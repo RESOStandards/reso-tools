@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page.title | default: site.title }}</title>
+  <meta name="description" content="{{ page.description | default: site.description }}">
+  {% seo %}
+  <style>
+    :root {
+      --reso-navy: #2d3748;
+      --reso-navy-dark: #1a202c;
+      --reso-green: #38a169;
+      --reso-green-light: #c6f6d5;
+      --reso-blue: #3182ce;
+      --reso-gray-50: #f7fafc;
+      --reso-gray-100: #edf2f7;
+      --reso-gray-200: #e2e8f0;
+      --reso-gray-300: #cbd5e0;
+      --reso-gray-500: #718096;
+      --reso-gray-600: #4a5568;
+      --reso-gray-700: #2d3748;
+      --reso-gray-800: #1a202c;
+      --reso-gray-900: #171923;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: var(--reso-gray-50);
+      color: var(--reso-gray-700);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    .site-header {
+      background: var(--reso-navy-dark);
+      padding: 0 1.5rem;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .site-header a { color: white; text-decoration: none; }
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+    .header-logo svg { height: 32px; width: auto; }
+    .header-nav { display: flex; gap: 1.5rem; align-items: center; }
+    .header-nav a {
+      font-size: 0.875rem;
+      font-weight: 500;
+      opacity: 0.85;
+      transition: opacity 0.15s;
+    }
+    .header-nav a:hover { opacity: 1; }
+
+    /* Main */
+    .site-main {
+      flex: 1;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    /* Cards */
+    .card {
+      background: white;
+      border: 1px solid var(--reso-gray-200);
+      border-radius: 0.5rem;
+      overflow: hidden;
+      transition: box-shadow 0.15s;
+    }
+    .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .card-header {
+      background: var(--reso-navy);
+      color: white;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-header h3 {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    .card-body { padding: 1.25rem; }
+
+    /* Badge */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-green {
+      background: var(--reso-green);
+      color: white;
+    }
+    .badge-blue {
+      background: var(--reso-blue);
+      color: white;
+    }
+    .badge-outline {
+      background: transparent;
+      border: 1px solid var(--reso-gray-300);
+      color: var(--reso-gray-600);
+    }
+
+    /* Package grid */
+    .package-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    @media (min-width: 768px) {
+      .package-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .package-item {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--reso-gray-100);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .package-item:last-child { border-bottom: none; }
+    .package-name {
+      font-weight: 600;
+      font-size: 0.9375rem;
+      color: var(--reso-gray-800);
+    }
+    .package-desc {
+      font-size: 0.8125rem;
+      color: var(--reso-gray-500);
+      margin-top: 0.25rem;
+      line-height: 1.5;
+    }
+    .package-meta {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .package-meta span {
+      font-size: 0.75rem;
+      color: var(--reso-gray-500);
+    }
+
+    /* View link */
+    .view-link {
+      font-size: 0.8125rem;
+      color: var(--reso-blue);
+      font-weight: 500;
+      white-space: nowrap;
+      text-decoration: none;
+    }
+    .view-link:hover { text-decoration: underline; }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 2rem 0 1rem;
+    }
+    .hero h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--reso-gray-800);
+      letter-spacing: -0.025em;
+    }
+    .hero p {
+      color: var(--reso-gray-500);
+      margin-top: 0.5rem;
+      font-size: 1rem;
+    }
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-top: 1.25rem;
+    }
+    .hero-stat {
+      text-align: center;
+    }
+    .hero-stat .number {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--reso-navy);
+    }
+    .hero-stat .label {
+      font-size: 0.75rem;
+      color: var(--reso-gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Section headings */
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--reso-gray-500);
+      margin-bottom: 0.75rem;
+    }
+    .section-group { margin-bottom: 2rem; }
+
+    /* Footer */
+    .site-footer {
+      background: var(--reso-navy-dark);
+      color: rgba(255,255,255,0.6);
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.8125rem;
+    }
+    .site-footer a { color: rgba(255,255,255,0.8); text-decoration: none; }
+    .site-footer a:hover { color: white; }
+
+    /* Markdown content */
+    .content h1, .content h2, .content h3 { margin-top: 1.5rem; margin-bottom: 0.75rem; color: var(--reso-gray-800); }
+    .content h1 { font-size: 1.5rem; }
+    .content h2 { font-size: 1.25rem; border-bottom: 1px solid var(--reso-gray-200); padding-bottom: 0.5rem; }
+    .content h3 { font-size: 1.1rem; }
+    .content p { margin-bottom: 0.75rem; }
+    .content pre {
+      background: var(--reso-gray-900);
+      color: #e2e8f0;
+      padding: 1rem;
+      border-radius: 0.375rem;
+      overflow-x: auto;
+      font-size: 0.8125rem;
+      margin-bottom: 1rem;
+    }
+    .content code {
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      font-size: 0.875em;
+    }
+    .content p code, .content li code {
+      background: var(--reso-gray-100);
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+      color: var(--reso-gray-700);
+    }
+    .content ul, .content ol { padding-left: 1.5rem; margin-bottom: 0.75rem; }
+    .content li { margin-bottom: 0.25rem; }
+    .content a { color: var(--reso-blue); }
+    .content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1rem;
+    }
+    .content th, .content td {
+      border: 1px solid var(--reso-gray-200);
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+    .content th { background: var(--reso-gray-100); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a href="{{ '/' | relative_url }}" class="header-logo">
+      <svg viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14.5 4L4 12l10.5 8L25 12 14.5 4z" fill="#38a169"/>
+        <path d="M14.5 16L4 24l10.5 8L25 24l-10.5-8z" fill="#38a169" opacity="0.6"/>
+        <text x="32" y="26" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif" font-size="20" font-weight="800" fill="white" letter-spacing="-0.5">RESO</text>
+      </svg>
+    </a>
+    <nav class="header-nav">
+      <a href="{{ '/' | relative_url }}">Home</a>
+      <a href="https://github.com/RESOStandards/reso-transport-tools">GitHub</a>
+      <a href="https://certification.reso.org">Certification</a>
+      <a href="https://reso.org">RESO.org</a>
+    </nav>
+  </header>
+
+  <main class="site-main">
+    {{ content }}
+  </main>
+
+  <footer class="site-footer">
+    <p>&copy; {{ 'now' | date: '%Y' }} <a href="https://reso.org">Real Estate Standards Organization (RESO)</a>. All rights reserved.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="https://github.com/RESOStandards/reso-transport-tools">Source</a> &middot;
+      <a href="https://certification.reso.org">Certification Analytics</a> &middot;
+      <a href="https://reso.org/reso-terms-of-use/">Terms of Use</a>
+    </p>
+  </footer>
+</body>
+</html>

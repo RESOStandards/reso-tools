@@ -1,0 +1,29 @@
+title: RESO Transport Tools
+description: Testing, client SDK, and reference implementation tools for the RESO Web API specification.
+url: https://tools.reso.org
+baseurl: ""
+
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+plugins:
+  - jekyll-seo-tag
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+
+collections:
+  packages:
+    output: true
+    permalink: /packages/:name/
+
+defaults:
+  - scope:
+      path: ""
+      type: "packages"
+    values:
+      layout: "package"

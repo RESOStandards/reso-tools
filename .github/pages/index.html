@@ -1,0 +1,172 @@
+---
+layout: default
+title: RESO Transport Tools
+---
+
+<div class="hero">
+  <h1>RESO Transport Tools</h1>
+  <p>Testing, client SDK, and reference implementation tools for the RESO Web API specification.</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="number">7</div>
+      <div class="label">Packages</div>
+    </div>
+    <div class="hero-stat">
+      <div class="number">433+</div>
+      <div class="label">Tests</div>
+    </div>
+    <div class="hero-stat">
+      <div class="number">3</div>
+      <div class="label">DB Backends</div>
+    </div>
+  </div>
+</div>
+
+<!-- Libraries -->
+<div class="section-group">
+  <div class="section-title">Libraries</div>
+  <div class="card">
+    <div class="card-header">
+      <h3>Core Libraries</h3>
+      <span class="badge badge-green">Stable</span>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso/validation</div>
+        <div class="package-desc">Isomorphic validation library for RESO metadata-driven field validation. Works in any JS runtime (Node.js, browser, edge).</div>
+        <div class="package-meta">
+          <span>41 tests</span>
+          <span>&middot;</span>
+          <span>Zero dependencies</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/validation' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso/odata-filter-parser</div>
+        <div class="package-desc">Standalone, zero-dependency library for parsing OData 4.01 $filter expressions into a typed AST.</div>
+        <div class="package-meta">
+          <span>97 tests</span>
+          <span>&middot;</span>
+          <span>Zero dependencies</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/odata-filter-parser' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso/odata-client</div>
+        <div class="package-desc">OData 4.01 client SDK for TypeScript. URI builder, CRUD helpers, CSDL metadata parsing, query validation, and response parsing.</div>
+        <div class="package-meta">
+          <span>101 tests</span>
+          <span>&middot;</span>
+          <span>Depends on odata-filter-parser</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/odata-client' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+  </div>
+</div>
+
+<!-- Tools -->
+<div class="section-group">
+  <div class="section-title">Tools</div>
+  <div class="card">
+    <div class="card-header">
+      <h3>Developer Tools</h3>
+      <span class="badge badge-blue">Tools</span>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso/data-generator</div>
+        <div class="package-desc">Generates realistic RESO Data Dictionary test data. Supports HTTP, JSON, and curl output modes with resource-specific generators.</div>
+        <div class="package-meta">
+          <span>69 tests</span>
+          <span>&middot;</span>
+          <span>CLI + Library</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/data-generator' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso/certification</div>
+        <div class="package-desc">RESO certification testing tools. Includes Web API Add/Edit (RCP-010) compliance testing against 8 Gherkin BDD scenarios.</div>
+        <div class="package-meta">
+          <span>49 tests</span>
+          <span>&middot;</span>
+          <span>Certification</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/certification' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+  </div>
+</div>
+
+<!-- Reference Server -->
+<div class="section-group">
+  <div class="section-title">Reference Implementation</div>
+  <div class="card">
+    <div class="card-header">
+      <h3>RESO Reference Server</h3>
+      <span class="badge badge-green">OData 4.01</span>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">reso-reference-server</div>
+        <div class="package-desc">
+          Metadata-driven OData 4.01 reference server with React UI.
+          Dynamically generates database tables, CRUD endpoints, EDMX metadata, and OpenAPI documentation
+          from the RESO Data Dictionary JSON metadata.
+        </div>
+        <div class="package-meta">
+          <span>76 tests</span>
+          <span>&middot;</span>
+          <span>PostgreSQL</span>
+          <span>&middot;</span>
+          <span>MongoDB</span>
+          <span>&middot;</span>
+          <span>SQLite</span>
+          <span>&middot;</span>
+          <span>Docker</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/reso-reference-server' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Start -->
+<div class="section-group">
+  <div class="section-title">Quick Start</div>
+  <div class="card">
+    <div class="card-body content">
+      <h3 style="margin-top: 0">Run the Reference Server</h3>
+<pre><code>git clone https://github.com/RESOStandards/reso-transport-tools.git
+cd reso-transport-tools/reso-reference-server
+docker compose up -d                      # Start server + PostgreSQL
+docker compose --profile seed up          # Seed with test data
+
+# Verify
+curl http://localhost:8080/health
+curl http://localhost:8080/\$metadata
+open http://localhost:8080/api-docs        # Swagger UI
+open http://localhost:5173                  # React UI</code></pre>
+
+      <h3>Run Certification Tests</h3>
+<pre><code>cd certification
+npx reso-cert-add-edit \
+  --url http://localhost:8080 \
+  --resource Property \
+  --payloads ./add-edit/sample-payloads \
+  --auth-token admin-token</code></pre>
+    </div>
+  </div>
+</div>
