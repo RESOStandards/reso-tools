@@ -1,0 +1,13 @@
+services:
+  ui:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/ui/Dockerfile
+      target: build
+    command: ["npx", "vite", "--config", "vite.config.docker.ts"]
+    volumes:
+      - ./ui/src:/app/src
+      - ./ui/index.html:/app/index.html
+      - ./ui/vite.config.docker.ts:/app/vite.config.docker.ts
+    environment:
+      NODE_ENV: development
