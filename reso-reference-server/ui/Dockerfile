@@ -15,7 +15,9 @@ RUN sed -i 's|file:../../validation|file:/deps/validation|' package.json && \
 RUN npm ci --ignore-scripts || npm install
 
 COPY reso-reference-server/ui/ ./
-RUN npm run build
+RUN cd /deps/validation && npm install && npx tsc && \
+    cd /deps/odata-filter-parser && npm install && npx tsc && \
+    cd /app && npx vite build
 
 # Stage 2: Serve with nginx
 FROM nginx:alpine
