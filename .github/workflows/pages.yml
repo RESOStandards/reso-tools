@@ -80,12 +80,11 @@ jobs:
           source: ./.github/pages
           destination: ./_site
 
-      - name: Copy DD docs into site
-        run: cp -r .github/pages/dd-output/* ./_site/dd/
-
       - name: Build search index with Pagefind
         run: |
           cp -r ./_site ./_site_searchable
+          mkdir -p ./_site_searchable/dd
+          cp -r .github/pages/dd-output/* ./_site_searchable/dd/
           npx pagefind --site ./_site_searchable
 
       - name: Upload artifact
