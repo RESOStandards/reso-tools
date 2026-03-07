@@ -58,7 +58,7 @@
       font-weight: 700;
       letter-spacing: -0.025em;
     }
-    .header-logo svg { height: 32px; width: auto; }
+    .header-logo img { height: 32px; width: auto; }
     .header-nav { display: flex; gap: 1.5rem; align-items: center; }
     .header-nav a {
       font-size: 0.875rem;
@@ -281,11 +281,7 @@
 <body>
   <header class="site-header">
     <a href="{{ '/' | relative_url }}" class="header-logo">
-      <svg viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M14.5 4L4 12l10.5 8L25 12 14.5 4z" fill="#38a169"/>
-        <path d="M14.5 16L4 24l10.5 8L25 24l-10.5-8z" fill="#38a169" opacity="0.6"/>
-        <text x="32" y="26" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif" font-size="20" font-weight="800" fill="white" letter-spacing="-0.5">RESO</text>
-      </svg>
+      <img src="{{ '/assets/reso-logo-white.png' | relative_url }}" alt="RESO" />
     </a>
     <nav class="header-nav">
       <a href="{{ '/' | relative_url }}">Home</a>
