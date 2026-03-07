@@ -14,7 +14,7 @@ services:
       DB_BACKEND: postgres
       DATABASE_URL: postgresql://reso:reso@db:5432/reso_reference
       METADATA_PATH: ./server-metadata.json
-      BASE_URL: http://localhost:8080
+      BASE_URL: http://server:8080
       ENUM_MODE: string
       ENTITY_EVENT: ${ENTITY_EVENT:-false}
     depends_on:
@@ -108,7 +108,7 @@ services:
       DB_BACKEND: mongodb
       MONGODB_URL: mongodb://mongodb:27017/reso_reference
       METADATA_PATH: ./server-metadata.json
-      BASE_URL: http://localhost:8080
+      BASE_URL: http://server-mongo:8080
       ENUM_MODE: string
       ENTITY_EVENT: ${ENTITY_EVENT:-false}
     depends_on:
@@ -176,7 +176,7 @@ services:
       DB_BACKEND: sqlite
       SQLITE_DB_PATH: /data/reso_reference.db
       METADATA_PATH: ./server-metadata.json
-      BASE_URL: http://localhost:8080
+      BASE_URL: http://server-sqlite:8080
       ENUM_MODE: string
       ENTITY_EVENT: ${ENTITY_EVENT:-false}
     volumes:
@@ -360,6 +360,164 @@ services:
       - compliance-core-sqlite
 
   # ---------------------------------------------------------------------------
+  # Compliance: EntityEvent RCP-027 (PostgreSQL)
+  # Usage: docker compose --profile compliance-entity-event up --build --exit-code-from compliance-entity-event
+  # ---------------------------------------------------------------------------
+  db-entity-event:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: reso
+      POSTGRES_PASSWORD: reso
+      POSTGRES_DB: reso_entity_event
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reso -d reso_entity_event"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - compliance-entity-event
+
+  server-entity-event:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/server/Dockerfile
+    environment:
+      PORT: 8080
+      DB_BACKEND: postgres
+      DATABASE_URL: postgresql://reso:reso@db-entity-event:5432/reso_entity_event
+      METADATA_PATH: ./server-metadata.json
+      BASE_URL: http://server-entity-event:8080
+      ENUM_MODE: string
+      ENTITY_EVENT: "true"
+    depends_on:
+      db-entity-event:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    profiles:
+      - compliance-entity-event
+
+  compliance-entity-event:
+    build:
+      context: ..
+      dockerfile: certification/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-entity-event.sh"]
+    environment:
+      SERVER_URL: http://server-entity-event:8080
+      AUTH_TOKEN: admin-token
+      MODE: full
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server-entity-event:
+        condition: service_healthy
+    profiles:
+      - compliance-entity-event
+
+  # ---------------------------------------------------------------------------
+  # Compliance: EntityEvent RCP-027 (MongoDB)
+  # Usage: docker compose --profile compliance-entity-event-mongo up --build --exit-code-from compliance-entity-event-mongo
+  # ---------------------------------------------------------------------------
+  mongodb-entity-event:
+    image: mongo:7
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - compliance-entity-event-mongo
+
+  server-entity-event-mongo:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/server/Dockerfile
+    environment:
+      PORT: 8080
+      DB_BACKEND: mongodb
+      MONGODB_URL: mongodb://mongodb-entity-event:27017/reso_entity_event
+      METADATA_PATH: ./server-metadata.json
+      BASE_URL: http://server-entity-event-mongo:8080
+      ENUM_MODE: string
+      ENTITY_EVENT: "true"
+    depends_on:
+      mongodb-entity-event:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    profiles:
+      - compliance-entity-event-mongo
+
+  compliance-entity-event-mongo:
+    build:
+      context: ..
+      dockerfile: certification/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-entity-event.sh"]
+    environment:
+      SERVER_URL: http://server-entity-event-mongo:8080
+      AUTH_TOKEN: admin-token
+      MODE: full
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server-entity-event-mongo:
+        condition: service_healthy
+    profiles:
+      - compliance-entity-event-mongo
+
+  # ---------------------------------------------------------------------------
+  # Compliance: EntityEvent RCP-027 (SQLite)
+  # Usage: docker compose --profile compliance-entity-event-sqlite up --build --exit-code-from compliance-entity-event-sqlite
+  # ---------------------------------------------------------------------------
+  server-entity-event-sqlite:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/server/Dockerfile
+    environment:
+      PORT: 8080
+      DB_BACKEND: sqlite
+      SQLITE_DB_PATH: /data/reso_entity_event.db
+      METADATA_PATH: ./server-metadata.json
+      BASE_URL: http://server-entity-event-sqlite:8080
+      ENUM_MODE: string
+      ENTITY_EVENT: "true"
+    volumes:
+      - sqlitedata-entity-event:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    profiles:
+      - compliance-entity-event-sqlite
+
+  compliance-entity-event-sqlite:
+    build:
+      context: ..
+      dockerfile: certification/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-entity-event.sh"]
+    environment:
+      SERVER_URL: http://server-entity-event-sqlite:8080
+      AUTH_TOKEN: admin-token
+      MODE: full
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server-entity-event-sqlite:
+        condition: service_healthy
+    profiles:
+      - compliance-entity-event-sqlite
+
+  # ---------------------------------------------------------------------------
   # Compliance: Add/Edit RCP-010 (ephemeral PostgreSQL)
   # Usage: docker compose --profile compliance-addedit up --build --exit-code-from compliance-addedit
   # ---------------------------------------------------------------------------
@@ -421,6 +579,7 @@ volumes:
   pgdata:
   mongodata:
   sqlitedata:
+  sqlitedata-entity-event:
   compliance-dd-results:
   compliance-core-results:
   compliance-dd-mongo-results:

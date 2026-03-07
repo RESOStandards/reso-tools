@@ -4,7 +4,7 @@ import type { Response } from 'express';
 export interface ODataHeaderOptions {
   readonly entityId?: string;
   readonly locationUrl?: string;
-  readonly preferenceApplied?: 'return=representation' | 'return=minimal';
+  readonly preferenceApplied?: string;
 }
 
 /** Sets standard OData 4.01 response headers on an Express response. */
