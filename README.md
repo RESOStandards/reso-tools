@@ -14,12 +14,12 @@ Isomorphic validation library for RESO metadata-driven field validation. Works i
 cd validation && npm install && npm test  # 41 tests
 ```
 
-#### [@reso/odata-filter-parser](odata-filter-parser/)
+#### [@reso/odata-expression-parser](odata-expression-parser/)
 
 Standalone, zero-dependency library for parsing OData 4.01 `$filter` expressions into a typed AST. Used by both the client SDK (query validation) and the reference server (SQL translation).
 
 ```bash
-cd odata-filter-parser && npm install && npm test  # 97 tests
+cd odata-expression-parser && npm install && npm test  # 97 tests
 ```
 
 #### [@reso/odata-client](odata-client/)
@@ -122,10 +122,10 @@ docker-compose --profile seed up
 Packages have `file:` dependencies. Build in this order:
 
 1. `validation` — no dependencies
-2. `odata-filter-parser` — no dependencies
-3. `odata-client` — depends on `odata-filter-parser`
+2. `odata-expression-parser` — no dependencies
+3. `odata-client` — depends on `odata-expression-parser`
 4. `data-generator` — no package dependencies (uses metadata from server at runtime)
-5. `reso-reference-server/server` — depends on `validation` + `odata-filter-parser` + `data-generator`
+5. `reso-reference-server/server` — depends on `validation` + `odata-expression-parser` + `data-generator`
 6. `certification/test-runner` — depends on `odata-client` + `validation`
 7. `certification/add-edit` — depends on `certification/test-runner` + `odata-client` + `validation`
 

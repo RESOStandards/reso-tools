@@ -11,7 +11,7 @@ pre-commit:
       priority: 1
 
     typecheck-filter-parser:
-      root: "tools/odata-filter-parser/"
+      root: "tools/odata-expression-parser/"
       run: npx tsc --noEmit
       priority: 1
 
@@ -46,7 +46,7 @@ pre-commit:
       priority: 3
 
     test-filter-parser:
-      root: "tools/odata-filter-parser/"
+      root: "tools/odata-expression-parser/"
       run: npx vitest run
       priority: 3
 

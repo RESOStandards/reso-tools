@@ -1,7 +1,7 @@
 # Build stage
 #
 # NOTE: Build context is the tools/ directory so that all file: dependencies
-# (odata-filter-parser, validation, data-generator) can be resolved.
+# (odata-expression-parser, validation, data-generator) can be resolved.
 #
 # From docker-compose: context is set to .. (tools/)
 # Standalone: docker build -f reso-reference-server/server/Dockerfile .
@@ -10,13 +10,13 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 # Copy file: dependencies
-COPY odata-filter-parser/ /deps/odata-filter-parser/
+COPY odata-expression-parser/ /deps/odata-expression-parser/
 COPY validation/ /deps/validation/
 COPY data-generator/package.json data-generator/tsconfig.json /deps/data-generator/
 COPY data-generator/src/ /deps/data-generator/src/
 
 # Build file: dependencies (server depends on these)
-WORKDIR /deps/odata-filter-parser
+WORKDIR /deps/odata-expression-parser
 RUN npm install && npx tsc
 
 WORKDIR /deps/validation
@@ -31,7 +31,7 @@ WORKDIR /app
 COPY reso-reference-server/server/package.json reso-reference-server/server/package-lock.json* ./
 
 # Rewrite file: dependency paths for the Docker build context
-RUN sed -i 's|file:../../odata-filter-parser|file:/deps/odata-filter-parser|' package.json \
+RUN sed -i 's|file:../../odata-expression-parser|file:/deps/odata-expression-parser|' package.json \
  && sed -i 's|file:../../validation|file:/deps/validation|' package.json \
  && sed -i 's|file:../../data-generator|file:/deps/data-generator|' package.json
 
@@ -47,7 +47,7 @@ FROM node:22-alpine
 WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /deps/odata-filter-parser /deps/odata-filter-parser
+COPY --from=build /deps/odata-expression-parser /deps/odata-expression-parser
 COPY --from=build /deps/validation /deps/validation
 COPY --from=build /deps/data-generator /deps/data-generator
 COPY reso-reference-server/server/package.json ./

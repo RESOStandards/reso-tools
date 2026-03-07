@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "fast-xml-parser": "^5.2.0",
-    "@reso/odata-filter-parser": "file:../odata-filter-parser"
+    "@reso/odata-expression-parser": "file:../odata-expression-parser"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

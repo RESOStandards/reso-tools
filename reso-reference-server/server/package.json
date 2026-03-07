@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@reso/data-generator": "file:../../data-generator",
-    "@reso/odata-filter-parser": "file:../../odata-filter-parser",
+    "@reso/odata-expression-parser": "file:../../odata-expression-parser",
     "@reso/validation": "file:../../validation",
     "better-sqlite3": "^11.0.0",
     "express": "^4.21.0",

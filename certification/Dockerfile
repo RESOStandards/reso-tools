@@ -3,12 +3,12 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 # Copy workspace dependencies (same resolution chain as the server Dockerfile)
-COPY odata-filter-parser/ /deps/odata-filter-parser/
+COPY odata-expression-parser/ /deps/odata-expression-parser/
 COPY validation/ /deps/validation/
 COPY odata-client/ /deps/odata-client/
 
-# Build odata-filter-parser
-WORKDIR /deps/odata-filter-parser
+# Build odata-expression-parser
+WORKDIR /deps/odata-expression-parser
 RUN npm install && npm run build
 
 # Build validation
@@ -18,7 +18,7 @@ RUN npm install && npm run build
 # Build odata-client (depends on filter-parser + validation)
 WORKDIR /deps/odata-client
 RUN rm -f package-lock.json \
- && sed -i 's|file:../odata-filter-parser|file:/deps/odata-filter-parser|' package.json \
+ && sed -i 's|file:../odata-expression-parser|file:/deps/odata-expression-parser|' package.json \
  && sed -i 's|file:../validation|file:/deps/validation|' package.json \
  && npm install && npm run build
 
@@ -47,7 +47,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./
 COPY --from=build /app/sample-payloads ./sample-payloads
 COPY --from=build /app/sample-metadata.xml ./
-COPY --from=build /deps/odata-filter-parser /deps/odata-filter-parser
+COPY --from=build /deps/odata-expression-parser /deps/odata-expression-parser
 COPY --from=build /deps/validation /deps/validation
 COPY --from=build /deps/odata-client /deps/odata-client
 

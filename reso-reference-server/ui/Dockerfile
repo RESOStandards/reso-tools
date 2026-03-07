@@ -4,19 +4,19 @@ WORKDIR /app
 
 # Copy file: dependencies
 COPY validation/ /deps/validation/
-COPY odata-filter-parser/ /deps/odata-filter-parser/
+COPY odata-expression-parser/ /deps/odata-expression-parser/
 
 COPY reso-reference-server/ui/package.json reso-reference-server/ui/package-lock.json* ./
 
 # Rewrite file: dependency paths for the Docker build context
 RUN sed -i 's|file:../../validation|file:/deps/validation|' package.json && \
-    sed -i 's|file:../../odata-filter-parser|file:/deps/odata-filter-parser|' package.json
+    sed -i 's|file:../../odata-expression-parser|file:/deps/odata-expression-parser|' package.json
 
 RUN npm ci --ignore-scripts || npm install
 
 COPY reso-reference-server/ui/ ./
 RUN cd /deps/validation && npm install && npx tsc && \
-    cd /deps/odata-filter-parser && npm install && npx tsc && \
+    cd /deps/odata-expression-parser && npm install && npx tsc && \
     cd /app && npx vite build
 
 # Stage 2: Serve with nginx

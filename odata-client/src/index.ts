@@ -101,7 +101,7 @@ export { isODataError, parseODataError, getErrorTargets } from './response/error
 // Metadata fetcher
 export { fetchRawMetadata, fetchAndParseMetadata } from './metadata/fetcher.js';
 
-// Re-export filter parser types for convenience
+// Re-export expression parser types for convenience
 export type {
   FilterExpression,
   ComparisonExpr,
@@ -112,6 +112,8 @@ export type {
   LambdaExpr,
   CollectionExpr,
   LiteralExpr,
-  PropertyExpr
-} from '@reso/odata-filter-parser';
-export { parseFilter } from '@reso/odata-filter-parser';
+  PropertyExpr,
+  ExpandExpression,
+  ExpandQueryOptions
+} from '@reso/odata-expression-parser';
+export { parseFilter, parseExpand } from '@reso/odata-expression-parser';

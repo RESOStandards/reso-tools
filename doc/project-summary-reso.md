@@ -70,7 +70,7 @@ Docker-based integration with the RESO Commander and a custom Add/Edit test runn
 | Package | Description |
 |---------|-------------|
 | `@reso/validation` | Isomorphic field + cross-field validation rules (browser & server) |
-| `odata-filter-parser` | Standalone OData `$filter` expression parser, zero dependencies |
+| `odata-expression-parser` | Standalone OData `$filter` expression parser, zero dependencies |
 | `odata-client` | OData 4.01 client SDK with type-safe query building |
 
 ---

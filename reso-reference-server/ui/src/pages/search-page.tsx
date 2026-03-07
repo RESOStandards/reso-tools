@@ -1,4 +1,4 @@
-import { LexerError, ParseError, parseFilter } from '@reso/odata-filter-parser';
+import { LexerError, ParseError, parseFilter } from '@reso/odata-expression-parser';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { AdvancedSearch } from '../components/advanced-search';

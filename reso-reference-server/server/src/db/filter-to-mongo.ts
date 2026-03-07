@@ -1,7 +1,7 @@
 /**
  * Translates an OData $filter expression into a MongoDB query document.
  *
- * Uses the shared @reso/odata-filter-parser library to parse the filter string
+ * Uses the shared @reso/odata-expression-parser library to parse the filter string
  * into an AST, then walks the tree to produce a MongoDB query.
  *
  * Two translation modes:
@@ -11,8 +11,8 @@
  *   contexts. Used when comparisons involve functions or arithmetic.
  */
 
-import { parseFilter } from '@reso/odata-filter-parser';
-import type { FilterExpression } from '@reso/odata-filter-parser';
+import { parseFilter } from '@reso/odata-expression-parser';
+import type { FilterExpression } from '@reso/odata-expression-parser';
 import type { ResoField } from '../metadata/types.js';
 
 /** Result of translating a $filter expression to a MongoDB query. */

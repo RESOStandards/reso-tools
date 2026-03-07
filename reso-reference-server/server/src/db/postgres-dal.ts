@@ -2,10 +2,12 @@
  * PostgreSQL implementation of the Data Access Layer.
  *
  * Uses LEFT JOINs for $expand resolution with app-side grouping to nest
- * expanded navigation properties into their parent entities.
+ * expanded navigation properties into their parent entities. Supports
+ * multi-level $expand via recursive sub-query resolution.
  */
 
 import type pg from 'pg';
+import type { ExpandExpression } from '@reso/odata-expression-parser';
 import type { ResoField } from '../metadata/types.js';
 import type {
   CollectionQueryOptions,
@@ -16,6 +18,8 @@ import type {
   ResourceContext,
   SingleResult
 } from './data-access.js';
+import { MAX_EXPAND_DEPTH } from './data-access.js';
+import { applyExpandSelect } from './expand-select.js';
 import { filterToSql } from './filter-to-sql.js';
 import { deserializeRow } from './queries.js';
 
@@ -55,16 +59,34 @@ const parseOrderBy = (orderby: string, fields: ReadonlyArray<ResoField>, tableAl
     .join(', ');
 };
 
-/** Parse a $expand string into navigation property names. */
-const parseExpand = (expand: string): ReadonlyArray<string> =>
-  expand
-    .split(',')
-    .map(s => {
-      // Strip any parenthesized options for now (single-level only)
-      const parenIdx = s.indexOf('(');
-      return (parenIdx >= 0 ? s.slice(0, parenIdx) : s).trim();
-    })
-    .filter(s => s.length > 0);
+/**
+ * Resolve expand expressions to navigation property bindings.
+ * Returns top-level binding + alias pairs, preserving the parsed expand
+ * tree for recursive resolution.
+ */
+const resolveExpandBindings = (
+  expandTree: ReadonlyArray<ExpandExpression>,
+  navigationBindings: ReadonlyArray<NavigationPropertyBinding>
+): ReadonlyArray<{
+  readonly binding: NavigationPropertyBinding;
+  readonly alias: string;
+  readonly expandExpr: ExpandExpression;
+}> => {
+  const bindingMap = new Map(navigationBindings.map(b => [b.name, b]));
+  const result: Array<{
+    readonly binding: NavigationPropertyBinding;
+    readonly alias: string;
+    readonly expandExpr: ExpandExpression;
+  }> = [];
+
+  for (const expr of expandTree) {
+    const binding = bindingMap.get(expr.property);
+    if (!binding) continue;
+    result.push({ binding, alias: `nav_${expr.property}`, expandExpr: expr });
+  }
+
+  return result;
+};
 
 /**
  * Build the SELECT column list for the parent resource, optionally
@@ -242,6 +264,189 @@ const groupRows = (
 };
 
 // ---------------------------------------------------------------------------
+// Recursive expand resolution
+// ---------------------------------------------------------------------------
+
+/**
+ * Recursively resolve nested $expand on already-grouped entities.
+ * After level-1 JOINs produce grouped entities, this function handles
+ * level-2+ by issuing sub-queries for each child navigation property.
+ */
+const resolveNestedExpand = async (
+  pool: pg.Pool,
+  entities: ReadonlyArray<EntityRecord>,
+  expandBindings: ReadonlyArray<{
+    readonly binding: NavigationPropertyBinding;
+    readonly expandExpr: ExpandExpression;
+  }>,
+  resolveChildContext: ((resource: string) => ResourceContext | undefined) | undefined,
+  depth: number
+): Promise<ReadonlyArray<EntityRecord>> => {
+  if (!resolveChildContext || depth >= MAX_EXPAND_DEPTH) return entities;
+
+  const result: EntityRecord[] = [];
+
+  for (const entity of entities) {
+    const expanded: Record<string, unknown> = { ...entity };
+
+    for (const { binding, expandExpr } of expandBindings) {
+      const nestedExpand = expandExpr.options.$expand;
+      if (!nestedExpand || nestedExpand.length === 0) continue;
+
+      const childCtx = resolveChildContext(binding.targetResource);
+      if (!childCtx) continue;
+
+      const childBindings = resolveExpandBindings(nestedExpand, childCtx.navigationBindings);
+      if (childBindings.length === 0) continue;
+
+      // Get the child entities (already resolved at this level)
+      const children = expanded[binding.name];
+      if (!children) continue;
+
+      const childEntities = binding.isCollection
+        ? (children as ReadonlyArray<EntityRecord>)
+        : [children as EntityRecord];
+
+      if (childEntities.length === 0) continue;
+
+      // For each child entity, resolve its nested expansions via sub-queries
+      const expandedChildren = await resolveChildExpand(
+        pool,
+        childCtx,
+        childEntities,
+        childBindings,
+        depth + 1
+      );
+
+      expanded[binding.name] = binding.isCollection ? expandedChildren : (expandedChildren[0] ?? null);
+    }
+
+    result.push(expanded);
+  }
+
+  return result;
+};
+
+/**
+ * Resolve $expand for a set of child entities by issuing batch sub-queries
+ * (same strategy as level-1 but scoped to the child resource context).
+ */
+const resolveChildExpand = async (
+  pool: pg.Pool,
+  childCtx: ResourceContext,
+  childEntities: ReadonlyArray<EntityRecord>,
+  expandBindings: ReadonlyArray<{
+    readonly binding: NavigationPropertyBinding;
+    readonly alias: string;
+    readonly expandExpr: ExpandExpression;
+  }>,
+  depth: number
+): Promise<ReadonlyArray<EntityRecord>> => {
+  if (childEntities.length === 0) return childEntities;
+
+  // Collect all child keys
+  const childKeys = childEntities.map(e => String(e[childCtx.keyField] ?? ''));
+
+  // For each nav binding, issue a batch query and group by child key
+  const navResults = new Map<string, Map<string, Record<string, unknown>[]>>();
+
+  for (const { binding } of expandBindings) {
+    const fk = binding.foreignKey;
+    const targetFields = binding.targetFields.filter(f => !f.isExpansion);
+    const selectCols = targetFields.map(f => `"${f.fieldName}"`).join(', ');
+
+    let sql: string;
+    let values: unknown[];
+
+    if (fk.strategy === 'resource-record-key') {
+      sql = `SELECT ${selectCols} FROM "${binding.targetResource}" WHERE "ResourceName" = $1 AND "ResourceRecordKey" = ANY($2)`;
+      values = [childCtx.resource, childKeys];
+    } else if (fk.strategy === 'parent-fk') {
+      const fkColumn = fk.parentColumn!;
+      const fkValues = [...new Set(childEntities.map(e => String(e[fkColumn] ?? '')).filter(v => v.length > 0))];
+      sql = `SELECT ${selectCols} FROM "${binding.targetResource}" WHERE "${binding.targetKeyField}" = ANY($1)`;
+      values = [fkValues];
+    } else {
+      const targetCol = fk.targetColumn ?? childCtx.keyField;
+      sql = `SELECT ${selectCols} FROM "${binding.targetResource}" WHERE "${targetCol}" = ANY($1)`;
+      values = [childKeys];
+    }
+
+    const result = await pool.query(sql, values);
+    const grouped = new Map<string, Record<string, unknown>[]>();
+
+    for (const row of result.rows as Record<string, unknown>[]) {
+      const deserialized = deserializeRow(row, [...binding.targetFields]);
+
+      let parentKey: string;
+      if (fk.strategy === 'resource-record-key') {
+        parentKey = String(row.ResourceRecordKey ?? '');
+      } else if (fk.strategy === 'parent-fk') {
+        // For parent-fk, we need to map target key back to parent entities
+        const targetKeyVal = String(deserialized[binding.targetKeyField] ?? '');
+        // Find which child entities reference this target
+        const fkColumn = fk.parentColumn!;
+        for (const child of childEntities) {
+          if (String(child[fkColumn] ?? '') === targetKeyVal) {
+            parentKey = String(child[childCtx.keyField] ?? '');
+            if (!grouped.has(parentKey)) grouped.set(parentKey, []);
+            grouped.get(parentKey)!.push(deserialized);
+          }
+        }
+        continue;
+      } else {
+        const targetCol = fk.targetColumn ?? childCtx.keyField;
+        parentKey = String(row[targetCol] ?? '');
+      }
+
+      if (!grouped.has(parentKey)) grouped.set(parentKey, []);
+      grouped.get(parentKey)!.push(deserialized);
+    }
+
+    navResults.set(binding.name, grouped);
+  }
+
+  // Stitch nav results into child entities
+  const stitched: ReadonlyArray<EntityRecord> = childEntities.map(child => {
+    const childKey = String(child[childCtx.keyField] ?? '');
+    const entity: Record<string, unknown> = { ...child };
+
+    for (const { binding } of expandBindings) {
+      const grouped = navResults.get(binding.name);
+      const related = grouped?.get(childKey) ?? [];
+
+      if (binding.isCollection) {
+        const seen = new Set<string>();
+        entity[binding.name] = related.filter(r => {
+          const k = String(r[binding.targetKeyField] ?? '');
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+      } else {
+        entity[binding.name] = related[0] ?? null;
+      }
+    }
+
+    return entity;
+  });
+
+  // Recurse for deeper levels before applying $select
+  const nestedBindings = expandBindings.filter(({ expandExpr }) =>
+    expandExpr.options.$expand && expandExpr.options.$expand.length > 0
+  );
+
+  if (nestedBindings.length > 0 && childCtx.resolveChildContext) {
+    return applyExpandSelect(
+      await resolveNestedExpand(pool, stitched, nestedBindings, childCtx.resolveChildContext, depth),
+      expandBindings
+    );
+  }
+
+  return applyExpandSelect(stitched, expandBindings);
+};
+
+// ---------------------------------------------------------------------------
 // PostgreSQL DAL implementation
 // ---------------------------------------------------------------------------
 
@@ -264,21 +469,9 @@ export const createPostgresDal = (pool: pg.Pool): DataAccessLayer => {
     }
 
     // Resolve $expand bindings (before building SELECT so FK columns can be included)
-    const expandBindings: Array<{
-      readonly binding: NavigationPropertyBinding;
-      readonly alias: string;
-    }> = [];
-
-    if (options?.$expand) {
-      const expandNames = parseExpand(options.$expand);
-      const bindingMap = new Map(ctx.navigationBindings.map(b => [b.name, b]));
-
-      for (const name of expandNames) {
-        const binding = bindingMap.get(name);
-        if (!binding) continue;
-        expandBindings.push({ binding, alias: `nav_${name}` });
-      }
-    }
+    const expandBindings = options?.$expand
+      ? resolveExpandBindings(options.$expand, ctx.navigationBindings)
+      : [];
 
     // Build SELECT columns for parent — include FK columns needed for $expand JOINs
     let expandSelect = options?.$select;
@@ -399,7 +592,19 @@ export const createPostgresDal = (pool: pg.Pool): DataAccessLayer => {
         count = Number(rows[0].__total_count);
       }
 
-      const entities = groupRows(rows, parentAlias, ctx.keyField, ctx.fields, selectedFields, expandBindings);
+      let entities = groupRows(rows, parentAlias, ctx.keyField, ctx.fields, selectedFields, expandBindings);
+
+      // Resolve nested $expand (level 2+) before applying $select — nested
+      // resolution may need FK columns that $select would strip.
+      const nestedBindings = expandBindings.filter(({ expandExpr }) =>
+        expandExpr.options.$expand && expandExpr.options.$expand.length > 0
+      );
+      if (nestedBindings.length > 0) {
+        entities = await resolveNestedExpand(pool, entities, nestedBindings, ctx.resolveChildContext, 1);
+      }
+
+      entities = applyExpandSelect(entities, expandBindings);
+
       return { value: entities, ...(count !== undefined ? { count } : {}) };
     }
 
@@ -439,7 +644,7 @@ export const createPostgresDal = (pool: pg.Pool): DataAccessLayer => {
   const readByKey = async (
     ctx: ResourceContext,
     keyValue: string,
-    options?: { readonly $select?: string; readonly $expand?: string }
+    options?: { readonly $select?: string; readonly $expand?: ReadonlyArray<ExpandExpression> }
   ): Promise<SingleResult> => {
     // If $expand is requested, delegate to queryCollection with a key filter
     if (options?.$expand) {

@@ -1,7 +1,7 @@
 # Project Core Principles
 - **Style:** Functional & Declarative.
 - **TypeScript:** ESM (`import`/`export`), strict mode enabled.
-- **Goal:** Zero-dependency OData $filter parser producing a typed AST.
+- **Goal:** Zero-dependency OData expression parsers ($filter, $expand) producing typed ASTs.
 
 # Coding Standards
 - **Paradigm:** Use functional programming patterns (`map`, `filter`, `reduce`, `flatMap`).

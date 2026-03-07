@@ -3,13 +3,15 @@
  *
  * Uses LEFT JOINs for $expand resolution with app-side grouping to nest
  * expanded navigation properties into their parent entities, mirroring
- * the PostgreSQL implementation pattern.
+ * the PostgreSQL implementation pattern. Supports multi-level $expand
+ * via recursive sub-query resolution.
  *
  * better-sqlite3 is synchronous — methods return Promise-wrapped results
  * to conform to the async DataAccessLayer interface.
  */
 
 import type Database from 'better-sqlite3';
+import type { ExpandExpression } from '@reso/odata-expression-parser';
 import type { ResoField } from '../metadata/types.js';
 import type {
   CollectionQueryOptions,
@@ -20,6 +22,8 @@ import type {
   ResourceContext,
   SingleResult
 } from './data-access.js';
+import { MAX_EXPAND_DEPTH } from './data-access.js';
+import { applyExpandSelect } from './expand-select.js';
 import { filterToSqlite } from './filter-to-sqlite.js';
 import { deserializeRow } from './queries.js';
 
@@ -81,15 +85,32 @@ const parseOrderBy = (orderby: string, fields: ReadonlyArray<ResoField>, tableAl
     .join(', ');
 };
 
-/** Parse a $expand string into navigation property names. */
-const parseExpand = (expand: string): ReadonlyArray<string> =>
-  expand
-    .split(',')
-    .map(s => {
-      const parenIdx = s.indexOf('(');
-      return (parenIdx >= 0 ? s.slice(0, parenIdx) : s).trim();
-    })
-    .filter(s => s.length > 0);
+/**
+ * Resolve expand expressions to navigation property bindings.
+ */
+const resolveExpandBindings = (
+  expandTree: ReadonlyArray<ExpandExpression>,
+  navigationBindings: ReadonlyArray<NavigationPropertyBinding>
+): ReadonlyArray<{
+  readonly binding: NavigationPropertyBinding;
+  readonly alias: string;
+  readonly expandExpr: ExpandExpression;
+}> => {
+  const bindingMap = new Map(navigationBindings.map(b => [b.name, b]));
+  const result: Array<{
+    readonly binding: NavigationPropertyBinding;
+    readonly alias: string;
+    readonly expandExpr: ExpandExpression;
+  }> = [];
+
+  for (const expr of expandTree) {
+    const binding = bindingMap.get(expr.property);
+    if (!binding) continue;
+    result.push({ binding, alias: `nav_${expr.property}`, expandExpr: expr });
+  }
+
+  return result;
+};
 
 /**
  * Build the SELECT column list for the parent resource, optionally
@@ -145,7 +166,6 @@ const buildExpandJoin = (
       `LEFT JOIN "${binding.targetResource}" ${navAlias} ` + `ON ${navAlias}."${binding.targetKeyField}" = ${parentAlias}."${parentCol}"`
     );
   }
-  // direct FK — target has parent's key field
   const targetCol = fk.targetColumn ?? parentKeyField;
   return `LEFT JOIN "${binding.targetResource}" ${navAlias} ` + `ON ${navAlias}."${targetCol}" = ${parentAlias}."${parentKeyField}"`;
 };
@@ -154,7 +174,6 @@ const buildExpandJoin = (
 // Row grouping — collapse LEFT JOIN results into nested entities
 // ---------------------------------------------------------------------------
 
-/** Extract parent-level columns from a flat row. */
 const extractParentColumns = (row: Record<string, unknown>, alias: string, fields: ReadonlyArray<ResoField>): Record<string, unknown> => {
   const prefix = `${alias}.`;
   const result: Record<string, unknown> = {};
@@ -167,7 +186,6 @@ const extractParentColumns = (row: Record<string, unknown>, alias: string, field
   return result;
 };
 
-/** Extract navigation property columns from a flat row. */
 const extractNavColumns = (
   row: Record<string, unknown>,
   navAlias: string,
@@ -188,9 +206,6 @@ const extractNavColumns = (
   return hasNonNull ? result : undefined;
 };
 
-/**
- * Group flat JOIN result rows into parent entities with nested navprops.
- */
 const groupRows = (
   rows: ReadonlyArray<Record<string, unknown>>,
   parentAlias: string,
@@ -202,13 +217,7 @@ const groupRows = (
     readonly alias: string;
   }>
 ): ReadonlyArray<EntityRecord> => {
-  const grouped = new Map<
-    string,
-    {
-      parent: Record<string, unknown>;
-      navs: Map<string, Record<string, unknown>[]>;
-    }
-  >();
+  const grouped = new Map<string, { parent: Record<string, unknown>; navs: Map<string, Record<string, unknown>[]> }>();
 
   for (const row of rows) {
     const parentData = extractParentColumns(row, parentAlias, selectedFields);
@@ -239,13 +248,12 @@ const groupRows = (
       const navRows = navs.get(binding.name) ?? [];
       if (binding.isCollection) {
         const seen = new Set<string>();
-        const unique = navRows.filter(r => {
+        entity[binding.name] = navRows.filter(r => {
           const k = String(r[binding.targetKeyField] ?? '');
           if (seen.has(k)) return false;
           seen.add(k);
           return true;
         });
-        entity[binding.name] = unique;
       } else {
         entity[binding.name] = navRows[0] ?? null;
       }
@@ -254,6 +262,166 @@ const groupRows = (
   }
 
   return result;
+};
+
+// ---------------------------------------------------------------------------
+// Recursive expand resolution
+// ---------------------------------------------------------------------------
+
+const resolveNestedExpand = (
+  database: Database.Database,
+  entities: ReadonlyArray<EntityRecord>,
+  expandBindings: ReadonlyArray<{
+    readonly binding: NavigationPropertyBinding;
+    readonly expandExpr: ExpandExpression;
+  }>,
+  resolveChildContext: ((resource: string) => ResourceContext | undefined) | undefined,
+  depth: number
+): ReadonlyArray<EntityRecord> => {
+  if (!resolveChildContext || depth >= MAX_EXPAND_DEPTH) return entities;
+
+  const result: EntityRecord[] = [];
+
+  for (const entity of entities) {
+    const expanded: Record<string, unknown> = { ...entity };
+
+    for (const { binding, expandExpr } of expandBindings) {
+      const nestedExpand = expandExpr.options.$expand;
+      if (!nestedExpand || nestedExpand.length === 0) continue;
+
+      const childCtx = resolveChildContext(binding.targetResource);
+      if (!childCtx) continue;
+
+      const childBindings = resolveExpandBindings(nestedExpand, childCtx.navigationBindings);
+      if (childBindings.length === 0) continue;
+
+      const children = expanded[binding.name];
+      if (!children) continue;
+
+      const childEntities = binding.isCollection
+        ? (children as ReadonlyArray<EntityRecord>)
+        : [children as EntityRecord];
+
+      if (childEntities.length === 0) continue;
+
+      const expandedChildren = resolveChildExpand(database, childCtx, childEntities, childBindings, depth + 1);
+      expanded[binding.name] = binding.isCollection ? expandedChildren : (expandedChildren[0] ?? null);
+    }
+
+    result.push(expanded);
+  }
+
+  return result;
+};
+
+const resolveChildExpand = (
+  database: Database.Database,
+  childCtx: ResourceContext,
+  childEntities: ReadonlyArray<EntityRecord>,
+  expandBindings: ReadonlyArray<{
+    readonly binding: NavigationPropertyBinding;
+    readonly alias: string;
+    readonly expandExpr: ExpandExpression;
+  }>,
+  depth: number
+): ReadonlyArray<EntityRecord> => {
+  if (childEntities.length === 0) return childEntities;
+
+  const childKeys = childEntities.map(e => String(e[childCtx.keyField] ?? ''));
+  const navResults = new Map<string, Map<string, Record<string, unknown>[]>>();
+  const placeholders = childKeys.map(() => '?').join(', ');
+
+  for (const { binding } of expandBindings) {
+    const fk = binding.foreignKey;
+    const targetFields = binding.targetFields.filter(f => !f.isExpansion);
+    const selectCols = targetFields.map(f => `"${f.fieldName}"`).join(', ');
+
+    let sql: string;
+    let values: unknown[];
+
+    if (fk.strategy === 'resource-record-key') {
+      sql = `SELECT ${selectCols} FROM "${binding.targetResource}" WHERE "ResourceName" = ? AND "ResourceRecordKey" IN (${placeholders})`;
+      values = [childCtx.resource, ...childKeys];
+    } else if (fk.strategy === 'parent-fk') {
+      const fkColumn = fk.parentColumn!;
+      const fkValues = [...new Set(childEntities.map(e => String(e[fkColumn] ?? '')).filter(v => v.length > 0))];
+      const fkPlaceholders = fkValues.map(() => '?').join(', ');
+      sql = `SELECT ${selectCols} FROM "${binding.targetResource}" WHERE "${binding.targetKeyField}" IN (${fkPlaceholders})`;
+      values = fkValues;
+    } else {
+      const targetCol = fk.targetColumn ?? childCtx.keyField;
+      sql = `SELECT ${selectCols} FROM "${binding.targetResource}" WHERE "${targetCol}" IN (${placeholders})`;
+      values = childKeys;
+    }
+
+    const rows = database.prepare(sql).all(...values) as Record<string, unknown>[];
+    const grouped = new Map<string, Record<string, unknown>[]>();
+
+    for (const row of rows) {
+      const deserialized = deserializeSqliteRow(row, [...binding.targetFields]);
+
+      let parentKey: string;
+      if (fk.strategy === 'resource-record-key') {
+        parentKey = String(row.ResourceRecordKey ?? '');
+      } else if (fk.strategy === 'parent-fk') {
+        const targetKeyVal = String(deserialized[binding.targetKeyField] ?? '');
+        const fkColumn = fk.parentColumn!;
+        for (const child of childEntities) {
+          if (String(child[fkColumn] ?? '') === targetKeyVal) {
+            parentKey = String(child[childCtx.keyField] ?? '');
+            if (!grouped.has(parentKey)) grouped.set(parentKey, []);
+            grouped.get(parentKey)!.push(deserialized);
+          }
+        }
+        continue;
+      } else {
+        const targetCol = fk.targetColumn ?? childCtx.keyField;
+        parentKey = String(row[targetCol] ?? '');
+      }
+
+      if (!grouped.has(parentKey)) grouped.set(parentKey, []);
+      grouped.get(parentKey)!.push(deserialized);
+    }
+
+    navResults.set(binding.name, grouped);
+  }
+
+  const stitched: ReadonlyArray<EntityRecord> = childEntities.map(child => {
+    const childKey = String(child[childCtx.keyField] ?? '');
+    const entity: Record<string, unknown> = { ...child };
+
+    for (const { binding } of expandBindings) {
+      const grouped = navResults.get(binding.name);
+      const related = grouped?.get(childKey) ?? [];
+
+      if (binding.isCollection) {
+        const seen = new Set<string>();
+        entity[binding.name] = related.filter(r => {
+          const k = String(r[binding.targetKeyField] ?? '');
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+      } else {
+        entity[binding.name] = related[0] ?? null;
+      }
+    }
+
+    return entity;
+  });
+
+  const nestedBindings = expandBindings.filter(({ expandExpr }) =>
+    expandExpr.options.$expand && expandExpr.options.$expand.length > 0
+  );
+
+  if (nestedBindings.length > 0 && childCtx.resolveChildContext) {
+    return applyExpandSelect(
+      resolveNestedExpand(database, stitched, nestedBindings, childCtx.resolveChildContext, depth),
+      expandBindings
+    );
+  }
+
+  return applyExpandSelect(stitched, expandBindings);
 };
 
 // ---------------------------------------------------------------------------
@@ -266,7 +434,6 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
     const parentAlias = 'p';
     const values: unknown[] = [];
 
-    // Determine which fields to select (exclude expansion fields)
     const dataFields = ctx.fields.filter(f => !f.isExpansion);
     let selectedFields: ReadonlyArray<ResoField>;
     if (options?.$select) {
@@ -277,24 +444,10 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
       selectedFields = dataFields;
     }
 
-    // Resolve $expand bindings
-    const expandBindings: Array<{
-      readonly binding: NavigationPropertyBinding;
-      readonly alias: string;
-    }> = [];
+    const expandBindings = options?.$expand
+      ? resolveExpandBindings(options.$expand, ctx.navigationBindings)
+      : [];
 
-    if (options?.$expand) {
-      const expandNames = parseExpand(options.$expand);
-      const bindingMap = new Map(ctx.navigationBindings.map(b => [b.name, b]));
-
-      for (const name of expandNames) {
-        const binding = bindingMap.get(name);
-        if (!binding) continue;
-        expandBindings.push({ binding, alias: `nav_${name}` });
-      }
-    }
-
-    // Build SELECT columns — include FK columns needed for $expand JOINs
     let expandSelect = options?.$select;
     if (options?.$select && expandBindings.length > 0) {
       const fkCols = expandBindings.map(({ binding }) => binding.foreignKey.parentColumn).filter((col): col is string => col !== undefined);
@@ -304,7 +457,6 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
     }
     const parentSelectCols: ReadonlyArray<string> = buildSelectColumns(dataFields, ctx.keyField, expandSelect, parentAlias);
 
-    // Build WHERE clause from $filter
     let whereClause = '';
     const filterValues: unknown[] = [];
     if (options?.$filter) {
@@ -314,7 +466,6 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
       values.push(...filterResult.values);
     }
 
-    // Build ORDER BY
     let orderByClause = '';
     if (options?.$orderby) {
       const parsed = parseOrderBy(options.$orderby, ctx.fields, parentAlias);
@@ -323,7 +474,6 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
       }
     }
 
-    // Build LIMIT/OFFSET (SQLite uses ? placeholders)
     let limitClause = '';
     if (options?.$top !== undefined) {
       limitClause = 'LIMIT ?';
@@ -336,10 +486,8 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
       values.push(options.$skip);
     }
 
-    // $count — window function for total matching parent count
     const countCol = options?.$count ? ', COUNT(*) OVER() AS "__total_count"' : '';
 
-    // ===== Branch: $expand present — use CTE to paginate parents first =====
     if (expandBindings.length > 0) {
       const cteSql = [
         `SELECT ${parentSelectCols.join(', ')}${countCol}`,
@@ -403,11 +551,20 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
         count = Number(rows[0].__total_count);
       }
 
-      const entities = groupRows(rows, parentAlias, ctx.keyField, ctx.fields, selectedFields, expandBindings);
+      let entities = groupRows(rows, parentAlias, ctx.keyField, ctx.fields, selectedFields, expandBindings);
+
+      const nestedBindings = expandBindings.filter(({ expandExpr }) =>
+        expandExpr.options.$expand && expandExpr.options.$expand.length > 0
+      );
+      if (nestedBindings.length > 0) {
+        entities = resolveNestedExpand(db, entities, nestedBindings, ctx.resolveChildContext, 1);
+      }
+
+      entities = applyExpandSelect(entities, expandBindings);
+
       return { value: entities, ...(count !== undefined ? { count } : {}) };
     }
 
-    // ===== Branch: no $expand — simple query =====
     const sql = [
       `SELECT ${parentSelectCols.join(', ')}${countCol}`,
       `FROM "${ctx.resource}" ${parentAlias}`,
@@ -425,7 +582,6 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
     if (options?.$count && rows.length > 0) {
       count = Number(rows[0].__total_count);
     } else if (options?.$count && rows.length === 0) {
-      // Window function returns nothing when LIMIT 0 — run a separate COUNT query
       const countSql = ['SELECT COUNT(*) AS cnt', `FROM "${ctx.resource}" ${parentAlias}`, whereClause].filter(s => s.length > 0).join(' ');
       const countRow = db.prepare(countSql).get(...filterValues) as Record<string, unknown> | undefined;
       count = Number(countRow?.cnt ?? 0);
@@ -442,7 +598,7 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
   const readByKey = async (
     ctx: ResourceContext,
     keyValue: string,
-    options?: { readonly $select?: string; readonly $expand?: string }
+    options?: { readonly $select?: string; readonly $expand?: ReadonlyArray<ExpandExpression> }
   ): Promise<SingleResult> => {
     if (options?.$expand) {
       const result = await queryCollection(ctx, {

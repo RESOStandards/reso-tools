@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { LexerError, ParseError } from '@reso/odata-filter-parser';
+import { ExpandParseError, LexerError, ParseError, parseExpand } from '@reso/odata-expression-parser';
 import type { RequestHandler } from 'express';
 import type { CollectionQueryOptions, DataAccessLayer, ResourceContext } from '../db/data-access.js';
 import { buildAnnotations } from './annotations.js';
@@ -93,10 +93,11 @@ export const readHandler =
 
       const selectParam = req.query.$select as string | undefined;
       const expandParam = req.query.$expand as string | undefined;
+      const expandTree = expandParam ? parseExpand(expandParam) : undefined;
 
       const row = await ctx.dal.readByKey(ctx.resourceCtx, key, {
         $select: selectParam,
-        $expand: expandParam
+        $expand: expandTree
       });
 
       if (!row) {
@@ -229,17 +230,28 @@ export const deleteHandler =
     }
   };
 
+/** Raw query params used for nextLink serialization (avoids round-tripping parsed $expand). */
+interface RawQueryParams {
+  readonly $filter?: string;
+  readonly $select?: string;
+  readonly $orderby?: string;
+  readonly $top?: number;
+  readonly $skip?: number;
+  readonly $count?: boolean;
+  readonly $expand?: string;
+}
+
 /** Builds an @odata.nextLink URL for server-driven pagination. */
-const buildNextLink = (baseUrl: string, resource: string, query: CollectionQueryOptions, top: number, skip: number): string => {
+const buildNextLink = (baseUrl: string, resource: string, raw: RawQueryParams, top: number, skip: number): string => {
   const nextSkip = skip + top;
   const params: string[] = [];
-  if (query.$filter) params.push(`$filter=${encodeURIComponent(query.$filter)}`);
-  if (query.$select) params.push(`$select=${encodeURIComponent(query.$select)}`);
-  if (query.$orderby) params.push(`$orderby=${encodeURIComponent(query.$orderby)}`);
+  if (raw.$filter) params.push(`$filter=${encodeURIComponent(raw.$filter)}`);
+  if (raw.$select) params.push(`$select=${encodeURIComponent(raw.$select)}`);
+  if (raw.$orderby) params.push(`$orderby=${encodeURIComponent(raw.$orderby)}`);
   params.push(`$top=${top}`);
   params.push(`$skip=${nextSkip}`);
-  if (query.$count) params.push('$count=true');
-  if (query.$expand) params.push(`$expand=${encodeURIComponent(query.$expand)}`);
+  if (raw.$count) params.push('$count=true');
+  if (raw.$expand) params.push(`$expand=${encodeURIComponent(raw.$expand)}`);
   return `${baseUrl}/${resource}?${params.join('&')}`;
 };
 
@@ -248,6 +260,9 @@ export const collectionHandler =
   (ctx: HandlerContext): RequestHandler =>
   async (req, res) => {
     try {
+      const rawExpand = req.query.$expand as string | undefined;
+      const expandTree = rawExpand ? parseExpand(rawExpand) : undefined;
+
       const options: CollectionQueryOptions = {
         ...(req.query.$filter && { $filter: req.query.$filter as string }),
         ...(req.query.$select && { $select: req.query.$select as string }),
@@ -255,7 +270,7 @@ export const collectionHandler =
         ...(req.query.$top && { $top: Number(req.query.$top) }),
         ...(req.query.$skip && { $skip: Number(req.query.$skip) }),
         ...(req.query.$count === 'true' && { $count: true }),
-        ...(req.query.$expand && { $expand: req.query.$expand as string })
+        ...(expandTree && { $expand: expandTree })
       };
 
       const result = await ctx.dal.queryCollection(ctx.resourceCtx, options);
@@ -272,16 +287,26 @@ export const collectionHandler =
       const top = options.$top;
       const skip = options.$skip ?? 0;
       if (top !== undefined && result.value.length === top) {
-        body['@odata.nextLink'] = buildNextLink(ctx.baseUrl, ctx.resourceCtx.resource, options, top, skip);
+        const rawParams: RawQueryParams = {
+          $filter: options.$filter,
+          $select: options.$select,
+          $orderby: options.$orderby,
+          $top: options.$top,
+          $skip: options.$skip,
+          $count: options.$count,
+          $expand: rawExpand
+        };
+        body['@odata.nextLink'] = buildNextLink(ctx.baseUrl, ctx.resourceCtx.resource, rawParams, top, skip);
       }
 
       setODataHeaders(res);
       res.status(200).json(body);
     } catch (err) {
       setODataHeaders(res);
-      if (err instanceof ParseError || err instanceof LexerError || isFilterError(err)) {
-        const msg = err instanceof Error ? err.message : 'Invalid $filter expression';
-        res.status(400).json(buildODataError('40000', msg, [{ target: '$filter', message: msg }], 'Query'));
+      if (err instanceof ParseError || err instanceof LexerError || err instanceof ExpandParseError || isFilterError(err)) {
+        const msg = err instanceof Error ? err.message : 'Invalid query expression';
+        const target = err instanceof ExpandParseError ? '$expand' : '$filter';
+        res.status(400).json(buildODataError('40000', msg, [{ target, message: msg }], 'Query'));
         return;
       }
       res.status(500).json(buildODataError('50000', err instanceof Error ? err.message : 'Internal server error', [], 'Query'));
