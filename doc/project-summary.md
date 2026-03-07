@@ -89,7 +89,7 @@ The server tracks every data change — every record created, updated, or delete
 | Web API Core tests passing | 42/42 |
 | DD 2.0 compliance checks | 1,034 passed, 0 failed |
 | Add/Edit (RCP-010) scenarios | 8 passed, 0 failed |
-| Releases | 27 (v0.0.1 – v0.0.27) |
+| Releases | 29 (v0.0.1 – v0.0.28, v0.1) |
 
 ---
 

@@ -1,6 +1,6 @@
-## v0.1 — UI Polish, Developer Experience, and GitHub Pages
+## v0.1 — UI Polish, Developer Experience, and Compliance Fixes
 
-First milestone release focusing on UI improvements, developer workflow enhancements, and project documentation infrastructure.
+First milestone release focusing on UI improvements, developer workflow enhancements, GitHub Pages documentation, and compliance test fixes.
 
 ### UI Improvements
 
@@ -20,6 +20,13 @@ First milestone release focusing on UI improvements, developer workflow enhancem
 
 - **RESO-branded GitHub Pages site** — Jekyll site in `.github/pages/` with custom layout matching certification.reso.org design (navy header, card-based content, green/blue badges). GitHub Actions workflow auto-syncs package READMEs into the site on every push to main.
 
+### Compliance Fixes
+
+- **Fix DD 2.0 schema validation errors** — Navigation properties (`HistoryTransactional`, `SocialMedia`) were leaking as empty arrays in MongoDB Property responses. Excluded `isExpansion` fields from collection field coercion.
+- **Fix SQLite readonly database** — Created `/data` directory with correct ownership in Dockerfile for non-root user.
+- **Fix Add/Edit compliance entrypoint** — Added `add-edit` subcommand after certification package consolidation.
+- **All three backends** (PostgreSQL, MongoDB, SQLite) pass DD 2.0 with 0 schema validation errors.
+
 ### Commits
 
 | SHA | Description |
@@ -29,14 +36,18 @@ First milestone release focusing on UI improvements, developer workflow enhancem
 | 970359c | Add zebra striping to Related Records expanded panels |
 | 9c31c5b | Add Docker hot-reload dev mode and fix Vite SPA proxy routing |
 | 408d3d6 | Add RESO-branded GitHub Pages site with auto-synced package docs |
+| 1904b71 | Fix DD 2.0 schema validation errors and SQLite readonly issue |
 
 ### Test Plan
 
-- [ ] Verify Add/Edit pages: submit button stays pinned at bottom when scrolling
+- [x] Verify Add/Edit pages: submit button stays pinned at bottom when scrolling
 - [ ] Verify detail page: media carousel appears beside summary on large screens
 - [ ] Verify detail page: field groups render in two columns
 - [ ] Verify Related Records: zebra stripes visible on expanded panels
 - [ ] Verify hot reload: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d` starts Vite dev server, source changes reflect immediately
 - [ ] Verify SPA routing: refreshing `/Property` in browser serves the React app, not JSON
-- [ ] Run compliance tests: PostgreSQL, MongoDB, SQLite (all passing)
+- [x] DD 2.0 compliance: PostgreSQL (0 errors, exit 0)
+- [x] DD 2.0 compliance: MongoDB (0 errors, exit 0)
+- [x] DD 2.0 compliance: SQLite (0 errors, exit 0)
+- [x] Web API Core 2.0.0: PostgreSQL (42 passed, 3 skipped, 0 failed)
 - [ ] Verify GitHub Pages deploys correctly after merge to main

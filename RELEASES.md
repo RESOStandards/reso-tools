@@ -2,6 +2,45 @@
 
 ---
 
+## v0.1 — 2026-03-06
+
+### UI Polish, Developer Experience, and Compliance Fixes
+
+First milestone release focusing on UI improvements, developer workflow enhancements, GitHub Pages documentation, and compliance test fixes.
+
+#### UI Improvements
+
+- **Pin action buttons to bottom of Add/Edit pages (#20)** — Submit buttons stay visible via `sticky bottom-0` as users scroll through long forms. Pinned header with back navigation and page title at the top.
+- **Fix detail page layout** — Restored side-by-side summary + media carousel using flexbox (`lg:flex-row`). Field groups render in two columns instead of one.
+- **Zebra striping on Related Records** — Alternating row backgrounds in expanded navigation property panels for improved readability.
+
+#### Developer Experience
+
+- **Docker hot-reload dev mode** — New `docker-compose.dev.yml` overlay runs the Vite dev server inside Docker with source volume mounts. Edits to `ui/src/` are reflected instantly without container rebuilds.
+- **Smart Vite proxy routing** — Rewrote `vite.config.ts` to mirror nginx routing logic: bare resource paths serve the SPA on browser navigation but proxy to the API for `fetch()` requests (`Accept: application/json`). Fixes the JSON-on-refresh bug in dev mode.
+
+#### Documentation & Infrastructure
+
+- **RESO-branded GitHub Pages site** — Jekyll site in `.github/pages/` with custom layout matching certification.reso.org design (navy header, card-based content, green/blue badges). GitHub Actions workflow auto-syncs package READMEs into the site on every push to main.
+
+#### Compliance Fixes
+
+- **Fix DD 2.0 schema validation errors** — Navigation properties (`HistoryTransactional`, `SocialMedia`) were leaking as empty arrays in MongoDB Property responses. Excluded `isExpansion` fields from collection field coercion.
+- **Fix SQLite readonly database** — Created `/data` directory with correct ownership in Dockerfile so the non-root `reso` user can write to mounted volumes.
+- **Fix Add/Edit compliance entrypoint** — Added `add-edit` subcommand after certification package consolidation.
+- **All three backends** (PostgreSQL, MongoDB, SQLite) now pass DD 2.0 compliance with 0 schema validation errors.
+
+| SHA | Description |
+|-----|-------------|
+| 38dfa81 | Pin action buttons to bottom of Add/Edit pages (#20) |
+| 295fcd0 | Fix detail page layout: side-by-side summary + media, two-column field groups |
+| 970359c | Add zebra striping to Related Records expanded panels |
+| 9c31c5b | Add Docker hot-reload dev mode and fix Vite SPA proxy routing |
+| 408d3d6 | Add RESO-branded GitHub Pages site with auto-synced package docs |
+| 1904b71 | Fix DD 2.0 schema validation errors and SQLite readonly issue |
+
+---
+
 ## v0.0.28 — 2026-03-06
 
 ### EntityEvent Compliance Testing Tool (#44)
