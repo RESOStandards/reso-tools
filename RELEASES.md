@@ -598,7 +598,7 @@ scroll container. This enables per-page pinning without `position: sticky` hacks
 | Package | Tests |
 |---------|------:|
 | `@reso/validation` | 103 |
-| `@reso/odata-filter-parser` | 152 |
+| `@reso/odata-expression-parser` | 152 |
 | `@reso/odata-client` | 101 |
 | `@reso/data-generator` | 76 |
 | `@reso/reference-server` | 137 |
@@ -667,7 +667,7 @@ variations, 0 schema validation errors) and fixed several OData spec issues.
 | Package | Tests |
 |---------|------:|
 | `@reso/validation` | 91 |
-| `@reso/odata-filter-parser` | 152 |
+| `@reso/odata-expression-parser` | 152 |
 | `@reso/odata-client` | 101 |
 | `@reso/data-generator` | 73 |
 | `@reso/reference-server` | 137 |
@@ -709,7 +709,7 @@ Fixed two OData spec compliance issues in the generated EDMX XML metadata
 | Package | Tests |
 |---------|------:|
 | `@reso/validation` | 91 |
-| `@reso/odata-filter-parser` | 151 |
+| `@reso/odata-expression-parser` | 151 |
 | `@reso/odata-client` | 101 |
 | `@reso/data-generator` | 71 |
 | `@reso/reference-server` | 130 |
@@ -728,7 +728,7 @@ parser.
 
 **AST serializer (`astToFilterString`):**
 
-- New `serializer.ts` in `@reso/odata-filter-parser` — walks the AST and
+- New `serializer.ts` in `@reso/odata-expression-parser` — walks the AST and
   produces a canonical OData `$filter` string
 - Handles all node types: comparison, logical, not, arithmetic, function,
   lambda, literal, property, collection
@@ -766,10 +766,10 @@ parser.
 
 **Modified files:**
 
-- `odata-filter-parser/src/serializer.ts` — New
-- `odata-filter-parser/src/index.ts` — Added export
-- `odata-filter-parser/tests/serializer.test.ts` — New (54 tests)
-- `ui/package.json` — Added `@reso/odata-filter-parser` dependency
+- `odata-expression-parser/src/serializer.ts` — New
+- `odata-expression-parser/src/index.ts` — Added export
+- `odata-expression-parser/tests/serializer.test.ts` — New (54 tests)
+- `ui/package.json` — Added `@reso/odata-expression-parser` dependency
 - `ui/Dockerfile` — Copy parser into Docker build
 - `ui/src/utils/filter-sync.ts` — New
 - `ui/src/pages/search-page.tsx` — Lifted state, validation
@@ -782,7 +782,7 @@ parser.
 | Package | Tests |
 |---------|------:|
 | `@reso/validation` | 91 |
-| `@reso/odata-filter-parser` | 151 |
+| `@reso/odata-expression-parser` | 151 |
 | `@reso/odata-client` | 101 |
 | `@reso/data-generator` | 71 |
 | `@reso/reference-server` | 126 |
@@ -874,7 +874,7 @@ to the OData entity and collection regex patterns.
 | Package | Tests |
 |---------|------:|
 | `@reso/validation` | 91 |
-| `@reso/odata-filter-parser` | 97 |
+| `@reso/odata-expression-parser` | 97 |
 | `@reso/odata-client` | 101 |
 | `@reso/data-generator` | 71 |
 | `@reso/reference-server` | 126 |
@@ -1060,7 +1060,7 @@ Fixed USPS-format address separators in the UI:
 | Package | Tests |
 |---------|------:|
 | `@reso/validation` | 91 |
-| `@reso/odata-filter-parser` | 97 |
+| `@reso/odata-expression-parser` | 97 |
 | `@reso/odata-client` | 101 |
 | `@reso/data-generator` | 71 |
 | `@reso/reference-server` | 76 |
@@ -1128,7 +1128,7 @@ from TOAST for large values.
 | Package | Tests |
 |---------|------:|
 | `@reso/validation` | 65 |
-| `@reso/odata-filter-parser` | 97 |
+| `@reso/odata-expression-parser` | 97 |
 | `@reso/odata-client` | 101 |
 | `@reso/data-generator` | 71 |
 | `@reso/reference-server` | 76 |
@@ -1166,7 +1166,7 @@ resources vs 1,316 fields, 2,951 lookups in 1.7).
 | Package | Tests |
 |---------|------:|
 | `@reso/validation` | 41 |
-| `@reso/odata-filter-parser` | 97 |
+| `@reso/odata-expression-parser` | 97 |
 | `@reso/odata-client` | 101 |
 | `@reso/data-generator` | 71 |
 | `@reso/reference-server` | 76 |
@@ -1264,7 +1264,7 @@ Added role-based authentication to `@reso/reference-server`.
 | Package | Tests |
 |---------|------:|
 | `@reso/validation` | 41 |
-| `@reso/odata-filter-parser` | 97 |
+| `@reso/odata-expression-parser` | 97 |
 | `@reso/odata-client` | 101 |
 | `@reso/data-generator` | 69 |
 | `@reso/reference-server` | 76 |
@@ -1318,7 +1318,7 @@ exercised by the failure test scenarios.
 | Package | Tests |
 |---------|------:|
 | `@reso/validation` | 41 |
-| `@reso/odata-filter-parser` | 97 |
+| `@reso/odata-expression-parser` | 97 |
 | `@reso/odata-client` | 101 |
 | `@reso/reference-server` | 67 |
 | `@reso/certification-add-edit` | 49 |
@@ -1372,7 +1372,7 @@ Added a React UI for the reference server at `tools/reso-reference-server/ui/`.
 | Package | Tests |
 |---------|------:|
 | `@reso/validation` | 41 |
-| `@reso/odata-filter-parser` | 97 |
+| `@reso/odata-expression-parser` | 97 |
 | `@reso/odata-client` | 101 |
 | `@reso/reference-server` | 67 |
 | `@reso/certification-add-edit` | 49 |
@@ -1426,7 +1426,7 @@ the RESO Data Dictionary and Web API specifications.
 
 ### New Packages
 
-#### `@reso/odata-filter-parser` — [odata-filter-parser/](odata-filter-parser/)
+#### `@reso/odata-expression-parser` — [odata-expression-parser/](odata-expression-parser/)
 
 Standalone, zero-dependency library for parsing OData `$filter` expressions into a
 typed AST. Shared by both the client SDK (query validation) and the reference server
@@ -1442,7 +1442,7 @@ typed AST. Shared by both the client SDK (query validation) and the reference se
 - **Lambda operators**: `any` and `all` with variable binding
 - **Literal types**: string, number, boolean, null, date, datetimeoffset, timeofday,
   duration, guid, enum
-- **97 tests** — [tests/filter-parser.test.ts](odata-filter-parser/tests/filter-parser.test.ts)
+- **97 tests** — [tests/filter-parser.test.ts](odata-expression-parser/tests/filter-parser.test.ts)
 
 #### `@reso/odata-client` — [odata-client/](odata-client/)
 
@@ -1493,7 +1493,7 @@ EDMX metadata, and OpenAPI documentation.
   — [server/src/db/postgres-dal.ts](reso-reference-server/server/src/db/postgres-dal.ts)
 - **MongoDB example** demonstrating batch-query pattern for document stores
   — [server/src/db/mongo-dal.example.ts](reso-reference-server/server/src/db/mongo-dal.example.ts)
-- **`$filter` → SQL translation** using `@reso/odata-filter-parser` AST with
+- **`$filter` → SQL translation** using `@reso/odata-expression-parser` AST with
   parameterized queries (SQL injection safe)
   — [server/src/db/filter-to-sql.ts](reso-reference-server/server/src/db/filter-to-sql.ts)
 - **Collection GET handler** with `$filter`, `$select`, `$orderby`, `$top`, `$skip`,
@@ -1523,7 +1523,7 @@ validation (zero deps)
     ├──> reso-reference-server (depends on validation + filter-parser)
     └──> reso-reference-server/ui (depends on validation)
 
-odata-filter-parser (zero deps)
+odata-expression-parser (zero deps)
     ├──> odata-client (depends on filter-parser)
     │       └──> certification/add-edit (depends on odata-client)
     └──> reso-reference-server (depends on filter-parser)
@@ -1551,7 +1551,7 @@ tracked in [TODO.md](TODO.md).
 
 | Package | Tests |
 |---------|------:|
-| `@reso/odata-filter-parser` | 97 |
+| `@reso/odata-expression-parser` | 97 |
 | `@reso/odata-client` | 101 |
 | `@reso/reference-server` | 67 |
 | `@reso/certification-add-edit` | 49 |

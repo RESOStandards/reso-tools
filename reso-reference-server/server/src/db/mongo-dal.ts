@@ -16,9 +16,12 @@
  * 4. Pagination is naturally correct — $skip/$limit apply to the parent
  *    cursor first, then batchExpandNavigation() resolves navigation properties
  *    against the already-paginated parent set. No CTE needed (unlike PostgreSQL).
+ *
+ * 5. Multi-level $expand is supported via recursive batch lookups.
  */
 
 import type { Db } from 'mongodb';
+import type { ExpandExpression } from '@reso/odata-expression-parser';
 import type {
   CollectionQueryOptions,
   CollectionResult,
@@ -28,6 +31,8 @@ import type {
   ResourceContext,
   SingleResult
 } from './data-access.js';
+import { MAX_EXPAND_DEPTH } from './data-access.js';
+import { applyMongoExpandSelect } from './expand-select.js';
 import { filterToMongo } from './filter-to-mongo.js';
 
 // ---------------------------------------------------------------------------
@@ -54,24 +59,26 @@ const coerceCollections = (doc: Record<string, unknown>, collectionFields: Reado
 
 /**
  * Resolve navigation properties for a set of parent entities using batch
- * queries. Unlike the PostgreSQL LEFT JOIN approach, this issues one query
- * per navigation property, collecting all parent keys first.
- *
- * For example, if we have 10 Property entities and need to expand Media:
- * 1. Collect all 10 ListingKey values
- * 2. Query Media WHERE ResourceName = "Property" AND ResourceRecordKey IN (keys)
- * 3. Group results by ResourceRecordKey and attach to parent entities
- *
- * This avoids the N+1 problem without requiring JOIN support.
+ * queries. Supports multi-level $expand via recursive resolution.
  */
 const batchExpandNavigation = async (
   db: Db,
   parentResource: string,
   parentKeyField: string,
   parents: ReadonlyArray<EntityRecord>,
-  bindings: ReadonlyArray<NavigationPropertyBinding>
+  expandTree: ReadonlyArray<ExpandExpression>,
+  navigationBindings: ReadonlyArray<NavigationPropertyBinding>,
+  resolveChildContext: ((resource: string) => ResourceContext | undefined) | undefined,
+  depth: number
 ): Promise<ReadonlyArray<EntityRecord>> => {
-  if (bindings.length === 0 || parents.length === 0) return parents;
+  if (expandTree.length === 0 || parents.length === 0) return parents;
+
+  const bindingMap = new Map(navigationBindings.map(b => [b.name, b]));
+  const bindings = expandTree
+    .map(expr => ({ expr, binding: bindingMap.get(expr.property) }))
+    .filter((e): e is { expr: ExpandExpression; binding: NavigationPropertyBinding } => e.binding !== undefined);
+
+  if (bindings.length === 0) return parents;
 
   // Collect all parent key values
   const parentKeys = parents.map(p => String(p[parentKeyField] ?? ''));
@@ -79,7 +86,7 @@ const batchExpandNavigation = async (
   // For each navigation property, fetch all related documents in one query
   const navResults = new Map<string, Map<string, Record<string, unknown>[]>>();
 
-  for (const binding of bindings) {
+  for (const { binding } of bindings) {
     const collection = db.collection(binding.targetResource);
     const fk = binding.foreignKey;
 
@@ -90,8 +97,6 @@ const batchExpandNavigation = async (
     }
 
     if (fk.strategy === 'parent-fk') {
-      // To-one: parent has FK column referencing target's key.
-      // Collect the FK values from parents, then look up target records by their key.
       const fkColumn = fk.parentColumn!;
       const fkValues = [...new Set(parents.map(p => String(p[fkColumn] ?? '')).filter(v => v.length > 0))];
       if (fkValues.length === 0) {
@@ -100,13 +105,11 @@ const batchExpandNavigation = async (
       }
       const docs = await collection.find({ [binding.targetKeyField]: { $in: fkValues } }, { projection: navProjection }).toArray();
 
-      // Index by target key for O(1) lookup
       const byKey = new Map<string, Record<string, unknown>>();
       for (const doc of docs) {
         byKey.set(String(doc[binding.targetKeyField] ?? ''), doc);
       }
 
-      // Group by parent key — each parent's FK value maps to at most one target
       const grouped = new Map<string, Record<string, unknown>[]>();
       for (const parent of parents) {
         const pk = String(parent[parentKeyField] ?? '');
@@ -131,7 +134,6 @@ const batchExpandNavigation = async (
 
     const docs = await collection.find(filter, { projection: navProjection }).toArray();
 
-    // Group by parent key
     const grouped = new Map<string, Record<string, unknown>[]>();
     for (const doc of docs) {
       const parentKey =
@@ -146,11 +148,11 @@ const batchExpandNavigation = async (
   }
 
   // Stitch navigation results into parent entities
-  return parents.map(parent => {
+  const stitched = parents.map(parent => {
     const parentKey = String(parent[parentKeyField] ?? '');
     const expanded: Record<string, unknown> = { ...parent };
 
-    for (const binding of bindings) {
+    for (const { binding } of bindings) {
       const grouped = navResults.get(binding.name);
       const related = grouped?.get(parentKey) ?? [];
 
@@ -163,6 +165,51 @@ const batchExpandNavigation = async (
 
     return expanded;
   });
+
+  // Recursively resolve nested $expand (level 2+), then apply inline $select
+  if (depth < MAX_EXPAND_DEPTH && resolveChildContext) {
+    const result: EntityRecord[] = [];
+
+    for (const entity of stitched) {
+      const expanded: Record<string, unknown> = { ...entity };
+
+      for (const { expr, binding } of bindings) {
+        const nestedExpand = expr.options.$expand;
+        if (!nestedExpand || nestedExpand.length === 0) continue;
+
+        const childCtx = resolveChildContext(binding.targetResource);
+        if (!childCtx) continue;
+
+        const children = expanded[binding.name];
+        if (!children) continue;
+
+        const childEntities = binding.isCollection
+          ? (children as ReadonlyArray<EntityRecord>)
+          : [children as EntityRecord];
+
+        if (childEntities.length === 0) continue;
+
+        const expandedChildren = await batchExpandNavigation(
+          db,
+          binding.targetResource,
+          childCtx.keyField,
+          childEntities,
+          nestedExpand,
+          childCtx.navigationBindings,
+          childCtx.resolveChildContext,
+          depth + 1
+        );
+
+        expanded[binding.name] = binding.isCollection ? expandedChildren : (expandedChildren[0] ?? null);
+      }
+
+      result.push(expanded);
+    }
+
+    return applyMongoExpandSelect(result, bindings);
+  }
+
+  return applyMongoExpandSelect(stitched, bindings);
 };
 
 // ---------------------------------------------------------------------------
@@ -237,12 +284,13 @@ export const createMongoDal = (db: Db): DataAccessLayer => {
       count = await collection.countDocuments(filter);
     }
 
-    // $expand — batch query per navigation property
+    // $expand — batch query per navigation property (supports multi-level)
     let entities: ReadonlyArray<EntityRecord> = docs;
     if (options?.$expand) {
-      const expandNames = new Set(options.$expand.split(',').map(s => s.trim()));
-      const bindings = ctx.navigationBindings.filter(b => expandNames.has(b.name));
-      entities = await batchExpandNavigation(db, ctx.resource, ctx.keyField, docs, bindings);
+      entities = await batchExpandNavigation(
+        db, ctx.resource, ctx.keyField, docs,
+        options.$expand, ctx.navigationBindings, ctx.resolveChildContext, 0
+      );
     }
 
     return { value: entities, ...(count !== undefined ? { count } : {}) };
@@ -251,7 +299,7 @@ export const createMongoDal = (db: Db): DataAccessLayer => {
   const readByKey = async (
     ctx: ResourceContext,
     keyValue: string,
-    options?: { readonly $select?: string; readonly $expand?: string }
+    options?: { readonly $select?: string; readonly $expand?: ReadonlyArray<ExpandExpression> }
   ): Promise<SingleResult> => {
     const collection = db.collection(ctx.resource);
     // Exclude expansion fields from projection — they are lazy, loaded via $expand
@@ -277,9 +325,10 @@ export const createMongoDal = (db: Db): DataAccessLayer => {
 
     // Apply $expand
     if (options?.$expand) {
-      const expandNames = new Set(options.$expand.split(',').map(s => s.trim()));
-      const bindings = ctx.navigationBindings.filter(b => expandNames.has(b.name));
-      const [expanded] = await batchExpandNavigation(db, ctx.resource, ctx.keyField, [entity], bindings);
+      const [expanded] = await batchExpandNavigation(
+        db, ctx.resource, ctx.keyField, [entity],
+        options.$expand, ctx.navigationBindings, ctx.resolveChildContext, 0
+      );
       return expanded;
     }
 

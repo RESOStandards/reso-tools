@@ -25,7 +25,7 @@ jobs:
           # Copy each package README as a Jekyll collection page
           packages=(
             "validation:@reso/validation:Isomorphic validation library"
-            "odata-filter-parser:@reso/odata-filter-parser:OData filter parser"
+            "odata-expression-parser:@reso/odata-expression-parser:OData filter parser"
             "odata-client:@reso/odata-client:OData client SDK"
             "data-generator:@reso/data-generator:Test data generator"
             "certification:@reso/certification:Certification testing tools"

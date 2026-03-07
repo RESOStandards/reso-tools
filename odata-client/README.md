@@ -191,7 +191,7 @@ if (!result.valid) {
 }
 ```
 
-Validates `$select` and `$orderby` field references against the entity type, `$filter` property references by walking the parsed AST (using `@reso/odata-filter-parser`), and `$top`/`$skip` value constraints.
+Validates `$select` and `$orderby` field references against the entity type, `$filter` property references by walking the parsed AST (using `@reso/odata-expression-parser`), and `$top`/`$skip` value constraints.
 
 ### Response Parsing
 
@@ -227,7 +227,7 @@ const allEntities = await followAllPages(client, firstResponse);
 
 ### Filter Parser (re-exported)
 
-The `parseFilter` function and AST types from [`@reso/odata-filter-parser`](../odata-filter-parser/) are re-exported for convenience.
+The `parseFilter` function and AST types from [`@reso/odata-expression-parser`](../odata-expression-parser/) are re-exported for convenience.
 
 ```typescript
 import { parseFilter } from "@reso/odata-client";

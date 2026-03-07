@@ -4,6 +4,8 @@ services:
       context: ..
       dockerfile: reso-reference-server/ui/Dockerfile
       target: build
+    ports:
+      - "5173:80"
     command: ["npx", "vite", "--config", "vite.config.docker.ts"]
     volumes:
       - ./ui/src:/app/src

@@ -1,17 +1,17 @@
-# @reso/odata-filter-parser
+# @reso/odata-expression-parser
 
-Standalone, zero-dependency library for parsing OData 4.01 `$filter` expressions into a typed AST (abstract syntax tree). Used by both [`@reso/odata-client`](../odata-client/) for query validation and [`@reso/reference-server`](../reso-reference-server/) for SQL WHERE clause generation.
+Standalone, zero-dependency library for parsing OData 4.01 `$filter` and `$expand` expressions into typed ASTs (abstract syntax trees). Used by both [`@reso/odata-client`](../odata-client/) for query validation and [`@reso/reference-server`](../reso-reference-server/) for SQL WHERE clause generation and multi-level navigation property expansion.
 
 ## Install
 
 ```bash
-npm install @reso/odata-filter-parser
+npm install @reso/odata-expression-parser
 ```
 
 ## Usage
 
 ```typescript
-import { parseFilter } from "@reso/odata-filter-parser";
+import { parseFilter } from "@reso/odata-expression-parser";
 
 const ast = parseFilter("ListPrice gt 200000 and contains(City, 'Austin')");
 
@@ -145,7 +145,7 @@ The parser produces a `FilterExpression` discriminated union:
 Convert an AST back to a canonical OData `$filter` string with `astToFilterString`:
 
 ```typescript
-import { parseFilter, astToFilterString } from '@reso/odata-filter-parser';
+import { parseFilter, astToFilterString } from '@reso/odata-expression-parser';
 
 const ast = parseFilter("ListPrice gt 200000 and contains(City, 'Austin')");
 const roundTripped = astToFilterString(ast);
@@ -154,12 +154,77 @@ const roundTripped = astToFilterString(ast);
 
 Handles all node types: comparison, logical, not, arithmetic, function, lambda, literal, property, and collection.
 
+## $expand Parser
+
+Parse `$expand` expressions into a structured tree with `parseExpand`. Supports nested (multi-level) expansion, inline query options, and `$levels`.
+
+```typescript
+import { parseExpand } from '@reso/odata-expression-parser';
+
+// Simple expansion
+parseExpand('Media');
+// → [{ property: "Media", options: {} }]
+
+// With inline query options
+parseExpand('Media($select=MediaURL;$top=5)');
+// → [{ property: "Media", options: { $select: "MediaURL", $top: 5 } }]
+
+// Multi-level (nested) expansion
+parseExpand('Rooms($expand=Media($select=MediaURL)),BuyerAgent');
+// → [
+//   { property: "Rooms", options: {
+//       $expand: [{ property: "Media", options: { $select: "MediaURL" } }]
+//   }},
+//   { property: "BuyerAgent", options: {} }
+// ]
+
+// $levels support
+parseExpand('Children($levels=3)');
+// → [{ property: "Children", options: { $levels: 3 } }]
+
+parseExpand('Children($levels=max)');
+// → [{ property: "Children", options: { $levels: "max" } }]
+```
+
+### Supported $expand Options
+
+| Option | Type | Example |
+|--------|------|---------|
+| `$select` | string | `Media($select=MediaURL,MediaKey)` |
+| `$filter` | string | `Media($filter=MediaType eq 'Photo')` |
+| `$orderby` | string | `Media($orderby=Order asc)` |
+| `$top` | number | `Media($top=5)` |
+| `$skip` | number | `Media($skip=10)` |
+| `$count` | boolean | `Media($count=true)` |
+| `$expand` | nested | `Rooms($expand=Media)` |
+| `$levels` | number or "max" | `Children($levels=3)` |
+
+### ExpandExpression Type
+
+```typescript
+interface ExpandExpression {
+  readonly property: string;
+  readonly options: ExpandQueryOptions;
+}
+
+interface ExpandQueryOptions {
+  readonly $select?: string;
+  readonly $filter?: string;
+  readonly $orderby?: string;
+  readonly $top?: number;
+  readonly $skip?: number;
+  readonly $count?: boolean;
+  readonly $expand?: ReadonlyArray<ExpandExpression>;
+  readonly $levels?: number | 'max';
+}
+```
+
 ## Development
 
 ```bash
 npm install
 npm run build
-npm test        # 152 tests
+npm test        # 180 tests
 ```
 
 ## License

@@ -10,7 +10,7 @@
     "lint:fix": "biome check --fix tools/",
     "test": "npm run test:validation && npm run test:filter-parser && npm run test:client && npm run test:data-generator && npm run test:server && npm run test:certification",
     "test:validation": "cd tools/validation && npx vitest run",
-    "test:filter-parser": "cd tools/odata-filter-parser && npx vitest run",
+    "test:filter-parser": "cd tools/odata-expression-parser && npx vitest run",
     "test:client": "cd tools/odata-client && npx vitest run",
     "test:data-generator": "cd tools/data-generator && npx vitest run",
     "test:server": "cd tools/reso-reference-server/server && npx vitest run",

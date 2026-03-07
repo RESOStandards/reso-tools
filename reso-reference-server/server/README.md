@@ -151,7 +151,7 @@ Collection GET endpoints (`GET /{Resource}`) support OData system query options:
 
 | Query Option | SQL Translation |
 |-------------|----------------|
-| `$filter` | Parsed via `@reso/odata-filter-parser` → parameterized `WHERE` clause |
+| `$filter` | Parsed via `@reso/odata-expression-parser` → parameterized `WHERE` clause |
 | `$select` | `SELECT` column list |
 | `$orderby` | `ORDER BY` clause (validated against metadata) |
 | `$top` | `LIMIT` |
@@ -161,7 +161,7 @@ Collection GET endpoints (`GET /{Resource}`) support OData system query options:
 
 ### $filter Translation (PostgreSQL)
 
-The `$filter` query option is parsed into an AST by `@reso/odata-filter-parser` and translated to parameterized SQL. All values use `$1`, `$2`, etc. placeholders — no string interpolation.
+The `$filter` query option is parsed into an AST by `@reso/odata-expression-parser` and translated to parameterized SQL. All values use `$1`, `$2`, etc. placeholders — no string interpolation.
 
 | OData | SQL |
 |-------|-----|
@@ -212,7 +212,7 @@ Dynamic imports ensure backend-specific packages (`mongodb`, `better-sqlite3`) a
 
 ### $filter Translation (SQLite)
 
-The `$filter` query option is parsed into an AST by `@reso/odata-filter-parser` and translated to parameterized SQLite SQL. All values use `?` positional placeholders.
+The `$filter` query option is parsed into an AST by `@reso/odata-expression-parser` and translated to parameterized SQLite SQL. All values use `?` positional placeholders.
 
 | OData | SQLite |
 |-------|--------|
@@ -228,7 +228,7 @@ The `$filter` query option is parsed into an AST by `@reso/odata-filter-parser` 
 
 ### $filter Translation (MongoDB)
 
-The `$filter` query option is parsed into an AST by `@reso/odata-filter-parser` and translated to MongoDB query documents. Two translation modes are used:
+The `$filter` query option is parsed into an AST by `@reso/odata-expression-parser` and translated to MongoDB query documents. Two translation modes are used:
 
 - **Query mode** — native MongoDB operators (`{ field: { $gt: value } }`) for simple comparisons that benefit from indexes
 - **Expression mode** — `$expr` aggregation expressions for functions and arithmetic
@@ -254,6 +254,26 @@ Navigation bindings are auto-detected at startup using three FK strategies:
 | `parent-fk` | Parent holds a FK to the target (to-one navigation) | Property.ListAgentKey → Member.MemberKey |
 
 The router discovers these bindings from `isExpansion` metadata attributes and logs them at startup. Expansion fields (e.g., HistoryTransactional, SocialMedia) are excluded from responses unless explicitly requested via `$expand`.
+
+#### Multi-Level $expand
+
+The server supports nested (multi-level) `$expand` up to 3 levels deep. Nested expansions use batch sub-queries after the initial level-1 JOIN grouping (PostgreSQL/SQLite) or recursive batch lookups (MongoDB).
+
+```
+# Single-level (existing)
+GET /Property?$expand=Media
+
+# Multi-level — expand Rooms, then each Room's Media
+GET /Property?$expand=Rooms($expand=Media)
+
+# Multi-level with inline options
+GET /Property?$expand=Rooms($select=RoomType;$expand=Media($top=1)),BuyerAgent
+
+# Three levels deep
+GET /Property?$expand=Rooms($expand=Media($expand=Tags))
+```
+
+The `$expand` string is parsed by `@reso/odata-expression-parser` into a structured tree, then each DAL implementation recursively resolves navigation properties at each depth level. The maximum depth is configurable via `MAX_EXPAND_DEPTH` (default: 3).
 
 ## UI Configuration
 
@@ -300,7 +320,7 @@ Placeholder SVG images are served from `public/images/` for the media carousel d
 
 1. **Metadata-driven** — No code generation. Routes, tables, and validation are built dynamically from `server-metadata.json` at startup.
 2. **DAL abstraction** — `DataAccessLayer` interface separates query handling from persistence. PostgreSQL uses LEFT JOIN; document stores can use batch queries.
-3. **Shared filter parser** — `@reso/odata-filter-parser` is used by both this server (SQL translation) and `@reso/odata-client` (query validation).
+3. **Shared filter parser** — `@reso/odata-expression-parser` is used by both this server (SQL translation) and `@reso/odata-client` (query validation).
 4. **Parameterized queries** — No ORM. All SQL uses parameterized `{ text, values }` objects to prevent SQL injection.
 5. **OData compliance** — Response format, headers, and error structure match what the RESO Web API Add/Edit test tool validates.
 6. **Negative numeric = validation error** — Convention shared with the test tool: negative values in numeric fields trigger 400 responses with field-level error details.

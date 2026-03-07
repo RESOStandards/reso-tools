@@ -8,11 +8,15 @@
   {% seo %}
   <style>
     :root {
-      --reso-navy: #2d3748;
-      --reso-navy-dark: #1a202c;
+      --reso-navy: #1a2f58;
+      --reso-navy-dark: #0f1d38;
+      --reso-navy-light: #2a4a7f;
+      --reso-orange: #ff9900;
+      --reso-orange-light: #fff3e0;
       --reso-green: #38a169;
-      --reso-green-light: #c6f6d5;
-      --reso-blue: #3182ce;
+      --reso-green-light: #e6f7ed;
+      --reso-blue: #007e9e;
+      --reso-blue-light: #e0f4f8;
       --reso-gray-50: #f7fafc;
       --reso-gray-100: #edf2f7;
       --reso-gray-200: #e2e8f0;
@@ -38,7 +42,7 @@
 
     /* Header */
     .site-header {
-      background: var(--reso-navy-dark);
+      background: var(--reso-navy);
       padding: 0 1.5rem;
       height: 64px;
       display: flex;
@@ -47,7 +51,7 @@
       position: sticky;
       top: 0;
       z-index: 50;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
     .site-header a { color: white; text-decoration: none; }
     .header-logo {
@@ -58,7 +62,7 @@
       font-weight: 700;
       letter-spacing: -0.025em;
     }
-    .header-logo svg { height: 32px; width: auto; }
+    .header-logo img { height: 36px; width: auto; }
     .header-nav { display: flex; gap: 1.5rem; align-items: center; }
     .header-nav a {
       font-size: 0.875rem;
@@ -66,7 +70,7 @@
       opacity: 0.85;
       transition: opacity 0.15s;
     }
-    .header-nav a:hover { opacity: 1; }
+    .header-nav a:hover { opacity: 1; color: var(--reso-orange); }
 
     /* Main */
     .site-main {
@@ -119,6 +123,10 @@
       background: var(--reso-blue);
       color: white;
     }
+    .badge-orange {
+      background: var(--reso-orange);
+      color: white;
+    }
     .badge-outline {
       background: transparent;
       border: 1px solid var(--reso-gray-300);
@@ -148,7 +156,7 @@
     .package-name {
       font-weight: 600;
       font-size: 0.9375rem;
-      color: var(--reso-gray-800);
+      color: var(--reso-navy);
     }
     .package-desc {
       font-size: 0.8125rem;
@@ -180,36 +188,43 @@
     /* Hero */
     .hero {
       text-align: center;
-      padding: 2rem 0 1rem;
+      padding: 3rem 1.5rem 2rem;
+      background: linear-gradient(135deg, var(--reso-navy) 0%, var(--reso-navy-light) 100%);
+      border-radius: 0.75rem;
+      margin-bottom: 2rem;
+      color: white;
     }
     .hero h1 {
-      font-size: 1.75rem;
+      font-size: 2rem;
       font-weight: 700;
-      color: var(--reso-gray-800);
+      color: white;
       letter-spacing: -0.025em;
     }
     .hero p {
-      color: var(--reso-gray-500);
+      color: rgba(255,255,255,0.8);
       margin-top: 0.5rem;
-      font-size: 1rem;
+      font-size: 1.05rem;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
     }
     .hero-stats {
       display: flex;
       justify-content: center;
-      gap: 2rem;
-      margin-top: 1.25rem;
+      gap: 3rem;
+      margin-top: 1.75rem;
     }
     .hero-stat {
       text-align: center;
     }
     .hero-stat .number {
-      font-size: 1.5rem;
+      font-size: 1.75rem;
       font-weight: 700;
-      color: var(--reso-navy);
+      color: var(--reso-orange);
     }
     .hero-stat .label {
       font-size: 0.75rem;
-      color: var(--reso-gray-500);
+      color: rgba(255,255,255,0.7);
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
@@ -220,21 +235,28 @@
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.1em;
-      color: var(--reso-gray-500);
+      color: var(--reso-blue);
       margin-bottom: 0.75rem;
     }
     .section-group { margin-bottom: 2rem; }
 
+    /* Section accent borders */
+    .section-group .card { border-top: 3px solid transparent; }
+    .section-libraries .card { border-top-color: var(--reso-green); }
+    .section-tools .card { border-top-color: var(--reso-blue); }
+    .section-server .card { border-top-color: var(--reso-orange); }
+    .section-quickstart .card { border-top-color: var(--reso-navy); }
+
     /* Footer */
     .site-footer {
-      background: var(--reso-navy-dark);
+      background: var(--reso-navy);
       color: rgba(255,255,255,0.6);
       text-align: center;
       padding: 1.5rem;
       font-size: 0.8125rem;
     }
     .site-footer a { color: rgba(255,255,255,0.8); text-decoration: none; }
-    .site-footer a:hover { color: white; }
+    .site-footer a:hover { color: var(--reso-orange); }
 
     /* Markdown content */
     .content h1, .content h2, .content h3 { margin-top: 1.5rem; margin-bottom: 0.75rem; color: var(--reso-gray-800); }
@@ -281,15 +303,11 @@
 <body>
   <header class="site-header">
     <a href="{{ '/' | relative_url }}" class="header-logo">
-      <svg viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M14.5 4L4 12l10.5 8L25 12 14.5 4z" fill="#38a169"/>
-        <path d="M14.5 16L4 24l10.5 8L25 24l-10.5-8z" fill="#38a169" opacity="0.6"/>
-        <text x="32" y="26" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif" font-size="20" font-weight="800" fill="white" letter-spacing="-0.5">RESO</text>
-      </svg>
+      <img src="{{ '/assets/reso-logo-white.png' | relative_url }}" alt="RESO" />
     </a>
     <nav class="header-nav">
       <a href="{{ '/' | relative_url }}">Home</a>
-      <a href="https://github.com/RESOStandards/reso-transport-tools">GitHub</a>
+      <a href="https://github.com/RESOStandards/reso-tools">GitHub</a>
       <a href="https://certification.reso.org">Certification</a>
       <a href="https://reso.org">RESO.org</a>
     </nav>
@@ -302,9 +320,9 @@
   <footer class="site-footer">
     <p>&copy; {{ 'now' | date: '%Y' }} <a href="https://reso.org">Real Estate Standards Organization (RESO)</a>. All rights reserved.</p>
     <p style="margin-top: 0.5rem;">
-      <a href="https://github.com/RESOStandards/reso-transport-tools">Source</a> &middot;
+      <a href="https://github.com/RESOStandards/reso-tools">Source</a> &middot;
       <a href="https://certification.reso.org">Certification Analytics</a> &middot;
-      <a href="https://reso.org/reso-terms-of-use/">Terms of Use</a>
+      <a href="https://www.reso.org/eula/">Terms of Use</a>
     </p>
   </footer>
 </body>

@@ -2,12 +2,12 @@
  * OData query option validator — validates $select, $orderby, $filter, $top,
  * $skip against CSDL entity type metadata.
  *
- * Uses @reso/odata-filter-parser to parse and walk $filter AST for property
+ * Uses @reso/odata-expression-parser to parse and walk $filter AST for property
  * reference validation.
  */
 
-import { parseFilter } from '@reso/odata-filter-parser';
-import type { FilterExpression } from '@reso/odata-filter-parser';
+import { parseFilter, parseExpand, ExpandParseError } from '@reso/odata-expression-parser';
+import type { FilterExpression, ExpandExpression } from '@reso/odata-expression-parser';
 import type { CsdlEntityType } from '../csdl/types.js';
 import type { ODataQueryOptions } from '../types.js';
 
@@ -45,21 +45,20 @@ const collectPropertyNames = (expr: FilterExpression): ReadonlyArray<string> => 
   }
 };
 
-/** Split $expand value on commas, respecting parenthesized nested options. */
-const splitExpandParts = (expand: string): ReadonlyArray<string> => {
-  const parts: string[] = [];
-  let depth = 0;
-  let start = 0;
-  for (let i = 0; i < expand.length; i++) {
-    if (expand[i] === '(') depth++;
-    else if (expand[i] === ')') depth--;
-    else if (expand[i] === ',' && depth === 0) {
-      parts.push(expand.slice(start, i).trim());
-      start = i + 1;
+/** Validate parsed expand expressions, checking nav property names exist. */
+const validateExpandExpressions = (
+  exprs: ReadonlyArray<ExpandExpression>,
+  navPropertyNames: ReadonlySet<string>,
+  errors: QueryValidationError[]
+): void => {
+  for (const expr of exprs) {
+    if (!navPropertyNames.has(expr.property)) {
+      errors.push({
+        option: '$expand',
+        message: `Unknown navigation property '${expr.property}' in $expand`
+      });
     }
   }
-  parts.push(expand.slice(start).trim());
-  return parts.filter(p => p.length > 0);
 };
 
 /**
@@ -129,17 +128,14 @@ export const validateQueryOptions = (options: ODataQueryOptions, entityType: Csd
 
   // Validate $expand
   if (options.$expand) {
-    // Split on commas that are NOT inside parentheses (nested options)
-    const expandParts = splitExpandParts(options.$expand);
-    for (const part of expandParts) {
-      // Strip nested query options: "Media($select=...)" → "Media"
-      const navName = part.split('(')[0].trim();
-      if (!navPropertyNames.has(navName)) {
-        errors.push({
-          option: '$expand',
-          message: `Unknown navigation property '${navName}' in $expand`
-        });
-      }
+    try {
+      const expandTree = parseExpand(options.$expand);
+      validateExpandExpressions(expandTree, navPropertyNames, errors);
+    } catch (err) {
+      errors.push({
+        option: '$expand',
+        message: `Invalid $expand expression: ${err instanceof ExpandParseError ? err.message : String(err)}`
+      });
     }
   }
 

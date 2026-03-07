@@ -5,8 +5,8 @@
  * - parseFilterToEntries: OData $filter string → form entries
  */
 
-import { LexerError, ParseError, parseFilter } from '@reso/odata-filter-parser';
-import type { FilterExpression } from '@reso/odata-filter-parser';
+import { LexerError, ParseError, parseFilter } from '@reso/odata-expression-parser';
+import type { FilterExpression } from '@reso/odata-expression-parser';
 import type { ResoField } from '../types.js';
 import { isEnumType, isNumericEdmType } from '../types.js';
 

@@ -1,11 +1,11 @@
 ---
 layout: default
-title: RESO Transport Tools
+title: RESO Tools
 ---
 
 <div class="hero">
-  <h1>RESO Transport Tools</h1>
-  <p>Testing, client SDK, and reference implementation tools for the RESO Web API specification.</p>
+  <h1>RESO Tools</h1>
+  <p>Open-source testing, client SDK, and reference implementation tools for the RESO Web API specification.</p>
   <div class="hero-stats">
     <div class="hero-stat">
       <div class="number">7</div>
@@ -23,7 +23,7 @@ title: RESO Transport Tools
 </div>
 
 <!-- Libraries -->
-<div class="section-group">
+<div class="section-group section-libraries">
   <div class="section-title">Libraries</div>
   <div class="card">
     <div class="card-header">
@@ -46,7 +46,7 @@ title: RESO Transport Tools
 
     <div class="package-item">
       <div>
-        <div class="package-name">@reso/odata-filter-parser</div>
+        <div class="package-name">@reso/odata-expression-parser</div>
         <div class="package-desc">Standalone, zero-dependency library for parsing OData 4.01 $filter expressions into a typed AST.</div>
         <div class="package-meta">
           <span>97 tests</span>
@@ -54,7 +54,7 @@ title: RESO Transport Tools
           <span>Zero dependencies</span>
         </div>
       </div>
-      <a href="{{ '/packages/odata-filter-parser' | relative_url }}" class="view-link">View &rarr;</a>
+      <a href="{{ '/packages/odata-expression-parser' | relative_url }}" class="view-link">View &rarr;</a>
     </div>
 
     <div class="package-item">
@@ -64,7 +64,7 @@ title: RESO Transport Tools
         <div class="package-meta">
           <span>101 tests</span>
           <span>&middot;</span>
-          <span>Depends on odata-filter-parser</span>
+          <span>Depends on odata-expression-parser</span>
         </div>
       </div>
       <a href="{{ '/packages/odata-client' | relative_url }}" class="view-link">View &rarr;</a>
@@ -73,7 +73,7 @@ title: RESO Transport Tools
 </div>
 
 <!-- Tools -->
-<div class="section-group">
+<div class="section-group section-tools">
   <div class="section-title">Tools</div>
   <div class="card">
     <div class="card-header">
@@ -97,7 +97,7 @@ title: RESO Transport Tools
     <div class="package-item">
       <div>
         <div class="package-name">@reso/certification</div>
-        <div class="package-desc">RESO certification testing tools. Includes Web API Add/Edit (RCP-010) compliance testing against 8 Gherkin BDD scenarios.</div>
+        <div class="package-desc">RESO certification compliance testing tools. Includes Web API Core, Data Dictionary, Add/Edit (RCP-010), and EntityEvent (RCP-027) endorsement testing.</div>
         <div class="package-meta">
           <span>49 tests</span>
           <span>&middot;</span>
@@ -110,12 +110,12 @@ title: RESO Transport Tools
 </div>
 
 <!-- Reference Server -->
-<div class="section-group">
+<div class="section-group section-server">
   <div class="section-title">Reference Implementation</div>
   <div class="card">
     <div class="card-header">
       <h3>RESO Reference Server</h3>
-      <span class="badge badge-green">OData 4.01</span>
+      <span class="badge badge-orange">OData 4.01</span>
     </div>
 
     <div class="package-item">
@@ -144,19 +144,19 @@ title: RESO Transport Tools
 </div>
 
 <!-- Quick Start -->
-<div class="section-group">
+<div class="section-group section-quickstart">
   <div class="section-title">Quick Start</div>
   <div class="card">
     <div class="card-body content">
       <h3 style="margin-top: 0">Run the Reference Server</h3>
-<pre><code>git clone https://github.com/RESOStandards/reso-transport-tools.git
-cd reso-transport-tools/reso-reference-server
+<pre><code>git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools/reso-reference-server
 docker compose up -d                      # Start server + PostgreSQL
 docker compose --profile seed up          # Seed with test data
 
 # Verify
 curl http://localhost:8080/health
-curl http://localhost:8080/\$metadata
+curl http://localhost:8080/$metadata
 open http://localhost:8080/api-docs        # Swagger UI
 open http://localhost:5173                  # React UI</code></pre>
 

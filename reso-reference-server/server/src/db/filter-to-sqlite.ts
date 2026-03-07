@@ -1,14 +1,14 @@
 /**
  * Translates an OData $filter expression into a parameterized SQLite WHERE clause.
  *
- * Uses the shared @reso/odata-filter-parser library to parse the filter string
+ * Uses the shared @reso/odata-expression-parser library to parse the filter string
  * into an AST, then walks the tree to produce SQLite SQL with parameterized values.
  *
  * All user-provided values are parameterized (?) to prevent SQL injection.
  */
 
-import { parseFilter } from '@reso/odata-filter-parser';
-import type { FilterExpression } from '@reso/odata-filter-parser';
+import { parseFilter } from '@reso/odata-expression-parser';
+import type { FilterExpression } from '@reso/odata-expression-parser';
 import type { ResoField } from '../metadata/types.js';
 import type { FilterSqlResult } from './filter-to-sql.js';
 
