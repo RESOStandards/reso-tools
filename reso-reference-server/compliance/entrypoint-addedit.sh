@@ -122,7 +122,7 @@ echo "--------------------------------------------"
 REPORT_PATH="/tmp/compliance-report.json"
 
 FAILED=0
-node /app/dist/cli/index.js \
+node /app/dist/cli/index.js add-edit \
   --url "$SERVER_URL" \
   --resource "$RESOURCE" \
   --payloads "$PAYLOADS_DIR" \

@@ -175,9 +175,9 @@ const batchExpandNavigation = async (
  * @param db - MongoDB Db instance (from MongoClient.db())
  */
 export const createMongoDal = (db: Db): DataAccessLayer => {
-  /** Returns the set of collection field names for a resource context. */
+  /** Returns the set of collection field names for a resource context (excludes expansion/navigation properties). */
   const collectionFieldSet = (ctx: ResourceContext): ReadonlySet<string> =>
-    new Set(ctx.fields.filter(f => f.isCollection).map(f => f.fieldName));
+    new Set(ctx.fields.filter(f => f.isCollection && !f.isExpansion).map(f => f.fieldName));
 
   const queryCollection = async (ctx: ResourceContext, options?: CollectionQueryOptions): Promise<CollectionResult> => {
     const collection = db.collection(ctx.resource);

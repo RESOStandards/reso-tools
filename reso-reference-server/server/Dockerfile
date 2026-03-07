@@ -58,7 +58,8 @@ ENV PORT=8080
 ENV METADATA_PATH=./server-metadata.json
 
 # Run as non-root user
-RUN addgroup -S reso && adduser -S reso -G reso
+RUN addgroup -S reso && adduser -S reso -G reso \
+ && mkdir -p /data && chown reso:reso /data
 USER reso
 
 EXPOSE 8080
