@@ -9,3 +9,4 @@ tools/PR.md
 *.db
 *.db-shm
 *.db-wal
+.github/pages/dd-output/
