@@ -225,7 +225,7 @@ export const RecordForm = ({
         </FieldGroupSection>
       )}
 
-      <div className="flex gap-2 pt-2">
+      <div className="sticky bottom-0 z-10 flex gap-2 pt-2 pb-2 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 -mx-4 px-4 sm:-mx-6 sm:px-6">
         <button
           type="submit"
           disabled={isLoading}

@@ -1,0 +1,16 @@
+---
+layout: default
+---
+<div style="margin-bottom: 1rem;">
+  <a href="{{ '/' | relative_url }}" class="view-link">&larr; Back to all packages</a>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3>{{ page.package_name | default: page.title }}</h3>
+    {% if page.badge %}<span class="badge badge-green">{{ page.badge }}</span>{% endif %}
+  </div>
+  <div class="card-body content">
+    {{ content }}
+  </div>
+</div>

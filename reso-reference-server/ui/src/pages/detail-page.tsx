@@ -299,83 +299,87 @@ export const DetailPage = () => {
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto min-h-0 px-4 sm:px-6 py-4 space-y-4">
-        {/* Summary header card */}
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-          {resourceName === 'Property' && address && (
-            <div className="text-base font-medium text-gray-900 dark:text-gray-100 mb-2">{address}</div>
-          )}
-          <div className="flex items-center gap-2 py-0.5 text-sm mb-1">
-            <span className="text-gray-500 dark:text-gray-400 shrink-0">{keyField}:</span>
-            <span className="font-mono text-gray-800 dark:text-gray-200">{String(record[keyField] ?? '')}</span>
-            <button
-              type="button"
-              onClick={handleCopyKey}
-              title={keyCopied ? 'Copied!' : 'Copy key to clipboard'}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-              {keyCopied ? (
-                <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <title>Copied</title>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <title>Copy to clipboard</title>
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-              )}
-            </button>
-          </div>
-          {record.ModificationTimestamp != null && (
-            <div className="flex items-baseline gap-2 py-0.5 text-sm mb-1">
-              <span className="text-gray-500 dark:text-gray-400 shrink-0">ModificationTimestamp:</span>
-              <span className="text-gray-800 dark:text-gray-200">{String(record.ModificationTimestamp)}</span>
+        {/* Summary + Media side-by-side on large screens */}
+        <div className={`flex flex-col ${media.length > 0 || hasMediaPreview ? 'lg:flex-row' : ''} gap-4`}>
+          {/* Summary header card */}
+          <div className="flex-1 min-w-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+            {resourceName === 'Property' && address && (
+              <div className="text-base font-medium text-gray-900 dark:text-gray-100 mb-2">{address}</div>
+            )}
+            <div className="flex items-center gap-2 py-0.5 text-sm mb-1">
+              <span className="text-gray-500 dark:text-gray-400 shrink-0">{keyField}:</span>
+              <span className="font-mono text-gray-800 dark:text-gray-200">{String(record[keyField] ?? '')}</span>
+              <button
+                type="button"
+                onClick={handleCopyKey}
+                title={keyCopied ? 'Copied!' : 'Copy key to clipboard'}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                {keyCopied ? (
+                  <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <title>Copied</title>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <title>Copy to clipboard</title>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                    />
+                  </svg>
+                )}
+              </button>
             </div>
-          )}
-          {hasGroupings && summaryFields.length > 0 && (
-            <>
-              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-3 mb-2">Summary</h3>
-              {renderFieldList(
-                summaryFields.filter(f => !ADDRESS_FIELDS.has(f.fieldName)),
-                1
-              )}
-            </>
-          )}
-        </div>
+            {record.ModificationTimestamp != null && (
+              <div className="flex items-baseline gap-2 py-0.5 text-sm mb-1">
+                <span className="text-gray-500 dark:text-gray-400 shrink-0">ModificationTimestamp:</span>
+                <span className="text-gray-800 dark:text-gray-200">{String(record.ModificationTimestamp)}</span>
+              </div>
+            )}
+            {hasGroupings && summaryFields.length > 0 && (
+              <>
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-3 mb-2">Summary</h3>
+                {renderFieldList(
+                  summaryFields.filter(f => !ADDRESS_FIELDS.has(f.fieldName)),
+                  1
+                )}
+              </>
+            )}
+          </div>
 
-        {/* Fields with optional media preview floated right */}
-        <div>
+          {/* Media carousel beside summary on large screens */}
           {media.length > 0 && (
-            <div className="float-none lg:float-right lg:ml-4 mb-4 lg:w-[45%] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+            <div className="lg:w-[45%] shrink-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
               <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Media ({media.length})</h3>
               <MediaCarousel media={media} />
             </div>
           )}
           {hasMediaPreview && (
-            <div className="float-none lg:float-right lg:ml-4 mb-4 lg:w-[45%] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+            <div className="lg:w-[45%] shrink-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
               <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Preview</h3>
               <MediaPreview url={record.MediaURL as string} mediaType={record.MediaType as string | undefined} />
             </div>
           )}
+        </div>
 
-          {/* Ungrouped resources: fields rendered directly (no card wrapper so they flow around the float) */}
-          {!hasGroupings && ungrouped.length > 0 && renderFieldList(ungrouped, 1)}
+        {/* Field groups */}
+        <div>
+          {/* Ungrouped resources: fields rendered directly */}
+          {!hasGroupings && ungrouped.length > 0 && renderFieldList(ungrouped)}
 
           {/* Grouped fields */}
           {sortedGroups.map(([group, groupFields]) => (
             <FieldGroupSection key={group} title={group} defaultOpen>
-              {renderFieldList(groupFields, 1)}
+              {renderFieldList(groupFields)}
             </FieldGroupSection>
           ))}
 
           {/* Ungrouped remainder in "Other" (only when resource HAS groupings) */}
           {ungrouped.length > 0 && hasGroupings && (
             <FieldGroupSection title="Other" defaultOpen>
-              {renderFieldList(ungrouped, 1)}
+              {renderFieldList(ungrouped)}
             </FieldGroupSection>
           )}
         </div>

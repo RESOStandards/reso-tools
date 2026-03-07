@@ -1,0 +1,82 @@
+name: GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync package READMEs into site
+        run: |
+          # Copy each package README as a Jekyll collection page
+          packages=(
+            "validation:@reso/validation:Isomorphic validation library"
+            "odata-filter-parser:@reso/odata-filter-parser:OData filter parser"
+            "odata-client:@reso/odata-client:OData client SDK"
+            "data-generator:@reso/data-generator:Test data generator"
+            "certification:@reso/certification:Certification testing tools"
+            "reso-reference-server:reso-reference-server:OData reference server"
+          )
+
+          mkdir -p .github/pages/_packages
+          for entry in "${packages[@]}"; do
+            IFS=':' read -r dir name desc <<< "$entry"
+
+            # Find the README — handle nested structures
+            if [ -f "$dir/README.md" ]; then
+              readme="$dir/README.md"
+            elif [ -f "$dir/server/README.md" ]; then
+              readme="$dir/server/README.md"
+            else
+              continue
+            fi
+
+            # Create Jekyll front matter + README content
+            cat > ".github/pages/_packages/$dir.md" <<FRONT
+          ---
+          title: "$name"
+          package_name: "$name"
+          description: "$desc"
+          layout: package
+          ---
+
+          FRONT
+            cat "$readme" >> ".github/pages/_packages/$dir.md"
+          done
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./.github/pages
+          destination: ./_site
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -15,7 +15,13 @@ COPY validation/ /deps/validation/
 COPY data-generator/package.json data-generator/tsconfig.json /deps/data-generator/
 COPY data-generator/src/ /deps/data-generator/src/
 
-# Build data-generator (server depends on it)
+# Build file: dependencies (server depends on these)
+WORKDIR /deps/odata-filter-parser
+RUN npm install && npx tsc
+
+WORKDIR /deps/validation
+RUN npm install && npx tsc
+
 WORKDIR /deps/data-generator
 RUN npm install && npm run build
 
@@ -52,7 +58,8 @@ ENV PORT=8080
 ENV METADATA_PATH=./server-metadata.json
 
 # Run as non-root user
-RUN addgroup -S reso && adduser -S reso -G reso
+RUN addgroup -S reso && adduser -S reso -G reso \
+ && mkdir -p /data && chown reso:reso /data
 USER reso
 
 EXPOSE 8080

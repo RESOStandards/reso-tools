@@ -37,9 +37,11 @@ Both modes pass Web API Core 2.0.0 certification independently.
 A React SPA (Vite + Tailwind CSS) providing:
 
 - Paginated data browsing for all 13 resources
-- Record creation and editing with real-time validation
+- Record creation and editing with real-time validation and pinned action buttons
 - Cross-field business rule enforcement (shared `@reso/validation` package)
-- Navigation property traversal between related records
+- Navigation property traversal between related records with zebra-striped detail panels
+- Side-by-side summary + media carousel layout on detail pages
+- Docker hot-reload dev mode via `docker-compose.dev.yml` overlay
 
 ### Test Data Generator
 
@@ -58,7 +60,7 @@ Docker-based integration with the RESO Commander and a custom Add/Edit test runn
 - **Web API Core 2.0.0** — 42 passed, 0 failed, 3 skipped (45 specification tests)
 - **Data Dictionary 2.0** — 1,034 passed, 570 skipped, 0 failed, 0 schema validation errors
 - **Add/Edit (RCP-010)** — 8 passed, 0 failed. Structured JSON compliance report generation with per-scenario details
-- **EntityEvent (RCP-027)** — manual testing verified on SQLite and MongoDB backends. Compliance testing tool planned.
+- **EntityEvent (RCP-027)** — 11 scenarios (8 observe-mode + 3 full-mode). Native TypeScript compliance testing tool with observe and full modes.
 - **Both enum modes** tested independently via `ENUM_MODE` environment variable
 - **PATCH validation** — Partial updates skip required-field checks (`skipRequired` parameter)
 - Configurable via Docker Compose profiles (`compliance-core`, `compliance-dd`, `compliance-addedit`)
@@ -93,7 +95,7 @@ The reference server has passed **RESO Certification** for Web API Core 2.0.0, D
 | Feature | RCP | Description |
 |---------|-----|-------------|
 | Validation Expressions | RCP-019 | Server-side validation expression evaluation and client exposure via metadata annotations |
-| ~~EntityEvent~~ | ~~RCP-027~~ | ~~Change tracking — delivered in v0.0.27. Compliance testing tool planned.~~ |
+| ~~EntityEvent~~ | ~~RCP-027~~ | ~~Change tracking — delivered in v0.0.27. Compliance testing tool delivered in v0.0.28.~~ |
 | Webhooks | RCP-028 | Push-based notification delivery for real-time data change subscriptions |
 
 ---
@@ -115,6 +117,9 @@ docker compose --profile seed up seed
 # Run compliance tests
 docker compose --profile compliance-core up compliance-core
 docker compose --profile compliance-dd up compliance-dd
+
+# Hot-reload dev mode (UI changes reflect instantly)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 # Enum-type mode
 ENUM_MODE=enum-type docker compose up -d --build

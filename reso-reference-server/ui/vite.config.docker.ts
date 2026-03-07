@@ -3,7 +3,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-const API_TARGET = 'http://localhost:8080';
+const API_TARGET = 'http://server:8080';
 
 /** Resources that exist as both API endpoints and SPA routes. */
 const RESOURCES = [
@@ -46,10 +46,15 @@ const shouldProxyResource = (req: IncomingMessage): boolean => {
   return accept.includes('application/json');
 };
 
+/** Vite config for Docker dev mode — proxies to the `server` compose service. */
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    port: 5173,
+    host: '0.0.0.0',
+    port: 80,
+    watch: {
+      usePolling: true
+    },
     proxy: {
       // Non-resource API endpoints — always proxy
       '/ui-config': API_TARGET,

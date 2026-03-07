@@ -114,8 +114,8 @@ export const ExpandedEntityCard = ({ title, targetResource, records, isCollectio
         {/* Two-column field list, vertically scrollable, max 4 rows visible */}
         <div className="overflow-y-auto max-h-28 flex-1 min-w-0">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0.5">
-            {displayFields.map(([key, value]) => (
-              <div key={key} className="flex items-baseline gap-2 py-0.5 text-sm">
+            {displayFields.map(([key, value], i) => (
+              <div key={key} className={`flex items-baseline gap-2 py-0.5 px-1 rounded text-sm ${i % 2 === 1 ? 'bg-gray-100 dark:bg-gray-700/40' : ''}`}>
                 <span className="text-gray-500 dark:text-gray-400 shrink-0 w-40 sm:w-44 truncate">{key}</span>
                 <span className="text-gray-800 dark:text-gray-200 truncate" title={formatValue(value)}>
                   {formatValue(value)}
