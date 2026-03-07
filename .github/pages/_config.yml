@@ -15,6 +15,9 @@ exclude:
   - Gemfile
   - Gemfile.lock
   - node_modules
+  - dd-generator
+  - dd-data
+  - dd-output
 
 collections:
   packages:

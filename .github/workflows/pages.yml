@@ -58,6 +58,19 @@ jobs:
             cat "$readme" >> ".github/pages/_packages/$dir.md"
           done
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Generate DD documentation
+        run: node .github/pages/dd-generator/generate.mjs
+        env:
+          TOKEN_URI: ${{ secrets.TOKEN_URI }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+          RESO_AGGS_URL: ${{ secrets.RESO_AGGS_URL }}
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
@@ -66,6 +79,9 @@ jobs:
         with:
           source: ./.github/pages
           destination: ./_site
+
+      - name: Copy DD docs into site
+        run: cp -r .github/pages/dd-output/* ./_site/dd/
 
       - name: Build search index with Pagefind
         run: |
