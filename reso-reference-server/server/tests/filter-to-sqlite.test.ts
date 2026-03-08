@@ -99,19 +99,19 @@ describe('filterToSqlite', () => {
   describe('string functions', () => {
     it('translates contains using LIKE', () => {
       const result = filterToSqlite("contains(City, 'Aus')", fields, 'p');
-      expect(result.where).toBe(`p."City" LIKE ?`);
+      expect(result.where).toBe(`p."City" LIKE ? ESCAPE '\\'`);
       expect(result.values).toEqual(['%Aus%']);
     });
 
     it('translates startswith using LIKE', () => {
       const result = filterToSqlite("startswith(City, 'A')", fields, 'p');
-      expect(result.where).toBe(`p."City" LIKE ?`);
+      expect(result.where).toBe(`p."City" LIKE ? ESCAPE '\\'`);
       expect(result.values).toEqual(['A%']);
     });
 
     it('translates endswith using LIKE', () => {
       const result = filterToSqlite("endswith(City, 'tin')", fields, 'p');
-      expect(result.where).toBe(`p."City" LIKE ?`);
+      expect(result.where).toBe(`p."City" LIKE ? ESCAPE '\\'`);
       expect(result.values).toEqual(['%tin']);
     });
 
@@ -203,7 +203,7 @@ describe('filterToSqlite', () => {
 
     it('handles function in comparison', () => {
       const result = filterToSqlite("contains(City, 'Aus') and ListPrice gt 100000", fields, 'p');
-      expect(result.where).toBe(`(p."City" LIKE ? AND p."ListPrice" > ?)`);
+      expect(result.where).toBe(`(p."City" LIKE ? ESCAPE '\\' AND p."ListPrice" > ?)`);
       expect(result.values).toEqual(['%Aus%', 100000]);
     });
   });

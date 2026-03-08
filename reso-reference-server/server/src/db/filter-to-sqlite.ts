@@ -12,6 +12,10 @@ import type { FilterExpression } from '@reso/odata-expression-parser';
 import type { ResoField } from '../metadata/types.js';
 import type { FilterSqlResult } from './filter-to-sql.js';
 
+/** Escape LIKE wildcard characters so they match literally. */
+const escapeLikeWildcards = (str: string): string =>
+  str.replace(/[%_\\]/g, ch => `\\${ch}`);
+
 /** Map OData comparison operators to SQL operators. */
 const COMPARISON_OPS: Readonly<Record<string, string>> = {
   eq: '=',
@@ -190,7 +194,8 @@ export const filterToSqlite = (
         const field = toSql(args[0]!);
         const value = args[1]!;
         if (value.type === 'literal' && typeof value.value === 'string') {
-          return `${field} LIKE ${addParam(`%${value.value}%`)}`;
+          const escaped = escapeLikeWildcards(value.value);
+          return `${field} LIKE ${addParam(`%${escaped}%`)} ESCAPE '\\'`;
         }
         return `${field} LIKE '%' || ${toSql(value)} || '%'`;
       }
@@ -198,7 +203,8 @@ export const filterToSqlite = (
         const field = toSql(args[0]!);
         const value = args[1]!;
         if (value.type === 'literal' && typeof value.value === 'string') {
-          return `${field} LIKE ${addParam(`${value.value}%`)}`;
+          const escaped = escapeLikeWildcards(value.value);
+          return `${field} LIKE ${addParam(`${escaped}%`)} ESCAPE '\\'`;
         }
         return `${field} LIKE ${toSql(value)} || '%'`;
       }
@@ -206,7 +212,8 @@ export const filterToSqlite = (
         const field = toSql(args[0]!);
         const value = args[1]!;
         if (value.type === 'literal' && typeof value.value === 'string') {
-          return `${field} LIKE ${addParam(`%${value.value}`)}`;
+          const escaped = escapeLikeWildcards(value.value);
+          return `${field} LIKE ${addParam(`%${escaped}`)} ESCAPE '\\'`;
         }
         return `${field} LIKE '%' || ${toSql(value)}`;
       }

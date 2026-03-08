@@ -19,6 +19,10 @@ export interface FilterSqlResult {
   readonly values: ReadonlyArray<unknown>;
 }
 
+/** Escape LIKE/ILIKE wildcard characters so they match literally. */
+const escapeLikeWildcards = (str: string): string =>
+  str.replace(/[%_\\]/g, ch => `\\${ch}`);
+
 /** Map OData comparison operators to SQL operators. */
 const COMPARISON_OPS: Readonly<Record<string, string>> = {
   eq: '=',
@@ -206,7 +210,8 @@ export const filterToSql = (
         const field = toSql(args[0]!);
         const value = args[1]!;
         if (value.type === 'literal' && typeof value.value === 'string') {
-          return `${field} ILIKE ${addParam(`%${value.value}%`)}`;
+          const escaped = escapeLikeWildcards(value.value);
+          return `${field} ILIKE ${addParam(`%${escaped}%`)} ESCAPE '\\'`;
         }
         return `${field} ILIKE '%' || ${toSql(value)} || '%'`;
       }
@@ -214,7 +219,8 @@ export const filterToSql = (
         const field = toSql(args[0]!);
         const value = args[1]!;
         if (value.type === 'literal' && typeof value.value === 'string') {
-          return `${field} ILIKE ${addParam(`${value.value}%`)}`;
+          const escaped = escapeLikeWildcards(value.value);
+          return `${field} ILIKE ${addParam(`${escaped}%`)} ESCAPE '\\'`;
         }
         return `${field} ILIKE ${toSql(value)} || '%'`;
       }
@@ -222,7 +228,8 @@ export const filterToSql = (
         const field = toSql(args[0]!);
         const value = args[1]!;
         if (value.type === 'literal' && typeof value.value === 'string') {
-          return `${field} ILIKE ${addParam(`%${value.value}`)}`;
+          const escaped = escapeLikeWildcards(value.value);
+          return `${field} ILIKE ${addParam(`%${escaped}`)} ESCAPE '\\'`;
         }
         return `${field} ILIKE '%' || ${toSql(value)}`;
       }

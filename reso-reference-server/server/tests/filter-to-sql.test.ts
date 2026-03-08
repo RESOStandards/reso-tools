@@ -99,19 +99,19 @@ describe('filterToSql', () => {
   describe('string functions', () => {
     it('translates contains', () => {
       const result = filterToSql("contains(City, 'Aus')", fields, 'p');
-      expect(result.where).toBe(`p."City" ILIKE $1`);
+      expect(result.where).toBe(`p."City" ILIKE $1 ESCAPE '\\'`);
       expect(result.values).toEqual(['%Aus%']);
     });
 
     it('translates startswith', () => {
       const result = filterToSql("startswith(City, 'A')", fields, 'p');
-      expect(result.where).toBe(`p."City" ILIKE $1`);
+      expect(result.where).toBe(`p."City" ILIKE $1 ESCAPE '\\'`);
       expect(result.values).toEqual(['A%']);
     });
 
     it('translates endswith', () => {
       const result = filterToSql("endswith(City, 'tin')", fields, 'p');
-      expect(result.where).toBe(`p."City" ILIKE $1`);
+      expect(result.where).toBe(`p."City" ILIKE $1 ESCAPE '\\'`);
       expect(result.values).toEqual(['%tin']);
     });
 
@@ -203,7 +203,7 @@ describe('filterToSql', () => {
 
     it('handles function in comparison', () => {
       const result = filterToSql("contains(City, 'Aus') and ListPrice gt 100000", fields, 'p');
-      expect(result.where).toBe(`(p."City" ILIKE $1 AND p."ListPrice" > $2)`);
+      expect(result.where).toBe(`(p."City" ILIKE $1 ESCAPE '\\' AND p."ListPrice" > $2)`);
       expect(result.values).toEqual(['%Aus%', 100000]);
     });
   });

@@ -649,7 +649,7 @@ export const createPostgresDal = (pool: pg.Pool): DataAccessLayer => {
     // If $expand is requested, delegate to queryCollection with a key filter
     if (options?.$expand) {
       const result = await queryCollection(ctx, {
-        $filter: `${ctx.keyField} eq '${keyValue}'`,
+        $filter: `${ctx.keyField} eq '${keyValue.replace(/'/g, "''")}'`,
         $select: options.$select,
         $expand: options.$expand,
         $top: 1

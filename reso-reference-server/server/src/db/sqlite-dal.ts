@@ -602,7 +602,7 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
   ): Promise<SingleResult> => {
     if (options?.$expand) {
       const result = await queryCollection(ctx, {
-        $filter: `${ctx.keyField} eq '${keyValue}'`,
+        $filter: `${ctx.keyField} eq '${keyValue.replace(/'/g, "''")}'`,
         $select: options.$select,
         $expand: options.$expand,
         $top: 1
