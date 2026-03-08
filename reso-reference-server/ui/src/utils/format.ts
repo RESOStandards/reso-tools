@@ -48,8 +48,12 @@ const toNumber = (value: unknown): number | null => {
  * Currency fields show USD symbols, numbers get thousands separators,
  * dates use locale formatting, and booleans show Yes/No.
  */
+/** Check whether a field name indicates a sensitive value that should be masked in the UI. */
+const isSensitiveField = (fieldName: string): boolean => fieldName.toLowerCase().includes('password');
+
 export const formatFieldValue = (value: unknown, field: ResoField | undefined): string => {
   if (value === null || value === undefined) return '\u2014';
+  if (field && isSensitiveField(field.fieldName) && value !== null && value !== undefined) return '*****';
   if (Array.isArray(value)) return value.join(', ');
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
 

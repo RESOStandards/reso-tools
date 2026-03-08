@@ -3,23 +3,20 @@ import { useNavigate, useParams } from 'react-router';
 import { readEntity } from '../api/client';
 import { DeleteDialog } from '../components/delete-dialog';
 import { KeyPrompt } from '../components/key-prompt';
-import type { ResourceName } from '../types';
-import { KEY_FIELD_MAP, TARGET_RESOURCES } from '../types';
+import { useServer } from '../context/server-context';
+import { TARGET_RESOURCES } from '../types';
 
 /** Page for deleting a record. Prompts for key, loads record, shows confirmation dialog. */
 export const DeletePage = () => {
   const { resource } = useParams<{ resource: string }>();
   const navigate = useNavigate();
-  const resourceName = resource as ResourceName;
+  const { isLocal, resources, isLoadingResources } = useServer();
+  const resourceName = resource ?? '';
 
   const [key, setKey] = useState<string | null>(null);
   const [record, setRecord] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (!TARGET_RESOURCES.includes(resourceName)) {
-    return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Unknown resource: {resource}</div>;
-  }
 
   // Load record when key is set
   useEffect(() => {
@@ -54,6 +51,17 @@ export const DeletePage = () => {
     setRecord(null);
     setError(null);
   }, []);
+
+  // Validate resource exists (after all hooks)
+  const isValidResource = isLocal
+    ? TARGET_RESOURCES.includes(resourceName as (typeof TARGET_RESOURCES)[number])
+    : (resources?.some(r => r.name === resourceName) ?? null);
+  if (isValidResource === null || isLoadingResources) {
+    return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading resources...</div>;
+  }
+  if (!isValidResource) {
+    return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Unknown resource: {resource}</div>;
+  }
 
   // No key yet — show prompt
   if (!key) {

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchCollectionByUrl, queryCollection } from '../api/client.js';
-import type { ResourceName } from '../types.js';
 
 const PAGE_SIZE = 25;
 
@@ -13,9 +12,9 @@ export interface UseCollectionResult {
   readonly loadMore: () => void;
 }
 
-/** Fetches a resource collection with infinite scroll pagination via @odata.nextLink. */
+/** Fetches a resource collection with server-driven pagination via @odata.nextLink. */
 export const useCollection = (
-  resource: ResourceName,
+  resource: string,
   params: { $filter?: string; $orderby?: string; $select?: string; $expand?: string }
 ): UseCollectionResult => {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
@@ -40,15 +39,16 @@ export const useCollection = (
         abortRef.current?.abort();
         abortRef.current = new AbortController();
 
+        // Use Prefer: odata.maxpagesize for server-driven pagination instead of $top.
+        // $top limits the total result set; maxpagesize tells the server the preferred page size
+        // while allowing it to return @odata.nextLink for subsequent pages.
         const result = await queryCollection(resource, {
           $filter: params.$filter || undefined,
           $orderby: params.$orderby || undefined,
           $select: params.$select || undefined,
           $expand: params.$expand || undefined,
-          $top: PAGE_SIZE,
-          $skip: 0,
           $count: true
-        });
+        }, PAGE_SIZE);
 
         setRows([...result.value]);
         if (result['@odata.count'] !== undefined) {
@@ -77,8 +77,8 @@ export const useCollection = (
     if (isLoading || !hasMore || !nextLinkRef.current) return;
     setIsLoading(true);
     try {
-      // Follow the server-provided @odata.nextLink
-      const result = await fetchCollectionByUrl(nextLinkRef.current);
+      // Follow the server-provided @odata.nextLink, preserving the page size preference
+      const result = await fetchCollectionByUrl(nextLinkRef.current, PAGE_SIZE);
 
       setRows(prev => [...prev, ...result.value]);
       nextLinkRef.current = result['@odata.nextLink'] ?? null;

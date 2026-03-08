@@ -4,13 +4,14 @@ interface SearchBarProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly onSearch: () => void;
+  readonly onClose: () => void;
   readonly onToggleAdvanced: () => void;
   readonly isAdvancedMode: boolean;
   readonly validationError: string | null;
 }
 
-/** OData $filter search bar with validation display and clipboard copy. */
-export const SearchBar = ({ value, onChange, onSearch, onToggleAdvanced, isAdvancedMode, validationError }: SearchBarProps) => {
+/** OData $filter editor — shown when user clicks the edit icon from basic search. */
+export const SearchBar = ({ value, onChange, onSearch, onClose, onToggleAdvanced, isAdvancedMode, validationError }: SearchBarProps) => {
   const [copied, setCopied] = useState(false);
 
   const handleSubmit = (e: FormEvent) => {
@@ -36,9 +37,10 @@ export const SearchBar = ({ value, onChange, onSearch, onToggleAdvanced, isAdvan
             value={value}
             onChange={e => onChange(e.target.value)}
             placeholder="OData $filter expression (e.g. ListPrice gt 500000)"
-            className={`w-full px-3 py-2 border rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
+            className={`w-full px-3 py-2 border rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
               validationError ? 'border-red-400 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
             } ${isLong ? 'pr-9' : ''}`}
+            autoFocus
           />
           {isLong && (
             <button
@@ -78,6 +80,15 @@ export const SearchBar = ({ value, onChange, onSearch, onToggleAdvanced, isAdvan
                 : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
             }`}>
             Advanced
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+            title="Back to basic search">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+            </svg>
           </button>
         </div>
       </form>

@@ -1,10 +1,9 @@
-import type { ResourceName } from '../types';
-import { KEY_FIELD_MAP } from '../types';
+import { useServer } from '../context/server-context';
 import { ADDRESS_FIELDS, formatAddress, formatFieldValue, getDisplayNameFromMap } from '../utils/format';
 import { MediaCarousel } from './media-carousel';
 
 interface ResultsCardProps {
-  readonly resource: ResourceName;
+  readonly resource: string;
   readonly record: Record<string, unknown>;
   readonly summaryFields: ReadonlyArray<string>;
   readonly fieldMap: ReadonlyMap<string, import('../types').ResoField>;
@@ -13,7 +12,8 @@ interface ResultsCardProps {
 
 /** Summary result card with media thumbnail and configurable fields. */
 export const ResultsCard = ({ resource, record, summaryFields, fieldMap, onClick }: ResultsCardProps) => {
-  const keyField = KEY_FIELD_MAP[resource];
+  const { getKeyField } = useServer();
+  const keyField = getKeyField(resource);
   const key = String(record[keyField] ?? '');
   const media = Array.isArray(record.Media) ? (record.Media as Record<string, unknown>[]) : [];
 

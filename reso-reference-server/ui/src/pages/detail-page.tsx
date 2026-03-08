@@ -7,8 +7,9 @@ import { FieldGroupSection } from '../components/field-group-section';
 import { MediaCarousel } from '../components/media-carousel';
 import { useMetadata } from '../hooks/use-metadata';
 import { useUiConfig } from '../hooks/use-ui-config';
-import type { ResoField, ResourceName } from '../types';
-import { KEY_FIELD_MAP, READ_ONLY_RESOURCES, TARGET_RESOURCES } from '../types';
+import { useServer } from '../context/server-context';
+import type { ResoField } from '../types';
+import { READ_ONLY_RESOURCES, TARGET_RESOURCES } from '../types';
 import { ADDRESS_FIELDS, formatAddress, formatFieldValue, getDisplayName, isUrlValue, isVideoMediaType } from '../utils/format';
 
 /** Renders a media preview (image or video) for a URL based on MediaType. */
@@ -29,7 +30,8 @@ const MediaPreview = ({ url, mediaType }: { readonly url: string; readonly media
 export const DetailPage = () => {
   const { resource, key } = useParams<{ resource: string; key: string }>();
   const navigate = useNavigate();
-  const resourceName = resource as ResourceName;
+  const { isLocal, resources, isLoadingResources, getKeyField } = useServer();
+  const resourceName = resource ?? '';
 
   const [record, setRecord] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,15 +49,11 @@ export const DetailPage = () => {
   const { fields } = useMetadata(resourceName);
   const { config, fieldGroups } = useUiConfig();
 
-  if (!TARGET_RESOURCES.includes(resourceName) || !key) {
-    return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Invalid resource or key</div>;
-  }
-
-  const keyField = KEY_FIELD_MAP[resourceName];
+  const keyField = getKeyField(resourceName);
 
   useEffect(() => {
     // Wait for metadata to load before fetching the entity so we know which nav props to $expand
-    if (fields.length === 0) return;
+    if (!key || fields.length === 0) return;
 
     let cancelled = false;
     setIsLoading(true);
@@ -82,6 +80,19 @@ export const DetailPage = () => {
       cancelled = true;
     };
   }, [resourceName, key, fields]);
+
+  // Validate resource exists (after all hooks)
+  const isValidResource = isLocal
+    ? TARGET_RESOURCES.includes(resourceName as (typeof TARGET_RESOURCES)[number])
+    : (resources?.some(r => r.name === resourceName) ?? null);
+
+  if (!isLocal && (isValidResource === null || isLoadingResources)) {
+    return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading resources...</div>;
+  }
+
+  if (!isValidResource || !key) {
+    return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Invalid resource or key</div>;
+  }
 
   if (isLoading) return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading...</div>;
   if (error)

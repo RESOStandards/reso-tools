@@ -1,9 +1,9 @@
-import type { ResoField, ResourceName } from '../types';
+import type { ResoField } from '../types';
 import { InfiniteScroll } from './infinite-scroll';
 import { ResultsCard } from './results-card';
 
 interface ResultsListProps {
-  readonly resource: ResourceName;
+  readonly resource: string;
   readonly rows: ReadonlyArray<Record<string, unknown>>;
   readonly summaryFields: ReadonlyArray<string>;
   readonly fields: ReadonlyArray<ResoField>;

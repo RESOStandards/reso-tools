@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchFieldsForResource, fetchLookupsForResource } from '../api/metadata';
+import { useServer } from '../context/server-context';
 import type { ResoField, ResoLookup } from '../types';
 
 export interface UseMetadataResult {
@@ -11,6 +12,7 @@ export interface UseMetadataResult {
 
 /** Fetches and caches field definitions and lookups for a resource. */
 export const useMetadata = (resource: string): UseMetadataResult => {
+  const { activeServer, isLocal } = useServer();
   const [fields, setFields] = useState<ReadonlyArray<ResoField>>([]);
   const [lookups, setLookups] = useState<Readonly<Record<string, ReadonlyArray<ResoLookup>>>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -21,9 +23,14 @@ export const useMetadata = (resource: string): UseMetadataResult => {
     setIsLoading(true);
     setError(null);
 
+    const metaOptions = isLocal ? undefined : { baseUrl: activeServer.baseUrl, token: activeServer.token };
+
     const load = async () => {
       try {
-        const [fieldsResult, lookupsResult] = await Promise.all([fetchFieldsForResource(resource), fetchLookupsForResource(resource)]);
+        const [fieldsResult, lookupsResult] = await Promise.all([
+          fetchFieldsForResource(resource, metaOptions),
+          fetchLookupsForResource(resource, metaOptions)
+        ]);
         if (!cancelled) {
           setFields(fieldsResult);
           setLookups(lookupsResult);
@@ -41,7 +48,7 @@ export const useMetadata = (resource: string): UseMetadataResult => {
     return () => {
       cancelled = true;
     };
-  }, [resource]);
+  }, [resource, activeServer.id, isLocal]);
 
   return { fields, lookups, isLoading, error };
 };

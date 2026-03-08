@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchFieldGroups, fetchUiConfig } from '../api/config';
+import { useServer } from '../context/server-context';
 import type { FieldGroups, UiConfig } from '../types';
 
 export interface UseUiConfigResult {
@@ -11,6 +12,7 @@ export interface UseUiConfigResult {
 
 /** Fetches and caches the UI config and field groups. */
 export const useUiConfig = (): UseUiConfigResult => {
+  const { activeServer, isLocal } = useServer();
   const [config, setConfig] = useState<UiConfig | null>(null);
   const [fieldGroups, setFieldGroups] = useState<FieldGroups | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -18,10 +20,11 @@ export const useUiConfig = (): UseUiConfigResult => {
 
   useEffect(() => {
     let cancelled = false;
+    setIsLoading(true);
 
     const load = async () => {
       try {
-        const [uiConfig, groups] = await Promise.all([fetchUiConfig(), fetchFieldGroups()]);
+        const [uiConfig, groups] = await Promise.all([fetchUiConfig(isLocal), fetchFieldGroups(isLocal)]);
         if (!cancelled) {
           setConfig(uiConfig);
           setFieldGroups(groups);
@@ -39,7 +42,7 @@ export const useUiConfig = (): UseUiConfigResult => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [activeServer.id, isLocal]);
 
   return { config, fieldGroups, isLoading, error };
 };

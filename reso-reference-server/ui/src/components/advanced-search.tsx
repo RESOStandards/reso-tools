@@ -1,12 +1,12 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import type { FieldGroups, ResoField, ResoLookup, ResourceName } from '../types';
+import type { FieldGroups, ResoField, ResoLookup } from '../types';
 import { isEnumType, isNumericEdmType } from '../types';
 import { type FilterEntry, buildFilterString, parseFilterToEntries } from '../utils/filter-sync.js';
 import { getDisplayName } from '../utils/format';
 import { FieldGroupSection } from './field-group-section';
 
 interface AdvancedSearchProps {
-  readonly resource: ResourceName;
+  readonly resource: string;
   readonly fields: ReadonlyArray<ResoField>;
   readonly lookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>>;
   readonly fieldGroups: FieldGroups | null;
@@ -52,7 +52,7 @@ const getOperatorsForField = (field: ResoField): ReadonlyArray<{ readonly value:
 /** Groups fields into sections matching the RESO Data Dictionary groupings. */
 const groupFields = (
   fields: ReadonlyArray<ResoField>,
-  resource: ResourceName,
+  resource: string,
   fieldGroups: FieldGroups | null
 ): { grouped: Map<string, ResoField[]>; ungrouped: ResoField[] } => {
   const grouped = new Map<string, ResoField[]>();

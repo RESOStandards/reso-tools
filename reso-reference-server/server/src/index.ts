@@ -260,6 +260,68 @@ const main = async (): Promise<void> => {
     res.json(result);
   });
 
+  // Proxy endpoint — forwards requests to external OData servers to avoid browser CORS restrictions.
+  // Usage: GET /api/proxy?url=<encoded-external-url>  (optional Authorization header forwarded)
+  app.all('/api/proxy', async (req, res) => {
+    const targetUrl = req.query.url as string | undefined;
+    if (!targetUrl) {
+      res.status(400).json({ error: 'Missing required query parameter: url' });
+      return;
+    }
+
+    // Validate URL to prevent SSRF against private networks
+    try {
+      const parsed = new URL(targetUrl);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        res.status(400).json({ error: 'Only http and https URLs are allowed' });
+        return;
+      }
+    } catch {
+      res.status(400).json({ error: 'Invalid URL' });
+      return;
+    }
+
+    // Forward the request to the external server — pass through OData-Version if provided, don't force a version
+    // Strip conditional caching headers so upstream always returns a full response (not 304)
+    const headers: Record<string, string> = {
+      Accept: req.headers.accept ?? 'application/json'
+    };
+    const odataVersion = req.headers['odata-version'];
+    if (typeof odataVersion === 'string') {
+      headers['OData-Version'] = odataVersion;
+    }
+    if (req.headers.authorization) {
+      headers['Authorization'] = req.headers.authorization;
+    }
+    if (req.headers['content-type']) {
+      headers['Content-Type'] = req.headers['content-type'];
+    }
+
+    try {
+      const upstream = await fetch(targetUrl, {
+        method: req.method,
+        headers,
+        body: ['POST', 'PATCH', 'PUT'].includes(req.method) ? JSON.stringify(req.body) : undefined
+      });
+
+      // Prevent browser from caching proxy responses (avoids stale 304s)
+      res.set('Cache-Control', 'no-store');
+
+      // Forward status and key headers
+      res.status(upstream.status);
+      const contentType = upstream.headers.get('content-type');
+      if (contentType) res.set('Content-Type', contentType);
+      const upstreamOdataVersion = upstream.headers.get('odata-version');
+      if (upstreamOdataVersion) res.set('OData-Version', upstreamOdataVersion);
+
+      const body = await upstream.text();
+      res.send(body);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Proxy request failed';
+      res.status(502).json({ error: message });
+    }
+  });
+
   // Health check
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', version: metadata.version });

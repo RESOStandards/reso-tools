@@ -1,9 +1,9 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react';
-import type { ResourceName } from '../types';
-import { ID_FIELD_MAP, KEY_FIELD_MAP } from '../types';
+import { useServer } from '../context/server-context';
+import { ID_FIELD_MAP, type ResourceName } from '../types';
 
 interface KeyPromptProps {
-  readonly resource: ResourceName;
+  readonly resource: string;
   readonly onSubmit: (key: string) => void;
   readonly action: 'edit' | 'delete';
 }
@@ -12,8 +12,9 @@ interface KeyPromptProps {
 export const KeyPrompt = ({ resource, onSubmit, action }: KeyPromptProps) => {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const keyField = KEY_FIELD_MAP[resource];
-  const idField = ID_FIELD_MAP[resource];
+  const { getKeyField } = useServer();
+  const keyField = getKeyField(resource);
+  const idField = ID_FIELD_MAP[resource as ResourceName];
 
   useEffect(() => {
     inputRef.current?.focus();

@@ -1,6 +1,12 @@
+import { useEffect } from 'react';
 import { Outlet, useLocation, useParams } from 'react-router';
+import { clearConfigCache } from '../api/config';
+import { setApiConfig } from '../api/client';
+import { clearMetadataCache } from '../api/metadata';
+import { useServer } from '../context/server-context';
 import { useDarkMode } from '../hooks/use-dark-mode';
 import { ResourceNav } from './resource-nav';
+import { ServerSwitcher } from './server-switcher';
 
 const LOGO_LIGHT = 'https://www.reso.org/wp-content/uploads/2020/06/RESO-Logo_Horizontal_Blue.png';
 const LOGO_DARK = 'https://www.reso.org/wp-content/uploads/2020/06/RESO-Logo_Horizontal_White.png';
@@ -23,6 +29,14 @@ export const Layout = () => {
   const { resource } = useParams<{ resource: string }>();
   const location = useLocation();
   const pageIndicator = getPageIndicator(location.pathname, resource);
+  const { activeServer } = useServer();
+
+  // Sync API client config and clear caches when server changes
+  useEffect(() => {
+    setApiConfig(activeServer.baseUrl, activeServer.token);
+    clearMetadataCache();
+    clearConfigCache();
+  }, [activeServer.id]);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 transition-colors">
@@ -32,13 +46,12 @@ export const Layout = () => {
           <div className="flex items-center gap-3">
             {/* RESO Logo */}
             <img src={isDark ? LOGO_DARK : LOGO_LIGHT} alt="RESO" className="h-8 sm:h-10" />
-            {/* Title */}
-            <div className="flex items-baseline gap-2">
-              <h1 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">RESO Web API Reference Server</h1>
-              {pageIndicator && <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">/ {pageIndicator}</span>}
-            </div>
+            {/* Server switcher replaces static title */}
+            <ServerSwitcher />
+            {pageIndicator && <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">/ {pageIndicator}</span>}
           </div>
 
+          <div className="flex items-center gap-3">
           {/* Dark mode toggle */}
           <button
             type="button"
@@ -72,6 +85,7 @@ export const Layout = () => {
               </svg>
             )}
           </button>
+          </div>
         </div>
       </header>
 

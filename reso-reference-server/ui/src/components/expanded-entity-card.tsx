@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { KEY_FIELD_MAP, TARGET_RESOURCES } from '../types';
+import { useServer } from '../context/server-context';
+import { TARGET_RESOURCES } from '../types';
 import type { ResourceName } from '../types';
 
 interface ExpandedEntityCardProps {
@@ -36,12 +37,15 @@ const isDisplayableField = (key: string, value: unknown): boolean => {
 export const ExpandedEntityCard = ({ title, targetResource, records, isCollection }: ExpandedEntityCardProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const navigate = useNavigate();
+  const { getKeyField, resources, isLocal } = useServer();
 
   if (records.length === 0) return null;
 
   const current = records[currentIndex];
-  const isTargetNavigable = TARGET_RESOURCES.includes(targetResource as ResourceName);
-  const keyField = isTargetNavigable ? KEY_FIELD_MAP[targetResource as ResourceName] : undefined;
+  const isTargetNavigable = isLocal
+    ? TARGET_RESOURCES.includes(targetResource as ResourceName)
+    : (resources?.some(r => r.name === targetResource) ?? false);
+  const keyField = isTargetNavigable ? getKeyField(targetResource) : undefined;
   const entityKey = keyField ? current[keyField] : undefined;
 
   const displayFields = Object.entries(current)

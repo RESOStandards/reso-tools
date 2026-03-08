@@ -377,20 +377,30 @@ export const parseCsdlXml = (xml: string): CsdlSchema => {
   const parser = new XMLParser(xmlParserOptions);
   const parsed = parser.parse(xml);
 
-  const schema = parsed?.['edmx:Edmx']?.['edmx:DataServices']?.Schema ?? parsed?.['edmx:Edmx']?.['edmx:DataServices']?.schema;
+  const rawSchema = parsed?.['edmx:Edmx']?.['edmx:DataServices']?.Schema ?? parsed?.['edmx:Edmx']?.['edmx:DataServices']?.schema;
 
-  if (!schema) {
+  if (!rawSchema) {
     throw new Error('Could not find Schema element in metadata XML');
   }
 
-  const namespace: string = schema['@_Namespace'] ?? '';
+  // Handle both single Schema element and multiple Schema elements (common in external servers
+  // that split entity types and enum types into separate namespaced schemas).
+  const schemas: ReadonlyArray<Record<string, unknown>> = Array.isArray(rawSchema) ? rawSchema : [rawSchema];
 
-  const rawEntityTypes: ReadonlyArray<Record<string, unknown>> = schema.EntityType ?? [];
-  const rawEnumTypes: ReadonlyArray<Record<string, unknown>> = schema.EnumType ?? [];
-  const rawComplexTypes: ReadonlyArray<Record<string, unknown>> = schema.ComplexType ?? [];
-  const rawActions: ReadonlyArray<Record<string, unknown>> = schema.Action ?? [];
-  const rawFunctions: ReadonlyArray<Record<string, unknown>> = schema.Function ?? [];
-  const rawContainer = schema.EntityContainer as Record<string, unknown> | undefined;
+  // Use the namespace from the first schema that has entity types, or fall back to the first schema
+  const namespace: string = (schemas.find(s => s.EntityType) ?? schemas[0])['@_Namespace'] as string ?? '';
+
+  // Merge elements from all schemas
+  const rawEntityTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.EntityType as ReadonlyArray<Record<string, unknown>>) ?? []);
+  const rawEnumTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.EnumType as ReadonlyArray<Record<string, unknown>>) ?? []);
+  const rawComplexTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.ComplexType as ReadonlyArray<Record<string, unknown>>) ?? []);
+  const rawActions: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.Action as ReadonlyArray<Record<string, unknown>>) ?? []);
+  const rawFunctions: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.Function as ReadonlyArray<Record<string, unknown>>) ?? []);
+  // EntityContainer is typically in one schema — find it
+  const rawContainer = schemas.reduce<Record<string, unknown> | undefined>(
+    (found, s) => found ?? (s.EntityContainer as Record<string, unknown> | undefined),
+    undefined
+  );
 
   return {
     namespace,

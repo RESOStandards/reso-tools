@@ -2,30 +2,32 @@ import { LexerError, ParseError, parseFilter } from '@reso/odata-expression-pars
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { AdvancedSearch } from '../components/advanced-search';
+import { BasicSearch } from '../components/basic-search';
 import { ResultsList } from '../components/results-list';
 import { SearchBar } from '../components/search-bar';
 import { useCollection } from '../hooks/use-collection';
 import { useMetadata } from '../hooks/use-metadata';
 import { useUiConfig } from '../hooks/use-ui-config';
-import type { ResourceName } from '../types';
-import { KEY_FIELD_MAP, READ_ONLY_RESOURCES, TARGET_RESOURCES } from '../types';
+import { useServer } from '../context/server-context';
+import { READ_ONLY_RESOURCES, TARGET_RESOURCES } from '../types';
 import { getDisplayNameFromMap } from '../utils/format';
 
-/** Search page with filter bar, optional advanced search, and infinite scroll results. */
+/** Search page with basic search, OData filter editor, optional advanced search, and infinite scroll results. */
 export const SearchPage = () => {
   const { resource } = useParams<{ resource: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const resourceName = resource as ResourceName;
-  if (!TARGET_RESOURCES.includes(resourceName)) {
-    return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Unknown resource: {resource}</div>;
-  }
+  const { isLocal, resources, isLoadingResources, resourceError } = useServer();
+  const resourceName = resource ?? '';
 
   const filter = searchParams.get('$filter') ?? '';
   const orderby = searchParams.get('$orderby') ?? '';
   const mode = searchParams.get('mode') ?? 'simple';
   const isAdvanced = mode === 'advanced';
+
+  // Whether the raw OData editor is visible (toggled by pencil icon / close button)
+  const [showODataEditor, setShowODataEditor] = useState(false);
 
   // Draft filter state — tracks what the user is composing before submitting
   const [draftFilter, setDraftFilter] = useState(filter);
@@ -124,6 +126,31 @@ export const SearchPage = () => {
     [navigate, resourceName]
   );
 
+  const handleShowOData = useCallback(() => {
+    setShowODataEditor(true);
+  }, []);
+
+  const handleCloseOData = useCallback(() => {
+    setShowODataEditor(false);
+    setValidationError(null);
+  }, []);
+
+  // Validate resource exists: check hardcoded list for local, dynamic list for external
+  const isValidResource = isLocal
+    ? TARGET_RESOURCES.includes(resourceName as (typeof TARGET_RESOURCES)[number])
+    : (resources?.some(r => r.name === resourceName) ?? null);
+
+  if (!isLocal && isLoadingResources) {
+    return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading resources...</div>;
+  }
+  if (!isLocal && resourceError) {
+    return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Failed to load server metadata: {resourceError}</div>;
+  }
+
+  if (!isValidResource) {
+    return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Unknown resource: {resource}</div>;
+  }
+
   if (metaLoading) {
     return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading metadata...</div>;
   }
@@ -159,15 +186,28 @@ export const SearchPage = () => {
           )}
         </div>
 
-        {/* Search */}
-        <SearchBar
-          value={draftFilter}
-          onChange={setDraftFilter}
-          onSearch={handleSubmit}
-          onToggleAdvanced={handleToggleAdvanced}
-          isAdvancedMode={isAdvanced}
-          validationError={validationError}
-        />
+        {/* Search — basic search by default, OData editor on toggle */}
+        {showODataEditor ? (
+          <SearchBar
+            value={draftFilter}
+            onChange={setDraftFilter}
+            onSearch={handleSubmit}
+            onClose={handleCloseOData}
+            onToggleAdvanced={handleToggleAdvanced}
+            isAdvancedMode={isAdvanced}
+            validationError={validationError}
+          />
+        ) : (
+          <BasicSearch
+            resource={resourceName}
+            fields={fields}
+            lookups={lookups}
+            filterString={draftFilter}
+            onFilterChange={setDraftFilter}
+            onSearch={handleSubmit}
+            onShowOData={handleShowOData}
+          />
+        )}
 
         {/* Sortable column headers */}
         {rows.length > 0 && (

@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { deleteEntity } from '../api/client';
-import type { ResourceName } from '../types';
-import { KEY_FIELD_MAP } from '../types';
+import { useServer } from '../context/server-context';
 
 interface DeleteDialogProps {
-  readonly resource: ResourceName;
+  readonly resource: string;
   readonly record: Record<string, unknown>;
   readonly onDeleted: () => void;
   readonly onCancel: () => void;
@@ -14,7 +13,8 @@ interface DeleteDialogProps {
 export const DeleteDialog = ({ resource, record, onDeleted, onCancel }: DeleteDialogProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const keyField = KEY_FIELD_MAP[resource];
+  const { getKeyField } = useServer();
+  const keyField = getKeyField(resource);
   const key = String(record[keyField] ?? '');
 
   const handleDelete = async () => {

@@ -5,14 +5,15 @@ import { KeyPrompt } from '../components/key-prompt';
 import { RecordForm } from '../components/record-form';
 import { useMetadata } from '../hooks/use-metadata';
 import { useUiConfig } from '../hooks/use-ui-config';
-import type { ResourceName } from '../types';
+import { useServer } from '../context/server-context';
 import { TARGET_RESOURCES } from '../types';
 
 /** Page for editing an existing record. Shows key prompt if no key in URL. */
 export const EditPage = () => {
   const { resource, key } = useParams<{ resource: string; key: string }>();
   const navigate = useNavigate();
-  const resourceName = resource as ResourceName;
+  const { isLocal, resources, isLoadingResources } = useServer();
+  const resourceName = resource ?? '';
 
   const [record, setRecord] = useState<Record<string, unknown> | null>(null);
   const [isLoadingRecord, setIsLoadingRecord] = useState(false);
@@ -21,10 +22,6 @@ export const EditPage = () => {
 
   const { fields, lookups, isLoading: metaLoading } = useMetadata(resourceName);
   const { fieldGroups } = useUiConfig();
-
-  if (!TARGET_RESOURCES.includes(resourceName)) {
-    return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Unknown resource: {resource}</div>;
-  }
 
   // Load record when key is provided
   useEffect(() => {
@@ -74,6 +71,17 @@ export const EditPage = () => {
     },
     [resourceName, key, navigate]
   );
+
+  // Validate resource exists (after all hooks)
+  const isValidResource = isLocal
+    ? TARGET_RESOURCES.includes(resourceName as (typeof TARGET_RESOURCES)[number])
+    : (resources?.some(r => r.name === resourceName) ?? null);
+  if (!isLocal && (isValidResource === null || isLoadingResources)) {
+    return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading resources...</div>;
+  }
+  if (!isValidResource) {
+    return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Unknown resource: {resource}</div>;
+  }
 
   if (metaLoading) return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading metadata...</div>;
 

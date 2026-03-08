@@ -1,12 +1,12 @@
 import { type ValidationFailure, validateRecord } from '@reso/validation';
 import { type FormEvent, useCallback, useMemo, useState } from 'react';
-import type { FieldGroups, ResoField, ResoLookup, ResourceName } from '../types';
-import { KEY_FIELD_MAP } from '../types';
+import { useServer } from '../context/server-context';
+import type { FieldGroups, ResoField, ResoLookup } from '../types';
 import { FieldGroupSection } from './field-group-section';
 import { FieldInput } from './field-input';
 
 interface RecordFormProps {
-  readonly resource: ResourceName;
+  readonly resource: string;
   readonly fields: ReadonlyArray<ResoField>;
   readonly lookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>>;
   readonly fieldGroups: FieldGroups | null;
@@ -19,7 +19,7 @@ interface RecordFormProps {
 /** Groups fields into sections based on RESO Data Dictionary field groups. */
 const groupFields = (
   fields: ReadonlyArray<ResoField>,
-  resource: ResourceName,
+  resource: string,
   fieldGroups: FieldGroups | null,
   excludeFields: ReadonlySet<string>
 ): { grouped: Map<string, ResoField[]>; ungrouped: ResoField[] } => {
@@ -70,7 +70,8 @@ export const RecordForm = ({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [keyCopied, setKeyCopied] = useState(false);
 
-  const keyField = KEY_FIELD_MAP[resource];
+  const { getKeyField } = useServer();
+  const keyField = getKeyField(resource);
   const excludeFields = new Set(['ModificationTimestamp', ...(isEdit ? [] : [keyField])]);
   const { grouped, ungrouped } = groupFields(fields, resource, fieldGroups, excludeFields);
 

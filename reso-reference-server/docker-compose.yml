@@ -575,6 +575,60 @@ services:
     profiles:
       - compliance-addedit
 
+  # ---------------------------------------------------------------------------
+  # Compliance: Add/Edit RCP-010 (ephemeral MongoDB)
+  # Usage: docker compose --profile compliance-addedit-mongo up --build --exit-code-from compliance-addedit-mongo
+  # ---------------------------------------------------------------------------
+  mongodb-addedit:
+    image: mongo:7
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - compliance-addedit-mongo
+
+  server-addedit-mongo:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/server/Dockerfile
+    environment:
+      PORT: 8080
+      DB_BACKEND: mongodb
+      MONGODB_URL: mongodb://mongodb-addedit:27017/reso_addedit
+      METADATA_PATH: ./server-metadata.json
+      BASE_URL: http://server-addedit-mongo:8080
+      ENUM_MODE: string
+    depends_on:
+      mongodb-addedit:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    profiles:
+      - compliance-addedit-mongo
+
+  compliance-addedit-mongo:
+    build:
+      context: ..
+      dockerfile: certification/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-addedit.sh"]
+    environment:
+      SERVER_URL: http://server-addedit-mongo:8080
+      AUTH_TOKEN: admin-token
+      RESOURCE: Property
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server-addedit-mongo:
+        condition: service_healthy
+    profiles:
+      - compliance-addedit-mongo
+
 volumes:
   pgdata:
   mongodata:
