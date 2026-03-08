@@ -225,6 +225,10 @@ function truncate(str, len) {
   return str.slice(0, len).replace(/\s+\S*$/, '') + '...';
 }
 
+function formatNumber(n) {
+  return Number(n).toLocaleString('en-US');
+}
+
 function formatPercent(mean) {
   if (mean === null || mean === undefined) return null;
   return (mean * 100).toFixed(1) + '%';
@@ -240,7 +244,7 @@ function usageHtml(stats) {
   }
   return `<div class="dd-usage">
     <span class="dd-usage-label">Adoption</span><span class="dd-usage-value">${formatPercent(stats.mean)}</span>
-    <span class="dd-usage-label">Providers</span><span class="dd-usage-value">${stats.recipients}</span>
+    <span class="dd-usage-label">Providers</span><span class="dd-usage-value">${formatNumber(stats.recipients)}</span>
   </div>`;
 }
 
@@ -306,6 +310,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { overflow-x: hidden; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
@@ -360,7 +365,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
     .menu-toggle svg { width: 24px; height: 24px; fill: currentColor; }
 
     @media (max-width: 768px) {
-      .site-header { flex-wrap: wrap; height: auto; min-height: 64px; }
+      .site-header { flex-wrap: wrap; height: auto; min-height: 64px; max-width: 100vw; overflow: hidden; }
       .menu-toggle { display: block; }
       .header-nav {
         display: none;
@@ -430,6 +435,10 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
       box-shadow: 0 20px 60px rgba(0,0,0,0.3);
       display: flex;
       flex-direction: column;
+    }
+    @media (max-width: 768px) {
+      .search-modal-overlay { padding-top: 1rem; }
+      .search-modal { width: calc(100% - 1.5rem); max-height: 85vh; border-radius: 0.5rem; }
     }
     .search-modal-body {
       padding: 1rem;
@@ -591,7 +600,9 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
       max-width: 1100px;
     }
     @media (max-width: 768px) {
-      .dd-content { padding: 1rem; }
+      .dd-content { padding: 1rem; max-width: 100vw; overflow-x: hidden; }
+      .dd-metadata-card { overflow-x: auto; }
+      .dd-resource-grid { grid-template-columns: 1fr; }
     }
 
     /* Breadcrumb */
@@ -625,7 +636,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
     .dd-resource-count { font-size: 0.75rem; color: var(--reso-gray-500); }
 
     /* Fields table */
-    .dd-fields-table-wrapper { margin-top: 1rem; }
+    .dd-fields-table-wrapper { margin-top: 1rem; overflow-x: auto; }
     .dd-group-heading {
       font-size: 1rem;
       font-weight: 600;
@@ -762,6 +773,46 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
     .dd-collapsible-content { display: none; padding: 1rem 1.25rem; }
     .dd-collapsible.open .dd-collapsible-content { display: block; }
 
+    /* Sort controls */
+    .dd-sort-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    .dd-sort-controls label {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--reso-gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .dd-sort-select {
+      padding: 0.375rem 0.5rem;
+      border: 1px solid var(--reso-gray-300);
+      border-radius: 0.375rem;
+      font-size: 0.8125rem;
+      color: var(--reso-gray-700);
+      background: white;
+      cursor: pointer;
+    }
+    .dd-sort-select:focus {
+      outline: none;
+      border-color: var(--reso-blue);
+      box-shadow: 0 0 0 2px rgba(0,126,158,0.15);
+    }
+    .dd-sort-dir {
+      background: none;
+      border: 1px solid var(--reso-gray-300);
+      border-radius: 0.375rem;
+      padding: 0.375rem 0.5rem;
+      cursor: pointer;
+      font-size: 0.8125rem;
+      color: var(--reso-gray-600);
+    }
+    .dd-sort-dir:hover { border-color: var(--reso-blue); color: var(--reso-blue); }
+
     /* Badge */
     .badge {
       display: inline-flex;
@@ -812,7 +863,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     </button>
 
-    <div class="dd-content" data-pagefind-body>
+    <div class="dd-content" data-pagefind-body data-pagefind-filter-dd-version="${version}">
       ${contentHtml}
     </div>
   </div>
@@ -838,7 +889,14 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
   <script src="/pagefind/pagefind-ui.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
-      new PagefindUI({ element: '#search', showSubResults: true, showImages: false, resetStyles: false });
+      var currentVersion = '${version}';
+      var pf = new PagefindUI({
+        element: '#search',
+        showSubResults: true,
+        showImages: false,
+        resetStyles: false,
+        filters: { 'dd-version': currentVersion }
+      });
 
       // Header hamburger
       document.getElementById('menuToggle').addEventListener('click', function() {
@@ -889,6 +947,104 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
           btn.parentElement.classList.toggle('open');
         });
       });
+
+      // Sort controls for version landing (resource grid)
+      var resSortField = document.getElementById('ddResourceSort');
+      var resSortDirBtn = document.getElementById('ddResourceSortDir');
+      var resGrid = document.getElementById('ddResourceGrid');
+      if (resSortField && resSortDirBtn && resGrid) {
+        var resAsc = true;
+        resSortDirBtn.addEventListener('click', function() {
+          resAsc = !resAsc;
+          resSortDirBtn.innerHTML = resAsc ? '&#9650;' : '&#9660;';
+          applyResSort();
+        });
+        resSortField.addEventListener('change', applyResSort);
+        function applyResSort() {
+          var cards = Array.from(resGrid.querySelectorAll('.dd-resource-card'));
+          cards.sort(function(a, b) {
+            var sf = resSortField.value;
+            if (sf === 'name') {
+              return resAsc ? a.dataset.name.localeCompare(b.dataset.name) : b.dataset.name.localeCompare(a.dataset.name);
+            } else if (sf === 'fields') {
+              var fa = parseInt(a.dataset.fields), fb = parseInt(b.dataset.fields);
+              return resAsc ? fb - fa : fa - fb;
+            }
+            return 0;
+          });
+          cards.forEach(function(c) { resGrid.appendChild(c); });
+        }
+      }
+
+      // Sort controls for resource pages
+      var sortField = document.getElementById('ddSortField');
+      var sortDirBtn = document.getElementById('ddSortDir');
+      if (sortField && sortDirBtn) {
+        var ascending = true;
+        var wrapper = document.querySelector('.dd-fields-table-wrapper');
+        if (wrapper) {
+          sortDirBtn.addEventListener('click', function() {
+            ascending = !ascending;
+            sortDirBtn.innerHTML = ascending ? '&#9650;' : '&#9660;';
+            applySort();
+          });
+          sortField.addEventListener('change', applySort);
+
+          function applySort() {
+            var field = sortField.value;
+            var headings = wrapper.querySelectorAll('.dd-group-heading');
+            var tables = wrapper.querySelectorAll('.dd-fields-table');
+
+            if (field === 'group') {
+              // Restore original group layout — reload page
+              window.location.reload();
+              return;
+            }
+
+            // Hide group headings when sorting by non-group
+            headings.forEach(function(h) { h.style.display = 'none'; });
+
+            // Collect all rows from all tables
+            var allRows = [];
+            tables.forEach(function(t) {
+              var rows = Array.from(t.querySelectorAll('tbody tr'));
+              rows.forEach(function(r) { allRows.push(r); });
+            });
+
+            // Sort
+            allRows.sort(function(a, b) {
+              var va, vb;
+              if (field === 'name') {
+                va = a.dataset.name || '';
+                vb = b.dataset.name || '';
+                return ascending ? va.localeCompare(vb) : vb.localeCompare(va);
+              } else if (field === 'usage') {
+                va = parseFloat(a.dataset.usage) || -1;
+                vb = parseFloat(b.dataset.usage) || -1;
+                return ascending ? vb - va : va - vb; // Default: highest usage first
+              } else if (field === 'added') {
+                va = a.dataset.added || '';
+                vb = b.dataset.added || '';
+                return ascending ? va.localeCompare(vb) : vb.localeCompare(va);
+              } else if (field === 'revised') {
+                va = a.dataset.revised || '';
+                vb = b.dataset.revised || '';
+                return ascending ? vb.localeCompare(va) : va.localeCompare(vb); // Default: newest first
+              }
+              return 0;
+            });
+
+            // Move all rows into the first table, hide others
+            if (tables.length > 0) {
+              var mainTbody = tables[0].querySelector('tbody');
+              allRows.forEach(function(r) { mainTbody.appendChild(r); });
+              for (var i = 1; i < tables.length; i++) {
+                tables[i].style.display = 'none';
+              }
+            }
+          }
+        }
+      }
     });
   </script>
 </body>
@@ -956,14 +1112,23 @@ function generateVersionLanding(vCfg, data, allVersions) {
 
   let html = `<div class="dd-page-header"><h1>${escapeHtml(label)}`;
   if (draft) html += ' <span class="badge badge-orange">DRAFT</span>';
-  html += `</h1><p class="dd-page-subtitle">RESO Data Dictionary ${escapeHtml(version)} &mdash; ${resources.length} resources, ${data.fields.length} fields</p></div>`;
+  html += `</h1><p class="dd-page-subtitle">RESO Data Dictionary ${escapeHtml(version)} &mdash; ${formatNumber(resources.length)} resources, ${formatNumber(data.fields.length)} fields</p></div>`;
 
-  html += `<div class="dd-resource-grid">`;
+  html += `<div class="dd-sort-controls">
+    <label>Sort by</label>
+    <select class="dd-sort-select" id="ddResourceSort">
+      <option value="name">Name</option>
+      <option value="fields">Field Count</option>
+    </select>
+    <button class="dd-sort-dir" id="ddResourceSortDir" type="button" title="Toggle sort direction">&#9650;</button>
+  </div>`;
+
+  html += `<div class="dd-resource-grid" id="ddResourceGrid">`;
   for (const rn of resources) {
     const fieldCount = resourceMap[rn].length;
-    html += `<a href="${ddUrl(version, rn)}" class="dd-resource-card">`;
+    html += `<a href="${ddUrl(version, rn)}" class="dd-resource-card" data-name="${escapeHtml(rn)}" data-fields="${fieldCount}">`;
     html += `<h3>${escapeHtml(rn)}</h3>`;
-    html += `<span class="dd-resource-count">${fieldCount} field${fieldCount !== 1 ? 's' : ''}</span>`;
+    html += `<span class="dd-resource-count">${formatNumber(fieldCount)} field${fieldCount !== 1 ? 's' : ''}</span>`;
     html += `</a>`;
   }
   html += `</div>`;
@@ -982,7 +1147,26 @@ function generateResourcePage(vCfg, data, resourceName, usageStats, allVersions)
 
   let html = breadcrumbHtml(version, label, [{ label: resourceName }]);
   html += `<div class="dd-page-header"><h1>${escapeHtml(resourceName)}</h1>`;
-  html += `<p class="dd-page-subtitle">${fields.length} fields</p></div>`;
+  const latestRevised = fields.reduce((latest, f) => {
+    if (f.RevisedDate && (!latest || f.RevisedDate > latest)) return f.RevisedDate;
+    return latest;
+  }, null);
+  html += `<p class="dd-page-subtitle" data-pagefind-meta="description">${formatNumber(fields.length)} fields`;
+  if (latestRevised) html += ` &middot; Last revised ${escapeHtml(latestRevised)}`;
+  html += `</p></div>`;
+
+  html += `<div class="dd-sort-controls">
+    <label>Sort by</label>
+    <select class="dd-sort-select" id="ddSortField">
+      <option value="group">Group</option>
+      <option value="name">Name</option>
+      <option value="usage">Usage</option>
+      <option value="added">Date Added</option>
+      <option value="revised">Revised Date</option>
+    </select>
+    <button class="dd-sort-dir" id="ddSortDir" type="button" title="Toggle sort direction">&#9650;</button>
+  </div>`;
+
   html += renderGroupedFields(version, resourceName, fields, groupTree, resourceStats);
 
   const sidebarHtml = generateSidebarHtml(vCfg, data, resourceName);
@@ -997,6 +1181,8 @@ function renderGroupedFields(version, resourceName, fields, tree, resourceStats)
   const sections = [];
   collectSections(tree, [], sections);
 
+  const hasGroupedSections = sections.some(s => s.path.length > 0);
+
   let html = '<div class="dd-fields-table-wrapper">';
   for (const section of sections) {
     const groupPath = section.path.join(' > ');
@@ -1004,7 +1190,7 @@ function renderGroupedFields(version, resourceName, fields, tree, resourceStats)
 
     if (section.path.length > 0) {
       html += `<h2 class="dd-group-heading" id="${escapeHtml(groupId)}">${escapeHtml(groupPath)}</h2>`;
-    } else {
+    } else if (hasGroupedSections) {
       html += `<h2 class="dd-group-heading" id="group-ungrouped">Other Fields</h2>`;
     }
 
@@ -1017,8 +1203,9 @@ function renderGroupedFields(version, resourceName, fields, tree, resourceStats)
       if (!field) continue;
       const fieldUrl = ddUrl(version, resourceName, field.StandardName);
       const stats = resourceStats?.[field.StandardName];
+      const usageVal = stats?.mean != null ? stats.mean : -1;
 
-      html += `<tr>`;
+      html += `<tr data-name="${escapeHtml(field.StandardName)}" data-usage="${usageVal}" data-added="${escapeHtml(field.AddedInVersion || '')}" data-revised="${escapeHtml(field.RevisedDate || '')}" data-group="${escapeHtml(section.path.join(' > '))}">`;
       html += `<td><a href="${fieldUrl}" class="dd-field-link">${escapeHtml(field.DisplayName || field.StandardName)}</a>`;
       html += `<div class="dd-field-standard-name">${escapeHtml(field.StandardName)}</div></td>`;
       html += `<td class="dd-field-def">${escapeHtml(truncate(field.Definition, DEFINITION_TRUNCATE_LENGTH))}`;
@@ -1064,7 +1251,8 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
     { label: field.DisplayName || field.StandardName },
   ]);
 
-  html += `<div class="dd-page-header"><h1>${escapeHtml(field.DisplayName || field.StandardName)}</h1></div>`;
+  html += `<div class="dd-page-header"><h1>${escapeHtml(field.DisplayName || field.StandardName)}</h1>`;
+  html += `<p class="dd-page-subtitle" data-pagefind-meta="description">${escapeHtml(resourceName)} field &mdash; ${escapeHtml(field.SimpleDataType || 'Unknown type')}</p></div>`;
 
   // Metadata
   html += `<div class="dd-metadata-card"><h2>Details</h2><table class="dd-metadata-table">`;
@@ -1075,18 +1263,19 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
     ['Data Type', field.SimpleDataType],
     ['Max Length', field.SugMaxLength],
     ['Max Precision', field.SugMaxPrecision],
-    ['Property Types', field.PropertyTypes],
-    ['Payloads', field.Payloads],
-    ['Status', field.ElementStatus],
-    ['Added in Version', field.AddedInVersion],
+    ['Property Types', field.PropertyTypes, 'PropertyTypes'],
+    ['Payloads', field.Payloads, 'Payloads'],
+    ['Status', field.ElementStatus, 'ElementStatus'],
+    ['Added in Version', field.AddedInVersion, 'AddedInVersion'],
     ['Revised Date', field.RevisedDate],
     ['Repeating Element', field.RepeatingElement],
     ['Source Resource', field.SourceResource],
     ['BEDES', field.BEDES],
   ];
-  for (const [lbl, value] of metaRows) {
+  for (const [lbl, value, xrefKey] of metaRows) {
     if (!value) continue;
-    html += `<tr><th>${escapeHtml(lbl)}</th><td>${escapeHtml(value)}</td></tr>`;
+    const rendered = xrefKey ? xrefLinksForField(version, xrefKey, value) : escapeHtml(value);
+    html += `<tr><th>${escapeHtml(lbl)}</th><td>${rendered}</td></tr>`;
   }
   html += `</table></div>`;
 
@@ -1099,7 +1288,7 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
     const lookupStats = fieldStats?.lookups;
 
     html += `<div class="dd-collapsible">`;
-    html += `<button class="dd-collapsible-toggle">Lookups (${lookupValues.length}) <span class="dd-toggle-icon">+</span></button>`;
+    html += `<button class="dd-collapsible-toggle">Lookups (${formatNumber(lookupValues.length)}) <span class="dd-toggle-icon">+</span></button>`;
     html += `<div class="dd-collapsible-content">`;
     html += `<table class="dd-lookups-table"><thead><tr>`;
     html += `<th>Standard Value</th><th>Legacy OData Value</th><th>Definition</th><th>Usage</th>`;
@@ -1125,7 +1314,7 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
   if ((field.SimpleDataType === 'Resource' || field.SimpleDataType === 'Collection') && field.SourceResource) {
     const expandedFields = data.resourceMap[field.SourceResource] || [];
     html += `<div class="dd-collapsible">`;
-    html += `<button class="dd-collapsible-toggle">${escapeHtml(field.SourceResource)} Fields (${expandedFields.length}) <span class="dd-toggle-icon">+</span></button>`;
+    html += `<button class="dd-collapsible-toggle">${escapeHtml(field.SourceResource)} Fields (${formatNumber(expandedFields.length)}) <span class="dd-toggle-icon">+</span></button>`;
     html += `<div class="dd-collapsible-content">`;
     html += `<table class="dd-fields-table"><thead><tr><th>Field</th><th>Definition</th><th>Type</th></tr></thead><tbody>`;
 
@@ -1160,7 +1349,8 @@ function generateLookupPage(vCfg, data, resourceName, field, lookup, usageStats,
     { label: lookup.StandardLookupValue },
   ]);
 
-  html += `<div class="dd-page-header"><h1>${escapeHtml(lookup.StandardLookupValue)}</h1></div>`;
+  html += `<div class="dd-page-header"><h1>${escapeHtml(lookup.StandardLookupValue)}</h1>`;
+  html += `<p class="dd-page-subtitle" data-pagefind-meta="description">Lookup value for ${escapeHtml(field.DisplayName || field.StandardName)} (${escapeHtml(resourceName)})</p></div>`;
 
   // Metadata
   html += `<div class="dd-metadata-card"><h2>Details</h2><table class="dd-metadata-table">`;
@@ -1170,14 +1360,15 @@ function generateLookupPage(vCfg, data, resourceName, field, lookup, usageStats,
     ['Legacy OData Value', lookup.LegacyODataValue],
     ['Definition', lookup.Definition],
     ['References', lookup.References],
-    ['Status', lookup.ElementStatus],
-    ['Added in Version', lookup.AddedInVersion],
+    ['Status', lookup.ElementStatus, 'ElementStatus'],
+    ['Added in Version', lookup.AddedInVersion, 'AddedInVersion'],
     ['Revised Date', lookup.RevisedDate],
     ['BEDES', lookup.BEDES],
   ];
-  for (const [lbl, value] of metaRows) {
+  for (const [lbl, value, xrefKey] of metaRows) {
     if (!value) continue;
-    html += `<tr><th>${escapeHtml(lbl)}</th><td>${escapeHtml(value)}</td></tr>`;
+    const rendered = xrefKey ? xrefLinksForField(version, xrefKey, value) : escapeHtml(value);
+    html += `<tr><th>${escapeHtml(lbl)}</th><td>${rendered}</td></tr>`;
   }
   html += `</table></div>`;
 
@@ -1192,6 +1383,141 @@ function generateLookupPage(vCfg, data, resourceName, field, lookup, usageStats,
   writeFileSync(join(dir, 'index.html'), wrapPage(
     `${lookup.StandardLookupValue} - ${field.StandardName} - ${resourceName}`, version, sidebarHtml, html, allVersions
   ));
+}
+
+// ---------------------------------------------------------------------------
+// Cross-Reference Page Generator
+// ---------------------------------------------------------------------------
+
+const XREF_DIMENSIONS = [
+  { key: 'Payloads', label: 'Payload', slug: 'payload', split: true },
+  { key: 'PropertyTypes', label: 'Property Type', slug: 'property-type', split: true },
+  { key: 'ElementStatus', label: 'Element Status', slug: 'status', split: false },
+  { key: 'AddedInVersion', label: 'Version Added', slug: 'version-added', split: false },
+];
+
+function buildXrefIndex(fields) {
+  const index = {};
+  for (const dim of XREF_DIMENSIONS) {
+    index[dim.key] = {};
+  }
+
+  for (const field of fields) {
+    for (const dim of XREF_DIMENSIONS) {
+      const raw = field[dim.key];
+      if (!raw) continue;
+      const values = dim.split ? raw.split(',').map(v => v.trim()).filter(Boolean) : [raw.trim()];
+      for (const val of values) {
+        if (!index[dim.key][val]) index[dim.key][val] = [];
+        index[dim.key][val].push(field);
+      }
+    }
+  }
+  return index;
+}
+
+function xrefUrl(version, slug, value) {
+  return '/dd/DD' + version + '/xref/' + slug + '/' + encodeURIComponent(value) + '/';
+}
+
+function xrefLink(version, slug, value) {
+  return `<a href="${xrefUrl(version, slug, value)}" class="dd-field-link">${escapeHtml(value)}</a>`;
+}
+
+function xrefLinksForField(version, dimKey, rawValue) {
+  const dim = XREF_DIMENSIONS.find(d => d.key === dimKey);
+  if (!dim || !rawValue) return escapeHtml(rawValue || '');
+  const values = dim.split ? rawValue.split(',').map(v => v.trim()).filter(Boolean) : [rawValue.trim()];
+  return values.map(v => xrefLink(version, dim.slug, v)).join(', ');
+}
+
+function generateXrefPages(vCfg, data, allVersions) {
+  const { version, label } = vCfg;
+  const xrefIndex = buildXrefIndex(data.fields);
+  let pageCount = 0;
+
+  // Generate index page listing all dimensions
+  let indexHtml = breadcrumbHtml(version, label, [{ label: 'Cross Reference' }]);
+  indexHtml += `<div class="dd-page-header"><h1>Cross Reference</h1>`;
+  indexHtml += `<p class="dd-page-subtitle">Browse fields by attribute</p></div>`;
+  indexHtml += `<div class="dd-resource-grid">`;
+  for (const dim of XREF_DIMENSIONS) {
+    const valueCount = Object.keys(xrefIndex[dim.key]).length;
+    if (valueCount === 0) continue;
+    indexHtml += `<a href="/dd/DD${version}/xref/${dim.slug}/" class="dd-resource-card">`;
+    indexHtml += `<h3>${escapeHtml(dim.label)}</h3>`;
+    indexHtml += `<span class="dd-resource-count">${formatNumber(valueCount)} value${valueCount !== 1 ? 's' : ''}</span>`;
+    indexHtml += `</a>`;
+  }
+  indexHtml += `</div>`;
+
+  const sidebarHtml = generateSidebarHtml(vCfg, data, null);
+  const xrefDir = join(OUTPUT_DIR, `DD${version}`, 'xref');
+  mkdirSync(xrefDir, { recursive: true });
+  writeFileSync(join(xrefDir, 'index.html'), wrapPage('Cross Reference - ' + label, version, sidebarHtml, indexHtml, allVersions));
+  pageCount++;
+
+  // Generate per-dimension landing pages and per-value pages
+  for (const dim of XREF_DIMENSIONS) {
+    const values = Object.keys(xrefIndex[dim.key]).sort();
+    if (values.length === 0) continue;
+
+    // Dimension landing page
+    let dimHtml = breadcrumbHtml(version, label, [
+      { label: 'Cross Reference', url: `/dd/DD${version}/xref/` },
+      { label: dim.label },
+    ]);
+    dimHtml += `<div class="dd-page-header"><h1>${escapeHtml(dim.label)}</h1>`;
+    dimHtml += `<p class="dd-page-subtitle">${formatNumber(values.length)} values</p></div>`;
+    dimHtml += `<div class="dd-resource-grid">`;
+    for (const val of values) {
+      const fCount = xrefIndex[dim.key][val].length;
+      dimHtml += `<a href="${xrefUrl(version, dim.slug, val)}" class="dd-resource-card">`;
+      dimHtml += `<h3>${escapeHtml(val)}</h3>`;
+      dimHtml += `<span class="dd-resource-count">${formatNumber(fCount)} field${fCount !== 1 ? 's' : ''}</span>`;
+      dimHtml += `</a>`;
+    }
+    dimHtml += `</div>`;
+
+    const dimDir = join(xrefDir, dim.slug);
+    mkdirSync(dimDir, { recursive: true });
+    writeFileSync(join(dimDir, 'index.html'), wrapPage(`${dim.label} - ${label}`, version, sidebarHtml, dimHtml, allVersions));
+    pageCount++;
+
+    // Per-value pages
+    for (const val of values) {
+      const matchingFields = xrefIndex[dim.key][val];
+      let valHtml = breadcrumbHtml(version, label, [
+        { label: 'Cross Reference', url: `/dd/DD${version}/xref/` },
+        { label: dim.label, url: `/dd/DD${version}/xref/${dim.slug}/` },
+        { label: val },
+      ]);
+      valHtml += `<div class="dd-page-header"><h1>${escapeHtml(val)}</h1>`;
+      valHtml += `<p class="dd-page-subtitle">${escapeHtml(dim.label)} &mdash; ${formatNumber(matchingFields.length)} fields</p></div>`;
+
+      valHtml += `<table class="dd-fields-table"><thead><tr>`;
+      valHtml += `<th>Resource</th><th>Field</th><th>Definition</th><th>Type</th>`;
+      valHtml += `</tr></thead><tbody>`;
+      for (const field of matchingFields) {
+        const fieldUrl = ddUrl(version, field.ResourceName, field.StandardName);
+        valHtml += `<tr>`;
+        valHtml += `<td><a href="${ddUrl(version, field.ResourceName)}" class="dd-field-link">${escapeHtml(field.ResourceName)}</a></td>`;
+        valHtml += `<td><a href="${fieldUrl}" class="dd-field-link">${escapeHtml(field.DisplayName || field.StandardName)}</a>`;
+        valHtml += `<div class="dd-field-standard-name">${escapeHtml(field.StandardName)}</div></td>`;
+        valHtml += `<td class="dd-field-def">${escapeHtml(truncate(field.Definition, DEFINITION_TRUNCATE_LENGTH))}</td>`;
+        valHtml += `<td><span class="dd-type-badge">${escapeHtml(field.SimpleDataType)}</span></td>`;
+        valHtml += `</tr>`;
+      }
+      valHtml += `</tbody></table>`;
+
+      const valDir = join(dimDir, encodeURIComponent(val));
+      mkdirSync(valDir, { recursive: true });
+      writeFileSync(join(valDir, 'index.html'), wrapPage(`${val} - ${dim.label}`, version, sidebarHtml, valHtml, allVersions));
+      pageCount++;
+    }
+  }
+
+  return pageCount;
 }
 
 // ---------------------------------------------------------------------------
@@ -1246,7 +1572,10 @@ async function main() {
       }
     }
 
-    console.log(`  Generated ${pageCount} pages`);
+    const xrefCount = generateXrefPages(vCfg, data, VERSIONS);
+    pageCount += xrefCount;
+
+    console.log(`  Generated ${pageCount} pages (${xrefCount} cross-reference)`);
   }
 
   // Generate DD root redirect
