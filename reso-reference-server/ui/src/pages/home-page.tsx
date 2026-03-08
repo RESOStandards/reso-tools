@@ -2,10 +2,13 @@ import { NavLink } from 'react-router';
 import { useServer } from '../context/server-context';
 
 /** Card wrapper for landing page sections. */
-const Card = ({ title, description, to, icon, disabled }: {
+const Card = ({ title, description, to, href, icon, disabled }: {
   readonly title: string;
   readonly description: string;
-  readonly to: string;
+  /** Client-side route (NavLink). */
+  readonly to?: string;
+  /** External / server-side URL (plain anchor). */
+  readonly href?: string;
   readonly icon: React.ReactNode;
   readonly disabled?: boolean;
 }) => {
@@ -30,7 +33,11 @@ const Card = ({ title, description, to, icon, disabled }: {
     return <div className={disabledClass}>{content}</div>;
   }
 
-  return <NavLink to={to} className={enabledClass}>{content}</NavLink>;
+  if (href) {
+    return <a href={href} className={enabledClass}>{content}</a>;
+  }
+
+  return <NavLink to={to ?? '/'} className={enabledClass}>{content}</NavLink>;
 };
 
 /** Server status badge shown on the landing page. */
@@ -122,7 +129,7 @@ export const HomePage = () => {
           <Card
             title="API Documentation"
             description="Interactive Swagger UI for exploring the OData REST API endpoints."
-            to="/api-docs"
+            href="/api-docs"
             icon={
               <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                 <title>API Docs</title>

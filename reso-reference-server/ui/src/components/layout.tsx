@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
+import { NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { clearConfigCache } from '../api/config';
 import { setApiConfig } from '../api/client';
 import { clearMetadataCache } from '../api/metadata';
@@ -94,8 +94,10 @@ export const Layout = () => {
                 </svg>
               )}
             </button>
-            {/* RESO Logo */}
-            <img src={isDark ? LOGO_DARK : LOGO_LIGHT} alt="RESO" className="h-8 sm:h-10" />
+            {/* RESO Logo — links to home */}
+            <NavLink to="/" className="shrink-0">
+              <img src={isDark ? LOGO_DARK : LOGO_LIGHT} alt="RESO" className="h-8 sm:h-10" />
+            </NavLink>
             {/* Server switcher replaces static title */}
             <ServerSwitcher />
             {pageIndicator && <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">/ {pageIndicator}</span>}

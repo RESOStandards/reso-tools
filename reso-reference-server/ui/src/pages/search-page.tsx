@@ -237,11 +237,10 @@ export const SearchPage = () => {
         )}
       </div>
 
-      {/* Scrollable results */}
-      <div className="flex-1 overflow-y-auto min-h-0 px-4 sm:px-6 py-4 space-y-4">
-        {/* Advanced search panel */}
-        {isAdvanced && (
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+      {/* Advanced search — takes over the results area when open */}
+      {isAdvanced ? (
+        <div className="flex-1 min-h-0 flex flex-col px-4 sm:px-6 py-4">
+          <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4">
             <AdvancedSearch
               resource={resourceName}
               fields={fields}
@@ -249,11 +248,13 @@ export const SearchPage = () => {
               fieldGroups={fieldGroups}
               filterString={draftFilter}
               onFilterChange={setDraftFilter}
-              onSearch={handleSubmit}
+              onSearch={() => { handleSubmit(); handleToggleAdvanced(); }}
+              onClose={handleToggleAdvanced}
             />
           </div>
-        )}
-
+        </div>
+      ) : (
+      <div className="flex-1 overflow-y-auto min-h-0 px-4 sm:px-6 py-4 space-y-4">
         <ResultsList
           resource={resourceName}
           rows={rows}
@@ -268,6 +269,7 @@ export const SearchPage = () => {
           hasMediaExpansion={hasMediaExpansion}
         />
       </div>
+      )}
     </div>
   );
 };

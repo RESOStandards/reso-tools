@@ -3,6 +3,24 @@ import { fetchCollectionByUrl, queryCollection } from '../api/client.js';
 
 const PAGE_SIZE = 25;
 
+/** Patterns that indicate the server doesn't support the query, with user-friendly messages. */
+const UNSUPPORTED_QUERY_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/cannot find property/i, 'The server does not recognize a property used in this query. Try removing or adjusting your filter.'],
+  [/not supported/i, 'This query uses features the server does not support. Try simplifying your filter.'],
+  [/too complex/i, 'The server considers this query too complex. Try reducing the number of filters or simplifying conditions.'],
+  [/invalid filter/i, 'The server rejected this filter expression. Check the syntax and try again.'],
+  [/unknown property/i, 'The server does not recognize a property used in this query. Try removing or adjusting your filter.'],
+  [/syntax error/i, 'The server could not parse this query. Check the filter syntax and try again.'],
+];
+
+/** Transforms raw server error messages into user-friendly descriptions. */
+const humanizeError = (raw: string): string => {
+  for (const [pattern, friendly] of UNSUPPORTED_QUERY_PATTERNS) {
+    if (pattern.test(raw)) return `${friendly}\n\nServer response: ${raw}`;
+  }
+  return raw;
+};
+
 export interface UseCollectionResult {
   readonly rows: ReadonlyArray<Record<string, unknown>>;
   readonly count: number | undefined;
@@ -64,7 +82,7 @@ export const useCollection = (
       } catch (err) {
         const msg =
           err instanceof Error ? err.message : ((err as { error?: { message?: string } })?.error?.message ?? 'Failed to load data');
-        setError(msg);
+        setError(humanizeError(msg));
       } finally {
         setIsLoading(false);
       }
@@ -90,7 +108,7 @@ export const useCollection = (
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : ((err as { error?: { message?: string } })?.error?.message ?? 'Failed to load more data');
-      setError(msg);
+      setError(humanizeError(msg));
     } finally {
       setIsLoading(false);
     }

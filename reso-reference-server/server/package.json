@@ -4,6 +4,9 @@
   "description": "RESO Reference OData Server — metadata-driven CRUD server for RESO Data Dictionary resources",
   "type": "module",
   "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",

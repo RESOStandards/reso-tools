@@ -38,12 +38,13 @@ const shouldProxyResource = (req: IncomingMessage): boolean => {
   if (!match) return false;
 
   const suffix = match[2];
-  // OData key syntax or query params → always proxy
-  if (suffix === '(' || suffix === '%28' || suffix === '?') return true;
+  // OData key syntax → always proxy (never a browser navigation)
+  if (suffix === '(' || suffix === '%28') return true;
 
-  // Bare resource path → only proxy if Accept includes application/json
+  // Query params or bare resource path → proxy only for API requests (Accept: application/json).
+  // Browser refreshes send Accept: text/html and should serve the SPA.
   const accept = req.headers.accept ?? '';
-  return accept.includes('application/json');
+  return accept.includes('application/json') && !accept.includes('text/html');
 };
 
 export default defineConfig({
