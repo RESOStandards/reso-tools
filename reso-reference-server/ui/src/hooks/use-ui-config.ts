@@ -24,7 +24,7 @@ export const useUiConfig = (): UseUiConfigResult => {
 
     const load = async () => {
       try {
-        const [uiConfig, groups] = await Promise.all([fetchUiConfig(isLocal), fetchFieldGroups(isLocal)]);
+        const [uiConfig, groups] = await Promise.all([fetchUiConfig(isLocal), fetchFieldGroups()]);
         if (!cancelled) {
           setConfig(uiConfig);
           setFieldGroups(groups);

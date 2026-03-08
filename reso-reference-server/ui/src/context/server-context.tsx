@@ -1,6 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
+/** Per-operation permissions for a server connection. */
+export interface ServerPermissions {
+  readonly canAdd: boolean;
+  readonly canEdit: boolean;
+  readonly canDelete: boolean;
+}
+
 /** Server connection configuration. */
 export interface ServerConfig {
   readonly id: string;
@@ -8,6 +15,8 @@ export interface ServerConfig {
   readonly baseUrl: string;
   readonly token?: string;
   readonly type: 'local' | 'external';
+  /** Per-operation permissions. Local server defaults to all true; external defaults to all false. */
+  readonly permissions?: ServerPermissions;
 }
 
 /** The built-in local reference server — always available. */
@@ -84,6 +93,8 @@ export interface ServerContextValue {
   readonly updateServer: (id: string, updates: Partial<Omit<ServerConfig, 'id' | 'type'>>) => void;
   /** Whether the active server is the local reference server. */
   readonly isLocal: boolean;
+  /** Resolved permissions for the active server. */
+  readonly permissions: ServerPermissions;
   /** Get the key field name for a resource (discovered from $metadata). */
   readonly getKeyField: (resource: string) => string;
   /** Whether the server has a Lookup entity set (for Lookup Resource enum fields). */
@@ -250,6 +261,14 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     [resources]
   );
 
+  /** Resolve permissions: local server always has full access; external uses stored config. */
+  const permissions = useMemo<ServerPermissions>(
+    () => isLocal
+      ? { canAdd: true, canEdit: true, canDelete: true }
+      : activeServer.permissions ?? { canAdd: false, canEdit: false, canDelete: false },
+    [isLocal, activeServer.permissions]
+  );
+
   const value = useMemo<ServerContextValue>(
     () => ({
       activeServer,
@@ -262,10 +281,11 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
       removeServer,
       updateServer,
       isLocal,
+      permissions,
       getKeyField,
       hasLookupResource
     }),
-    [activeServer, servers, resources, isLoadingResources, resourceError, switchServer, addServer, removeServer, updateServer, isLocal, getKeyField, hasLookupResource]
+    [activeServer, servers, resources, isLoadingResources, resourceError, switchServer, addServer, removeServer, updateServer, isLocal, permissions, getKeyField, hasLookupResource]
   );
 
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;

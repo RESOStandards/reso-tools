@@ -9,7 +9,6 @@ import { useMetadata } from '../hooks/use-metadata';
 import { useUiConfig } from '../hooks/use-ui-config';
 import { useServer } from '../context/server-context';
 import type { ResoField } from '../types';
-import { READ_ONLY_RESOURCES } from '../types';
 import { ADDRESS_FIELDS, formatAddress, formatFieldValue, getDisplayName, isUrlValue, isVideoMediaType } from '../utils/format';
 
 /** Renders a media preview (image or video) for a URL based on MediaType. */
@@ -30,7 +29,7 @@ const MediaPreview = ({ url, mediaType }: { readonly url: string; readonly media
 export const DetailPage = () => {
   const { resource, key } = useParams<{ resource: string; key: string }>();
   const navigate = useNavigate();
-  const { isLocal, resources, isLoadingResources, resourceError, getKeyField } = useServer();
+  const { isLocal, resources, isLoadingResources, resourceError, getKeyField, permissions } = useServer();
   const resourceName = resource ?? '';
 
   const [record, setRecord] = useState<Record<string, unknown> | null>(null);
@@ -114,8 +113,19 @@ export const DetailPage = () => {
   const skipFields = new Set([keyField, 'ModificationTimestamp']);
 
   // Determine summary fields for the left pane
+  // For external servers with no explicit config, auto-derive from the first few populated fields
   const summaryFieldNames = config?.resources?.[resourceName]?.summaryFields;
-  const summarySet = new Set(Array.isArray(summaryFieldNames) ? summaryFieldNames : []);
+  const autoSummary = !summaryFieldNames && hasGroupings;
+  const summarySet = new Set(
+    Array.isArray(summaryFieldNames)
+      ? summaryFieldNames
+      : autoSummary
+        ? fields
+            .filter(f => !skipFields.has(f.fieldName) && !f.isExpansion && !f.fieldName.startsWith('@') && record[f.fieldName] != null)
+            .slice(0, 6)
+            .map(f => f.fieldName)
+        : []
+  );
 
   // For Property: summary fields go in the left pane, rest go in groups
   // For other resources: all fields go in a single alphabetical list (rendered beside carousel if present)
@@ -287,20 +297,24 @@ export const DetailPage = () => {
             </button>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{resourceName} Detail</h2>
           </div>
-          {!READ_ONLY_RESOURCES.has(resourceName) && (
+          {(permissions.canEdit || permissions.canDelete) && (
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => navigate(`/${resourceName}/edit/${encodeURIComponent(key!)}`)}
-                className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
-                Edit
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowDelete(true)}
-                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700">
-                Delete
-              </button>
+              {permissions.canEdit && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/${resourceName}/edit/${encodeURIComponent(key!)}`)}
+                  className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+                  Edit
+                </button>
+              )}
+              {permissions.canDelete && (
+                <button
+                  type="button"
+                  onClick={() => setShowDelete(true)}
+                  className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700">
+                  Delete
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -385,9 +399,9 @@ export const DetailPage = () => {
             </FieldGroupSection>
           ))}
 
-          {/* Ungrouped remainder in "Other" (only when resource HAS groupings) */}
+          {/* Ungrouped remainder (only when resource HAS groupings) */}
           {ungrouped.length > 0 && hasGroupings && (
-            <FieldGroupSection title="Other" defaultOpen>
+            <FieldGroupSection title={isLocal ? 'Other' : 'Local Fields'} defaultOpen>
               {renderFieldList(ungrouped)}
             </FieldGroupSection>
           )}
@@ -412,7 +426,7 @@ export const DetailPage = () => {
       </div>
 
       {/* Delete dialog (fixed overlay, outside scroll area) */}
-      {!READ_ONLY_RESOURCES.has(resourceName) && showDelete && (
+      {permissions.canDelete && showDelete && (
         <DeleteDialog
           resource={resourceName}
           record={record}

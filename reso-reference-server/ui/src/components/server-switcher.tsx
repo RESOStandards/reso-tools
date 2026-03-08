@@ -27,7 +27,8 @@ export const ServerSwitcher = () => {
       const id = addServer({
         name: data.name,
         baseUrl: data.baseUrl,
-        token: data.token || undefined
+        token: data.token || undefined,
+        permissions: data.permissions
       });
       switchServer(id);
       setShowModal(false);
@@ -42,7 +43,8 @@ export const ServerSwitcher = () => {
       updateServer(editingServer.id, {
         name: data.name,
         baseUrl: data.baseUrl,
-        token: data.token || undefined
+        token: data.token || undefined,
+        permissions: data.permissions
       });
       setEditingServer(null);
     },
@@ -181,7 +183,7 @@ export const ServerSwitcher = () => {
           isOpen
           onClose={() => setEditingServer(null)}
           onSubmit={handleEditConnection}
-          initial={{ name: editingServer.name, baseUrl: editingServer.baseUrl, token: editingServer.token ?? '' }}
+          initial={{ name: editingServer.name, baseUrl: editingServer.baseUrl, token: editingServer.token ?? '', permissions: editingServer.permissions ?? { canAdd: false, canEdit: false, canDelete: false } }}
           title="Edit Connection"
         />
       )}

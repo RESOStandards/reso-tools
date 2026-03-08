@@ -53,7 +53,6 @@ export default defineConfig({
     proxy: {
       // Non-resource API endpoints — always proxy
       '/ui-config': API_TARGET,
-      '/field-groups': API_TARGET,
       '/api': API_TARGET,
       '/health': API_TARGET,
       '/images': API_TARGET,

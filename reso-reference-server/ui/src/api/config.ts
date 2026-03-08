@@ -6,8 +6,6 @@ let cachedFieldGroups: FieldGroups | null = null;
 /** Default UI config for external servers (show all fields). */
 const DEFAULT_UI_CONFIG: UiConfig = { resources: {} };
 
-/** Default field groups for external servers (no grouping). */
-const DEFAULT_FIELD_GROUPS: FieldGroups = {};
 
 /** Clear config caches. Called when switching servers. */
 export const clearConfigCache = (): void => {
@@ -25,11 +23,13 @@ export const fetchUiConfig = async (isLocal = true): Promise<UiConfig> => {
   return cachedUiConfig!;
 };
 
-/** Fetches the field groups mapping from the server. Returns defaults for external servers. */
-export const fetchFieldGroups = async (isLocal = true): Promise<FieldGroups> => {
-  if (!isLocal) return DEFAULT_FIELD_GROUPS;
+/**
+ * Fetches the DD field groups mapping from the bundled static asset.
+ * These are standard RESO Data Dictionary groupings that apply to any RESO server.
+ */
+export const fetchFieldGroups = async (): Promise<FieldGroups> => {
   if (cachedFieldGroups) return cachedFieldGroups;
-  const res = await fetch('/field-groups');
+  const res = await fetch('/field-groups.json');
   if (!res.ok) throw new Error(`Failed to fetch field groups: ${res.statusText}`);
   cachedFieldGroups = await res.json();
   return cachedFieldGroups!;

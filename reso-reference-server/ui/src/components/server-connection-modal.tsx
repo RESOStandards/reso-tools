@@ -1,9 +1,11 @@
 import { useCallback, useState } from 'react';
+import type { ServerPermissions } from '../context/server-context';
 
 export interface ServerFormData {
   readonly name: string;
   readonly baseUrl: string;
   readonly token: string;
+  readonly permissions: ServerPermissions;
 }
 
 interface ServerConnectionModalProps {
@@ -26,6 +28,9 @@ export const ServerConnectionModal = ({
   const [name, setName] = useState(initial?.name ?? '');
   const [baseUrl, setBaseUrl] = useState(initial?.baseUrl ?? '');
   const [token, setToken] = useState(initial?.token ?? '');
+  const [canAdd, setCanAdd] = useState(initial?.permissions.canAdd ?? false);
+  const [canEdit, setCanEdit] = useState(initial?.permissions.canEdit ?? false);
+  const [canDelete, setCanDelete] = useState(initial?.permissions.canDelete ?? false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = useCallback(
@@ -50,12 +55,20 @@ export const ServerConnectionModal = ({
         return;
       }
 
-      onSubmit({ name: name.trim(), baseUrl: trimmedUrl, token: token.trim() });
+      onSubmit({
+        name: name.trim(),
+        baseUrl: trimmedUrl,
+        token: token.trim(),
+        permissions: { canAdd, canEdit, canDelete }
+      });
       setName('');
       setBaseUrl('');
       setToken('');
+      setCanAdd(false);
+      setCanEdit(false);
+      setCanDelete(false);
     },
-    [name, baseUrl, token, onSubmit]
+    [name, baseUrl, token, canAdd, canEdit, canDelete, onSubmit]
   );
 
   if (!isOpen) return null;
@@ -126,6 +139,47 @@ export const ServerConnectionModal = ({
               className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
+
+          <fieldset>
+            <legend className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Allowed Operations
+            </legend>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCanAdd(v => !v)}
+                className={`px-3 py-1.5 text-sm rounded-md border font-medium transition-colors ${
+                  canAdd
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-transparent text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                }`}>
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => setCanEdit(v => !v)}
+                className={`px-3 py-1.5 text-sm rounded-md border font-medium transition-colors ${
+                  canEdit
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-transparent text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                }`}>
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => setCanDelete(v => !v)}
+                className={`px-3 py-1.5 text-sm rounded-md border font-medium transition-colors ${
+                  canDelete
+                    ? 'bg-red-600 text-white border-red-600'
+                    : 'bg-transparent text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                }`}>
+                Delete
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Select which write operations this server supports
+            </p>
+          </fieldset>
 
           <div className="flex justify-end gap-3 pt-2">
             <button
