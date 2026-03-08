@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { clearConfigCache } from '../api/config';
 import { setApiConfig } from '../api/client';
@@ -13,6 +13,7 @@ const LOGO_DARK = 'https://www.reso.org/wp-content/uploads/2020/06/RESO-Logo_Hor
 
 /** Derives the current page indicator from the URL path. */
 const getPageIndicator = (pathname: string, resource?: string): string | null => {
+  if (pathname === '/') return 'Home';
   if (!resource) return null;
   if (pathname.includes('/add')) return 'Add';
   if (pathname.includes('/edit')) return 'Edit';
@@ -26,12 +27,18 @@ const getPageIndicator = (pathname: string, resource?: string): string | null =>
 /** App shell with responsive sidebar nav, RESO branding, dark mode toggle, and main content. */
 export const Layout = () => {
   const { isDark, toggle } = useDarkMode();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { resource } = useParams<{ resource: string }>();
   const location = useLocation();
   const pageIndicator = getPageIndicator(location.pathname, resource);
   const navigate = useNavigate();
   const { activeServer, resources } = useServer();
   const prevServerIdRef = useRef(activeServer.id);
+
+  // Close sidebar on navigation (mobile)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   // Sync API client config and clear caches when server changes
   useEffect(() => {
@@ -69,6 +76,24 @@ export const Layout = () => {
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 sm:px-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
+            {/* Hamburger menu — mobile only */}
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(o => !o)}
+              className="sm:hidden p-1.5 -ml-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
+              aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}>
+              {sidebarOpen ? (
+                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                  <title>Close menu</title>
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                  <title>Open menu</title>
+                  <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                </svg>
+              )}
+            </button>
             {/* RESO Logo */}
             <img src={isDark ? LOGO_DARK : LOGO_LIGHT} alt="RESO" className="h-8 sm:h-10" />
             {/* Server switcher replaces static title */}
@@ -114,9 +139,30 @@ export const Layout = () => {
         </div>
       </header>
 
-      <div className="flex flex-col sm:flex-row flex-1 overflow-hidden">
-        {/* Sidebar — fixed, does not scroll with content */}
-        <nav className="w-full sm:w-56 shrink-0 bg-white dark:bg-gray-800 border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-gray-700 p-3 sm:p-4 sm:overflow-y-auto">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile sidebar overlay */}
+        {sidebarOpen && (
+          <div
+            className="sm:hidden fixed inset-0 z-30 bg-black/30"
+            onClick={() => setSidebarOpen(false)}
+            onKeyDown={e => e.key === 'Escape' && setSidebarOpen(false)}
+            role="button"
+            tabIndex={-1}
+            aria-label="Close sidebar"
+          />
+        )}
+
+        {/* Sidebar — slide-over on mobile, fixed on desktop */}
+        <nav className={`
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          sm:translate-x-0
+          fixed sm:static z-40 sm:z-auto
+          w-64 sm:w-56 h-full
+          shrink-0 bg-white dark:bg-gray-800
+          border-r border-gray-200 dark:border-gray-700
+          p-4 overflow-y-auto
+          transition-transform duration-200 ease-in-out
+        `}>
           <ResourceNav />
         </nav>
 

@@ -18,9 +18,9 @@ const Chevron = ({ open }: { readonly open: boolean }) => (
   </svg>
 );
 
-type Section = 'resources' | 'metadata';
+type Section = 'home' | 'resources' | 'metadata';
 
-/** Sidebar navigation with collapsible Resources and Metadata Explorer sections. */
+/** Sidebar navigation with Home link and collapsible Resources and Metadata Explorer sections. */
 export const ResourceNav = () => {
   const { resource: activeResource } = useParams<{ resource: string }>();
   const location = useLocation();
@@ -32,7 +32,10 @@ export const ResourceNav = () => {
   );
 
   // Derive which section is active from the current URL
-  const activeSection: Section = location.pathname.startsWith('/metadata') ? 'metadata' : 'resources';
+  const activeSection: Section =
+    location.pathname === '/' ? 'home'
+    : location.pathname.startsWith('/metadata') ? 'metadata'
+    : 'resources';
 
   const sectionHeaderClass = (section: Section) =>
     `flex items-center gap-1.5 w-full text-xs font-semibold uppercase tracking-wider mb-2 cursor-pointer select-none ${
@@ -43,6 +46,14 @@ export const ResourceNav = () => {
 
   return (
     <div>
+      {/* Home link */}
+      <NavLink to="/" className={sectionHeaderClass('home')}>
+        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <title>Home</title>
+          <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+        </svg>
+        Home
+      </NavLink>
       {/* Resources section */}
       <NavLink to={activeSection === 'resources' ? '/metadata' : `/${resourceNames[0] ?? 'Property'}`} className={sectionHeaderClass('resources')}>
         <Chevron open={activeSection === 'resources'} />
@@ -62,7 +73,7 @@ export const ResourceNav = () => {
             </div>
           )}
 
-          <ul className="flex flex-row sm:flex-col gap-1 overflow-x-auto sm:overflow-visible">
+          <ul className="flex flex-wrap sm:flex-col gap-1.5 sm:gap-1">
             {resourceNames.map(resource => {
               const isActive = activeResource === resource;
               const isReadOnly = READ_ONLY_RESOURCES.has(resource);
@@ -70,10 +81,10 @@ export const ResourceNav = () => {
                 <li key={resource}>
                   <NavLink
                     to={`/${resource}`}
-                    className={`block px-3 py-1.5 rounded text-sm whitespace-nowrap ${
+                    className={`block px-3 py-1.5 rounded sm:rounded text-sm whitespace-nowrap ${
                       isActive
-                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium border border-blue-200 dark:border-blue-800 sm:border-0'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 sm:bg-transparent sm:dark:bg-transparent hover:bg-gray-200 dark:hover:bg-gray-600 sm:hover:bg-gray-100 sm:dark:hover:bg-gray-700'
                     }`}>
                     {resource}
                   </NavLink>
@@ -129,7 +140,7 @@ export const ResourceNav = () => {
               </div>
             )}
 
-            <ul className="flex flex-row sm:flex-col gap-1 overflow-x-auto sm:overflow-visible">
+            <ul className="flex flex-wrap sm:flex-col gap-1.5 sm:gap-1">
               {resourceNames.map(resource => {
                 const isActive = location.pathname === `/metadata/${resource}`;
                 return (
@@ -138,8 +149,8 @@ export const ResourceNav = () => {
                       to={`/metadata/${resource}`}
                       className={`block px-3 py-1.5 rounded text-sm whitespace-nowrap ${
                         isActive
-                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                          ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium border border-blue-200 dark:border-blue-800 sm:border-0'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 sm:bg-transparent sm:dark:bg-transparent hover:bg-gray-200 dark:hover:bg-gray-600 sm:hover:bg-gray-100 sm:dark:hover:bg-gray-700'
                       }`}>
                       {resource}
                     </NavLink>

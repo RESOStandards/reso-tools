@@ -10,6 +10,7 @@ import { DataGeneratorPage } from './pages/admin/data-generator-page';
 import { DeletePage } from './pages/delete-page';
 import { DetailPage } from './pages/detail-page';
 import { EditPage } from './pages/edit-page';
+import { HomePage } from './pages/home-page';
 import { MetadataPage } from './pages/metadata-page';
 import { NotFoundPage } from './pages/not-found-page';
 import { SearchPage } from './pages/search-page';
@@ -19,7 +20,7 @@ const router = createBrowserRouter([
     path: '/',
     element: <Layout />,
     children: [
-      { index: true, element: <Navigate to="/Property" replace /> },
+      { index: true, element: <HomePage /> },
       {
         path: 'admin',
         element: <AdminLayout />,

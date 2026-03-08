@@ -1,6 +1,7 @@
 import { useServer } from '../context/server-context';
-import { ADDRESS_FIELDS, formatAddress, formatFieldValue, getDisplayNameFromMap } from '../utils/format';
+import { ADDRESS_FIELDS, formatAddress, formatFieldValue, getDisplayNameFromMap, isSensitiveField } from '../utils/format';
 import { MediaCarousel } from './media-carousel';
+import { SensitiveValue } from './sensitive-value';
 
 interface ResultsCardProps {
   readonly resource: string;
@@ -69,13 +70,18 @@ export const ResultsCard = ({ resource, record, summaryFields, fieldMap, onClick
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-0.5">
             {displayFields.slice(0, 9).map(fieldName => {
               const formatted = formatFieldValue(record[fieldName], fieldMap.get(fieldName));
+              const sensitive = isSensitiveField(fieldName);
               return (
                 <div
                   key={fieldName}
                   className="flex items-baseline gap-1 text-sm truncate"
-                  title={`${getDisplayNameFromMap(fieldName, fieldMap)}: ${formatted}`}>
+                  title={sensitive ? getDisplayNameFromMap(fieldName, fieldMap) : `${getDisplayNameFromMap(fieldName, fieldMap)}: ${formatted}`}>
                   <span className="text-gray-500 dark:text-gray-400 shrink-0">{getDisplayNameFromMap(fieldName, fieldMap)}:</span>
-                  <span className="text-gray-800 dark:text-gray-200 truncate">{formatted}</span>
+                  {sensitive ? (
+                    <SensitiveValue value={formatted} className="text-gray-800 dark:text-gray-200 truncate" />
+                  ) : (
+                    <span className="text-gray-800 dark:text-gray-200 truncate">{formatted}</span>
+                  )}
                 </div>
               );
             })}

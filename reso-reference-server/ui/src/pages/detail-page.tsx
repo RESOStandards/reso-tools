@@ -10,7 +10,8 @@ import { useMetadata } from '../hooks/use-metadata';
 import { useUiConfig } from '../hooks/use-ui-config';
 import { useServer } from '../context/server-context';
 import type { ResoField } from '../types';
-import { ADDRESS_FIELDS, formatAddress, formatFieldValue, getDisplayName, isUrlValue, isVideoMediaType } from '../utils/format';
+import { SensitiveValue } from '../components/sensitive-value';
+import { ADDRESS_FIELDS, formatAddress, formatFieldValue, getDisplayName, isSensitiveField, isUrlValue, isVideoMediaType } from '../utils/format';
 
 /** Renders a media preview (image or video) for a URL based on MediaType. */
 const MediaPreview = ({ url, mediaType }: { readonly url: string; readonly mediaType?: string }) => {
@@ -210,13 +211,16 @@ export const DetailPage = () => {
     const value = record[field.fieldName];
     const isArray = Array.isArray(value) && value.length > 0;
     const displayName = getDisplayName(field);
+    const sensitive = isSensitiveField(field.fieldName);
     const formattedValue = formatFieldValue(value, field);
     return (
-      <div className={`flex ${isArray ? 'items-start' : 'items-baseline'} gap-2 py-1 text-sm min-w-0`}>
-        <span className="text-gray-500 dark:text-gray-400 shrink-0 w-36 sm:w-48 truncate" title={displayName}>
+      <div className={`flex flex-col sm:flex-row ${isArray ? 'sm:items-start' : 'sm:items-baseline'} gap-0.5 sm:gap-2 py-1 text-sm min-w-0`}>
+        <span className="text-gray-500 dark:text-gray-400 shrink-0 sm:w-48 truncate text-xs sm:text-sm" title={displayName}>
           {displayName}
         </span>
-        {isArray ? (
+        {sensitive && value != null ? (
+          <SensitiveValue value={formattedValue} className="text-gray-800 dark:text-gray-200 break-all min-w-0" />
+        ) : isArray ? (
           <div className="flex flex-wrap gap-1 min-w-0">
             {(value as unknown[]).map(item => (
               <span

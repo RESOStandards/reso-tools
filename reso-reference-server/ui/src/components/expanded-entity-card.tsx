@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useServer } from '../context/server-context';
+import { isSensitiveField } from '../utils/format';
 import { MediaCarousel } from './media-carousel';
+import { SensitiveValue } from './sensitive-value';
 
 interface ExpandedEntityCardProps {
   /** Navigation property name (e.g., "ListAgent", "Media"). */
@@ -93,13 +95,18 @@ const RecordSummary = ({
         <div>
           {displayFields.slice(0, MAX_SUMMARY_FIELDS).map(([key, value], idx) => {
             const stripe = idx % 2 === 1 ? 'bg-gray-100 dark:bg-gray-700/40' : '';
+            const sensitive = isSensitiveField(key);
             return (
               <div
                 key={key}
                 className={`flex items-baseline gap-1 text-xs truncate px-1.5 py-0.5 rounded ${stripe}`}
-                title={`${key}: ${value}`}>
+                title={sensitive ? key : `${key}: ${value}`}>
                 <span className="text-gray-500 dark:text-gray-400 shrink-0">{key}:</span>
-                <span className="text-gray-800 dark:text-gray-200 truncate">{value}</span>
+                {sensitive ? (
+                  <SensitiveValue value={value} className="text-gray-800 dark:text-gray-200 truncate" />
+                ) : (
+                  <span className="text-gray-800 dark:text-gray-200 truncate">{value}</span>
+                )}
               </div>
             );
           })}
