@@ -1,7 +1,6 @@
 import type { CsdlSchema, LookupResolver, LookupValue } from '@reso/odata-client';
 import { entityTypeToFields } from './metadata-adapter';
 import type { ResoField, ResoLookup } from '../types';
-import { isEnumType } from '../types';
 
 /** Cache for the local server's custom metadata endpoints. */
 const fieldsCache = new Map<string, ReadonlyArray<ResoField>>();
@@ -97,7 +96,9 @@ const toLookup = (lv: LookupValue): ResoLookup => ({
   lookupName: lv.lookupName,
   lookupValue: lv.lookupValue,
   type: lv.lookupName,
-  annotations: []
+  annotations: [],
+  ...(lv.standardLookupValue !== undefined ? { standardLookupValue: lv.standardLookupValue } : {}),
+  ...(lv.legacyODataValue !== undefined ? { legacyODataValue: lv.legacyODataValue } : {})
 });
 
 /** Fetches field definitions for a resource. Uses local endpoints or CSDL parsing. */
@@ -160,25 +161,19 @@ export const fetchLookupsForResource = async (
     );
   }
 
-  // Local server path — remap from type-keyed to fieldName-keyed
-  const cached = resourceLookupsCache.get(resource);
-  if (cached) return cached;
+  // Local server path — use the resolver with the current origin as baseUrl.
+  // The Vite proxy forwards /Lookup requests to the backend.
+  const localBaseUrl = window.location.origin;
+  const resolver = await getResolver(localBaseUrl);
+  const result = await resolver.resolveLookupsForResource(resource);
 
-  const [fieldsResult, lookupsRes] = await Promise.all([
-    fetchFieldsForResource(resource),
-    fetch(`/api/metadata/lookups-for-resource?resource=${encodeURIComponent(resource)}`)
-  ]);
-
-  if (!lookupsRes.ok) throw new Error(`Failed to fetch lookups for ${resource}: ${lookupsRes.statusText}`);
-  const typeKeyedLookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>> = await lookupsRes.json();
-
-  // Remap: for each enum field, map fieldName → lookups[field.type]
-  const fieldNameKeyed = Object.fromEntries(
-    fieldsResult
-      .filter(f => isEnumType(f.type) && typeKeyedLookups[f.type])
-      .map(f => [f.fieldName, typeKeyedLookups[f.type]])
+  const converted = Object.fromEntries(
+    Object.entries(result).map(([fieldName, values]) => [
+      fieldName,
+      values.map(toLookup)
+    ])
   );
 
-  resourceLookupsCache.set(resource, fieldNameKeyed);
-  return fieldNameKeyed;
+  resourceLookupsCache.set(resource, converted);
+  return converted;
 };

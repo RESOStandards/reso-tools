@@ -27,6 +27,8 @@ import type {
   CsdlProperty,
   CsdlReferentialConstraint,
   CsdlResourceInfo,
+  FieldAnnotation,
+  FieldInfo,
   CsdlReturnType,
   CsdlSchema,
   CsdlSingleton
@@ -438,12 +440,49 @@ export const discoverResources = (schema: CsdlSchema): ReadonlyArray<CsdlResourc
     return fallback;
   };
 
+  /**
+   * Find a human-friendly alternate key (e.g. ListingId, MemberId) distinct from the primary key.
+   * Prefers a field matching the key field pattern (e.g. ListingKey → ListingId) or the
+   * entity set / type name + "Id", then falls back to the first Edm.String *Id field.
+   */
+  const resolveAlternateKey = (
+    et: CsdlEntityType | undefined,
+    keyField: string,
+    entitySetName: string,
+    typeName: string
+  ): string | undefined => {
+    if (!et) return undefined;
+    const idProps = et.properties.filter(
+      p => p.name !== keyField && p.name.endsWith('Id') && p.type === 'Edm.String'
+    );
+    if (idProps.length === 0) return undefined;
+
+    // Derive the stem from the key field (e.g. "ListingKey" → "Listing", "MemberKey" → "Member")
+    const keyStem = keyField.endsWith('Key') ? keyField.slice(0, -3) : undefined;
+    const preferredNames = [
+      keyStem ? `${keyStem}Id` : undefined,    // ListingKey → ListingId
+      `${entitySetName}Id`,                     // Property → PropertyId
+      `${typeName}Id`                           // Property → PropertyId (type name)
+    ].filter((n): n is string => n !== undefined);
+
+    const preferred = preferredNames.reduce<string | undefined>(
+      (found, name) => found ?? idProps.find(p => p.name === name)?.name,
+      undefined
+    );
+    return preferred;
+  };
+
   return schema.entityContainer.entitySets.map(es => {
     const typeName = extractTypeName(es.entityType);
     const et = entityTypeMap.get(typeName);
     const keyField = resolveKeyField(et, `${typeName}Key`);
+    const alternateKeyField = resolveAlternateKey(et, keyField, es.name, typeName);
     const navigationProperties = et?.navigationProperties.map(np => np.name) ?? [];
-    return { name: es.name, entityType: es.entityType, keyField, navigationProperties };
+    return {
+      name: es.name, entityType: es.entityType, keyField,
+      ...(alternateKeyField ? { alternateKeyField } : {}),
+      navigationProperties
+    };
   });
 };
 
@@ -453,3 +492,109 @@ export const getEntityType = (schema: CsdlSchema, name: string): CsdlEntityType 
 
 /** Find an enum type by name. */
 export const getEnumType = (schema: CsdlSchema, name: string): CsdlEnumType | undefined => schema.enumTypes.find(et => et.name === name);
+
+/** Find a complex type by name. */
+export const getComplexType = (schema: CsdlSchema, name: string): CsdlComplexType | undefined => schema.complexTypes.find(ct => ct.name === name);
+
+/** The RESO annotation term that indicates a field uses the Lookup Resource. */
+const LOOKUP_NAME_TERM = 'RESO.OData.Metadata.LookupName';
+
+/** Check if a CSDL type is an Edm primitive. */
+const isEdmPrimitive = (type: string): boolean => {
+  const unwrapped = isCollectionType(type) ? unwrapCollectionType(type) : type;
+  return unwrapped.startsWith('Edm.');
+};
+
+/** Convert CSDL annotations record to FieldAnnotation array. */
+const toAnnotations = (annotations?: Readonly<Record<string, string>>): ReadonlyArray<FieldAnnotation> =>
+  annotations ? Object.entries(annotations).map(([term, value]) => ({ term, value })) : [];
+
+/** Convert a single CSDL property to a FieldInfo. */
+const propertyToFieldInfo = (resourceName: string, prop: CsdlProperty, namespace: string): FieldInfo => {
+  const rawType = isCollectionType(prop.type) ? unwrapCollectionType(prop.type) : prop.type;
+  const lookupName = prop.annotations?.[LOOKUP_NAME_TERM];
+  const isCsdlEnum = !isEdmPrimitive(prop.type) && !prop.type.startsWith('Collection(Edm.');
+
+  const typeName = isCsdlEnum
+    ? (rawType.startsWith(namespace + '.') ? rawType.slice(namespace.length + 1) : rawType)
+    : lookupName ?? undefined;
+
+  return {
+    resourceName,
+    fieldName: prop.name,
+    type: prop.type,
+    typeName,
+    nullable: prop.nullable,
+    isCollection: isCollectionType(prop.type),
+    maxLength: prop.maxLength,
+    scale: prop.scale,
+    precision: prop.precision,
+    annotations: toAnnotations(prop.annotations),
+    lookupName: lookupName ?? undefined
+  };
+};
+
+/**
+ * Extract field metadata for all properties and navigation properties
+ * of a CSDL entity type.
+ */
+export const getFieldsForEntityType = (
+  schema: CsdlSchema,
+  entityType: CsdlEntityType,
+  resourceName: string
+): ReadonlyArray<FieldInfo> => {
+  const fields = entityType.properties.map(p =>
+    propertyToFieldInfo(resourceName, p, schema.namespace)
+  );
+
+  const navFields: ReadonlyArray<FieldInfo> = entityType.navigationProperties.map(nav => ({
+    resourceName,
+    fieldName: nav.name,
+    type: nav.type,
+    typeName: nav.entityTypeName,
+    nullable: nav.nullable,
+    isCollection: nav.isCollection,
+    isExpansion: true,
+    annotations: []
+  }));
+
+  return [...fields, ...navFields];
+};
+
+/**
+ * Extract field metadata for a resource (entity set) by name.
+ * Returns all properties and navigation properties as FieldInfo.
+ *
+ * @throws {Error} if the schema has no EntityContainer or the resource is not found
+ */
+export const getFieldsForResource = (schema: CsdlSchema, resourceName: string): ReadonlyArray<FieldInfo> => {
+  if (!schema.entityContainer) throw new Error('No EntityContainer found in metadata');
+
+  const entitySet = schema.entityContainer.entitySets.find(es => es.name === resourceName);
+  if (!entitySet) throw new Error(`Resource "${resourceName}" not found in metadata`);
+
+  const typeName = extractTypeName(entitySet.entityType);
+  const entityType = schema.entityTypes.find(et => et.name === typeName);
+  if (!entityType) throw new Error(`Entity type "${typeName}" not found in metadata`);
+
+  return getFieldsForEntityType(schema, entityType, resourceName);
+};
+
+/**
+ * Extract field metadata for all resources in a schema.
+ * Returns a record keyed by entity set name.
+ */
+export const getAllFields = (schema: CsdlSchema): Readonly<Record<string, ReadonlyArray<FieldInfo>>> => {
+  if (!schema.entityContainer) return {};
+
+  const entityTypeMap = new Map(schema.entityTypes.map(et => [et.name, et]));
+
+  return Object.fromEntries(
+    schema.entityContainer.entitySets.map(es => {
+      const typeName = extractTypeName(es.entityType);
+      const entityType = entityTypeMap.get(typeName);
+      if (!entityType) return [es.name, []];
+      return [es.name, getFieldsForEntityType(schema, entityType, es.name)];
+    })
+  );
+};

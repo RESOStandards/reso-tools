@@ -49,7 +49,7 @@ export type { UriBuilder } from './uri/builder.js';
 export { parseQueryString } from './uri/parser.js';
 
 // CSDL parser & validator
-export { parseCsdlXml, discoverResources, getEntityType, getEnumType } from './csdl/parser.js';
+export { parseCsdlXml, discoverResources, getEntityType, getEnumType, getComplexType, getFieldsForResource, getFieldsForEntityType, getAllFields } from './csdl/parser.js';
 export { validateCsdl } from './csdl/validator.js';
 export type {
   CsdlSchema,
@@ -72,7 +72,9 @@ export type {
   CsdlFunction,
   CsdlValidationError,
   CsdlResourceInfo,
-  CsdlValidationResult
+  CsdlValidationResult,
+  FieldAnnotation,
+  FieldInfo
 } from './csdl/types.js';
 
 // Query validator

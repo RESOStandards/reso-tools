@@ -1,6 +1,5 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useServer } from '../context/server-context';
-import { ID_FIELD_MAP, type ResourceName } from '../types';
 
 interface KeyPromptProps {
   readonly resource: string;
@@ -12,9 +11,9 @@ interface KeyPromptProps {
 export const KeyPrompt = ({ resource, onSubmit, action }: KeyPromptProps) => {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const { getKeyField } = useServer();
+  const { getKeyField, getAlternateKeyField } = useServer();
   const keyField = getKeyField(resource);
-  const idField = ID_FIELD_MAP[resource as ResourceName];
+  const idField = getAlternateKeyField(resource);
 
   useEffect(() => {
     inputRef.current?.focus();

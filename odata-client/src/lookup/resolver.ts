@@ -50,10 +50,16 @@ const fetchFromLookupResource = async (
   const body = await res.json();
   const records: ReadonlyArray<Record<string, unknown>> = body?.value ?? [];
 
-  return records.map(r => ({
-    lookupName: String(r.LookupName ?? lookupName),
-    lookupValue: String(r.LookupValue ?? '')
-  }));
+  return records.map(r => {
+    const standardLookupValue = r.StandardLookupValue != null ? String(r.StandardLookupValue) : undefined;
+    const legacyODataValue = r.LegacyODataValue != null ? String(r.LegacyODataValue) : undefined;
+    return {
+      lookupName: String(r.LookupName ?? lookupName),
+      lookupValue: String(r.LookupValue ?? ''),
+      ...(standardLookupValue !== undefined ? { standardLookupValue } : {}),
+      ...(legacyODataValue !== undefined ? { legacyODataValue } : {})
+    };
+  });
 };
 
 /**

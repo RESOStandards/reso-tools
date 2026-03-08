@@ -67,6 +67,8 @@ export interface ResourceInfo {
   readonly name: string;
   readonly entityType: string;
   readonly keyField: string;
+  /** Human-friendly alternate key field (e.g. `ListingId` for Property). */
+  readonly alternateKeyField?: string;
   /** Navigation property names available for $expand. */
   readonly navigationProperties: ReadonlyArray<string>;
 }
@@ -97,6 +99,8 @@ export interface ServerContextValue {
   readonly permissions: ServerPermissions;
   /** Get the key field name for a resource (discovered from $metadata). */
   readonly getKeyField: (resource: string) => string;
+  /** Get the human-friendly alternate key field for a resource, if one exists. */
+  readonly getAlternateKeyField: (resource: string) => string | undefined;
   /** Whether the server has a Lookup entity set (for Lookup Resource enum fields). */
   readonly hasLookupResource: boolean;
 }
@@ -243,6 +247,12 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     [resources]
   );
 
+  const getAlternateKeyField = useCallback(
+    (resource: string): string | undefined =>
+      resources?.find(r => r.name === resource)?.alternateKeyField,
+    [resources]
+  );
+
   const hasLookupResource = useMemo(
     () => resources?.some(r => r.name === 'Lookup') ?? false,
     [resources]
@@ -270,9 +280,10 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
       isLocal,
       permissions,
       getKeyField,
+      getAlternateKeyField,
       hasLookupResource
     }),
-    [activeServer, servers, resources, isLoadingResources, resourceError, switchServer, addServer, removeServer, updateServer, isLocal, permissions, getKeyField, hasLookupResource]
+    [activeServer, servers, resources, isLoadingResources, resourceError, switchServer, addServer, removeServer, updateServer, isLocal, permissions, getKeyField, getAlternateKeyField, hasLookupResource]
   );
 
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;

@@ -181,8 +181,36 @@ export interface CsdlResourceInfo {
   readonly entityType: string;
   /** Primary key field name from the entity type definition. Falls back to `{TypeName}Key`. */
   readonly keyField: string;
+  /** Human-friendly alternate key field (e.g. `ListingId` for Property). Discovered from entity type properties. */
+  readonly alternateKeyField?: string;
   /** Navigation property names available for $expand. */
   readonly navigationProperties: ReadonlyArray<string>;
+}
+
+/** An annotation key-value pair. */
+export interface FieldAnnotation {
+  readonly term: string;
+  readonly value: string;
+}
+
+/** Extracted field metadata from a CSDL entity type property or navigation property. */
+export interface FieldInfo {
+  readonly resourceName: string;
+  readonly fieldName: string;
+  /** OData type string (e.g. "Edm.String", "Collection(org.reso.metadata.Media)"). */
+  readonly type: string;
+  /** Unqualified type name for enum, complex, or navigation types. */
+  readonly typeName?: string;
+  readonly nullable?: boolean;
+  readonly isCollection?: boolean;
+  /** True for navigation properties ($expand targets). */
+  readonly isExpansion?: boolean;
+  readonly maxLength?: number;
+  readonly scale?: number;
+  readonly precision?: number;
+  readonly annotations: ReadonlyArray<FieldAnnotation>;
+  /** RESO Lookup Resource name (from RESO.OData.Metadata.LookupName annotation). */
+  readonly lookupName?: string;
 }
 
 /** Validation error for a CSDL document. */

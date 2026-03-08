@@ -7,6 +7,10 @@
 export interface LookupValue {
   readonly lookupName: string;
   readonly lookupValue: string;
+  /** RESO standard lookup value. Present only when fetched from Lookup Resource. */
+  readonly standardLookupValue?: string;
+  /** Legacy OData enumeration member name. Present only when fetched from Lookup Resource. */
+  readonly legacyODataValue?: string;
 }
 
 /** Configuration for creating a lookup resolver. */

@@ -10,6 +10,7 @@ import { DataGeneratorPage } from './pages/admin/data-generator-page';
 import { DeletePage } from './pages/delete-page';
 import { DetailPage } from './pages/detail-page';
 import { EditPage } from './pages/edit-page';
+import { MetadataPage } from './pages/metadata-page';
 import { NotFoundPage } from './pages/not-found-page';
 import { SearchPage } from './pages/search-page';
 
@@ -27,6 +28,8 @@ const router = createBrowserRouter([
           { path: 'data-generator', element: <DataGeneratorPage /> }
         ]
       },
+      { path: 'metadata', element: <MetadataPage /> },
+      { path: 'metadata/:resource', element: <MetadataPage /> },
       { path: ':resource', element: <SearchPage /> },
       { path: ':resource/add', element: <AddPage /> },
       { path: ':resource/edit', element: <EditPage /> },

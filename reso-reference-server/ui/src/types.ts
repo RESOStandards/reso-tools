@@ -31,6 +31,10 @@ export interface ResoLookup {
   readonly lookupValue: string;
   readonly type: string;
   readonly annotations: ReadonlyArray<ResoAnnotation>;
+  /** RESO standard lookup value. Present when fetched from the Lookup Resource. */
+  readonly standardLookupValue?: string;
+  /** Legacy OData enumeration member name. Present when fetched from the Lookup Resource. */
+  readonly legacyODataValue?: string;
 }
 
 /** UI configuration served by the server at GET /ui-config. */
@@ -90,12 +94,5 @@ export type ResourceName = (typeof TARGET_RESOURCES)[number];
 
 /** Resources that are read-only (no Add/Edit/Delete). */
 export const READ_ONLY_RESOURCES: ReadonlySet<string> = new Set(['Lookup']);
-
-/** Secondary ID fields (user-facing, not UUIDs). */
-export const ID_FIELD_MAP: Readonly<Partial<Record<ResourceName, string>>> = {
-  Property: 'ListingId',
-  Member: 'MemberId',
-  Office: 'OfficeId'
-};
 
 export { isEnumType, isNumericEdmType } from '@reso/validation';
