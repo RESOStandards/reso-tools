@@ -18,7 +18,8 @@ export const fetchRawMetadata = async (baseUrl: string, token: string): Promise<
   const response = await fetch(metadataUrl, {
     headers: {
       Authorization: `Bearer ${token}`,
-      Accept: 'application/xml'
+      Accept: 'application/xml',
+      'Accept-Encoding': 'gzip, deflate'
     }
   });
 
