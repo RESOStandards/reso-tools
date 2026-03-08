@@ -153,10 +153,15 @@ export const ExpandedEntityCard = ({ title, targetResource, records, isCollectio
   if (records.length === 0) return null;
 
   const isTargetNavigable = resources?.some(r => r.name === targetResource) ?? false;
-  const keyField = isTargetNavigable ? getKeyField(targetResource) : undefined;
+  const discoveredKeyField = isTargetNavigable ? getKeyField(targetResource) : undefined;
 
   // For collections, show one record at a time with pagination
   const currentRecord = records[page];
+
+  // Fall back to guessing the key field from the record when the target isn't a standalone entity set
+  // (e.g., Media only reachable via $expand on external servers). Matches {TargetResource}Key pattern.
+  const keyField = discoveredKeyField
+    ?? (currentRecord[`${targetResource}Key`] !== undefined ? `${targetResource}Key` : undefined);
   const entityKey = keyField ? currentRecord[keyField] : undefined;
 
   return (
