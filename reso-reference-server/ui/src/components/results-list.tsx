@@ -13,6 +13,8 @@ interface ResultsListProps {
   readonly error: string | null;
   readonly onLoadMore: () => void;
   readonly onRowClick: (key: string) => void;
+  /** Whether this resource has a Media navigation property (show placeholder when no media). */
+  readonly hasMediaExpansion?: boolean;
 }
 
 /** Scrollable list of result cards with infinite scroll and count display. */
@@ -26,7 +28,8 @@ export const ResultsList = ({
   hasMore,
   error,
   onLoadMore,
-  onRowClick
+  onRowClick,
+  hasMediaExpansion = false
 }: ResultsListProps) => {
   const fieldMap = new Map(fields.map(f => [f.fieldName, f]));
 
@@ -57,6 +60,7 @@ export const ResultsList = ({
             summaryFields={summaryFields}
             fieldMap={fieldMap}
             onClick={onRowClick}
+            showMediaPlaceholder={hasMediaExpansion}
           />
         ))}
       </div>

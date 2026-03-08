@@ -9,7 +9,7 @@ import { useMetadata } from '../hooks/use-metadata';
 import { useUiConfig } from '../hooks/use-ui-config';
 import { useServer } from '../context/server-context';
 import type { ResoField } from '../types';
-import { READ_ONLY_RESOURCES, TARGET_RESOURCES } from '../types';
+import { READ_ONLY_RESOURCES } from '../types';
 import { ADDRESS_FIELDS, formatAddress, formatFieldValue, getDisplayName, isUrlValue, isVideoMediaType } from '../utils/format';
 
 /** Renders a media preview (image or video) for a URL based on MediaType. */
@@ -30,7 +30,7 @@ const MediaPreview = ({ url, mediaType }: { readonly url: string; readonly media
 export const DetailPage = () => {
   const { resource, key } = useParams<{ resource: string; key: string }>();
   const navigate = useNavigate();
-  const { isLocal, resources, isLoadingResources, getKeyField } = useServer();
+  const { isLocal, resources, isLoadingResources, resourceError, getKeyField } = useServer();
   const resourceName = resource ?? '';
 
   const [record, setRecord] = useState<Record<string, unknown> | null>(null);
@@ -81,12 +81,10 @@ export const DetailPage = () => {
     };
   }, [resourceName, key, fields]);
 
-  // Validate resource exists (after all hooks)
-  const isValidResource = isLocal
-    ? TARGET_RESOURCES.includes(resourceName as (typeof TARGET_RESOURCES)[number])
-    : (resources?.some(r => r.name === resourceName) ?? null);
+  // Validate resource exists in discovered metadata
+  const isValidResource = resources?.some(r => r.name === resourceName) ?? null;
 
-  if (!isLocal && (isValidResource === null || isLoadingResources)) {
+  if (isLoadingResources || isValidResource === null) {
     return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading resources...</div>;
   }
 

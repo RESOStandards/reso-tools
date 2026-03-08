@@ -23,12 +23,40 @@ export const MediaCarousel = ({ media, compact = false }: MediaCarouselProps) =>
 
   if (media.length === 0) return null;
 
+  const handlePrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrent(prev => (prev > 0 ? prev - 1 : media.length - 1));
+  };
+
+  const handleNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrent(prev => (prev < media.length - 1 ? prev + 1 : 0));
+  };
+
   if (compact) {
     return (
-      <div className="relative w-full h-32 sm:h-40 rounded overflow-hidden bg-gray-100">
-        <img src={getImageUrl(media[0], 0)} alt="Property media" className="w-full h-full object-cover" />
+      <div className="group relative w-full h-32 sm:h-40 rounded overflow-hidden bg-gray-100">
+        <img src={getImageUrl(media[current], current)} alt={`Media ${current + 1} of ${media.length}`} className="w-full h-full object-cover" />
         {media.length > 1 && (
-          <span className="absolute bottom-1 right-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">+{media.length - 1}</span>
+          <>
+            <button
+              type="button"
+              onClick={handlePrev}
+              className="absolute left-1 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+              aria-label="Previous image">
+              &larr;
+            </button>
+            <button
+              type="button"
+              onClick={handleNext}
+              className="absolute right-1 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+              aria-label="Next image">
+              &rarr;
+            </button>
+            <span className="absolute bottom-1 right-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
+              {current + 1}/{media.length}
+            </span>
+          </>
         )}
       </div>
     );
@@ -47,7 +75,7 @@ export const MediaCarousel = ({ media, compact = false }: MediaCarouselProps) =>
         {media.length > 1 && (
           <button
             type="button"
-            onClick={() => setCurrent(prev => (prev > 0 ? prev - 1 : media.length - 1))}
+            onClick={handlePrev}
             className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center"
             aria-label="Previous image">
             &larr;
@@ -58,7 +86,7 @@ export const MediaCarousel = ({ media, compact = false }: MediaCarouselProps) =>
         {media.length > 1 && (
           <button
             type="button"
-            onClick={() => setCurrent(prev => (prev < media.length - 1 ? prev + 1 : 0))}
+            onClick={handleNext}
             className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center"
             aria-label="Next image">
             &rarr;

@@ -1,31 +1,30 @@
 import { useMemo } from 'react';
 import { NavLink, useParams } from 'react-router';
 import { useServer } from '../context/server-context';
-import { READ_ONLY_RESOURCES, TARGET_RESOURCES } from '../types';
+import { READ_ONLY_RESOURCES } from '../types';
 
 /** Sidebar navigation with resource links and CRUD sub-links. */
 export const ResourceNav = () => {
   const { resource: activeResource } = useParams<{ resource: string }>();
   const { resources, isLocal, isLoadingResources } = useServer();
 
-  // Use hardcoded TARGET_RESOURCES for local server, dynamic list for external
   const resourceNames = useMemo(
-    () => (isLocal ? [...TARGET_RESOURCES] : (resources?.map(r => r.name) ?? [])),
-    [isLocal, resources]
+    () => resources?.map(r => r.name) ?? [],
+    [resources]
   );
 
   return (
     <div>
       <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Resources</h2>
 
-      {isLoadingResources && !isLocal && (
+      {isLoadingResources && (
         <p className="text-xs text-gray-400 dark:text-gray-500 px-3 py-1">Loading resources...</p>
       )}
 
       <ul className="flex flex-row sm:flex-col gap-1 overflow-x-auto sm:overflow-visible">
         {resourceNames.map(resource => {
           const isActive = activeResource === resource;
-          const isReadOnly = isLocal && READ_ONLY_RESOURCES.has(resource);
+          const isReadOnly = READ_ONLY_RESOURCES.has(resource);
           return (
             <li key={resource}>
               <NavLink

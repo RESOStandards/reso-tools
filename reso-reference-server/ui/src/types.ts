@@ -17,6 +17,12 @@ export interface ResoField {
   readonly scale?: number;
   readonly precision?: number;
   readonly annotations: ReadonlyArray<ResoAnnotation>;
+  /**
+   * LookupName for fields that use the Lookup Resource (Edm.String with
+   * RESO.OData.Metadata.LookupName annotation). When set, lookup values
+   * are fetched from the Lookup entity set rather than CSDL enum types.
+   */
+  readonly lookupName?: string;
 }
 
 /** A lookup value entry (one member of an enumeration). */

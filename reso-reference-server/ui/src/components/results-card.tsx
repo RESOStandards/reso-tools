@@ -8,10 +8,12 @@ interface ResultsCardProps {
   readonly summaryFields: ReadonlyArray<string>;
   readonly fieldMap: ReadonlyMap<string, import('../types').ResoField>;
   readonly onClick: (key: string) => void;
+  /** Show a placeholder thumbnail when the record has no media (resource supports Media expansion). */
+  readonly showMediaPlaceholder?: boolean;
 }
 
 /** Summary result card with media thumbnail and configurable fields. */
-export const ResultsCard = ({ resource, record, summaryFields, fieldMap, onClick }: ResultsCardProps) => {
+export const ResultsCard = ({ resource, record, summaryFields, fieldMap, onClick, showMediaPlaceholder = false }: ResultsCardProps) => {
   const { getKeyField } = useServer();
   const keyField = getKeyField(resource);
   const key = String(record[keyField] ?? '');
@@ -30,12 +32,21 @@ export const ResultsCard = ({ resource, record, summaryFields, fieldMap, onClick
       onClick={() => onClick(key)}
       className="w-full text-left bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-all p-3 sm:p-4">
       <div className="flex flex-col sm:flex-row gap-3">
-        {/* Media thumbnail */}
-        {media.length > 0 && (
+        {/* Media thumbnail or placeholder */}
+        {media.length > 0 ? (
           <div className="w-full sm:w-36 shrink-0">
             <MediaCarousel media={media} compact />
           </div>
-        )}
+        ) : showMediaPlaceholder ? (
+          <div className="w-full sm:w-36 shrink-0">
+            <div className="relative w-full h-32 sm:h-40 rounded overflow-hidden bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+              <svg className="w-10 h-10 text-gray-300 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <title>No media</title>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+          </div>
+        ) : null}
 
         {/* Fields */}
         <div className="flex-1 min-w-0">

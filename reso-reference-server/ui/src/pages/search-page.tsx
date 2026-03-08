@@ -9,7 +9,7 @@ import { useCollection } from '../hooks/use-collection';
 import { useMetadata } from '../hooks/use-metadata';
 import { useUiConfig } from '../hooks/use-ui-config';
 import { useServer } from '../context/server-context';
-import { READ_ONLY_RESOURCES, TARGET_RESOURCES } from '../types';
+import { READ_ONLY_RESOURCES } from '../types';
 import { getDisplayNameFromMap } from '../utils/format';
 
 /** Search page with basic search, OData filter editor, optional advanced search, and infinite scroll results. */
@@ -18,7 +18,7 @@ export const SearchPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const { isLocal, resources, isLoadingResources, resourceError } = useServer();
+  const { resources, isLoadingResources, resourceError } = useServer();
   const resourceName = resource ?? '';
 
   const filter = searchParams.get('$filter') ?? '';
@@ -50,17 +50,17 @@ export const SearchPage = () => {
   // Build field lookup map for display names
   const fieldMap = new Map(fields.map(f => [f.fieldName, f]));
 
-  // Determine $select and $expand for the collection query
-  const hasMedia = resourceName === 'Property';
+  // Determine $select and $expand — use stable server context (not async fields)
+  const resourceInfo = resources?.find(r => r.name === resourceName);
+  const hasMediaExpansion = resourceInfo?.navigationProperties.includes('Media') ?? false;
   const selectFields = isAllFields ? undefined : summaryFields.join(',');
 
   const { rows, count, isLoading, hasMore, error, loadMore } = useCollection(resourceName, {
     $filter: filter || undefined,
     $orderby: orderby || undefined,
     $select: selectFields,
-    $expand: hasMedia ? 'Media' : undefined
-  });
-
+    $expand: hasMediaExpansion ? 'Media' : undefined
+  }, !isLoadingResources);
   const handleSearch = useCallback(
     (newFilter: string) => {
       const params = new URLSearchParams(searchParams);
@@ -135,15 +135,13 @@ export const SearchPage = () => {
     setValidationError(null);
   }, []);
 
-  // Validate resource exists: check hardcoded list for local, dynamic list for external
-  const isValidResource = isLocal
-    ? TARGET_RESOURCES.includes(resourceName as (typeof TARGET_RESOURCES)[number])
-    : (resources?.some(r => r.name === resourceName) ?? null);
+  // Validate resource exists in discovered metadata
+  const isValidResource = resources?.some(r => r.name === resourceName) ?? null;
 
-  if (!isLocal && isLoadingResources) {
+  if (isLoadingResources || isValidResource === null) {
     return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading resources...</div>;
   }
-  if (!isLocal && resourceError) {
+  if (resourceError) {
     return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Failed to load server metadata: {resourceError}</div>;
   }
 
@@ -265,6 +263,7 @@ export const SearchPage = () => {
           error={error}
           onLoadMore={loadMore}
           onRowClick={handleRowClick}
+          hasMediaExpansion={hasMediaExpansion}
         />
       </div>
     </div>

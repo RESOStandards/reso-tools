@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useServer } from '../context/server-context';
-import { TARGET_RESOURCES } from '../types';
-import type { ResourceName } from '../types';
 
 interface ExpandedEntityCardProps {
   /** Navigation property name (e.g., "ListAgent", "Media"). */
@@ -37,14 +35,12 @@ const isDisplayableField = (key: string, value: unknown): boolean => {
 export const ExpandedEntityCard = ({ title, targetResource, records, isCollection }: ExpandedEntityCardProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const navigate = useNavigate();
-  const { getKeyField, resources, isLocal } = useServer();
+  const { getKeyField, resources } = useServer();
 
   if (records.length === 0) return null;
 
   const current = records[currentIndex];
-  const isTargetNavigable = isLocal
-    ? TARGET_RESOURCES.includes(targetResource as ResourceName)
-    : (resources?.some(r => r.name === targetResource) ?? false);
+  const isTargetNavigable = resources?.some(r => r.name === targetResource) ?? false;
   const keyField = isTargetNavigable ? getKeyField(targetResource) : undefined;
   const entityKey = keyField ? current[keyField] : undefined;
 

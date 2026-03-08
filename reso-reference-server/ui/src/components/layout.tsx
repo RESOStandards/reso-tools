@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { Outlet, useLocation, useParams } from 'react-router';
+import { useEffect, useRef } from 'react';
+import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { clearConfigCache } from '../api/config';
 import { setApiConfig } from '../api/client';
 import { clearMetadataCache } from '../api/metadata';
@@ -29,7 +29,9 @@ export const Layout = () => {
   const { resource } = useParams<{ resource: string }>();
   const location = useLocation();
   const pageIndicator = getPageIndicator(location.pathname, resource);
-  const { activeServer } = useServer();
+  const navigate = useNavigate();
+  const { activeServer, resources } = useServer();
+  const prevServerIdRef = useRef(activeServer.id);
 
   // Sync API client config and clear caches when server changes
   useEffect(() => {
@@ -37,6 +39,29 @@ export const Layout = () => {
     clearMetadataCache();
     clearConfigCache();
   }, [activeServer.id]);
+
+  // Guard: when server changes and new resources load, validate the current route
+  useEffect(() => {
+    if (!resources || resources.length === 0) return;
+
+    // Only redirect on actual server switches, not initial load
+    if (prevServerIdRef.current === activeServer.id) {
+      prevServerIdRef.current = activeServer.id;
+      return;
+    }
+    prevServerIdRef.current = activeServer.id;
+
+    const resourceExists = resource && resources.some(r => r.name === resource);
+
+    if (resource && !resourceExists) {
+      // Current resource doesn't exist on the new server — go to first available
+      navigate(`/${resources[0].name}`, { replace: true });
+    } else if (resource && resourceExists && location.pathname !== `/${resource}`) {
+      // Resource exists but we're on a detail/add/edit/delete page — go to search
+      // (the specific record or context won't carry over between servers)
+      navigate(`/${resource}`, { replace: true });
+    }
+  }, [resources, activeServer.id, resource, location.pathname, navigate]);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 transition-colors">

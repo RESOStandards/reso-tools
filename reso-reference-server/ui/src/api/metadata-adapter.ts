@@ -5,6 +5,9 @@
 import type { CsdlEntityType, CsdlEnumType, CsdlProperty, CsdlSchema } from '@reso/odata-client';
 import type { ResoAnnotation, ResoField, ResoLookup } from '../types';
 
+/** The RESO annotation term that indicates a field uses the Lookup Resource. */
+const LOOKUP_NAME_TERM = 'RESO.OData.Metadata.LookupName';
+
 /** Convert CSDL annotations record to ResoAnnotation array. */
 const toAnnotations = (annotations?: Readonly<Record<string, string>>): ReadonlyArray<ResoAnnotation> =>
   annotations ? Object.entries(annotations).map(([term, value]) => ({ term, value })) : [];
@@ -22,12 +25,18 @@ const isEdmPrimitive = (type: string): boolean => unwrapType(type).startsWith('E
 /** Convert a single CSDL property to a ResoField. */
 const propertyToField = (resourceName: string, prop: CsdlProperty, namespace: string): ResoField => {
   const rawType = unwrapType(prop.type);
-  const isEnum = !isEdmPrimitive(prop.type) && !prop.type.startsWith('Collection(Edm.');
 
-  // For enum types, extract just the type name without namespace
-  const typeName = isEnum
+  // Check for Lookup Resource annotation (Edm.String or Collection(Edm.String) with LookupName)
+  const lookupName = prop.annotations?.[LOOKUP_NAME_TERM];
+
+  // A field is a CSDL enum if its type is not an Edm primitive and not Collection(Edm.*)
+  const isCsdlEnum = !isEdmPrimitive(prop.type) && !prop.type.startsWith('Collection(Edm.');
+
+  // For CSDL enum types, extract just the type name without namespace
+  // For Lookup Resource fields, use the lookupName as the typeName
+  const typeName = isCsdlEnum
     ? (rawType.startsWith(namespace + '.') ? rawType.slice(namespace.length + 1) : rawType)
-    : undefined;
+    : lookupName ?? undefined;
 
   return {
     resourceName,
@@ -39,7 +48,8 @@ const propertyToField = (resourceName: string, prop: CsdlProperty, namespace: st
     maxLength: prop.maxLength,
     scale: prop.scale,
     precision: prop.precision,
-    annotations: toAnnotations(prop.annotations)
+    annotations: toAnnotations(prop.annotations),
+    lookupName: lookupName ?? undefined
   };
 };
 
@@ -114,6 +124,9 @@ export const buildResourceLookups = (
 ): Readonly<Record<string, ReadonlyArray<ResoLookup>>> =>
   Object.fromEntries(
     fields
-      .filter(f => f.typeName && allLookups[f.typeName])
-      .map(f => [f.fieldName, allLookups[f.typeName!]])
+      .filter(f => (f.typeName && allLookups[f.typeName]) || (f.lookupName && allLookups[f.lookupName]))
+      .map(f => {
+        const key = f.lookupName ?? f.typeName!;
+        return [f.fieldName, allLookups[key]];
+      })
   );

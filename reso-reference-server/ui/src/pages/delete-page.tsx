@@ -4,13 +4,13 @@ import { readEntity } from '../api/client';
 import { DeleteDialog } from '../components/delete-dialog';
 import { KeyPrompt } from '../components/key-prompt';
 import { useServer } from '../context/server-context';
-import { TARGET_RESOURCES } from '../types';
+import { READ_ONLY_RESOURCES } from '../types';
 
 /** Page for deleting a record. Prompts for key, loads record, shows confirmation dialog. */
 export const DeletePage = () => {
   const { resource } = useParams<{ resource: string }>();
   const navigate = useNavigate();
-  const { isLocal, resources, isLoadingResources } = useServer();
+  const { resources, isLoadingResources } = useServer();
   const resourceName = resource ?? '';
 
   const [key, setKey] = useState<string | null>(null);
@@ -53,9 +53,7 @@ export const DeletePage = () => {
   }, []);
 
   // Validate resource exists (after all hooks)
-  const isValidResource = isLocal
-    ? TARGET_RESOURCES.includes(resourceName as (typeof TARGET_RESOURCES)[number])
-    : (resources?.some(r => r.name === resourceName) ?? null);
+  const isValidResource = resources?.some(r => r.name === resourceName) ?? null;
   if (isValidResource === null || isLoadingResources) {
     return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading resources...</div>;
   }

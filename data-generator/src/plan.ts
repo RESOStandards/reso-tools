@@ -53,7 +53,9 @@ export const getRelatedResources = (
 
 /** Maps parent resources to their key field for child resource discovery. */
 const PARENT_KEY_FIELDS: Readonly<Record<string, string>> = {
-  Property: 'ListingKey'
+  Property: 'ListingKey',
+  Member: 'MemberKey',
+  Office: 'OfficeKey'
 };
 
 /** Returns the default count for a related resource. */

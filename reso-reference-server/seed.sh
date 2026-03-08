@@ -50,4 +50,34 @@ curl -sf -X POST "$URL/admin/data-generator" \
   }' | tee /dev/stderr | jq -r '"  Property: \(.created) created, \(.failed) failed"' 2>/dev/null || true
 echo ""
 
+# Generate Media for Member records (headshots, team photos)
+echo "Generating Media for existing Member records..."
+curl -sf -X POST "$URL/admin/data-generator" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "resource": "Member",
+    "count": 10,
+    "resolveDependencies": true,
+    "relatedRecords": {
+      "Media": 2
+    }
+  }' | tee /dev/stderr | jq -r '"  Member: \(.created) created, \(.failed) failed"' 2>/dev/null || true
+echo ""
+
+# Generate Media for Office records (building exteriors, logos)
+echo "Generating Media for existing Office records..."
+curl -sf -X POST "$URL/admin/data-generator" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "resource": "Office",
+    "count": 5,
+    "resolveDependencies": true,
+    "relatedRecords": {
+      "Media": 3
+    }
+  }' | tee /dev/stderr | jq -r '"  Office: \(.created) created, \(.failed) failed"' 2>/dev/null || true
+echo ""
+
 echo "Seed complete."

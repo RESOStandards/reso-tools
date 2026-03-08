@@ -15,7 +15,9 @@ export interface UseCollectionResult {
 /** Fetches a resource collection with server-driven pagination via @odata.nextLink. */
 export const useCollection = (
   resource: string,
-  params: { $filter?: string; $orderby?: string; $select?: string; $expand?: string }
+  params: { $filter?: string; $orderby?: string; $select?: string; $expand?: string },
+  /** When false, the hook defers fetching until enabled. Prevents race conditions with dependent data. */
+  enabled = true
 ): UseCollectionResult => {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [count, setCount] = useState<number | undefined>(undefined);
@@ -32,6 +34,8 @@ export const useCollection = (
     setHasMore(true);
     setError(null);
     nextLinkRef.current = null;
+
+    if (!enabled) return;
 
     const loadFirst = async () => {
       setIsLoading(true);
@@ -71,7 +75,7 @@ export const useCollection = (
     return () => {
       abortRef.current?.abort();
     };
-  }, [resource, params.$filter, params.$orderby, params.$select, params.$expand]);
+  }, [resource, params.$filter, params.$orderby, params.$select, params.$expand, enabled]);
 
   const loadMore = useCallback(async () => {
     if (isLoading || !hasMore || !nextLinkRef.current) return;

@@ -58,6 +58,8 @@ export interface ResourceInfo {
   readonly name: string;
   readonly entityType: string;
   readonly keyField: string;
+  /** Navigation property names available for $expand. */
+  readonly navigationProperties: ReadonlyArray<string>;
 }
 
 /** Server context value exposed to consumers. */
@@ -82,8 +84,10 @@ export interface ServerContextValue {
   readonly updateServer: (id: string, updates: Partial<Omit<ServerConfig, 'id' | 'type'>>) => void;
   /** Whether the active server is the local reference server. */
   readonly isLocal: boolean;
-  /** Get the key field name for a resource. */
+  /** Get the key field name for a resource (discovered from $metadata). */
   readonly getKeyField: (resource: string) => string;
+  /** Whether the server has a Lookup entity set (for Lookup Resource enum fields). */
+  readonly hasLookupResource: boolean;
 }
 
 const ServerContext = createContext<ServerContextValue | null>(null);
@@ -102,12 +106,31 @@ export interface ServerProviderProps {
   readonly children: ReactNode;
 }
 
+/**
+ * Resolve the $metadata URL for fetching.
+ * - Local server: relative path (through Vite dev proxy or same origin)
+ * - External localhost: direct URL
+ * - External remote: through /api/proxy to avoid CORS
+ */
+const resolveMetadataUrl = (baseUrl: string): string => {
+  if (!baseUrl) {
+    // Local server — relative path
+    return '/$metadata?$format=application/xml';
+  }
+  const rawUrl = `${baseUrl}/$metadata?$format=application/xml`;
+  try {
+    const hostname = new URL(rawUrl).hostname;
+    if (['localhost', '127.0.0.1', '::1'].includes(hostname)) return rawUrl;
+  } catch { /* fall through to proxy */ }
+  return `/api/proxy?url=${encodeURIComponent(rawUrl)}`;
+};
+
 /** Provider that manages server connections and exposes them via context. */
 export const ServerProvider = ({ children }: ServerProviderProps) => {
   const [externalConfigs, setExternalConfigs] = useState<ReadonlyArray<ServerConfig>>(loadSavedConfigs);
   const [activeServerId, setActiveServerId] = useState<string>(loadActiveServerId);
   const [resources, setResources] = useState<ReadonlyArray<ResourceInfo> | null>(null);
-  const [isLoadingResources, setIsLoadingResources] = useState(false);
+  const [isLoadingResources, setIsLoadingResources] = useState(true);
   const [resourceError, setResourceError] = useState<string | null>(null);
 
   const servers = useMemo(() => [LOCAL_SERVER, ...externalConfigs], [externalConfigs]);
@@ -119,15 +142,8 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
 
   const isLocal = activeServer.type === 'local';
 
-  // Load resources when active server changes
+  // Always fetch $metadata to discover resources and keys
   useEffect(() => {
-    if (isLocal) {
-      // Local server uses hardcoded resources — set to null to signal "use defaults"
-      setResources(null);
-      setResourceError(null);
-      return;
-    }
-
     const controller = new AbortController();
     setIsLoadingResources(true);
     setResourceError(null);
@@ -137,20 +153,18 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
       try {
         const { parseCsdlXml } = await import('@reso/odata-client');
 
-        const headers: Record<string, string> = {
-          Accept: 'application/xml'
-        };
+        const headers: Record<string, string> = { Accept: 'application/xml' };
         if (activeServer.token) {
           headers['Authorization'] = `Bearer ${activeServer.token}`;
         }
 
-        const rawUrl = `${activeServer.baseUrl}/$metadata?$format=application/xml`;
-        const isLocalhost = (() => {
-          try { return ['localhost', '127.0.0.1', '::1'].includes(new URL(rawUrl).hostname); }
-          catch { return false; }
-        })();
-        const metadataUrl = isLocalhost ? rawUrl : `/api/proxy?url=${encodeURIComponent(rawUrl)}`;
-        const res = await fetch(metadataUrl, { headers, signal: controller.signal, cache: 'no-store' });
+        const metadataUrl = resolveMetadataUrl(activeServer.baseUrl);
+        const needsCacheBust = metadataUrl.startsWith('/api/proxy');
+        const res = await fetch(metadataUrl, {
+          headers,
+          signal: controller.signal,
+          ...(needsCacheBust ? { cache: 'no-store' as const } : {})
+        });
         if (!res.ok) throw new Error(`Failed to fetch metadata: ${res.status} ${res.statusText}`);
 
         const xml = await res.text();
@@ -163,11 +177,11 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
         const entityTypeMap = new Map(schema.entityTypes.map(et => [et.name, et]));
 
         const discovered: ReadonlyArray<ResourceInfo> = schema.entityContainer.entitySets.map(es => {
-          // entityType is fully qualified, e.g. "org.reso.metadata.Property"
           const typeName = es.entityType.includes('.') ? es.entityType.split('.').pop()! : es.entityType;
           const et = entityTypeMap.get(typeName);
           const keyField = et?.key[0] ?? `${typeName}Key`;
-          return { name: es.name, entityType: es.entityType, keyField };
+          const navigationProperties = et?.navigationProperties.map(np => np.name) ?? [];
+          return { name: es.name, entityType: es.entityType, keyField, navigationProperties };
         });
 
         if (!controller.signal.aborted) {
@@ -186,7 +200,7 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
 
     loadMetadata();
     return () => controller.abort();
-  }, [activeServer, isLocal]);
+  }, [activeServer]);
 
   const switchServer = useCallback((id: string) => {
     setActiveServerId(id);
@@ -211,7 +225,6 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
       persistConfigs(updated);
       return updated;
     });
-    // If removing the active server, switch back to local
     setActiveServerId(prev => (prev === id ? 'local' : prev));
   }, []);
 
@@ -232,6 +245,11 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     [resources]
   );
 
+  const hasLookupResource = useMemo(
+    () => resources?.some(r => r.name === 'Lookup') ?? false,
+    [resources]
+  );
+
   const value = useMemo<ServerContextValue>(
     () => ({
       activeServer,
@@ -244,9 +262,10 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
       removeServer,
       updateServer,
       isLocal,
-      getKeyField
+      getKeyField,
+      hasLookupResource
     }),
-    [activeServer, servers, resources, isLoadingResources, resourceError, switchServer, addServer, removeServer, updateServer, isLocal, getKeyField]
+    [activeServer, servers, resources, isLoadingResources, resourceError, switchServer, addServer, removeServer, updateServer, isLocal, getKeyField, hasLookupResource]
   );
 
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;
