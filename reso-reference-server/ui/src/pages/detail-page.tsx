@@ -114,7 +114,7 @@ export const DetailPage = () => {
   // Determine summary fields for the left pane
   // For external servers with no explicit config, auto-derive from the first few populated fields
   const summaryFieldNames = config?.resources?.[resourceName]?.summaryFields;
-  const autoSummary = !summaryFieldNames && hasGroupings;
+  const autoSummary = !summaryFieldNames || summaryFieldNames === '__all__';
   const summarySet = new Set(
     Array.isArray(summaryFieldNames)
       ? summaryFieldNames
@@ -166,29 +166,26 @@ export const DetailPage = () => {
     if (field.fieldName.startsWith('@')) continue;
     if (field.isExpansion) continue;
 
-    if (hasGroupings) {
-      // Resources with groupings: split into summary vs grouped/ungrouped
-      if (summarySet.has(field.fieldName)) {
-        summaryFields.push(field);
+    // Summary fields always go to the summary pane
+    if (summarySet.has(field.fieldName)) {
+      summaryFields.push(field);
+    } else if (hasGroupings) {
+      const groups = resourceGroups[field.fieldName];
+      if (groups && groups.length > 0) {
+        const groupKey = groups[0];
+        const existing = grouped.get(groupKey);
+        if (existing) existing.push(field);
+        else grouped.set(groupKey, [field]);
       } else {
-        const groups = resourceGroups[field.fieldName];
-        if (groups && groups.length > 0) {
-          const groupKey = groups[0];
-          const existing = grouped.get(groupKey);
-          if (existing) existing.push(field);
-          else grouped.set(groupKey, [field]);
-        } else {
-          ungrouped.push(field);
-        }
+        ungrouped.push(field);
       }
     } else {
-      // Resources without groupings: all fields in one flat list
       ungrouped.push(field);
     }
   }
 
   // Sort summary fields in config order
-  if (hasGroupings && summaryFields.length > 0) {
+  if (summaryFields.length > 0) {
     const orderMap = new Map(Array.from(summarySet).map((name, i) => [name, i]));
     summaryFields.sort((a, b) => (orderMap.get(a.fieldName) ?? 999) - (orderMap.get(b.fieldName) ?? 999));
   }
@@ -291,7 +288,7 @@ export const DetailPage = () => {
       <div className="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div>
-            <button type="button" onClick={() => navigate(`/${resourceName}`)} className="text-sm text-blue-600 hover:text-blue-800 mb-1">
+            <button type="button" onClick={() => navigate(`/${resourceName}`)} className="text-sm text-blue-600 hover:text-blue-800 mb-1 cursor-pointer">
               &larr; Back to {resourceName}
             </button>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{resourceName} Detail</h2>
@@ -360,7 +357,7 @@ export const DetailPage = () => {
                 <span className="text-gray-800 dark:text-gray-200">{String(record.ModificationTimestamp)}</span>
               </div>
             )}
-            {hasGroupings && summaryFields.length > 0 && (
+            {summaryFields.length > 0 && (
               <>
                 <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-3 mb-2">Summary</h3>
                 {renderFieldList(
@@ -409,7 +406,7 @@ export const DetailPage = () => {
         {/* Related Records — all expanded navigation properties */}
         {expansions.length > 0 && (
           <FieldGroupSection title="Related Records" defaultOpen>
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {expansions.map(exp => (
                 <ExpandedEntityCard
                   key={exp.fieldName}

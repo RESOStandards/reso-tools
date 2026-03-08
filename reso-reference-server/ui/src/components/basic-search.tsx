@@ -66,7 +66,15 @@ const deriveSearchFields = (fields: ReadonlyArray<ResoField>): ReadonlyArray<Bas
   for (const field of searchable) {
     if (result.length >= MAX_AUTO_FIELDS) break;
 
-    if (field.type === 'Edm.String') {
+    if (field.lookupName || isEnumType(field.type)) {
+      result.push({
+        id: field.fieldName,
+        fieldName: field.fieldName,
+        label: getDisplayName(field),
+        operator: 'eq',
+        inputType: 'enum'
+      });
+    } else if (field.type === 'Edm.String') {
       result.push({
         id: field.fieldName,
         fieldName: field.fieldName,
@@ -83,14 +91,6 @@ const deriveSearchFields = (fields: ReadonlyArray<ResoField>): ReadonlyArray<Bas
         operator: 'ge',
         inputType: 'number',
         placeholder: '0'
-      });
-    } else if (isEnumType(field.type)) {
-      result.push({
-        id: field.fieldName,
-        fieldName: field.fieldName,
-        label: getDisplayName(field),
-        operator: 'eq',
-        inputType: 'enum'
       });
     }
   }
@@ -263,7 +263,7 @@ export const BasicSearch = ({
       <div className="flex flex-wrap gap-2 items-end">
         {activeFields.map(sf => {
           const field = fieldMap.get(sf.fieldName);
-          const fieldLookups = field && isEnumType(field.type) ? lookups[field.type] : undefined;
+          const fieldLookups = lookups[sf.fieldName];
 
           return (
             <div key={sf.id} className="flex flex-col gap-0.5 min-w-0">

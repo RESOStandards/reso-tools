@@ -161,7 +161,7 @@ const FieldDetail = ({
           <button
             type="button"
             onClick={() => onNavigate(targetResource)}
-            className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+            className="text-sm text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
             {targetResource} {field.isCollection ? '(collection)' : '(single)'}
           </button>
         </div>
@@ -509,7 +509,7 @@ export const MetadataPage = () => {
                   <button
                     type="button"
                     onClick={() => handleToggleField(field.fieldName)}
-                    className={`w-full text-left px-4 sm:px-6 py-2.5 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors ${stripe}`}>
+                    className={`w-full text-left px-4 sm:px-6 py-2.5 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors cursor-pointer ${stripe}`}>
                     <div className="flex items-center gap-3">
                       {/* Expand indicator */}
                       <svg className={`w-3 h-3 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="currentColor" viewBox="0 0 20 20">

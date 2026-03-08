@@ -30,7 +30,7 @@ export const ResultsCard = ({ resource, record, summaryFields, fieldMap, onClick
     <button
       type="button"
       onClick={() => onClick(key)}
-      className="w-full text-left bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-all p-3 sm:p-4">
+      className="w-full text-left bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-all p-3 sm:p-4 cursor-pointer">
       <div className="flex flex-col sm:flex-row gap-3">
         {/* Media thumbnail or placeholder */}
         {media.length > 0 ? (
