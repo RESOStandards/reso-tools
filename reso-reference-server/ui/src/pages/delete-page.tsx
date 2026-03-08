@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router';
 import { readEntity } from '../api/client';
 import { DeleteDialog } from '../components/delete-dialog';
 import { KeyPrompt } from '../components/key-prompt';
+import { LoadingSpinner } from '../components/loading-spinner';
 import { useServer } from '../context/server-context';
 
 /** Page for deleting a record. Prompts for key, loads record, shows confirmation dialog. */
@@ -54,7 +55,7 @@ export const DeletePage = () => {
   // Validate resource exists (after all hooks)
   const isValidResource = resources?.some(r => r.name === resourceName) ?? null;
   if (isValidResource === null || isLoadingResources) {
-    return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading resources...</div>;
+    return <LoadingSpinner />;
   }
   if (!isValidResource) {
     return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Unknown resource: {resource}</div>;

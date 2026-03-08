@@ -162,7 +162,7 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
 
     const loadMetadata = async () => {
       try {
-        const { parseCsdlXml } = await import('@reso/odata-client');
+        const { parseCsdlXml, discoverResources } = await import('@reso/odata-client');
 
         const headers: Record<string, string> = { Accept: 'application/xml' };
         if (activeServer.token) {
@@ -180,20 +180,7 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
 
         const xml = await res.text();
         const schema = parseCsdlXml(xml);
-
-        if (!schema.entityContainer) {
-          throw new Error('No EntityContainer found in metadata');
-        }
-
-        const entityTypeMap = new Map(schema.entityTypes.map(et => [et.name, et]));
-
-        const discovered: ReadonlyArray<ResourceInfo> = schema.entityContainer.entitySets.map(es => {
-          const typeName = es.entityType.includes('.') ? es.entityType.split('.').pop()! : es.entityType;
-          const et = entityTypeMap.get(typeName);
-          const keyField = et?.key[0] ?? `${typeName}Key`;
-          const navigationProperties = et?.navigationProperties.map(np => np.name) ?? [];
-          return { name: es.name, entityType: es.entityType, keyField, navigationProperties };
-        });
+        const discovered = discoverResources(schema);
 
         if (!controller.signal.aborted) {
           setResources(discovered);

@@ -1,29 +1,26 @@
-import type { CsdlSchema } from '@reso/odata-client';
-import { buildResourceLookups, entityTypeToFields, schemaToLookups } from './metadata-adapter';
+import type { CsdlSchema, LookupResolver, LookupValue } from '@reso/odata-client';
+import { entityTypeToFields } from './metadata-adapter';
 import type { ResoField, ResoLookup } from '../types';
+import { isEnumType } from '../types';
 
 /** Cache for the local server's custom metadata endpoints. */
 const fieldsCache = new Map<string, ReadonlyArray<ResoField>>();
-const lookupsCache = new Map<string, ReadonlyArray<ResoLookup>>();
 const resourceLookupsCache = new Map<string, Readonly<Record<string, ReadonlyArray<ResoLookup>>>>();
 
 /** Cache for external server CSDL-based metadata. Keyed by baseUrl. */
 const csdlSchemaCache = new Map<string, CsdlSchema>();
 const csdlFieldsCache = new Map<string, ReadonlyArray<ResoField>>();
-const csdlLookupsCache = new Map<string, Readonly<Record<string, ReadonlyArray<ResoLookup>>>>();
 
-/** Cache for Lookup Resource values, keyed by LookupName. Shared across all servers. */
-const lookupResourceCache = new Map<string, ReadonlyArray<ResoLookup>>();
+/** Cache for lookup resolvers, keyed by baseUrl. */
+const lookupResolverCache = new Map<string, LookupResolver>();
 
 /** Clear all metadata caches. Called when switching servers. */
 export const clearMetadataCache = (): void => {
   fieldsCache.clear();
-  lookupsCache.clear();
   resourceLookupsCache.clear();
   csdlSchemaCache.clear();
   csdlFieldsCache.clear();
-  csdlLookupsCache.clear();
-  lookupResourceCache.clear();
+  lookupResolverCache.clear();
 };
 
 /** Check whether a URL points to localhost. */
@@ -35,6 +32,20 @@ const isLocalhostUrl = (url: string): boolean => {
 /** Resolve a URL for fetching — direct for localhost, proxied for remote. */
 const resolveUrl = (url: string): string =>
   isLocalhostUrl(url) ? url : `/api/proxy?url=${encodeURIComponent(url)}`;
+
+/**
+ * Create a fetch function that routes through the proxy for remote servers.
+ * Passed to createLookupResolver so it can fetch from the Lookup Resource.
+ */
+const createProxiedFetch = (): ((url: string, init?: RequestInit) => Promise<Response>) =>
+  (url: string, init?: RequestInit) => {
+    const fetchUrl = resolveUrl(url);
+    const needsCacheBust = fetchUrl.startsWith('/api/proxy');
+    return fetch(fetchUrl, {
+      ...init,
+      ...(needsCacheBust ? { cache: 'no-store' as const } : {})
+    });
+  };
 
 /** Fetch and cache the CSDL schema for a server. */
 const fetchCsdlSchema = async (baseUrl: string, token?: string): Promise<CsdlSchema> => {
@@ -63,6 +74,31 @@ const fetchCsdlSchema = async (baseUrl: string, token?: string): Promise<CsdlSch
   csdlSchemaCache.set(cacheKey, schema);
   return schema;
 };
+
+/** Get or create a LookupResolver for an external server. */
+const getResolver = async (baseUrl: string, token?: string): Promise<LookupResolver> => {
+  const cached = lookupResolverCache.get(baseUrl);
+  if (cached) return cached;
+
+  const { createLookupResolver } = await import('@reso/odata-client');
+  const schema = await fetchCsdlSchema(baseUrl, token);
+  const resolver = createLookupResolver({
+    schema,
+    baseUrl,
+    token,
+    fetchFn: createProxiedFetch()
+  });
+  lookupResolverCache.set(baseUrl, resolver);
+  return resolver;
+};
+
+/** Convert LookupValue (odata-client) to ResoLookup (UI type). */
+const toLookup = (lv: LookupValue): ResoLookup => ({
+  lookupName: lv.lookupName,
+  lookupValue: lv.lookupValue,
+  type: lv.lookupName,
+  annotations: []
+});
 
 /** Fetches field definitions for a resource. Uses local endpoints or CSDL parsing. */
 export const fetchFieldsForResource = async (
@@ -102,95 +138,47 @@ export const fetchFieldsForResource = async (
   return fields;
 };
 
-/** Fetches lookup values for a specific enum type. Only available on local server. */
-export const fetchLookupsForType = async (type: string): Promise<ReadonlyArray<ResoLookup>> => {
-  const cached = lookupsCache.get(type);
-  if (cached) return cached;
-  const res = await fetch(`/api/metadata/lookups?type=${encodeURIComponent(type)}`);
-  if (!res.ok) throw new Error(`Failed to fetch lookups for ${type}: ${res.statusText}`);
-  const lookups: ReadonlyArray<ResoLookup> = await res.json();
-  lookupsCache.set(type, lookups);
-  return lookups;
-};
-
 /**
- * Lazily fetch lookup values from the Lookup Resource for a given LookupName.
- * Fetches from GET /Lookup?$filter=LookupName eq '{name}'&$orderby=LookupValue asc
- * and caches the result by LookupName.
+ * Fetches all lookup values for all enum/lookup fields in a resource.
+ * Always returns lookups keyed by **field name**.
  */
-export const fetchLookupResourceValues = async (
-  lookupName: string,
-  options: { baseUrl: string; token?: string }
-): Promise<ReadonlyArray<ResoLookup>> => {
-  const cached = lookupResourceCache.get(lookupName);
-  if (cached) return cached;
-
-  const headers: Record<string, string> = { Accept: 'application/json' };
-  if (options.token) headers['Authorization'] = `Bearer ${options.token}`;
-
-  const filter = encodeURIComponent(`LookupName eq '${lookupName}'`);
-  const rawUrl = `${options.baseUrl}/Lookup?$filter=${filter}&$orderby=LookupValue asc&$top=1000`;
-  const fetchUrl = resolveUrl(rawUrl);
-  const needsCacheBust = fetchUrl.startsWith('/api/proxy');
-  const res = await fetch(fetchUrl, {
-    headers,
-    ...(needsCacheBust ? { cache: 'no-store' as const } : {})
-  });
-  if (!res.ok) throw new Error(`Failed to fetch Lookup values for ${lookupName}: ${res.status}`);
-
-  const body = await res.json();
-  const records: ReadonlyArray<Record<string, unknown>> = body?.value ?? [];
-
-  const lookups: ReadonlyArray<ResoLookup> = records.map(r => ({
-    lookupName: String(r.LookupName ?? lookupName),
-    lookupValue: String(r.LookupValue ?? ''),
-    type: lookupName,
-    annotations: []
-  }));
-
-  lookupResourceCache.set(lookupName, lookups);
-  return lookups;
-};
-
-/** Fetches all lookup values for all enum fields in a resource. */
 export const fetchLookupsForResource = async (
   resource: string,
-  options?: { baseUrl?: string; token?: string; hasLookupResource?: boolean }
+  options?: { baseUrl?: string; token?: string }
 ): Promise<Readonly<Record<string, ReadonlyArray<ResoLookup>>>> => {
-  // External server path — derive from CSDL enums + Lookup Resource
+  // External server path — use the odata-client lookup resolver
   if (options?.baseUrl) {
-    const cacheKey = `${options.baseUrl}:${resource}`;
-    const cached = csdlLookupsCache.get(cacheKey);
-    if (cached) return cached;
+    const resolver = await getResolver(options.baseUrl, options.token);
+    const result = await resolver.resolveLookupsForResource(resource);
 
-    const schema = await fetchCsdlSchema(options.baseUrl, options.token);
-    const csdlLookups = schemaToLookups(schema);
-    const fields = await fetchFieldsForResource(resource, options);
-
-    // For fields with lookupName (Lookup Resource), lazy-fetch from Lookup entity set
-    // For fields with typeName only (CSDL enums), use CSDL-derived lookups
-    const lookupResourceFields = fields.filter(f => f.lookupName && options.hasLookupResource);
-    const lookupResourceResults = await Promise.all(
-      lookupResourceFields.map(async f => {
-        const values = await fetchLookupResourceValues(f.lookupName!, { baseUrl: options.baseUrl!, token: options.token });
-        return [f.fieldName, values] as const;
-      })
+    // Convert LookupValue → ResoLookup
+    return Object.fromEntries(
+      Object.entries(result).map(([fieldName, values]) => [
+        fieldName,
+        values.map(toLookup)
+      ])
     );
-    const lookupResourceMap = Object.fromEntries(lookupResourceResults);
-
-    // Merge: Lookup Resource values take precedence over CSDL enum values
-    const csdlBasedLookups = buildResourceLookups(fields, csdlLookups);
-    const resourceLookups = { ...csdlBasedLookups, ...lookupResourceMap };
-    csdlLookupsCache.set(cacheKey, resourceLookups);
-    return resourceLookups;
   }
 
-  // Local server path
+  // Local server path — remap from type-keyed to fieldName-keyed
   const cached = resourceLookupsCache.get(resource);
   if (cached) return cached;
-  const res = await fetch(`/api/metadata/lookups-for-resource?resource=${encodeURIComponent(resource)}`);
-  if (!res.ok) throw new Error(`Failed to fetch lookups for ${resource}: ${res.statusText}`);
-  const lookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>> = await res.json();
-  resourceLookupsCache.set(resource, lookups);
-  return lookups;
+
+  const [fieldsResult, lookupsRes] = await Promise.all([
+    fetchFieldsForResource(resource),
+    fetch(`/api/metadata/lookups-for-resource?resource=${encodeURIComponent(resource)}`)
+  ]);
+
+  if (!lookupsRes.ok) throw new Error(`Failed to fetch lookups for ${resource}: ${lookupsRes.statusText}`);
+  const typeKeyedLookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>> = await lookupsRes.json();
+
+  // Remap: for each enum field, map fieldName → lookups[field.type]
+  const fieldNameKeyed = Object.fromEntries(
+    fieldsResult
+      .filter(f => isEnumType(f.type) && typeKeyedLookups[f.type])
+      .map(f => [f.fieldName, typeKeyedLookups[f.type]])
+  );
+
+  resourceLookupsCache.set(resource, fieldNameKeyed);
+  return fieldNameKeyed;
 };

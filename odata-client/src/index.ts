@@ -49,7 +49,7 @@ export type { UriBuilder } from './uri/builder.js';
 export { parseQueryString } from './uri/parser.js';
 
 // CSDL parser & validator
-export { parseCsdlXml, getEntityType, getEnumType } from './csdl/parser.js';
+export { parseCsdlXml, discoverResources, getEntityType, getEnumType } from './csdl/parser.js';
 export { validateCsdl } from './csdl/validator.js';
 export type {
   CsdlSchema,
@@ -71,6 +71,7 @@ export type {
   CsdlAction,
   CsdlFunction,
   CsdlValidationError,
+  CsdlResourceInfo,
   CsdlValidationResult
 } from './csdl/types.js';
 
@@ -100,6 +101,10 @@ export { isODataError, parseODataError, getErrorTargets } from './response/error
 
 // Metadata fetcher
 export { fetchRawMetadata, fetchAndParseMetadata } from './metadata/fetcher.js';
+
+// Lookup resolver
+export { createLookupResolver } from './lookup/resolver.js';
+export type { LookupValue, LookupResolverConfig, LookupResolver } from './lookup/types.js';
 
 // Re-export expression parser types for convenience
 export type {

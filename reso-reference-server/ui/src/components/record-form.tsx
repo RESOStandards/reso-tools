@@ -138,7 +138,7 @@ export const RecordForm = ({
           field={field}
           value={values[field.fieldName]}
           onChange={handleChange}
-          lookups={lookups[field.type]}
+          lookups={lookups[field.fieldName]}
           disabled={isLoading || (isEdit && field.fieldName === keyField)}
           error={errors.get(field.fieldName)}
         />

@@ -1,9 +1,9 @@
 /**
- * Converts CSDL schema types from @reso/odata-client into the ResoField/ResoLookup
+ * Converts CSDL schema types from @reso/odata-client into the ResoField
  * types used by the UI. This enables the UI to work with any OData server's $metadata.
  */
-import type { CsdlEntityType, CsdlEnumType, CsdlProperty, CsdlSchema } from '@reso/odata-client';
-import type { ResoAnnotation, ResoField, ResoLookup } from '../types';
+import type { CsdlEntityType, CsdlProperty, CsdlSchema } from '@reso/odata-client';
+import type { ResoAnnotation, ResoField } from '../types';
 
 /** The RESO annotation term that indicates a field uses the Lookup Resource. */
 const LOOKUP_NAME_TERM = 'RESO.OData.Metadata.LookupName';
@@ -99,34 +99,3 @@ export const schemaToFieldsByResource = (
     })
   );
 };
-
-/** Convert a CSDL enum type to an array of ResoLookup entries. */
-const enumTypeToLookups = (enumType: CsdlEnumType): ReadonlyArray<ResoLookup> =>
-  enumType.members.map(member => ({
-    lookupName: enumType.name,
-    lookupValue: member.name,
-    type: enumType.name,
-    annotations: []
-  }));
-
-/** Convert all enum types in a schema to ResoLookup records, keyed by enum type name. */
-export const schemaToLookups = (
-  schema: CsdlSchema
-): Readonly<Record<string, ReadonlyArray<ResoLookup>>> =>
-  Object.fromEntries(
-    schema.enumTypes.map(et => [et.name, enumTypeToLookups(et)])
-  );
-
-/** Build a resource-scoped lookup map: for each enum field in a resource, map fieldName → lookups. */
-export const buildResourceLookups = (
-  fields: ReadonlyArray<ResoField>,
-  allLookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>>
-): Readonly<Record<string, ReadonlyArray<ResoLookup>>> =>
-  Object.fromEntries(
-    fields
-      .filter(f => (f.typeName && allLookups[f.typeName]) || (f.lookupName && allLookups[f.lookupName]))
-      .map(f => {
-        const key = f.lookupName ?? f.typeName!;
-        return [f.fieldName, allLookups[key]];
-      })
-  );

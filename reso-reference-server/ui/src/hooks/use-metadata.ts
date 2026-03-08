@@ -12,7 +12,7 @@ export interface UseMetadataResult {
 
 /** Fetches and caches field definitions and lookups for a resource. */
 export const useMetadata = (resource: string): UseMetadataResult => {
-  const { activeServer, isLocal, hasLookupResource } = useServer();
+  const { activeServer, isLocal } = useServer();
   const [fields, setFields] = useState<ReadonlyArray<ResoField>>([]);
   const [lookups, setLookups] = useState<Readonly<Record<string, ReadonlyArray<ResoLookup>>>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -25,7 +25,7 @@ export const useMetadata = (resource: string): UseMetadataResult => {
 
     const metaOptions = isLocal
       ? undefined
-      : { baseUrl: activeServer.baseUrl, token: activeServer.token, hasLookupResource };
+      : { baseUrl: activeServer.baseUrl, token: activeServer.token };
 
     const load = async () => {
       try {
@@ -50,7 +50,7 @@ export const useMetadata = (resource: string): UseMetadataResult => {
     return () => {
       cancelled = true;
     };
-  }, [resource, activeServer.id, isLocal, hasLookupResource]);
+  }, [resource, activeServer.id, isLocal]);
 
   return { fields, lookups, isLoading, error };
 };

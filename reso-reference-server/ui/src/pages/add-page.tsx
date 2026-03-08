@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { createEntity } from '../api/client';
+import { LoadingSpinner } from '../components/loading-spinner';
 import { RecordForm } from '../components/record-form';
 import { useMetadata } from '../hooks/use-metadata';
 import { useUiConfig } from '../hooks/use-ui-config';
@@ -32,8 +33,8 @@ export const AddPage = () => {
 
   // Validate resource exists (after all hooks)
   const isValidResource = resources?.some(r => r.name === resourceName) ?? null;
-  if (isLoadingResources || isValidResource === null) {
-    return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading resources...</div>;
+  if (isLoadingResources || isValidResource === null || metaLoading) {
+    return <LoadingSpinner />;
   }
   if (!isValidResource) {
     return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Unknown resource: {resource}</div>;
@@ -48,8 +49,6 @@ export const AddPage = () => {
       </div>
     );
   }
-
-  if (metaLoading) return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading metadata...</div>;
 
   return (
     <div className="flex flex-col h-full min-h-0">

@@ -132,7 +132,7 @@ export const AdvancedSearch = ({ resource, fields, lookups, fieldGroups, filterS
 
   const renderFieldRow = (field: ResoField, index: number) => {
     const entry = filters.get(field.fieldName);
-    const fieldLookups = isEnumType(field.type) ? lookups[field.type] : undefined;
+    const fieldLookups = lookups[field.fieldName];
     const operators = getOperatorsForField(field);
     const defaultOp = operators[0].value;
     const stripe = index % 2 === 1 ? 'bg-gray-100 dark:bg-gray-700/40' : '';

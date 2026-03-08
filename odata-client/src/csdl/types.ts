@@ -173,6 +173,18 @@ export interface CsdlSchema {
   readonly entityContainer?: CsdlEntityContainer;
 }
 
+/** Discovered resource info from an entity container + entity types. */
+export interface CsdlResourceInfo {
+  /** Entity set name (e.g. "Property", "Member"). */
+  readonly name: string;
+  /** Fully-qualified entity type (e.g. "org.reso.metadata.Property"). */
+  readonly entityType: string;
+  /** Primary key field name from the entity type definition. Falls back to `{TypeName}Key`. */
+  readonly keyField: string;
+  /** Navigation property names available for $expand. */
+  readonly navigationProperties: ReadonlyArray<string>;
+}
+
 /** Validation error for a CSDL document. */
 export interface CsdlValidationError {
   readonly path: string;

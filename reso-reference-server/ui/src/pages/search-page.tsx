@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { AdvancedSearch } from '../components/advanced-search';
 import { BasicSearch } from '../components/basic-search';
+import { LoadingSpinner } from '../components/loading-spinner';
 import { ResultsList } from '../components/results-list';
 import { SearchBar } from '../components/search-bar';
 import { useCollection } from '../hooks/use-collection';
@@ -137,8 +138,8 @@ export const SearchPage = () => {
   // Validate resource exists in discovered metadata
   const isValidResource = resources?.some(r => r.name === resourceName) ?? null;
 
-  if (isLoadingResources || isValidResource === null) {
-    return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading resources...</div>;
+  if (isLoadingResources || isValidResource === null || metaLoading) {
+    return <LoadingSpinner />;
   }
   if (resourceError) {
     return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Failed to load server metadata: {resourceError}</div>;
@@ -146,10 +147,6 @@ export const SearchPage = () => {
 
   if (!isValidResource) {
     return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Unknown resource: {resource}</div>;
-  }
-
-  if (metaLoading) {
-    return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading metadata...</div>;
   }
 
   return (

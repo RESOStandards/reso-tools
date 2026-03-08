@@ -91,24 +91,6 @@ export type ResourceName = (typeof TARGET_RESOURCES)[number];
 /** Resources that are read-only (no Add/Edit/Delete). */
 export const READ_ONLY_RESOURCES: ReadonlySet<string> = new Set(['Lookup']);
 
-/** Map of resource names to their primary key field names. */
-export const KEY_FIELD_MAP: Readonly<Record<ResourceName, string>> = {
-  Property: 'ListingKey',
-  Member: 'MemberKey',
-  Office: 'OfficeKey',
-  Media: 'MediaKey',
-  OpenHouse: 'OpenHouseKey',
-  Showing: 'ShowingKey',
-  PropertyGreenVerification: 'GreenBuildingVerificationKey',
-  PropertyPowerProduction: 'PowerProductionKey',
-  PropertyRooms: 'RoomKey',
-  PropertyUnitTypes: 'UnitTypeKey',
-  Teams: 'TeamKey',
-  TeamMembers: 'TeamMemberKey',
-  OUID: 'OrganizationUniqueIdKey',
-  Lookup: 'LookupKey'
-};
-
 /** Secondary ID fields (user-facing, not UUIDs). */
 export const ID_FIELD_MAP: Readonly<Partial<Record<ResourceName, string>>> = {
   Property: 'ListingId',

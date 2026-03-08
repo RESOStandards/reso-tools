@@ -1,5 +1,4 @@
 import type { ResoField, ResoLookup } from '../types';
-import { isEnumType } from '../types';
 import { getDisplayName } from '../utils/format';
 
 interface FieldInputProps {
@@ -18,8 +17,8 @@ export const FieldInput = ({ field, value, onChange, lookups, disabled = false, 
     error ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-gray-300 dark:border-gray-600'
   }`;
 
-  // Enum field with lookup values → select dropdown
-  if (isEnumType(field.type) && lookups && lookups.length > 0) {
+  // Enum or Lookup Resource field with lookup values → select dropdown
+  if (lookups && lookups.length > 0) {
     return (
       <div>
         <label htmlFor={id} className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5" title={getDisplayName(field)}>

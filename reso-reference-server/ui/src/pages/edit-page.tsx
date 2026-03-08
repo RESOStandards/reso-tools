@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { readEntity, updateEntity } from '../api/client';
 import { KeyPrompt } from '../components/key-prompt';
+import { LoadingSpinner } from '../components/loading-spinner';
 import { RecordForm } from '../components/record-form';
 import { useMetadata } from '../hooks/use-metadata';
 import { useUiConfig } from '../hooks/use-ui-config';
@@ -73,8 +74,8 @@ export const EditPage = () => {
 
   // Validate resource exists (after all hooks)
   const isValidResource = resources?.some(r => r.name === resourceName) ?? null;
-  if (isLoadingResources || isValidResource === null) {
-    return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading resources...</div>;
+  if (isLoadingResources || isValidResource === null || metaLoading) {
+    return <LoadingSpinner />;
   }
   if (!isValidResource) {
     return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Unknown resource: {resource}</div>;
@@ -89,8 +90,6 @@ export const EditPage = () => {
       </div>
     );
   }
-
-  if (metaLoading) return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading metadata...</div>;
 
   // No key — show prompt
   if (!key) {

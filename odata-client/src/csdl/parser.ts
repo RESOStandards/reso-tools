@@ -26,6 +26,7 @@ import type {
   CsdlParameter,
   CsdlProperty,
   CsdlReferentialConstraint,
+  CsdlResourceInfo,
   CsdlReturnType,
   CsdlSchema,
   CsdlSingleton
@@ -411,6 +412,39 @@ export const parseCsdlXml = (xml: string): CsdlSchema => {
     functions: parseFunctions(rawFunctions),
     entityContainer: parseEntityContainer(rawContainer)
   };
+};
+
+/**
+ * Discover all resources (entity sets) from a parsed schema, resolving
+ * key fields and navigation properties from their entity type definitions.
+ *
+ * @throws {Error} if the schema has no EntityContainer
+ */
+export const discoverResources = (schema: CsdlSchema): ReadonlyArray<CsdlResourceInfo> => {
+  if (!schema.entityContainer) {
+    throw new Error('No EntityContainer found in metadata');
+  }
+
+  const entityTypeMap = new Map(schema.entityTypes.map(et => [et.name, et]));
+
+  /** Resolve key field by walking up the inheritance chain. */
+  const resolveKeyField = (et: CsdlEntityType | undefined, fallback: string): string => {
+    let current = et;
+    while (current) {
+      if (current.key.length > 0) return current.key[0];
+      if (!current.baseType) break;
+      current = entityTypeMap.get(extractTypeName(current.baseType));
+    }
+    return fallback;
+  };
+
+  return schema.entityContainer.entitySets.map(es => {
+    const typeName = extractTypeName(es.entityType);
+    const et = entityTypeMap.get(typeName);
+    const keyField = resolveKeyField(et, `${typeName}Key`);
+    const navigationProperties = et?.navigationProperties.map(np => np.name) ?? [];
+    return { name: es.name, entityType: es.entityType, keyField, navigationProperties };
+  });
 };
 
 /** Find an entity type by name. */

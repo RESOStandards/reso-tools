@@ -4,6 +4,7 @@ import { readEntity } from '../api/client';
 import { DeleteDialog } from '../components/delete-dialog';
 import { ExpandedEntityCard } from '../components/expanded-entity-card';
 import { FieldGroupSection } from '../components/field-group-section';
+import { LoadingSpinner } from '../components/loading-spinner';
 import { MediaCarousel } from '../components/media-carousel';
 import { useMetadata } from '../hooks/use-metadata';
 import { useUiConfig } from '../hooks/use-ui-config';
@@ -83,15 +84,13 @@ export const DetailPage = () => {
   // Validate resource exists in discovered metadata
   const isValidResource = resources?.some(r => r.name === resourceName) ?? null;
 
-  if (isLoadingResources || isValidResource === null) {
-    return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading resources...</div>;
+  if (isLoadingResources || isValidResource === null || isLoading) {
+    return <LoadingSpinner />;
   }
 
   if (!isValidResource || !key) {
     return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Invalid resource or key</div>;
   }
-
-  if (isLoading) return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Loading...</div>;
   if (error)
     return (
       <div className="p-4 sm:p-6">
