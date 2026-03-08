@@ -16,17 +16,17 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 | 2 | Mock OAuth Accepts Any Credentials | Critical | Open | [#51](https://github.com/RESOStandards/reso-tools/issues/51) |
 | 3 | Auth Disabled by Default; No Auth on Write Routes | High | Open | [#52](https://github.com/RESOStandards/reso-tools/issues/52) |
 | 4 | Hardcoded Default Auth Tokens | High | Open | [#53](https://github.com/RESOStandards/reso-tools/issues/53) |
-| 5 | Key Value Interpolated into $filter String | High | Open | [#54](https://github.com/RESOStandards/reso-tools/issues/54) |
+| 5 | Key Value Interpolated into $filter String | High | **Fixed** | [#54](https://github.com/RESOStandards/reso-tools/issues/54) |
 | 6 | ReDoS via matchesPattern in SQLite | Medium | Open | [#55](https://github.com/RESOStandards/reso-tools/issues/55) |
 | 7 | Regex Injection in MongoDB matchesPattern | Medium | Open | [#56](https://github.com/RESOStandards/reso-tools/issues/56) |
 | 8 | No Rate Limiting on Any Endpoint | Medium | Open | [#57](https://github.com/RESOStandards/reso-tools/issues/57) |
-| 9 | Dynamic Token Map Never Expires | Medium | Open | [#58](https://github.com/RESOStandards/reso-tools/issues/58) |
+| 9 | Dynamic Token Map Never Expires | Medium | **Fixed** | [#58](https://github.com/RESOStandards/reso-tools/issues/58) |
 | 10 | Wide-Open CORS Policy | Medium | Open | [#59](https://github.com/RESOStandards/reso-tools/issues/59) |
 | 11 | Information Disclosure in Error Messages | Low | Open | [#60](https://github.com/RESOStandards/reso-tools/issues/60) |
-| 12 | Missing Security Headers | Low | Open | [#61](https://github.com/RESOStandards/reso-tools/issues/61) |
+| 12 | Missing Security Headers | Low | **Fixed** | [#61](https://github.com/RESOStandards/reso-tools/issues/61) |
 | 13 | Static File Serving Path Not Strictly Bounded | Low | Open | [#62](https://github.com/RESOStandards/reso-tools/issues/62) |
-| 14 | Non-Constant-Time Token Comparison | Low | Open | [#63](https://github.com/RESOStandards/reso-tools/issues/63) |
-| 15 | LIKE Wildcard Characters Not Escaped | Low | Open | [#64](https://github.com/RESOStandards/reso-tools/issues/64) |
+| 14 | Non-Constant-Time Token Comparison | Low | **Fixed** | [#63](https://github.com/RESOStandards/reso-tools/issues/63) |
+| 15 | LIKE Wildcard Characters Not Escaped | Low | **Fixed** | [#64](https://github.com/RESOStandards/reso-tools/issues/64) |
 | 16 | Decorative ETags (Not Content-Based) | Info | Open | [#65](https://github.com/RESOStandards/reso-tools/issues/65) |
 
 ### Positive Findings
@@ -116,23 +116,12 @@ curl -X POST http://localhost:8080/Property -H "Content-Type: application/json" 
 
 ### Finding 5: Key Value Interpolated into $filter String (readByKey + $expand)
 
-**Severity: High**
-**File:** `reso-reference-server/server/src/db/postgres-dal.ts`, lines 651-657; `sqlite-dal.ts`, lines 603-610
+**Severity: High** | **Status: Fixed** (a9e8620)
+**File:** `reso-reference-server/server/src/db/postgres-dal.ts`; `sqlite-dal.ts`
 
-**Description:** When `readByKey` is called with `$expand`, it constructs a `$filter` string by interpolating the user-supplied key value directly:
+**Description:** When `readByKey` is called with `$expand`, it constructs a `$filter` string by interpolating the user-supplied key value directly.
 
-```typescript
-$filter: `${ctx.keyField} eq '${keyValue}'`
-```
-
-While the URL regex limits the immediate attack surface, this is a dangerous pattern.
-
-**Proof of Concept:**
-```
-GET /Property('x') or 1 eq 1')?$expand=Media
-```
-
-**Recommended Fix:** Pass the key value as a parameter rather than interpolating into a filter string. Add a dedicated path that uses parameterized queries.
+**Fix Applied:** Single quotes in key values are now escaped via `.replace(/'/g, "''")` before interpolation into the filter string.
 
 ---
 
@@ -176,12 +165,12 @@ GET /Property?$filter=matchesPattern(City, '(a+)+$')
 
 ### Finding 9: Dynamic Token Map Never Expires Entries (Memory Leak)
 
-**Severity: Medium**
-**File:** `reso-reference-server/server/src/auth/config.ts`, line 32
+**Severity: Medium** | **Status: Fixed** (a9e8620)
+**File:** `reso-reference-server/server/src/auth/config.ts`
 
-**Description:** The `dynamicTokens` Map grows without bound. Every `/oauth/token` call adds a token that is never removed.
+**Description:** The `dynamicTokens` Map grew without bound. Every `/oauth/token` call added a token that was never removed.
 
-**Recommended Fix:** Implement TTL-based expiry matching the `expires_in` value (3600s). Use `lru-cache` or scheduled cleanup.
+**Fix Applied:** Dynamic tokens now store `{ role, expiresAt }` with 1-hour TTL. Expired tokens are cleaned up lazily on lookup and via a periodic sweep every 60 seconds (`.unref()` timer).
 
 ---
 
@@ -209,12 +198,12 @@ GET /Property?$filter=matchesPattern(City, '(a+)+$')
 
 ### Finding 12: Missing Security Headers
 
-**Severity: Low**
+**Severity: Low** | **Status: Fixed** (a9e8620)
 **File:** `reso-reference-server/server/src/index.ts`
 
-**Description:** No `X-Content-Type-Options`, `X-Frame-Options`, `Content-Security-Policy`, or `Strict-Transport-Security`. Express `X-Powered-By` header not removed.
+**Description:** Missing security headers and Express `X-Powered-By` not removed.
 
-**Recommended Fix:** Add `helmet` middleware or manually set headers. Remove `X-Powered-By`.
+**Fix Applied:** Added `X-Content-Type-Options: nosniff` and `X-Frame-Options: DENY` headers. Disabled `x-powered-by` via `app.disable('x-powered-by')`.
 
 ---
 
@@ -231,29 +220,23 @@ GET /Property?$filter=matchesPattern(City, '(a+)+$')
 
 ### Finding 14: Non-Constant-Time Token Comparison
 
-**Severity: Low**
-**File:** `reso-reference-server/server/src/auth/config.ts`, lines 53-55
+**Severity: Low** | **Status: Fixed** (a9e8620)
+**File:** `reso-reference-server/server/src/auth/config.ts`
 
-**Description:** Token comparison uses `===` (not constant-time). Theoretically allows timing attacks.
+**Description:** Token comparison used `===` (not constant-time), theoretically allowing timing attacks.
 
-**Recommended Fix:** Use `crypto.timingSafeEqual()`.
+**Fix Applied:** Added `safeTokenEquals` helper using `crypto.timingSafeEqual()` with Buffer conversion and length check.
 
 ---
 
 ### Finding 15: LIKE Wildcard Characters Not Escaped in contains/startswith/endswith
 
-**Severity: Low**
-**File:** `reso-reference-server/server/src/db/filter-to-sql.ts`, lines 205-228; `filter-to-sqlite.ts`, lines 189-212
+**Severity: Low** | **Status: Fixed** (a9e8620)
+**File:** `reso-reference-server/server/src/db/filter-to-sql.ts`; `filter-to-sqlite.ts`
 
-**Description:** `%` and `_` wildcard characters in user search values are not escaped before embedding in LIKE patterns.
+**Description:** `%` and `_` wildcard characters in user search values were not escaped before embedding in LIKE patterns.
 
-**Proof of Concept:**
-```
-GET /Property?$filter=contains(City, '_____')
-# Matches any 5+ char city, not literally 5 underscores
-```
-
-**Recommended Fix:** Escape `%` and `_` in values. Use `LIKE $1 ESCAPE '\'`.
+**Fix Applied:** Added `escapeLikeWildcards` helper that escapes `%`, `_`, and `\` with backslash prefix. All LIKE/ILIKE clauses now include `ESCAPE '\'`.
 
 ---
 
