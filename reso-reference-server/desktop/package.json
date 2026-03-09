@@ -1,0 +1,66 @@
+{
+  "name": "@reso/desktop",
+  "version": "0.2.0",
+  "description": "RESO Reference Server — Desktop Client",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc && cp src/server-entry.mjs dist/",
+    "start": "env -u ELECTRON_RUN_AS_NODE electron dist/main.js",
+    "dev": "tsc && cp src/server-entry.mjs dist/ && env -u ELECTRON_RUN_AS_NODE electron dist/main.js",
+    "postinstall": "/usr/libexec/PlistBuddy -c \"Set CFBundleDisplayName 'RESO Desktop Client'\" node_modules/electron/dist/Electron.app/Contents/Info.plist 2>/dev/null; /usr/libexec/PlistBuddy -c \"Set CFBundleName 'RESO Desktop Client'\" node_modules/electron/dist/Electron.app/Contents/Info.plist 2>/dev/null; true",
+    "package": "npm run build && electron-builder"
+  },
+  "dependencies": {
+    "@reso/reference-server": "file:../server"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.0",
+    "typescript": "^5.7.0"
+  },
+  "build": {
+    "appId": "org.reso.desktop",
+    "productName": "RESO Desktop Client",
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../server/dist",
+        "to": "server"
+      },
+      {
+        "from": "../server/server-metadata.json",
+        "to": "server-metadata.json"
+      },
+      {
+        "from": "../server/src/ui-config.json",
+        "to": "ui-config.json"
+      },
+      {
+        "from": "../server/src/field-groups.json",
+        "to": "field-groups.json"
+      },
+      {
+        "from": "../ui/dist",
+        "to": "ui"
+      }
+    ],
+    "directories": {
+      "buildResources": "build"
+    },
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.icns"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Development"
+    },
+    "win": {
+      "target": ["nsis"]
+    }
+  }
+}
