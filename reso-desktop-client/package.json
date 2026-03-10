@@ -57,6 +57,10 @@
       {
         "from": "../reso-web-client/dist",
         "to": "ui"
+      },
+      {
+        "from": "build/reso-logo.png",
+        "to": "reso-logo.png"
       }
     ],
     "directories": {

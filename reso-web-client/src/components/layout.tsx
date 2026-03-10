@@ -13,7 +13,7 @@ const LOGO_DARK = 'https://www.reso.org/wp-content/uploads/2020/06/RESO-Logo_Hor
 
 /** Derives the current page indicator from the URL path. */
 const getPageIndicator = (pathname: string, resource?: string): string | null => {
-  if (pathname === '/') return 'Home';
+  if (pathname === '/') return 'Dashboard';
   if (!resource) return null;
   if (pathname.includes('/add')) return 'Add';
   if (pathname.includes('/edit')) return 'Edit';

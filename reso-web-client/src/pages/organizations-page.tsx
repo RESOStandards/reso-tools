@@ -144,13 +144,13 @@ const SortHeader = ({ label, column, current, asc, onSort, className = '' }: {
   const active = current === column;
   return (
     <th
-      className={`text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400 cursor-pointer select-none hover:text-gray-900 dark:hover:text-gray-200 transition-colors ${className}`}
+      className={`text-left px-4 py-3 font-medium cursor-pointer select-none transition-colors ${active ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'} ${className}`}
       onClick={() => onSort(column)}
     >
       <span className="inline-flex items-center gap-1">
         {label}
-        <svg className={`w-3.5 h-3.5 transition-transform ${active ? 'text-blue-600 dark:text-blue-400' : 'text-gray-300 dark:text-gray-600'} ${active && !asc ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+        <svg className={`w-4 h-4 transition-transform ${active ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-400'} ${active && !asc ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
         </svg>
       </span>
     </th>
@@ -349,12 +349,14 @@ export const OrganizationsPage = () => {
   );
 };
 
-/** Certification status badge color. */
+/** Certification status badge color — matches RESO certification map legend. */
 const statusColor = (status: string | undefined) => {
   const s = (status ?? '').toLowerCase();
-  if (s.includes('passed')) return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300';
-  if (s.includes('expired')) return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300';
-  return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400';
+  if (s === 'certified current')  return 'bg-blue-900 text-white dark:bg-blue-800 dark:text-blue-100';
+  if (s === 'passed current')     return 'bg-blue-500 text-white dark:bg-blue-600 dark:text-blue-100';
+  if (s === 'certified legacy')   return 'bg-amber-500 text-white dark:bg-amber-600 dark:text-amber-100';
+  if (s === 'passed legacy')      return 'bg-amber-500 text-white dark:bg-amber-600 dark:text-amber-100';
+  return 'bg-gray-400 text-white dark:bg-gray-500 dark:text-gray-100';
 };
 
 const OrgRow = ({ org, stripe, expanded, onToggle }: {
@@ -431,7 +433,7 @@ const OrgRow = ({ org, stripe, expanded, onToggle }: {
 
                 <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">Address:</span>
                 <span className="text-gray-900 dark:text-white">
-                  {org.OrganizationAddress1}, {org.OrganizationCity}, {org.OrganizationStateOrProvince} {org.OrganizationPostalCode}
+                  {[org.OrganizationAddress1, org.OrganizationCity, [org.OrganizationStateOrProvince, org.OrganizationPostalCode].filter(Boolean).join(' ')].filter(Boolean).join(', ')}
                 </span>
 
                 {org.OrganizationMemberCount != null && (<>

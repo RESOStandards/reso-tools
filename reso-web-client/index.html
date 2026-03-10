@@ -8,6 +8,16 @@
     <title>RESO Reference Server</title>
   </head>
   <body>
+    <script>
+      // Apply dark mode class before first paint to prevent flash of white.
+      // Mirrors the priority order in use-dark-mode.ts: localStorage > system preference.
+      (function() {
+        var stored = localStorage.getItem('reso-theme');
+        var isDark = stored === 'dark' || (stored !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        if (isDark) document.documentElement.classList.add('dark');
+        document.documentElement.style.backgroundColor = isDark ? '#111827' : '#fff';
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

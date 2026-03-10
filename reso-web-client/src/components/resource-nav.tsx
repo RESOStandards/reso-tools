@@ -32,13 +32,13 @@ export const ResourceNav = () => {
 
   return (
     <div className="space-y-4">
-      {/* Home link */}
+      {/* Dashboard link */}
       <NavLink to="/" className={sectionHeaderClass('home')}>
         <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-          <title>Home</title>
-          <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+          <title>Dashboard</title>
+          <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zm10 0a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
         </svg>
-        Home
+        Dashboard
       </NavLink>
 
       {/* Organizations link */}

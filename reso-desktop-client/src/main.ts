@@ -98,6 +98,7 @@ const resolvePaths = (): {
   readonly serverRoot: string;
   readonly uiDistPath: string;
   readonly iconPath: string;
+  readonly logoPath: string;
 } => {
   const sqliteDbPath = resolve(app.getPath('userData'), 'reso_reference.db');
 
@@ -108,7 +109,8 @@ const resolvePaths = (): {
       metadataPath: resolve(process.resourcesPath, 'server-metadata.json'),
       serverRoot: process.resourcesPath,
       uiDistPath: resolve(process.resourcesPath, 'ui'),
-      iconPath: resolve(process.resourcesPath, '..', 'Resources', 'icon.icns')
+      iconPath: resolve(process.resourcesPath, '..', 'Resources', 'icon.icns'),
+      logoPath: resolve(process.resourcesPath, 'reso-logo.png')
     };
   }
 
@@ -118,8 +120,19 @@ const resolvePaths = (): {
     metadataPath: resolve(__dirname, '..', '..', 'reso-reference-server', 'server-metadata.json'),
     serverRoot: resolve(__dirname, '..', '..', 'reso-reference-server', 'src'),
     uiDistPath: resolve(__dirname, '..', '..', 'reso-web-client', 'dist'),
-    iconPath: resolve(__dirname, '..', 'build', 'icon.png')
+    iconPath: resolve(__dirname, '..', 'build', 'icon.png'),
+    logoPath: resolve(__dirname, '..', 'build', 'reso-logo.png')
   };
+};
+
+/** Navigate the SPA to a path by executing pushState + popstate in the renderer. */
+const navigateTo = (path: string): void => {
+  const win = BrowserWindow.getFocusedWindow();
+  if (win) {
+    win.webContents.executeJavaScript(
+      `window.history.pushState({}, '', '${path}'); window.dispatchEvent(new PopStateEvent('popstate'));`
+    ).catch(() => {});
+  }
 };
 
 /** Build the native application menu. */
@@ -201,12 +214,30 @@ const buildMenu = (): void => {
         },
         { type: 'separator' },
         {
-          label: 'Home',
+          label: 'Dashboard',
           accelerator: isMac ? 'Cmd+Shift+H' : 'Ctrl+Shift+H',
-          click: () => {
-            const win = BrowserWindow.getFocusedWindow();
-            if (win && state.serverUrl) win.loadURL(state.serverUrl);
-          }
+          click: () => navigateTo('/')
+        },
+        { type: 'separator' },
+        {
+          label: 'Organizations',
+          accelerator: isMac ? 'Cmd+Shift+O' : 'Ctrl+Shift+O',
+          click: () => navigateTo('/organizations')
+        },
+        {
+          label: 'Resources',
+          accelerator: isMac ? 'Cmd+Shift+R' : 'Ctrl+Shift+R',
+          click: () => navigateTo('/Property')
+        },
+        {
+          label: 'Metadata',
+          accelerator: isMac ? 'Cmd+Shift+M' : 'Ctrl+Shift+M',
+          click: () => navigateTo('/metadata')
+        },
+        { type: 'separator' },
+        {
+          label: 'Data Generator',
+          click: () => navigateTo('/admin/data-generator')
         }
       ]
     },
@@ -403,6 +434,17 @@ const shutdown = (): void => {
 
 // App lifecycle
 app.whenReady().then(async () => {
+  const paths = resolvePaths();
+  app.setAboutPanelOptions({
+    applicationName: 'RESO Desktop Client',
+    applicationVersion: '0.2.0',
+    version: 'v0.2 — The "There\'s an App for That" Release',
+    copyright: '© 2026 Real Estate Standards Organization',
+    credits: 'Browse, query, and manage real estate data using RESO standards.',
+    website: 'https://reso.org',
+    iconPath: paths.iconPath
+  });
+
   registerStorageHandlers();
   buildMenu();
 
