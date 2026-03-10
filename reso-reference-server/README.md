@@ -118,13 +118,14 @@ docker compose --profile seed up seed   # or: --profile seed-mongo up seed-mongo
 
 ```
 reso-reference-server/
-├── server/          # Node/Express/TypeScript OData server
-├── ui/              # React SPA for browsing/editing records (Vite + Tailwind)
-├── desktop/         # Electron desktop client (macOS/Windows/Linux)
+├── src/             # Node/Express/TypeScript OData server source
+├── tests/           # Vitest test suite (254 tests)
 ├── compliance/      # RESO compliance test infrastructure (Docker)
 ├── docker-compose.yml
 └── CLAUDE.md        # Coding conventions
 ```
+
+See also: [`reso-web-client/`](../reso-web-client/) (React UI) and [`reso-desktop-client/`](../reso-desktop-client/) (Electron shell).
 
 The server is **metadata-driven**: it reads `server-metadata.json` (RESO Data Dictionary 2.0) at startup and dynamically:
 
@@ -133,7 +134,7 @@ The server is **metadata-driven**: it reads `server-metadata.json` (RESO Data Di
 3. Generates EDMX XML metadata at `/$metadata`
 4. Generates OpenAPI 3.0 documentation at `/api-docs`
 
-The `DataAccessLayer` interface abstracts persistence, allowing the same OData handlers to work with PostgreSQL, MongoDB, or SQLite. See [server/README.md](server/README.md) for backend-specific details.
+The `DataAccessLayer` interface abstracts persistence, allowing the same OData handlers to work with PostgreSQL, MongoDB, or SQLite.
 
 ## Supported Resources
 
@@ -272,8 +273,14 @@ Compliance tests run automatically on push to `main` and on pull requests via Gi
 
 ## Development
 
-See [server/README.md](server/README.md) for development setup and testing instructions.
+```bash
+npm install
+npm run build
+npm test       # 254 tests
+npm run dev    # tsc --watch
+npm start      # node dist/index.js
+```
 
 ## License
 
-See [LICENSE](../../License.txt) in the repository root.
+See [LICENSE](../License.txt) in the repository root.

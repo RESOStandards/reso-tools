@@ -79,17 +79,25 @@ npx reso-cert-add-edit \
   --mock
 ```
 
-#### [@reso/desktop](reso-reference-server/desktop/)
+#### [@reso/desktop-client](reso-desktop-client/)
 
 Electron desktop client for the RESO Reference Server. Wraps the server and UI into a native macOS/Windows/Linux application with native menus, keyboard shortcuts (Cmd/Ctrl+Arrow, Cmd/Ctrl+[/]), and trackpad navigation gestures.
 
 ```bash
-cd reso-reference-server/desktop && npm install && npm run dev
+cd reso-desktop-client && npm install && npm run dev
+```
+
+#### [@reso/web-client](reso-web-client/)
+
+React + Vite OData browser UI with server switcher for connecting to external OData servers, metadata explorer, and CRUD interface. Can be deployed standalone or served by the reference server.
+
+```bash
+cd reso-web-client && npm install && npm run dev
 ```
 
 #### [reso-reference-server](reso-reference-server/)
 
-Metadata-driven OData 4.01 reference server backed by PostgreSQL, MongoDB, or SQLite. Reads the RESO Data Dictionary JSON metadata and dynamically generates database tables, OData CRUD endpoints, EDMX metadata, and OpenAPI documentation for 14 RESO resources. Includes a React UI for browsing and editing records, a server switcher for connecting to external OData servers, and a metadata explorer.
+Metadata-driven OData 4.01 reference server backed by PostgreSQL, MongoDB, or SQLite. Reads the RESO Data Dictionary JSON metadata and dynamically generates database tables, OData CRUD endpoints, EDMX metadata, and OpenAPI documentation for 14 RESO resources.
 
 **Build and run with Docker:**
 
@@ -106,7 +114,7 @@ open http://localhost:8080/api-docs
 **Build and run locally (requires PostgreSQL):**
 
 ```bash
-cd reso-reference-server/server
+cd reso-reference-server
 npm install
 npm run build
 npm start
@@ -133,7 +141,7 @@ Packages have `file:` dependencies. Build in this order:
 2. `odata-expression-parser` — no dependencies
 3. `odata-client` — depends on `odata-expression-parser`
 4. `data-generator` — no package dependencies (uses metadata from server at runtime)
-5. `reso-reference-server/server` — depends on `validation` + `odata-expression-parser` + `data-generator`
+5. `reso-reference-server` — depends on `validation` + `odata-expression-parser` + `data-generator`
 6. `certification/test-runner` — depends on `odata-client` + `validation`
 7. `certification/add-edit` — depends on `certification/test-runner` + `odata-client` + `validation`
 

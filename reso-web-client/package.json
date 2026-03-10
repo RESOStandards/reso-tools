@@ -1,6 +1,6 @@
 {
-  "name": "@reso/reference-server-ui",
-  "version": "0.1.0",
+  "name": "@reso/web-client",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,9 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@reso/odata-client": "file:../../odata-client",
-    "@reso/odata-expression-parser": "file:../../odata-expression-parser",
-    "@reso/validation": "file:../../validation",
+    "@reso/odata-client": "file:../odata-client",
+    "@reso/odata-expression-parser": "file:../odata-expression-parser",
+    "@reso/validation": "file:../validation",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router": "^7.0.0"

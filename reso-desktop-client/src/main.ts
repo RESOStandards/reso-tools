@@ -115,9 +115,9 @@ const resolvePaths = (): {
   return {
     serverEntry: resolve(__dirname, 'server-entry.mjs'),
     sqliteDbPath,
-    metadataPath: resolve(__dirname, '..', '..', 'server', 'server-metadata.json'),
-    serverRoot: resolve(__dirname, '..', '..', 'server', 'src'),
-    uiDistPath: resolve(__dirname, '..', '..', 'ui', 'dist'),
+    metadataPath: resolve(__dirname, '..', '..', 'reso-reference-server', 'server-metadata.json'),
+    serverRoot: resolve(__dirname, '..', '..', 'reso-reference-server', 'src'),
+    uiDistPath: resolve(__dirname, '..', '..', 'reso-web-client', 'dist'),
     iconPath: resolve(__dirname, '..', 'build', 'icon.png')
   };
 };

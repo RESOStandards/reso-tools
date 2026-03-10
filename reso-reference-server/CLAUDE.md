@@ -19,7 +19,7 @@
 - Prefer `unknown` over `any`. Use type narrowing and type guards instead of type assertions.
 - Use `.js` extensions in import paths (required for Node16 module resolution with ESM).
 
-# Directory Structure (server/)
+# Directory Structure
 - `/src/metadata` — RESO JSON metadata types, loader, EDMX/OpenAPI generators.
 - `/src/db` — PostgreSQL pool, schema generator, migration runner, CRUD query builders.
 - `/src/odata` — OData route handlers, response headers/annotations/errors, request validation.
@@ -27,7 +27,7 @@
 - `/src/docs` — Swagger UI middleware.
 - `/tests` — Vitest tests.
 
-# Commands (run from server/)
+# Commands (run from reso-reference-server/)
 - Build: `npm run build`
 - Test: `npm test`
 - Dev: `npm run dev`

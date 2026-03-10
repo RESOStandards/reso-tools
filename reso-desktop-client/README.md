@@ -1,4 +1,4 @@
-# @reso/desktop
+# @reso/desktop-client
 
 Electron desktop client for the RESO Reference Server. Runs the server and UI as a native application on macOS, Windows, and Linux.
 

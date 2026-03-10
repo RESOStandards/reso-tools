@@ -1,5 +1,5 @@
 {
-  "name": "@reso/desktop",
+  "name": "@reso/desktop-client",
   "version": "0.2.0",
   "description": "RESO Reference Server — Desktop Client",
   "private": true,
@@ -13,7 +13,7 @@
     "package": "npm run build && npm run build:server-bundle && electron-builder"
   },
   "dependencies": {
-    "@reso/reference-server": "file:../server"
+    "@reso/reference-server": "file:../reso-reference-server"
   },
   "devDependencies": {
     "electron": "^35.0.0",
@@ -40,19 +40,19 @@
         "filter": ["**/*"]
       },
       {
-        "from": "../server/server-metadata.json",
+        "from": "../reso-reference-server/server-metadata.json",
         "to": "server-metadata.json"
       },
       {
-        "from": "../server/src/ui-config.json",
+        "from": "../reso-reference-server/src/ui-config.json",
         "to": "ui-config.json"
       },
       {
-        "from": "../server/src/field-groups.json",
+        "from": "../reso-reference-server/src/field-groups.json",
         "to": "field-groups.json"
       },
       {
-        "from": "../ui/dist",
+        "from": "../reso-web-client/dist",
         "to": "ui"
       }
     ],

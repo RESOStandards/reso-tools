@@ -131,10 +131,11 @@ for entry in $RESOURCES; do
 
   echo "--- Generating RESOScript for $RESOURCE (key=$KEY_FIELD) ---"
 
-  # Fetch sample records (multiple to increase chance of finding populated fields)
+  # Fetch sample records (large enough to find single-element collection arrays
+  # needed for the OData all() lambda test)
   SAMPLE=$(wget -qO- --header="Authorization: Bearer $AUTH_TOKEN" \
     --header="Accept: application/json" \
-    "$SERVER_URL/$RESOURCE?\$top=10" 2>/dev/null || echo "{}")
+    "$SERVER_URL/$RESOURCE?\$top=100" 2>/dev/null || echo "{}")
 
   RECORD_COUNT=$(echo "$SAMPLE" | jq -r '.value | length' 2>/dev/null || echo "0")
 

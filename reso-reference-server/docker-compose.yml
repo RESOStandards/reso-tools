@@ -6,7 +6,7 @@ services:
   server:
     build:
       context: ..
-      dockerfile: reso-reference-server/server/Dockerfile
+      dockerfile: reso-reference-server/Dockerfile
     ports:
       - "8080:8080"
     environment:
@@ -47,7 +47,7 @@ services:
   ui:
     build:
       context: ..
-      dockerfile: reso-reference-server/ui/Dockerfile
+      dockerfile: reso-web-client/Dockerfile
     ports:
       - "5173:80"
     depends_on:
@@ -59,7 +59,7 @@ services:
   seed:
     build:
       context: ..
-      dockerfile: reso-reference-server/server/Dockerfile
+      dockerfile: reso-reference-server/Dockerfile
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -100,7 +100,7 @@ services:
   server-mongo:
     build:
       context: ..
-      dockerfile: reso-reference-server/server/Dockerfile
+      dockerfile: reso-reference-server/Dockerfile
     ports:
       - "8080:8080"
     environment:
@@ -127,7 +127,7 @@ services:
   ui-mongo:
     build:
       context: ..
-      dockerfile: reso-reference-server/ui/Dockerfile
+      dockerfile: reso-web-client/Dockerfile
     ports:
       - "5173:80"
     environment:
@@ -141,7 +141,7 @@ services:
   seed-mongo:
     build:
       context: ..
-      dockerfile: reso-reference-server/server/Dockerfile
+      dockerfile: reso-reference-server/Dockerfile
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -168,7 +168,7 @@ services:
   server-sqlite:
     build:
       context: ..
-      dockerfile: reso-reference-server/server/Dockerfile
+      dockerfile: reso-reference-server/Dockerfile
     ports:
       - "8080:8080"
     environment:
@@ -194,7 +194,7 @@ services:
   ui-sqlite:
     build:
       context: ..
-      dockerfile: reso-reference-server/ui/Dockerfile
+      dockerfile: reso-web-client/Dockerfile
     ports:
       - "5173:80"
     environment:
@@ -208,7 +208,7 @@ services:
   seed-sqlite:
     build:
       context: ..
-      dockerfile: reso-reference-server/server/Dockerfile
+      dockerfile: reso-reference-server/Dockerfile
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -380,7 +380,7 @@ services:
   server-entity-event:
     build:
       context: ..
-      dockerfile: reso-reference-server/server/Dockerfile
+      dockerfile: reso-reference-server/Dockerfile
     environment:
       PORT: 8080
       DB_BACKEND: postgres
@@ -435,7 +435,7 @@ services:
   server-entity-event-mongo:
     build:
       context: ..
-      dockerfile: reso-reference-server/server/Dockerfile
+      dockerfile: reso-reference-server/Dockerfile
     environment:
       PORT: 8080
       DB_BACKEND: mongodb
@@ -480,7 +480,7 @@ services:
   server-entity-event-sqlite:
     build:
       context: ..
-      dockerfile: reso-reference-server/server/Dockerfile
+      dockerfile: reso-reference-server/Dockerfile
     environment:
       PORT: 8080
       DB_BACKEND: sqlite
@@ -538,7 +538,7 @@ services:
   server-addedit:
     build:
       context: ..
-      dockerfile: reso-reference-server/server/Dockerfile
+      dockerfile: reso-reference-server/Dockerfile
     environment:
       PORT: 8080
       DB_BACKEND: postgres
@@ -592,7 +592,7 @@ services:
   server-addedit-mongo:
     build:
       context: ..
-      dockerfile: reso-reference-server/server/Dockerfile
+      dockerfile: reso-reference-server/Dockerfile
     environment:
       PORT: 8080
       DB_BACKEND: mongodb

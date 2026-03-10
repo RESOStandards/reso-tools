@@ -1,6 +1,6 @@
-# RESO Reference Server — UI
+# @reso/web-client
 
-React-based web interface for browsing and editing RESO Data Dictionary records served by the reference server.
+React-based OData browser UI with server switcher for connecting to external OData servers, metadata explorer, and CRUD interface.
 
 ## Features
 
@@ -39,13 +39,13 @@ The dev server starts at `http://localhost:5173`. All API requests are proxied t
 **Prerequisites**: The reference server must be running at port 8080. Start it with:
 
 ```bash
-cd ../  # reso-reference-server/
-docker-compose up -d
+cd ../reso-reference-server
+docker compose up -d
 ```
 
 ## Configuration
 
-### UI Config (`server/src/ui-config.json`)
+### UI Config (`reso-reference-server/src/ui-config.json`)
 
 Controls which fields appear in the summary results list for each resource.
 
@@ -65,7 +65,7 @@ Controls which fields appear in the summary results list for each resource.
 
 Served by the server at `GET /ui-config`.
 
-### Field Groups (`server/src/field-groups.json`)
+### Field Groups (`reso-reference-server/src/field-groups.json`)
 
 Maps Property fields to RESO Data Dictionary group categories for organizing detail pages, forms, and advanced search.
 

@@ -7,16 +7,16 @@ COPY validation/ /deps/validation/
 COPY odata-expression-parser/ /deps/odata-expression-parser/
 COPY odata-client/ /deps/odata-client/
 
-COPY reso-reference-server/ui/package.json reso-reference-server/ui/package-lock.json* ./
+COPY reso-web-client/package.json reso-web-client/package-lock.json* ./
 
 # Rewrite file: dependency paths for the Docker build context
-RUN sed -i 's|file:../../validation|file:/deps/validation|' package.json && \
-    sed -i 's|file:../../odata-expression-parser|file:/deps/odata-expression-parser|' package.json && \
-    sed -i 's|file:../../odata-client|file:/deps/odata-client|' package.json
+RUN sed -i 's|file:../validation|file:/deps/validation|' package.json && \
+    sed -i 's|file:../odata-expression-parser|file:/deps/odata-expression-parser|' package.json && \
+    sed -i 's|file:../odata-client|file:/deps/odata-client|' package.json
 
 RUN npm ci --ignore-scripts || npm install
 
-COPY reso-reference-server/ui/ ./
+COPY reso-web-client/ ./
 RUN cd /deps/validation && npm install && npx tsc && \
     cd /deps/odata-expression-parser && npm install && npx tsc && \
     cd /deps/odata-client && npm install && npx tsc && \
@@ -32,6 +32,6 @@ COPY --from=build /app/dist /usr/share/nginx/html
 # Override via environment variable to point at a different backend service.
 ENV API_UPSTREAM=server:8080
 
-COPY reso-reference-server/ui/nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY reso-web-client/nginx.conf.template /etc/nginx/templates/default.conf.template
 
 EXPOSE 80

@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const desktopRoot = resolve(__dirname, '..');
-const monoRoot = resolve(desktopRoot, '..'); // reso-reference-server/
+const monoRoot = resolve(desktopRoot, '..'); // monorepo root (reso-tools/)
 const outDir = resolve(desktopRoot, 'dist', 'server-bundle');
 
 // External packages — not bundled, resolved at runtime from node_modules alongside the bundle
