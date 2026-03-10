@@ -171,6 +171,15 @@ export const OrganizationsPage = () => {
     const id = setTimeout(() => setSearch(searchInput), 150);
     return () => clearTimeout(id);
   }, [searchInput]);
+  // Defer heavy table render so header/filters paint first
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (organizations.length > 0 && !ready) {
+      const id = setTimeout(() => setReady(true), 50);
+      return () => clearTimeout(id);
+    }
+  }, [organizations.length, ready]);
+
   const [expandedOrg, setExpandedOrg] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortColumn>('name');
   const [sortAsc, setSortAsc] = useState(true);
@@ -256,8 +265,19 @@ export const OrganizationsPage = () => {
           </div>
         )}
 
-        {/* Loading */}
-        {isLoading && organizations.length === 0 && (
+        {/* Loading — spinner for initial fetch or deferred table render */}
+        {(!ready || isLoading) && !organizations.length && (
+          <div className="flex items-center justify-center py-20">
+            <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
+              <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Loading organizations...
+            </div>
+          </div>
+        )}
+        {!ready && organizations.length > 0 && (
           <div className="flex items-center justify-center py-20">
             <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
               <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -269,7 +289,7 @@ export const OrganizationsPage = () => {
           </div>
         )}
 
-        {!isLoading && organizations.length > 0 && (
+        {ready && organizations.length > 0 && (
           <>
             {/* Filters */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
