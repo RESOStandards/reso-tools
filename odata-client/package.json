@@ -1,5 +1,5 @@
 {
-  "name": "@reso/odata-client",
+  "name": "@reso-standards/odata-client",
   "version": "0.1.0",
   "description": "OData 4.01 client SDK for TypeScript — URI builder, CRUD helpers, CSDL metadata validation, and query parsing. Inspired by Apache Olingo's Java Client.",
   "type": "module",
@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "fast-xml-parser": "^5.2.0",
-    "@reso/odata-expression-parser": "file:../odata-expression-parser"
+    "@reso-standards/odata-expression-parser": "file:../odata-expression-parser"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

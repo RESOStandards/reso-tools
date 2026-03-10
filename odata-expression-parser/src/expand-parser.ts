@@ -196,7 +196,7 @@ const parseExpandClauses = (input: string, basePosition: number): ReadonlyArray<
  *
  * @example
  * ```ts
- * import { parseExpand } from "@reso/odata-expression-parser";
+ * import { parseExpand } from "@reso-standards/odata-expression-parser";
  *
  * const result = parseExpand("Media($select=MediaURL),Rooms($expand=Listing)");
  * // [

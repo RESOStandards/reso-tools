@@ -1,11 +1,11 @@
-# @reso/odata-client
+# @reso-standards/odata-client
 
 OData 4.01 client SDK for TypeScript. Provides URI building, CRUD helpers, CSDL metadata parsing and validation, query option validation, and response parsing. Inspired by [Apache Olingo's Java Client SDK](https://olingo.apache.org/doc/odata4/index.html).
 
 ## Install
 
 ```bash
-npm install @reso/odata-client
+npm install @reso-standards/odata-client
 ```
 
 ## Quick Start
@@ -18,7 +18,7 @@ import {
   queryEntities,
   buildUri,
   isODataCollection,
-} from "@reso/odata-client";
+} from "@reso-standards/odata-client";
 
 // Create a client with bearer token auth
 const client = await createClient({
@@ -56,7 +56,7 @@ if (response.status === 200 && isODataCollection(response.body)) {
 Chainable functional API for constructing OData URLs with system query options.
 
 ```typescript
-import { buildUri } from "@reso/odata-client";
+import { buildUri } from "@reso-standards/odata-client";
 
 const url = buildUri("http://localhost:8080", "Property")
   .key("ABC123")
@@ -89,7 +89,7 @@ import {
   replaceEntity,
   deleteEntity,
   queryEntities,
-} from "@reso/odata-client";
+} from "@reso-standards/odata-client";
 
 // POST /{Resource}
 await createEntity(client, "Property", body, { prefer: "representation" });
@@ -149,7 +149,7 @@ import {
   parseCsdlXml,
   validateCsdl,
   getEntityType,
-} from "@reso/odata-client";
+} from "@reso-standards/odata-client";
 
 // Fetch and parse from a server
 const schema = await fetchAndParseMetadata("http://localhost:8080", "my-token");
@@ -174,7 +174,7 @@ Parsed types include: `CsdlEntityType`, `CsdlProperty`, `CsdlNavigationProperty`
 Validate query options against CSDL metadata to catch errors before sending requests.
 
 ```typescript
-import { validateQueryOptions } from "@reso/odata-client";
+import { validateQueryOptions } from "@reso-standards/odata-client";
 
 const result = validateQueryOptions(
   {
@@ -191,7 +191,7 @@ if (!result.valid) {
 }
 ```
 
-Validates `$select` and `$orderby` field references against the entity type, `$filter` property references by walking the parsed AST (using `@reso/odata-expression-parser`), and `$top`/`$skip` value constraints.
+Validates `$select` and `$orderby` field references against the entity type, `$filter` property references by walking the parsed AST (using `@reso-standards/odata-expression-parser`), and `$top`/`$skip` value constraints.
 
 ### Response Parsing
 
@@ -206,7 +206,7 @@ import {
   isODataCollection,
   getNextLink,
   followAllPages,
-} from "@reso/odata-client";
+} from "@reso-standards/odata-client";
 
 // Extract @odata annotations
 const annotations = extractAnnotations(entity);
@@ -227,10 +227,10 @@ const allEntities = await followAllPages(client, firstResponse);
 
 ### Filter Parser (re-exported)
 
-The `parseFilter` function and AST types from [`@reso/odata-expression-parser`](../odata-expression-parser/) are re-exported for convenience.
+The `parseFilter` function and AST types from [`@reso-standards/odata-expression-parser`](../odata-expression-parser/) are re-exported for convenience.
 
 ```typescript
-import { parseFilter } from "@reso/odata-client";
+import { parseFilter } from "@reso-standards/odata-client";
 
 const ast = parseFilter("ListPrice gt 200000 and City eq 'Austin'");
 ```

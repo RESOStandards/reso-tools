@@ -20,6 +20,11 @@ export const ResultsCard = ({ resource, record, summaryFields, fieldMap, onClick
   const key = String(record[keyField] ?? '');
   const media = Array.isArray(record.Media) ? (record.Media as Record<string, unknown>[]) : [];
 
+  // For Media resource records, use MediaURL directly as thumbnail
+  const mediaUrl = resource === 'Media' && typeof record.MediaURL === 'string' && record.MediaURL.length > 0
+    ? record.MediaURL
+    : undefined;
+
   // Build formatted address for Property resources
   const address = resource === 'Property' ? formatAddress(record) : null;
 
@@ -37,6 +42,10 @@ export const ResultsCard = ({ resource, record, summaryFields, fieldMap, onClick
         {media.length > 0 ? (
           <div className="w-full sm:w-36 shrink-0">
             <MediaCarousel media={media} compact />
+          </div>
+        ) : mediaUrl ? (
+          <div className="shrink-0 w-full sm:w-36 h-32 sm:h-40 rounded overflow-hidden bg-gray-100 dark:bg-gray-700">
+            <img src={mediaUrl} alt="Media thumbnail" className="w-full h-full object-cover" />
           </div>
         ) : showMediaPlaceholder ? (
           <div className="w-full sm:w-36 shrink-0">
@@ -87,8 +96,8 @@ export const ResultsCard = ({ resource, record, summaryFields, fieldMap, onClick
             })}
           </div>
 
-          {displayFields.length > 9 && (
-            <span className="text-xs text-gray-400 dark:text-gray-500 mt-1 block">+{displayFields.length - 9} more fields</span>
+          {fieldMap.size > displayFields.slice(0, 9).length + (keyField ? 1 : 0) && (
+            <span className="text-xs text-gray-400 dark:text-gray-500 mt-1 block">+{fieldMap.size - displayFields.slice(0, 9).length - (keyField ? 1 : 0)} more fields</span>
           )}
         </div>
       </div>

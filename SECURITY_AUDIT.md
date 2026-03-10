@@ -185,7 +185,7 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 - JSON body size limit (`10mb`), page size cap (2000), expand depth limit (3)
 - Non-root Docker container
 - Database credentials masked in logs
-- Input validation via `@reso/validation`
+- Input validation via `@reso-standards/validation`
 
 ### Finding 1: SSRF via Proxy Endpoint — Insufficient Private Network Protection
 

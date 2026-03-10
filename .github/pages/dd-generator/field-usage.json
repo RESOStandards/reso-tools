@@ -1,0 +1,4965 @@
+{
+  "Property": [
+    {
+      "field": "UnparsedAddress",
+      "adoption": 0.9946499308900651,
+      "providers": 316
+    },
+    {
+      "field": "ListingKey",
+      "adoption": 0.9942594718714122,
+      "providers": 337
+    },
+    {
+      "field": "ListOfficeKey",
+      "adoption": 0.9926787830214623,
+      "providers": 324
+    },
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 0.9920544835414302,
+      "providers": 344
+    },
+    {
+      "field": "ListingId",
+      "adoption": 0.9918182093436301,
+      "providers": 344
+    },
+    {
+      "field": "PropertyType",
+      "adoption": 0.9918087835935279,
+      "providers": 342
+    },
+    {
+      "field": "ListAgentKey",
+      "adoption": 0.9905165463649444,
+      "providers": 269
+    },
+    {
+      "field": "ListOfficeName",
+      "adoption": 0.9900976504514492,
+      "providers": 334
+    },
+    {
+      "field": "StandardStatus",
+      "adoption": 0.9896669046552821,
+      "providers": 325
+    },
+    {
+      "field": "StreetName",
+      "adoption": 0.9887557902112829,
+      "providers": 340
+    },
+    {
+      "field": "ListPrice",
+      "adoption": 0.9879676610539226,
+      "providers": 344
+    },
+    {
+      "field": "ListAgentMlsId",
+      "adoption": 0.9874248239451009,
+      "providers": 331
+    },
+    {
+      "field": "SourceSystemKey",
+      "adoption": 0.9871471930068352,
+      "providers": 286
+    },
+    {
+      "field": "ListOfficeMlsId",
+      "adoption": 0.9869337917464394,
+      "providers": 333
+    },
+    {
+      "field": "OriginatingSystemKey",
+      "adoption": 0.9865318672870528,
+      "providers": 311
+    },
+    {
+      "field": "ListAgentFirstName",
+      "adoption": 0.9849959390744137,
+      "providers": 320
+    },
+    {
+      "field": "ListingContractDate",
+      "adoption": 0.9847837747990579,
+      "providers": 336
+    },
+    {
+      "field": "ListAgentLastName",
+      "adoption": 0.9845355577943756,
+      "providers": 320
+    },
+    {
+      "field": "StateOrProvince",
+      "adoption": 0.9840918780708138,
+      "providers": 339
+    },
+    {
+      "field": "SourceSystemID",
+      "adoption": 0.9826011616519595,
+      "providers": 201
+    },
+    {
+      "field": "PostalCode",
+      "adoption": 0.981339285157895,
+      "providers": 341
+    },
+    {
+      "field": "MlsStatus",
+      "adoption": 0.9792404752655174,
+      "providers": 335
+    },
+    {
+      "field": "City",
+      "adoption": 0.9751709821250106,
+      "providers": 338
+    },
+    {
+      "field": "InternetAddressDisplayYN",
+      "adoption": 0.9685881805634656,
+      "providers": 337
+    },
+    {
+      "field": "OriginalListPrice",
+      "adoption": 0.9684326178598868,
+      "providers": 323
+    },
+    {
+      "field": "PhotosCount",
+      "adoption": 0.9661785780862802,
+      "providers": 341
+    },
+    {
+      "field": "InternetEntireListingDisplayYN",
+      "adoption": 0.9629779684564652,
+      "providers": 331
+    },
+    {
+      "field": "PublicRemarks",
+      "adoption": 0.962441741929347,
+      "providers": 342
+    },
+    {
+      "field": "OriginatingSystemName",
+      "adoption": 0.9620193638098116,
+      "providers": 328
+    },
+    {
+      "field": "CountyOrParish",
+      "adoption": 0.9582041803549275,
+      "providers": 326
+    },
+    {
+      "field": "ListOfficePhone",
+      "adoption": 0.9563634169269455,
+      "providers": 303
+    },
+    {
+      "field": "StreetNumber",
+      "adoption": 0.9533892369349916,
+      "providers": 339
+    },
+    {
+      "field": "ListAgentFullName",
+      "adoption": 0.9464316368018868,
+      "providers": 312
+    },
+    {
+      "field": "OriginalEntryTimestamp",
+      "adoption": 0.9455710963972067,
+      "providers": 324
+    },
+    {
+      "field": "PhotosChangeTimestamp",
+      "adoption": 0.9320557475810128,
+      "providers": 334
+    },
+    {
+      "field": "Longitude",
+      "adoption": 0.9302643681695739,
+      "providers": 330
+    },
+    {
+      "field": "Latitude",
+      "adoption": 0.9302227740039697,
+      "providers": 330
+    },
+    {
+      "field": "PropertySubType",
+      "adoption": 0.9276940610783029,
+      "providers": 327
+    },
+    {
+      "field": "StatusChangeTimestamp",
+      "adoption": 0.9178482345856881,
+      "providers": 235
+    },
+    {
+      "field": "ListAgentEmail",
+      "adoption": 0.9128030092901445,
+      "providers": 307
+    },
+    {
+      "field": "DaysOnMarket",
+      "adoption": 0.8966881236746489,
+      "providers": 325
+    },
+    {
+      "field": "ContractStatusChangeDate",
+      "adoption": 0.8885445553691447,
+      "providers": 247
+    },
+    {
+      "field": "StreetNumberNumeric",
+      "adoption": 0.8635692003188984,
+      "providers": 250
+    },
+    {
+      "field": "PostalCity",
+      "adoption": 0.8595603928955455,
+      "providers": 100
+    },
+    {
+      "field": "ParcelNumber",
+      "adoption": 0.8463463376687718,
+      "providers": 304
+    },
+    {
+      "field": "ListAOR",
+      "adoption": 0.8405668288162571,
+      "providers": 110
+    },
+    {
+      "field": "UniversalPropertyId",
+      "adoption": 0.8351388084606131,
+      "providers": 78
+    },
+    {
+      "field": "MajorChangeTimestamp",
+      "adoption": 0.8347097684547266,
+      "providers": 208
+    },
+    {
+      "field": "LotSizeUnits",
+      "adoption": 0.8345203068614475,
+      "providers": 302
+    },
+    {
+      "field": "ListAgentAOR",
+      "adoption": 0.8230529610938625,
+      "providers": 111
+    },
+    {
+      "field": "ListOfficeEmail",
+      "adoption": 0.8191128150210563,
+      "providers": 289
+    },
+    {
+      "field": "LotSizeAcres",
+      "adoption": 0.8133936849685601,
+      "providers": 333
+    },
+    {
+      "field": "ListAgentStateLicense",
+      "adoption": 0.8133442730803244,
+      "providers": 207
+    },
+    {
+      "field": "ListOfficeAOR",
+      "adoption": 0.808737761334297,
+      "providers": 99
+    },
+    {
+      "field": "YearBuilt",
+      "adoption": 0.7968636820366344,
+      "providers": 342
+    },
+    {
+      "field": "LotSizeArea",
+      "adoption": 0.7886631974814411,
+      "providers": 311
+    },
+    {
+      "field": "ExpirationDate",
+      "adoption": 0.7794070792005386,
+      "providers": 224
+    },
+    {
+      "field": "MajorChangeType",
+      "adoption": 0.7728384431160631,
+      "providers": 203
+    },
+    {
+      "field": "StreetSuffix",
+      "adoption": 0.7715242187393115,
+      "providers": 246
+    },
+    {
+      "field": "Directions",
+      "adoption": 0.7657821939756106,
+      "providers": 326
+    },
+    {
+      "field": "WaterSource",
+      "adoption": 0.7616807171199076,
+      "providers": 296
+    },
+    {
+      "field": "Media",
+      "adoption": 0.7529541026312802,
+      "providers": 105
+    },
+    {
+      "field": "MLSAreaMajor",
+      "adoption": 0.7494293630773305,
+      "providers": 262
+    },
+    {
+      "field": "BathroomsTotalInteger",
+      "adoption": 0.7470829492366351,
+      "providers": 320
+    },
+    {
+      "field": "ListAgentPreferredPhone",
+      "adoption": 0.7449972658330429,
+      "providers": 278
+    },
+    {
+      "field": "Sewer",
+      "adoption": 0.7397106211418544,
+      "providers": 299
+    },
+    {
+      "field": "Heating",
+      "adoption": 0.7369608023408513,
+      "providers": 311
+    },
+    {
+      "field": "CumulativeDaysOnMarket",
+      "adoption": 0.736577344310048,
+      "providers": 206
+    },
+    {
+      "field": "BedroomsTotal",
+      "adoption": 0.734363169855888,
+      "providers": 344
+    },
+    {
+      "field": "ListAgentDirectPhone",
+      "adoption": 0.732337933482386,
+      "providers": 204
+    },
+    {
+      "field": "ListAgentOfficePhone",
+      "adoption": 0.7305014898563462,
+      "providers": 229
+    },
+    {
+      "field": "ListingAgreement",
+      "adoption": 0.7230561704085504,
+      "providers": 236
+    },
+    {
+      "field": "OnMarketDate",
+      "adoption": 0.7225715631369634,
+      "providers": 222
+    },
+    {
+      "field": "ListAgentNationalAssociationId",
+      "adoption": 0.720962162707254,
+      "providers": 71
+    },
+    {
+      "field": "HeatingYN",
+      "adoption": 0.7168322453122876,
+      "providers": 280
+    },
+    {
+      "field": "PrivateRemarks",
+      "adoption": 0.7104782399113029,
+      "providers": 311
+    },
+    {
+      "field": "ConstructionMaterials",
+      "adoption": 0.705295647183031,
+      "providers": 307
+    },
+    {
+      "field": "BathroomsFull",
+      "adoption": 0.7048163222473904,
+      "providers": 323
+    },
+    {
+      "field": "ListAgentMobilePhone",
+      "adoption": 0.7013990436478345,
+      "providers": 202
+    },
+    {
+      "field": "Cooling",
+      "adoption": 0.6985807270089761,
+      "providers": 308
+    },
+    {
+      "field": "PropertyTimeZoneName",
+      "adoption": 0.6943741099765163,
+      "providers": 2
+    },
+    {
+      "field": "SubdivisionName",
+      "adoption": 0.6903241623859259,
+      "providers": 309
+    },
+    {
+      "field": "ParkingFeatures",
+      "adoption": 0.6885834598305985,
+      "providers": 296
+    },
+    {
+      "field": "TaxLegalDescription",
+      "adoption": 0.6882271274246778,
+      "providers": 216
+    },
+    {
+      "field": "ShowingInstructions",
+      "adoption": 0.6831391556230134,
+      "providers": 285
+    },
+    {
+      "field": "TaxAnnualAmount",
+      "adoption": 0.6753441777918393,
+      "providers": 297
+    },
+    {
+      "field": "LivingArea",
+      "adoption": 0.6650544662225957,
+      "providers": 270
+    },
+    {
+      "field": "Appliances",
+      "adoption": 0.6553667865079137,
+      "providers": 305
+    },
+    {
+      "field": "Possession",
+      "adoption": 0.6533499455096787,
+      "providers": 256
+    },
+    {
+      "field": "OwnerName",
+      "adoption": 0.6350625091170411,
+      "providers": 265
+    },
+    {
+      "field": "InternetAutomatedValuationDisplayYN",
+      "adoption": 0.6320634147225819,
+      "providers": 308
+    },
+    {
+      "field": "CoolingYN",
+      "adoption": 0.6264582822344295,
+      "providers": 279
+    },
+    {
+      "field": "LotFeatures",
+      "adoption": 0.6174333618249989,
+      "providers": 288
+    },
+    {
+      "field": "InteriorFeatures",
+      "adoption": 0.605050440688456,
+      "providers": 301
+    },
+    {
+      "field": "Rooms",
+      "adoption": 0.6,
+      "providers": 3
+    },
+    {
+      "field": "InternetConsumerCommentYN",
+      "adoption": 0.5910065043305577,
+      "providers": 306
+    },
+    {
+      "field": "Roof",
+      "adoption": 0.5796186742977729,
+      "providers": 307
+    },
+    {
+      "field": "Levels",
+      "adoption": 0.5768105454565553,
+      "providers": 267
+    },
+    {
+      "field": "ListingTerms",
+      "adoption": 0.5705636918036295,
+      "providers": 267
+    },
+    {
+      "field": "LotSizeSquareFeet",
+      "adoption": 0.569129632666912,
+      "providers": 301
+    },
+    {
+      "field": "DocumentsCount",
+      "adoption": 0.5620290135335793,
+      "providers": 296
+    },
+    {
+      "field": "ArchitecturalStyle",
+      "adoption": 0.5602820471346627,
+      "providers": 311
+    },
+    {
+      "field": "Flooring",
+      "adoption": 0.554788836661354,
+      "providers": 290
+    },
+    {
+      "field": "BuildingAreaTotal",
+      "adoption": 0.5378921192385602,
+      "providers": 304
+    },
+    {
+      "field": "TaxYear",
+      "adoption": 0.5373701750535118,
+      "providers": 224
+    },
+    {
+      "field": "Utilities",
+      "adoption": 0.5244623417953861,
+      "providers": 303
+    },
+    {
+      "field": "Stories",
+      "adoption": 0.5201731878767313,
+      "providers": 244
+    },
+    {
+      "field": "PatioAndPorchFeatures",
+      "adoption": 0.5156156379697674,
+      "providers": 263
+    },
+    {
+      "field": "GarageYN",
+      "adoption": 0.5087219048723838,
+      "providers": 281
+    },
+    {
+      "field": "PriceChangeTimestamp",
+      "adoption": 0.4887681371970364,
+      "providers": 311
+    },
+    {
+      "field": "GarageSpaces",
+      "adoption": 0.47964564361088574,
+      "providers": 290
+    },
+    {
+      "field": "ElementarySchool",
+      "adoption": 0.47853996384293135,
+      "providers": 192
+    },
+    {
+      "field": "ExteriorFeatures",
+      "adoption": 0.47418129462876824,
+      "providers": 294
+    },
+    {
+      "field": "HighSchool",
+      "adoption": 0.46635939241105445,
+      "providers": 184
+    },
+    {
+      "field": "DocumentsChangeTimestamp",
+      "adoption": 0.4579829066287601,
+      "providers": 270
+    },
+    {
+      "field": "MiddleOrJuniorSchool",
+      "adoption": 0.4536017453181077,
+      "providers": 180
+    },
+    {
+      "field": "RoomsTotal",
+      "adoption": 0.433902038039438,
+      "providers": 231
+    },
+    {
+      "field": "LaundryFeatures",
+      "adoption": 0.43009693279788397,
+      "providers": 257
+    },
+    {
+      "field": "ListOfficeURL",
+      "adoption": 0.4289330646604377,
+      "providers": 273
+    },
+    {
+      "field": "LotSizeDimensions",
+      "adoption": 0.42719642163473126,
+      "providers": 282
+    },
+    {
+      "field": "OriginatingSystemID",
+      "adoption": 0.4142845529610683,
+      "providers": 242
+    },
+    {
+      "field": "HighSchoolDistrict",
+      "adoption": 0.4100936512693805,
+      "providers": 161
+    },
+    {
+      "field": "Basement",
+      "adoption": 0.4032508997191639,
+      "providers": 245
+    },
+    {
+      "field": "FoundationDetails",
+      "adoption": 0.4031000981840111,
+      "providers": 269
+    },
+    {
+      "field": "ZoningDescription",
+      "adoption": 0.40022519011910357,
+      "providers": 204
+    },
+    {
+      "field": "FireplaceFeatures",
+      "adoption": 0.3948754711356712,
+      "providers": 277
+    },
+    {
+      "field": "LivingAreaSource",
+      "adoption": 0.38559087688918153,
+      "providers": 177
+    },
+    {
+      "field": "OffMarketDate",
+      "adoption": 0.37641667849614985,
+      "providers": 284
+    },
+    {
+      "field": "ListAgentHomePhone",
+      "adoption": 0.3678304143567003,
+      "providers": 142
+    },
+    {
+      "field": "FireplaceYN",
+      "adoption": 0.36522341855916085,
+      "providers": 267
+    },
+    {
+      "field": "RoadSurfaceType",
+      "adoption": 0.36498225067550005,
+      "providers": 253
+    },
+    {
+      "field": "PoolFeatures",
+      "adoption": 0.36363247522021047,
+      "providers": 271
+    },
+    {
+      "field": "BathroomsHalf",
+      "adoption": 0.3586494942211231,
+      "providers": 306
+    },
+    {
+      "field": "Fencing",
+      "adoption": 0.3543129158644894,
+      "providers": 267
+    },
+    {
+      "field": "CommunityFeatures",
+      "adoption": 0.3535634663401429,
+      "providers": 218
+    },
+    {
+      "field": "WindowFeatures",
+      "adoption": 0.3500387855001197,
+      "providers": 261
+    },
+    {
+      "field": "PreviousListPrice",
+      "adoption": 0.3497992021669511,
+      "providers": 217
+    },
+    {
+      "field": "PropertyCondition",
+      "adoption": 0.34966111782169357,
+      "providers": 215
+    },
+    {
+      "field": "OccupantType",
+      "adoption": 0.34948819067538145,
+      "providers": 213
+    },
+    {
+      "field": "ElementarySchoolDistrict",
+      "adoption": 0.34909917033269666,
+      "providers": 97
+    },
+    {
+      "field": "SpecialListingConditions",
+      "adoption": 0.34093814314547605,
+      "providers": 254
+    },
+    {
+      "field": "MiddleOrJuniorSchoolDistrict",
+      "adoption": 0.33984566038404074,
+      "providers": 85
+    },
+    {
+      "field": "View",
+      "adoption": 0.3354557840826579,
+      "providers": 216
+    },
+    {
+      "field": "TaxLot",
+      "adoption": 0.3262767538451989,
+      "providers": 123
+    },
+    {
+      "field": "MLSAreaMinor",
+      "adoption": 0.32298429642998566,
+      "providers": 144
+    },
+    {
+      "field": "AssociationFee",
+      "adoption": 0.3189648104671296,
+      "providers": 283
+    },
+    {
+      "field": "ShowingRequirements",
+      "adoption": 0.3151443815160206,
+      "providers": 98
+    },
+    {
+      "field": "Country",
+      "adoption": 0.31226714308058806,
+      "providers": 140
+    },
+    {
+      "field": "AttachedGarageYN",
+      "adoption": 0.31110590305044966,
+      "providers": 271
+    },
+    {
+      "field": "SecurityFeatures",
+      "adoption": 0.30968889164197133,
+      "providers": 254
+    },
+    {
+      "field": "AssociationYN",
+      "adoption": 0.3074867348001876,
+      "providers": 270
+    },
+    {
+      "field": "VirtualTourURLUnbranded",
+      "adoption": 0.2976847276475724,
+      "providers": 316
+    },
+    {
+      "field": "BuildingAreaSource",
+      "adoption": 0.2944488916951546,
+      "providers": 161
+    },
+    {
+      "field": "BuyerOfficeMlsId",
+      "adoption": 0.2944200478876865,
+      "providers": 314
+    },
+    {
+      "field": "AttributionContact",
+      "adoption": 0.2932735884803893,
+      "providers": 126
+    },
+    {
+      "field": "BuyerOfficeKey",
+      "adoption": 0.286603814455498,
+      "providers": 288
+    },
+    {
+      "field": "AssociationFeeFrequency",
+      "adoption": 0.2810741510568527,
+      "providers": 249
+    },
+    {
+      "field": "OtherStructures",
+      "adoption": 0.2769817630372455,
+      "providers": 266
+    },
+    {
+      "field": "BuyerOfficeName",
+      "adoption": 0.2756699747548783,
+      "providers": 309
+    },
+    {
+      "field": "BuyerAgentMlsId",
+      "adoption": 0.2724456751600788,
+      "providers": 301
+    },
+    {
+      "field": "FireplacesTotal",
+      "adoption": 0.27132989052122114,
+      "providers": 184
+    },
+    {
+      "field": "SourceSystemName",
+      "adoption": 0.2688991882045465,
+      "providers": 135
+    },
+    {
+      "field": "Zoning",
+      "adoption": 0.26702798812619144,
+      "providers": 216
+    },
+    {
+      "field": "ListAgentURL",
+      "adoption": 0.2664043287366949,
+      "providers": 270
+    },
+    {
+      "field": "ListOfficeFax",
+      "adoption": 0.2651617855547607,
+      "providers": 204
+    },
+    {
+      "field": "PurchaseContractDate",
+      "adoption": 0.26356535145174753,
+      "providers": 290
+    },
+    {
+      "field": "BuyerAgentFullName",
+      "adoption": 0.2615501547407833,
+      "providers": 280
+    },
+    {
+      "field": "BuyerAgentKey",
+      "adoption": 0.2583930559272244,
+      "providers": 241
+    },
+    {
+      "field": "ViewYN",
+      "adoption": 0.2566362422039242,
+      "providers": 175
+    },
+    {
+      "field": "LockBoxType",
+      "adoption": 0.25546592742762336,
+      "providers": 133
+    },
+    {
+      "field": "BuildingAreaUnits",
+      "adoption": 0.255144194533965,
+      "providers": 138
+    },
+    {
+      "field": "BuyerAgentLastName",
+      "adoption": 0.2532561348915386,
+      "providers": 276
+    },
+    {
+      "field": "BuyerAgentFirstName",
+      "adoption": 0.2524863554882924,
+      "providers": 277
+    },
+    {
+      "field": "UnitTypes",
+      "adoption": 0.25,
+      "providers": 1
+    },
+    {
+      "field": "AssociationFeeIncludes",
+      "adoption": 0.24876284111793787,
+      "providers": 202
+    },
+    {
+      "field": "ClosePrice",
+      "adoption": 0.24836086489648565,
+      "providers": 286
+    },
+    {
+      "field": "PendingTimestamp",
+      "adoption": 0.24113987590380953,
+      "providers": 253
+    },
+    {
+      "field": "CloseDate",
+      "adoption": 0.24092671948634825,
+      "providers": 299
+    },
+    {
+      "field": "Disclosures",
+      "adoption": 0.24023125504274268,
+      "providers": 179
+    },
+    {
+      "field": "AboveGradeFinishedArea",
+      "adoption": 0.23421971639262024,
+      "providers": 118
+    },
+    {
+      "field": "LivingAreaUnits",
+      "adoption": 0.22950983591295937,
+      "providers": 133
+    },
+    {
+      "field": "CoveredSpaces",
+      "adoption": 0.22679376663516457,
+      "providers": 143
+    },
+    {
+      "field": "BuyerOfficePhone",
+      "adoption": 0.22580064000805125,
+      "providers": 279
+    },
+    {
+      "field": "ListingService",
+      "adoption": 0.225310693067942,
+      "providers": 135
+    },
+    {
+      "field": "RoadFrontageType",
+      "adoption": 0.22523357132499733,
+      "providers": 246
+    },
+    {
+      "field": "RoomType",
+      "adoption": 0.2250491722095549,
+      "providers": 85
+    },
+    {
+      "field": "WaterfrontFeatures",
+      "adoption": 0.22356306113560895,
+      "providers": 244
+    },
+    {
+      "field": "TaxAssessedValue",
+      "adoption": 0.22223740769023193,
+      "providers": 105
+    },
+    {
+      "field": "ParkingTotal",
+      "adoption": 0.22108013198671106,
+      "providers": 249
+    },
+    {
+      "field": "ShowingContactPhone",
+      "adoption": 0.22018721695353913,
+      "providers": 100
+    },
+    {
+      "field": "StoriesTotal",
+      "adoption": 0.21980151880952967,
+      "providers": 122
+    },
+    {
+      "field": "ListAgentMiddleName",
+      "adoption": 0.21812884963717968,
+      "providers": 224
+    },
+    {
+      "field": "BasementYN",
+      "adoption": 0.2177150122265369,
+      "providers": 113
+    },
+    {
+      "field": "AssociationAmenities",
+      "adoption": 0.2113775342382388,
+      "providers": 193
+    },
+    {
+      "field": "DocumentsAvailable",
+      "adoption": 0.1988259244431752,
+      "providers": 247
+    },
+    {
+      "field": "Ownership",
+      "adoption": 0.19875274091869605,
+      "providers": 86
+    },
+    {
+      "field": "LotSizeSource",
+      "adoption": 0.19862798233648815,
+      "providers": 82
+    },
+    {
+      "field": "BuyerAgentEmail",
+      "adoption": 0.1941369375039295,
+      "providers": 279
+    },
+    {
+      "field": "BuyerOfficeEmail",
+      "adoption": 0.19323835907471945,
+      "providers": 271
+    },
+    {
+      "field": "VideosCount",
+      "adoption": 0.19285397335752763,
+      "providers": 152
+    },
+    {
+      "field": "PostalCodePlus4",
+      "adoption": 0.18562575315020735,
+      "providers": 184
+    },
+    {
+      "field": "PetsAllowed",
+      "adoption": 0.18218098980303876,
+      "providers": 224
+    },
+    {
+      "field": "TaxBlock",
+      "adoption": 0.1785623658549541,
+      "providers": 98
+    },
+    {
+      "field": "Electric",
+      "adoption": 0.17759655706163044,
+      "providers": 226
+    },
+    {
+      "field": "YearBuiltDetails",
+      "adoption": 0.17502000053806469,
+      "providers": 54
+    },
+    {
+      "field": "StreetDirPrefix",
+      "adoption": 0.17492083877281617,
+      "providers": 303
+    },
+    {
+      "field": "CoListAgentKey",
+      "adoption": 0.17268341798788497,
+      "providers": 257
+    },
+    {
+      "field": "SyndicateTo",
+      "adoption": 0.17260733116396698,
+      "providers": 54
+    },
+    {
+      "field": "NewConstructionYN",
+      "adoption": 0.1722068183017516,
+      "providers": 249
+    },
+    {
+      "field": "CoListOfficeKey",
+      "adoption": 0.17135264270196315,
+      "providers": 252
+    },
+    {
+      "field": "BuyerAgentPreferredPhone",
+      "adoption": 0.17073978532994724,
+      "providers": 247
+    },
+    {
+      "field": "Furnished",
+      "adoption": 0.1690064042441816,
+      "providers": 185
+    },
+    {
+      "field": "CoListAgentAOR",
+      "adoption": 0.16883432175763427,
+      "providers": 84
+    },
+    {
+      "field": "SignOnPropertyYN",
+      "adoption": 0.16672778540620947,
+      "providers": 117
+    },
+    {
+      "field": "CoListAgentMlsId",
+      "adoption": 0.16668366678254654,
+      "providers": 296
+    },
+    {
+      "field": "StructureType",
+      "adoption": 0.16298786089490092,
+      "providers": 218
+    },
+    {
+      "field": "CrossStreet",
+      "adoption": 0.16218700689863866,
+      "providers": 85
+    },
+    {
+      "field": "CoListAgentFirstName",
+      "adoption": 0.16126136403191085,
+      "providers": 273
+    },
+    {
+      "field": "CoListAgentLastName",
+      "adoption": 0.16123927826676185,
+      "providers": 273
+    },
+    {
+      "field": "CoListOfficeName",
+      "adoption": 0.1608952399229556,
+      "providers": 291
+    },
+    {
+      "field": "PublicSurveySection",
+      "adoption": 0.1587603256829816,
+      "providers": 62
+    },
+    {
+      "field": "CoListOfficeMlsId",
+      "adoption": 0.15789445505914054,
+      "providers": 296
+    },
+    {
+      "field": "CoListOfficePhone",
+      "adoption": 0.1574791046958452,
+      "providers": 268
+    },
+    {
+      "field": "BuyerFinancing",
+      "adoption": 0.15690975894653367,
+      "providers": 181
+    },
+    {
+      "field": "Township",
+      "adoption": 0.15534794575888752,
+      "providers": 79
+    },
+    {
+      "field": "CoListAgentFullName",
+      "adoption": 0.1545715489633429,
+      "providers": 275
+    },
+    {
+      "field": "CoListAgentEmail",
+      "adoption": 0.1527064196922244,
+      "providers": 279
+    },
+    {
+      "field": "CarportYN",
+      "adoption": 0.15180610504418912,
+      "providers": 234
+    },
+    {
+      "field": "LockBoxLocation",
+      "adoption": 0.14797474223334828,
+      "providers": 74
+    },
+    {
+      "field": "BuyerAgentStateLicense",
+      "adoption": 0.14592555471028446,
+      "providers": 185
+    },
+    {
+      "field": "WaterfrontYN",
+      "adoption": 0.14457232360439556,
+      "providers": 249
+    },
+    {
+      "field": "CoListOfficeAOR",
+      "adoption": 0.1424771044705726,
+      "providers": 92
+    },
+    {
+      "field": "AccessibilityFeatures",
+      "adoption": 0.1417926212680116,
+      "providers": 251
+    },
+    {
+      "field": "CoListAgentStateLicense",
+      "adoption": 0.14031441400806402,
+      "providers": 199
+    },
+    {
+      "field": "OnMarketTimestamp",
+      "adoption": 0.1402828381924336,
+      "providers": 27
+    },
+    {
+      "field": "YearBuiltSource",
+      "adoption": 0.13966362869056567,
+      "providers": 57
+    },
+    {
+      "field": "ActivationDate",
+      "adoption": 0.1377515428240949,
+      "providers": 61
+    },
+    {
+      "field": "UnitNumber",
+      "adoption": 0.1347705582222815,
+      "providers": 272
+    },
+    {
+      "field": "CoListOfficeEmail",
+      "adoption": 0.1345034778712238,
+      "providers": 259
+    },
+    {
+      "field": "BuyerAgentOfficePhone",
+      "adoption": 0.13062042613420197,
+      "providers": 209
+    },
+    {
+      "field": "CoListAgentNationalAssociationId",
+      "adoption": 0.12963669187600516,
+      "providers": 70
+    },
+    {
+      "field": "CoListAgentDirectPhone",
+      "adoption": 0.12899360059297263,
+      "providers": 195
+    },
+    {
+      "field": "DirectionFaces",
+      "adoption": 0.12813092847825,
+      "providers": 81
+    },
+    {
+      "field": "ShowingContactType",
+      "adoption": 0.1271534435453473,
+      "providers": 47
+    },
+    {
+      "field": "CoListAgentMobilePhone",
+      "adoption": 0.12558697223370247,
+      "providers": 198
+    },
+    {
+      "field": "CoListAgentOfficePhone",
+      "adoption": 0.12540837398869942,
+      "providers": 221
+    },
+    {
+      "field": "NumberOfUnitsTotal",
+      "adoption": 0.12375979715615482,
+      "providers": 290
+    },
+    {
+      "field": "PossibleUse",
+      "adoption": 0.120734338366925,
+      "providers": 168
+    },
+    {
+      "field": "SubAgencyCompensation",
+      "adoption": 0.1203498279896735,
+      "providers": 98
+    },
+    {
+      "field": "MainLevelBedrooms",
+      "adoption": 0.12024068794749232,
+      "providers": 73
+    },
+    {
+      "field": "GreenEnergyEfficient",
+      "adoption": 0.11980509187441625,
+      "providers": 162
+    },
+    {
+      "field": "MainLevelBathrooms",
+      "adoption": 0.119650155062651,
+      "providers": 60
+    },
+    {
+      "field": "CoListAgentPreferredPhone",
+      "adoption": 0.11951378180575463,
+      "providers": 252
+    },
+    {
+      "field": "BuyerAgentMobilePhone",
+      "adoption": 0.11892975448325697,
+      "providers": 183
+    },
+    {
+      "field": "BelowGradeFinishedArea",
+      "adoption": 0.11857831585988625,
+      "providers": 150
+    },
+    {
+      "field": "Topography",
+      "adoption": 0.11825854195179285,
+      "providers": 190
+    },
+    {
+      "field": "BuyerOfficeURL",
+      "adoption": 0.11777028295330577,
+      "providers": 248
+    },
+    {
+      "field": "PublicSurveyRange",
+      "adoption": 0.11652942538307386,
+      "providers": 47
+    },
+    {
+      "field": "BuyerOfficeFax",
+      "adoption": 0.11634605382451745,
+      "providers": 189
+    },
+    {
+      "field": "CurrentUse",
+      "adoption": 0.11525863981577511,
+      "providers": 217
+    },
+    {
+      "field": "PublicSurveyTownship",
+      "adoption": 0.10962810139385219,
+      "providers": 44
+    },
+    {
+      "field": "OtherEquipment",
+      "adoption": 0.10625781497437703,
+      "providers": 243
+    },
+    {
+      "field": "Inclusions",
+      "adoption": 0.10501160507419614,
+      "providers": 164
+    },
+    {
+      "field": "BathroomsThreeQuarter",
+      "adoption": 0.10431698798325742,
+      "providers": 99
+    },
+    {
+      "field": "VirtualTourURLBranded",
+      "adoption": 0.10321588613467213,
+      "providers": 169
+    },
+    {
+      "field": "TransactionBrokerCompensation",
+      "adoption": 0.10246673712046546,
+      "providers": 78
+    },
+    {
+      "field": "ShowingContactName",
+      "adoption": 0.10228843161175781,
+      "providers": 41
+    },
+    {
+      "field": "AssociationName",
+      "adoption": 0.10222112296765531,
+      "providers": 104
+    },
+    {
+      "field": "Concessions",
+      "adoption": 0.10022284068674107,
+      "providers": 133
+    },
+    {
+      "field": "OffMarketTimestamp",
+      "adoption": 0.09996549533664031,
+      "providers": 111
+    },
+    {
+      "field": "SyndicationRemarks",
+      "adoption": 0.09921795948562462,
+      "providers": 39
+    },
+    {
+      "field": "LockBoxSerialNumber",
+      "adoption": 0.09747722958623331,
+      "providers": 82
+    },
+    {
+      "field": "SpaFeatures",
+      "adoption": 0.09657370674583841,
+      "providers": 212
+    },
+    {
+      "field": "ListAgentFax",
+      "adoption": 0.09541744789978608,
+      "providers": 163
+    },
+    {
+      "field": "TaxMapNumber",
+      "adoption": 0.09299720810049583,
+      "providers": 49
+    },
+    {
+      "field": "WaterBodyName",
+      "adoption": 0.0924466775656188,
+      "providers": 114
+    },
+    {
+      "field": "ContingentDate",
+      "adoption": 0.09133773599502888,
+      "providers": 124
+    },
+    {
+      "field": "RoadResponsibility",
+      "adoption": 0.08976630874408054,
+      "providers": 125
+    },
+    {
+      "field": "SimpleDaysOnMarket",
+      "adoption": 0.08931060702065645,
+      "providers": 1
+    },
+    {
+      "field": "TransactionBrokerCompensationType",
+      "adoption": 0.08905908066131583,
+      "providers": 64
+    },
+    {
+      "field": "SubAgencyCompensationType",
+      "adoption": 0.0890564564628469,
+      "providers": 78
+    },
+    {
+      "field": "PropertyAttachedYN",
+      "adoption": 0.08702731149304486,
+      "providers": 135
+    },
+    {
+      "field": "MapCoordinateSource",
+      "adoption": 0.0861504405233284,
+      "providers": 15
+    },
+    {
+      "field": "BelowGradeFinishedAreaUnits",
+      "adoption": 0.08588690906174837,
+      "providers": 50
+    },
+    {
+      "field": "AvailabilityDate",
+      "adoption": 0.08523029373168649,
+      "providers": 197
+    },
+    {
+      "field": "BuyerAgentAOR",
+      "adoption": 0.08472939899497836,
+      "providers": 71
+    },
+    {
+      "field": "PoolPrivateYN",
+      "adoption": 0.08391573846404443,
+      "providers": 141
+    },
+    {
+      "field": "BuyerAgentDirectPhone",
+      "adoption": 0.08373522833984816,
+      "providers": 182
+    },
+    {
+      "field": "DoorFeatures",
+      "adoption": 0.08359558512076072,
+      "providers": 176
+    },
+    {
+      "field": "HomeWarrantyYN",
+      "adoption": 0.08307500940571394,
+      "providers": 168
+    },
+    {
+      "field": "AboveGradeFinishedAreaUnits",
+      "adoption": 0.0830670849026161,
+      "providers": 42
+    },
+    {
+      "field": "CurrentFinancing",
+      "adoption": 0.08216815455837968,
+      "providers": 91
+    },
+    {
+      "field": "CarportSpaces",
+      "adoption": 0.08161930726365708,
+      "providers": 166
+    },
+    {
+      "field": "EntryLevel",
+      "adoption": 0.08109637862069174,
+      "providers": 83
+    },
+    {
+      "field": "BuyerOfficeAOR",
+      "adoption": 0.08106582097856077,
+      "providers": 81
+    },
+    {
+      "field": "Exclusions",
+      "adoption": 0.08044351207550625,
+      "providers": 111
+    },
+    {
+      "field": "CommonWalls",
+      "adoption": 0.08037916945699042,
+      "providers": 86
+    },
+    {
+      "field": "BuilderName",
+      "adoption": 0.07886494106766812,
+      "providers": 121
+    },
+    {
+      "field": "Vegetation",
+      "adoption": 0.07361367760005855,
+      "providers": 119
+    },
+    {
+      "field": "HorseAmenities",
+      "adoption": 0.07330704712674617,
+      "providers": 137
+    },
+    {
+      "field": "CoListOfficeURL",
+      "adoption": 0.07214851931882542,
+      "providers": 236
+    },
+    {
+      "field": "GreenEnergyGeneration",
+      "adoption": 0.07127844899601372,
+      "providers": 134
+    },
+    {
+      "field": "BuyerAgentURL",
+      "adoption": 0.07126485074874338,
+      "providers": 248
+    },
+    {
+      "field": "OpenParkingYN",
+      "adoption": 0.07114412662433697,
+      "providers": 139
+    },
+    {
+      "field": "AdditionalParcelsDescription",
+      "adoption": 0.07109778582701094,
+      "providers": 81
+    },
+    {
+      "field": "Contingency",
+      "adoption": 0.07007994441152535,
+      "providers": 147
+    },
+    {
+      "field": "TaxBookNumber",
+      "adoption": 0.06796287235600883,
+      "providers": 38
+    },
+    {
+      "field": "ConcessionsAmount",
+      "adoption": 0.06607898408754376,
+      "providers": 127
+    },
+    {
+      "field": "OccupantName",
+      "adoption": 0.06563534044684077,
+      "providers": 85
+    },
+    {
+      "field": "TenantPays",
+      "adoption": 0.06460932849810737,
+      "providers": 216
+    },
+    {
+      "field": "FrontageType",
+      "adoption": 0.061253011127512566,
+      "providers": 121
+    },
+    {
+      "field": "BuildingFeatures",
+      "adoption": 0.06075274265756964,
+      "providers": 212
+    },
+    {
+      "field": "CityRegion",
+      "adoption": 0.060557213142394886,
+      "providers": 23
+    },
+    {
+      "field": "OwnershipType",
+      "adoption": 0.05985911596004468,
+      "providers": 76
+    },
+    {
+      "field": "BuyerBrokerageCompensation",
+      "adoption": 0.05956528880894127,
+      "providers": 16
+    },
+    {
+      "field": "FarmLandAreaUnits",
+      "adoption": 0.0594364634551937,
+      "providers": 39
+    },
+    {
+      "field": "LeaseTerm",
+      "adoption": 0.05874032760454753,
+      "providers": 197
+    },
+    {
+      "field": "BodyType",
+      "adoption": 0.05641539234881072,
+      "providers": 144
+    },
+    {
+      "field": "SpaYN",
+      "adoption": 0.05532129284562729,
+      "providers": 182
+    },
+    {
+      "field": "NumberOfBuildings",
+      "adoption": 0.05532071492554615,
+      "providers": 153
+    },
+    {
+      "field": "ConcessionsComments",
+      "adoption": 0.055036462303392084,
+      "providers": 139
+    },
+    {
+      "field": "NumberOfUnitsInCommunity",
+      "adoption": 0.054106664636729,
+      "providers": 72
+    },
+    {
+      "field": "EntryLocation",
+      "adoption": 0.05303994433982713,
+      "providers": 62
+    },
+    {
+      "field": "ExistingLeaseType",
+      "adoption": 0.05288739178062592,
+      "providers": 147
+    },
+    {
+      "field": "CoListAgentHomePhone",
+      "adoption": 0.05247205250440802,
+      "providers": 125
+    },
+    {
+      "field": "BusinessType",
+      "adoption": 0.05228185489958664,
+      "providers": 232
+    },
+    {
+      "field": "HorseYN",
+      "adoption": 0.0517235959859886,
+      "providers": 153
+    },
+    {
+      "field": "RentIncludes",
+      "adoption": 0.051131725695599047,
+      "providers": 133
+    },
+    {
+      "field": "Disclaimer",
+      "adoption": 0.051083019665162495,
+      "providers": 27
+    },
+    {
+      "field": "GreenWaterConservation",
+      "adoption": 0.05079982330020374,
+      "providers": 96
+    },
+    {
+      "field": "SeniorCommunityYN",
+      "adoption": 0.050411083971252005,
+      "providers": 117
+    },
+    {
+      "field": "BathroomsOneQuarter",
+      "adoption": 0.04994830482562845,
+      "providers": 35
+    },
+    {
+      "field": "StreetDirSuffix",
+      "adoption": 0.049845031990156594,
+      "providers": 172
+    },
+    {
+      "field": "OwnerPays",
+      "adoption": 0.04793571548778292,
+      "providers": 183
+    },
+    {
+      "field": "BuyerAgentMiddleName",
+      "adoption": 0.04760142217388554,
+      "providers": 199
+    },
+    {
+      "field": "FrontageLength",
+      "adoption": 0.04730397658353996,
+      "providers": 99
+    },
+    {
+      "field": "AssociationPhone",
+      "adoption": 0.04648029040408021,
+      "providers": 96
+    },
+    {
+      "field": "OwnerPhone",
+      "adoption": 0.0462633842911958,
+      "providers": 146
+    },
+    {
+      "field": "CommonInterest",
+      "adoption": 0.04566735878696348,
+      "providers": 41
+    },
+    {
+      "field": "AboveGradeFinishedAreaSource",
+      "adoption": 0.045632286651952556,
+      "providers": 30
+    },
+    {
+      "field": "StreetAdditionalInfo",
+      "adoption": 0.04520107242657185,
+      "providers": 80
+    },
+    {
+      "field": "ListAgentDesignation",
+      "adoption": 0.04398779117305135,
+      "providers": 103
+    },
+    {
+      "field": "BuyerAgentHomePhone",
+      "adoption": 0.043946707025867254,
+      "providers": 119
+    },
+    {
+      "field": "VideosChangeTimestamp",
+      "adoption": 0.04379852806456805,
+      "providers": 148
+    },
+    {
+      "field": "GreenBuildingVerificationType",
+      "adoption": 0.04366975251687661,
+      "providers": 79
+    },
+    {
+      "field": "LeasableAreaUnits",
+      "adoption": 0.042888102834925376,
+      "providers": 30
+    },
+    {
+      "field": "ListPriceLow",
+      "adoption": 0.042298699665772495,
+      "providers": 47
+    },
+    {
+      "field": "ElectricOnPropertyYN",
+      "adoption": 0.04163318596914351,
+      "providers": 113
+    },
+    {
+      "field": "LeaseConsideredYN",
+      "adoption": 0.041029139705863964,
+      "providers": 113
+    },
+    {
+      "field": "GrossIncome",
+      "adoption": 0.04033970661061634,
+      "providers": 222
+    },
+    {
+      "field": "TaxTract",
+      "adoption": 0.04032878953981486,
+      "providers": 27
+    },
+    {
+      "field": "BedroomsPossible",
+      "adoption": 0.03915332416515069,
+      "providers": 26
+    },
+    {
+      "field": "CoListAgentURL",
+      "adoption": 0.03874508973251152,
+      "providers": 247
+    },
+    {
+      "field": "TaxParcelLetter",
+      "adoption": 0.038609926344826455,
+      "providers": 12
+    },
+    {
+      "field": "DevelopmentStatus",
+      "adoption": 0.038387279450542176,
+      "providers": 97
+    },
+    {
+      "field": "PrivateOfficeRemarks",
+      "adoption": 0.0382442181181506,
+      "providers": 68
+    },
+    {
+      "field": "MapCoordinate",
+      "adoption": 0.037595368281982594,
+      "providers": 24
+    },
+    {
+      "field": "CoListAgentMiddleName",
+      "adoption": 0.03659028148790654,
+      "providers": 212
+    },
+    {
+      "field": "NetOperatingIncome",
+      "adoption": 0.03636295734330102,
+      "providers": 210
+    },
+    {
+      "field": "OtherParking",
+      "adoption": 0.03609022439371091,
+      "providers": 55
+    },
+    {
+      "field": "BuyerAgentFax",
+      "adoption": 0.03501295479453303,
+      "providers": 149
+    },
+    {
+      "field": "GreenIndoorAirQuality",
+      "adoption": 0.03500115426228047,
+      "providers": 67
+    },
+    {
+      "field": "AssociationFee2",
+      "adoption": 0.03451972511267248,
+      "providers": 78
+    },
+    {
+      "field": "IrrigationSource",
+      "adoption": 0.03451718672536236,
+      "providers": 76
+    },
+    {
+      "field": "NumberOfLots",
+      "adoption": 0.03397233406628196,
+      "providers": 72
+    },
+    {
+      "field": "OpenParkingSpaces",
+      "adoption": 0.03296160665543226,
+      "providers": 62
+    },
+    {
+      "field": "YearBuiltEffective",
+      "adoption": 0.03267439746745193,
+      "providers": 63
+    },
+    {
+      "field": "GreenSustainability",
+      "adoption": 0.03190081430399803,
+      "providers": 45
+    },
+    {
+      "field": "CoListOfficeFax",
+      "adoption": 0.031514590901351176,
+      "providers": 167
+    },
+    {
+      "field": "BuildingName",
+      "adoption": 0.03103132167725269,
+      "providers": 88
+    },
+    {
+      "field": "BathroomsPartial",
+      "adoption": 0.030171168066774504,
+      "providers": 27
+    },
+    {
+      "field": "WithdrawnDate",
+      "adoption": 0.029844515738112243,
+      "providers": 228
+    },
+    {
+      "field": "Elevation",
+      "adoption": 0.028941425036181627,
+      "providers": 27
+    },
+    {
+      "field": "OperatingExpense",
+      "adoption": 0.02861831530047474,
+      "providers": 187
+    },
+    {
+      "field": "BelowGradeFinishedAreaSource",
+      "adoption": 0.028509663528905896,
+      "providers": 27
+    },
+    {
+      "field": "CoBuyerAgentAOR",
+      "adoption": 0.028101724603900122,
+      "providers": 58
+    },
+    {
+      "field": "BuyerAgentDesignation",
+      "adoption": 0.027866181038832764,
+      "providers": 104
+    },
+    {
+      "field": "InsuranceExpense",
+      "adoption": 0.027448709602871157,
+      "providers": 153
+    },
+    {
+      "field": "BuyerBrokerageCompensationType",
+      "adoption": 0.027326691419302704,
+      "providers": 10
+    },
+    {
+      "field": "ListingURL",
+      "adoption": 0.02713973079147515,
+      "providers": 12
+    },
+    {
+      "field": "LotDimensionsSource",
+      "adoption": 0.02653585443924927,
+      "providers": 22
+    },
+    {
+      "field": "Skirt",
+      "adoption": 0.02636940917834976,
+      "providers": 42
+    },
+    {
+      "field": "MaintenanceExpense",
+      "adoption": 0.02589325071038195,
+      "providers": 123
+    },
+    {
+      "field": "ShowingConsiderations",
+      "adoption": 0.02504997025460281,
+      "providers": 32
+    },
+    {
+      "field": "AdditionalParcelsYN",
+      "adoption": 0.024666921265251506,
+      "providers": 69
+    },
+    {
+      "field": "LeaseAmountFrequency",
+      "adoption": 0.024562910160990006,
+      "providers": 51
+    },
+    {
+      "field": "OperatingExpenseIncludes",
+      "adoption": 0.02392804653797073,
+      "providers": 75
+    },
+    {
+      "field": "CapRate",
+      "adoption": 0.023099842204885233,
+      "providers": 109
+    },
+    {
+      "field": "LandLeaseYN",
+      "adoption": 0.023024283798222817,
+      "providers": 123
+    },
+    {
+      "field": "ShowingAttendedYN",
+      "adoption": 0.022950567844710747,
+      "providers": 43
+    },
+    {
+      "field": "ElevationUnits",
+      "adoption": 0.022379564387566313,
+      "providers": 11
+    },
+    {
+      "field": "TaxOtherAnnualAssessmentAmount",
+      "adoption": 0.021044976938792943,
+      "providers": 51
+    },
+    {
+      "field": "TotalActualRent",
+      "adoption": 0.020884174861879396,
+      "providers": 123
+    },
+    {
+      "field": "PowerProductionType",
+      "adoption": 0.020708421833485768,
+      "providers": 42
+    },
+    {
+      "field": "ShowingServiceName",
+      "adoption": 0.020617670152278573,
+      "providers": 5
+    },
+    {
+      "field": "CancellationDate",
+      "adoption": 0.020487799588545602,
+      "providers": 78
+    },
+    {
+      "field": "StateRegion",
+      "adoption": 0.02024878033969289,
+      "providers": 5
+    },
+    {
+      "field": "BelowGradeUnfinishedArea",
+      "adoption": 0.02013724526105497,
+      "providers": 20
+    },
+    {
+      "field": "BuilderModel",
+      "adoption": 0.019487876882357886,
+      "providers": 46
+    },
+    {
+      "field": "DistanceToSchoolsUnits",
+      "adoption": 0.01885694467891252,
+      "providers": 7
+    },
+    {
+      "field": "OccupantPhone",
+      "adoption": 0.017769337798591706,
+      "providers": 41
+    },
+    {
+      "field": "WoodedArea",
+      "adoption": 0.01728684754530351,
+      "providers": 91
+    },
+    {
+      "field": "OtherExpense",
+      "adoption": 0.01723959971394022,
+      "providers": 97
+    },
+    {
+      "field": "ListAgentOfficePhoneExt",
+      "adoption": 0.017154426545590348,
+      "providers": 125
+    },
+    {
+      "field": "CoListAgentDesignation",
+      "adoption": 0.01696928969713075,
+      "providers": 101
+    },
+    {
+      "field": "GreenLocation",
+      "adoption": 0.016750985538729734,
+      "providers": 11
+    },
+    {
+      "field": "MobileLength",
+      "adoption": 0.016406468535586118,
+      "providers": 39
+    },
+    {
+      "field": "WaterSewerExpense",
+      "adoption": 0.016364565348013945,
+      "providers": 81
+    },
+    {
+      "field": "MobileWidth",
+      "adoption": 0.01632240647199861,
+      "providers": 39
+    },
+    {
+      "field": "LandLeaseAmount",
+      "adoption": 0.01610920798176121,
+      "providers": 58
+    },
+    {
+      "field": "NumberOfSeparateElectricMeters",
+      "adoption": 0.015945301671298682,
+      "providers": 47
+    },
+    {
+      "field": "IrrigationWaterRightsYN",
+      "adoption": 0.015755392838770418,
+      "providers": 38
+    },
+    {
+      "field": "ListOfficeNationalAssociationId",
+      "adoption": 0.015738996343149608,
+      "providers": 3
+    },
+    {
+      "field": "NumberOfSeparateGasMeters",
+      "adoption": 0.01529770959468877,
+      "providers": 41
+    },
+    {
+      "field": "BackOnMarketDate",
+      "adoption": 0.015238698484963027,
+      "providers": 28
+    },
+    {
+      "field": "AssociationFee2Frequency",
+      "adoption": 0.015229025253484487,
+      "providers": 62
+    },
+    {
+      "field": "UnitTypeType",
+      "adoption": 0.015115921895460457,
+      "providers": 14
+    },
+    {
+      "field": "CoBuyerAgentKey",
+      "adoption": 0.015078494651837799,
+      "providers": 218
+    },
+    {
+      "field": "GrossScheduledIncome",
+      "adoption": 0.015061508689166392,
+      "providers": 89
+    },
+    {
+      "field": "CoBuyerOfficeKey",
+      "adoption": 0.014966160724868798,
+      "providers": 215
+    },
+    {
+      "field": "CoBuyerAgentDesignation",
+      "adoption": 0.01450044774330649,
+      "providers": 99
+    },
+    {
+      "field": "LeaseRenewalCompensation",
+      "adoption": 0.013532633561755391,
+      "providers": 18
+    },
+    {
+      "field": "LeaseRenewalOptionYN",
+      "adoption": 0.0130781145416279,
+      "providers": 49
+    },
+    {
+      "field": "ListAgentPager",
+      "adoption": 0.013042946291008717,
+      "providers": 67
+    },
+    {
+      "field": "ElectricExpense",
+      "adoption": 0.012940694908501202,
+      "providers": 79
+    },
+    {
+      "field": "NewTaxesExpense",
+      "adoption": 0.01262232512164863,
+      "providers": 47
+    },
+    {
+      "field": "CoListAgentFax",
+      "adoption": 0.012540209733945018,
+      "providers": 157
+    },
+    {
+      "field": "AvailableLeaseType",
+      "adoption": 0.012154115053728775,
+      "providers": 9
+    },
+    {
+      "field": "StreetSuffixModifier",
+      "adoption": 0.01186380868704961,
+      "providers": 15
+    },
+    {
+      "field": "LeaseAmount",
+      "adoption": 0.011263530961031734,
+      "providers": 89
+    },
+    {
+      "field": "FinancialDataSource",
+      "adoption": 0.011193580444242186,
+      "providers": 40
+    },
+    {
+      "field": "WalkScore",
+      "adoption": 0.011125924850224799,
+      "providers": 11
+    },
+    {
+      "field": "StartShowingDate",
+      "adoption": 0.011032454680944584,
+      "providers": 22
+    },
+    {
+      "field": "FoundationArea",
+      "adoption": 0.010563802496795149,
+      "providers": 15
+    },
+    {
+      "field": "LeasableArea",
+      "adoption": 0.010317884836260135,
+      "providers": 75
+    },
+    {
+      "field": "PastureArea",
+      "adoption": 0.01025577822811011,
+      "providers": 66
+    },
+    {
+      "field": "CultivatedArea",
+      "adoption": 0.010211752969511443,
+      "providers": 76
+    },
+    {
+      "field": "CoBuyerAgentFullName",
+      "adoption": 0.010086237059950931,
+      "providers": 245
+    },
+    {
+      "field": "SpecialLicenses",
+      "adoption": 0.009368025271655435,
+      "providers": 46
+    },
+    {
+      "field": "BelowGradeUnfinishedAreaUnits",
+      "adoption": 0.009272388309711986,
+      "providers": 4
+    },
+    {
+      "field": "HoursDaysOfOperation",
+      "adoption": 0.009250311728706816,
+      "providers": 22
+    },
+    {
+      "field": "MobileDimUnits",
+      "adoption": 0.00921012891344383,
+      "providers": 6
+    },
+    {
+      "field": "CoBuyerAgentMlsId",
+      "adoption": 0.009133215504283605,
+      "providers": 255
+    },
+    {
+      "field": "CopyrightNotice",
+      "adoption": 0.009122948328267478,
+      "providers": 2
+    },
+    {
+      "field": "YearEstablished",
+      "adoption": 0.009054557025409086,
+      "providers": 56
+    },
+    {
+      "field": "NumberOfSeparateWaterMeters",
+      "adoption": 0.009014537599366393,
+      "providers": 44
+    },
+    {
+      "field": "NumberOfUnitsLeased",
+      "adoption": 0.008998790241607827,
+      "providers": 33
+    },
+    {
+      "field": "CoBuyerOfficeName",
+      "adoption": 0.008901511724416073,
+      "providers": 253
+    },
+    {
+      "field": "CoBuyerOfficeMlsId",
+      "adoption": 0.008886231567974924,
+      "providers": 255
+    },
+    {
+      "field": "BusinessName",
+      "adoption": 0.008758624276013635,
+      "providers": 155
+    },
+    {
+      "field": "TaxStatusCurrent",
+      "adoption": 0.008612277553821473,
+      "providers": 10
+    },
+    {
+      "field": "AboveGradeUnfinishedAreaUnits",
+      "adoption": 0.00860448106945726,
+      "providers": 4
+    },
+    {
+      "field": "IncomeIncludes",
+      "adoption": 0.008567373087820329,
+      "providers": 31
+    },
+    {
+      "field": "Model",
+      "adoption": 0.008324542449803603,
+      "providers": 72
+    },
+    {
+      "field": "ProfessionalManagementExpense",
+      "adoption": 0.00818048279871993,
+      "providers": 63
+    },
+    {
+      "field": "CoBuyerAgentFirstName",
+      "adoption": 0.008141645155671598,
+      "providers": 239
+    },
+    {
+      "field": "CoBuyerAgentLastName",
+      "adoption": 0.00813834266380401,
+      "providers": 239
+    },
+    {
+      "field": "DistanceToSewerComments",
+      "adoption": 0.007921180556633576,
+      "providers": 21
+    },
+    {
+      "field": "TrashExpense",
+      "adoption": 0.007873095488069082,
+      "providers": 59
+    },
+    {
+      "field": "CoBuyerOfficePhone",
+      "adoption": 0.007850978596640771,
+      "providers": 232
+    },
+    {
+      "field": "ShowingDays",
+      "adoption": 0.007847284729626898,
+      "providers": 7
+    },
+    {
+      "field": "FuelExpense",
+      "adoption": 0.007736309145584497,
+      "providers": 58
+    },
+    {
+      "field": "AssociationName2",
+      "adoption": 0.00764505088330415,
+      "providers": 26
+    },
+    {
+      "field": "NumberOfUnitsMoMo",
+      "adoption": 0.00747360363433712,
+      "providers": 9
+    },
+    {
+      "field": "LaborInformation",
+      "adoption": 0.007406364152038727,
+      "providers": 13
+    },
+    {
+      "field": "ListTeamName",
+      "adoption": 0.007049219445870171,
+      "providers": 38
+    },
+    {
+      "field": "CoBuyerAgentEmail",
+      "adoption": 0.006995518507069185,
+      "providers": 244
+    },
+    {
+      "field": "DistanceToWaterComments",
+      "adoption": 0.006691297375917532,
+      "providers": 25
+    },
+    {
+      "field": "YearsCurrentOwner",
+      "adoption": 0.006463244485655112,
+      "providers": 25
+    },
+    {
+      "field": "NumberOfUnitsVacant",
+      "adoption": 0.006404098460300508,
+      "providers": 21
+    },
+    {
+      "field": "CoBuyerOfficeEmail",
+      "adoption": 0.006359317551129988,
+      "providers": 221
+    },
+    {
+      "field": "CoBuyerAgentStateLicense",
+      "adoption": 0.006078447032411757,
+      "providers": 174
+    },
+    {
+      "field": "HabitableResidenceYN",
+      "adoption": 0.005989845054850947,
+      "providers": 40
+    },
+    {
+      "field": "AccessCode",
+      "adoption": 0.005951645628158407,
+      "providers": 31
+    },
+    {
+      "field": "CoBuyerAgentPreferredPhone",
+      "adoption": 0.005772133002770436,
+      "providers": 217
+    },
+    {
+      "field": "SuppliesExpense",
+      "adoption": 0.005718525497897501,
+      "providers": 24
+    },
+    {
+      "field": "RVParkingDimensions",
+      "adoption": 0.005693216056412279,
+      "providers": 11
+    },
+    {
+      "field": "SeatingCapacity",
+      "adoption": 0.0056316145761022484,
+      "providers": 27
+    },
+    {
+      "field": "ShowingStartTime",
+      "adoption": 0.005572857121858389,
+      "providers": 3
+    },
+    {
+      "field": "LicensesExpense",
+      "adoption": 0.00543751442663157,
+      "providers": 22
+    },
+    {
+      "field": "VacancyAllowanceRate",
+      "adoption": 0.005338356747887797,
+      "providers": 57
+    },
+    {
+      "field": "CoBuyerAgentMobilePhone",
+      "adoption": 0.004959031820432175,
+      "providers": 169
+    },
+    {
+      "field": "CoBuyerAgentOfficePhone",
+      "adoption": 0.00477944312776353,
+      "providers": 181
+    },
+    {
+      "field": "NumberOfPads",
+      "adoption": 0.004432781389028772,
+      "providers": 14
+    },
+    {
+      "field": "CoBuyerOfficeFax",
+      "adoption": 0.004415670100358257,
+      "providers": 158
+    },
+    {
+      "field": "DistanceToPhoneServiceComments",
+      "adoption": 0.004392103834033526,
+      "providers": 18
+    },
+    {
+      "field": "DistanceToElectricComments",
+      "adoption": 0.004344391965716316,
+      "providers": 27
+    },
+    {
+      "field": "CoBuyerOfficeURL",
+      "adoption": 0.004317171370878288,
+      "providers": 200
+    },
+    {
+      "field": "ShowingAdvanceNotice",
+      "adoption": 0.0043005796517019915,
+      "providers": 34
+    },
+    {
+      "field": "CoListOfficeNationalAssociationId",
+      "adoption": 0.004261978582046589,
+      "providers": 3
+    },
+    {
+      "field": "ParkName",
+      "adoption": 0.004237281295133305,
+      "providers": 45
+    },
+    {
+      "field": "LeaseExpiration",
+      "adoption": 0.004192061832623845,
+      "providers": 63
+    },
+    {
+      "field": "CropsIncludedYN",
+      "adoption": 0.0041485958527625036,
+      "providers": 26
+    },
+    {
+      "field": "DistanceToGasComments",
+      "adoption": 0.0038124011438980692,
+      "providers": 18
+    },
+    {
+      "field": "ListAgentVoiceMail",
+      "adoption": 0.0036279030305943465,
+      "providers": 52
+    },
+    {
+      "field": "IrrigationWaterRightsAcres",
+      "adoption": 0.0036110279014326166,
+      "providers": 18
+    },
+    {
+      "field": "Make",
+      "adoption": 0.0035395668713825057,
+      "providers": 60
+    },
+    {
+      "field": "CompensationComments",
+      "adoption": 0.003477890204642545,
+      "providers": 3
+    },
+    {
+      "field": "SerialU",
+      "adoption": 0.0034268092636661417,
+      "providers": 58
+    },
+    {
+      "field": "AssociationPhone2",
+      "adoption": 0.003341462975978804,
+      "providers": 17
+    },
+    {
+      "field": "CoBuyerAgentDirectPhone",
+      "adoption": 0.003112077186023547,
+      "providers": 150
+    },
+    {
+      "field": "CoBuyerAgentURL",
+      "adoption": 0.0031001409536221946,
+      "providers": 207
+    },
+    {
+      "field": "ListAgentPreferredPhoneExt",
+      "adoption": 0.00288769687606676,
+      "providers": 113
+    },
+    {
+      "field": "RangeArea",
+      "adoption": 0.0026622385687572934,
+      "providers": 11
+    },
+    {
+      "field": "BuyerAgentOfficePhoneExt",
+      "adoption": 0.0026494060333465174,
+      "providers": 117
+    },
+    {
+      "field": "DistanceToBusComments",
+      "adoption": 0.002626790999258902,
+      "providers": 12
+    },
+    {
+      "field": "VacancyAllowance",
+      "adoption": 0.00242524894163814,
+      "providers": 25
+    },
+    {
+      "field": "CoBuyerAgentMiddleName",
+      "adoption": 0.0023645565955337992,
+      "providers": 171
+    },
+    {
+      "field": "DualOrVariableRateCommissionYN",
+      "adoption": 0.0022585140639658544,
+      "providers": 4
+    },
+    {
+      "field": "ListOfficePhoneExt",
+      "adoption": 0.002163936973447964,
+      "providers": 61
+    },
+    {
+      "field": "DistanceToShoppingComments",
+      "adoption": 0.0020981578121995964,
+      "providers": 10
+    },
+    {
+      "field": "CoBuyerOfficeAOR",
+      "adoption": 0.0020158767088841187,
+      "providers": 55
+    },
+    {
+      "field": "BuyerAgentPager",
+      "adoption": 0.0019890057758650097,
+      "providers": 61
+    },
+    {
+      "field": "ListAgentTollFreePhone",
+      "adoption": 0.0019744501511051588,
+      "providers": 87
+    },
+    {
+      "field": "ListTeamKey",
+      "adoption": 0.0019488292710568077,
+      "providers": 13
+    },
+    {
+      "field": "ShowingEndTime",
+      "adoption": 0.001917213526753538,
+      "providers": 2
+    },
+    {
+      "field": "CoListAgentOfficePhoneExt",
+      "adoption": 0.0018429746569115807,
+      "providers": 109
+    },
+    {
+      "field": "CoBuyerAgentFax",
+      "adoption": 0.00160935134913621,
+      "providers": 133
+    },
+    {
+      "field": "SerialXX",
+      "adoption": 0.001570846150291975,
+      "providers": 14
+    },
+    {
+      "field": "BuyerAgentPreferredPhoneExt",
+      "adoption": 0.0015418244218309523,
+      "providers": 104
+    },
+    {
+      "field": "ListAgentVoiceMailExt",
+      "adoption": 0.001488909267362731,
+      "providers": 8
+    },
+    {
+      "field": "BuyerAgentVoiceMail",
+      "adoption": 0.001469688676507972,
+      "providers": 50
+    },
+    {
+      "field": "NumberOfFullTimeEmployees",
+      "adoption": 0.0014033307830588937,
+      "providers": 35
+    },
+    {
+      "field": "LandLeaseAmountFrequency",
+      "adoption": 0.0012851035224854634,
+      "providers": 24
+    },
+    {
+      "field": "License1",
+      "adoption": 0.0012446392586806397,
+      "providers": 25
+    },
+    {
+      "field": "BuyerAgentNationalAssociationId",
+      "adoption": 0.001212638878286198,
+      "providers": 3
+    },
+    {
+      "field": "BuyerOfficeNationalAssociationId",
+      "adoption": 0.0012121019065116927,
+      "providers": 3
+    },
+    {
+      "field": "DOH1",
+      "adoption": 0.0011636169517589086,
+      "providers": 27
+    },
+    {
+      "field": "CoBuyerAgentHomePhone",
+      "adoption": 0.0011569233598358892,
+      "providers": 83
+    },
+    {
+      "field": "AboveGradeUnfinishedArea",
+      "adoption": 0.0011243846175523105,
+      "providers": 13
+    },
+    {
+      "field": "ParkManagerName",
+      "adoption": 0.0011050144050848752,
+      "providers": 22
+    },
+    {
+      "field": "RentControlYN",
+      "adoption": 0.001095548681912028,
+      "providers": 14
+    },
+    {
+      "field": "SerialX",
+      "adoption": 0.0009245633437152477,
+      "providers": 21
+    },
+    {
+      "field": "CarrierRoute",
+      "adoption": 0.0009245474067184734,
+      "providers": 3
+    },
+    {
+      "field": "HoursDaysOfOperationDescription",
+      "adoption": 0.0008967906060303844,
+      "providers": 17
+    },
+    {
+      "field": "BuyerAgentTollFreePhone",
+      "adoption": 0.0008783423621734518,
+      "providers": 87
+    },
+    {
+      "field": "ParkManagerPhone",
+      "adoption": 0.0008703390016393804,
+      "providers": 22
+    },
+    {
+      "field": "DistanceToFreewayNumeric",
+      "adoption": 0.0008577063392044751,
+      "providers": 8
+    },
+    {
+      "field": "MobileHomeRemainsYN",
+      "adoption": 0.0008246881034562187,
+      "providers": 11
+    },
+    {
+      "field": "ManagerExpense",
+      "adoption": 0.0007727343932218414,
+      "providers": 53
+    },
+    {
+      "field": "ShowingContactPhoneExt",
+      "adoption": 0.0007716974948564936,
+      "providers": 7
+    },
+    {
+      "field": "BelowGradeUnfinishedAreaSource",
+      "adoption": 0.0006504528301886792,
+      "providers": 1
+    },
+    {
+      "field": "CoListAgentPager",
+      "adoption": 0.0006211660906878942,
+      "providers": 53
+    },
+    {
+      "field": "LeaseAssignableYN",
+      "adoption": 0.0006052465029621928,
+      "providers": 22
+    },
+    {
+      "field": "AnchorsCoTenants",
+      "adoption": 0.0006041033010176565,
+      "providers": 18
+    },
+    {
+      "field": "GardenerExpense",
+      "adoption": 0.00046684711713885764,
+      "providers": 16
+    },
+    {
+      "field": "CoListAgentVoiceMail",
+      "adoption": 0.0004628655459317539,
+      "providers": 38
+    },
+    {
+      "field": "DistanceToStreetComments",
+      "adoption": 0.0004508882138360783,
+      "providers": 7
+    },
+    {
+      "field": "DOH2",
+      "adoption": 0.00044766069751630194,
+      "providers": 14
+    },
+    {
+      "field": "License2",
+      "adoption": 0.0004287208401646813,
+      "providers": 14
+    },
+    {
+      "field": "CoListOfficePhoneExt",
+      "adoption": 0.00042061938444438513,
+      "providers": 27
+    },
+    {
+      "field": "UnitsFurnished",
+      "adoption": 0.0003580524355558801,
+      "providers": 21
+    },
+    {
+      "field": "LandLeaseExpirationDate",
+      "adoption": 0.00033307380456711625,
+      "providers": 18
+    },
+    {
+      "field": "BuyerTeamName",
+      "adoption": 0.0003315954953738146,
+      "providers": 22
+    },
+    {
+      "field": "CoListAgentVoiceMailExt",
+      "adoption": 0.00025528812492307796,
+      "providers": 2
+    },
+    {
+      "field": "CoBuyerAgentNationalAssociationId",
+      "adoption": 0.00022947214421635217,
+      "providers": 1
+    },
+    {
+      "field": "CoBuyerOfficeNationalAssociationId",
+      "adoption": 0.00022947214421635217,
+      "providers": 1
+    },
+    {
+      "field": "BuyerOfficePhoneExt",
+      "adoption": 0.0002267357337119838,
+      "providers": 63
+    },
+    {
+      "field": "CoListAgentTollFreePhone",
+      "adoption": 0.0002201990497947477,
+      "providers": 68
+    },
+    {
+      "field": "CoListAgentPreferredPhoneExt",
+      "adoption": 0.00021084371849418694,
+      "providers": 84
+    },
+    {
+      "field": "CountryRegion",
+      "adoption": 0.0001581958422455784,
+      "providers": 4
+    },
+    {
+      "field": "BuyerTeamKey",
+      "adoption": 0.00014256017802300166,
+      "providers": 9
+    },
+    {
+      "field": "DistanceToStreetNumeric",
+      "adoption": 0.00012233242201713552,
+      "providers": 4
+    },
+    {
+      "field": "CompSaleYN",
+      "adoption": 0.00011841872300290401,
+      "providers": 10
+    },
+    {
+      "field": "NumberOfPartTimeEmployees",
+      "adoption": 0.00009897933311992207,
+      "providers": 23
+    },
+    {
+      "field": "PestControlExpense",
+      "adoption": 0.00008810373262006559,
+      "providers": 10
+    },
+    {
+      "field": "CoBuyerAgentOfficePhoneExt",
+      "adoption": 0.00007277054684762755,
+      "providers": 87
+    },
+    {
+      "field": "CoBuyerAgentPager",
+      "adoption": 0.00006825473321585541,
+      "providers": 38
+    },
+    {
+      "field": "DistanceToFreewayComments",
+      "adoption": 0.0000609627333474878,
+      "providers": 8
+    },
+    {
+      "field": "ListAgentNameSuffix",
+      "adoption": 0.00005753246753246753,
+      "providers": 2
+    },
+    {
+      "field": "DOH3",
+      "adoption": 0.000048397703704501345,
+      "providers": 12
+    },
+    {
+      "field": "CableTvExpense",
+      "adoption": 0.00004636226649613081,
+      "providers": 13
+    },
+    {
+      "field": "DistanceToSchoolsNumeric",
+      "adoption": 0.00004476552772227436,
+      "providers": 6
+    },
+    {
+      "field": "AboveGradeUnfinishedAreaSource",
+      "adoption": 0.000041452830188679245,
+      "providers": 1
+    },
+    {
+      "field": "License3",
+      "adoption": 0.000035477095397542357,
+      "providers": 8
+    },
+    {
+      "field": "CoBuyerAgentVoiceMail",
+      "adoption": 0.000034652941500203286,
+      "providers": 39
+    },
+    {
+      "field": "DistanceToBusNumeric",
+      "adoption": 0.00003294548337180103,
+      "providers": 3
+    },
+    {
+      "field": "BuyerAgentNameSuffix",
+      "adoption": 0.000029330855018587366,
+      "providers": 2
+    },
+    {
+      "field": "DistanceToSchoolsComments",
+      "adoption": 0.000026064447554935325,
+      "providers": 7
+    },
+    {
+      "field": "CoBuyerAgentTollFreePhone",
+      "adoption": 0.000025258853550144953,
+      "providers": 50
+    },
+    {
+      "field": "CoBuyerAgentPreferredPhoneExt",
+      "adoption": 0.000024208835739528617,
+      "providers": 63
+    },
+    {
+      "field": "GreenVerificationYN",
+      "adoption": 0.000022504148845980026,
+      "providers": 2
+    },
+    {
+      "field": "CoListAgentNameSuffix",
+      "adoption": 0.000018038936428844358,
+      "providers": 3
+    },
+    {
+      "field": "DistanceToPlaceofWorshipComments",
+      "adoption": 0.000013279368249339821,
+      "providers": 4
+    },
+    {
+      "field": "GrazingPermitsPrivateYN",
+      "adoption": 0.000012185513678646702,
+      "providers": 7
+    },
+    {
+      "field": "PoolExpense",
+      "adoption": 0.000010496233728053112,
+      "providers": 5
+    },
+    {
+      "field": "GrazingPermitsBlmYN",
+      "adoption": 0.000009752796989378762,
+      "providers": 5
+    },
+    {
+      "field": "DistanceToWaterNumeric",
+      "adoption": 0.000009012953247597383,
+      "providers": 4
+    },
+    {
+      "field": "BuyerAgentVoiceMailExt",
+      "adoption": 0.000008689331641937646,
+      "providers": 9
+    },
+    {
+      "field": "WorkmansCompensationExpense",
+      "adoption": 0.000008683643501986765,
+      "providers": 4
+    },
+    {
+      "field": "GrazingPermitsForestServiceYN",
+      "adoption": 0.000008614692040106404,
+      "providers": 2
+    },
+    {
+      "field": "DistanceToSchoolBusComments",
+      "adoption": 0.000008515103206307416,
+      "providers": 3
+    },
+    {
+      "field": "DistanceToBusUnits",
+      "adoption": 0.000007345346975501757,
+      "providers": 2
+    },
+    {
+      "field": "DistanceToShoppingNumeric",
+      "adoption": 0.000007035593410163878,
+      "providers": 2
+    },
+    {
+      "field": "DistanceToShoppingUnits",
+      "adoption": 0.000007033183841028944,
+      "providers": 2
+    },
+    {
+      "field": "FarmLandAreaSource",
+      "adoption": 0.000006877323420074349,
+      "providers": 2
+    },
+    {
+      "field": "FarmCreditServiceInclYN",
+      "adoption": 0.000006823335394763966,
+      "providers": 2
+    },
+    {
+      "field": "CoBuyerAgentNameSuffix",
+      "adoption": 0.00000645666181179764,
+      "providers": 3
+    },
+    {
+      "field": "DistanceToFreewayUnits",
+      "adoption": 0.000006375936589338549,
+      "providers": 2
+    },
+    {
+      "field": "DistanceToPlaceofWorshipNumeric",
+      "adoption": 0.000005991202725612264,
+      "providers": 2
+    },
+    {
+      "field": "DistanceToSewerNumeric",
+      "adoption": 0.000005948401500821731,
+      "providers": 3
+    },
+    {
+      "field": "DistanceToPlaceofWorshipUnits",
+      "adoption": 0.000005845739190886048,
+      "providers": 2
+    },
+    {
+      "field": "DistanceToGasNumeric",
+      "adoption": 0.000005784420433648564,
+      "providers": 2
+    },
+    {
+      "field": "DistanceToGasUnits",
+      "adoption": 0.000005704344584414172,
+      "providers": 2
+    },
+    {
+      "field": "DistanceToWaterUnits",
+      "adoption": 0.000005626679507292751,
+      "providers": 2
+    },
+    {
+      "field": "DistanceToElectricUnits",
+      "adoption": 0.000005550878392022243,
+      "providers": 2
+    },
+    {
+      "field": "DistanceToSewerUnits",
+      "adoption": 0.000005550878392022243,
+      "providers": 2
+    },
+    {
+      "field": "FurnitureReplacementExpense",
+      "adoption": 0.000005503811032047196,
+      "providers": 5
+    },
+    {
+      "field": "DistanceToElectricNumeric",
+      "adoption": 0.0000054935615651066334,
+      "providers": 2
+    },
+    {
+      "field": "UniversalPropertySubId",
+      "adoption": 0.000005451127819548872,
+      "providers": 1
+    },
+    {
+      "field": "DistanceToSchoolBusNumeric",
+      "adoption": 0.000005448522129820621,
+      "providers": 2
+    },
+    {
+      "field": "DistanceToStreetUnits",
+      "adoption": 0.000005409689591259911,
+      "providers": 2
+    },
+    {
+      "field": "DistanceToSchoolBusUnits",
+      "adoption": 0.000005401120689220427,
+      "providers": 2
+    },
+    {
+      "field": "ContinentRegion",
+      "adoption": 0.000005400372439478584,
+      "providers": 1
+    },
+    {
+      "field": "BuyerAgentNamePrefix",
+      "adoption": 0.000005390334572490706,
+      "providers": 1
+    },
+    {
+      "field": "CoBuyerAgentNamePrefix",
+      "adoption": 0.000005390334572490706,
+      "providers": 1
+    },
+    {
+      "field": "MapURL",
+      "adoption": 0.000005390334572490706,
+      "providers": 1
+    },
+    {
+      "field": "CoListAgentNamePrefix",
+      "adoption": 0.000005380333951762523,
+      "providers": 1
+    },
+    {
+      "field": "DistanceToPhoneServiceNumeric",
+      "adoption": 0.000005380333951762523,
+      "providers": 1
+    },
+    {
+      "field": "DistanceToPhoneServiceUnits",
+      "adoption": 0.000005380333951762523,
+      "providers": 1
+    },
+    {
+      "field": "ListAgentNamePrefix",
+      "adoption": 0.000005380333951762523,
+      "providers": 1
+    },
+    {
+      "field": "CoBuyerOfficePhoneExt",
+      "adoption": 0.000004800275742374923,
+      "providers": 20
+    },
+    {
+      "field": "PowerProductionYN",
+      "adoption": 5.031412998127182e-8,
+      "providers": 1
+    },
+    {
+      "field": "CoBuyerAgentVoiceMailExt",
+      "adoption": 4.107870703380343e-8,
+      "providers": 2
+    }
+  ],
+  "Association": [
+    {
+      "field": "AssociationKey",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "AssociationName",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OriginalEntryTimestamp",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OriginatingSystemAssociationKey",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OriginatingSystemId",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OriginatingSystemName",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "SourceSystemAssociationKey",
+      "adoption": 1,
+      "providers": 1
+    }
+  ],
+  "Contacts": [
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "ContactKey",
+      "adoption": 0.2,
+      "providers": 1
+    }
+  ],
+  "EntityEvent": [
+    {
+      "field": "EntityEventSequence",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "ResourceName",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "ResourceRecordKey",
+      "adoption": 1,
+      "providers": 1
+    }
+  ],
+  "Field": [
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 0.8779372599054754,
+      "providers": 8
+    },
+    {
+      "field": "FieldKey",
+      "adoption": 0.3076923076923077,
+      "providers": 8
+    },
+    {
+      "field": "FieldName",
+      "adoption": 0.3076923076923077,
+      "providers": 8
+    },
+    {
+      "field": "ResourceName",
+      "adoption": 0.28,
+      "providers": 7
+    }
+  ],
+  "HistoryTransactional": [
+    {
+      "field": "EntityEventSequence",
+      "adoption": 1,
+      "providers": 36
+    },
+    {
+      "field": "FieldKey",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "HistoryTransactionalKey",
+      "adoption": 1,
+      "providers": 40
+    },
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 1,
+      "providers": 41
+    },
+    {
+      "field": "ResourceName",
+      "adoption": 1,
+      "providers": 39
+    },
+    {
+      "field": "SourceSystemHistoryKey",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "SourceSystemID",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "SourceSystemName",
+      "adoption": 1,
+      "providers": 2
+    },
+    {
+      "field": "OriginatingSystemName",
+      "adoption": 0.9999983333333334,
+      "providers": 4
+    },
+    {
+      "field": "ChangedByMemberID",
+      "adoption": 0.9999800000000001,
+      "providers": 2
+    },
+    {
+      "field": "ChangedByMemberKey",
+      "adoption": 0.9999152319873289,
+      "providers": 38
+    },
+    {
+      "field": "ResourceRecordID",
+      "adoption": 0.9978400000000001,
+      "providers": 2
+    },
+    {
+      "field": "ResourceRecordKey",
+      "adoption": 0.9902939293154288,
+      "providers": 40
+    },
+    {
+      "field": "ChangeType",
+      "adoption": 0.9812475030427692,
+      "providers": 40
+    },
+    {
+      "field": "NewValue",
+      "adoption": 0.8183886189772446,
+      "providers": 40
+    },
+    {
+      "field": "OriginatingSystemID",
+      "adoption": 0.8,
+      "providers": 2
+    },
+    {
+      "field": "OriginatingSystemHistoryKey",
+      "adoption": 0.6666666666666666,
+      "providers": 2
+    },
+    {
+      "field": "FieldName",
+      "adoption": 0.57576100585908,
+      "providers": 40
+    },
+    {
+      "field": "PreviousValue",
+      "adoption": 0.37065464605612786,
+      "providers": 40
+    }
+  ],
+  "Lookup": [
+    {
+      "field": "LookupKey",
+      "adoption": 0.9447004608294931,
+      "providers": 166
+    },
+    {
+      "field": "LookupName",
+      "adoption": 0.9447004608294931,
+      "providers": 166
+    },
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 0.9447004608294931,
+      "providers": 166
+    },
+    {
+      "field": "LookupValue",
+      "adoption": 0.9446908049284355,
+      "providers": 166
+    },
+    {
+      "field": "LegacyODataValue",
+      "adoption": 0.7455471095948495,
+      "providers": 127
+    },
+    {
+      "field": "StandardLookupValue",
+      "adoption": 0.2748282381797132,
+      "providers": 164
+    }
+  ],
+  "Media": [
+    {
+      "field": "ResourceName",
+      "adoption": 0.9789473684210527,
+      "providers": 89
+    },
+    {
+      "field": "SourceSystemID",
+      "adoption": 0.9772727272727273,
+      "providers": 80
+    },
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 0.973568281938326,
+      "providers": 118
+    },
+    {
+      "field": "OriginatingSystemName",
+      "adoption": 0.961352657004831,
+      "providers": 102
+    },
+    {
+      "field": "MediaType",
+      "adoption": 0.9519482378322098,
+      "providers": 111
+    },
+    {
+      "field": "OriginatingSystemResourceRecordKey",
+      "adoption": 0.9305189504987034,
+      "providers": 78
+    },
+    {
+      "field": "MediaModificationTimestamp",
+      "adoption": 0.9287598775510204,
+      "providers": 114
+    },
+    {
+      "field": "MediaObjectID",
+      "adoption": 0.8457809541934894,
+      "providers": 83
+    },
+    {
+      "field": "MediaURL",
+      "adoption": 0.7333662350003212,
+      "providers": 175
+    },
+    {
+      "field": "MediaKey",
+      "adoption": 0.7281947261663286,
+      "providers": 165
+    },
+    {
+      "field": "ResourceRecordKey",
+      "adoption": 0.6956354193519967,
+      "providers": 172
+    },
+    {
+      "field": "ResourceRecordID",
+      "adoption": 0.6767886789608418,
+      "providers": 147
+    },
+    {
+      "field": "Order",
+      "adoption": 0.6722482910596106,
+      "providers": 174
+    },
+    {
+      "field": "OriginatingSystemMediaKey",
+      "adoption": 0.6438970132851866,
+      "providers": 127
+    },
+    {
+      "field": "MediaCategory",
+      "adoption": 0.4178486423479553,
+      "providers": 102
+    },
+    {
+      "field": "ShortDescription",
+      "adoption": 0.3213094293482922,
+      "providers": 128
+    },
+    {
+      "field": "ImageHeight",
+      "adoption": 0.2636660365359082,
+      "providers": 49
+    },
+    {
+      "field": "ImageWidth",
+      "adoption": 0.2636660365359082,
+      "providers": 49
+    },
+    {
+      "field": "Permission",
+      "adoption": 0.23427685127692777,
+      "providers": 87
+    },
+    {
+      "field": "SourceSystemMediaKey",
+      "adoption": 0.19854851311879565,
+      "providers": 23
+    },
+    {
+      "field": "ImageSizeDescription",
+      "adoption": 0.19517484210555178,
+      "providers": 36
+    },
+    {
+      "field": "OriginatingSystemID",
+      "adoption": 0.1578007875570546,
+      "providers": 29
+    },
+    {
+      "field": "PreferredPhotoYN",
+      "adoption": 0.14278078543132078,
+      "providers": 50
+    },
+    {
+      "field": "MediaStatus",
+      "adoption": 0.1379777375144704,
+      "providers": 23
+    },
+    {
+      "field": "ClassName",
+      "adoption": 0.12975585064009393,
+      "providers": 26
+    },
+    {
+      "field": "ImageOf",
+      "adoption": 0.11891243480916522,
+      "providers": 44
+    },
+    {
+      "field": "LongDescription",
+      "adoption": 0.11883088654895689,
+      "providers": 164
+    },
+    {
+      "field": "SourceSystemName",
+      "adoption": 0.011363636363636364,
+      "providers": 2
+    },
+    {
+      "field": "OriginatingSystemResourceRecordId",
+      "adoption": 0.010341737909037951,
+      "providers": 5
+    },
+    {
+      "field": "MediaAlteration",
+      "adoption": 0.00582660326405014,
+      "providers": 5
+    },
+    {
+      "field": "ChangedByMemberID",
+      "adoption": 0.005747126436781609,
+      "providers": 1
+    },
+    {
+      "field": "ChangedByMemberKey",
+      "adoption": 0.005714285714285714,
+      "providers": 1
+    },
+    {
+      "field": "MediaHTML",
+      "adoption": 0.00000659681930930676,
+      "providers": 1
+    }
+  ],
+  "Member": [
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 0.979495770802218,
+      "providers": 338
+    },
+    {
+      "field": "MemberFirstName",
+      "adoption": 0.9770414047840168,
+      "providers": 339
+    },
+    {
+      "field": "MemberMlsId",
+      "adoption": 0.9765546736844941,
+      "providers": 331
+    },
+    {
+      "field": "MemberStatus",
+      "adoption": 0.9735663613958305,
+      "providers": 319
+    },
+    {
+      "field": "MemberKey",
+      "adoption": 0.9734977265055798,
+      "providers": 333
+    },
+    {
+      "field": "MemberLastName",
+      "adoption": 0.9725471422150426,
+      "providers": 338
+    },
+    {
+      "field": "OriginatingSystemMemberKey",
+      "adoption": 0.9703351865496239,
+      "providers": 300
+    },
+    {
+      "field": "SourceSystemID",
+      "adoption": 0.9664040600818686,
+      "providers": 201
+    },
+    {
+      "field": "OfficeKey",
+      "adoption": 0.9650550041891229,
+      "providers": 262
+    },
+    {
+      "field": "OfficeMlsId",
+      "adoption": 0.9581475010036645,
+      "providers": 323
+    },
+    {
+      "field": "OfficeName",
+      "adoption": 0.950417792280238,
+      "providers": 250
+    },
+    {
+      "field": "MemberFullName",
+      "adoption": 0.9413366123906107,
+      "providers": 317
+    },
+    {
+      "field": "OriginatingSystemName",
+      "adoption": 0.9244775663114109,
+      "providers": 318
+    },
+    {
+      "field": "MemberEmail",
+      "adoption": 0.9210252404196245,
+      "providers": 337
+    },
+    {
+      "field": "SourceSystemMemberKey",
+      "adoption": 0.8896556662691392,
+      "providers": 196
+    },
+    {
+      "field": "MemberType",
+      "adoption": 0.8347365762848952,
+      "providers": 301
+    },
+    {
+      "field": "MemberPostalCode",
+      "adoption": 0.8288680904909477,
+      "providers": 325
+    },
+    {
+      "field": "MemberCity",
+      "adoption": 0.8282206020727461,
+      "providers": 325
+    },
+    {
+      "field": "MemberStateOrProvince",
+      "adoption": 0.8219781290100692,
+      "providers": 326
+    },
+    {
+      "field": "MemberAddress1",
+      "adoption": 0.8148795592243597,
+      "providers": 313
+    },
+    {
+      "field": "MemberMlsSecurityClass",
+      "adoption": 0.7804739561093554,
+      "providers": 160
+    },
+    {
+      "field": "MemberPreferredPhone",
+      "adoption": 0.7669658672371235,
+      "providers": 293
+    },
+    {
+      "field": "MemberNationalAssociationId",
+      "adoption": 0.7507754003844004,
+      "providers": 313
+    },
+    {
+      "field": "MemberAOR",
+      "adoption": 0.749844182904255,
+      "providers": 108
+    },
+    {
+      "field": "MemberStateLicense",
+      "adoption": 0.740603925655501,
+      "providers": 316
+    },
+    {
+      "field": "MemberDirectPhone",
+      "adoption": 0.7211997097528793,
+      "providers": 113
+    },
+    {
+      "field": "OriginatingSystemID",
+      "adoption": 0.6757708663619173,
+      "providers": 247
+    },
+    {
+      "field": "MemberLoginId",
+      "adoption": 0.6648478346175147,
+      "providers": 193
+    },
+    {
+      "field": "OriginalEntryTimestamp",
+      "adoption": 0.6258130565445402,
+      "providers": 256
+    },
+    {
+      "field": "MemberMobilePhone",
+      "adoption": 0.6122018929494402,
+      "providers": 303
+    },
+    {
+      "field": "MemberOfficePhone",
+      "adoption": 0.5677893700594643,
+      "providers": 234
+    },
+    {
+      "field": "SourceSystemName",
+      "adoption": 0.4645380249278718,
+      "providers": 136
+    },
+    {
+      "field": "MemberOtherPhone",
+      "adoption": 0.4561845102195233,
+      "providers": 1
+    },
+    {
+      "field": "MemberCountry",
+      "adoption": 0.4025967169639066,
+      "providers": 108
+    },
+    {
+      "field": "MemberHomePhone",
+      "adoption": 0.3016519344658955,
+      "providers": 179
+    },
+    {
+      "field": "MemberMlsAccessYN",
+      "adoption": 0.29303472571449046,
+      "providers": 71
+    },
+    {
+      "field": "MemberNickname",
+      "adoption": 0.2658385262453712,
+      "providers": 73
+    },
+    {
+      "field": "MemberMiddleName",
+      "adoption": 0.23100287968559766,
+      "providers": 264
+    },
+    {
+      "field": "MemberFax",
+      "adoption": 0.2219625036211874,
+      "providers": 248
+    },
+    {
+      "field": "MemberDesignation",
+      "adoption": 0.21677480610730956,
+      "providers": 169
+    },
+    {
+      "field": "MemberAORMlsId",
+      "adoption": 0.21420505056857458,
+      "providers": 49
+    },
+    {
+      "field": "MemberLanguages",
+      "adoption": 0.2127305498535515,
+      "providers": 157
+    },
+    {
+      "field": "MemberAORkey",
+      "adoption": 0.20783865216172032,
+      "providers": 44
+    },
+    {
+      "field": "MemberStateLicenseState",
+      "adoption": 0.12758548115495005,
+      "providers": 54
+    },
+    {
+      "field": "Media",
+      "adoption": 0.0990131741302457,
+      "providers": 26
+    },
+    {
+      "field": "MemberAddress2",
+      "adoption": 0.09413576313967728,
+      "providers": 285
+    },
+    {
+      "field": "MemberPassword",
+      "adoption": 0.08854474666917975,
+      "providers": 6
+    },
+    {
+      "field": "JobTitle",
+      "adoption": 0.05702669052073877,
+      "providers": 18
+    },
+    {
+      "field": "MemberOfficePhoneExt",
+      "adoption": 0.05394315788169129,
+      "providers": 156
+    },
+    {
+      "field": "SyndicateTo",
+      "adoption": 0.05392059669653475,
+      "providers": 6
+    },
+    {
+      "field": "MemberAssociationComments",
+      "adoption": 0.053907417078823544,
+      "providers": 38
+    },
+    {
+      "field": "MemberTransferDate",
+      "adoption": 0.05060969406159537,
+      "providers": 11
+    },
+    {
+      "field": "MemberNamePrefix",
+      "adoption": 0.048317582589639654,
+      "providers": 52
+    },
+    {
+      "field": "MemberAlternateId",
+      "adoption": 0.038150813606545965,
+      "providers": 9
+    },
+    {
+      "field": "MemberCarrierRoute",
+      "adoption": 0.03699830077243049,
+      "providers": 10
+    },
+    {
+      "field": "MemberPostalCodePlus4",
+      "adoption": 0.03371168332422275,
+      "providers": 149
+    },
+    {
+      "field": "MemberStateLicenseType",
+      "adoption": 0.033674327003842944,
+      "providers": 9
+    },
+    {
+      "field": "MemberBio",
+      "adoption": 0.029366987050214774,
+      "providers": 39
+    },
+    {
+      "field": "MemberOtherPhoneType",
+      "adoption": 0.028992953497840878,
+      "providers": 2
+    },
+    {
+      "field": "SocialMediaType",
+      "adoption": 0.025987495449344703,
+      "providers": 7
+    },
+    {
+      "field": "MemberStateLicenseExpirationDate",
+      "adoption": 0.024096385542168676,
+      "providers": 1
+    },
+    {
+      "field": "OfficeNationalAssociationId",
+      "adoption": 0.020366799831183436,
+      "providers": 3
+    },
+    {
+      "field": "MemberPager",
+      "adoption": 0.017816370158894042,
+      "providers": 81
+    },
+    {
+      "field": "LastLoginTimestamp",
+      "adoption": 0.01557647139035891,
+      "providers": 8
+    },
+    {
+      "field": "MemberNationalAssociationEntryDate",
+      "adoption": 0.013632973476380691,
+      "providers": 3
+    },
+    {
+      "field": "MemberCountyOrParish",
+      "adoption": 0.00992557491215166,
+      "providers": 17
+    },
+    {
+      "field": "MemberPrimaryAorId",
+      "adoption": 0.007169266468624236,
+      "providers": 4
+    },
+    {
+      "field": "MemberNameSuffix",
+      "adoption": 0.004452790598736566,
+      "providers": 69
+    },
+    {
+      "field": "MemberPreferredPhoneExt",
+      "adoption": 0.004329442636629378,
+      "providers": 130
+    },
+    {
+      "field": "MemberVoiceMail",
+      "adoption": 0.003259914524260677,
+      "providers": 11
+    },
+    {
+      "field": "MemberIsAssistantTo",
+      "adoption": 0.0021711695175067737,
+      "providers": 10
+    },
+    {
+      "field": "MemberTollFreePhone",
+      "adoption": 0.002167179891500086,
+      "providers": 84
+    },
+    {
+      "field": "MemberVoiceMailExt",
+      "adoption": 0.0012121737357747365,
+      "providers": 4
+    }
+  ],
+  "MemberAssociation": [
+    {
+      "field": "MemberAssociationStatusDate",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 1,
+      "providers": 18
+    },
+    {
+      "field": "OriginatingSystemMemberKey",
+      "adoption": 1,
+      "providers": 2
+    },
+    {
+      "field": "MemberMlsId",
+      "adoption": 0.9915207872632933,
+      "providers": 17
+    },
+    {
+      "field": "MemberAssociationStatus",
+      "adoption": 0.978102500287109,
+      "providers": 1
+    },
+    {
+      "field": "MemberKey",
+      "adoption": 0.9130434782608695,
+      "providers": 19
+    }
+  ],
+  "Office": [
+    {
+      "field": "MainOffice",
+      "adoption": 0.9989971586160789,
+      "providers": 1
+    },
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 0.9866513559694802,
+      "providers": 342
+    },
+    {
+      "field": "OfficeName",
+      "adoption": 0.9861040740318573,
+      "providers": 343
+    },
+    {
+      "field": "OfficeKey",
+      "adoption": 0.9827297873420292,
+      "providers": 340
+    },
+    {
+      "field": "OfficeMlsId",
+      "adoption": 0.9783382605940262,
+      "providers": 333
+    },
+    {
+      "field": "OfficeStatus",
+      "adoption": 0.976417059049287,
+      "providers": 304
+    },
+    {
+      "field": "OriginatingSystemOfficeKey",
+      "adoption": 0.9762949302233401,
+      "providers": 305
+    },
+    {
+      "field": "SourceSystemID",
+      "adoption": 0.9747515753253306,
+      "providers": 202
+    },
+    {
+      "field": "OriginatingSystemName",
+      "adoption": 0.9365985616953535,
+      "providers": 320
+    },
+    {
+      "field": "OfficePostalCode",
+      "adoption": 0.9339163846777623,
+      "providers": 337
+    },
+    {
+      "field": "OfficeAddress1",
+      "adoption": 0.9338778094536778,
+      "providers": 338
+    },
+    {
+      "field": "OfficeCity",
+      "adoption": 0.9319438242120572,
+      "providers": 338
+    },
+    {
+      "field": "OfficePhone",
+      "adoption": 0.9311976256253449,
+      "providers": 336
+    },
+    {
+      "field": "OfficeStateOrProvince",
+      "adoption": 0.9168590840067026,
+      "providers": 336
+    },
+    {
+      "field": "MainOfficeKey",
+      "adoption": 0.9100635119128687,
+      "providers": 245
+    },
+    {
+      "field": "MainOfficeMlsId",
+      "adoption": 0.9070967732681504,
+      "providers": 242
+    },
+    {
+      "field": "SourceSystemOfficeKey",
+      "adoption": 0.8876701932359772,
+      "providers": 198
+    },
+    {
+      "field": "OfficeAOR",
+      "adoption": 0.7862538894130716,
+      "providers": 104
+    },
+    {
+      "field": "OfficeEmail",
+      "adoption": 0.7065912317607678,
+      "providers": 337
+    },
+    {
+      "field": "OriginatingSystemID",
+      "adoption": 0.6563899967521152,
+      "providers": 240
+    },
+    {
+      "field": "OfficeBrokerMlsId",
+      "adoption": 0.6436213560985905,
+      "providers": 219
+    },
+    {
+      "field": "OfficeNationalAssociationId",
+      "adoption": 0.6431448133220442,
+      "providers": 279
+    },
+    {
+      "field": "OriginalEntryTimestamp",
+      "adoption": 0.6277553828619293,
+      "providers": 251
+    },
+    {
+      "field": "IDXOfficeParticipationYN",
+      "adoption": 0.6143973256248039,
+      "providers": 240
+    },
+    {
+      "field": "OfficeBrokerKey",
+      "adoption": 0.5853991650959993,
+      "providers": 224
+    },
+    {
+      "field": "OfficeType",
+      "adoption": 0.5657694332354611,
+      "providers": 262
+    },
+    {
+      "field": "SourceSystemName",
+      "adoption": 0.47945025878821684,
+      "providers": 138
+    },
+    {
+      "field": "OfficeMailPostalCode",
+      "adoption": 0.45373855402680596,
+      "providers": 57
+    },
+    {
+      "field": "OfficeMailCity",
+      "adoption": 0.453038869187525,
+      "providers": 60
+    },
+    {
+      "field": "OfficeMailAddress1",
+      "adoption": 0.4502579807907448,
+      "providers": 59
+    },
+    {
+      "field": "OfficeFax",
+      "adoption": 0.4502418733233318,
+      "providers": 317
+    },
+    {
+      "field": "OfficeMailStateOrProvince",
+      "adoption": 0.44945832189302565,
+      "providers": 59
+    },
+    {
+      "field": "OfficeCorporateLicense",
+      "adoption": 0.3854604274186365,
+      "providers": 248
+    },
+    {
+      "field": "OfficeManagerMlsId",
+      "adoption": 0.3081341756528451,
+      "providers": 57
+    },
+    {
+      "field": "OfficeManagerKey",
+      "adoption": 0.2547271246370122,
+      "providers": 49
+    },
+    {
+      "field": "OfficeAORMlsId",
+      "adoption": 0.1970756021070558,
+      "providers": 46
+    },
+    {
+      "field": "OfficeAORkey",
+      "adoption": 0.1901668546983873,
+      "providers": 44
+    },
+    {
+      "field": "OfficeBranchType",
+      "adoption": 0.18252863534204308,
+      "providers": 37
+    },
+    {
+      "field": "SyndicateTo",
+      "adoption": 0.14795200667870925,
+      "providers": 33
+    },
+    {
+      "field": "OfficeAddress2",
+      "adoption": 0.12858860481434564,
+      "providers": 291
+    },
+    {
+      "field": "NumberOfBranches",
+      "adoption": 0.09634149544661938,
+      "providers": 21
+    },
+    {
+      "field": "FranchiseAffiliation",
+      "adoption": 0.09226392226726218,
+      "providers": 17
+    },
+    {
+      "field": "OfficeCountry",
+      "adoption": 0.08132720193089113,
+      "providers": 11
+    },
+    {
+      "field": "OfficeMailCareOf",
+      "adoption": 0.05532086347879131,
+      "providers": 37
+    },
+    {
+      "field": "OfficePostalCodePlus4",
+      "adoption": 0.04785912586843344,
+      "providers": 149
+    },
+    {
+      "field": "OfficeCountyOrParish",
+      "adoption": 0.027880872686067263,
+      "providers": 29
+    },
+    {
+      "field": "BillingOfficeKey",
+      "adoption": 0.024390243902439025,
+      "providers": 1
+    },
+    {
+      "field": "OfficeMailPostalCodePlus4",
+      "adoption": 0.022047596550091884,
+      "providers": 41
+    },
+    {
+      "field": "OfficeAssociationComments",
+      "adoption": 0.022019349447131357,
+      "providers": 22
+    },
+    {
+      "field": "OfficeMailAddress2",
+      "adoption": 0.018680903037604977,
+      "providers": 20
+    },
+    {
+      "field": "SocialMediaType",
+      "adoption": 0.01557106177004581,
+      "providers": 4
+    },
+    {
+      "field": "OfficePrimaryStateOrProvince",
+      "adoption": 0.012328878067132048,
+      "providers": 1
+    },
+    {
+      "field": "OfficePreferredMedia",
+      "adoption": 0.006211180124223602,
+      "providers": 1
+    },
+    {
+      "field": "SyndicateAgentOption",
+      "adoption": 0.005952866662780983,
+      "providers": 2
+    },
+    {
+      "field": "OtherPhone",
+      "adoption": 0.005306967122291024,
+      "providers": 17
+    },
+    {
+      "field": "OfficePhoneExt",
+      "adoption": 0.0031272496914249224,
+      "providers": 101
+    },
+    {
+      "field": "OfficeAlternateId",
+      "adoption": 0.003097296399132558,
+      "providers": 2
+    },
+    {
+      "field": "FranchiseNationalAssociationId",
+      "adoption": 0.0017314606860693406,
+      "providers": 3
+    },
+    {
+      "field": "OfficeMailCountry",
+      "adoption": 0.000549420054057164,
+      "providers": 2
+    },
+    {
+      "field": "OfficeBio",
+      "adoption": 0.0005155563190248147,
+      "providers": 25
+    },
+    {
+      "field": "OfficeMailCountyOrParish",
+      "adoption": 0.000019156610171743607,
+      "providers": 5
+    }
+  ],
+  "OfficeAssociation": [
+    {
+      "field": "BillStatus",
+      "adoption": 1,
+      "providers": 18
+    },
+    {
+      "field": "JoinDate",
+      "adoption": 1,
+      "providers": 18
+    },
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 1,
+      "providers": 18
+    },
+    {
+      "field": "OfficeAssociationStatusDate",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OfficeMlsId",
+      "adoption": 0.9813081876834948,
+      "providers": 1
+    },
+    {
+      "field": "OfficeKey",
+      "adoption": 0.9090909090909091,
+      "providers": 19
+    }
+  ],
+  "OpenHouse": [
+    {
+      "field": "OpenHouseId",
+      "adoption": 0.9808966265600177,
+      "providers": 162
+    },
+    {
+      "field": "SourceSystemKey",
+      "adoption": 0.9712905449319026,
+      "providers": 161
+    },
+    {
+      "field": "OriginatingSystemName",
+      "adoption": 0.9636295265044768,
+      "providers": 200
+    },
+    {
+      "field": "ListingKey",
+      "adoption": 0.9619871572332543,
+      "providers": 306
+    },
+    {
+      "field": "SourceSystemID",
+      "adoption": 0.9580904191616767,
+      "providers": 82
+    },
+    {
+      "field": "OpenHouseStatus",
+      "adoption": 0.9577837247459962,
+      "providers": 160
+    },
+    {
+      "field": "OpenHouseType",
+      "adoption": 0.95518651722952,
+      "providers": 157
+    },
+    {
+      "field": "OpenHouseKey",
+      "adoption": 0.9550362448307491,
+      "providers": 310
+    },
+    {
+      "field": "OpenHouseEndTime",
+      "adoption": 0.9518097419757167,
+      "providers": 316
+    },
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 0.9485779644597184,
+      "providers": 262
+    },
+    {
+      "field": "OpenHouseStartTime",
+      "adoption": 0.9480331823757854,
+      "providers": 315
+    },
+    {
+      "field": "OpenHouseDate",
+      "adoption": 0.9377727301639823,
+      "providers": 271
+    },
+    {
+      "field": "ListingId",
+      "adoption": 0.7277914207766369,
+      "providers": 222
+    },
+    {
+      "field": "OriginatingSystemKey",
+      "adoption": 0.7165618406331301,
+      "providers": 158
+    },
+    {
+      "field": "OriginatingSystemID",
+      "adoption": 0.47854090276763994,
+      "providers": 116
+    },
+    {
+      "field": "OriginalEntryTimestamp",
+      "adoption": 0.377015908165074,
+      "providers": 63
+    },
+    {
+      "field": "ShowingAgentMlsID",
+      "adoption": 0.3508302380840973,
+      "providers": 81
+    },
+    {
+      "field": "OpenHouseRemarks",
+      "adoption": 0.33427920631070607,
+      "providers": 296
+    },
+    {
+      "field": "Refreshments",
+      "adoption": 0.20974307945747095,
+      "providers": 63
+    },
+    {
+      "field": "ShowingAgentFirstName",
+      "adoption": 0.2057623464990799,
+      "providers": 33
+    },
+    {
+      "field": "ShowingAgentLastName",
+      "adoption": 0.20327192600591162,
+      "providers": 32
+    },
+    {
+      "field": "ShowingAgentKey",
+      "adoption": 0.14354870350137716,
+      "providers": 16
+    },
+    {
+      "field": "SourceSystemName",
+      "adoption": 0.12689034698947388,
+      "providers": 16
+    },
+    {
+      "field": "OpenHouseAttendedBy",
+      "adoption": 0.039732780594113476,
+      "providers": 5
+    },
+    {
+      "field": "AppointmentRequiredYN",
+      "adoption": 0.013375917955989067,
+      "providers": 3
+    },
+    {
+      "field": "LivestreamOpenHouseURL",
+      "adoption": 0.010744721532732208,
+      "providers": 67
+    }
+  ],
+  "OtherPhone": [
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OtherPhoneKey",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OtherPhoneType",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "ResourceName",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "ResourceRecordID",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "ResourceRecordKey",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OtherPhoneNumber",
+      "adoption": 0.9998086316305653,
+      "providers": 1
+    },
+    {
+      "field": "OtherPhoneExt",
+      "adoption": 0.0151296187482143,
+      "providers": 1
+    }
+  ],
+  "OUID": [
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OrganizationAddress1",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OrganizationCity",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OrganizationCountry",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OrganizationName",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OrganizationPostalCode",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OrganizationStateOrProvince",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OrganizationStatus",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OrganizationUniqueId",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OrganizationUniqueIdKey",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "OriginalEntryTimestamp",
+      "adoption": 1,
+      "providers": 1
+    }
+  ],
+  "PropertyGreenVerification": [
+    {
+      "field": "ListingKey",
+      "adoption": 1.1739130434782608,
+      "providers": 7
+    },
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 1.1739130434782608,
+      "providers": 7
+    },
+    {
+      "field": "GreenBuildingVerificationKey",
+      "adoption": 1.141311891132907,
+      "providers": 7
+    },
+    {
+      "field": "ListingId",
+      "adoption": 1,
+      "providers": 5
+    },
+    {
+      "field": "GreenBuildingVerificationType",
+      "adoption": 0.6897593948710223,
+      "providers": 6
+    },
+    {
+      "field": "GreenVerificationMetric",
+      "adoption": 0.4803983819467211,
+      "providers": 5
+    },
+    {
+      "field": "GreenVerificationYear",
+      "adoption": 0.4605106400694261,
+      "providers": 5
+    },
+    {
+      "field": "GreenVerificationSource",
+      "adoption": 0.20682136569554777,
+      "providers": 3
+    },
+    {
+      "field": "GreenVerificationStatus",
+      "adoption": 0.2005789410712768,
+      "providers": 5
+    },
+    {
+      "field": "GreenVerificationRating",
+      "adoption": 0.1578972144864563,
+      "providers": 5
+    },
+    {
+      "field": "GreenVerificationURL",
+      "adoption": 0.06986097041000051,
+      "providers": 3
+    },
+    {
+      "field": "GreenVerificationVersion",
+      "adoption": 0.007402400360720657,
+      "providers": 2
+    },
+    {
+      "field": "GreenVerificationBody",
+      "adoption": 0.0010495393149323746,
+      "providers": 3
+    }
+  ],
+  "PropertyPowerProduction": [
+    {
+      "field": "ListingId",
+      "adoption": 1,
+      "providers": 5
+    },
+    {
+      "field": "ListingKey",
+      "adoption": 1,
+      "providers": 5
+    },
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 1,
+      "providers": 5
+    },
+    {
+      "field": "PowerProductionKey",
+      "adoption": 0.9950002311774229,
+      "providers": 4
+    },
+    {
+      "field": "PowerProductionType",
+      "adoption": 0.012871581252580514,
+      "providers": 4
+    },
+    {
+      "field": "PowerProductionOwnership",
+      "adoption": 0.0052752966272132515,
+      "providers": 4
+    }
+  ],
+  "PropertyRooms": [
+    {
+      "field": "ListingId",
+      "adoption": 0.993421052631579,
+      "providers": 77
+    },
+    {
+      "field": "ListingKey",
+      "adoption": 0.9876543209876543,
+      "providers": 81
+    },
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 0.9875,
+      "providers": 79
+    },
+    {
+      "field": "RoomKey",
+      "adoption": 0.9357798165137615,
+      "providers": 125
+    },
+    {
+      "field": "RoomType",
+      "adoption": 0.9195201525013751,
+      "providers": 124
+    },
+    {
+      "field": "RoomLevel",
+      "adoption": 0.6623638120027062,
+      "providers": 112
+    },
+    {
+      "field": "RoomDimensions",
+      "adoption": 0.43403126332289255,
+      "providers": 88
+    },
+    {
+      "field": "RoomLength",
+      "adoption": 0.31557260787689967,
+      "providers": 89
+    },
+    {
+      "field": "RoomWidth",
+      "adoption": 0.3151339862984133,
+      "providers": 89
+    },
+    {
+      "field": "RoomDescription",
+      "adoption": 0.20459293032708326,
+      "providers": 90
+    },
+    {
+      "field": "RoomFeatures",
+      "adoption": 0.12161063686548666,
+      "providers": 56
+    },
+    {
+      "field": "RoomAreaUnits",
+      "adoption": 0.08091553393327573,
+      "providers": 13
+    },
+    {
+      "field": "RoomArea",
+      "adoption": 0.07662876199010246,
+      "providers": 28
+    },
+    {
+      "field": "RoomLengthWidthUnits",
+      "adoption": 0.024007122391915606,
+      "providers": 7
+    },
+    {
+      "field": "RoomAreaSource",
+      "adoption": 0.004650418907387162,
+      "providers": 3
+    },
+    {
+      "field": "RoomLengthWidthSource",
+      "adoption": 0.0011856188853912842,
+      "providers": 2
+    }
+  ],
+  "PropertyUnitTypes": [
+    {
+      "field": "ListingKey",
+      "adoption": 0.9861111111111112,
+      "providers": 72
+    },
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 0.9856115107913669,
+      "providers": 68
+    },
+    {
+      "field": "ListingId",
+      "adoption": 0.9852939170904207,
+      "providers": 69
+    },
+    {
+      "field": "UnitTypeKey",
+      "adoption": 0.9112426035502958,
+      "providers": 83
+    },
+    {
+      "field": "UnitTypeBathsTotal",
+      "adoption": 0.687163241920722,
+      "providers": 76
+    },
+    {
+      "field": "UnitTypeBedsTotal",
+      "adoption": 0.6686630250866815,
+      "providers": 78
+    },
+    {
+      "field": "UnitTypeActualRent",
+      "adoption": 0.4672014043009944,
+      "providers": 75
+    },
+    {
+      "field": "UnitTypeDescription",
+      "adoption": 0.3806161684958407,
+      "providers": 61
+    },
+    {
+      "field": "UnitTypeType",
+      "adoption": 0.2721306362169989,
+      "providers": 50
+    },
+    {
+      "field": "UnitTypeUnitsTotal",
+      "adoption": 0.20869733296379578,
+      "providers": 34
+    },
+    {
+      "field": "UnitTypeTotalRent",
+      "adoption": 0.14841443336125854,
+      "providers": 36
+    },
+    {
+      "field": "UnitTypeFurnished",
+      "adoption": 0.11086142327057875,
+      "providers": 18
+    },
+    {
+      "field": "UnitTypeGarageSpaces",
+      "adoption": 0.023604937671732797,
+      "providers": 10
+    },
+    {
+      "field": "UnitTypeProForma",
+      "adoption": 0.021477954096171866,
+      "providers": 4
+    },
+    {
+      "field": "UnitTypeGarageAttachedYN",
+      "adoption": 0.0035763101996904006,
+      "providers": 4
+    }
+  ],
+  "Prospecting": [
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "ProspectingKey",
+      "adoption": 1,
+      "providers": 1
+    }
+  ],
+  "SavedSearch": [
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "SavedSearchKey",
+      "adoption": 1,
+      "providers": 1
+    }
+  ],
+  "SocialMedia": [
+    {
+      "field": "ClassName",
+      "adoption": 1,
+      "providers": 1
+    },
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 1,
+      "providers": 2
+    },
+    {
+      "field": "ResourceName",
+      "adoption": 1,
+      "providers": 2
+    },
+    {
+      "field": "SocialMediaKey",
+      "adoption": 1,
+      "providers": 28
+    },
+    {
+      "field": "SocialMediaType",
+      "adoption": 1,
+      "providers": 28
+    },
+    {
+      "field": "DisplayName",
+      "adoption": 0.9999950848733127,
+      "providers": 26
+    },
+    {
+      "field": "ResourceRecordID",
+      "adoption": 0.9999382716049383,
+      "providers": 2
+    },
+    {
+      "field": "ResourceRecordKey",
+      "adoption": 0.9896296296296296,
+      "providers": 2
+    },
+    {
+      "field": "SocialMediaUrlOrId",
+      "adoption": 0.8281173951389799,
+      "providers": 28
+    }
+  ],
+  "TeamMembers": [
+    {
+      "field": "MemberKey",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "MemberLoginId",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "MemberMlsId",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "OriginalEntryTimestamp",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "OriginatingSystemKey",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "SourceSystemKey",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "SourceSystemName",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "TeamImpersonationLevel",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "TeamKey",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "TeamMemberType",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "TeamMemberKey",
+      "adoption": 0.24875,
+      "providers": 1
+    }
+  ],
+  "Teams": [
+    {
+      "field": "ModificationTimestamp",
+      "adoption": 0.6666666666666666,
+      "providers": 2
+    },
+    {
+      "field": "TeamKey",
+      "adoption": 0.6666666666666666,
+      "providers": 2
+    },
+    {
+      "field": "OriginalEntryTimestamp",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "OriginatingSystemKey",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "OriginatingSystemName",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "SourceSystemID",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "TeamLeadLoginId",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "TeamLeadMlsId",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "TeamStateOrProvince",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "TeamStatus",
+      "adoption": 0.5,
+      "providers": 1
+    },
+    {
+      "field": "TeamAddress1",
+      "adoption": 0.4999304202616198,
+      "providers": 1
+    },
+    {
+      "field": "TeamCity",
+      "adoption": 0.4999304202616198,
+      "providers": 1
+    },
+    {
+      "field": "TeamDirectPhone",
+      "adoption": 0.4999304202616198,
+      "providers": 1
+    },
+    {
+      "field": "TeamName",
+      "adoption": 0.4999304202616198,
+      "providers": 1
+    },
+    {
+      "field": "TeamPostalCode",
+      "adoption": 0.4999304202616198,
+      "providers": 1
+    },
+    {
+      "field": "TeamEmail",
+      "adoption": 0.489006401335931,
+      "providers": 1
+    },
+    {
+      "field": "TeamMobilePhone",
+      "adoption": 0.269691065961592,
+      "providers": 1
+    },
+    {
+      "field": "TeamAddress2",
+      "adoption": 0.10416086835513498,
+      "providers": 1
+    }
+  ]
+}

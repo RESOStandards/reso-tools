@@ -1,17 +1,17 @@
-# @reso/odata-expression-parser
+# @reso-standards/odata-expression-parser
 
-Standalone, zero-dependency library for parsing OData 4.01 `$filter` and `$expand` expressions into typed ASTs (abstract syntax trees). Used by both [`@reso/odata-client`](../odata-client/) for query validation and [`@reso/reference-server`](../reso-reference-server/) for SQL WHERE clause generation and multi-level navigation property expansion.
+Standalone, zero-dependency library for parsing OData 4.01 `$filter` and `$expand` expressions into typed ASTs (abstract syntax trees). Used by both [`@reso-standards/odata-client`](../odata-client/) for query validation and [`@reso-standards/reference-server`](../reso-reference-server/) for SQL WHERE clause generation and multi-level navigation property expansion.
 
 ## Install
 
 ```bash
-npm install @reso/odata-expression-parser
+npm install @reso-standards/odata-expression-parser
 ```
 
 ## Usage
 
 ```typescript
-import { parseFilter } from "@reso/odata-expression-parser";
+import { parseFilter } from "@reso-standards/odata-expression-parser";
 
 const ast = parseFilter("ListPrice gt 200000 and contains(City, 'Austin')");
 
@@ -145,7 +145,7 @@ The parser produces a `FilterExpression` discriminated union:
 Convert an AST back to a canonical OData `$filter` string with `astToFilterString`:
 
 ```typescript
-import { parseFilter, astToFilterString } from '@reso/odata-expression-parser';
+import { parseFilter, astToFilterString } from '@reso-standards/odata-expression-parser';
 
 const ast = parseFilter("ListPrice gt 200000 and contains(City, 'Austin')");
 const roundTripped = astToFilterString(ast);
@@ -159,7 +159,7 @@ Handles all node types: comparison, logical, not, arithmetic, function, lambda, 
 Parse `$expand` expressions into a structured tree with `parseExpand`. Supports nested (multi-level) expansion, inline query options, and `$levels`.
 
 ```typescript
-import { parseExpand } from '@reso/odata-expression-parser';
+import { parseExpand } from '@reso-standards/odata-expression-parser';
 
 // Simple expansion
 parseExpand('Media');

@@ -13,7 +13,7 @@ server {
     }
 
     # Non-resource API endpoints — always proxy
-    location ~ ^/(ui-config|field-groups|api|health|images|oauth|\$metadata) {
+    location ~ ^/(ui-config|api|health|images|oauth|\$metadata) {
         proxy_pass http://${API_UPSTREAM};
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

@@ -7,7 +7,7 @@
  */
 
 import type pg from 'pg';
-import type { ExpandExpression } from '@reso/odata-expression-parser';
+import type { ExpandExpression } from '@reso-standards/odata-expression-parser';
 import type { ResoField } from '../metadata/types.js';
 import type {
   CollectionQueryOptions,

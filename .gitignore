@@ -10,3 +10,6 @@ tools/PR.md
 *.db-shm
 *.db-wal
 .github/pages/dd-output/
+.env
+.env.*
+*.env

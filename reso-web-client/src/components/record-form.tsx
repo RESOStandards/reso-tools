@@ -1,4 +1,4 @@
-import { type ValidationFailure, validateRecord } from '@reso/validation';
+import { type ValidationFailure, validateRecord } from '@reso-standards/validation';
 import { type FormEvent, useCallback, useMemo, useState } from 'react';
 import { useServer } from '../context/server-context';
 import type { FieldGroups, ResoField, ResoLookup } from '../types';

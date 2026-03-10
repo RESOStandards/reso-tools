@@ -1,4 +1,4 @@
-# @reso/data-generator
+# @reso-standards/data-generator
 
 Generates realistic RESO Data Dictionary test data for OData servers. Supports three output modes (HTTP, JSON, curl), automatic dependency resolution with FK linkage, and domain-specific generators for Property, Member, Office, Media, OpenHouse, Showing, Teams, TeamMembers, OUID, and Property child resources.
 
@@ -90,7 +90,7 @@ A generic field generator handles all Edm types (String, Boolean, Int16/32/64, D
 ## Programmatic API
 
 ```typescript
-import { generateSeedData, generateWithDependencies, getGenerator, buildSeedPlan } from '@reso/data-generator';
+import { generateSeedData, generateWithDependencies, getGenerator, buildSeedPlan } from '@reso-standards/data-generator';
 
 // Generate with automatic dependency resolution
 const result = await generateWithDependencies(seedOptions, outputOptions, metadata, (progress) => {

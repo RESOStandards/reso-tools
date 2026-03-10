@@ -1,6 +1,6 @@
 {
   "private": true,
-  "name": "@reso/transport",
+  "name": "@reso-standards/transport",
   "type": "module",
   "engines": {
     "node": ">=22"

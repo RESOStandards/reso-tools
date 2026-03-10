@@ -1,5 +1,5 @@
 {
-  "name": "@reso/certification",
+  "name": "@reso-standards/certification",
   "version": "0.1.0",
   "description": "RESO certification testing toolkit — Add/Edit (RCP-010), Web API Core, Data Dictionary",
   "type": "module",
@@ -25,8 +25,8 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@reso/odata-client": "file:../odata-client",
-    "@reso/validation": "file:../validation",
+    "@reso-standards/odata-client": "file:../odata-client",
+    "@reso-standards/validation": "file:../validation",
     "commander": "^12.0.0",
     "express": "^4.21.0"
   },

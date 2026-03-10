@@ -48,7 +48,7 @@ export const DetailPage = () => {
   }, [key]);
 
   const { fields } = useMetadata(resourceName);
-  const { config, fieldGroups } = useUiConfig();
+  const { config, fieldGroups, summaryFieldsConfig } = useUiConfig();
 
   const keyField = getKeyField(resourceName);
 
@@ -113,19 +113,17 @@ export const DetailPage = () => {
   const skipFields = new Set([keyField, 'ModificationTimestamp']);
 
   // Determine summary fields for the left pane
-  // For external servers with no explicit config, auto-derive from the first few populated fields
-  const summaryFieldNames = config?.resources?.[resourceName]?.summaryFields;
-  const autoSummary = !summaryFieldNames || summaryFieldNames === '__all__';
-  const summarySet = new Set(
-    Array.isArray(summaryFieldNames)
-      ? summaryFieldNames
-      : autoSummary
-        ? fields
-            .filter(f => !skipFields.has(f.fieldName) && !f.isExpansion && !f.fieldName.startsWith('@') && record[f.fieldName] != null)
-            .slice(0, 6)
-            .map(f => f.fieldName)
-        : []
-  );
+  // Priority: server-specific config > bundled summary-fields.json > first 10 populated fields
+  const serverSummaryFields = config?.resources?.[resourceName]?.summaryFields;
+  const defaultSummaryFields = summaryFieldsConfig?.[resourceName];
+  const resolvedSummaryFields =
+    Array.isArray(serverSummaryFields) ? serverSummaryFields
+    : defaultSummaryFields ? defaultSummaryFields
+    : fields
+        .filter(f => !skipFields.has(f.fieldName) && !f.isExpansion && !f.fieldName.startsWith('@') && record[f.fieldName] != null)
+        .slice(0, 10)
+        .map(f => f.fieldName);
+  const summarySet = new Set(resolvedSummaryFields);
 
   // For Property: summary fields go in the left pane, rest go in groups
   // For other resources: all fields go in a single alphabetical list (rendered beside carousel if present)
@@ -418,6 +416,7 @@ export const DetailPage = () => {
                   targetResource={exp.targetResource}
                   records={exp.records}
                   isCollection={exp.isCollection}
+                  summaryFields={summaryFieldsConfig?.[exp.targetResource]}
                 />
               ))}
             </div>

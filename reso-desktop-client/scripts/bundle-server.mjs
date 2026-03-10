@@ -41,7 +41,7 @@ await build({
   target: 'node22',
   outfile: resolve(outDir, 'server-entry.mjs'),
   external,
-  // Resolve @reso/* file: deps from the monorepo node_modules
+  // Resolve @reso-standards/* file: deps from the monorepo node_modules
   nodePaths: [resolve(monoRoot, 'node_modules')],
   banner: {
     // esbuild ESM output needs createRequire for any CJS interop

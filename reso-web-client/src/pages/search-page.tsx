@@ -1,4 +1,4 @@
-import { LexerError, ParseError, parseFilter } from '@reso/odata-expression-parser';
+import { LexerError, ParseError, parseFilter } from '@reso-standards/odata-expression-parser';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { AdvancedSearch } from '../components/advanced-search';
@@ -39,13 +39,18 @@ export const SearchPage = () => {
     setValidationError(null);
   }, [filter]);
 
-  const { config, fieldGroups } = useUiConfig();
+  const { config, fieldGroups, summaryFieldsConfig } = useUiConfig();
   const { fields, lookups, isLoading: metaLoading } = useMetadata(resourceName);
 
   // Resolve summary fields from config
+  // Priority: server-specific config > bundled summary-fields.json > all fields
   const resourceConfig = config?.resources?.[resourceName];
+  const defaultSummaryFields = summaryFieldsConfig?.[resourceName];
   const isAllFields = !resourceConfig || resourceConfig.summaryFields === '__all__';
-  const summaryFields: string[] = isAllFields ? fields.map(f => f.fieldName) : [...resourceConfig.summaryFields];
+  const summaryFields: string[] =
+    !isAllFields ? [...resourceConfig.summaryFields]
+    : defaultSummaryFields ? [...defaultSummaryFields]
+    : fields.map(f => f.fieldName);
 
   // Build field lookup map for display names
   const fieldMap = new Map(fields.map(f => [f.fieldName, f]));

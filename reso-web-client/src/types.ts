@@ -52,6 +52,9 @@ export interface UiConfig {
 /** Field group mapping served by the server at GET /field-groups. */
 export type FieldGroups = Readonly<Record<string, Readonly<Record<string, ReadonlyArray<string>>>>>;
 
+/** Default summary fields per resource, ranked by RESO adoption data. */
+export type SummaryFieldsConfig = Readonly<Record<string, ReadonlyArray<string>>>;
+
 /** OData collection response shape. */
 export interface ODataCollectionResponse {
   readonly '@odata.context'?: string;
@@ -95,4 +98,4 @@ export type ResourceName = (typeof TARGET_RESOURCES)[number];
 /** Resources that are read-only (no Add/Edit/Delete). */
 export const READ_ONLY_RESOURCES: ReadonlySet<string> = new Set(['Lookup']);
 
-export { isEnumType, isNumericEdmType } from '@reso/validation';
+export { isEnumType, isNumericEdmType } from '@reso-standards/validation';

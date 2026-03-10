@@ -1,13 +1,13 @@
-# @reso/certification
+# @reso-standards/certification
 
 RESO certification testing toolkit for validating OData 4.01 server compliance against RESO Web API endorsement specifications. Ships as a single package with spec-specific modules for Add/Edit (RCP-010), Web API Core, and Data Dictionary.
 
-Uses shared test infrastructure (`src/test-runner/`) providing OData protocol validators, metadata parsing (via [`@reso/odata-client`](../odata-client/)), field validation (via [`@reso/validation`](../validation/)), reporting, and HTTP client helpers.
+Uses shared test infrastructure (`src/test-runner/`) providing OData protocol validators, metadata parsing (via [`@reso-standards/odata-client`](../odata-client/)), field validation (via [`@reso-standards/validation`](../validation/)), reporting, and HTTP client helpers.
 
 ## Install
 
 ```bash
-npm install @reso/certification
+npm install @reso-standards/certification
 ```
 
 ## Project Structure
@@ -119,7 +119,7 @@ import {
   generateComplianceReport,
   startMockServer,
   stopMockServer
-} from '@reso/certification';
+} from '@reso-standards/certification';
 
 // Run all 8 Add/Edit scenarios
 const report = await runAllScenarios({
@@ -166,7 +166,7 @@ import {
   // Helpers
   extractPrimaryKey,
   buildScenarioResult
-} from '@reso/certification';
+} from '@reso-standards/certification';
 ```
 
 ## Docker Compliance Testing

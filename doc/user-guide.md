@@ -678,7 +678,7 @@ docker compose --profile compliance-dd up compliance-dd
 
 ### Add/Edit (RCP-010)
 
-Uses the custom `@reso/certification-add-edit` test runner to validate Create,
+Uses the custom `@reso-standards/certification-add-edit` test runner to validate Create,
 Update, and Delete operations with representation and minimal response modes:
 
 ```bash

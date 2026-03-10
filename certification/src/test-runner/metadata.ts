@@ -1,12 +1,12 @@
 /**
  * Metadata loading, parsing, and validation — delegates XML parsing to
- * @reso/odata-client's CSDL parser and type validation to @reso/validation.
+ * @reso-standards/odata-client's CSDL parser and type validation to @reso-standards/validation.
  */
 
 import { readFile } from 'node:fs/promises';
-import { fetchRawMetadata, parseCsdlXml } from '@reso/odata-client';
-import type { CsdlEntityType, CsdlProperty, CsdlSchema } from '@reso/odata-client';
-import { type ResoField, type ValidationFailure, validateRecord } from '@reso/validation';
+import { fetchRawMetadata, parseCsdlXml } from '@reso-standards/odata-client';
+import type { CsdlEntityType, CsdlProperty, CsdlSchema } from '@reso-standards/odata-client';
+import { type ResoField, type ValidationFailure, validateRecord } from '@reso-standards/validation';
 import type { EntityProperty, EntityType, ParsedMetadata } from './types.js';
 
 // ── Type adapters (CsdlEntityType → EntityType) ──
@@ -36,7 +36,7 @@ const adaptSchema = (schema: CsdlSchema): ParsedMetadata => ({
 });
 
 /**
- * Converts an EntityProperty to a ResoField for use with @reso/validation.
+ * Converts an EntityProperty to a ResoField for use with @reso-standards/validation.
  * Handles Collection() type syntax by extracting the inner type and setting isCollection.
  */
 const toResoField = (prop: EntityProperty, resourceName: string): ResoField => {
@@ -75,7 +75,7 @@ export const loadMetadataFromFile = async (filePath: string): Promise<string> =>
 
 /**
  * Parses an OData EDMX XML metadata document into a structured representation.
- * Delegates to @reso/odata-client's parseCsdlXml and adapts the types.
+ * Delegates to @reso-standards/odata-client's parseCsdlXml and adapts the types.
  */
 export const parseMetadataXml = (xml: string): ParsedMetadata => {
   const schema = parseCsdlXml(xml);
@@ -87,11 +87,11 @@ export const getEntityType = (metadata: ParsedMetadata, resourceName: string): E
   metadata.entityTypes.find(et => et.name === resourceName);
 
 /**
- * Validates a payload against the entity type's metadata using @reso/validation.
+ * Validates a payload against the entity type's metadata using @reso-standards/validation.
  *
  * Performs two levels of validation:
  * 1. Unknown field detection (fields not in metadata)
- * 2. Type/value validation via @reso/validation (type mismatches, negative numerics,
+ * 2. Type/value validation via @reso-standards/validation (type mismatches, negative numerics,
  *    MaxLength, integer enforcement, collection/enum checks)
  *
  * Keys prefixed with `@` (OData annotations) are ignored.

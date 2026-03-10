@@ -1,4 +1,4 @@
-# @reso/web-client
+# @reso-standards/web-client
 
 React-based OData browser UI with server switcher for connecting to external OData servers, metadata explorer, and CRUD interface.
 

@@ -1,5 +1,5 @@
 {
-  "name": "@reso/desktop-client",
+  "name": "@reso-standards/desktop-client",
   "version": "0.2.0",
   "description": "RESO Reference Server — Desktop Client",
   "private": true,
@@ -13,7 +13,7 @@
     "package": "npm run build && npm run build:server-bundle && electron-builder"
   },
   "dependencies": {
-    "@reso/reference-server": "file:../reso-reference-server"
+    "@reso-standards/reference-server": "file:../reso-reference-server"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",

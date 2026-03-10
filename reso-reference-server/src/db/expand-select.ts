@@ -7,7 +7,7 @@
  * property names).
  */
 
-import type { ExpandExpression } from '@reso/odata-expression-parser';
+import type { ExpandExpression } from '@reso-standards/odata-expression-parser';
 import type { EntityRecord, NavigationPropertyBinding } from './data-access.js';
 
 /** Parse a $select string into an array of field names. */

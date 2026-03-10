@@ -38,7 +38,7 @@ A React SPA (Vite + Tailwind CSS) providing:
 
 - Paginated data browsing for all 13 resources
 - Record creation and editing with real-time validation and pinned action buttons
-- Cross-field business rule enforcement (shared `@reso/validation` package)
+- Cross-field business rule enforcement (shared `@reso-standards/validation` package)
 - Navigation property traversal between related records with zebra-striped detail panels
 - Side-by-side summary + media carousel layout on detail pages
 - Docker hot-reload dev mode via `docker-compose.dev.yml` overlay
@@ -69,7 +69,7 @@ Docker-based integration with the RESO Commander and a custom Add/Edit test runn
 
 | Package | Description |
 |---------|-------------|
-| `@reso/validation` | Isomorphic field + cross-field validation rules (browser & server) |
+| `@reso-standards/validation` | Isomorphic field + cross-field validation rules (browser & server) |
 | `odata-expression-parser` | Standalone OData `$filter` expression parser, zero dependencies |
 | `odata-client` | OData 4.01 client SDK with type-safe query building |
 

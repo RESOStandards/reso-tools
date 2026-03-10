@@ -14,6 +14,8 @@ interface ExpandedEntityCardProps {
   readonly records: ReadonlyArray<Record<string, unknown>>;
   /** Whether this is a collection (enables pagination). */
   readonly isCollection: boolean;
+  /** Optional preferred summary fields for the target resource. */
+  readonly summaryFields?: ReadonlyArray<string>;
 }
 
 /** Max summary fields shown per card. */
@@ -31,9 +33,10 @@ const formatValue = (value: unknown): string => {
 /** Returns displayable field entries from a record (excludes @odata, null, nested objects). */
 const getDisplayFields = (
   record: Record<string, unknown>,
-  keyField: string | undefined
-): ReadonlyArray<readonly [string, string]> =>
-  Object.entries(record)
+  keyField: string | undefined,
+  preferredFields?: ReadonlyArray<string>
+): ReadonlyArray<readonly [string, string]> => {
+  const allFields = Object.entries(record)
     .filter(([key, value]) => {
       if (key.startsWith('@') || key === 'Media') return false;
       if (key === keyField) return false;
@@ -42,6 +45,24 @@ const getDisplayFields = (
       return true;
     })
     .map(([key, value]) => [key, formatValue(value)] as const);
+
+  if (!preferredFields || preferredFields.length === 0) return allFields;
+
+  // Return preferred fields first (in order), then remaining fields
+  const fieldMap = new Map(allFields);
+  const ordered: (readonly [string, string])[] = [];
+  for (const name of preferredFields) {
+    const value = fieldMap.get(name);
+    if (value !== undefined) {
+      ordered.push([name, value]);
+      fieldMap.delete(name);
+    }
+  }
+  for (const [name, value] of fieldMap) {
+    ordered.push([name, value]);
+  }
+  return ordered;
+};
 
 /** Extract Media array from a record if present. */
 const extractMedia = (record: Record<string, unknown>): ReadonlyArray<Record<string, unknown>> => {
@@ -57,7 +78,8 @@ const RecordSummary = ({
   isNavigable,
   keyField,
   entityKey,
-  onNavigate
+  onNavigate,
+  summaryFields
 }: {
   readonly record: Record<string, unknown>;
   readonly targetResource: string;
@@ -65,9 +87,10 @@ const RecordSummary = ({
   readonly keyField: string | undefined;
   readonly entityKey: unknown;
   readonly onNavigate: () => void;
+  readonly summaryFields?: ReadonlyArray<string>;
 }) => {
   const media = extractMedia(record);
-  const displayFields = getDisplayFields(record, keyField);
+  const displayFields = getDisplayFields(record, keyField, summaryFields);
 
   // For Media resources, treat MediaURL as a single-item media array for the thumbnail
   const isMediaResource = targetResource === 'Media';
@@ -112,9 +135,9 @@ const RecordSummary = ({
           })}
         </div>
 
-        {displayFields.length > MAX_SUMMARY_FIELDS && (
+        {Object.keys(record).filter(k => !k.startsWith('@')).length > MAX_SUMMARY_FIELDS + (keyField ? 1 : 0) && (
           <span className="text-xs text-gray-400 dark:text-gray-500 mt-1 block px-1.5">
-            +{displayFields.length - MAX_SUMMARY_FIELDS} more fields
+            +{Object.keys(record).filter(k => !k.startsWith('@')).length - MAX_SUMMARY_FIELDS - (keyField ? 1 : 0)} more fields
           </span>
         )}
       </div>
@@ -152,7 +175,7 @@ const RecordSummary = ({
 };
 
 /** Compact expansion panel for a single navigation property. Collections get prev/next pagination. */
-export const ExpandedEntityCard = ({ title, targetResource, records, isCollection }: ExpandedEntityCardProps) => {
+export const ExpandedEntityCard = ({ title, targetResource, records, isCollection, summaryFields }: ExpandedEntityCardProps) => {
   const navigate = useNavigate();
   const { getKeyField, resources } = useServer();
   const [page, setPage] = useState(0);
@@ -214,6 +237,7 @@ export const ExpandedEntityCard = ({ title, targetResource, records, isCollectio
           isNavigable={isTargetNavigable}
           keyField={keyField}
           entityKey={entityKey}
+          summaryFields={summaryFields}
           onNavigate={() => {
             if (entityKey != null) navigate(`/${targetResource}/${encodeURIComponent(String(entityKey))}`);
           }}

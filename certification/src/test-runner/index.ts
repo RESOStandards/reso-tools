@@ -12,7 +12,7 @@ export type {
   ODataResponse,
   MockServerOptions
 } from './types.js';
-export type { ValidationFailure } from '@reso/validation';
+export type { ValidationFailure } from '@reso-standards/validation';
 export type { RequestOptions } from './client.js';
 
 // Validators

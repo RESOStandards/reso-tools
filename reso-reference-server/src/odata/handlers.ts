@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { ExpandParseError, LexerError, ParseError, parseExpand } from '@reso/odata-expression-parser';
+import { ExpandParseError, LexerError, ParseError, parseExpand } from '@reso-standards/odata-expression-parser';
 import type { RequestHandler } from 'express';
 import type { CollectionQueryOptions, DataAccessLayer, ResourceContext } from '../db/data-access.js';
 import { buildAnnotations } from './annotations.js';

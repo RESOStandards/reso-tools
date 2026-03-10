@@ -1,5 +1,5 @@
 {
-  "name": "@reso/web-client",
+  "name": "@reso-standards/web-client",
   "version": "0.2.0",
   "private": true,
   "type": "module",
@@ -9,9 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@reso/odata-client": "file:../odata-client",
-    "@reso/odata-expression-parser": "file:../odata-expression-parser",
-    "@reso/validation": "file:../validation",
+    "@reso-standards/odata-client": "file:../odata-client",
+    "@reso-standards/odata-expression-parser": "file:../odata-expression-parser",
+    "@reso-standards/validation": "file:../validation",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router": "^7.0.0"

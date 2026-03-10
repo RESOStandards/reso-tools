@@ -2,12 +2,12 @@
  * OData query option validator — validates $select, $orderby, $filter, $top,
  * $skip against CSDL entity type metadata.
  *
- * Uses @reso/odata-expression-parser to parse and walk $filter AST for property
+ * Uses @reso-standards/odata-expression-parser to parse and walk $filter AST for property
  * reference validation.
  */
 
-import { parseFilter, parseExpand, ExpandParseError } from '@reso/odata-expression-parser';
-import type { FilterExpression, ExpandExpression } from '@reso/odata-expression-parser';
+import { parseFilter, parseExpand, ExpandParseError } from '@reso-standards/odata-expression-parser';
+import type { FilterExpression, ExpandExpression } from '@reso-standards/odata-expression-parser';
 import type { CsdlEntityType } from '../csdl/types.js';
 import type { ODataQueryOptions } from '../types.js';
 

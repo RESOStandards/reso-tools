@@ -1,5 +1,5 @@
 {
-  "name": "@reso/odata-expression-parser",
+  "name": "@reso-standards/odata-expression-parser",
   "version": "0.1.0",
   "description": "OData expression parsers — $filter and $expand tokenizer and recursive descent parsers producing typed ASTs. Inspired by Apache Olingo's UriParser.",
   "type": "module",

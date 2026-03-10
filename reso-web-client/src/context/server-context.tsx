@@ -228,7 +228,7 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
 
     const loadMetadata = async () => {
       try {
-        const { parseCsdlXml, discoverResources } = await import('@reso/odata-client');
+        const { parseCsdlXml, discoverResources } = await import('@reso-standards/odata-client');
 
         const headers: Record<string, string> = { Accept: 'application/xml' };
         if (activeServer.token) {

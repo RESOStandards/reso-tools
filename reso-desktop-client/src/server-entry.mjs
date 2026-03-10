@@ -15,7 +15,7 @@
 const [sqliteDbPath, metadataPath, serverRoot, uiDistPath] = process.argv.slice(2);
 
 const start = async () => {
-  const { createApp, loadConfig } = await import('@reso/reference-server');
+  const { createApp, loadConfig } = await import('@reso-standards/reference-server');
 
   const config = loadConfig({
     port: 0,

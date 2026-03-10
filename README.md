@@ -6,7 +6,7 @@ Testing, client SDK, and reference implementation tools for the RESO Web API spe
 
 ### Libraries
 
-#### [@reso/validation](validation/)
+#### [@reso-standards/validation](validation/)
 
 Isomorphic validation library for RESO metadata-driven field validation. Works in any JS runtime (Node.js, browser, edge). Used by both the reference server API and the React UI.
 
@@ -14,7 +14,7 @@ Isomorphic validation library for RESO metadata-driven field validation. Works i
 cd validation && npm install && npm test  # 103 tests
 ```
 
-#### [@reso/odata-expression-parser](odata-expression-parser/)
+#### [@reso-standards/odata-expression-parser](odata-expression-parser/)
 
 Standalone, zero-dependency library for parsing OData 4.01 `$filter` expressions into a typed AST. Used by both the client SDK (query validation) and the reference server (SQL translation).
 
@@ -22,7 +22,7 @@ Standalone, zero-dependency library for parsing OData 4.01 `$filter` expressions
 cd odata-expression-parser && npm install && npm test  # 180 tests
 ```
 
-#### [@reso/odata-client](odata-client/)
+#### [@reso-standards/odata-client](odata-client/)
 
 OData 4.01 client SDK for TypeScript. URI builder, CRUD helpers, CSDL metadata parsing/validation, query validation, and response parsing. Inspired by Apache Olingo.
 
@@ -32,7 +32,7 @@ cd odata-client && npm install && npm test  # 118 tests
 
 ### Tools
 
-#### [@reso/data-generator](data-generator/)
+#### [@reso-standards/data-generator](data-generator/)
 
 Generates realistic RESO Data Dictionary test data. Supports three output modes: HTTP (POST to an OData server), JSON files, and curl script generation. Includes resource-specific generators for Property, Member, Office, Media, OpenHouse, and Showing with domain-appropriate values.
 
@@ -79,7 +79,7 @@ npx reso-cert-add-edit \
   --mock
 ```
 
-#### [@reso/desktop-client](reso-desktop-client/)
+#### [@reso-standards/desktop-client](reso-desktop-client/)
 
 Electron desktop client for the RESO Reference Server. Wraps the server and UI into a native macOS/Windows/Linux application with native menus, keyboard shortcuts (Cmd/Ctrl+Arrow, Cmd/Ctrl+[/]), and trackpad navigation gestures.
 
@@ -87,7 +87,7 @@ Electron desktop client for the RESO Reference Server. Wraps the server and UI i
 cd reso-desktop-client && npm install && npm run dev
 ```
 
-#### [@reso/web-client](reso-web-client/)
+#### [@reso-standards/web-client](reso-web-client/)
 
 React + Vite OData browser UI with server switcher for connecting to external OData servers, metadata explorer, and CRUD interface. Can be deployed standalone or served by the reference server.
 

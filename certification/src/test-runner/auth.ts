@@ -1,8 +1,8 @@
 /**
- * Authentication helpers — delegates to @reso/odata-client.
+ * Authentication helpers — delegates to @reso-standards/odata-client.
  */
 
-import { fetchAccessToken as clientFetchAccessToken, resolveToken } from '@reso/odata-client';
+import { fetchAccessToken as clientFetchAccessToken, resolveToken } from '@reso-standards/odata-client';
 import type { AuthConfig } from './types.js';
 
 /**

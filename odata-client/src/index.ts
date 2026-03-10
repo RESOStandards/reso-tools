@@ -1,5 +1,5 @@
 /**
- * @reso/odata-client
+ * @reso-standards/odata-client
  *
  * OData 4.01 client SDK for TypeScript. Provides URI building, CRUD helpers,
  * CSDL metadata parsing/validation, query option validation, and response
@@ -11,7 +11,7 @@
  *
  * @example
  * ```ts
- * import { createClient, createEntity, readEntity, buildUri } from "@reso/odata-client";
+ * import { createClient, createEntity, readEntity, buildUri } from "@reso-standards/odata-client";
  *
  * const client = await createClient({
  *   baseUrl: "http://localhost:8080",
@@ -122,5 +122,5 @@ export type {
   PropertyExpr,
   ExpandExpression,
   ExpandQueryOptions
-} from '@reso/odata-expression-parser';
-export { parseFilter, parseExpand } from '@reso/odata-expression-parser';
+} from '@reso-standards/odata-expression-parser';
+export { parseFilter, parseExpand } from '@reso-standards/odata-expression-parser';
