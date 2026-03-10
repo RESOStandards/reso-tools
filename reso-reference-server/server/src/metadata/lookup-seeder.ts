@@ -14,16 +14,16 @@ const stripEnumPrefix = (lookupName: string): string =>
 const getStandardName = (lookup: ResoLookup): string | undefined =>
   lookup.annotations?.find(a => a.term === 'RESO.OData.Metadata.StandardName')?.value;
 
-/** Generates a deterministic LookupKey using SHA-3 256 hash of LookupName:LookupValue. */
+/** Generates a deterministic LookupKey using SHA-256 hash of LookupName:LookupValue. */
 const generateLookupKey = (lookupName: string, lookupValue: string): string =>
-  createHash('sha3-256').update(`${lookupName}:${lookupValue}`).digest('hex');
+  createHash('sha256').update(`${lookupName}:${lookupValue}`).digest('hex');
 
 /**
  * Transforms the metadata lookups array into Lookup entity records
  * conforming to RESO DD 2.0 Section 2.2.
  *
  * Each record contains:
- * - LookupKey: SHA-3 256 hash of "{LookupName}:{LookupValue}"
+ * - LookupKey: SHA-256 hash of "{LookupName}:{LookupValue}"
  * - LookupName: Short name (e.g., "StandardStatus")
  * - LookupValue: Human-friendly display name from StandardName annotation
  * - StandardLookupValue: Same as LookupValue for DD-standard entries

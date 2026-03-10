@@ -30,10 +30,28 @@ const LOCAL_SERVER: ServerConfig = {
 const STORAGE_KEY = 'reso-server-configs';
 const ACTIVE_KEY = 'reso-active-server';
 
-/** Load saved external server configs from localStorage. */
-const loadSavedConfigs = (): ReadonlyArray<ServerConfig> => {
+// ── Storage abstraction: Electron secure storage or browser localStorage ──
+
+/** Electron preload API shape, available only in the desktop client. */
+interface ElectronStorageApi {
+  readonly get: (key: string) => Promise<string | null>;
+  readonly set: (key: string, value: string) => Promise<void>;
+  readonly remove: (key: string) => Promise<void>;
+}
+
+/** True when running inside the Electron desktop client (preload script exposes this). */
+const isElectron = (): boolean => 'electronStorage' in window;
+
+/** Access the Electron storage API (only call after isElectron() check). */
+const electronStorage = (): ElectronStorageApi =>
+  (window as unknown as { electronStorage: ElectronStorageApi }).electronStorage;
+
+/** Load saved external server configs (async — works with both Electron and localStorage). */
+const loadSavedConfigs = async (): Promise<ReadonlyArray<ServerConfig>> => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = isElectron()
+      ? await electronStorage().get(STORAGE_KEY)
+      : localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -43,23 +61,35 @@ const loadSavedConfigs = (): ReadonlyArray<ServerConfig> => {
   }
 };
 
-/** Load the active server ID from localStorage. */
-const loadActiveServerId = (): string => {
+/** Load the active server ID (async). */
+const loadActiveServerId = async (): Promise<string> => {
   try {
-    return localStorage.getItem(ACTIVE_KEY) ?? 'local';
+    const val = isElectron()
+      ? await electronStorage().get(ACTIVE_KEY)
+      : localStorage.getItem(ACTIVE_KEY);
+    return val ?? 'local';
   } catch {
     return 'local';
   }
 };
 
-/** Save external server configs to localStorage. */
-const persistConfigs = (configs: ReadonlyArray<ServerConfig>): void => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(configs));
+/** Save external server configs (async). */
+const persistConfigs = async (configs: ReadonlyArray<ServerConfig>): Promise<void> => {
+  const json = JSON.stringify(configs);
+  if (isElectron()) {
+    await electronStorage().set(STORAGE_KEY, json);
+  } else {
+    localStorage.setItem(STORAGE_KEY, json);
+  }
 };
 
-/** Save the active server ID to localStorage. */
-const persistActiveServer = (id: string): void => {
-  localStorage.setItem(ACTIVE_KEY, id);
+/** Save the active server ID (async). */
+const persistActiveServer = async (id: string): Promise<void> => {
+  if (isElectron()) {
+    await electronStorage().set(ACTIVE_KEY, id);
+  } else {
+    localStorage.setItem(ACTIVE_KEY, id);
+  }
 };
 
 /** Dynamic resource info discovered from a server's metadata. */
@@ -142,11 +172,42 @@ const resolveMetadataUrl = (baseUrl: string): string => {
 
 /** Provider that manages server connections and exposes them via context. */
 export const ServerProvider = ({ children }: ServerProviderProps) => {
-  const [externalConfigs, setExternalConfigs] = useState<ReadonlyArray<ServerConfig>>(loadSavedConfigs);
-  const [activeServerId, setActiveServerId] = useState<string>(loadActiveServerId);
+  const [externalConfigs, setExternalConfigs] = useState<ReadonlyArray<ServerConfig>>([]);
+  const [activeServerId, setActiveServerId] = useState<string>('local');
+  const [storageReady, setStorageReady] = useState(!isElectron());
   const [resources, setResources] = useState<ReadonlyArray<ResourceInfo> | null>(null);
   const [isLoadingResources, setIsLoadingResources] = useState(true);
   const [resourceError, setResourceError] = useState<string | null>(null);
+
+  // Hydrate state from storage (async for Electron secure storage, instant for localStorage)
+  useEffect(() => {
+    if (storageReady && !isElectron()) return; // localStorage already hydrated synchronously below
+    let cancelled = false;
+    const hydrate = async () => {
+      const [configs, activeId] = await Promise.all([loadSavedConfigs(), loadActiveServerId()]);
+      if (!cancelled) {
+        setExternalConfigs(configs);
+        setActiveServerId(activeId);
+        setStorageReady(true);
+      }
+    };
+    hydrate();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // For web (non-Electron), hydrate synchronously on mount so there's no flash
+  useEffect(() => {
+    if (isElectron()) return;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        if (Array.isArray(parsed)) setExternalConfigs(parsed as ReadonlyArray<ServerConfig>);
+      }
+      const activeId = localStorage.getItem(ACTIVE_KEY);
+      if (activeId) setActiveServerId(activeId);
+    } catch { /* ignore */ }
+  }, []);
 
   const servers = useMemo(() => [LOCAL_SERVER, ...externalConfigs], [externalConfigs]);
 
@@ -157,8 +218,9 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
 
   const isLocal = activeServer.type === 'local';
 
-  // Always fetch $metadata to discover resources and keys
+  // Fetch $metadata to discover resources and keys (wait for storage hydration)
   useEffect(() => {
+    if (!storageReady) return;
     const controller = new AbortController();
     setIsLoadingResources(true);
     setResourceError(null);
@@ -202,11 +264,11 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
 
     loadMetadata();
     return () => controller.abort();
-  }, [activeServer]);
+  }, [activeServer, storageReady]);
 
   const switchServer = useCallback((id: string) => {
     setActiveServerId(id);
-    persistActiveServer(id);
+    void persistActiveServer(id);
   }, []);
 
   const addServer = useCallback((config: Omit<ServerConfig, 'id' | 'type'>): string => {
@@ -214,7 +276,7 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     const newConfig: ServerConfig = { ...config, id, type: 'external' };
     setExternalConfigs(prev => {
       const updated = [...prev, newConfig];
-      persistConfigs(updated);
+      void persistConfigs(updated);
       return updated;
     });
     return id;
@@ -224,7 +286,7 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     if (id === 'local') return;
     setExternalConfigs(prev => {
       const updated = prev.filter(c => c.id !== id);
-      persistConfigs(updated);
+      void persistConfigs(updated);
       return updated;
     });
     setActiveServerId(prev => (prev === id ? 'local' : prev));
@@ -234,7 +296,7 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     if (id === 'local') return;
     setExternalConfigs(prev => {
       const updated = prev.map(c => (c.id === id ? { ...c, ...updates } : c));
-      persistConfigs(updated);
+      void persistConfigs(updated);
       return updated;
     });
   }, []);

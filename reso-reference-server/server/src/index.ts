@@ -391,9 +391,9 @@ export const startServer = (app: express.Express, config: ServerConfig): Server 
 export { loadConfig } from './config.js';
 export type { ServerConfig, DbBackend, EnumMode } from './config.js';
 
-// CLI entry point — only runs when executed directly (not when imported as library)
-const isDirectExecution = import.meta.url === `file://${process.argv[1]}` ||
-  process.argv[1]?.endsWith('/dist/index.js');
+// CLI entry point — only runs when executed directly (not when imported as library).
+// Check argv only (not import.meta.url) to avoid false positives when bundled.
+const isDirectExecution = process.argv[1]?.endsWith('/dist/index.js') === true;
 
 if (isDirectExecution) {
   const config = loadConfig();

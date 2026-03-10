@@ -1,9 +1,81 @@
-import { app, BrowserWindow, Menu, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, safeStorage, shell } from 'electron';
 import { resolve } from 'node:path';
 import { fork, type ChildProcess } from 'node:child_process';
+import { appendFileSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+
+/** Write diagnostic messages to a log file in the user data directory. */
+const logFile = (): string => resolve(app.getPath('userData'), 'reso-desktop.log');
+const log = (msg: string): void => {
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  try { appendFileSync(logFile(), line); } catch { /* ignore */ }
+  console.log(msg);
+};
 
 // Override default "Electron" name shown in macOS menu bar and dock
 app.setName('RESO Desktop Client');
+
+// ── Persistent storage (encrypted when safeStorage is available, plain JSON otherwise) ──
+
+/** Path to the storage file in the user data directory. */
+const storageFilePath = (): string => resolve(app.getPath('userData'), 'secure-storage.json');
+
+/** Whether OS-level encryption (Keychain/DPAPI/libsecret) is available. */
+const canEncrypt = (): boolean => safeStorage.isEncryptionAvailable();
+
+/** Read the entire store as a Record<string, string>. */
+const readStore = (): Record<string, string> => {
+  try {
+    const raw = readFileSync(storageFilePath(), 'utf-8');
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
+
+    const encrypted = canEncrypt();
+    const result: Record<string, string> = {};
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof value === 'string') {
+        result[key] = encrypted
+          ? safeStorage.decryptString(Buffer.from(value, 'base64'))
+          : value;
+      }
+    }
+    return result;
+  } catch {
+    return {};
+  }
+};
+
+/** Write the store, encrypting values when safeStorage is available. */
+const writeStore = (store: Record<string, string>): void => {
+  const encrypted = canEncrypt();
+  const output: Record<string, string> = {};
+  for (const [key, value] of Object.entries(store)) {
+    output[key] = encrypted
+      ? safeStorage.encryptString(value).toString('base64')
+      : value;
+  }
+  mkdirSync(app.getPath('userData'), { recursive: true });
+  writeFileSync(storageFilePath(), JSON.stringify(output, null, 2), 'utf-8');
+};
+
+/** Register IPC handlers for secure storage operations. */
+const registerStorageHandlers = (): void => {
+  ipcMain.handle('storage:get', (_event, key: string): string | null => {
+    const store = readStore();
+    return store[key] ?? null;
+  });
+
+  ipcMain.handle('storage:set', (_event, key: string, value: string): void => {
+    const store = readStore();
+    store[key] = value;
+    writeStore(store);
+  });
+
+  ipcMain.handle('storage:remove', (_event, key: string): void => {
+    const store = readStore();
+    delete store[key];
+    writeStore(store);
+  });
+};
 
 /** State for the running server instance. */
 interface AppState {
@@ -31,12 +103,12 @@ const resolvePaths = (): {
 
   if (app.isPackaged) {
     return {
-      serverEntry: resolve(process.resourcesPath, 'server-entry.mjs'),
+      serverEntry: resolve(process.resourcesPath, 'server-bundle', 'server-entry.mjs'),
       sqliteDbPath,
       metadataPath: resolve(process.resourcesPath, 'server-metadata.json'),
       serverRoot: process.resourcesPath,
       uiDistPath: resolve(process.resourcesPath, 'ui'),
-      iconPath: resolve(process.resourcesPath, '..', 'build', 'icon.png')
+      iconPath: resolve(process.resourcesPath, '..', 'Resources', 'icon.icns')
     };
   }
 
@@ -177,20 +249,22 @@ const buildMenu = (): void => {
 const startReferenceServer = (): Promise<string> => {
   const paths = resolvePaths();
 
-  console.log('Launching server child process...');
-  console.log(`  Entry:  ${paths.serverEntry}`);
-  console.log(`  SQLite: ${paths.sqliteDbPath}`);
+  log('Launching server child process...');
+  log(`  Entry:  ${paths.serverEntry}`);
+  log(`  SQLite: ${paths.sqliteDbPath}`);
+  log(`  isPackaged: ${app.isPackaged}`);
+  log(`  resourcesPath: ${process.resourcesPath}`);
 
   return new Promise((resolvePromise, reject) => {
-    // Use system node to run the ESM server entry — Electron's Node has
-    // CJS/ESM interop issues with native modules like better-sqlite3.
+    // Fork Electron as a plain Node.js process via ELECTRON_RUN_AS_NODE.
+    // This uses Electron's bundled Node (same ABI as the compiled native
+    // addons), so it works in packaged apps without requiring system Node.
     const child = fork(
       paths.serverEntry,
       [paths.sqliteDbPath, paths.metadataPath, paths.serverRoot, paths.uiDistPath],
       {
-        execPath: 'node',
         stdio: ['pipe', 'inherit', 'inherit', 'ipc'],
-        env: { ...process.env }
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
       }
     );
 
@@ -208,10 +282,12 @@ const startReferenceServer = (): Promise<string> => {
     });
 
     child.on('error', (err) => {
+      log(`Fork error: ${err.message}`);
       reject(new Error(`Failed to spawn server process: ${err.message}`));
     });
 
     child.on('exit', (code) => {
+      log(`Server child exited with code ${code}`);
       if (!state.serverUrl) {
         reject(new Error(`Server process exited with code ${code} before becoming ready`));
       }
@@ -233,7 +309,8 @@ const createWindow = (url: string): BrowserWindow => {
     icon,
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      preload: resolve(__dirname, 'preload.js')
     }
   });
 
@@ -326,13 +403,14 @@ const shutdown = (): void => {
 
 // App lifecycle
 app.whenReady().then(async () => {
+  registerStorageHandlers();
   buildMenu();
 
   try {
     const url = await startReferenceServer();
     createWindow(url);
   } catch (err) {
-    console.error('Failed to start server:', err);
+    log(`Failed to start server: ${err instanceof Error ? err.message : String(err)}`);
     app.quit();
   }
 });
