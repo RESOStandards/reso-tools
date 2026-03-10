@@ -71,7 +71,7 @@ The server starts at `http://localhost:8080` by default.
 npm test
 ```
 
-198 tests across 10 test files:
+254 tests across 13 test files:
 - `metadata.test.ts` — Metadata loader and helpers
 - `edmx-generator.test.ts` — EDMX XML generation, EntityContainer, NavigationProperty
 - `schema-generator.test.ts` — PostgreSQL DDL generation
@@ -79,9 +79,12 @@ npm test
 - `validation.test.ts` — Request body validation with business rules
 - `navigation.test.ts` — Navigation property bindings, $expand, expansion field filtering
 - `auth.test.ts` — Authentication and authorization middleware
-- `filter-to-sql.test.ts` — OData `$filter` to parameterized SQL WHERE translation (31 tests)
-- `filter-to-mongo.test.ts` — OData `$filter` to MongoDB query translation (33 tests)
-- `filter-to-sqlite.test.ts` — OData `$filter` to parameterized SQLite WHERE translation (32 tests)
+- `filter-to-sql.test.ts` — OData `$filter` to parameterized SQL WHERE translation
+- `filter-to-mongo.test.ts` — OData `$filter` to MongoDB query translation
+- `filter-to-sqlite.test.ts` — OData `$filter` to parameterized SQLite WHERE translation
+- `entity-event.test.ts` — EntityEvent (RCP-027) change tracking
+- `paging.test.ts` — Server-driven paging
+- `mongo-schema-generator.test.ts` — MongoDB schema and index generation
 
 ## Environment Variables
 

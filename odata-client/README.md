@@ -260,7 +260,7 @@ npx tsx examples/query-with-filter.ts
 ```bash
 npm install
 npm run build
-npm test        # 101 tests
+npm test        # 118 tests
 ```
 
 ## License

@@ -272,25 +272,25 @@ describe('server-driven paging', () => {
       expect(res._body['@odata.nextLink']).toBeUndefined();
     });
 
-    it('second page with $skip returns remaining records', async () => {
+    it('second page with $skip returns records respecting per-page $top', async () => {
       const dal = makeMockDal(500);
       const handler = collectionHandler(makeCtx(dal));
-      // Simulate following a nextLink: $top=300, $skip=100
-      // remaining = 300 - 100 = 200, effectivePageSize = min(300, 2000) = 300
-      // fetchLimit = min(200, 300) = 200, returns 200, client satisfied (100+200=300)
+      // $top=300 is a per-page limit, $skip=100 is an independent offset
+      // effectivePageSize = min(300, 2000) = 300, fetchLimit = 300
+      // DAL returns min(300, 500-100) = 300, client satisfied (100+300=400 >= 300)
       const req = makeReq({ $top: '300', $skip: '100' });
       const res = makeRes();
 
       await handler(req as Request, res as unknown as Response, vi.fn());
 
-      expect((res._body.value as unknown[]).length).toBe(200);
+      expect((res._body.value as unknown[]).length).toBe(300);
       expect(res._body['@odata.nextLink']).toBeUndefined();
     });
 
-    it('pages correctly when maxpagesize is smaller than remaining', async () => {
+    it('pages correctly when maxpagesize is smaller than $top', async () => {
       const dal = makeMockDal(500);
       const handler = collectionHandler(makeCtx(dal));
-      // $top=300, $skip=100, maxpagesize=50 → remaining=200, pageSize=50, fetch=50
+      // $top=300, $skip=100, maxpagesize=50 → pageSize=50, fetchLimit=50
       const req = makeReq({ $top: '300', $skip: '100' }, { prefer: 'odata.maxpagesize=50' });
       const res = makeRes();
 
@@ -302,16 +302,17 @@ describe('server-driven paging', () => {
       expect(res._body['@odata.nextLink']).toContain('$top=300');
     });
 
-    it('last page has no nextLink when $top obligation is met', async () => {
+    it('last page has no nextLink when $top is satisfied', async () => {
       const dal = makeMockDal(500);
       const handler = collectionHandler(makeCtx(dal));
-      // $top=150, $skip=100 → remaining=50, fetch 50, then done
+      // $top=150, $skip=100 → fetchLimit=150, DAL returns 150
+      // clientSatisfied: 100+150=250 >= 150 → no nextLink
       const req = makeReq({ $top: '150', $skip: '100' });
       const res = makeRes();
 
       await handler(req as Request, res as unknown as Response, vi.fn());
 
-      expect((res._body.value as unknown[]).length).toBe(50);
+      expect((res._body.value as unknown[]).length).toBe(150);
       expect(res._body['@odata.nextLink']).toBeUndefined();
     });
   });

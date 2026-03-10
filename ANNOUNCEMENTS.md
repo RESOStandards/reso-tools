@@ -2,6 +2,22 @@
 
 ---
 
+## v0.2 — 2026-03-10
+
+### The "There's an App for That" Release
+
+**RESO has a desktop app.** The reference server now runs as a native application on macOS, Windows, and Linux — no terminal, no Docker, no database setup. Just launch it and start exploring RESO data. Native menus, keyboard shortcuts, trackpad gestures, and RESO-branded icons included.
+
+**Connect to any OData server.** The new server switcher lets you point the UI at your own server (or anyone else's) and browse its data, metadata, and resources — all from the same interface. Great for vendors who want to see how their data looks through a standards-compliant lens.
+
+**Explore your metadata.** A new Metadata Explorer lets you browse entity types, fields, navigation properties, and enumerations straight from `$metadata`. Searchable, filterable, and a lot easier than reading raw XML.
+
+**Four-for-four on compliance.** Data Dictionary 2.0, Web API Core 2.0, Add/Edit (RCP-010), and EntityEvent (RCP-027) all pass with zero failures against PostgreSQL with human-friendly enumerations. See the [technical release notes](RELEASES.md) for the full scorecard.
+
+**The UI got a lot more polished.** Landing page, mobile-responsive layout, advanced search, human-friendly lookup values, loading spinners, and password masking — the kind of details that make the difference between a demo and a product.
+
+---
+
 ## v0.1 — 2026-03-06
 
 ### The "Everything Under One Roof" Release

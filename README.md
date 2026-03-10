@@ -11,7 +11,7 @@ Testing, client SDK, and reference implementation tools for the RESO Web API spe
 Isomorphic validation library for RESO metadata-driven field validation. Works in any JS runtime (Node.js, browser, edge). Used by both the reference server API and the React UI.
 
 ```bash
-cd validation && npm install && npm test  # 41 tests
+cd validation && npm install && npm test  # 103 tests
 ```
 
 #### [@reso/odata-expression-parser](odata-expression-parser/)
@@ -19,7 +19,7 @@ cd validation && npm install && npm test  # 41 tests
 Standalone, zero-dependency library for parsing OData 4.01 `$filter` expressions into a typed AST. Used by both the client SDK (query validation) and the reference server (SQL translation).
 
 ```bash
-cd odata-expression-parser && npm install && npm test  # 97 tests
+cd odata-expression-parser && npm install && npm test  # 180 tests
 ```
 
 #### [@reso/odata-client](odata-client/)
@@ -27,7 +27,7 @@ cd odata-expression-parser && npm install && npm test  # 97 tests
 OData 4.01 client SDK for TypeScript. URI builder, CRUD helpers, CSDL metadata parsing/validation, query validation, and response parsing. Inspired by Apache Olingo.
 
 ```bash
-cd odata-client && npm install && npm test  # 101 tests
+cd odata-client && npm install && npm test  # 118 tests
 ```
 
 ### Tools
@@ -37,7 +37,7 @@ cd odata-client && npm install && npm test  # 101 tests
 Generates realistic RESO Data Dictionary test data. Supports three output modes: HTTP (POST to an OData server), JSON files, and curl script generation. Includes resource-specific generators for Property, Member, Office, Media, OpenHouse, and Showing with domain-appropriate values.
 
 ```bash
-cd data-generator && npm install && npm test  # 69 tests
+cd data-generator && npm install && npm test  # 104 tests
 
 # Interactive CLI
 npx reso-data-generator
@@ -61,7 +61,7 @@ RESO certification testing tools. Each subdirectory implements an independent ce
 Compliance testing tool for the RESO Web API Add/Edit Endorsement. Validates OData CRUD operations against 8 Gherkin BDD certification scenarios.
 
 ```bash
-cd certification/add-edit && npm install && npm test  # 49 tests
+cd certification && npm install && npm test  # 102 tests
 
 # Run against a server
 npx reso-cert-add-edit \
@@ -79,9 +79,17 @@ npx reso-cert-add-edit \
   --mock
 ```
 
+#### [@reso/desktop](reso-reference-server/desktop/)
+
+Electron desktop client for the RESO Reference Server. Wraps the server and UI into a native macOS/Windows/Linux application with native menus, keyboard shortcuts (Cmd/Ctrl+Arrow, Cmd/Ctrl+[/]), and trackpad navigation gestures.
+
+```bash
+cd reso-reference-server/desktop && npm install && npm run dev
+```
+
 #### [reso-reference-server](reso-reference-server/)
 
-Metadata-driven OData 4.01 reference server backed by PostgreSQL. Reads the RESO Data Dictionary JSON metadata and dynamically generates database tables, OData CRUD endpoints, EDMX metadata, and OpenAPI documentation for Property, Member, Office, Media, OpenHouse, and Showing resources. Includes a React UI for browsing and editing records.
+Metadata-driven OData 4.01 reference server backed by PostgreSQL, MongoDB, or SQLite. Reads the RESO Data Dictionary JSON metadata and dynamically generates database tables, OData CRUD endpoints, EDMX metadata, and OpenAPI documentation for 14 RESO resources. Includes a React UI for browsing and editing records, a server switcher for connecting to external OData servers, and a metadata explorer.
 
 **Build and run with Docker:**
 
@@ -102,7 +110,7 @@ cd reso-reference-server/server
 npm install
 npm run build
 npm start
-npm test  # 76 tests
+npm test  # 254 tests
 ```
 
 **Seed with test data:**

@@ -53,6 +53,8 @@ COPY --from=build /deps/data-generator /deps/data-generator
 COPY reso-reference-server/server/package.json ./
 COPY reso-reference-server/server/server-metadata.json ./
 COPY reso-reference-server/server/public ./public
+# Config resolves serverRoot to ../src when running from dist/
+COPY reso-reference-server/server/src/ui-config.json reso-reference-server/server/src/field-groups.json ./src/
 
 ENV PORT=8080
 ENV METADATA_PATH=./server-metadata.json

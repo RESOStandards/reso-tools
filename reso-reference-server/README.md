@@ -120,6 +120,7 @@ docker compose --profile seed up seed   # or: --profile seed-mongo up seed-mongo
 reso-reference-server/
 ├── server/          # Node/Express/TypeScript OData server
 ├── ui/              # React SPA for browsing/editing records (Vite + Tailwind)
+├── desktop/         # Electron desktop client (macOS/Windows/Linux)
 ├── compliance/      # RESO compliance test infrastructure (Docker)
 ├── docker-compose.yml
 └── CLAUDE.md        # Coding conventions

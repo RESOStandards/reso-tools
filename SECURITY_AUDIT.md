@@ -4,6 +4,154 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
+## Audit: 2026-03-09 — v0.2 New Code
+
+**Scope:** `reso-reference-server/desktop/`, `reso-reference-server/ui/src/` (server switcher, context, metadata adapter), server proxy changes
+**Auditor:** Claude Opus 4.6
+
+| # | Finding | Severity | Status | Area |
+|---|---------|----------|--------|------|
+| 17 | Bearer Tokens Stored in localStorage in Plaintext | High | Open | UI |
+| 18 | No Authentication on Proxy Endpoint | High | Open | Server |
+| 19 | Authorization Header Forwarded Through Proxy to Arbitrary Targets | High | Open | Server |
+| 20 | No URL Scheme Validation in Server Connection Modal | Medium | Open | UI |
+| 21 | Proxy Response Body Passed Through Without Sanitization | Medium | Open | Server |
+| 22 | DNS Rebinding Risk on Localhost Bypass | Medium | Open | UI |
+| 23 | Full process.env Passed to Child Process | Medium | Open | Desktop |
+| 24 | Default Auth Tokens Not Warned at Startup | Medium | Open | Server |
+| 25 | executeJavaScript with Inline Code Strings | Low | Open | Desktop |
+| 26 | localStorage Config Not Validated on Parse | Low | Open | UI |
+| 27 | DevTools Accessible in Production Build | Low | Open | Desktop |
+
+### Positive Findings (v0.2)
+
+- Electron `nodeIntegration: false` and `contextIsolation: true` correctly set
+- External links open in system browser via `shell.openExternal`
+- New window creation denied (`action: 'deny'`)
+- External servers default to read-only permissions (`canAdd/canEdit/canDelete: false`)
+- AbortController used for metadata fetch cleanup on server switch
+- Query parameters properly `encodeURIComponent`-encoded in OData client
+- Timing-safe token comparison retained from v0.1 fixes
+
+### Finding 17: Bearer Tokens Stored in localStorage in Plaintext
+
+**Severity: High**
+**File:** `reso-reference-server/ui/src/context/server-context.tsx`, lines 30, 56-58
+
+**Description:** The `ServerConfig` object (including bearer tokens) is serialized to `localStorage` under the key `reso-server-configs`. Any XSS vulnerability allows an attacker to exfiltrate all stored tokens via `JSON.parse(localStorage.getItem('reso-server-configs'))`.
+
+**Recommended Fix:** For the Electron desktop app, use Electron's `safeStorage` API to encrypt tokens at rest. For the web version, consider storing tokens only in memory (session-lived). At minimum, document the risk.
+
+---
+
+### Finding 18: No Authentication on Proxy Endpoint
+
+**Severity: High**
+**File:** `reso-reference-server/server/src/index.ts`, lines 299-357
+
+**Description:** The `/api/proxy` endpoint has no authentication check. Any unauthenticated client can use it as an open proxy, regardless of `AUTH_REQUIRED` setting. This amplifies the existing SSRF finding (#1/issue #50).
+
+**Recommended Fix:** Apply auth middleware to the proxy endpoint. At minimum require a valid bearer token.
+
+---
+
+### Finding 19: Authorization Header Forwarded Through Proxy to Arbitrary Targets
+
+**Severity: High**
+**File:** `reso-reference-server/server/src/index.ts`, lines 327-329
+
+**Description:** The proxy blindly forwards the `Authorization` header to the upstream target. If a user is authenticated and the proxy URL points to an attacker-controlled server, the user's auth token is forwarded to the attacker.
+
+**Recommended Fix:** Only forward Authorization if the target URL matches the configured external server's baseUrl. Strip it otherwise.
+
+---
+
+### Finding 20: No URL Scheme Validation in Server Connection Modal
+
+**Severity: Medium**
+**File:** `reso-reference-server/ui/src/components/server-connection-modal.tsx`, lines 51-54
+
+**Description:** URL validation uses `new URL()` which accepts `javascript:`, `file:///`, `data:`, and `ftp:` schemes. The localhost bypass in `server-context.tsx` connects directly without the proxy for matching hosts.
+
+**Recommended Fix:** After `new URL()` parse, explicitly check that `parsed.protocol` is `'http:'` or `'https:'`.
+
+---
+
+### Finding 21: Proxy Response Body Passed Through Without Sanitization
+
+**Severity: Medium**
+**File:** `reso-reference-server/server/src/index.ts`, lines 346-352
+
+**Description:** The proxy forwards upstream `Content-Type` and body verbatim. If upstream returns `text/html` with malicious JavaScript, this is a reflected XSS vector via `/api/proxy?url=https://evil.com/xss.html`. The global `X-Content-Type-Options: nosniff` header mitigates but doesn't fully prevent this when Content-Type is `text/html`.
+
+**Recommended Fix:** Force `Content-Type: application/json` on proxy responses, or strip HTML content types.
+
+---
+
+### Finding 22: DNS Rebinding Risk on Localhost Bypass
+
+**Severity: Medium**
+**File:** `reso-reference-server/ui/src/api/client.ts`, lines 44-51
+
+**Description:** Localhost detection checks hostname strings (`localhost`, `127.0.0.1`, `::1`) but doesn't account for DNS rebinding (attacker domain resolving to 127.0.0.1) or alternate representations like `0.0.0.0`.
+
+**Recommended Fix:** Accept that the proxy path is the safe default for non-obvious localhost addresses.
+
+---
+
+### Finding 23: Full process.env Passed to Child Process
+
+**Severity: Medium**
+**File:** `reso-reference-server/desktop/src/main.ts`, line 193
+
+**Description:** `env: { ...process.env }` passes the entire shell environment to the forked server child process, including any sensitive variables (AWS keys, etc.) not needed by the child.
+
+**Recommended Fix:** Explicitly pass only the environment variables the child needs.
+
+---
+
+### Finding 24: Default Auth Tokens Not Warned at Startup
+
+**Severity: Medium**
+**File:** `reso-reference-server/server/src/auth/config.ts`, lines 68-73
+
+**Description:** Default tokens (`admin-token`, `write-token`, `read-token`) with `AUTH_REQUIRED=false` are used without warning. Related to existing finding #4 (issue #53) but the proxy endpoint makes this more urgent.
+
+---
+
+### Finding 25: executeJavaScript with Inline Code Strings
+
+**Severity: Low**
+**File:** `reso-reference-server/desktop/src/main.ts`, lines 260-263, 269-272, 279-304
+
+**Description:** Uses `win.webContents.executeJavaScript()` with hardcoded strings for navigation gestures. Bypasses the `contextIsolation` boundary. Risk is low since `nodeIntegration: false` and content is always from the local server.
+
+**Recommended Fix:** Use a preload script with `contextBridge.exposeInMainWorld` and IPC instead.
+
+---
+
+### Finding 26: localStorage Config Not Validated on Parse
+
+**Severity: Low**
+**File:** `reso-reference-server/ui/src/context/server-context.tsx`, lines 34-44
+
+**Description:** `loadSavedConfigs` parses JSON from localStorage and casts to `ReadonlyArray<ServerConfig>` without shape validation. Tampered localStorage could cause runtime errors.
+
+**Recommended Fix:** Add runtime validation of parsed shape before returning.
+
+---
+
+### Finding 27: DevTools Accessible in Production Build
+
+**Severity: Low**
+**File:** `reso-reference-server/desktop/src/main.ts`, line 101
+
+**Description:** The Electron menu includes `toggleDevTools` unconditionally. In packaged builds, this lets users inspect localStorage tokens and execute arbitrary JavaScript.
+
+**Recommended Fix:** Conditionally include only when `!app.isPackaged`.
+
+---
+
 ## Audit: 2026-03-08
 
 **Scope:** `reso-reference-server/server/src/`

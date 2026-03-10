@@ -298,12 +298,10 @@ export const collectionHandler =
       // When $top is specified, the server tries to satisfy it in as few pages as possible.
       const effectivePageSize = Math.min(maxPageSize ?? clientTop ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
 
-      // How many records to fetch for this page:
-      // - If client specified $top, only fetch what's still owed (remaining = $top - $skip)
-      // - Cap at effective page size either way
-      const remaining = clientTop !== undefined ? Math.max(clientTop - skip, 0) : undefined;
-      const fetchLimit = remaining !== undefined
-        ? Math.min(remaining, effectivePageSize)
+      // How many records to fetch: the lesser of $top (per-page client limit) and
+      // effective page size. $skip is an independent offset per OData spec.
+      const fetchLimit = clientTop !== undefined
+        ? Math.min(clientTop, effectivePageSize)
         : effectivePageSize;
 
       const options: CollectionQueryOptions = {

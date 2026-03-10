@@ -21,7 +21,7 @@ certification/
 │   ├── add-edit/             # RCP-010 Add/Edit scenarios + mock server
 │   ├── web-api-core/         # Web API Core 2.0.0 (stub)
 │   └── data-dictionary/      # Data Dictionary 2.0 (stub)
-├── tests/                    # 60 Vitest tests
+├── tests/                    # 102 Vitest tests
 ├── sample-payloads/          # JSON payload files for Add/Edit testing
 ├── sample-metadata.xml       # Sample EDMX metadata for mock server
 └── Dockerfile                # Multi-stage Docker build for CI

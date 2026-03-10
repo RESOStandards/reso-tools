@@ -2,6 +2,90 @@
 
 ---
 
+## v0.2 — 2026-03-10
+
+### RESO Desktop Client and Other Improvements
+
+Second milestone release introducing a native desktop application, multi-server connectivity, a full-featured metadata explorer, and comprehensive compliance testing across all four RESO certification suites.
+
+#### Desktop Client (New)
+
+- **Electron desktop application** — Native app wrapping the reference server and UI for macOS, Windows, and Linux. Dual-process architecture: CJS main process for window management, ESM child process for the server (avoids Electron's CJS/ESM interop issues).
+- **Native menus and navigation** — Full menu bar (File, Edit, View, Navigate, Window, Help), keyboard shortcuts (Cmd/Ctrl+[/] for back/forward), three-finger swipe gestures, and trackpad scroll navigation.
+- **RESO-branded icons** — Custom `.icns` (macOS), `.ico` (Windows), and `.png` (Linux) app icons.
+- **Automatic port discovery** — Server starts on a random available port and communicates readiness via IPC.
+- **SQLite backend** — Persistent storage in the user data directory, no external database required.
+
+#### Server Switcher & External Server Support
+
+- **Multi-server connectivity** — New server switcher component allows connecting to external OData servers alongside the built-in reference server. Supports Bearer token and Client Credentials OAuth2 authentication.
+- **Server connection modal** — Add/edit/remove server connections with live connection testing. Stored in React context with localStorage persistence.
+- **Server-aware proxy** — Backend proxy endpoint forwards OData requests to external servers, handling authentication and CORS transparently.
+- **Metadata adapter** — Translates external server CSDL metadata into the internal format, enabling the full UI (search, detail, CRUD) against any OData-compliant server.
+- **Granular permissions** — Server context tracks per-server capabilities (read, create, update, delete) and the UI adapts accordingly (hides Add/Edit/Delete for read-only servers).
+
+#### UI Enhancements
+
+- **Landing page** — New home page with server status, resource overview cards, and quick navigation.
+- **Metadata Explorer** — Browse entity types, fields, navigation properties, and enumerations from the server's `$metadata`. Searchable and filterable.
+- **Mobile responsive layout** — Collapsible sidebar, responsive grid layouts, and touch-friendly controls.
+- **Advanced search overlay** — Full-screen search panel with field-type-aware inputs, date pickers, and lookup dropdowns.
+- **Human-friendly lookups** — Unified lookup resolver translates enum values to display names throughout the UI.
+- **Loading spinner** — Consistent loading state across all pages.
+- **Password field masking** — Sensitive fields (tokens, passwords) masked by default with toggle to reveal.
+- **Dynamic key discovery** — Detail/edit pages work with any key field, not just hardcoded `ListingKey`.
+- **Generic media display** — Media carousel works with any resource that has navigation to Media, not just Property.
+
+#### OData Client Improvements
+
+- **HTTP keep-alive and gzip compression** — Connection pooling and response compression for faster metadata and data fetching.
+- **CSDL parser enhancements** — Extended parser handles navigation property bindings, enum type members, and complex type definitions from external servers.
+- **Lookup resolver library** — New `@reso/odata-client` export for resolving human-friendly lookup values from CSDL metadata.
+
+#### Compliance Testing
+
+All four RESO certification suites pass against the reference server with PostgreSQL backend and string enumerations:
+
+| Suite | Result |
+|-------|--------|
+| Data Dictionary 2.0 | 1038 passed, 0 failed |
+| Web API Core 2.0 | 42 passed, 0 failed |
+| Add/Edit (RCP-010) | All passed |
+| EntityEvent (RCP-027) | All passed, 1000 events validated |
+
+- **Docker compliance infrastructure** — Added data seeding to DD and Web API Core compliance entrypoints. Fixed Dockerfile runtime stage to include server config files required by `import.meta.dirname` resolution.
+- **Fixed OData `$skip` handling** — `$top` is now correctly treated as a per-page limit per the OData spec, independent of `$skip`. Previously, `$top=5&$skip=5` returned empty results because the handler calculated `remaining = 5-5 = 0`.
+
+#### Security
+
+- **v0.2 security audit** — 11 new findings across desktop client, server switcher, proxy, and UI. 3 High, 5 Medium, 3 Low severity.
+- **5 prior findings confirmed fixed** — Token expiry, timing-safe auth, LIKE escaping, key interpolation, and security headers (matching closed GitHub issues).
+
+#### Bug Fixes
+
+- **Fix detail page summary fields** — Summary section now displays correctly with proper field resolution.
+- **Fix expansion card layout** — Related record cards handle non-entity-set expansions with key field fallback.
+- **Fix search lookups** — Lookup fields in search filters resolve to correct display values.
+- **Fix MongoDB Add/Edit compliance** — CRUD operations work correctly with MongoDB backend.
+
+| SHA | Description |
+|-----|-------------|
+| 0f4715b | Add HTTP keep-alive and gzip compression to OData client |
+| fa06efa | Add server switcher, external OData server support, and MongoDB Add/Edit compliance |
+| 3039ada | Add generic media display, navigation guard, and resource-aware data generation |
+| de0c1e7 | Add granular server permissions, static DD field groups, and external server UI improvements |
+| d90f81f | Add unified lookup resolver, loading spinner, and permission-aware nav |
+| a2de8e2 | Add Metadata Explorer, dynamic key discovery, and human-friendly lookups |
+| 65cfa3c | Fix detail page summary fields, expansion card layout, and search lookups |
+| 982d98d | Add key field fallback for non-entity-set expansion cards |
+| a9e8620 | Fix security findings: token expiry, timing-safe auth, LIKE escaping, key interpolation, security headers |
+| fb4a383 | Update SECURITY_AUDIT.md: mark 5 findings as fixed |
+| fbd0b3c | Add landing page, mobile responsive layout, and password field masking |
+| d2b5bca | Improve UI: advanced search overlay, landing page fixes, error messages, and dev proxy |
+| 9344ebd | Add Electron desktop client with native menus, navigation, and app icons |
+
+---
+
 ## v0.1 — 2026-03-06
 
 ### UI Polish, Developer Experience, and Compliance Fixes

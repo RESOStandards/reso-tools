@@ -5,10 +5,18 @@
 set -e
 
 SERVER_URL="${SERVER_URL:-http://server:8080}"
+AUTH_TOKEN="${AUTH_TOKEN:-admin-token}"
 
 echo "Waiting for server at $SERVER_URL..."
 until wget -qO- "$SERVER_URL/health" > /dev/null 2>&1; do sleep 2; done
 echo "Server ready."
+
+# Seed test data so there are records for compliance queries
+echo "Seeding test data..."
+wget -qO- --post-data='{"resource":"Property","count":10,"resolveDependencies":true,"relatedRecords":{"Media":2,"OpenHouse":1,"Showing":1,"PropertyRooms":1,"PropertyGreenVerification":1,"PropertyPowerProduction":1,"PropertyUnitTypes":1}}' \
+  --header='Content-Type: application/json' --header="Authorization: Bearer $AUTH_TOKEN" \
+  "$SERVER_URL/admin/data-generator" || echo "WARNING: Seed failed, continuing anyway"
+echo "Seed complete."
 
 # Substitute server URL into config template
 sed "s|SERVER_URL_PLACEHOLDER|$SERVER_URL|g" /config/dd-config.json > /tmp/dd-config.json
