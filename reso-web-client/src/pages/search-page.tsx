@@ -10,6 +10,8 @@ import { useCollection } from '../hooks/use-collection';
 import { useMetadata } from '../hooks/use-metadata';
 import { useUiConfig } from '../hooks/use-ui-config';
 import { useServer } from '../context/server-context';
+import { FriendlyError } from '../components/friendly-error';
+import { NotFoundPage } from './not-found-page';
 import { getDisplayNameFromMap } from '../utils/format';
 
 /** Search page with basic search, OData filter editor, optional advanced search, and infinite scroll results. */
@@ -147,11 +149,11 @@ export const SearchPage = () => {
     return <LoadingSpinner />;
   }
   if (resourceError) {
-    return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Failed to load server metadata: {resourceError}</div>;
+    return <FriendlyError title="Failed to Load Metadata" message={resourceError} />;
   }
 
   if (!isValidResource) {
-    return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Unknown resource: {resource}</div>;
+    return <NotFoundPage />;
   }
 
   return (

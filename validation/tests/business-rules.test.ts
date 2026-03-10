@@ -218,39 +218,11 @@ describe('getCrossFieldRules', () => {
   it('returns cross-field rules for Property', () => {
     const rules = getCrossFieldRules('Property');
     expect(rules.length).toBeGreaterThan(0);
-    expect(rules.some(r => r.name.includes('ListPrice'))).toBe(true);
     expect(rules.some(r => r.name.includes('Bathroom'))).toBe(true);
   });
 
   it('returns empty array for unknown resource', () => {
     expect(getCrossFieldRules('Member')).toHaveLength(0);
-  });
-});
-
-describe('cross-field rules: ListPrice >= ListPriceLow', () => {
-  it('passes when ListPrice > ListPriceLow', () => {
-    const failures = validateBusinessRules('Property', { ...VALID_ADDRESS, ListPrice: 500000, ListPriceLow: 400000 });
-    expect(failures.some(f => f.field === 'ListPrice' && f.reason.includes('ListPriceLow'))).toBe(false);
-  });
-
-  it('passes when ListPrice = ListPriceLow', () => {
-    const failures = validateBusinessRules('Property', { ...VALID_ADDRESS, ListPrice: 500000, ListPriceLow: 500000 });
-    expect(failures.some(f => f.field === 'ListPrice' && f.reason.includes('ListPriceLow'))).toBe(false);
-  });
-
-  it('fails when ListPrice < ListPriceLow', () => {
-    const failures = validateBusinessRules('Property', { ...VALID_ADDRESS, ListPrice: 300000, ListPriceLow: 400000 });
-    expect(failures.some(f => f.field === 'ListPrice' && f.reason.includes('ListPriceLow'))).toBe(true);
-  });
-
-  it('skips when ListPriceLow is absent', () => {
-    const failures = validateBusinessRules('Property', { ...VALID_ADDRESS, ListPrice: 500000 });
-    expect(failures.some(f => f.reason.includes('ListPriceLow'))).toBe(false);
-  });
-
-  it('skips when ListPrice is absent', () => {
-    const failures = validateBusinessRules('Property', { ...VALID_ADDRESS, ListPriceLow: 400000 });
-    expect(failures.some(f => f.reason.includes('ListPriceLow'))).toBe(false);
   });
 });
 

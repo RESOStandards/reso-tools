@@ -14,7 +14,9 @@
 
 **Four-for-four on compliance.** Data Dictionary 2.0, Web API Core 2.0, Add/Edit (RCP-010), and EntityEvent (RCP-027) all pass with zero failures against PostgreSQL with human-friendly enumerations. See the [technical release notes](RELEASES.md) for the full scorecard.
 
-**The UI got a lot more polished.** Landing page, mobile-responsive layout, advanced search, human-friendly lookup values, loading spinners, and password masking — the kind of details that make the difference between a demo and a product.
+**Browse RESO organizations.** A new Organizations page lets you browse and search the full RESO member directory — filterable by type, location, and certification status, with sortable columns, expandable detail rows showing endorsements, addresses, and certification summaries alongside an embedded map.
+
+**The UI got a lot more polished.** Landing page, mobile-responsive layout, advanced search, human-friendly lookup values, loading spinners, password masking, friendly error pages with helpful navigation, and a cleaner sidebar with icons — the kind of details that make the difference between a demo and a product.
 
 ---
 

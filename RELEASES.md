@@ -35,6 +35,10 @@ Second milestone release introducing a native desktop application, multi-server 
 - **Password field masking** — Sensitive fields (tokens, passwords) masked by default with toggle to reveal.
 - **Dynamic key discovery** — Detail/edit pages work with any key field, not just hardcoded `ListingKey`.
 - **Generic media display** — Media carousel works with any resource that has navigation to Media, not just Property.
+- **Organizations page** — Browse the RESO member directory with multi-select filters (type, location, status), sortable columns, sticky table header, zebra-striped rows, and expandable detail rows with endorsements, address, certification link, and embedded OpenStreetMap.
+- **Friendly error pages** — Reusable `FriendlyError` component and redesigned 404 page with real-estate quips, styled server message blocks, navigation buttons, and Contact Support link. Applied consistently across all page-level error states.
+- **Sidebar navigation polish** — Added Organizations link, replaced chevron arrows with semantic icons (search for Resources, code brackets for Metadata, gear for Admin, chart for Data Generator), renamed "Metadata Explorer" to "Metadata", consistent spacing via `space-y-4`.
+- **Metadata filter labels** — Renamed "Properties" filter to "Fields" to avoid ambiguity with the Property resource in real estate contexts.
 
 #### OData Client Improvements
 
@@ -67,6 +71,7 @@ All four RESO certification suites pass against the reference server with Postgr
 - **Fix expansion card layout** — Related record cards handle non-entity-set expansions with key field fallback.
 - **Fix search lookups** — Lookup fields in search filters resolve to correct display values.
 - **Fix MongoDB Add/Edit compliance** — CRUD operations work correctly with MongoDB backend.
+- **Remove `ListPrice >= ListPriceLow` cross-field rule** — The comparison prevented setting a low list price. Both fields are now validated independently as > 0, which is sufficient. A proper RESO Validation Expressions engine will replace hardcoded rules in a future release.
 
 | SHA | Description |
 |-----|-------------|

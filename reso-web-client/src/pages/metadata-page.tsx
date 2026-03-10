@@ -1,6 +1,7 @@
 import type { CsdlComplexType, CsdlEnumType, CsdlNavigationProperty, CsdlSchema, FieldInfo } from '@reso-standards/odata-client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
+import { FriendlyError } from '../components/friendly-error';
 import { LoadingSpinner } from '../components/loading-spinner';
 import { useServer } from '../context/server-context';
 import type { ResoLookup } from '../types';
@@ -381,7 +382,7 @@ export const MetadataPage = () => {
   }), [fields]);
 
   if (isLoadingResources) return <LoadingSpinner />;
-  if (error && !resource) return <div className="p-6 text-red-600 dark:text-red-400">{error}</div>;
+  if (error && !resource) return <FriendlyError title="Metadata Error" message={error} />;
 
   // Resource grid view
   if (!resource) {
@@ -439,7 +440,7 @@ export const MetadataPage = () => {
               {schema.complexTypes.map(ct => (
                 <div key={ct.name} className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
                   <div className="font-medium text-sm text-gray-900 dark:text-gray-100">{ct.name}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ct.properties.length} properties</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ct.properties.length} fields</div>
                 </div>
               ))}
             </div>
@@ -478,19 +479,22 @@ export const MetadataPage = () => {
             className="flex-1 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
           <div className="flex gap-1">
-            {(['all', 'properties', 'expansions', 'enums'] as const).map(filter => (
-              <button
-                key={filter}
-                type="button"
-                onClick={() => setTypeFilter(filter)}
-                className={`px-2 py-1 rounded text-xs transition-colors ${
-                  typeFilter === filter
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}>
-                {filter.charAt(0).toUpperCase() + filter.slice(1)} ({typeCounts[filter]})
-              </button>
-            ))}
+            {(['all', 'properties', 'expansions', 'enums'] as const).map(filter => {
+              const label = filter === 'properties' ? 'Fields' : filter.charAt(0).toUpperCase() + filter.slice(1);
+              return (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setTypeFilter(filter)}
+                  className={`px-2 py-1 rounded text-xs transition-colors ${
+                    typeFilter === filter
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}>
+                  {label} ({typeCounts[filter]})
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

@@ -8,17 +8,20 @@ import { AddPage } from './pages/add-page';
 import { AdminLayout } from './pages/admin/admin-layout';
 import { DataGeneratorPage } from './pages/admin/data-generator-page';
 import { DeletePage } from './pages/delete-page';
+import { ErrorPage } from './pages/error-page';
 import { DetailPage } from './pages/detail-page';
 import { EditPage } from './pages/edit-page';
 import { HomePage } from './pages/home-page';
 import { MetadataPage } from './pages/metadata-page';
 import { NotFoundPage } from './pages/not-found-page';
+import { OrganizationsPage } from './pages/organizations-page';
 import { SearchPage } from './pages/search-page';
 
 const router = createBrowserRouter([
   {
     path: '/',
     element: <Layout />,
+    errorElement: <ErrorPage />,
     children: [
       { index: true, element: <HomePage /> },
       {
@@ -29,6 +32,7 @@ const router = createBrowserRouter([
           { path: 'data-generator', element: <DataGeneratorPage /> }
         ]
       },
+      { path: 'organizations', element: <OrganizationsPage /> },
       { path: 'metadata', element: <MetadataPage /> },
       { path: 'metadata/:resource', element: <MetadataPage /> },
       { path: ':resource', element: <SearchPage /> },

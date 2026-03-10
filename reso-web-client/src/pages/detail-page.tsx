@@ -8,6 +8,7 @@ import { LoadingSpinner } from '../components/loading-spinner';
 import { MediaCarousel } from '../components/media-carousel';
 import { useMetadata } from '../hooks/use-metadata';
 import { useUiConfig } from '../hooks/use-ui-config';
+import { FriendlyError } from '../components/friendly-error';
 import { useServer } from '../context/server-context';
 import type { ResoField } from '../types';
 import { SensitiveValue } from '../components/sensitive-value';
@@ -90,7 +91,7 @@ export const DetailPage = () => {
   }
 
   if (!isValidResource || !key) {
-    return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Invalid resource or key</div>;
+    return <FriendlyError title="Invalid Resource" message={`Could not find resource "${resource}" with key "${key ?? 'none'}".`} />;
   }
   if (error)
     return (

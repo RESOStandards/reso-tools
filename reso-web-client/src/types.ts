@@ -98,4 +98,42 @@ export type ResourceName = (typeof TARGET_RESOURCES)[number];
 /** Resources that are read-only (no Add/Edit/Delete). */
 export const READ_ONLY_RESOURCES: ReadonlySet<string> = new Set(['Lookup']);
 
+/** A RESO member organization from the Organizations and Endorsements service. */
+export interface ResoOrganization {
+  readonly OrganizationUniqueId: string;
+  readonly OrganizationType: string;
+  readonly OrganizationName: string;
+  readonly OrganizationAddress1: string;
+  readonly OrganizationCity: string;
+  readonly OrganizationStateOrProvince: string;
+  readonly OrganizationPostalCode: string;
+  readonly OrganizationWebsite: string | null;
+  readonly OrganizationCountry: string;
+  readonly ModificationTimestamp: string;
+  readonly OrganizationLatitude: number;
+  readonly OrganizationLongitude: number;
+  readonly OrganizationMemberCount: number | null;
+  readonly OrganizationCertName: string | null;
+  readonly AssnToMls: string | null;
+  readonly CertificationStatus: string;
+  readonly CertificationSummaryUrl: string;
+  readonly Endorsements: ReadonlyArray<ResoEndorsement>;
+}
+
+/** An endorsement (certification) held by a RESO organization. */
+export interface ResoEndorsement {
+  readonly Endorsement: string;
+  readonly Version: string;
+  readonly Status: string;
+  readonly ProviderUoi: string;
+  readonly StatusUpdatedAt: string;
+}
+
+/** Response shape from the RESO Organizations and Endorsements service. */
+export interface OrganizationsResponse {
+  readonly Description: string;
+  readonly GeneratedOn: string;
+  readonly Organizations: ReadonlyArray<ResoOrganization>;
+}
+
 export { isEnumType, isNumericEdmType } from '@reso-standards/validation';

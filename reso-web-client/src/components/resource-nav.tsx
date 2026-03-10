@@ -3,22 +3,7 @@ import { NavLink, useLocation, useParams } from 'react-router';
 import { useServer } from '../context/server-context';
 import { READ_ONLY_RESOURCES } from '../types';
 
-/** Chevron icon that rotates when open. */
-const Chevron = ({ open }: { readonly open: boolean }) => (
-  <svg
-    className={`w-3 h-3 transition-transform ${open ? 'rotate-90' : ''}`}
-    viewBox="0 0 20 20"
-    fill="currentColor">
-    <title>{open ? 'Collapse' : 'Expand'}</title>
-    <path
-      fillRule="evenodd"
-      d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
-      clipRule="evenodd"
-    />
-  </svg>
-);
-
-type Section = 'home' | 'resources' | 'metadata';
+type Section = 'home' | 'organizations' | 'resources' | 'metadata';
 
 /** Sidebar navigation with Home link and collapsible Resources and Metadata Explorer sections. */
 export const ResourceNav = () => {
@@ -34,18 +19,19 @@ export const ResourceNav = () => {
   // Derive which section is active from the current URL
   const activeSection: Section =
     location.pathname === '/' ? 'home'
+    : location.pathname.startsWith('/organizations') ? 'organizations'
     : location.pathname.startsWith('/metadata') ? 'metadata'
     : 'resources';
 
-  const sectionHeaderClass = (section: Section) =>
-    `flex items-center gap-1.5 w-full text-xs font-semibold uppercase tracking-wider mb-2 cursor-pointer select-none ${
+  const sectionHeaderClass = (section: Section, extra = '') =>
+    `flex items-center gap-1.5 w-full text-xs font-semibold uppercase tracking-wider cursor-pointer select-none ${extra} ${
       activeSection === section
         ? 'text-blue-600 dark:text-blue-400'
         : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
     }`;
 
   return (
-    <div>
+    <div className="space-y-4">
       {/* Home link */}
       <NavLink to="/" className={sectionHeaderClass('home')}>
         <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -54,11 +40,25 @@ export const ResourceNav = () => {
         </svg>
         Home
       </NavLink>
-      {/* Resources section */}
-      <NavLink to={activeSection === 'resources' ? '/metadata' : `/${resourceNames[0] ?? 'Property'}`} className={sectionHeaderClass('resources')}>
-        <Chevron open={activeSection === 'resources'} />
-        Resources
+
+      {/* Organizations link */}
+      <NavLink to="/organizations" className={sectionHeaderClass('organizations')}>
+        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <title>Organizations</title>
+          <path d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" />
+        </svg>
+        Organizations
       </NavLink>
+
+      {/* Resources section */}
+      <div>
+        <NavLink to={activeSection === 'resources' ? '/metadata' : `/${resourceNames[0] ?? 'Property'}`} className={sectionHeaderClass('resources', 'mb-2')}>
+          <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+            <title>Resources</title>
+            <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+          </svg>
+          Resources
+        </NavLink>
 
       {activeSection === 'resources' && (
         <>
@@ -119,12 +119,16 @@ export const ResourceNav = () => {
           </ul>
         </>
       )}
+      </div>
 
-      {/* Metadata Explorer section */}
-      <div className={`${activeSection === 'resources' ? 'mt-6 pt-4 border-t border-gray-200 dark:border-gray-700' : 'mt-4'}`}>
-        <NavLink to={activeSection === 'metadata' ? `/${resourceNames[0] ?? 'Property'}` : '/metadata'} className={sectionHeaderClass('metadata')}>
-          <Chevron open={activeSection === 'metadata'} />
-          Metadata Explorer
+      {/* Metadata section */}
+      <div>
+        <NavLink to={activeSection === 'metadata' ? `/${resourceNames[0] ?? 'Property'}` : '/metadata'} className={sectionHeaderClass('metadata', 'mb-2')}>
+          <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+            <title>Metadata</title>
+            <path fillRule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+          Metadata
         </NavLink>
 
         {activeSection === 'metadata' && (
@@ -164,17 +168,27 @@ export const ResourceNav = () => {
 
       {/* Admin section — only show for local server */}
       {isLocal && (
-        <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Admin</h2>
+        <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+          <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+              <title>Admin</title>
+              <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+            </svg>
+            Admin
+          </h2>
           <NavLink
             to="/admin/data-generator"
             className={({ isActive }) =>
-              `block px-3 py-1.5 rounded text-sm whitespace-nowrap ${
+              `flex items-center gap-1.5 px-3 py-1.5 rounded text-sm whitespace-nowrap ${
                 isActive
                   ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-medium'
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`
             }>
+            <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+              <title>Data Generator</title>
+              <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
             Data Generator
           </NavLink>
         </div>

@@ -5,6 +5,7 @@ import { DeleteDialog } from '../components/delete-dialog';
 import { KeyPrompt } from '../components/key-prompt';
 import { LoadingSpinner } from '../components/loading-spinner';
 import { useServer } from '../context/server-context';
+import { NotFoundPage } from './not-found-page';
 
 /** Page for deleting a record. Prompts for key, loads record, shows confirmation dialog. */
 export const DeletePage = () => {
@@ -58,7 +59,7 @@ export const DeletePage = () => {
     return <LoadingSpinner />;
   }
   if (!isValidResource) {
-    return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Unknown resource: {resource}</div>;
+    return <NotFoundPage />;
   }
   if (!permissions.canDelete) {
     return (

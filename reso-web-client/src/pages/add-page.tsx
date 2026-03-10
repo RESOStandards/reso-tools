@@ -6,6 +6,7 @@ import { RecordForm } from '../components/record-form';
 import { useMetadata } from '../hooks/use-metadata';
 import { useUiConfig } from '../hooks/use-ui-config';
 import { useServer } from '../context/server-context';
+import { NotFoundPage } from './not-found-page';
 
 /** Page for creating a new record. */
 export const AddPage = () => {
@@ -37,7 +38,7 @@ export const AddPage = () => {
     return <LoadingSpinner />;
   }
   if (!isValidResource) {
-    return <div className="p-4 sm:p-6 text-red-600 dark:text-red-400">Unknown resource: {resource}</div>;
+    return <NotFoundPage />;
   }
   if (!permissions.canAdd) {
     return (
