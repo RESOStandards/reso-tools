@@ -160,10 +160,17 @@ const SortHeader = ({ label, column, current, asc, onSort, className = '' }: {
 export const OrganizationsPage = () => {
   const { organizations, generatedOn, isLoading, error, refresh } = useOrganizations();
 
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<ReadonlySet<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<ReadonlySet<string>>(new Set());
   const [stateFilter, setStateFilter] = useState<ReadonlySet<string>>(new Set());
+
+  // Debounce search input by 150ms
+  useEffect(() => {
+    const id = setTimeout(() => setSearch(searchInput), 150);
+    return () => clearTimeout(id);
+  }, [searchInput]);
   const [expandedOrg, setExpandedOrg] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortColumn>('name');
   const [sortAsc, setSortAsc] = useState(true);
@@ -269,8 +276,8 @@ export const OrganizationsPage = () => {
               <input
                 type="text"
                 placeholder="Search by name, city, or ID..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
                 className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               />
               <MultiSelect label="All Types" options={orgTypes} selected={typeFilter} onChange={setTypeFilter} />
