@@ -4,12 +4,22 @@ Electron desktop client for the RESO Reference Server. Runs the server and UI as
 
 ## Quick Start
 
+The desktop client depends on the reference server (`file:../reso-reference-server`), which must be built first:
+
 ```bash
+# 1. Build the reference server (required — provides the embedded OData server)
+cd ../reso-reference-server && npm install && npm run build && cd ../reso-desktop-client
+
+# 2. Install desktop client dependencies (runs electron-rebuild automatically)
 npm install
+
+# 3. Launch
 npm run dev
 ```
 
 This builds the TypeScript, starts the reference server on a random port, and opens the UI in an Electron window.
+
+> **Note:** `npm install` automatically rebuilds native modules (e.g. `better-sqlite3`) for Electron's Node.js version via the `postinstall` script. If you see a `NODE_MODULE_VERSION` mismatch error, re-run `npm install`.
 
 ## Scripts
 

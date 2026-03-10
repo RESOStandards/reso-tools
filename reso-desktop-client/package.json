@@ -9,13 +9,14 @@
     "build:server-bundle": "node scripts/bundle-server.mjs",
     "start": "env -u ELECTRON_RUN_AS_NODE electron dist/main.js",
     "dev": "tsc && cp src/server-entry.mjs dist/ && env -u ELECTRON_RUN_AS_NODE electron dist/main.js",
-    "postinstall": "/usr/libexec/PlistBuddy -c \"Set CFBundleDisplayName 'RESO Desktop Client'\" node_modules/electron/dist/Electron.app/Contents/Info.plist 2>/dev/null; /usr/libexec/PlistBuddy -c \"Set CFBundleName 'RESO Desktop Client'\" node_modules/electron/dist/Electron.app/Contents/Info.plist 2>/dev/null; true",
+    "postinstall": "electron-rebuild 2>/dev/null; /usr/libexec/PlistBuddy -c \"Set CFBundleDisplayName 'RESO Desktop Client'\" node_modules/electron/dist/Electron.app/Contents/Info.plist 2>/dev/null; /usr/libexec/PlistBuddy -c \"Set CFBundleName 'RESO Desktop Client'\" node_modules/electron/dist/Electron.app/Contents/Info.plist 2>/dev/null; true",
     "package": "npm run build && npm run build:server-bundle && electron-builder"
   },
   "dependencies": {
     "@reso/reference-server": "file:../reso-reference-server"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
     "electron": "^35.0.0",
     "electron-builder": "^26.0.0",
     "esbuild": "^0.27.3",
@@ -37,7 +38,9 @@
       {
         "from": "dist/server-bundle/node_modules",
         "to": "server-bundle/node_modules",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../reso-reference-server/server-metadata.json",

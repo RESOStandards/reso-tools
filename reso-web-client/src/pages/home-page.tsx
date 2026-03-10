@@ -67,7 +67,7 @@ export const HomePage = () => {
       <div className="max-w-3xl mx-auto px-6 py-12">
         {/* Hero */}
         <div className="mb-10">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">RESO Reference Server</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">RESO Dashboard</h1>
           <p className="text-gray-600 dark:text-gray-400 text-lg mb-4">
             Browse, query, and manage real estate data using the RESO Data Dictionary standard.
           </p>
