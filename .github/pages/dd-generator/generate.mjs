@@ -1517,7 +1517,7 @@ function getPageJS() {
 
       function initPagefind() {
         pfUI = new PagefindUI({
-          element: '#search', showSubResults: false, showImages: false, resetStyles: false, baseUrl: '/dd/',
+          element: '#search', showSubResults: false, showImages: false, resetStyles: false,
           processResult: function(result) {
             var parts = [];
             if (result.meta && result.meta.description) parts.push(result.meta.description);
@@ -2620,7 +2620,7 @@ function getLandingJS() {
 
       function initPagefind() {
         pfUI = new PagefindUI({
-          element: '#search', showSubResults: false, showImages: false, resetStyles: false, baseUrl: '/dd/',
+          element: '#search', showSubResults: false, showImages: false, resetStyles: false,
           processResult: function(result) {
             var parts = [];
             if (result.meta && result.meta.description) parts.push(result.meta.description);
