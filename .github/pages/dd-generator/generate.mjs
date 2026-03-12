@@ -1163,8 +1163,16 @@ function getPageCSS() {
       .dd-field-def { max-width: none; }
       /* Lookup tables keep all columns but scroll */
       .dd-lookups-table { min-width: 600px; }
+      /* Disable sticky headers and reset overflow on mobile */
+      .dd-fields-table-wrapper .dd-fields-table {
+        overflow: hidden;
+      }
       .dd-fields-table-wrapper .dd-fields-table th {
         position: static;
+        box-shadow: none;
+      }
+      .dd-fields-table-wrapper .dd-sticky-col-headers {
+        display: none !important;
       }
       .dd-mobile-group-indicator {
         top: calc(64px + 1.75rem);
