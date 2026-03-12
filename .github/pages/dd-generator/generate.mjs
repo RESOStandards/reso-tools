@@ -1160,12 +1160,7 @@ function getPageCSS() {
       /* Hide Type and Usage columns on mobile (3rd and 4th) */
       .dd-fields-table th:nth-child(n+3),
       .dd-fields-table td:nth-child(n+3) { display: none; }
-      .dd-field-def {
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-      }
+      .dd-field-def { max-width: none; }
       /* Lookup tables keep all columns but scroll */
       .dd-lookups-table { min-width: 600px; }
       .dd-fields-table-wrapper .dd-fields-table th {
