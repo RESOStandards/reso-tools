@@ -960,6 +960,8 @@ function getPageCSS() {
         position: fixed;
         left: -280px;
         top: 64px;
+        width: 280px;
+        min-width: 0;
         z-index: 55;
         transition: left 0.2s ease;
         box-shadow: 4px 0 12px rgba(0,0,0,0.1);
@@ -977,7 +979,7 @@ function getPageCSS() {
       max-width: 1100px;
     }
     @media (max-width: 768px) {
-      .dd-content { padding: 1rem; max-width: 100vw; overflow-x: hidden; }
+      .dd-content { padding: 1rem; max-width: 100vw; overflow-x: auto; }
       .dd-metadata-card { overflow-x: auto; }
       .dd-resource-grid { grid-template-columns: 1fr; }
     }
