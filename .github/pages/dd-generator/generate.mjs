@@ -332,23 +332,11 @@ function breadcrumbHtml(version, versionLabel, items) {
 }
 
 // ---------------------------------------------------------------------------
-// Full HTML Page Template
+// Shared CSS/JS extracted into functions so they can be written as external files
 // ---------------------------------------------------------------------------
 
-function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagefindWeight } = {}) {
-  const versionOptions = allVersions.map(v =>
-    `<option value="${v.version}"${v.version === version ? ' selected' : ''}>${escapeHtml(v.label)}${v.draft ? ' (DRAFT)' : ''}</option>`
-  ).join('\n          ');
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(title)} - RESO Data Dictionary</title>
-  <meta name="description" content="${escapeHtml(title)} - RESO Data Dictionary documentation">
-  <style>
-    :root {
+function getPageCSS() {
+  return `    :root {
       --reso-navy: #1a2f58;
       --reso-navy-dark: #0f1d38;
       --reso-navy-light: #2a4a7f;
@@ -1402,96 +1390,12 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
       font-size: 0.8125rem;
       color: var(--reso-gray-700);
     }
-    .dd-callout strong { color: var(--reso-gray-800); }
-  </style>
-  <link href="/pagefind/pagefind-ui.css" rel="stylesheet">
-  <script>(function(){var t=localStorage.getItem('dd-theme');if(t==='dark'||(t===null&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');})()</script>
-</head>
-<body>
-  <header class="site-header">
-    <a href="/" class="header-logo">
-      <img src="/assets/reso-logo-white.png" alt="RESO" />
-    </a>
-    <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle menu">
-      <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
-    </button>
-    <nav class="header-nav" id="headerNav">
-      <a href="/">Home</a>
-      <a href="/dd/">Data Dictionary</a>
-      <a href="https://github.com/RESOStandards/reso-tools">GitHub</a>
-      <a href="https://reso.org">RESO.org</a>
-      <button class="search-trigger" id="searchTrigger" type="button">
-        <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-        Search<kbd>/</kbd>
-      </button>
-      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
-        <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
-        <svg class="icon-sun" viewBox="0 0 24 24"><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41M12 6a6 6 0 100 12 6 6 0 000-12z"/></svg>
-      </button>
-    </nav>
-  </header>
+    .dd-callout strong { color: var(--reso-gray-800); }`;
+}
 
-  <div class="dd-layout">
-    <aside class="dd-sidebar" id="ddSidebar">
-      <div class="dd-sidebar-header">
-        <div class="dd-sidebar-title">Data Dictionary</div>
-        <select class="dd-version-select" id="ddVersionSelect" onchange="window.location.href='/dd/DD' + this.value + '/'">
-          ${versionOptions}
-        </select>
-      </div>
-      <div class="dd-sidebar-search" id="sidebarSearch">
-        <svg class="dd-sidebar-search-icon" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-        <input type="text" placeholder="Search..." readonly />
-        <kbd>/</kbd>
-      </div>
-      ${sidebarHtml}
-    </aside>
-
-    <div class="dd-sidebar-overlay" id="ddSidebarOverlay"></div>
-    <button class="dd-sidebar-toggle" id="ddSidebarToggle" type="button" aria-label="Toggle sidebar">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-    </button>
-
-    <div class="dd-content" data-pagefind-body data-pagefind-filter="dd-version:${version}" data-pagefind-meta="dd-version:DD ${version}"${pagefindWeight != null ? ` data-pagefind-weight="${pagefindWeight}"` : ''}>
-      ${contentHtml}
-      <div class="dd-page-generated">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
-    </div>
-  </div>
-
-  <!-- Search modal -->
-  <div class="search-modal-overlay" id="searchOverlay">
-    <div class="search-modal" id="searchModal">
-      <div id="search"></div>
-      <div class="dd-search-welcome visible" id="ddSearchWelcome">
-        <div class="dd-search-welcome-icon">\u{1F50D}</div>
-        <p id="ddSearchWelcomeText">Search across all Data Dictionary resources, fields and lookup values.</p>
-        <p class="dd-search-hint">Press <kbd>Esc</kbd> to close</p>
-      </div>
-      <div class="dd-search-empty" id="ddSearchEmpty">No results found. Try a different search term or filter.</div>
-    </div>
-  </div>
-  <template id="searchFiltersTemplate">
-    <div class="dd-search-meta">
-      <div class="dd-search-filters" id="ddSearchFilters">
-        <button class="dd-search-filter-pill" data-version="">All</button>
-        ${allVersions.map(v => `<button class="dd-search-filter-pill${v.version === version ? ' active' : ''}" data-version="${v.version}">DD ${v.version}</button>`).join('\n        ')}
-      </div>
-      <div class="dd-search-count" id="ddSearchCount"></div>
-    </div>
-  </template>
-
-  <footer class="site-footer">
-    <p>&copy; ${new Date().getFullYear()} <a href="https://reso.org">Real Estate Standards Organization (RESO)</a>. All rights reserved.</p>
-    <p style="margin-top: 0.5rem;">
-      <a href="https://github.com/RESOStandards/reso-tools">Source</a> &middot;
-      <a href="https://certification.reso.org">Certification Analytics</a> &middot;
-      <a href="https://www.reso.org/eula/">Terms of Use</a>
-    </p>
-  </footer>
-
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      var currentVersion = '${version}';
+function getPageJS() {
+  return `    document.addEventListener('DOMContentLoaded', function() {
+      var currentVersion = document.body.dataset.version;
       var activeFilter = currentVersion;
       var pfUI = null;
       var searchEl = document.getElementById('search');
@@ -1635,7 +1539,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
                 var needsSort = items.some(function(item) {
                   var link = item.querySelector('.pagefind-ui__result-link');
                   if (!link) return false;
-                  var title = (link.textContent || '').replace(/DD\s*\d+\.\d+$/, '').trim();
+                  var title = (link.textContent || '').replace(/DD\\s*\\d+\\.\\d+$/, '').trim();
                   return title.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === query;
                 });
                 if (needsSort) {
@@ -1643,7 +1547,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
                   items.forEach(function(item) {
                     var link = item.querySelector('.pagefind-ui__result-link');
                     if (!link) return;
-                    var title = (link.textContent || '').replace(/DD\s*\d+\.\d+$/, '').trim();
+                    var title = (link.textContent || '').replace(/DD\\s*\\d+\\.\\d+$/, '').trim();
                     var normTitle = title.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
                     if (normTitle === query) {
                       resultsList.insertBefore(item, resultsList.firstChild);
@@ -1931,8 +1835,970 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
           });
         }
       }
-    });
-  </script>
+
+      // Scroll-spy: sync sidebar tree with visible group headings
+      var groupHeadings = document.querySelectorAll('.dd-group-heading');
+      if (groupHeadings.length > 0) {
+        var groupLinks = document.querySelectorAll('.dd-nav-group-link');
+        var activeGroupLink = null;
+
+        function activateGroupLink(id) {
+          if (activeGroupLink) activeGroupLink.classList.remove('active');
+          var link = null;
+          for (var i = 0; i < groupLinks.length; i++) {
+            if (groupLinks[i].getAttribute('href') === '#' + id) {
+              link = groupLinks[i];
+              break;
+            }
+          }
+          if (!link) return;
+          activeGroupLink = link;
+          link.classList.add('active');
+          // Expand parent group nodes
+          var parent = link.closest('.dd-nav-group');
+          while (parent) {
+            parent.classList.add('expanded');
+            parent = parent.parentElement.closest('.dd-nav-group');
+          }
+          // Scroll sidebar to keep active link visible
+          var sidebar = document.getElementById('ddSidebar');
+          if (sidebar && link.offsetParent) {
+            var linkRect = link.getBoundingClientRect();
+            var sidebarRect = sidebar.getBoundingClientRect();
+            if (linkRect.top < sidebarRect.top || linkRect.bottom > sidebarRect.bottom) {
+              link.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+          }
+        }
+
+        var observer = new IntersectionObserver(function(entries) {
+          var topEntry = null;
+          entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+              if (!topEntry || entry.boundingClientRect.top < topEntry.boundingClientRect.top) {
+                topEntry = entry;
+              }
+            }
+          });
+          if (topEntry) activateGroupLink(topEntry.target.id);
+        }, { rootMargin: '-80px 0px -60% 0px' });
+
+        groupHeadings.forEach(function(h) { observer.observe(h); });
+      }
+    });`;
+}
+
+function getLandingCSS() {
+  return `    :root {
+      --reso-navy: #1a2f58;
+      --reso-navy-dark: #0f1d38;
+      --reso-navy-light: #2a4a7f;
+      --reso-orange: #ff9900;
+      --reso-orange-light: #fff3e0;
+      --reso-green: #38a169;
+      --reso-green-light: #e6f7ed;
+      --reso-blue: #007e9e;
+      --reso-blue-light: #e0f4f8;
+      --reso-gray-50: #f7fafc;
+      --reso-gray-100: #edf2f7;
+      --reso-gray-200: #e2e8f0;
+      --reso-gray-300: #cbd5e0;
+      --reso-gray-500: #718096;
+      --reso-gray-600: #4a5568;
+      --reso-gray-700: #2d3748;
+      --reso-gray-800: #1a202c;
+      --reso-gray-900: #171923;
+    }
+
+    html.dark {
+      --reso-gray-50: #1a202c;
+      --reso-gray-100: #2d3748;
+      --reso-gray-200: #4a5568;
+      --reso-gray-300: #718096;
+      --reso-gray-500: #a0aec0;
+      --reso-gray-600: #cbd5e0;
+      --reso-gray-700: #e2e8f0;
+      --reso-gray-800: #edf2f7;
+      --reso-gray-900: #f7fafc;
+      --reso-green-light: rgba(56,161,105,0.15);
+      --reso-orange-light: rgba(255,153,0,0.15);
+      --reso-blue-light: rgba(0,126,158,0.15);
+    }
+    html.dark .dd-landing-tile,
+    html.dark .dd-landing-related-grid,
+    html.dark .dd-landing-note,
+    html.dark .search-modal { background: var(--reso-gray-100); }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: var(--reso-gray-50);
+      color: var(--reso-gray-700);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    .site-header {
+      background: var(--reso-navy);
+      padding: 0 1.5rem;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .site-header a { color: white; text-decoration: none; }
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+    .header-logo img { height: 36px; width: auto; }
+    .header-nav { display: flex; gap: 1.5rem; align-items: center; }
+    .header-nav a {
+      font-size: 0.875rem;
+      font-weight: 500;
+      opacity: 0.85;
+      transition: opacity 0.15s;
+    }
+    .header-nav a:hover { opacity: 1; color: var(--reso-orange); }
+
+    .menu-toggle {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0.5rem;
+      color: white;
+    }
+    .menu-toggle svg { width: 24px; height: 24px; fill: currentColor; }
+
+    @media (max-width: 768px) {
+      .site-header { flex-wrap: wrap; height: auto; min-height: 64px; }
+      .menu-toggle { display: block; }
+      .header-nav {
+        display: none;
+        flex-direction: column;
+        width: 100%;
+        gap: 0;
+        padding: 0.5rem 0 1rem;
+        border-top: 1px solid rgba(255,255,255,0.15);
+      }
+      .header-nav.open { display: flex; }
+      .header-nav a {
+        padding: 0.625rem 0;
+        opacity: 1;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+      }
+      .header-nav a:last-of-type { border-bottom: none; }
+    }
+
+    /* Footer */
+    .site-footer {
+      background: var(--reso-navy);
+      color: rgba(255,255,255,0.6);
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.8125rem;
+    }
+    .site-footer a { color: rgba(255,255,255,0.8); text-decoration: none; }
+    .site-footer a:hover { color: var(--reso-orange); }
+
+    /* Landing page */
+    .dd-landing {
+      flex: 1;
+      max-width: 1100px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem;
+    }
+
+    .dd-landing-header {
+      margin-bottom: 2rem;
+    }
+    .dd-landing-header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--reso-gray-800);
+      letter-spacing: -0.025em;
+    }
+    .dd-landing-header p {
+      font-size: 0.95rem;
+      color: var(--reso-gray-500);
+      margin-top: 0.375rem;
+      max-width: 700px;
+      line-height: 1.6;
+    }
+
+    .dd-hero-search {
+      margin-top: 1.25rem;
+      max-width: 520px;
+      position: relative;
+      cursor: pointer;
+    }
+    .dd-hero-search-input {
+      width: 100%;
+      padding: 0.75rem 1rem 0.75rem 2.75rem;
+      font-size: 0.9375rem;
+      border: 1.5px solid var(--reso-gray-300);
+      border-radius: 0.5rem;
+      background: white;
+      color: var(--reso-gray-600);
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .dd-hero-search-input:hover {
+      border-color: var(--reso-blue);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    html.dark .dd-hero-search-input { background: var(--reso-gray-100); }
+    .dd-hero-search-icon {
+      position: absolute;
+      left: 0.875rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: var(--reso-gray-500);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+    .dd-hero-search-kbd {
+      position: absolute;
+      right: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.6875rem;
+      font-family: inherit;
+      color: var(--reso-gray-500);
+      background: var(--reso-gray-100);
+      border: 1px solid var(--reso-gray-300);
+      border-radius: 0.25rem;
+      padding: 0.125rem 0.5rem;
+      pointer-events: none;
+    }
+
+    .dd-landing-note {
+      margin-top: 2rem;
+      padding: 0.75rem 1rem;
+      background: white;
+      border: 1px solid var(--reso-gray-200);
+      border-left: 3px solid var(--reso-blue);
+      border-radius: 0.375rem;
+      font-size: 0.8125rem;
+      color: var(--reso-gray-600);
+      line-height: 1.6;
+      max-width: 600px;
+    }
+    .dd-landing-note a {
+      color: var(--reso-blue);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .dd-landing-note a:hover { text-decoration: underline; }
+
+    .dd-landing-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    @media (min-width: 640px) {
+      .dd-landing-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    }
+
+    .dd-landing-tile {
+      background: white;
+      border: 1px solid var(--reso-gray-200);
+      border-radius: 0.625rem;
+      padding: 1.5rem;
+      text-decoration: none;
+      color: inherit;
+      transition: box-shadow 0.15s, border-color 0.15s;
+      display: block;
+    }
+    .dd-landing-tile:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      border-color: var(--reso-blue);
+    }
+    .dd-landing-tile-legacy {
+      opacity: 0.75;
+    }
+    .dd-landing-tile-legacy:hover {
+      opacity: 1;
+    }
+
+    .dd-landing-tile-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.375rem;
+    }
+    .dd-landing-tile-header h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--reso-gray-800);
+    }
+
+    .dd-landing-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.1875rem 0.625rem;
+      border-radius: 0.25rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .dd-landing-badge-active {
+      background: var(--reso-green-light);
+      color: var(--reso-green);
+    }
+    .dd-landing-badge-legacy {
+      background: var(--reso-gray-100);
+      color: var(--reso-gray-500);
+    }
+    .dd-landing-badge-draft {
+      background: var(--reso-orange-light);
+      color: var(--reso-orange);
+    }
+
+    .dd-landing-tile-approved {
+      font-size: 0.8125rem;
+      color: var(--reso-gray-500);
+      margin-bottom: 1rem;
+    }
+
+    .dd-landing-tile-stats {
+      display: flex;
+      gap: 1.5rem;
+    }
+    .dd-landing-stat {
+      display: flex;
+      flex-direction: column;
+    }
+    .dd-landing-stat-number {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--reso-gray-800);
+      line-height: 1.2;
+    }
+    .dd-landing-stat-label {
+      font-size: 0.6875rem;
+      color: var(--reso-gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* Related Resources */
+    .dd-landing-related {
+      margin-top: 2.5rem;
+    }
+    .dd-landing-related h3 {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--reso-gray-500);
+      margin-bottom: 0.75rem;
+    }
+    .dd-landing-related-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+      background: white;
+      border: 1px solid var(--reso-gray-200);
+      border-radius: 0.625rem;
+      overflow: hidden;
+    }
+    @media (min-width: 768px) {
+      .dd-landing-related-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .dd-landing-related-item {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--reso-gray-100);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: inherit;
+      transition: background 0.1s;
+    }
+    .dd-landing-related-item:hover { background: var(--reso-gray-50); }
+    .dd-landing-related-item:last-child { border-bottom: none; }
+    @media (min-width: 768px) {
+      .dd-landing-related-item { border-right: 1px solid var(--reso-gray-100); }
+      .dd-landing-related-item:nth-child(2n) { border-right: none; }
+      .dd-landing-related-item:nth-last-child(-n+2) { border-bottom: none; }
+    }
+    .dd-landing-related-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 0.375rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .dd-landing-related-icon svg { width: 18px; height: 18px; }
+    .dd-landing-related-icon-navy { background: rgba(26,47,88,0.1); }
+    .dd-landing-related-icon-navy svg { fill: var(--reso-navy); }
+    .dd-landing-related-icon-blue { background: rgba(0,126,158,0.1); }
+    .dd-landing-related-icon-blue svg { fill: var(--reso-blue); }
+    .dd-landing-related-icon-orange { background: rgba(255,153,0,0.1); }
+    .dd-landing-related-icon-orange svg { fill: var(--reso-orange); }
+    .dd-landing-related-icon-green { background: rgba(56,161,105,0.1); }
+    .dd-landing-related-icon-green svg { fill: var(--reso-green); }
+    .dd-landing-related-text h4 {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--reso-gray-800);
+    }
+    .dd-landing-related-text p {
+      font-size: 0.75rem;
+      color: var(--reso-gray-500);
+      margin-top: 0.125rem;
+    }
+
+    /* Acknowledgements */
+    .dd-landing-acknowledgements {
+      margin-top: 2.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--reso-gray-200);
+    }
+    .dd-landing-acknowledgements p {
+      font-size: 0.8125rem;
+      color: var(--reso-gray-500);
+      line-height: 1.6;
+    }
+    .dd-landing-acknowledgements a {
+      color: var(--reso-blue);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .dd-landing-acknowledgements a:hover { text-decoration: underline; }
+
+    /* Theme toggle */
+    .theme-toggle {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 0.375rem;
+      color: rgba(255,255,255,0.7);
+      padding: 0.375rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+    .theme-toggle:hover { background: rgba(255,255,255,0.25); color: white; }
+    .theme-toggle svg { width: 16px; height: 16px; fill: currentColor; }
+    .theme-toggle .icon-moon { display: block; }
+    .theme-toggle .icon-sun { display: none; }
+    html.dark .theme-toggle .icon-moon { display: none; }
+    html.dark .theme-toggle .icon-sun { display: block; }
+
+    /* Search trigger */
+    .search-trigger {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 0.375rem;
+      color: rgba(255,255,255,0.7);
+      font-size: 0.8125rem;
+      padding: 0.375rem 0.75rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: background 0.15s;
+    }
+    .search-trigger:hover {
+      background: rgba(255,255,255,0.25);
+      color: white;
+    }
+    .search-trigger svg { width: 14px; height: 14px; fill: currentColor; }
+    .search-trigger kbd {
+      font-family: inherit;
+      font-size: 0.6875rem;
+      background: rgba(255,255,255,0.15);
+      border-radius: 0.25rem;
+      padding: 0.125rem 0.375rem;
+    }
+    @media (max-width: 768px) {
+      .search-trigger { margin-top: 0.5rem; justify-content: center; }
+      .search-trigger kbd { display: none; }
+    }
+
+    /* Search modal — reuses same styles as version pages */
+    .search-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 10vh;
+    }
+    .search-modal-overlay.active { display: flex; }
+    body.search-open { overflow: hidden; }
+    .search-modal {
+      background: white;
+      border-radius: 0.75rem;
+      width: 90%;
+      max-width: 640px;
+      height: 70vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    @media (max-width: 768px) {
+      .search-modal-overlay { padding-top: 1rem; }
+      .search-modal { width: calc(100% - 1.5rem); height: 85vh; border-radius: 0.5rem; }
+    }
+    /* Pagefind flexbox layout — input+pills stay fixed, drawer scrolls */
+    #search, .pagefind-ui, .pagefind-ui .pagefind-ui__form {
+      display: flex !important; flex-direction: column !important; flex: 1 !important; min-height: 0 !important;
+    }
+    .pagefind-ui .pagefind-ui__form { padding: 1rem 1rem 0 !important; position: relative !important; }
+    .pagefind-ui .pagefind-ui__form::before { position: absolute !important; top: 1.875rem !important; left: 1.625rem !important; width: 18px !important; height: 18px !important; }
+    html.dark .pagefind-ui .pagefind-ui__form { background: #1e293b; }
+    .pagefind-ui .pagefind-ui__search-input {
+      border: 1.5px solid var(--reso-gray-300) !important; border-radius: 0.5rem !important;
+      padding: 0.625rem 3.5rem 0.625rem 2.5rem !important; font-size: 1rem !important;
+      color: var(--reso-gray-800) !important; background: var(--reso-gray-50) !important;
+      font-family: inherit !important; height: auto !important;
+    }
+    .pagefind-ui .pagefind-ui__search-input::placeholder { color: var(--reso-gray-500) !important; }
+    .pagefind-ui .pagefind-ui__search-input:focus {
+      border-color: var(--reso-blue) !important; box-shadow: 0 0 0 3px rgba(0,126,158,0.15) !important; outline: none !important;
+    }
+    .dd-search-input {
+      width: 100%; border: 1.5px solid var(--reso-gray-300); border-radius: 0.5rem;
+      padding: 0.625rem 3.5rem 0.625rem 2.5rem; font-size: 1rem;
+      color: var(--reso-gray-800); background: var(--reso-gray-50); font-family: inherit; box-sizing: border-box;
+    }
+    .dd-search-input::placeholder { color: var(--reso-gray-500); }
+    .dd-search-input:focus { border-color: var(--reso-blue); box-shadow: 0 0 0 3px rgba(0,126,158,0.15); outline: none; }
+    html.dark .dd-search-input { background: #2d3748; border-color: #4a5568; color: #e2e8f0; }
+    html.dark .dd-search-input::placeholder { color: #718096; }
+    .pagefind-ui .pagefind-ui__search-clear {
+      position: absolute !important; top: 1rem !important; right: 1.5rem !important;
+      color: var(--reso-gray-500) !important; font-size: 0.8125rem !important; font-weight: 500 !important;
+      background: none !important; border: none !important; padding: 0.125rem 0.375rem !important; cursor: pointer !important;
+    }
+    .pagefind-ui .pagefind-ui__search-clear:hover { color: var(--reso-gray-800) !important; }
+    .dd-search-meta { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0 0.75rem; border-bottom: 1px solid var(--reso-gray-200); }
+    .dd-search-filters { display: flex; gap: 0.375rem; flex-wrap: wrap; }
+    .dd-search-filter-pill { padding: 0.1875rem 0.625rem; border-radius: 0.25rem; border: 1px solid var(--reso-gray-200); background: transparent; color: var(--reso-gray-600); font-size: 0.6875rem; font-weight: 500; cursor: pointer; transition: all 0.1s; }
+    .dd-search-filter-pill:hover { border-color: var(--reso-blue); color: var(--reso-blue); }
+    .dd-search-filter-pill.active { background: var(--reso-blue); border-color: var(--reso-blue); color: white; }
+    .dd-search-count { font-size: 0.6875rem; color: var(--reso-gray-500); white-space: nowrap; }
+    .pagefind-ui .pagefind-ui__button { height: 0 !important; overflow: hidden !important; opacity: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important; }
+    .pagefind-ui .pagefind-ui__message { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; }
+    .pagefind-ui .pagefind-ui__filter-panel { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; }
+    .pagefind-ui .pagefind-ui__drawer { padding: 0 1rem 1rem !important; overflow-y: auto !important; flex: 1 !important; min-height: 0 !important; }
+    .pagefind-ui .pagefind-ui__result-link { color: var(--reso-blue) !important; font-weight: 600 !important; }
+    .pagefind-ui .pagefind-ui__result-excerpt { font-size: 0.8125rem !important; color: var(--reso-gray-600) !important; line-height: 1.5 !important; }
+    .pagefind-ui .pagefind-ui__result-tags { display: none !important; }
+    .pagefind-ui .pagefind-ui__result { border-color: var(--reso-gray-200) !important; padding: 0.75rem 0 !important; }
+    .dd-result-version { display: inline-block; font-size: 0.625rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.125rem 0.4375rem; border-radius: 0.1875rem; background: var(--reso-gray-100); color: var(--reso-gray-500); margin-left: 0.5rem; vertical-align: middle; }
+    .dd-search-welcome { display: none; text-align: center; padding: 2rem 1rem 3rem; padding-top: 2rem; color: var(--reso-gray-500); font-size: 0.9375rem; flex: 1; align-items: center; justify-content: flex-start; flex-direction: column; }
+    .dd-search-welcome.visible { display: flex; }
+    .dd-search-welcome-icon { font-size: 2rem; margin-bottom: 0.75rem; opacity: 0.6; }
+    .dd-search-welcome p { margin: 0 0 0.5rem; line-height: 1.5; }
+    .dd-search-hint { font-size: 0.75rem; opacity: 0.7; }
+    .dd-search-hint kbd { display: inline-block; padding: 0.125rem 0.375rem; font-size: 0.6875rem; font-family: inherit; background: var(--reso-gray-200); border: 1px solid var(--reso-gray-300); border-radius: 0.25rem; }
+    html.dark .dd-search-welcome { color: #a0aec0; }
+    html.dark .dd-search-hint kbd { background: #2d3748; border-color: #4a5568; color: #a0aec0; }
+    .dd-search-empty { display: none; text-align: center; padding: 3rem 1rem; color: var(--reso-gray-500); font-size: 0.875rem; }
+    .dd-search-empty.visible { display: block; }
+    html.dark .dd-search-empty { color: #a0aec0; }
+    html.dark .search-modal { background: #1e293b !important; }
+    html.dark .pagefind-ui .pagefind-ui__search-input { background: #2d3748 !important; border-color: #4a5568 !important; color: #e2e8f0 !important; }
+    html.dark .pagefind-ui .pagefind-ui__search-input::placeholder { color: #718096 !important; }
+    html.dark .pagefind-ui .pagefind-ui__search-clear { color: #a0aec0 !important; }
+    html.dark .pagefind-ui .pagefind-ui__search-clear:hover { color: #e2e8f0 !important; }
+    html.dark .dd-search-meta { border-color: #4a5568; }
+    html.dark .pagefind-ui .pagefind-ui__result-link { color: #63b3ed !important; }
+    html.dark .pagefind-ui .pagefind-ui__result-excerpt { color: #a0aec0 !important; }
+    html.dark .pagefind-ui .pagefind-ui__result { border-color: #4a5568 !important; }
+    html.dark .dd-search-filter-pill { background: transparent; border-color: #4a5568; color: #a0aec0; }
+    html.dark .dd-search-filter-pill:hover { border-color: #63b3ed; color: #63b3ed; }
+    html.dark .dd-search-filter-pill.active { background: var(--reso-blue); border-color: var(--reso-blue); color: white; }
+    html.dark .dd-result-version { background: #2d3748; color: #a0aec0; }`;
+}
+
+function getLandingJS() {
+  return `    document.addEventListener('DOMContentLoaded', function() {
+      // Pagefind search
+      var activeFilter = '';
+      var pfUI = null;
+      var searchEl = document.getElementById('search');
+      var modalEl = document.getElementById('searchModal');
+      var countEl = null;
+      var filtersEl = null;
+      var ddCustomInput = null;
+      var observer = null;
+
+      function initPagefind() {
+        pfUI = new PagefindUI({
+          element: '#search', showSubResults: false, showImages: false, resetStyles: false, baseUrl: '/dd/',
+          processResult: function(result) {
+            var parts = [];
+            if (result.meta && result.meta.description) parts.push(result.meta.description);
+            if (result.meta && result.meta.date) parts.push(result.meta.date);
+            var line1 = parts.join(' &middot; ');
+            var def = (result.meta && result.meta.definition) ? result.meta.definition : '';
+            result.excerpt = (line1 && def) ? line1 + '<br>' + def : (line1 || def || result.excerpt);
+            return result;
+          }
+        });
+
+        var form = searchEl.querySelector('.pagefind-ui__form');
+        if (form) {
+          var tpl = document.getElementById('searchFiltersTemplate');
+          var clone = tpl.content.cloneNode(true);
+          var drawer = form.querySelector('.pagefind-ui__drawer');
+          if (drawer) form.insertBefore(clone, drawer);
+          else form.appendChild(clone);
+          filtersEl = form.querySelector('.dd-search-filters');
+          countEl = form.querySelector('.dd-search-count');
+
+          if (filtersEl) {
+            filtersEl.querySelectorAll('.dd-search-filter-pill').forEach(function(b) {
+              b.classList.toggle('active', b.dataset.version === activeFilter);
+            });
+            filtersEl.addEventListener('click', function(e) {
+              var btn = e.target.closest('.dd-search-filter-pill');
+              if (!btn) return;
+              filtersEl.querySelectorAll('.dd-search-filter-pill').forEach(function(b) { b.classList.remove('active'); });
+              btn.classList.add('active');
+              activeFilter = btn.dataset.version;
+              applyFilter(activeFilter);
+              var welcomeText = document.getElementById('ddSearchWelcomeText');
+              if (welcomeText) {
+                welcomeText.textContent = activeFilter
+                  ? 'Search across Data Dictionary ' + activeFilter + ' resources, fields and lookup values.'
+                  : 'Search across all Data Dictionary resources, fields and lookup values.';
+              }
+            });
+          }
+        }
+
+        // Custom input overlay: user types here, we normalize and proxy to Pagefind
+        var pfInput = searchEl.querySelector('.pagefind-ui__search-input');
+        if (pfInput) {
+          pfInput.style.position = 'absolute';
+          pfInput.style.opacity = '0';
+          pfInput.style.pointerEvents = 'none';
+          var customInput = document.createElement('input');
+          customInput.type = 'text';
+          customInput.placeholder = 'Search...';
+          customInput.className = 'dd-search-input';
+          pfInput.parentNode.insertBefore(customInput, pfInput);
+          ddCustomInput = customInput;
+
+          function clearSearch() {
+            customInput.value = '';
+            var welcomeEl = document.getElementById('ddSearchWelcome');
+            var emptyEl = document.getElementById('ddSearchEmpty');
+            var drawerEl = searchEl.querySelector('.pagefind-ui__drawer');
+            if (welcomeEl) welcomeEl.classList.add('visible');
+            if (emptyEl) emptyEl.classList.remove('visible');
+            if (drawerEl) drawerEl.style.display = 'none';
+            if (countEl) countEl.textContent = '';
+            pfUI.triggerSearch('');
+          }
+
+          var normDebounce = null;
+          customInput.addEventListener('input', function() {
+            var raw = customInput.value;
+            var hasQuery = raw.trim().length > 0;
+            if (!hasQuery) { clearSearch(); return; }
+            var welcomeEl = document.getElementById('ddSearchWelcome');
+            var emptyEl = document.getElementById('ddSearchEmpty');
+            var drawerEl = searchEl.querySelector('.pagefind-ui__drawer');
+            if (welcomeEl) welcomeEl.classList.remove('visible');
+            if (emptyEl) emptyEl.classList.remove('visible');
+            if (drawerEl) drawerEl.style.display = '';
+            clearTimeout(normDebounce);
+            normDebounce = setTimeout(function() {
+              var normalized = customInput.value.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+              if (normalized) pfUI.triggerSearch(normalized);
+            }, 150);
+          });
+
+          // Sync Pagefind's Clear button with our custom input
+          var clearBtn = searchEl.querySelector('.pagefind-ui__search-clear');
+          if (clearBtn) {
+            clearBtn.addEventListener('click', function() { clearSearch(); customInput.focus(); });
+          }
+        }
+
+        var drawerEl = searchEl.querySelector('.pagefind-ui__drawer');
+        if (drawerEl) {
+          drawerEl.addEventListener('scroll', function() {
+            if (drawerEl.scrollTop + drawerEl.clientHeight >= drawerEl.scrollHeight - 300) {
+              var btn = searchEl.querySelector('.pagefind-ui__button');
+              if (btn) btn.click();
+            }
+          });
+        }
+
+        var processing = false;
+        observer = new MutationObserver(function() {
+          if (processing) return;
+          processing = true;
+          requestAnimationFrame(function() {
+            searchEl.querySelectorAll('.pagefind-ui__result-link:not([data-badge])').forEach(function(link) {
+              link.setAttribute('data-badge', '1');
+              var url = link.getAttribute('href') || '';
+              var m = url.match(/\\/DD(\\d+\\.\\d+)\\//);
+              if (m) {
+                var badge = document.createElement('span');
+                badge.className = 'dd-result-version';
+                badge.textContent = 'DD ' + m[1];
+                link.appendChild(badge);
+              }
+            });
+            // Re-sort: exact title matches go first
+            var query = ddCustomInput ? ddCustomInput.value.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : '';
+            if (query) {
+              var resultsList = searchEl.querySelector('.pagefind-ui__results');
+              if (resultsList) {
+                var items = Array.from(resultsList.querySelectorAll('.pagefind-ui__result'));
+                var needsSort = items.some(function(item) {
+                  var link = item.querySelector('.pagefind-ui__result-link');
+                  if (!link) return false;
+                  var title = (link.textContent || '').replace(/DD\\s*\\d+\\.\\d+$/, '').trim();
+                  return title.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === query;
+                });
+                if (needsSort) {
+                  observer.disconnect();
+                  items.forEach(function(item) {
+                    var link = item.querySelector('.pagefind-ui__result-link');
+                    if (!link) return;
+                    var title = (link.textContent || '').replace(/DD\\s*\\d+\\.\\d+$/, '').trim();
+                    var normTitle = title.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+                    if (normTitle === query) {
+                      resultsList.insertBefore(item, resultsList.firstChild);
+                    }
+                  });
+                  observer.observe(searchEl, { childList: true, subtree: true });
+                }
+              }
+            }
+            var hasQuery = ddCustomInput && ddCustomInput.value.trim().length > 0;
+            var msg = searchEl.querySelector('.pagefind-ui__message');
+            var emptyEl = document.getElementById('ddSearchEmpty');
+            if (msg && countEl) {
+              if (!hasQuery) {
+                countEl.textContent = '';
+                if (emptyEl) emptyEl.classList.remove('visible');
+              } else {
+                var txt = msg.textContent || '';
+                var cm = txt.match(/(\\d+)\\s+result/);
+                var count = cm ? parseInt(cm[1], 10) : -1;
+                var newCount = count > 0 ? count + ' results' : '';
+                if (countEl.textContent !== newCount) countEl.textContent = newCount;
+                if (emptyEl) emptyEl.classList.toggle('visible', count === 0);
+              }
+            }
+            var dEl = searchEl.querySelector('.pagefind-ui__drawer');
+            var loadBtn = searchEl.querySelector('.pagefind-ui__button');
+            if (dEl && loadBtn && dEl.scrollHeight <= dEl.clientHeight) {
+              setTimeout(function() { loadBtn.click(); }, 50);
+            }
+            processing = false;
+          });
+        });
+        observer.observe(searchEl, { childList: true, subtree: true });
+
+        if (activeFilter) {
+          pfUI.triggerFilters({ 'dd-version': [activeFilter] });
+        }
+      }
+
+      function applyFilter(version) {
+        if (!pfUI) return;
+        if (version) {
+          pfUI.triggerFilters({ 'dd-version': [version] });
+        } else {
+          pfUI.triggerFilters({});
+        }
+        var raw = ddCustomInput ? ddCustomInput.value : '';
+        if (raw) {
+          pfUI.triggerSearch(raw.replace(/[^a-zA-Z0-9]/g, '').toLowerCase());
+        }
+      }
+
+      var s = document.createElement('script');
+      s.src = '/pagefind/pagefind-ui.js';
+      s.onload = function() { if (typeof PagefindUI !== 'undefined') initPagefind(); };
+      document.head.appendChild(s);
+
+      // Header hamburger
+      document.getElementById('menuToggle').addEventListener('click', function() {
+        document.getElementById('headerNav').classList.toggle('open');
+      });
+
+      // Search modal
+      var overlay = document.getElementById('searchOverlay');
+      function openSearch() {
+        overlay.classList.add('active');
+        document.body.classList.add('search-open');
+        setTimeout(function() {
+          if (ddCustomInput) {
+            ddCustomInput.focus();
+            var hasQuery = ddCustomInput.value.trim().length > 0;
+            var welcomeEl = document.getElementById('ddSearchWelcome');
+            var drawerEl = searchEl.querySelector('.pagefind-ui__drawer');
+            if (welcomeEl) welcomeEl.classList.toggle('visible', !hasQuery);
+            if (drawerEl) drawerEl.style.display = hasQuery ? '' : 'none';
+            if (!hasQuery && countEl) countEl.textContent = '';
+          }
+        }, 100);
+      }
+      function closeSearch() {
+        overlay.classList.remove('active');
+        document.body.classList.remove('search-open');
+      }
+      document.getElementById('searchTrigger').addEventListener('click', openSearch);
+      document.getElementById('heroSearch').addEventListener('click', openSearch);
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) closeSearch(); });
+      document.addEventListener('keydown', function(e) {
+        if (e.key === '/' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          openSearch();
+        }
+        if (e.key === 'Escape') closeSearch();
+      });
+
+      // Theme toggle
+      document.getElementById('themeToggle').addEventListener('click', function() {
+        var isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('dd-theme', isDark ? 'dark' : 'light');
+      });
+    });`;
+}
+
+// ---------------------------------------------------------------------------
+// Full HTML Page Template
+// ---------------------------------------------------------------------------
+
+function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagefindWeight } = {}) {
+  const versionOptions = allVersions.map(v =>
+    `<option value="${v.version}"${v.version === version ? ' selected' : ''}>${escapeHtml(v.label)}${v.draft ? ' (DRAFT)' : ''}</option>`
+  ).join('\n          ');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(title)} - RESO Data Dictionary</title>
+  <meta name="description" content="${escapeHtml(title)} - RESO Data Dictionary documentation">
+  <link rel="stylesheet" href="/dd/assets/dd.css">
+  <link href="/pagefind/pagefind-ui.css" rel="stylesheet">
+  <script>(function(){var t=localStorage.getItem('dd-theme');if(t==='dark'||(t===null&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');})()</script>
+</head>
+<body data-version="${version}">
+  <header class="site-header">
+    <a href="/" class="header-logo">
+      <img src="/assets/reso-logo-white.png" alt="RESO" />
+    </a>
+    <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle menu">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+    </button>
+    <nav class="header-nav" id="headerNav">
+      <a href="/">Home</a>
+      <a href="/dd/">Data Dictionary</a>
+      <a href="https://github.com/RESOStandards/reso-tools">GitHub</a>
+      <a href="https://reso.org">RESO.org</a>
+      <button class="search-trigger" id="searchTrigger" type="button">
+        <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        Search<kbd>/</kbd>
+      </button>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
+        <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24"><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41M12 6a6 6 0 100 12 6 6 0 000-12z"/></svg>
+      </button>
+    </nav>
+  </header>
+
+  <div class="dd-layout">
+    <aside class="dd-sidebar" id="ddSidebar">
+      <div class="dd-sidebar-header">
+        <div class="dd-sidebar-title">Data Dictionary</div>
+        <select class="dd-version-select" id="ddVersionSelect" onchange="window.location.href='/dd/DD' + this.value + '/'">
+          ${versionOptions}
+        </select>
+      </div>
+      <div class="dd-sidebar-search" id="sidebarSearch">
+        <svg class="dd-sidebar-search-icon" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input type="text" placeholder="Search..." readonly />
+        <kbd>/</kbd>
+      </div>
+      ${sidebarHtml}
+    </aside>
+
+    <div class="dd-sidebar-overlay" id="ddSidebarOverlay"></div>
+    <button class="dd-sidebar-toggle" id="ddSidebarToggle" type="button" aria-label="Toggle sidebar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+
+    <div class="dd-content" data-pagefind-body data-pagefind-filter="dd-version:${version}" data-pagefind-meta="dd-version:DD ${version}"${pagefindWeight != null ? ` data-pagefind-weight="${pagefindWeight}"` : ''}>
+      ${contentHtml}
+      <div class="dd-page-generated">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+    </div>
+  </div>
+
+  <!-- Search modal -->
+  <div class="search-modal-overlay" id="searchOverlay">
+    <div class="search-modal" id="searchModal">
+      <div id="search"></div>
+      <div class="dd-search-welcome visible" id="ddSearchWelcome">
+        <div class="dd-search-welcome-icon">\u{1F50D}</div>
+        <p id="ddSearchWelcomeText">Search across all Data Dictionary resources, fields and lookup values.</p>
+        <p class="dd-search-hint">Press <kbd>Esc</kbd> to close</p>
+      </div>
+      <div class="dd-search-empty" id="ddSearchEmpty">No results found. Try a different search term or filter.</div>
+    </div>
+  </div>
+  <template id="searchFiltersTemplate">
+    <div class="dd-search-meta">
+      <div class="dd-search-filters" id="ddSearchFilters">
+        <button class="dd-search-filter-pill" data-version="">All</button>
+        ${allVersions.map(v => `<button class="dd-search-filter-pill${v.version === version ? ' active' : ''}" data-version="${v.version}">DD ${v.version}</button>`).join('\n        ')}
+      </div>
+      <div class="dd-search-count" id="ddSearchCount"></div>
+    </div>
+  </template>
+
+  <footer class="site-footer">
+    <p>&copy; ${new Date().getFullYear()} <a href="https://reso.org">Real Estate Standards Organization (RESO)</a>. All rights reserved.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="https://github.com/RESOStandards/reso-tools">Source</a> &middot;
+      <a href="https://certification.reso.org">Certification Analytics</a> &middot;
+      <a href="https://www.reso.org/eula/">Terms of Use</a>
+    </p>
+  </footer>
+
+  <script src="/dd/assets/dd.js"></script>
 </body>
 </html>`;
 }
@@ -2940,559 +3806,7 @@ function generateDDLandingPage(allData) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Data Dictionary - RESO Tools</title>
   <meta name="description" content="RESO Data Dictionary documentation — browse resources, fields and lookups across all versions.">
-  <style>
-    :root {
-      --reso-navy: #1a2f58;
-      --reso-navy-dark: #0f1d38;
-      --reso-navy-light: #2a4a7f;
-      --reso-orange: #ff9900;
-      --reso-orange-light: #fff3e0;
-      --reso-green: #38a169;
-      --reso-green-light: #e6f7ed;
-      --reso-blue: #007e9e;
-      --reso-blue-light: #e0f4f8;
-      --reso-gray-50: #f7fafc;
-      --reso-gray-100: #edf2f7;
-      --reso-gray-200: #e2e8f0;
-      --reso-gray-300: #cbd5e0;
-      --reso-gray-500: #718096;
-      --reso-gray-600: #4a5568;
-      --reso-gray-700: #2d3748;
-      --reso-gray-800: #1a202c;
-      --reso-gray-900: #171923;
-    }
-
-    html.dark {
-      --reso-gray-50: #1a202c;
-      --reso-gray-100: #2d3748;
-      --reso-gray-200: #4a5568;
-      --reso-gray-300: #718096;
-      --reso-gray-500: #a0aec0;
-      --reso-gray-600: #cbd5e0;
-      --reso-gray-700: #e2e8f0;
-      --reso-gray-800: #edf2f7;
-      --reso-gray-900: #f7fafc;
-      --reso-green-light: rgba(56,161,105,0.15);
-      --reso-orange-light: rgba(255,153,0,0.15);
-      --reso-blue-light: rgba(0,126,158,0.15);
-    }
-    html.dark .dd-landing-tile,
-    html.dark .dd-landing-related-grid,
-    html.dark .dd-landing-note,
-    html.dark .search-modal { background: var(--reso-gray-100); }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-      background: var(--reso-gray-50);
-      color: var(--reso-gray-700);
-      line-height: 1.6;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* Header */
-    .site-header {
-      background: var(--reso-navy);
-      padding: 0 1.5rem;
-      height: 64px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 50;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    }
-    .site-header a { color: white; text-decoration: none; }
-    .header-logo {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      font-size: 1.25rem;
-      font-weight: 700;
-      letter-spacing: -0.025em;
-    }
-    .header-logo img { height: 36px; width: auto; }
-    .header-nav { display: flex; gap: 1.5rem; align-items: center; }
-    .header-nav a {
-      font-size: 0.875rem;
-      font-weight: 500;
-      opacity: 0.85;
-      transition: opacity 0.15s;
-    }
-    .header-nav a:hover { opacity: 1; color: var(--reso-orange); }
-
-    .menu-toggle {
-      display: none;
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 0.5rem;
-      color: white;
-    }
-    .menu-toggle svg { width: 24px; height: 24px; fill: currentColor; }
-
-    @media (max-width: 768px) {
-      .site-header { flex-wrap: wrap; height: auto; min-height: 64px; }
-      .menu-toggle { display: block; }
-      .header-nav {
-        display: none;
-        flex-direction: column;
-        width: 100%;
-        gap: 0;
-        padding: 0.5rem 0 1rem;
-        border-top: 1px solid rgba(255,255,255,0.15);
-      }
-      .header-nav.open { display: flex; }
-      .header-nav a {
-        padding: 0.625rem 0;
-        opacity: 1;
-        border-bottom: 1px solid rgba(255,255,255,0.08);
-      }
-      .header-nav a:last-of-type { border-bottom: none; }
-    }
-
-    /* Footer */
-    .site-footer {
-      background: var(--reso-navy);
-      color: rgba(255,255,255,0.6);
-      text-align: center;
-      padding: 1.5rem;
-      font-size: 0.8125rem;
-    }
-    .site-footer a { color: rgba(255,255,255,0.8); text-decoration: none; }
-    .site-footer a:hover { color: var(--reso-orange); }
-
-    /* Landing page */
-    .dd-landing {
-      flex: 1;
-      max-width: 1100px;
-      width: 100%;
-      margin: 0 auto;
-      padding: 2.5rem 1.5rem;
-    }
-
-    .dd-landing-header {
-      margin-bottom: 2rem;
-    }
-    .dd-landing-header h1 {
-      font-size: 1.75rem;
-      font-weight: 700;
-      color: var(--reso-gray-800);
-      letter-spacing: -0.025em;
-    }
-    .dd-landing-header p {
-      font-size: 0.95rem;
-      color: var(--reso-gray-500);
-      margin-top: 0.375rem;
-      max-width: 700px;
-      line-height: 1.6;
-    }
-
-    .dd-hero-search {
-      margin-top: 1.25rem;
-      max-width: 520px;
-      position: relative;
-      cursor: pointer;
-    }
-    .dd-hero-search-input {
-      width: 100%;
-      padding: 0.75rem 1rem 0.75rem 2.75rem;
-      font-size: 0.9375rem;
-      border: 1.5px solid var(--reso-gray-300);
-      border-radius: 0.5rem;
-      background: white;
-      color: var(--reso-gray-600);
-      cursor: pointer;
-      transition: border-color 0.15s, box-shadow 0.15s;
-    }
-    .dd-hero-search-input:hover {
-      border-color: var(--reso-blue);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    }
-    html.dark .dd-hero-search-input { background: var(--reso-gray-100); }
-    .dd-hero-search-icon {
-      position: absolute;
-      left: 0.875rem;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 18px;
-      height: 18px;
-      fill: none;
-      stroke: var(--reso-gray-500);
-      stroke-width: 2;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      pointer-events: none;
-    }
-    .dd-hero-search-kbd {
-      position: absolute;
-      right: 0.75rem;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 0.6875rem;
-      font-family: inherit;
-      color: var(--reso-gray-500);
-      background: var(--reso-gray-100);
-      border: 1px solid var(--reso-gray-300);
-      border-radius: 0.25rem;
-      padding: 0.125rem 0.5rem;
-      pointer-events: none;
-    }
-
-    .dd-landing-note {
-      margin-top: 2rem;
-      padding: 0.75rem 1rem;
-      background: white;
-      border: 1px solid var(--reso-gray-200);
-      border-left: 3px solid var(--reso-blue);
-      border-radius: 0.375rem;
-      font-size: 0.8125rem;
-      color: var(--reso-gray-600);
-      line-height: 1.6;
-      max-width: 600px;
-    }
-    .dd-landing-note a {
-      color: var(--reso-blue);
-      text-decoration: none;
-      font-weight: 500;
-    }
-    .dd-landing-note a:hover { text-decoration: underline; }
-
-    .dd-landing-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 1rem;
-    }
-    @media (min-width: 640px) {
-      .dd-landing-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
-    }
-
-    .dd-landing-tile {
-      background: white;
-      border: 1px solid var(--reso-gray-200);
-      border-radius: 0.625rem;
-      padding: 1.5rem;
-      text-decoration: none;
-      color: inherit;
-      transition: box-shadow 0.15s, border-color 0.15s;
-      display: block;
-    }
-    .dd-landing-tile:hover {
-      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-      border-color: var(--reso-blue);
-    }
-    .dd-landing-tile-legacy {
-      opacity: 0.75;
-    }
-    .dd-landing-tile-legacy:hover {
-      opacity: 1;
-    }
-
-    .dd-landing-tile-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 0.375rem;
-    }
-    .dd-landing-tile-header h2 {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--reso-gray-800);
-    }
-
-    .dd-landing-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.1875rem 0.625rem;
-      border-radius: 0.25rem;
-      font-size: 0.6875rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .dd-landing-badge-active {
-      background: var(--reso-green-light);
-      color: var(--reso-green);
-    }
-    .dd-landing-badge-legacy {
-      background: var(--reso-gray-100);
-      color: var(--reso-gray-500);
-    }
-    .dd-landing-badge-draft {
-      background: var(--reso-orange-light);
-      color: var(--reso-orange);
-    }
-
-    .dd-landing-tile-approved {
-      font-size: 0.8125rem;
-      color: var(--reso-gray-500);
-      margin-bottom: 1rem;
-    }
-
-    .dd-landing-tile-stats {
-      display: flex;
-      gap: 1.5rem;
-    }
-    .dd-landing-stat {
-      display: flex;
-      flex-direction: column;
-    }
-    .dd-landing-stat-number {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--reso-gray-800);
-      line-height: 1.2;
-    }
-    .dd-landing-stat-label {
-      font-size: 0.6875rem;
-      color: var(--reso-gray-500);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    /* Related Resources */
-    .dd-landing-related {
-      margin-top: 2.5rem;
-    }
-    .dd-landing-related h3 {
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--reso-gray-500);
-      margin-bottom: 0.75rem;
-    }
-    .dd-landing-related-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0;
-      background: white;
-      border: 1px solid var(--reso-gray-200);
-      border-radius: 0.625rem;
-      overflow: hidden;
-    }
-    @media (min-width: 768px) {
-      .dd-landing-related-grid { grid-template-columns: repeat(2, 1fr); }
-    }
-    .dd-landing-related-item {
-      padding: 1rem 1.25rem;
-      border-bottom: 1px solid var(--reso-gray-100);
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      text-decoration: none;
-      color: inherit;
-      transition: background 0.1s;
-    }
-    .dd-landing-related-item:hover { background: var(--reso-gray-50); }
-    .dd-landing-related-item:last-child { border-bottom: none; }
-    @media (min-width: 768px) {
-      .dd-landing-related-item { border-right: 1px solid var(--reso-gray-100); }
-      .dd-landing-related-item:nth-child(2n) { border-right: none; }
-      .dd-landing-related-item:nth-last-child(-n+2) { border-bottom: none; }
-    }
-    .dd-landing-related-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 0.375rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-    .dd-landing-related-icon svg { width: 18px; height: 18px; }
-    .dd-landing-related-icon-navy { background: rgba(26,47,88,0.1); }
-    .dd-landing-related-icon-navy svg { fill: var(--reso-navy); }
-    .dd-landing-related-icon-blue { background: rgba(0,126,158,0.1); }
-    .dd-landing-related-icon-blue svg { fill: var(--reso-blue); }
-    .dd-landing-related-icon-orange { background: rgba(255,153,0,0.1); }
-    .dd-landing-related-icon-orange svg { fill: var(--reso-orange); }
-    .dd-landing-related-icon-green { background: rgba(56,161,105,0.1); }
-    .dd-landing-related-icon-green svg { fill: var(--reso-green); }
-    .dd-landing-related-text h4 {
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: var(--reso-gray-800);
-    }
-    .dd-landing-related-text p {
-      font-size: 0.75rem;
-      color: var(--reso-gray-500);
-      margin-top: 0.125rem;
-    }
-
-    /* Acknowledgements */
-    .dd-landing-acknowledgements {
-      margin-top: 2.5rem;
-      padding-top: 1.5rem;
-      border-top: 1px solid var(--reso-gray-200);
-    }
-    .dd-landing-acknowledgements p {
-      font-size: 0.8125rem;
-      color: var(--reso-gray-500);
-      line-height: 1.6;
-    }
-    .dd-landing-acknowledgements a {
-      color: var(--reso-blue);
-      text-decoration: none;
-      font-weight: 600;
-    }
-    .dd-landing-acknowledgements a:hover { text-decoration: underline; }
-
-    /* Theme toggle */
-    .theme-toggle {
-      background: rgba(255,255,255,0.15);
-      border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 0.375rem;
-      color: rgba(255,255,255,0.7);
-      padding: 0.375rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.15s;
-    }
-    .theme-toggle:hover { background: rgba(255,255,255,0.25); color: white; }
-    .theme-toggle svg { width: 16px; height: 16px; fill: currentColor; }
-    .theme-toggle .icon-moon { display: block; }
-    .theme-toggle .icon-sun { display: none; }
-    html.dark .theme-toggle .icon-moon { display: none; }
-    html.dark .theme-toggle .icon-sun { display: block; }
-
-    /* Search trigger */
-    .search-trigger {
-      background: rgba(255,255,255,0.15);
-      border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 0.375rem;
-      color: rgba(255,255,255,0.7);
-      font-size: 0.8125rem;
-      padding: 0.375rem 0.75rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      transition: background 0.15s;
-    }
-    .search-trigger:hover {
-      background: rgba(255,255,255,0.25);
-      color: white;
-    }
-    .search-trigger svg { width: 14px; height: 14px; fill: currentColor; }
-    .search-trigger kbd {
-      font-family: inherit;
-      font-size: 0.6875rem;
-      background: rgba(255,255,255,0.15);
-      border-radius: 0.25rem;
-      padding: 0.125rem 0.375rem;
-    }
-    @media (max-width: 768px) {
-      .search-trigger { margin-top: 0.5rem; justify-content: center; }
-      .search-trigger kbd { display: none; }
-    }
-
-    /* Search modal — reuses same styles as version pages */
-    .search-modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 100;
-      align-items: flex-start;
-      justify-content: center;
-      padding-top: 10vh;
-    }
-    .search-modal-overlay.active { display: flex; }
-    body.search-open { overflow: hidden; }
-    .search-modal {
-      background: white;
-      border-radius: 0.75rem;
-      width: 90%;
-      max-width: 640px;
-      height: 70vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    }
-    @media (max-width: 768px) {
-      .search-modal-overlay { padding-top: 1rem; }
-      .search-modal { width: calc(100% - 1.5rem); height: 85vh; border-radius: 0.5rem; }
-    }
-    /* Pagefind flexbox layout — input+pills stay fixed, drawer scrolls */
-    #search, .pagefind-ui, .pagefind-ui .pagefind-ui__form {
-      display: flex !important; flex-direction: column !important; flex: 1 !important; min-height: 0 !important;
-    }
-    .pagefind-ui .pagefind-ui__form { padding: 1rem 1rem 0 !important; position: relative !important; }
-    .pagefind-ui .pagefind-ui__form::before { position: absolute !important; top: 1.875rem !important; left: 1.625rem !important; width: 18px !important; height: 18px !important; }
-    html.dark .pagefind-ui .pagefind-ui__form { background: #1e293b; }
-    .pagefind-ui .pagefind-ui__search-input {
-      border: 1.5px solid var(--reso-gray-300) !important; border-radius: 0.5rem !important;
-      padding: 0.625rem 3.5rem 0.625rem 2.5rem !important; font-size: 1rem !important;
-      color: var(--reso-gray-800) !important; background: var(--reso-gray-50) !important;
-      font-family: inherit !important; height: auto !important;
-    }
-    .pagefind-ui .pagefind-ui__search-input::placeholder { color: var(--reso-gray-500) !important; }
-    .pagefind-ui .pagefind-ui__search-input:focus {
-      border-color: var(--reso-blue) !important; box-shadow: 0 0 0 3px rgba(0,126,158,0.15) !important; outline: none !important;
-    }
-    .dd-search-input {
-      width: 100%; border: 1.5px solid var(--reso-gray-300); border-radius: 0.5rem;
-      padding: 0.625rem 3.5rem 0.625rem 2.5rem; font-size: 1rem;
-      color: var(--reso-gray-800); background: var(--reso-gray-50); font-family: inherit; box-sizing: border-box;
-    }
-    .dd-search-input::placeholder { color: var(--reso-gray-500); }
-    .dd-search-input:focus { border-color: var(--reso-blue); box-shadow: 0 0 0 3px rgba(0,126,158,0.15); outline: none; }
-    html.dark .dd-search-input { background: #2d3748; border-color: #4a5568; color: #e2e8f0; }
-    html.dark .dd-search-input::placeholder { color: #718096; }
-    .pagefind-ui .pagefind-ui__search-clear {
-      position: absolute !important; top: 1rem !important; right: 1.5rem !important;
-      color: var(--reso-gray-500) !important; font-size: 0.8125rem !important; font-weight: 500 !important;
-      background: none !important; border: none !important; padding: 0.125rem 0.375rem !important; cursor: pointer !important;
-    }
-    .pagefind-ui .pagefind-ui__search-clear:hover { color: var(--reso-gray-800) !important; }
-    .dd-search-meta { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0 0.75rem; border-bottom: 1px solid var(--reso-gray-200); }
-    .dd-search-filters { display: flex; gap: 0.375rem; flex-wrap: wrap; }
-    .dd-search-filter-pill { padding: 0.1875rem 0.625rem; border-radius: 0.25rem; border: 1px solid var(--reso-gray-200); background: transparent; color: var(--reso-gray-600); font-size: 0.6875rem; font-weight: 500; cursor: pointer; transition: all 0.1s; }
-    .dd-search-filter-pill:hover { border-color: var(--reso-blue); color: var(--reso-blue); }
-    .dd-search-filter-pill.active { background: var(--reso-blue); border-color: var(--reso-blue); color: white; }
-    .dd-search-count { font-size: 0.6875rem; color: var(--reso-gray-500); white-space: nowrap; }
-    .pagefind-ui .pagefind-ui__button { height: 0 !important; overflow: hidden !important; opacity: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important; }
-    .pagefind-ui .pagefind-ui__message { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; }
-    .pagefind-ui .pagefind-ui__filter-panel { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; }
-    .pagefind-ui .pagefind-ui__drawer { padding: 0 1rem 1rem !important; overflow-y: auto !important; flex: 1 !important; min-height: 0 !important; }
-    .pagefind-ui .pagefind-ui__result-link { color: var(--reso-blue) !important; font-weight: 600 !important; }
-    .pagefind-ui .pagefind-ui__result-excerpt { font-size: 0.8125rem !important; color: var(--reso-gray-600) !important; line-height: 1.5 !important; }
-    .pagefind-ui .pagefind-ui__result-tags { display: none !important; }
-    .pagefind-ui .pagefind-ui__result { border-color: var(--reso-gray-200) !important; padding: 0.75rem 0 !important; }
-    .dd-result-version { display: inline-block; font-size: 0.625rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.125rem 0.4375rem; border-radius: 0.1875rem; background: var(--reso-gray-100); color: var(--reso-gray-500); margin-left: 0.5rem; vertical-align: middle; }
-    .dd-search-welcome { display: none; text-align: center; padding: 2rem 1rem 3rem; padding-top: 2rem; color: var(--reso-gray-500); font-size: 0.9375rem; flex: 1; align-items: center; justify-content: flex-start; flex-direction: column; }
-    .dd-search-welcome.visible { display: flex; }
-    .dd-search-welcome-icon { font-size: 2rem; margin-bottom: 0.75rem; opacity: 0.6; }
-    .dd-search-welcome p { margin: 0 0 0.5rem; line-height: 1.5; }
-    .dd-search-hint { font-size: 0.75rem; opacity: 0.7; }
-    .dd-search-hint kbd { display: inline-block; padding: 0.125rem 0.375rem; font-size: 0.6875rem; font-family: inherit; background: var(--reso-gray-200); border: 1px solid var(--reso-gray-300); border-radius: 0.25rem; }
-    html.dark .dd-search-welcome { color: #a0aec0; }
-    html.dark .dd-search-hint kbd { background: #2d3748; border-color: #4a5568; color: #a0aec0; }
-    .dd-search-empty { display: none; text-align: center; padding: 3rem 1rem; color: var(--reso-gray-500); font-size: 0.875rem; }
-    .dd-search-empty.visible { display: block; }
-    html.dark .dd-search-empty { color: #a0aec0; }
-    html.dark .search-modal { background: #1e293b !important; }
-    html.dark .pagefind-ui .pagefind-ui__search-input { background: #2d3748 !important; border-color: #4a5568 !important; color: #e2e8f0 !important; }
-    html.dark .pagefind-ui .pagefind-ui__search-input::placeholder { color: #718096 !important; }
-    html.dark .pagefind-ui .pagefind-ui__search-clear { color: #a0aec0 !important; }
-    html.dark .pagefind-ui .pagefind-ui__search-clear:hover { color: #e2e8f0 !important; }
-    html.dark .dd-search-meta { border-color: #4a5568; }
-    html.dark .pagefind-ui .pagefind-ui__result-link { color: #63b3ed !important; }
-    html.dark .pagefind-ui .pagefind-ui__result-excerpt { color: #a0aec0 !important; }
-    html.dark .pagefind-ui .pagefind-ui__result { border-color: #4a5568 !important; }
-    html.dark .dd-search-filter-pill { background: transparent; border-color: #4a5568; color: #a0aec0; }
-    html.dark .dd-search-filter-pill:hover { border-color: #63b3ed; color: #63b3ed; }
-    html.dark .dd-search-filter-pill.active { background: var(--reso-blue); border-color: var(--reso-blue); color: white; }
-    html.dark .dd-result-version { background: #2d3748; color: #a0aec0; }
-  </style>
+  <link rel="stylesheet" href="/dd/assets/dd-landing.css">
   <link href="/pagefind/pagefind-ui.css" rel="stylesheet">
   <script>(function(){var t=localStorage.getItem('dd-theme');if(t==='dark'||(t===null&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');})()</script>
 </head>
@@ -3617,259 +3931,7 @@ function generateDDLandingPage(allData) {
     </p>
   </footer>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      // Pagefind search
-      var activeFilter = '';
-      var pfUI = null;
-      var searchEl = document.getElementById('search');
-      var modalEl = document.getElementById('searchModal');
-      var countEl = null;
-      var filtersEl = null;
-      var ddCustomInput = null;
-      var observer = null;
-
-      function initPagefind() {
-        pfUI = new PagefindUI({
-          element: '#search', showSubResults: false, showImages: false, resetStyles: false, baseUrl: '/dd/',
-          processResult: function(result) {
-            var parts = [];
-            if (result.meta && result.meta.description) parts.push(result.meta.description);
-            if (result.meta && result.meta.date) parts.push(result.meta.date);
-            var line1 = parts.join(' &middot; ');
-            var def = (result.meta && result.meta.definition) ? result.meta.definition : '';
-            result.excerpt = (line1 && def) ? line1 + '<br>' + def : (line1 || def || result.excerpt);
-            return result;
-          }
-        });
-
-        var form = searchEl.querySelector('.pagefind-ui__form');
-        if (form) {
-          var tpl = document.getElementById('searchFiltersTemplate');
-          var clone = tpl.content.cloneNode(true);
-          var drawer = form.querySelector('.pagefind-ui__drawer');
-          if (drawer) form.insertBefore(clone, drawer);
-          else form.appendChild(clone);
-          filtersEl = form.querySelector('.dd-search-filters');
-          countEl = form.querySelector('.dd-search-count');
-
-          if (filtersEl) {
-            filtersEl.querySelectorAll('.dd-search-filter-pill').forEach(function(b) {
-              b.classList.toggle('active', b.dataset.version === activeFilter);
-            });
-            filtersEl.addEventListener('click', function(e) {
-              var btn = e.target.closest('.dd-search-filter-pill');
-              if (!btn) return;
-              filtersEl.querySelectorAll('.dd-search-filter-pill').forEach(function(b) { b.classList.remove('active'); });
-              btn.classList.add('active');
-              activeFilter = btn.dataset.version;
-              applyFilter(activeFilter);
-              var welcomeText = document.getElementById('ddSearchWelcomeText');
-              if (welcomeText) {
-                welcomeText.textContent = activeFilter
-                  ? 'Search across Data Dictionary ' + activeFilter + ' resources, fields and lookup values.'
-                  : 'Search across all Data Dictionary resources, fields and lookup values.';
-              }
-            });
-          }
-        }
-
-        // Custom input overlay: user types here, we normalize and proxy to Pagefind
-        var pfInput = searchEl.querySelector('.pagefind-ui__search-input');
-        if (pfInput) {
-          pfInput.style.position = 'absolute';
-          pfInput.style.opacity = '0';
-          pfInput.style.pointerEvents = 'none';
-          var customInput = document.createElement('input');
-          customInput.type = 'text';
-          customInput.placeholder = 'Search...';
-          customInput.className = 'dd-search-input';
-          pfInput.parentNode.insertBefore(customInput, pfInput);
-          ddCustomInput = customInput;
-
-          function clearSearch() {
-            customInput.value = '';
-            var welcomeEl = document.getElementById('ddSearchWelcome');
-            var emptyEl = document.getElementById('ddSearchEmpty');
-            var drawerEl = searchEl.querySelector('.pagefind-ui__drawer');
-            if (welcomeEl) welcomeEl.classList.add('visible');
-            if (emptyEl) emptyEl.classList.remove('visible');
-            if (drawerEl) drawerEl.style.display = 'none';
-            if (countEl) countEl.textContent = '';
-            pfUI.triggerSearch('');
-          }
-
-          var normDebounce = null;
-          customInput.addEventListener('input', function() {
-            var raw = customInput.value;
-            var hasQuery = raw.trim().length > 0;
-            if (!hasQuery) { clearSearch(); return; }
-            var welcomeEl = document.getElementById('ddSearchWelcome');
-            var emptyEl = document.getElementById('ddSearchEmpty');
-            var drawerEl = searchEl.querySelector('.pagefind-ui__drawer');
-            if (welcomeEl) welcomeEl.classList.remove('visible');
-            if (emptyEl) emptyEl.classList.remove('visible');
-            if (drawerEl) drawerEl.style.display = '';
-            clearTimeout(normDebounce);
-            normDebounce = setTimeout(function() {
-              var normalized = customInput.value.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-              if (normalized) pfUI.triggerSearch(normalized);
-            }, 150);
-          });
-
-          // Sync Pagefind's Clear button with our custom input
-          var clearBtn = searchEl.querySelector('.pagefind-ui__search-clear');
-          if (clearBtn) {
-            clearBtn.addEventListener('click', function() { clearSearch(); customInput.focus(); });
-          }
-        }
-
-        var drawerEl = searchEl.querySelector('.pagefind-ui__drawer');
-        if (drawerEl) {
-          drawerEl.addEventListener('scroll', function() {
-            if (drawerEl.scrollTop + drawerEl.clientHeight >= drawerEl.scrollHeight - 300) {
-              var btn = searchEl.querySelector('.pagefind-ui__button');
-              if (btn) btn.click();
-            }
-          });
-        }
-
-        var processing = false;
-        observer = new MutationObserver(function() {
-          if (processing) return;
-          processing = true;
-          requestAnimationFrame(function() {
-            searchEl.querySelectorAll('.pagefind-ui__result-link:not([data-badge])').forEach(function(link) {
-              link.setAttribute('data-badge', '1');
-              var url = link.getAttribute('href') || '';
-              var m = url.match(/\\/DD(\\d+\\.\\d+)\\//);
-              if (m) {
-                var badge = document.createElement('span');
-                badge.className = 'dd-result-version';
-                badge.textContent = 'DD ' + m[1];
-                link.appendChild(badge);
-              }
-            });
-            // Re-sort: exact title matches go first
-            var query = ddCustomInput ? ddCustomInput.value.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : '';
-            if (query) {
-              var resultsList = searchEl.querySelector('.pagefind-ui__results');
-              if (resultsList) {
-                var items = Array.from(resultsList.querySelectorAll('.pagefind-ui__result'));
-                var needsSort = items.some(function(item) {
-                  var link = item.querySelector('.pagefind-ui__result-link');
-                  if (!link) return false;
-                  var title = (link.textContent || '').replace(/DD\s*\d+\.\d+$/, '').trim();
-                  return title.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === query;
-                });
-                if (needsSort) {
-                  observer.disconnect();
-                  items.forEach(function(item) {
-                    var link = item.querySelector('.pagefind-ui__result-link');
-                    if (!link) return;
-                    var title = (link.textContent || '').replace(/DD\s*\d+\.\d+$/, '').trim();
-                    var normTitle = title.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-                    if (normTitle === query) {
-                      resultsList.insertBefore(item, resultsList.firstChild);
-                    }
-                  });
-                  observer.observe(searchEl, { childList: true, subtree: true });
-                }
-              }
-            }
-            var hasQuery = ddCustomInput && ddCustomInput.value.trim().length > 0;
-            var msg = searchEl.querySelector('.pagefind-ui__message');
-            var emptyEl = document.getElementById('ddSearchEmpty');
-            if (msg && countEl) {
-              if (!hasQuery) {
-                countEl.textContent = '';
-                if (emptyEl) emptyEl.classList.remove('visible');
-              } else {
-                var txt = msg.textContent || '';
-                var cm = txt.match(/(\\d+)\\s+result/);
-                var count = cm ? parseInt(cm[1], 10) : -1;
-                var newCount = count > 0 ? count + ' results' : '';
-                if (countEl.textContent !== newCount) countEl.textContent = newCount;
-                if (emptyEl) emptyEl.classList.toggle('visible', count === 0);
-              }
-            }
-            var dEl = searchEl.querySelector('.pagefind-ui__drawer');
-            var loadBtn = searchEl.querySelector('.pagefind-ui__button');
-            if (dEl && loadBtn && dEl.scrollHeight <= dEl.clientHeight) {
-              setTimeout(function() { loadBtn.click(); }, 50);
-            }
-            processing = false;
-          });
-        });
-        observer.observe(searchEl, { childList: true, subtree: true });
-
-        if (activeFilter) {
-          pfUI.triggerFilters({ 'dd-version': [activeFilter] });
-        }
-      }
-
-      function applyFilter(version) {
-        if (!pfUI) return;
-        if (version) {
-          pfUI.triggerFilters({ 'dd-version': [version] });
-        } else {
-          pfUI.triggerFilters({});
-        }
-        var raw = ddCustomInput ? ddCustomInput.value : '';
-        if (raw) {
-          pfUI.triggerSearch(raw.replace(/[^a-zA-Z0-9]/g, '').toLowerCase());
-        }
-      }
-
-      var s = document.createElement('script');
-      s.src = '/pagefind/pagefind-ui.js';
-      s.onload = function() { if (typeof PagefindUI !== 'undefined') initPagefind(); };
-      document.head.appendChild(s);
-
-      // Header hamburger
-      document.getElementById('menuToggle').addEventListener('click', function() {
-        document.getElementById('headerNav').classList.toggle('open');
-      });
-
-      // Search modal
-      var overlay = document.getElementById('searchOverlay');
-      function openSearch() {
-        overlay.classList.add('active');
-        document.body.classList.add('search-open');
-        setTimeout(function() {
-          if (ddCustomInput) {
-            ddCustomInput.focus();
-            var hasQuery = ddCustomInput.value.trim().length > 0;
-            var welcomeEl = document.getElementById('ddSearchWelcome');
-            var drawerEl = searchEl.querySelector('.pagefind-ui__drawer');
-            if (welcomeEl) welcomeEl.classList.toggle('visible', !hasQuery);
-            if (drawerEl) drawerEl.style.display = hasQuery ? '' : 'none';
-            if (!hasQuery && countEl) countEl.textContent = '';
-          }
-        }, 100);
-      }
-      function closeSearch() {
-        overlay.classList.remove('active');
-        document.body.classList.remove('search-open');
-      }
-      document.getElementById('searchTrigger').addEventListener('click', openSearch);
-      document.getElementById('heroSearch').addEventListener('click', openSearch);
-      overlay.addEventListener('click', function(e) { if (e.target === overlay) closeSearch(); });
-      document.addEventListener('keydown', function(e) {
-        if (e.key === '/' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-          e.preventDefault();
-          openSearch();
-        }
-        if (e.key === 'Escape') closeSearch();
-      });
-
-      // Theme toggle
-      document.getElementById('themeToggle').addEventListener('click', function() {
-        var isDark = document.documentElement.classList.toggle('dark');
-        localStorage.setItem('dd-theme', isDark ? 'dark' : 'light');
-      });
-    });
-  </script>
+  <script src="/dd/assets/dd-landing.js"></script>
 </body>
 </html>`;
 
@@ -3960,6 +4022,15 @@ async function main() {
 
   // Generate DD landing page
   generateDDLandingPage(allData);
+
+  // Write shared assets
+  const assetsDir = join(OUTPUT_DIR, 'assets');
+  mkdirSync(assetsDir, { recursive: true });
+  writeFileSync(join(assetsDir, 'dd.css'), getPageCSS());
+  writeFileSync(join(assetsDir, 'dd.js'), getPageJS());
+  writeFileSync(join(assetsDir, 'dd-landing.css'), getLandingCSS());
+  writeFileSync(join(assetsDir, 'dd-landing.js'), getLandingJS());
+  console.log('  Written shared assets to dd-output/assets/');
 
   console.log('\nDone!');
 }

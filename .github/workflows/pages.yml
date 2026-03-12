@@ -2,7 +2,9 @@ name: GitHub Pages
 
 on:
   push:
-    branches: [main]
+    # TODO: Change back to main after v0.2 merge
+    # branches: [main]
+    branches: [v0.2]
   workflow_dispatch:
 
 permissions:
