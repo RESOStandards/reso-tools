@@ -513,6 +513,26 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
       box-shadow: 0 0 0 3px rgba(0,126,158,0.15) !important;
       outline: none !important;
     }
+    /* Custom search input overlay */
+    .dd-search-input {
+      width: 100%;
+      border: 1.5px solid var(--reso-gray-300);
+      border-radius: 0.5rem;
+      padding: 0.625rem 3.5rem 0.625rem 2.5rem;
+      font-size: 1rem;
+      color: var(--reso-gray-800);
+      background: var(--reso-gray-50);
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+    .dd-search-input::placeholder { color: var(--reso-gray-500); }
+    .dd-search-input:focus {
+      border-color: var(--reso-blue);
+      box-shadow: 0 0 0 3px rgba(0,126,158,0.15);
+      outline: none;
+    }
+    html.dark .dd-search-input { background: #2d3748; border-color: #4a5568; color: #e2e8f0; }
+    html.dark .dd-search-input::placeholder { color: #718096; }
     /* Clear button — vertically center in input */
     .pagefind-ui .pagefind-ui__search-clear {
       position: absolute !important;
@@ -576,6 +596,35 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
     .pagefind-ui .pagefind-ui__result-excerpt { font-size: 0.8125rem !important; color: var(--reso-gray-600) !important; line-height: 1.5 !important; }
     .pagefind-ui .pagefind-ui__result-tags { display: none !important; }
     .pagefind-ui .pagefind-ui__result { border-color: var(--reso-gray-200) !important; padding: 0.75rem 0 !important; }
+
+    /* Welcome state */
+    .dd-search-welcome {
+      display: none;
+      text-align: center;
+      padding: 2rem 1rem 3rem;
+      color: var(--reso-gray-500);
+      font-size: 0.9375rem;
+      flex: 1;
+      align-items: center;
+      justify-content: flex-start;
+      flex-direction: column;
+      padding-top: 10%;
+    }
+    .dd-search-welcome.visible { display: flex; }
+    .dd-search-welcome-icon { font-size: 2rem; margin-bottom: 0.75rem; opacity: 0.6; }
+    .dd-search-welcome p { margin: 0 0 0.5rem; line-height: 1.5; }
+    .dd-search-hint { font-size: 0.75rem; opacity: 0.7; }
+    .dd-search-hint kbd {
+      display: inline-block;
+      padding: 0.125rem 0.375rem;
+      font-size: 0.6875rem;
+      font-family: inherit;
+      background: var(--reso-gray-200);
+      border: 1px solid var(--reso-gray-300);
+      border-radius: 0.25rem;
+    }
+    html.dark .dd-search-welcome { color: #a0aec0; }
+    html.dark .dd-search-hint kbd { background: #2d3748; border-color: #4a5568; color: #a0aec0; }
 
     /* No results message */
     .dd-search-empty {
@@ -822,6 +871,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
     .dd-page-header { margin-bottom: 1.5rem; }
     .dd-page-header h1 { font-size: 1.5rem; font-weight: 700; color: var(--reso-gray-800); }
     .dd-page-subtitle { font-size: 0.875rem; color: var(--reso-gray-500); margin-top: 0.25rem; }
+    .dd-search-norm { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
 
     /* Resource grid */
     .dd-resource-grid {
@@ -1089,6 +1139,11 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
   <div class="search-modal-overlay" id="searchOverlay">
     <div class="search-modal" id="searchModal">
       <div id="search"></div>
+      <div class="dd-search-welcome visible" id="ddSearchWelcome">
+        <div class="dd-search-welcome-icon">\u{1F50D}</div>
+        <p id="ddSearchWelcomeText">Search across all Data Dictionary resources, fields and lookup values.</p>
+        <p class="dd-search-hint">Press <kbd>Esc</kbd> to close</p>
+      </div>
       <div class="dd-search-empty" id="ddSearchEmpty">No results found. Try a different search term or filter.</div>
     </div>
   </div>
@@ -1120,11 +1175,23 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
       var modalEl = document.getElementById('searchModal');
       var countEl = null;
       var filtersEl = null;
+      var ddCustomInput = null;
 
       var observer = null;
 
       function initPagefind() {
-        pfUI = new PagefindUI({ element: '#search', showSubResults: true, showImages: false, resetStyles: false });
+        pfUI = new PagefindUI({
+          element: '#search', showSubResults: false, showImages: false, resetStyles: false, baseUrl: '/dd/',
+          processResult: function(result) {
+            var parts = [];
+            if (result.meta && result.meta.description) parts.push(result.meta.description);
+            if (result.meta && result.meta.date) parts.push(result.meta.date);
+            var line1 = parts.join(' &middot; ');
+            var def = (result.meta && result.meta.definition) ? result.meta.definition : '';
+            result.excerpt = (line1 && def) ? line1 + '<br>' + def : (line1 || def || result.excerpt);
+            return result;
+          }
+        });
 
         // Inject filter pills before the drawer
         var form = searchEl.querySelector('.pagefind-ui__form');
@@ -1148,7 +1215,63 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
               btn.classList.add('active');
               activeFilter = btn.dataset.version;
               applyFilter(activeFilter);
+              var welcomeText = document.getElementById('ddSearchWelcomeText');
+              if (welcomeText) {
+                welcomeText.textContent = activeFilter
+                  ? 'Search across Data Dictionary ' + activeFilter + ' resources, fields and lookup values.'
+                  : 'Search across all Data Dictionary resources, fields and lookup values.';
+              }
             });
+          }
+        }
+
+        // Custom input overlay: user types here, we normalize and proxy to Pagefind
+        var pfInput = searchEl.querySelector('.pagefind-ui__search-input');
+        if (pfInput) {
+          pfInput.style.position = 'absolute';
+          pfInput.style.opacity = '0';
+          pfInput.style.pointerEvents = 'none';
+          var customInput = document.createElement('input');
+          customInput.type = 'text';
+          customInput.placeholder = 'Search...';
+          customInput.className = 'dd-search-input';
+          pfInput.parentNode.insertBefore(customInput, pfInput);
+          ddCustomInput = customInput;
+
+          function clearSearch() {
+            customInput.value = '';
+            var welcomeEl = document.getElementById('ddSearchWelcome');
+            var emptyEl = document.getElementById('ddSearchEmpty');
+            var drawerEl = searchEl.querySelector('.pagefind-ui__drawer');
+            if (welcomeEl) welcomeEl.classList.add('visible');
+            if (emptyEl) emptyEl.classList.remove('visible');
+            if (drawerEl) drawerEl.style.display = 'none';
+            if (countEl) countEl.textContent = '';
+            pfUI.triggerSearch('');
+          }
+
+          var normDebounce = null;
+          customInput.addEventListener('input', function() {
+            var raw = customInput.value;
+            var hasQuery = raw.trim().length > 0;
+            if (!hasQuery) { clearSearch(); return; }
+            var welcomeEl = document.getElementById('ddSearchWelcome');
+            var emptyEl = document.getElementById('ddSearchEmpty');
+            var drawerEl = searchEl.querySelector('.pagefind-ui__drawer');
+            if (welcomeEl) welcomeEl.classList.remove('visible');
+            if (emptyEl) emptyEl.classList.remove('visible');
+            if (drawerEl) drawerEl.style.display = '';
+            clearTimeout(normDebounce);
+            normDebounce = setTimeout(function() {
+              var normalized = customInput.value.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+              if (normalized) pfUI.triggerSearch(normalized);
+            }, 150);
+          });
+
+          // Sync Pagefind's Clear button with our custom input
+          var clearBtn = searchEl.querySelector('.pagefind-ui__search-clear');
+          if (clearBtn) {
+            clearBtn.addEventListener('click', function() { clearSearch(); customInput.focus(); });
           }
         }
 
@@ -1180,6 +1303,23 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
                 link.appendChild(badge);
               }
             });
+            // Re-sort: exact title matches go first
+            var query = ddCustomInput ? ddCustomInput.value.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : '';
+            if (query) {
+              var resultsList = searchEl.querySelector('.pagefind-ui__results');
+              if (resultsList) {
+                var items = Array.from(resultsList.querySelectorAll('.pagefind-ui__result'));
+                items.forEach(function(item) {
+                  var link = item.querySelector('.pagefind-ui__result-link');
+                  if (!link) return;
+                  var title = (link.textContent || '').replace(/DD\\s*\\d+\\.\\d+$/, '').trim();
+                  var normTitle = title.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+                  if (normTitle === query) {
+                    resultsList.insertBefore(item, resultsList.firstChild);
+                  }
+                });
+              }
+            }
             var msg = searchEl.querySelector('.pagefind-ui__message');
             var emptyEl = document.getElementById('ddSearchEmpty');
             if (msg && countEl) {
@@ -1205,9 +1345,13 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
         });
         observer.observe(searchEl, { childList: true, subtree: true });
 
-        // Apply initial filter
+        // Apply initial filter and set welcome text
         if (activeFilter) {
           pfUI.triggerFilters({ 'dd-version': [activeFilter] });
+          var welcomeText = document.getElementById('ddSearchWelcomeText');
+          if (welcomeText) {
+            welcomeText.textContent = 'Search across Data Dictionary ' + activeFilter + ' resources, fields and lookup values.';
+          }
         }
       }
 
@@ -1218,11 +1362,10 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
         } else {
           pfUI.triggerFilters({});
         }
-        // Re-trigger current search term so results update
-        var input = searchEl.querySelector('.pagefind-ui__search-input');
-        var term = input ? input.value : '';
-        if (term) {
-          pfUI.triggerSearch(term);
+        // Re-trigger current search term (normalized) so results update
+        var raw = ddCustomInput ? ddCustomInput.value : '';
+        if (raw) {
+          pfUI.triggerSearch(raw.replace(/[^a-zA-Z0-9]/g, '').toLowerCase());
         }
       }
 
@@ -1243,8 +1386,14 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
         overlay.classList.add('active');
         document.body.classList.add('search-open');
         setTimeout(function() {
-          var pfInput = searchEl.querySelector('.pagefind-ui__search-input');
-          if (pfInput) pfInput.focus();
+          if (ddCustomInput) {
+            ddCustomInput.focus();
+            var hasQuery = ddCustomInput.value.trim().length > 0;
+            var welcomeEl = document.getElementById('ddSearchWelcome');
+            var drawerEl = searchEl.querySelector('.pagefind-ui__drawer');
+            if (welcomeEl) welcomeEl.classList.toggle('visible', !hasQuery);
+            if (drawerEl) drawerEl.style.display = hasQuery ? '' : 'none';
+          }
         }, 100);
       }
       function closeSearch() {
@@ -1496,14 +1645,18 @@ function generateResourcePage(vCfg, data, resourceName, usageStats, allVersions)
   const resourceStats = usageStats?.[resourceName];
 
   let html = breadcrumbHtml(version, label, [{ label: resourceName }]);
-  html += `<div class="dd-page-header"><h1>${escapeHtml(resourceName)}</h1>`;
+  const resNorm = resourceName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  html += `<div class="dd-page-header"><h1 data-pagefind-meta="title" data-pagefind-weight="10">${escapeHtml(resourceName)}</h1>`;
+  html += `<span class="dd-search-norm" data-pagefind-weight="100">${resNorm}</span>`;
   const latestRevised = fields.reduce((latest, f) => {
     if (f.RevisedDate && (!latest || f.RevisedDate > latest)) return f.RevisedDate;
     return latest;
   }, null);
   html += `<p class="dd-page-subtitle" data-pagefind-meta="description">${formatNumber(fields.length)} fields`;
   if (latestRevised) html += ` &middot; Last revised ${escapeHtml(latestRevised)}`;
-  html += `</p></div>`;
+  html += `</p>`;
+  if (latestRevised) html += `<span class="dd-search-norm" data-pagefind-meta="date">${escapeHtml(latestRevised)}</span>`;
+  html += `</div>`;
 
   html += `<div class="dd-sort-controls">
     <label>Sort by</label>
@@ -1601,11 +1754,17 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
     { label: field.DisplayName || field.StandardName },
   ]);
 
-  html += `<div class="dd-page-header"><h1>${escapeHtml(field.DisplayName || field.StandardName)}</h1>`;
-  html += `<p class="dd-page-subtitle" data-pagefind-meta="description">${escapeHtml(resourceName)} field &mdash; ${escapeHtml(field.SimpleDataType || 'Unknown type')}</p></div>`;
+  const fieldTitle = field.DisplayName || field.StandardName;
+  const fieldNorm = fieldTitle.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  html += `<div class="dd-page-header"><h1 data-pagefind-meta="title" data-pagefind-weight="10">${escapeHtml(fieldTitle)}</h1>`;
+  html += `<span class="dd-search-norm" data-pagefind-weight="100">${fieldNorm}</span>`;
+  html += `<p class="dd-page-subtitle" data-pagefind-meta="description">${escapeHtml(resourceName)} field &mdash; ${escapeHtml(field.SimpleDataType || 'Unknown type')}</p>`;
+  if (field.Definition) html += `<span class="dd-search-norm" data-pagefind-meta="definition">${escapeHtml(truncate(field.Definition, 200))}</span>`;
+  if (field.RevisedDate) html += `<span class="dd-search-norm" data-pagefind-meta="date">${escapeHtml(field.RevisedDate)}</span>`;
+  html += `</div>`;
 
-  // Metadata
-  html += `<div class="dd-metadata-card" data-pagefind-ignore><h2>Details</h2><table class="dd-metadata-table">`;
+  // Metadata — indexed so Pagefind can match on field name, definition, etc.
+  html += `<div class="dd-metadata-card"><h2>Details</h2><table class="dd-metadata-table">`;
   const metaRows = [
     ['Standard Name', field.StandardName],
     ['Display Name', field.DisplayName],
@@ -1700,11 +1859,16 @@ function generateLookupPage(vCfg, data, resourceName, field, lookup, usageStats,
     { label: lookup.StandardLookupValue },
   ]);
 
-  html += `<div class="dd-page-header"><h1>${escapeHtml(lookup.StandardLookupValue)}</h1>`;
-  html += `<p class="dd-page-subtitle" data-pagefind-meta="description">Lookup value for ${escapeHtml(field.DisplayName || field.StandardName)} (${escapeHtml(resourceName)})</p></div>`;
+  const lookupNorm = lookup.StandardLookupValue.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  html += `<div class="dd-page-header"><h1 data-pagefind-meta="title" data-pagefind-weight="10">${escapeHtml(lookup.StandardLookupValue)}</h1>`;
+  html += `<span class="dd-search-norm" data-pagefind-weight="100">${lookupNorm}</span>`;
+  html += `<p class="dd-page-subtitle" data-pagefind-meta="description">Lookup value for ${escapeHtml(field.DisplayName || field.StandardName)} (${escapeHtml(resourceName)})</p>`;
+  if (lookup.Definition) html += `<span class="dd-search-norm" data-pagefind-meta="definition">${escapeHtml(truncate(lookup.Definition, 200))}</span>`;
+  if (lookup.RevisedDate) html += `<span class="dd-search-norm" data-pagefind-meta="date">${escapeHtml(lookup.RevisedDate)}</span>`;
+  html += `</div>`;
 
-  // Metadata
-  html += `<div class="dd-metadata-card" data-pagefind-ignore><h2>Details</h2><table class="dd-metadata-table">`;
+  // Metadata — indexed so Pagefind can match on lookup value, definition, etc.
+  html += `<div class="dd-metadata-card"><h2>Details</h2><table class="dd-metadata-table">`;
   const metaRows = [
     ['Lookup Name', lookup.LookupName],
     ['Standard Value', lookup.StandardLookupValue],
@@ -2425,6 +2589,15 @@ function generateDDLandingPage(allData) {
     .pagefind-ui .pagefind-ui__search-input:focus {
       border-color: var(--reso-blue) !important; box-shadow: 0 0 0 3px rgba(0,126,158,0.15) !important; outline: none !important;
     }
+    .dd-search-input {
+      width: 100%; border: 1.5px solid var(--reso-gray-300); border-radius: 0.5rem;
+      padding: 0.625rem 3.5rem 0.625rem 2.5rem; font-size: 1rem;
+      color: var(--reso-gray-800); background: var(--reso-gray-50); font-family: inherit; box-sizing: border-box;
+    }
+    .dd-search-input::placeholder { color: var(--reso-gray-500); }
+    .dd-search-input:focus { border-color: var(--reso-blue); box-shadow: 0 0 0 3px rgba(0,126,158,0.15); outline: none; }
+    html.dark .dd-search-input { background: #2d3748; border-color: #4a5568; color: #e2e8f0; }
+    html.dark .dd-search-input::placeholder { color: #718096; }
     .pagefind-ui .pagefind-ui__search-clear {
       position: absolute !important; top: 1rem !important; right: 1.5rem !important;
       color: var(--reso-gray-500) !important; font-size: 0.8125rem !important; font-weight: 500 !important;
@@ -2446,6 +2619,14 @@ function generateDDLandingPage(allData) {
     .pagefind-ui .pagefind-ui__result-tags { display: none !important; }
     .pagefind-ui .pagefind-ui__result { border-color: var(--reso-gray-200) !important; padding: 0.75rem 0 !important; }
     .dd-result-version { display: inline-block; font-size: 0.625rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.125rem 0.4375rem; border-radius: 0.1875rem; background: var(--reso-gray-100); color: var(--reso-gray-500); margin-left: 0.5rem; vertical-align: middle; }
+    .dd-search-welcome { display: none; text-align: center; padding: 2rem 1rem 3rem; padding-top: 10%; color: var(--reso-gray-500); font-size: 0.9375rem; flex: 1; align-items: center; justify-content: flex-start; flex-direction: column; }
+    .dd-search-welcome.visible { display: flex; }
+    .dd-search-welcome-icon { font-size: 2rem; margin-bottom: 0.75rem; opacity: 0.6; }
+    .dd-search-welcome p { margin: 0 0 0.5rem; line-height: 1.5; }
+    .dd-search-hint { font-size: 0.75rem; opacity: 0.7; }
+    .dd-search-hint kbd { display: inline-block; padding: 0.125rem 0.375rem; font-size: 0.6875rem; font-family: inherit; background: var(--reso-gray-200); border: 1px solid var(--reso-gray-300); border-radius: 0.25rem; }
+    html.dark .dd-search-welcome { color: #a0aec0; }
+    html.dark .dd-search-hint kbd { background: #2d3748; border-color: #4a5568; color: #a0aec0; }
     .dd-search-empty { display: none; text-align: center; padding: 3rem 1rem; color: var(--reso-gray-500); font-size: 0.875rem; }
     .dd-search-empty.visible { display: block; }
     html.dark .dd-search-empty { color: #a0aec0; }
@@ -2560,6 +2741,11 @@ function generateDDLandingPage(allData) {
   <div class="search-modal-overlay" id="searchOverlay">
     <div class="search-modal" id="searchModal">
       <div id="search"></div>
+      <div class="dd-search-welcome visible" id="ddSearchWelcome">
+        <div class="dd-search-welcome-icon">\u{1F50D}</div>
+        <p id="ddSearchWelcomeText">Search across all Data Dictionary resources, fields and lookup values.</p>
+        <p class="dd-search-hint">Press <kbd>Esc</kbd> to close</p>
+      </div>
       <div class="dd-search-empty" id="ddSearchEmpty">No results found. Try a different search term or filter.</div>
     </div>
   </div>
@@ -2591,10 +2777,22 @@ function generateDDLandingPage(allData) {
       var modalEl = document.getElementById('searchModal');
       var countEl = null;
       var filtersEl = null;
+      var ddCustomInput = null;
       var observer = null;
 
       function initPagefind() {
-        pfUI = new PagefindUI({ element: '#search', showSubResults: true, showImages: false, resetStyles: false });
+        pfUI = new PagefindUI({
+          element: '#search', showSubResults: false, showImages: false, resetStyles: false, baseUrl: '/dd/',
+          processResult: function(result) {
+            var parts = [];
+            if (result.meta && result.meta.description) parts.push(result.meta.description);
+            if (result.meta && result.meta.date) parts.push(result.meta.date);
+            var line1 = parts.join(' &middot; ');
+            var def = (result.meta && result.meta.definition) ? result.meta.definition : '';
+            result.excerpt = (line1 && def) ? line1 + '<br>' + def : (line1 || def || result.excerpt);
+            return result;
+          }
+        });
 
         var form = searchEl.querySelector('.pagefind-ui__form');
         if (form) {
@@ -2617,7 +2815,63 @@ function generateDDLandingPage(allData) {
               btn.classList.add('active');
               activeFilter = btn.dataset.version;
               applyFilter(activeFilter);
+              var welcomeText = document.getElementById('ddSearchWelcomeText');
+              if (welcomeText) {
+                welcomeText.textContent = activeFilter
+                  ? 'Search across Data Dictionary ' + activeFilter + ' resources, fields and lookup values.'
+                  : 'Search across all Data Dictionary resources, fields and lookup values.';
+              }
             });
+          }
+        }
+
+        // Custom input overlay: user types here, we normalize and proxy to Pagefind
+        var pfInput = searchEl.querySelector('.pagefind-ui__search-input');
+        if (pfInput) {
+          pfInput.style.position = 'absolute';
+          pfInput.style.opacity = '0';
+          pfInput.style.pointerEvents = 'none';
+          var customInput = document.createElement('input');
+          customInput.type = 'text';
+          customInput.placeholder = 'Search...';
+          customInput.className = 'dd-search-input';
+          pfInput.parentNode.insertBefore(customInput, pfInput);
+          ddCustomInput = customInput;
+
+          function clearSearch() {
+            customInput.value = '';
+            var welcomeEl = document.getElementById('ddSearchWelcome');
+            var emptyEl = document.getElementById('ddSearchEmpty');
+            var drawerEl = searchEl.querySelector('.pagefind-ui__drawer');
+            if (welcomeEl) welcomeEl.classList.add('visible');
+            if (emptyEl) emptyEl.classList.remove('visible');
+            if (drawerEl) drawerEl.style.display = 'none';
+            if (countEl) countEl.textContent = '';
+            pfUI.triggerSearch('');
+          }
+
+          var normDebounce = null;
+          customInput.addEventListener('input', function() {
+            var raw = customInput.value;
+            var hasQuery = raw.trim().length > 0;
+            if (!hasQuery) { clearSearch(); return; }
+            var welcomeEl = document.getElementById('ddSearchWelcome');
+            var emptyEl = document.getElementById('ddSearchEmpty');
+            var drawerEl = searchEl.querySelector('.pagefind-ui__drawer');
+            if (welcomeEl) welcomeEl.classList.remove('visible');
+            if (emptyEl) emptyEl.classList.remove('visible');
+            if (drawerEl) drawerEl.style.display = '';
+            clearTimeout(normDebounce);
+            normDebounce = setTimeout(function() {
+              var normalized = customInput.value.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+              if (normalized) pfUI.triggerSearch(normalized);
+            }, 150);
+          });
+
+          // Sync Pagefind's Clear button with our custom input
+          var clearBtn = searchEl.querySelector('.pagefind-ui__search-clear');
+          if (clearBtn) {
+            clearBtn.addEventListener('click', function() { clearSearch(); customInput.focus(); });
           }
         }
 
@@ -2647,6 +2901,23 @@ function generateDDLandingPage(allData) {
                 link.appendChild(badge);
               }
             });
+            // Re-sort: exact title matches go first
+            var query = ddCustomInput ? ddCustomInput.value.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : '';
+            if (query) {
+              var resultsList = searchEl.querySelector('.pagefind-ui__results');
+              if (resultsList) {
+                var items = Array.from(resultsList.querySelectorAll('.pagefind-ui__result'));
+                items.forEach(function(item) {
+                  var link = item.querySelector('.pagefind-ui__result-link');
+                  if (!link) return;
+                  var title = (link.textContent || '').replace(/DD\\s*\\d+\\.\\d+$/, '').trim();
+                  var normTitle = title.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+                  if (normTitle === query) {
+                    resultsList.insertBefore(item, resultsList.firstChild);
+                  }
+                });
+              }
+            }
             var msg = searchEl.querySelector('.pagefind-ui__message');
             var emptyEl = document.getElementById('ddSearchEmpty');
             if (msg && countEl) {
@@ -2683,10 +2954,9 @@ function generateDDLandingPage(allData) {
         } else {
           pfUI.triggerFilters({});
         }
-        var input = searchEl.querySelector('.pagefind-ui__search-input');
-        var term = input ? input.value : '';
-        if (term) {
-          pfUI.triggerSearch(term);
+        var raw = ddCustomInput ? ddCustomInput.value : '';
+        if (raw) {
+          pfUI.triggerSearch(raw.replace(/[^a-zA-Z0-9]/g, '').toLowerCase());
         }
       }
 
@@ -2706,8 +2976,14 @@ function generateDDLandingPage(allData) {
         overlay.classList.add('active');
         document.body.classList.add('search-open');
         setTimeout(function() {
-          var pfInput = searchEl.querySelector('.pagefind-ui__search-input');
-          if (pfInput) pfInput.focus();
+          if (ddCustomInput) {
+            ddCustomInput.focus();
+            var hasQuery = ddCustomInput.value.trim().length > 0;
+            var welcomeEl = document.getElementById('ddSearchWelcome');
+            var drawerEl = searchEl.querySelector('.pagefind-ui__drawer');
+            if (welcomeEl) welcomeEl.classList.toggle('visible', !hasQuery);
+            if (drawerEl) drawerEl.style.display = hasQuery ? '' : 'none';
+          }
         }, 100);
       }
       function closeSearch() {
