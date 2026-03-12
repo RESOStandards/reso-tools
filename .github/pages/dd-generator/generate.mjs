@@ -405,6 +405,12 @@ function getPageCSS() {
     html.dark .dd-field-link,
     html.dark .dd-lookups-table a,
     html.dark .dd-more-link { color: #63b3ed; }
+    html.dark .dd-collapsible { background: var(--reso-gray-100); border-color: var(--reso-gray-200); }
+    html.dark .dd-collapsible-toggle { background: var(--reso-gray-50); color: #edf2f7; }
+    html.dark .dd-collapsible-toggle:hover { background: var(--reso-gray-200); }
+    html.dark .dd-toggle-icon { color: var(--reso-gray-500); }
+    html.dark .dd-usage-value { color: #edf2f7; }
+    html.dark .dd-usage-label { color: var(--reso-gray-500); }
     html.dark .dd-group-heading { color: #edf2f7; border-bottom-color: var(--reso-gray-200); }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1469,7 +1475,11 @@ function getPageCSS() {
       overflow: hidden;
       margin-bottom: 1rem;
     }
-    html.dark .dd-about-table { background: var(--reso-gray-100); }
+    html.dark .dd-about-table { background: var(--reso-gray-100); border-color: var(--reso-gray-200); }
+    html.dark .dd-about-table th { background: var(--reso-gray-50); color: var(--reso-gray-500); }
+    html.dark .dd-about-table td { color: var(--reso-gray-600); }
+    html.dark .dd-about-table th, html.dark .dd-about-table td { border-bottom-color: var(--reso-gray-200); }
+    html.dark .dd-about-table a { color: #63b3ed; }
     .dd-about-table th, .dd-about-table td {
       padding: 0.5rem 0.75rem;
       text-align: left;
