@@ -20,9 +20,9 @@ const DD_DATA_DIR = join(PAGES_DIR, 'dd-data');
 const OUTPUT_DIR = join(PAGES_DIR, 'dd-output');
 
 const VERSIONS = [
-  { version: '1.7', label: 'DD 1.7', draft: false },
-  { version: '2.0', label: 'DD 2.0', draft: false },
-  { version: '2.1', label: 'DD 2.1', draft: true },
+  { version: '1.7', label: 'DD 1.7', draft: false, legacy: true, approved: 'December 18, 2018' },
+  { version: '2.0', label: 'DD 2.0', draft: false, legacy: false, approved: 'October 23, 2023' },
+  { version: '2.1', label: 'DD 2.1', draft: true, legacy: false },
 ];
 
 const DEFINITION_TRUNCATE_LENGTH = 150;
@@ -258,7 +258,7 @@ function ddUrl(version, ...parts) {
 }
 
 function breadcrumbHtml(version, versionLabel, items) {
-  let html = `<nav class="dd-breadcrumb"><a href="/dd/DD${version}/">${escapeHtml(versionLabel)}</a>`;
+  let html = `<nav class="dd-breadcrumb"><a href="/dd/">Data Dictionary</a> <span class="dd-breadcrumb-sep">/</span> <a href="/dd/DD${version}/">${escapeHtml(versionLabel)}</a>`;
   for (const item of items) {
     html += ` <span class="dd-breadcrumb-sep">/</span> `;
     if (item.url) {
@@ -837,7 +837,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
     </button>
     <nav class="header-nav" id="headerNav">
       <a href="/">Home</a>
-      <a href="/dd/DD2.0/">Data Dictionary</a>
+      <a href="/dd/">Data Dictionary</a>
       <a href="https://github.com/RESOStandards/reso-tools">GitHub</a>
       <a href="https://reso.org">RESO.org</a>
       <button class="search-trigger" id="searchTrigger" type="button">
@@ -1521,6 +1521,662 @@ function generateXrefPages(vCfg, data, allVersions) {
 }
 
 // ---------------------------------------------------------------------------
+// DD Landing Page — shows all versions as tiles
+// ---------------------------------------------------------------------------
+
+function generateDDLandingPage(allData) {
+  mkdirSync(OUTPUT_DIR, { recursive: true });
+
+  // Build version tiles
+  let tilesHtml = '';
+  for (const { vCfg, data } of allData) {
+    const { version, label, draft, legacy, approved } = vCfg;
+    const resourceCount = Object.keys(data.resourceMap).length;
+    const fieldCount = data.fields.length;
+    const lookupCount = data.lookups.length;
+
+    let statusBadge;
+    if (draft) {
+      statusBadge = '<span class="dd-landing-badge dd-landing-badge-draft">Draft</span>';
+    } else if (legacy) {
+      statusBadge = '<span class="dd-landing-badge dd-landing-badge-legacy">Legacy</span>';
+    } else {
+      statusBadge = '<span class="dd-landing-badge dd-landing-badge-active">Active</span>';
+    }
+
+    tilesHtml += `
+    <a href="/dd/DD${version}/" class="dd-landing-tile${draft ? ' dd-landing-tile-draft' : ''}${legacy ? ' dd-landing-tile-legacy' : ''}">
+      <div class="dd-landing-tile-header">
+        <h2>${escapeHtml(label)}</h2>
+        ${statusBadge}
+      </div>
+      ${approved ? `<p class="dd-landing-tile-approved">Approved ${escapeHtml(approved)}</p>` : '<p class="dd-landing-tile-approved">In development</p>'}
+      <div class="dd-landing-tile-stats">
+        <div class="dd-landing-stat">
+          <span class="dd-landing-stat-number">${formatNumber(resourceCount)}</span>
+          <span class="dd-landing-stat-label">Resources</span>
+        </div>
+        <div class="dd-landing-stat">
+          <span class="dd-landing-stat-number">${formatNumber(fieldCount)}</span>
+          <span class="dd-landing-stat-label">Fields</span>
+        </div>
+        <div class="dd-landing-stat">
+          <span class="dd-landing-stat-number">${formatNumber(lookupCount)}</span>
+          <span class="dd-landing-stat-label">Lookups</span>
+        </div>
+      </div>
+    </a>`;
+  }
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data Dictionary - RESO Tools</title>
+  <meta name="description" content="RESO Data Dictionary documentation — browse resources, fields and lookups across all versions.">
+  <style>
+    :root {
+      --reso-navy: #1a2f58;
+      --reso-navy-dark: #0f1d38;
+      --reso-navy-light: #2a4a7f;
+      --reso-orange: #ff9900;
+      --reso-orange-light: #fff3e0;
+      --reso-green: #38a169;
+      --reso-green-light: #e6f7ed;
+      --reso-blue: #007e9e;
+      --reso-blue-light: #e0f4f8;
+      --reso-gray-50: #f7fafc;
+      --reso-gray-100: #edf2f7;
+      --reso-gray-200: #e2e8f0;
+      --reso-gray-300: #cbd5e0;
+      --reso-gray-500: #718096;
+      --reso-gray-600: #4a5568;
+      --reso-gray-700: #2d3748;
+      --reso-gray-800: #1a202c;
+      --reso-gray-900: #171923;
+    }
+
+    html.dark {
+      --reso-gray-50: #1a202c;
+      --reso-gray-100: #2d3748;
+      --reso-gray-200: #4a5568;
+      --reso-gray-300: #718096;
+      --reso-gray-500: #a0aec0;
+      --reso-gray-600: #cbd5e0;
+      --reso-gray-700: #e2e8f0;
+      --reso-gray-800: #edf2f7;
+      --reso-gray-900: #f7fafc;
+      --reso-green-light: rgba(56,161,105,0.15);
+      --reso-orange-light: rgba(255,153,0,0.15);
+      --reso-blue-light: rgba(0,126,158,0.15);
+    }
+    html.dark .dd-landing-tile,
+    html.dark .dd-landing-related-grid,
+    html.dark .dd-landing-note,
+    html.dark .search-modal { background: var(--reso-gray-100); }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: var(--reso-gray-50);
+      color: var(--reso-gray-700);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    .site-header {
+      background: var(--reso-navy);
+      padding: 0 1.5rem;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .site-header a { color: white; text-decoration: none; }
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+    .header-logo img { height: 36px; width: auto; }
+    .header-nav { display: flex; gap: 1.5rem; align-items: center; }
+    .header-nav a {
+      font-size: 0.875rem;
+      font-weight: 500;
+      opacity: 0.85;
+      transition: opacity 0.15s;
+    }
+    .header-nav a:hover { opacity: 1; color: var(--reso-orange); }
+
+    .menu-toggle {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0.5rem;
+      color: white;
+    }
+    .menu-toggle svg { width: 24px; height: 24px; fill: currentColor; }
+
+    @media (max-width: 768px) {
+      .site-header { flex-wrap: wrap; height: auto; min-height: 64px; }
+      .menu-toggle { display: block; }
+      .header-nav {
+        display: none;
+        flex-direction: column;
+        width: 100%;
+        gap: 0;
+        padding: 0.5rem 0 1rem;
+        border-top: 1px solid rgba(255,255,255,0.15);
+      }
+      .header-nav.open { display: flex; }
+      .header-nav a {
+        padding: 0.625rem 0;
+        opacity: 1;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+      }
+      .header-nav a:last-of-type { border-bottom: none; }
+    }
+
+    /* Footer */
+    .site-footer {
+      background: var(--reso-navy);
+      color: rgba(255,255,255,0.6);
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.8125rem;
+    }
+    .site-footer a { color: rgba(255,255,255,0.8); text-decoration: none; }
+    .site-footer a:hover { color: var(--reso-orange); }
+
+    /* Landing page */
+    .dd-landing {
+      flex: 1;
+      max-width: 1100px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem;
+    }
+
+    .dd-landing-header {
+      margin-bottom: 2rem;
+    }
+    .dd-landing-header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--reso-gray-800);
+      letter-spacing: -0.025em;
+    }
+    .dd-landing-header p {
+      font-size: 0.95rem;
+      color: var(--reso-gray-500);
+      margin-top: 0.375rem;
+      max-width: 600px;
+      line-height: 1.6;
+    }
+
+    .dd-landing-note {
+      margin-top: 2rem;
+      padding: 0.75rem 1rem;
+      background: white;
+      border: 1px solid var(--reso-gray-200);
+      border-left: 3px solid var(--reso-blue);
+      border-radius: 0.375rem;
+      font-size: 0.8125rem;
+      color: var(--reso-gray-600);
+      line-height: 1.6;
+      max-width: 600px;
+    }
+    .dd-landing-note a {
+      color: var(--reso-blue);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .dd-landing-note a:hover { text-decoration: underline; }
+
+    .dd-landing-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    @media (min-width: 640px) {
+      .dd-landing-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    }
+
+    .dd-landing-tile {
+      background: white;
+      border: 1px solid var(--reso-gray-200);
+      border-radius: 0.625rem;
+      padding: 1.5rem;
+      text-decoration: none;
+      color: inherit;
+      transition: box-shadow 0.15s, border-color 0.15s;
+      display: block;
+    }
+    .dd-landing-tile:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      border-color: var(--reso-blue);
+    }
+    .dd-landing-tile-legacy {
+      opacity: 0.75;
+    }
+    .dd-landing-tile-legacy:hover {
+      opacity: 1;
+    }
+
+    .dd-landing-tile-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.375rem;
+    }
+    .dd-landing-tile-header h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--reso-navy);
+    }
+
+    .dd-landing-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.1875rem 0.625rem;
+      border-radius: 0.25rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .dd-landing-badge-active {
+      background: var(--reso-green-light);
+      color: var(--reso-green);
+    }
+    .dd-landing-badge-legacy {
+      background: var(--reso-gray-100);
+      color: var(--reso-gray-500);
+    }
+    .dd-landing-badge-draft {
+      background: var(--reso-orange-light);
+      color: var(--reso-orange);
+    }
+
+    .dd-landing-tile-approved {
+      font-size: 0.8125rem;
+      color: var(--reso-gray-500);
+      margin-bottom: 1rem;
+    }
+
+    .dd-landing-tile-stats {
+      display: flex;
+      gap: 1.5rem;
+    }
+    .dd-landing-stat {
+      display: flex;
+      flex-direction: column;
+    }
+    .dd-landing-stat-number {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--reso-gray-800);
+      line-height: 1.2;
+    }
+    .dd-landing-stat-label {
+      font-size: 0.6875rem;
+      color: var(--reso-gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* Related Resources */
+    .dd-landing-related {
+      margin-top: 2.5rem;
+    }
+    .dd-landing-related h3 {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--reso-gray-500);
+      margin-bottom: 0.75rem;
+    }
+    .dd-landing-related-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+      background: white;
+      border: 1px solid var(--reso-gray-200);
+      border-radius: 0.625rem;
+      overflow: hidden;
+    }
+    @media (min-width: 768px) {
+      .dd-landing-related-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .dd-landing-related-item {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--reso-gray-100);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: inherit;
+      transition: background 0.1s;
+    }
+    .dd-landing-related-item:hover { background: var(--reso-gray-50); }
+    .dd-landing-related-item:last-child { border-bottom: none; }
+    @media (min-width: 768px) {
+      .dd-landing-related-item { border-right: 1px solid var(--reso-gray-100); }
+      .dd-landing-related-item:nth-child(2n) { border-right: none; }
+      .dd-landing-related-item:nth-last-child(-n+2) { border-bottom: none; }
+    }
+    .dd-landing-related-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 0.375rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .dd-landing-related-icon svg { width: 18px; height: 18px; }
+    .dd-landing-related-icon-navy { background: rgba(26,47,88,0.1); }
+    .dd-landing-related-icon-navy svg { fill: var(--reso-navy); }
+    .dd-landing-related-icon-blue { background: rgba(0,126,158,0.1); }
+    .dd-landing-related-icon-blue svg { fill: var(--reso-blue); }
+    .dd-landing-related-icon-orange { background: rgba(255,153,0,0.1); }
+    .dd-landing-related-icon-orange svg { fill: var(--reso-orange); }
+    .dd-landing-related-icon-green { background: rgba(56,161,105,0.1); }
+    .dd-landing-related-icon-green svg { fill: var(--reso-green); }
+    .dd-landing-related-text h4 {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--reso-gray-800);
+    }
+    .dd-landing-related-text p {
+      font-size: 0.75rem;
+      color: var(--reso-gray-500);
+      margin-top: 0.125rem;
+    }
+
+    /* Acknowledgements */
+    .dd-landing-acknowledgements {
+      margin-top: 2.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--reso-gray-200);
+    }
+    .dd-landing-acknowledgements p {
+      font-size: 0.8125rem;
+      color: var(--reso-gray-500);
+      line-height: 1.6;
+    }
+    .dd-landing-acknowledgements a {
+      color: var(--reso-blue);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .dd-landing-acknowledgements a:hover { text-decoration: underline; }
+
+    /* Theme toggle */
+    .theme-toggle {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 0.375rem;
+      color: rgba(255,255,255,0.7);
+      padding: 0.375rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+    .theme-toggle:hover { background: rgba(255,255,255,0.25); color: white; }
+    .theme-toggle svg { width: 16px; height: 16px; fill: currentColor; }
+    .theme-toggle .icon-moon { display: block; }
+    .theme-toggle .icon-sun { display: none; }
+    html.dark .theme-toggle .icon-moon { display: none; }
+    html.dark .theme-toggle .icon-sun { display: block; }
+
+    /* Search trigger */
+    .search-trigger {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 0.375rem;
+      color: rgba(255,255,255,0.7);
+      font-size: 0.8125rem;
+      padding: 0.375rem 0.75rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: background 0.15s;
+    }
+    .search-trigger:hover {
+      background: rgba(255,255,255,0.25);
+      color: white;
+    }
+    .search-trigger svg { width: 14px; height: 14px; fill: currentColor; }
+    .search-trigger kbd {
+      font-family: inherit;
+      font-size: 0.6875rem;
+      background: rgba(255,255,255,0.15);
+      border-radius: 0.25rem;
+      padding: 0.125rem 0.375rem;
+    }
+    @media (max-width: 768px) {
+      .search-trigger { margin-top: 0.5rem; justify-content: center; }
+      .search-trigger kbd { display: none; }
+    }
+
+    /* Search modal */
+    .search-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 10vh;
+    }
+    .search-modal-overlay.active { display: flex; }
+    .search-modal {
+      background: white;
+      border-radius: 0.75rem;
+      width: 90%;
+      max-width: 640px;
+      max-height: 70vh;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      display: flex;
+      flex-direction: column;
+    }
+    @media (max-width: 768px) {
+      .search-modal-overlay { padding-top: 1rem; }
+      .search-modal { width: calc(100% - 1.5rem); max-height: 85vh; border-radius: 0.5rem; }
+    }
+    .search-modal-body {
+      padding: 1rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .pagefind-ui .pagefind-ui__search-input {
+      border-radius: 0.375rem !important;
+      border-color: var(--reso-gray-200) !important;
+      font-size: 1rem !important;
+    }
+    .pagefind-ui .pagefind-ui__search-input:focus {
+      border-color: var(--reso-blue) !important;
+      box-shadow: 0 0 0 3px rgba(0,126,158,0.15) !important;
+    }
+    .pagefind-ui .pagefind-ui__result-link {
+      color: var(--reso-navy) !important;
+    }
+  </style>
+  <link href="/pagefind/pagefind-ui.css" rel="stylesheet">
+  <script>(function(){var t=localStorage.getItem('dd-theme');if(t==='dark'||(t===null&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');})()</script>
+</head>
+<body>
+  <header class="site-header">
+    <a href="/" class="header-logo">
+      <img src="/assets/reso-logo-white.png" alt="RESO" />
+    </a>
+    <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle menu">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+    </button>
+    <nav class="header-nav" id="headerNav">
+      <a href="/">Home</a>
+      <a href="/dd/">Data Dictionary</a>
+      <a href="https://github.com/RESOStandards/reso-tools">GitHub</a>
+      <a href="https://certification.reso.org">Certification</a>
+      <a href="https://reso.org">RESO.org</a>
+      <button class="search-trigger" id="searchTrigger" type="button">
+        <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        Search<kbd>/</kbd>
+      </button>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
+        <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24"><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41M12 6a6 6 0 100 12 6 6 0 000-12z"/></svg>
+      </button>
+    </nav>
+  </header>
+
+  <main class="dd-landing">
+    <div class="dd-landing-header">
+      <h1>Data Dictionary</h1>
+      <p>The RESO Data Dictionary defines standard resources, fields and lookups for the exchange of real estate data.</p>
+    </div>
+
+    <div class="dd-landing-grid">
+      ${tilesHtml}
+    </div>
+
+    <div class="dd-landing-note">
+      DD 2.0 is the current version for RESO certification. Ratified standards are published on the <a href="https://transport.reso.org" target="_blank" rel="noopener">RESO Transport site</a>. Log in to view <a href="https://reso.atlassian.net/wiki/spaces/DD/overview?homepageId=3305046895" target="_blank" rel="noopener">Data Dictionary discussions</a>.
+    </div>
+
+    <div class="dd-landing-related">
+      <h3>Related Resources</h3>
+      <div class="dd-landing-related-grid">
+        <a href="https://ddwiki.reso.org" class="dd-landing-related-item">
+          <div class="dd-landing-related-icon dd-landing-related-icon-navy">
+            <svg viewBox="0 0 24 24"><path d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3zm5 1h6m-6 3h6m-6 3h4"/></svg>
+          </div>
+          <div class="dd-landing-related-text">
+            <h4>Data Dictionary Wiki</h4>
+            <p>Browse all standard fields, resources and lookups</p>
+          </div>
+        </a>
+        <a href="https://certification.reso.org" class="dd-landing-related-item">
+          <div class="dd-landing-related-icon dd-landing-related-icon-green">
+            <svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          </div>
+          <div class="dd-landing-related-text">
+            <h4>Certification Portal</h4>
+            <p>View certification results and analytics</p>
+          </div>
+        </a>
+        <a href="https://transport.reso.org" class="dd-landing-related-item">
+          <div class="dd-landing-related-icon dd-landing-related-icon-orange">
+            <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
+          </div>
+          <div class="dd-landing-related-text">
+            <h4>Transport Specifications</h4>
+            <p>Official RESO transport specifications and endorsements</p>
+          </div>
+        </a>
+        <a href="https://www.reso.org/data-dictionary/" class="dd-landing-related-item">
+          <div class="dd-landing-related-icon dd-landing-related-icon-blue">
+            <svg viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <div class="dd-landing-related-text">
+            <h4>About the Data Dictionary</h4>
+            <p>Learn about the RESO Data Dictionary program</p>
+          </div>
+        </a>
+      </div>
+    </div>
+    <div class="dd-landing-acknowledgements">
+      <p>The RESO Data Dictionary is a collaborative effort by industry experts who volunteer their time and expertise. <a href="https://www.reso.org/data-dictionary/acknowledgements/" target="_blank" rel="noopener">View contributors</a></p>
+    </div>
+  </main>
+
+  <!-- Search modal -->
+  <div class="search-modal-overlay" id="searchOverlay">
+    <div class="search-modal">
+      <div class="search-modal-body">
+        <div id="search"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <p>&copy; ${new Date().getFullYear()} <a href="https://reso.org">Real Estate Standards Organization (RESO)</a>. All rights reserved.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="https://github.com/RESOStandards/reso-tools">Source</a> &middot;
+      <a href="https://certification.reso.org">Certification Analytics</a> &middot;
+      <a href="https://www.reso.org/eula/">Terms of Use</a>
+    </p>
+  </footer>
+
+  <script src="/pagefind/pagefind-ui.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Pagefind search (no version filter on landing page)
+      if (typeof PagefindUI !== 'undefined') {
+        new PagefindUI({
+          element: '#search',
+          showSubResults: true,
+          showImages: false,
+          resetStyles: false
+        });
+      }
+
+      // Header hamburger
+      document.getElementById('menuToggle').addEventListener('click', function() {
+        document.getElementById('headerNav').classList.toggle('open');
+      });
+
+      // Search modal
+      var overlay = document.getElementById('searchOverlay');
+      document.getElementById('searchTrigger').addEventListener('click', function() {
+        overlay.classList.add('active');
+        setTimeout(function() { var i = overlay.querySelector('.pagefind-ui__search-input'); if (i) i.focus(); }, 100);
+      });
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.classList.remove('active'); });
+      document.addEventListener('keydown', function(e) {
+        if (e.key === '/' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          overlay.classList.add('active');
+          setTimeout(function() { var i = overlay.querySelector('.pagefind-ui__search-input'); if (i) i.focus(); }, 100);
+        }
+        if (e.key === 'Escape') overlay.classList.remove('active');
+      });
+
+      // Theme toggle
+      document.getElementById('themeToggle').addEventListener('click', function() {
+        var isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('dd-theme', isDark ? 'dark' : 'light');
+      });
+    });
+  </script>
+</body>
+</html>`;
+
+  writeFileSync(join(OUTPUT_DIR, 'index.html'), html);
+  console.log('  Generated DD landing page');
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -1578,13 +2234,8 @@ async function main() {
     console.log(`  Generated ${pageCount} pages (${xrefCount} cross-reference)`);
   }
 
-  // Generate DD root redirect
-  mkdirSync(OUTPUT_DIR, { recursive: true });
-  const latestVersion = VERSIONS.filter(v => !v.draft).pop() || VERSIONS[0];
-  writeFileSync(join(OUTPUT_DIR, 'index.html'),
-    `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/dd/DD${latestVersion.version}/"></head>` +
-    `<body><p>Redirecting to <a href="/dd/DD${latestVersion.version}/">${escapeHtml(latestVersion.label)}</a>...</p></body></html>`
-  );
+  // Generate DD landing page
+  generateDDLandingPage(allData);
 
   console.log('\nDone!');
 }
