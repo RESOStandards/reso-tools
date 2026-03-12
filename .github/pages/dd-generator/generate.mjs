@@ -461,6 +461,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
       padding-top: 10vh;
     }
     .search-modal-overlay.active { display: flex; }
+    body.search-open { overflow: hidden; }
     .search-modal {
       background: white;
       border-radius: 0.75rem;
@@ -554,7 +555,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
     }
 
     /* Hide Pagefind's Load more button (infinite scroll), message (we show our own count), filter panel */
-    .pagefind-ui .pagefind-ui__button { height: 0 !important; overflow: hidden !important; opacity: 0 !important; pointer-events: none !important; padding: 0 !important; margin: 0 !important; border: none !important; }
+    .pagefind-ui .pagefind-ui__button { height: 0 !important; overflow: hidden !important; opacity: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important; }
     .pagefind-ui .pagefind-ui__message { display: none !important; }
     .pagefind-ui .pagefind-ui__filter-panel { display: none !important; }
 
@@ -562,7 +563,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
     .pagefind-ui .pagefind-ui__drawer {
       padding: 0 1rem 1rem !important;
       overflow-y: auto !important;
-      max-height: calc(70vh - 7.5rem) !important;
+      max-height: calc(70vh - 7rem) !important;
     }
     .pagefind-ui .pagefind-ui__result-link { color: var(--reso-blue) !important; font-weight: 600 !important; }
     .pagefind-ui .pagefind-ui__result-excerpt { font-size: 0.8125rem !important; color: var(--reso-gray-600) !important; line-height: 1.5 !important; }
@@ -1117,7 +1118,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
         injectFilters();
         attachScrollLoader();
 
-        // Observe for version badges and result count — pause during DOM writes
+        // Observe for version badges, result count, and auto-load
         var processing = false;
         observer = new MutationObserver(function() {
           if (processing) return;
@@ -1140,6 +1141,12 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
               var cm = txt.match(/(\\d+)\\s+result/);
               var newCount = cm ? cm[1] + ' results' : '';
               if (countEl.textContent !== newCount) countEl.textContent = newCount;
+            }
+            // Auto-load more results until drawer is scrollable
+            var drawer = searchEl.querySelector('.pagefind-ui__drawer');
+            var loadBtn = searchEl.querySelector('.pagefind-ui__button');
+            if (drawer && loadBtn && drawer.scrollHeight <= drawer.clientHeight) {
+              setTimeout(function() { loadBtn.click(); }, 50);
             }
             processing = false;
           });
@@ -1208,21 +1215,26 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
       var overlay = document.getElementById('searchOverlay');
       function openSearch() {
         overlay.classList.add('active');
+        document.body.classList.add('search-open');
         setTimeout(function() {
           var pfInput = searchEl.querySelector('.pagefind-ui__search-input');
           if (pfInput) pfInput.focus();
         }, 100);
       }
+      function closeSearch() {
+        overlay.classList.remove('active');
+        document.body.classList.remove('search-open');
+      }
       document.getElementById('searchTrigger').addEventListener('click', openSearch);
       var sidebarSearchEl = document.getElementById('sidebarSearch');
       if (sidebarSearchEl) sidebarSearchEl.addEventListener('click', openSearch);
-      overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.classList.remove('active'); });
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) closeSearch(); });
       document.addEventListener('keydown', function(e) {
         if (e.key === '/' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
           e.preventDefault();
           openSearch();
         }
-        if (e.key === 'Escape') overlay.classList.remove('active');
+        if (e.key === 'Escape') closeSearch();
       });
 
       // Sidebar toggle (mobile)
@@ -2354,6 +2366,7 @@ function generateDDLandingPage(allData) {
       padding-top: 10vh;
     }
     .search-modal-overlay.active { display: flex; }
+    body.search-open { overflow: hidden; }
     .search-modal {
       background: white;
       border-radius: 0.75rem;
@@ -2398,10 +2411,10 @@ function generateDDLandingPage(allData) {
     .dd-search-filter-pill:hover { border-color: var(--reso-blue); color: var(--reso-blue); }
     .dd-search-filter-pill.active { background: var(--reso-blue); border-color: var(--reso-blue); color: white; }
     .dd-search-count { font-size: 0.6875rem; color: var(--reso-gray-500); white-space: nowrap; }
-    .pagefind-ui .pagefind-ui__button { height: 0 !important; overflow: hidden !important; opacity: 0 !important; pointer-events: none !important; padding: 0 !important; margin: 0 !important; border: none !important; }
+    .pagefind-ui .pagefind-ui__button { height: 0 !important; overflow: hidden !important; opacity: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important; }
     .pagefind-ui .pagefind-ui__message { display: none !important; }
     .pagefind-ui .pagefind-ui__filter-panel { display: none !important; }
-    .pagefind-ui .pagefind-ui__drawer { padding: 0 1rem 1rem !important; overflow-y: auto !important; max-height: calc(70vh - 7.5rem) !important; }
+    .pagefind-ui .pagefind-ui__drawer { padding: 0 1rem 1rem !important; overflow-y: auto !important; max-height: calc(70vh - 7rem) !important; }
     .pagefind-ui .pagefind-ui__result-link { color: var(--reso-blue) !important; font-weight: 600 !important; }
     .pagefind-ui .pagefind-ui__result-excerpt { font-size: 0.8125rem !important; color: var(--reso-gray-600) !important; line-height: 1.5 !important; }
     .pagefind-ui .pagefind-ui__result-tags { display: none !important; }
@@ -2586,6 +2599,12 @@ function generateDDLandingPage(allData) {
               var newCount = cm ? cm[1] + ' results' : '';
               if (countEl.textContent !== newCount) countEl.textContent = newCount;
             }
+            // Auto-load more results until drawer is scrollable
+            var drawer = searchEl.querySelector('.pagefind-ui__drawer');
+            var loadBtn = searchEl.querySelector('.pagefind-ui__button');
+            if (drawer && loadBtn && drawer.scrollHeight <= drawer.clientHeight) {
+              setTimeout(function() { loadBtn.click(); }, 50);
+            }
             processing = false;
           });
         });
@@ -2648,20 +2667,25 @@ function generateDDLandingPage(allData) {
       var overlay = document.getElementById('searchOverlay');
       function openSearch() {
         overlay.classList.add('active');
+        document.body.classList.add('search-open');
         setTimeout(function() {
           var pfInput = searchEl.querySelector('.pagefind-ui__search-input');
           if (pfInput) pfInput.focus();
         }, 100);
       }
+      function closeSearch() {
+        overlay.classList.remove('active');
+        document.body.classList.remove('search-open');
+      }
       document.getElementById('searchTrigger').addEventListener('click', openSearch);
       document.getElementById('heroSearch').addEventListener('click', openSearch);
-      overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.classList.remove('active'); });
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) closeSearch(); });
       document.addEventListener('keydown', function(e) {
         if (e.key === '/' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
           e.preventDefault();
           openSearch();
         }
-        if (e.key === 'Escape') overlay.classList.remove('active');
+        if (e.key === 'Escape') closeSearch();
       });
 
       // Theme toggle
