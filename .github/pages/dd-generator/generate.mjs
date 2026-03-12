@@ -467,7 +467,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
       border-radius: 0.75rem;
       width: 90%;
       max-width: 640px;
-      max-height: 70vh;
+      height: 70vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -475,10 +475,16 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
     }
     @media (max-width: 768px) {
       .search-modal-overlay { padding-top: 1rem; }
-      .search-modal { width: calc(100% - 1.5rem); max-height: 85vh; border-radius: 0.5rem; }
+      .search-modal { width: calc(100% - 1.5rem); height: 85vh; border-radius: 0.5rem; }
     }
 
     /* Pagefind layout — input+pills fixed at top, drawer scrolls */
+    #search, .pagefind-ui, .pagefind-ui .pagefind-ui__form {
+      display: flex !important;
+      flex-direction: column !important;
+      flex: 1 !important;
+      min-height: 0 !important;
+    }
     .pagefind-ui .pagefind-ui__form {
       padding: 1rem 1rem 0 !important;
       position: relative !important;
@@ -556,19 +562,31 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
 
     /* Hide Pagefind's Load more button (infinite scroll), message (we show our own count), filter panel */
     .pagefind-ui .pagefind-ui__button { height: 0 !important; overflow: hidden !important; opacity: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important; }
-    .pagefind-ui .pagefind-ui__message { display: none !important; }
-    .pagefind-ui .pagefind-ui__filter-panel { display: none !important; }
+    .pagefind-ui .pagefind-ui__message { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; }
+    .pagefind-ui .pagefind-ui__filter-panel { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; }
 
-    /* Drawer scrolls — explicit max-height since flex chain can break */
+    /* Drawer fills remaining space and scrolls */
     .pagefind-ui .pagefind-ui__drawer {
       padding: 0 1rem 1rem !important;
       overflow-y: auto !important;
-      max-height: calc(70vh - 7rem) !important;
+      flex: 1 !important;
+      min-height: 0 !important;
     }
     .pagefind-ui .pagefind-ui__result-link { color: var(--reso-blue) !important; font-weight: 600 !important; }
     .pagefind-ui .pagefind-ui__result-excerpt { font-size: 0.8125rem !important; color: var(--reso-gray-600) !important; line-height: 1.5 !important; }
     .pagefind-ui .pagefind-ui__result-tags { display: none !important; }
     .pagefind-ui .pagefind-ui__result { border-color: var(--reso-gray-200) !important; padding: 0.75rem 0 !important; }
+
+    /* No results message */
+    .dd-search-empty {
+      display: none;
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--reso-gray-500);
+      font-size: 0.875rem;
+    }
+    .dd-search-empty.visible { display: block; }
+    html.dark .dd-search-empty { color: #a0aec0; }
 
     /* Version badge in results */
     .dd-result-version {
@@ -1071,6 +1089,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
   <div class="search-modal-overlay" id="searchOverlay">
     <div class="search-modal" id="searchModal">
       <div id="search"></div>
+      <div class="dd-search-empty" id="ddSearchEmpty">No results found. Try a different search term or filter.</div>
     </div>
   </div>
   <template id="searchFiltersTemplate">
@@ -1104,19 +1123,45 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
 
       var observer = null;
 
-      function initPagefind(filterVersion) {
-        var prevTerm = '';
-        var prevInput = searchEl.querySelector('.pagefind-ui__search-input');
-        if (prevInput) prevTerm = prevInput.value || '';
-        if (observer) { observer.disconnect(); observer = null; }
-        searchEl.innerHTML = '';
-        var opts = { element: '#search', showSubResults: true, showImages: false, resetStyles: false };
-        if (filterVersion) opts.filters = { 'dd-version': filterVersion };
-        pfUI = new PagefindUI(opts);
+      function initPagefind() {
+        pfUI = new PagefindUI({ element: '#search', showSubResults: true, showImages: false, resetStyles: false });
 
-        // Inject filter pills before the drawer, attach scroll loader
-        injectFilters();
-        attachScrollLoader();
+        // Inject filter pills before the drawer
+        var form = searchEl.querySelector('.pagefind-ui__form');
+        if (form) {
+          var tpl = document.getElementById('searchFiltersTemplate');
+          var clone = tpl.content.cloneNode(true);
+          var drawer = form.querySelector('.pagefind-ui__drawer');
+          if (drawer) form.insertBefore(clone, drawer);
+          else form.appendChild(clone);
+          filtersEl = form.querySelector('.dd-search-filters');
+          countEl = form.querySelector('.dd-search-count');
+
+          if (filtersEl) {
+            filtersEl.querySelectorAll('.dd-search-filter-pill').forEach(function(b) {
+              b.classList.toggle('active', b.dataset.version === activeFilter);
+            });
+            filtersEl.addEventListener('click', function(e) {
+              var btn = e.target.closest('.dd-search-filter-pill');
+              if (!btn) return;
+              filtersEl.querySelectorAll('.dd-search-filter-pill').forEach(function(b) { b.classList.remove('active'); });
+              btn.classList.add('active');
+              activeFilter = btn.dataset.version;
+              applyFilter(activeFilter);
+            });
+          }
+        }
+
+        // Attach infinite scroll on the drawer
+        var drawerEl = searchEl.querySelector('.pagefind-ui__drawer');
+        if (drawerEl) {
+          drawerEl.addEventListener('scroll', function() {
+            if (drawerEl.scrollTop + drawerEl.clientHeight >= drawerEl.scrollHeight - 300) {
+              var btn = searchEl.querySelector('.pagefind-ui__button');
+              if (btn) btn.click();
+            }
+          });
+        }
 
         // Observe for version badges, result count, and auto-load
         var processing = false;
@@ -1136,16 +1181,23 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
               }
             });
             var msg = searchEl.querySelector('.pagefind-ui__message');
+            var emptyEl = document.getElementById('ddSearchEmpty');
             if (msg && countEl) {
               var txt = msg.textContent || '';
               var cm = txt.match(/(\\d+)\\s+result/);
-              var newCount = cm ? cm[1] + ' results' : '';
+              var count = cm ? parseInt(cm[1], 10) : -1;
+              var newCount = count > 0 ? count + ' results' : '';
               if (countEl.textContent !== newCount) countEl.textContent = newCount;
+              // Show empty message when search returned 0 results
+              if (emptyEl) {
+                var input = searchEl.querySelector('.pagefind-ui__search-input');
+                var hasQuery = input && input.value.trim().length > 0;
+                emptyEl.classList.toggle('visible', hasQuery && count === 0);
+              }
             }
-            // Auto-load more results until drawer is scrollable
-            var drawer = searchEl.querySelector('.pagefind-ui__drawer');
+            var dEl = searchEl.querySelector('.pagefind-ui__drawer');
             var loadBtn = searchEl.querySelector('.pagefind-ui__button');
-            if (drawer && loadBtn && drawer.scrollHeight <= drawer.clientHeight) {
+            if (dEl && loadBtn && dEl.scrollHeight <= dEl.clientHeight) {
               setTimeout(function() { loadBtn.click(); }, 50);
             }
             processing = false;
@@ -1153,57 +1205,31 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
         });
         observer.observe(searchEl, { childList: true, subtree: true });
 
-        // Re-trigger previous search term if switching filters
-        if (prevTerm) {
-          setTimeout(function() { pfUI.triggerSearch(prevTerm); }, 100);
+        // Apply initial filter
+        if (activeFilter) {
+          pfUI.triggerFilters({ 'dd-version': [activeFilter] });
         }
       }
 
-      function injectFilters() {
-        var form = searchEl.querySelector('.pagefind-ui__form');
-        if (!form) return;
-        var tpl = document.getElementById('searchFiltersTemplate');
-        var clone = tpl.content.cloneNode(true);
-        // Insert pills BEFORE the drawer so they stay above results
-        var drawer = form.querySelector('.pagefind-ui__drawer');
-        if (drawer) form.insertBefore(clone, drawer);
-        else form.appendChild(clone);
-        filtersEl = form.querySelector('.dd-search-filters');
-        countEl = form.querySelector('.dd-search-count');
-
-        // Set active pill from activeFilter (not from template defaults)
-        if (filtersEl) {
-          filtersEl.querySelectorAll('.dd-search-filter-pill').forEach(function(b) {
-            b.classList.toggle('active', b.dataset.version === activeFilter);
-          });
+      function applyFilter(version) {
+        if (!pfUI) return;
+        if (version) {
+          pfUI.triggerFilters({ 'dd-version': [version] });
+        } else {
+          pfUI.triggerFilters({});
         }
-
-        filtersEl.addEventListener('click', function(e) {
-          var btn = e.target.closest('.dd-search-filter-pill');
-          if (!btn || typeof PagefindUI === 'undefined') return;
-          filtersEl.querySelectorAll('.dd-search-filter-pill').forEach(function(b) { b.classList.remove('active'); });
-          btn.classList.add('active');
-          activeFilter = btn.dataset.version;
-          initPagefind(activeFilter);
-        });
-      }
-
-      // Infinite scroll on the drawer (the scrollable results area)
-      function attachScrollLoader() {
-        var drawer = searchEl.querySelector('.pagefind-ui__drawer');
-        if (!drawer) return;
-        drawer.addEventListener('scroll', function() {
-          if (drawer.scrollTop + drawer.clientHeight >= drawer.scrollHeight - 300) {
-            var btn = searchEl.querySelector('.pagefind-ui__button');
-            if (btn) btn.click();
-          }
-        });
+        // Re-trigger current search term so results update
+        var input = searchEl.querySelector('.pagefind-ui__search-input');
+        var term = input ? input.value : '';
+        if (term) {
+          pfUI.triggerSearch(term);
+        }
       }
 
       // Load Pagefind
       var s = document.createElement('script');
       s.src = '/pagefind/pagefind-ui.js';
-      s.onload = function() { if (typeof PagefindUI !== 'undefined') initPagefind(currentVersion); };
+      s.onload = function() { if (typeof PagefindUI !== 'undefined') initPagefind(); };
       document.head.appendChild(s);
 
       // Header hamburger
@@ -2372,7 +2398,7 @@ function generateDDLandingPage(allData) {
       border-radius: 0.75rem;
       width: 90%;
       max-width: 640px;
-      max-height: 70vh;
+      height: 70vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -2380,7 +2406,7 @@ function generateDDLandingPage(allData) {
     }
     @media (max-width: 768px) {
       .search-modal-overlay { padding-top: 1rem; }
-      .search-modal { width: calc(100% - 1.5rem); max-height: 85vh; border-radius: 0.5rem; }
+      .search-modal { width: calc(100% - 1.5rem); height: 85vh; border-radius: 0.5rem; }
     }
     /* Pagefind flexbox layout — input+pills stay fixed, drawer scrolls */
     #search, .pagefind-ui, .pagefind-ui .pagefind-ui__form {
@@ -2412,14 +2438,17 @@ function generateDDLandingPage(allData) {
     .dd-search-filter-pill.active { background: var(--reso-blue); border-color: var(--reso-blue); color: white; }
     .dd-search-count { font-size: 0.6875rem; color: var(--reso-gray-500); white-space: nowrap; }
     .pagefind-ui .pagefind-ui__button { height: 0 !important; overflow: hidden !important; opacity: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important; }
-    .pagefind-ui .pagefind-ui__message { display: none !important; }
-    .pagefind-ui .pagefind-ui__filter-panel { display: none !important; }
-    .pagefind-ui .pagefind-ui__drawer { padding: 0 1rem 1rem !important; overflow-y: auto !important; max-height: calc(70vh - 7rem) !important; }
+    .pagefind-ui .pagefind-ui__message { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; }
+    .pagefind-ui .pagefind-ui__filter-panel { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; }
+    .pagefind-ui .pagefind-ui__drawer { padding: 0 1rem 1rem !important; overflow-y: auto !important; flex: 1 !important; min-height: 0 !important; }
     .pagefind-ui .pagefind-ui__result-link { color: var(--reso-blue) !important; font-weight: 600 !important; }
     .pagefind-ui .pagefind-ui__result-excerpt { font-size: 0.8125rem !important; color: var(--reso-gray-600) !important; line-height: 1.5 !important; }
     .pagefind-ui .pagefind-ui__result-tags { display: none !important; }
     .pagefind-ui .pagefind-ui__result { border-color: var(--reso-gray-200) !important; padding: 0.75rem 0 !important; }
     .dd-result-version { display: inline-block; font-size: 0.625rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.125rem 0.4375rem; border-radius: 0.1875rem; background: var(--reso-gray-100); color: var(--reso-gray-500); margin-left: 0.5rem; vertical-align: middle; }
+    .dd-search-empty { display: none; text-align: center; padding: 3rem 1rem; color: var(--reso-gray-500); font-size: 0.875rem; }
+    .dd-search-empty.visible { display: block; }
+    html.dark .dd-search-empty { color: #a0aec0; }
     html.dark .search-modal { background: #1e293b !important; }
     html.dark .pagefind-ui .pagefind-ui__search-input { background: #2d3748 !important; border-color: #4a5568 !important; color: #e2e8f0 !important; }
     html.dark .pagefind-ui .pagefind-ui__search-input::placeholder { color: #718096 !important; }
@@ -2531,6 +2560,7 @@ function generateDDLandingPage(allData) {
   <div class="search-modal-overlay" id="searchOverlay">
     <div class="search-modal" id="searchModal">
       <div id="search"></div>
+      <div class="dd-search-empty" id="ddSearchEmpty">No results found. Try a different search term or filter.</div>
     </div>
   </div>
   <template id="searchFiltersTemplate">
@@ -2563,18 +2593,43 @@ function generateDDLandingPage(allData) {
       var filtersEl = null;
       var observer = null;
 
-      function initPagefind(filterVersion) {
-        var prevTerm = '';
-        var prevInput = searchEl.querySelector('.pagefind-ui__search-input');
-        if (prevInput) prevTerm = prevInput.value || '';
-        if (observer) { observer.disconnect(); observer = null; }
-        searchEl.innerHTML = '';
-        var opts = { element: '#search', showSubResults: true, showImages: false, resetStyles: false };
-        if (filterVersion) opts.filters = { 'dd-version': filterVersion };
-        pfUI = new PagefindUI(opts);
+      function initPagefind() {
+        pfUI = new PagefindUI({ element: '#search', showSubResults: true, showImages: false, resetStyles: false });
 
-        injectFilters();
-        attachScrollLoader();
+        var form = searchEl.querySelector('.pagefind-ui__form');
+        if (form) {
+          var tpl = document.getElementById('searchFiltersTemplate');
+          var clone = tpl.content.cloneNode(true);
+          var drawer = form.querySelector('.pagefind-ui__drawer');
+          if (drawer) form.insertBefore(clone, drawer);
+          else form.appendChild(clone);
+          filtersEl = form.querySelector('.dd-search-filters');
+          countEl = form.querySelector('.dd-search-count');
+
+          if (filtersEl) {
+            filtersEl.querySelectorAll('.dd-search-filter-pill').forEach(function(b) {
+              b.classList.toggle('active', b.dataset.version === activeFilter);
+            });
+            filtersEl.addEventListener('click', function(e) {
+              var btn = e.target.closest('.dd-search-filter-pill');
+              if (!btn) return;
+              filtersEl.querySelectorAll('.dd-search-filter-pill').forEach(function(b) { b.classList.remove('active'); });
+              btn.classList.add('active');
+              activeFilter = btn.dataset.version;
+              applyFilter(activeFilter);
+            });
+          }
+        }
+
+        var drawerEl = searchEl.querySelector('.pagefind-ui__drawer');
+        if (drawerEl) {
+          drawerEl.addEventListener('scroll', function() {
+            if (drawerEl.scrollTop + drawerEl.clientHeight >= drawerEl.scrollHeight - 300) {
+              var btn = searchEl.querySelector('.pagefind-ui__button');
+              if (btn) btn.click();
+            }
+          });
+        }
 
         var processing = false;
         observer = new MutationObserver(function() {
@@ -2593,16 +2648,22 @@ function generateDDLandingPage(allData) {
               }
             });
             var msg = searchEl.querySelector('.pagefind-ui__message');
+            var emptyEl = document.getElementById('ddSearchEmpty');
             if (msg && countEl) {
               var txt = msg.textContent || '';
               var cm = txt.match(/(\\d+)\\s+result/);
-              var newCount = cm ? cm[1] + ' results' : '';
+              var count = cm ? parseInt(cm[1], 10) : -1;
+              var newCount = count > 0 ? count + ' results' : '';
               if (countEl.textContent !== newCount) countEl.textContent = newCount;
+              if (emptyEl) {
+                var input = searchEl.querySelector('.pagefind-ui__search-input');
+                var hasQuery = input && input.value.trim().length > 0;
+                emptyEl.classList.toggle('visible', hasQuery && count === 0);
+              }
             }
-            // Auto-load more results until drawer is scrollable
-            var drawer = searchEl.querySelector('.pagefind-ui__drawer');
+            var dEl = searchEl.querySelector('.pagefind-ui__drawer');
             var loadBtn = searchEl.querySelector('.pagefind-ui__button');
-            if (drawer && loadBtn && drawer.scrollHeight <= drawer.clientHeight) {
+            if (dEl && loadBtn && dEl.scrollHeight <= dEl.clientHeight) {
               setTimeout(function() { loadBtn.click(); }, 50);
             }
             processing = false;
@@ -2610,52 +2671,28 @@ function generateDDLandingPage(allData) {
         });
         observer.observe(searchEl, { childList: true, subtree: true });
 
-        if (prevTerm) {
-          setTimeout(function() { pfUI.triggerSearch(prevTerm); }, 100);
+        if (activeFilter) {
+          pfUI.triggerFilters({ 'dd-version': [activeFilter] });
         }
       }
 
-      function injectFilters() {
-        var form = searchEl.querySelector('.pagefind-ui__form');
-        if (!form) return;
-        var tpl = document.getElementById('searchFiltersTemplate');
-        var clone = tpl.content.cloneNode(true);
-        var drawer = form.querySelector('.pagefind-ui__drawer');
-        if (drawer) form.insertBefore(clone, drawer);
-        else form.appendChild(clone);
-        filtersEl = form.querySelector('.dd-search-filters');
-        countEl = form.querySelector('.dd-search-count');
-
-        if (filtersEl) {
-          filtersEl.querySelectorAll('.dd-search-filter-pill').forEach(function(b) {
-            b.classList.toggle('active', b.dataset.version === activeFilter);
-          });
+      function applyFilter(version) {
+        if (!pfUI) return;
+        if (version) {
+          pfUI.triggerFilters({ 'dd-version': [version] });
+        } else {
+          pfUI.triggerFilters({});
         }
-
-        filtersEl.addEventListener('click', function(e) {
-          var btn = e.target.closest('.dd-search-filter-pill');
-          if (!btn || typeof PagefindUI === 'undefined') return;
-          filtersEl.querySelectorAll('.dd-search-filter-pill').forEach(function(b) { b.classList.remove('active'); });
-          btn.classList.add('active');
-          activeFilter = btn.dataset.version;
-          initPagefind(activeFilter);
-        });
-      }
-
-      function attachScrollLoader() {
-        var drawer = searchEl.querySelector('.pagefind-ui__drawer');
-        if (!drawer) return;
-        drawer.addEventListener('scroll', function() {
-          if (drawer.scrollTop + drawer.clientHeight >= drawer.scrollHeight - 300) {
-            var btn = searchEl.querySelector('.pagefind-ui__button');
-            if (btn) btn.click();
-          }
-        });
+        var input = searchEl.querySelector('.pagefind-ui__search-input');
+        var term = input ? input.value : '';
+        if (term) {
+          pfUI.triggerSearch(term);
+        }
       }
 
       var s = document.createElement('script');
       s.src = '/pagefind/pagefind-ui.js';
-      s.onload = function() { if (typeof PagefindUI !== 'undefined') initPagefind(''); };
+      s.onload = function() { if (typeof PagefindUI !== 'undefined') initPagefind(); };
       document.head.appendChild(s);
 
       // Header hamburger
