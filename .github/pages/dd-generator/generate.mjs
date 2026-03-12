@@ -1148,15 +1148,13 @@ function getPageCSS() {
       .dd-resource-sticky {
         position: static;
       }
-      .dd-fields-table-wrapper {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-      }
-      .dd-fields-table-wrapper .dd-fields-table,
+      .dd-fields-table-wrapper,
+      .dd-collapsible-content,
+      .dd-content { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .dd-fields-table,
       .dd-lookups-table {
         min-width: 600px;
       }
-      .dd-collapsible-content { overflow-x: auto; -webkit-overflow-scrolling: touch; }
       .dd-field-def {
         max-width: 200px;
         display: -webkit-box;
@@ -3915,6 +3913,7 @@ function generateXrefPages(vCfg, data, allVersions) {
       valHtml += `<div class="dd-page-header"><h1>${escapeHtml(val)}</h1>`;
       valHtml += `<p class="dd-page-subtitle">${escapeHtml(dim.label)} &mdash; ${formatNumber(matchingFields.length)} fields</p></div>`;
 
+      valHtml += `<div class="dd-fields-table-wrapper">`;
       valHtml += `<table class="dd-fields-table"><thead><tr>`;
       valHtml += `<th>Resource</th><th>Field</th><th>Definition</th><th>Type</th>`;
       valHtml += `</tr></thead><tbody>`;
@@ -3928,7 +3927,7 @@ function generateXrefPages(vCfg, data, allVersions) {
         valHtml += `<td><span class="dd-type-badge">${escapeHtml(field.SimpleDataType)}</span></td>`;
         valHtml += `</tr>`;
       }
-      valHtml += `</tbody></table>`;
+      valHtml += `</tbody></table></div>`;
 
       const valDir = join(dimDir, encodeURIComponent(val));
       mkdirSync(valDir, { recursive: true });
