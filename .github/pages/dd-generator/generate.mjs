@@ -3503,7 +3503,7 @@ function generateResourcePage(vCfg, data, resourceName, usageStats, allVersions,
   </div>`;
   html += '</div>';
 
-  html += renderGroupedFields(version, resourceName, fields, groupTree, resourceStats);
+  html += renderGroupedFields(version, resourceName, fields, groupTree, resourceStats, totalProviders);
 
   const sidebarHtml = generateSidebarHtml(vCfg, data, resourceName);
   const dir = join(OUTPUT_DIR, `DD${version}`, resourceName);
@@ -3513,7 +3513,7 @@ function generateResourcePage(vCfg, data, resourceName, usageStats, allVersions,
   ));
 }
 
-function renderGroupedFields(version, resourceName, fields, tree, resourceStats) {
+function renderGroupedFields(version, resourceName, fields, tree, resourceStats, totalProviders) {
   const sections = [];
   collectSections(tree, [], sections);
 
