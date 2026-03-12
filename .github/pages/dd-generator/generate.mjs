@@ -1157,16 +1157,17 @@ function getPageCSS() {
       .dd-fields-table-wrapper,
       .dd-collapsible-content,
       .dd-content { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-      .dd-fields-table,
-      .dd-lookups-table {
-        min-width: 600px;
-      }
+      /* Hide Type and Usage columns on mobile (3rd and 4th) */
+      .dd-fields-table th:nth-child(n+3),
+      .dd-fields-table td:nth-child(n+3) { display: none; }
       .dd-field-def {
         display: -webkit-box;
         -webkit-line-clamp: 3;
         -webkit-box-orient: vertical;
         overflow: hidden;
       }
+      /* Lookup tables keep all columns but scroll */
+      .dd-lookups-table { min-width: 600px; }
       .dd-fields-table-wrapper .dd-fields-table th {
         top: 64px;
       }
