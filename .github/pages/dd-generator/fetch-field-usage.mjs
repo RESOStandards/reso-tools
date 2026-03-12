@@ -176,14 +176,22 @@ async function main() {
   const results = await fetchAggs(token, payload);
 
   // Response shape: { ResourceName: { FieldName: { mean, recipients }, ... }, ... }
+  // Adoption = recipients / totalOrgs, where totalOrgs = max recipients across all fields in the resource
   const ranked = {};
   for (const [resourceName, fields] of Object.entries(results)) {
+    let maxRecipients = 0;
+    for (const stats of Object.values(fields)) {
+      if (stats.recipients > maxRecipients) maxRecipients = stats.recipients;
+    }
+
     ranked[resourceName] = [];
     for (const [fieldName, stats] of Object.entries(fields)) {
+      const recipients = stats.recipients ?? 0;
       ranked[resourceName].push({
         field: fieldName,
-        adoption: stats.mean ?? null,
-        providers: stats.recipients ?? null,
+        adoption: maxRecipients > 0 ? recipients / maxRecipients : null,
+        providers: recipients,
+        totalProviders: maxRecipients,
       });
     }
   }

@@ -298,9 +298,9 @@ function usageHtml(stats, totalProviders) {
       <p class="dd-usage-note">Usage data not yet available</p>
     </div>`;
   }
-  const pct = Math.round(stats.mean * 100);
   const total = totalProviders || 0;
-  const adoptionDetail = total ? `${formatNumber(stats.recipients)} of ${formatNumber(total)} providers` : '';
+  const pct = total ? Math.round((stats.recipients / total) * 100) : 0;
+  const adoptionDetail = total ? `${formatNumber(stats.recipients)} of ${formatNumber(total)} Organizations` : '';
   return `<div class="dd-usage">
     <span class="dd-usage-label">Adoption</span>
     <span class="dd-usage-value">${pct}%</span>
@@ -308,9 +308,10 @@ function usageHtml(stats, totalProviders) {
   </div>`;
 }
 
-function usageBadge(stats) {
+function usageBadge(stats, totalProviders) {
   if (!stats) return '<span class="dd-usage-badge dd-usage-badge-na">&mdash;</span>';
-  return `<span class="dd-usage-badge">${formatPercent(stats.mean)}</span>`;
+  const pct = totalProviders ? Math.round((stats.recipients / totalProviders) * 100) + '%' : formatPercent(stats.mean);
+  return `<span class="dd-usage-badge">${pct}</span>`;
 }
 
 function ddUrl(version, ...parts) {
@@ -3549,7 +3550,7 @@ function renderGroupedFields(version, resourceName, fields, tree, resourceStats)
       if (!field) continue;
       const fieldUrl = ddUrl(version, resourceName, field.StandardName);
       const stats = resourceStats?.[field.StandardName];
-      const usageVal = stats?.mean != null ? stats.mean : -1;
+      const usageVal = stats?.recipients != null && totalProviders ? stats.recipients / totalProviders : -1;
 
       html += `<tr data-name="${escapeHtml(field.StandardName)}" data-type="${escapeHtml(field.SimpleDataType || '')}" data-usage="${usageVal}" data-added="${escapeHtml(field.AddedInVersion || '')}" data-revised="${escapeHtml(field.RevisedDate || '')}" data-group="${escapeHtml(section.path.join(' > '))}">`;
       html += `<td><a href="${fieldUrl}" class="dd-field-link">${escapeHtml(field.DisplayName || field.StandardName)}</a>`;
@@ -3560,7 +3561,7 @@ function renderGroupedFields(version, resourceName, fields, tree, resourceStats)
       }
       html += `</td>`;
       html += `<td><span class="dd-type-badge">${escapeHtml(field.SimpleDataType)}</span></td>`;
-      html += `<td>${usageBadge(stats)}</td>`;
+      html += `<td>${usageBadge(stats, totalProviders)}</td>`;
       html += `</tr>`;
     }
     html += `</tbody></table>`;
@@ -3674,7 +3675,7 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
       html += `<td><a href="${lkUrl}">${escapeHtml(lk.StandardLookupValue)}</a></td>`;
       html += `<td>${escapeHtml(lk.LegacyODataValue)}</td>`;
       html += `<td class="dd-field-def">${escapeHtml(truncate(lk.Definition, DEFINITION_TRUNCATE_LENGTH))}</td>`;
-      html += `<td>${usageBadge(lkStats)}</td>`;
+      html += `<td>${usageBadge(lkStats, totalProviders)}</td>`;
       html += `</tr>`;
     }
     html += `</tbody></table></div></div>`;
@@ -3705,7 +3706,7 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
   const sidebarHtml = generateSidebarHtml(vCfg, data, resourceName);
   const dir = join(OUTPUT_DIR, `DD${version}`, resourceName, field.StandardName);
   mkdirSync(dir, { recursive: true });
-  const weight = fieldStats?.mean != null ? fieldStats.mean : undefined;
+  const weight = fieldStats?.recipients != null && totalProviders ? fieldStats.recipients / totalProviders : undefined;
   writeFileSync(join(dir, 'index.html'), wrapPage(
     `${field.DisplayName || field.StandardName} - ${resourceName}`, version, sidebarHtml, html, allVersions, { pagefindWeight: weight }
   ));
@@ -3779,7 +3780,7 @@ function generateLookupPage(vCfg, data, resourceName, field, lookup, usageStats,
   const sidebarHtml = generateSidebarHtml(vCfg, data, resourceName);
   const dir = join(OUTPUT_DIR, `DD${version}`, resourceName, field.StandardName, lookup.StandardLookupValue);
   mkdirSync(dir, { recursive: true });
-  const weight = lookupStats?.mean != null ? lookupStats.mean : undefined;
+  const weight = lookupStats?.recipients != null && totalProviders ? lookupStats.recipients / totalProviders : undefined;
   writeFileSync(join(dir, 'index.html'), wrapPage(
     `${lookup.StandardLookupValue} - ${field.StandardName} - ${resourceName}`, version, sidebarHtml, html, allVersions, { pagefindWeight: weight }
   ));
@@ -4138,20 +4139,18 @@ async function main() {
     console.warn('Error fetching usage stats:', err.message);
   }
 
-  // Derive total providers per resource: pick field with most recipients,
-  // break ties by highest mean (most reliable estimate)
+  // Derive total organizations per resource: the field with the most
+  // recipients is the best proxy for the total number of organizations
   if (usageStats) {
     for (const [resourceName, resource] of Object.entries(usageStats)) {
       let maxRecipients = 0;
-      let bestMean = 0;
       for (const [key, stats] of Object.entries(resource)) {
-        if (key === 'lookups' || !stats?.recipients || !stats?.mean) continue;
-        if (stats.recipients > maxRecipients || (stats.recipients === maxRecipients && stats.mean > bestMean)) {
+        if (key === 'lookups' || !stats?.recipients) continue;
+        if (stats.recipients > maxRecipients) {
           maxRecipients = stats.recipients;
-          bestMean = stats.mean;
-          totalProvidersByResource[resourceName] = Math.round(stats.recipients / stats.mean);
         }
       }
+      if (maxRecipients > 0) totalProvidersByResource[resourceName] = maxRecipients;
     }
   }
 
