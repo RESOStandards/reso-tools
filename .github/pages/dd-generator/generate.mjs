@@ -258,7 +258,7 @@ function ddUrl(version, ...parts) {
 }
 
 function breadcrumbHtml(version, versionLabel, items) {
-  let html = `<nav class="dd-breadcrumb"><a href="/dd/">Data Dictionary</a> <span class="dd-breadcrumb-sep">/</span> <a href="/dd/DD${version}/">${escapeHtml(versionLabel)}</a>`;
+  let html = `<nav class="dd-breadcrumb" data-pagefind-ignore><a href="/dd/">Data Dictionary</a> <span class="dd-breadcrumb-sep">/</span> <a href="/dd/DD${version}/">${escapeHtml(versionLabel)}</a>`;
   for (const item of items) {
     html += ` <span class="dd-breadcrumb-sep">/</span> `;
     if (item.url) {
@@ -275,7 +275,7 @@ function breadcrumbHtml(version, versionLabel, items) {
 // Full HTML Page Template
 // ---------------------------------------------------------------------------
 
-function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
+function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagefindWeight } = {}) {
   const versionOptions = allVersions.map(v =>
     `<option value="${v.version}"${v.version === version ? ' selected' : ''}>${escapeHtml(v.label)}${v.draft ? ' (DRAFT)' : ''}</option>`
   ).join('\n          ');
@@ -308,6 +308,23 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
       --reso-gray-800: #1a202c;
       --reso-gray-900: #171923;
     }
+
+    html.dark {
+      --reso-gray-50: #1a202c;
+      --reso-gray-100: #2d3748;
+      --reso-gray-200: #4a5568;
+      --reso-gray-300: #718096;
+      --reso-gray-500: #a0aec0;
+      --reso-gray-600: #cbd5e0;
+      --reso-gray-700: #e2e8f0;
+      --reso-gray-800: #edf2f7;
+      --reso-gray-900: #f7fafc;
+      --reso-green-light: rgba(56,161,105,0.15);
+      --reso-orange-light: rgba(255,153,0,0.15);
+      --reso-blue-light: rgba(0,126,158,0.15);
+    }
+    html.dark .dd-metadata-card,
+    html.dark .search-modal { background: var(--reso-gray-100); }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html { overflow-x: hidden; }
@@ -413,6 +430,25 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
       padding: 0.125rem 0.375rem;
     }
 
+    /* Theme toggle */
+    .theme-toggle {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.7);
+      cursor: pointer;
+      padding: 0.375rem;
+      border-radius: 0.375rem;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+    }
+    .theme-toggle:hover { background: rgba(255,255,255,0.25); color: white; }
+    .theme-toggle svg { width: 16px; height: 16px; fill: currentColor; }
+    .theme-toggle .icon-moon { display: block; }
+    .theme-toggle .icon-sun { display: none; }
+    html.dark .theme-toggle .icon-moon { display: none; }
+    html.dark .theme-toggle .icon-sun { display: block; }
+
     /* Search modal */
     .search-modal-overlay {
       display: none;
@@ -431,32 +467,138 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
       width: 90%;
       max-width: 640px;
       max-height: 70vh;
-      overflow: hidden;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     }
     @media (max-width: 768px) {
       .search-modal-overlay { padding-top: 1rem; }
       .search-modal { width: calc(100% - 1.5rem); max-height: 85vh; border-radius: 0.5rem; }
     }
-    .search-modal-body {
-      padding: 1rem;
-      overflow-y: auto;
-      flex: 1;
+
+    /* Pagefind layout — input+pills fixed at top, drawer scrolls */
+    .pagefind-ui .pagefind-ui__form {
+      padding: 1rem 1rem 0 !important;
+      position: relative !important;
+    }
+    /* Search icon — vertically center in input */
+    .pagefind-ui .pagefind-ui__form::before {
+      position: absolute !important;
+      top: 1.875rem !important;
+      left: 1.625rem !important;
+      width: 18px !important;
+      height: 18px !important;
     }
     .pagefind-ui .pagefind-ui__search-input {
-      border-radius: 0.375rem !important;
-      border-color: var(--reso-gray-200) !important;
+      border: 1.5px solid var(--reso-gray-300) !important;
+      border-radius: 0.5rem !important;
+      padding: 0.625rem 3.5rem 0.625rem 2.5rem !important;
       font-size: 1rem !important;
+      color: var(--reso-gray-800) !important;
+      background: var(--reso-gray-50) !important;
+      font-family: inherit !important;
+      height: auto !important;
     }
+    .pagefind-ui .pagefind-ui__search-input::placeholder { color: var(--reso-gray-500) !important; }
     .pagefind-ui .pagefind-ui__search-input:focus {
       border-color: var(--reso-blue) !important;
       box-shadow: 0 0 0 3px rgba(0,126,158,0.15) !important;
+      outline: none !important;
     }
-    .pagefind-ui .pagefind-ui__result-link {
-      color: var(--reso-navy) !important;
+    /* Clear button — vertically center in input */
+    .pagefind-ui .pagefind-ui__search-clear {
+      position: absolute !important;
+      top: 1rem !important;
+      right: 1.5rem !important;
+      color: var(--reso-gray-500) !important;
+      font-size: 0.8125rem !important;
+      font-weight: 500 !important;
+      background: none !important;
+      border: none !important;
+      padding: 0.125rem 0.375rem !important;
+      cursor: pointer !important;
     }
+    .pagefind-ui .pagefind-ui__search-clear:hover { color: var(--reso-gray-800) !important; }
+
+    /* Filter pills — injected before the drawer */
+    .dd-search-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 0 0.75rem;
+      border-bottom: 1px solid var(--reso-gray-200);
+    }
+    .dd-search-filters {
+      display: flex;
+      gap: 0.375rem;
+      flex-wrap: wrap;
+    }
+    .dd-search-filter-pill {
+      padding: 0.1875rem 0.625rem;
+      border-radius: 0.25rem;
+      border: 1px solid var(--reso-gray-200);
+      background: transparent;
+      color: var(--reso-gray-600);
+      font-size: 0.6875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+    .dd-search-filter-pill:hover { border-color: var(--reso-blue); color: var(--reso-blue); }
+    .dd-search-filter-pill.active { background: var(--reso-blue); border-color: var(--reso-blue); color: white; }
+    .dd-search-count {
+      font-size: 0.6875rem;
+      color: var(--reso-gray-500);
+      white-space: nowrap;
+    }
+
+    /* Hide Pagefind's Load more button (infinite scroll), message (we show our own count), filter panel */
+    .pagefind-ui .pagefind-ui__button { height: 0 !important; overflow: hidden !important; opacity: 0 !important; pointer-events: none !important; padding: 0 !important; margin: 0 !important; border: none !important; }
+    .pagefind-ui .pagefind-ui__message { display: none !important; }
+    .pagefind-ui .pagefind-ui__filter-panel { display: none !important; }
+
+    /* Drawer scrolls — explicit max-height since flex chain can break */
+    .pagefind-ui .pagefind-ui__drawer {
+      padding: 0 1rem 1rem !important;
+      overflow-y: auto !important;
+      max-height: calc(70vh - 7.5rem) !important;
+    }
+    .pagefind-ui .pagefind-ui__result-link { color: var(--reso-blue) !important; font-weight: 600 !important; }
+    .pagefind-ui .pagefind-ui__result-excerpt { font-size: 0.8125rem !important; color: var(--reso-gray-600) !important; line-height: 1.5 !important; }
+    .pagefind-ui .pagefind-ui__result-tags { display: none !important; }
+    .pagefind-ui .pagefind-ui__result { border-color: var(--reso-gray-200) !important; padding: 0.75rem 0 !important; }
+
+    /* Version badge in results */
+    .dd-result-version {
+      display: inline-block;
+      font-size: 0.625rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0.125rem 0.4375rem;
+      border-radius: 0.1875rem;
+      background: var(--reso-gray-100);
+      color: var(--reso-gray-500);
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
+
+    /* Dark mode search */
+    html.dark .search-modal { background: #1e293b !important; }
+    html.dark .pagefind-ui .pagefind-ui__form { background: #1e293b; }
+    html.dark .pagefind-ui .pagefind-ui__search-input { background: #2d3748 !important; border-color: #4a5568 !important; color: #e2e8f0 !important; }
+    html.dark .pagefind-ui .pagefind-ui__search-input::placeholder { color: #718096 !important; }
+    html.dark .pagefind-ui .pagefind-ui__search-clear { color: #a0aec0 !important; }
+    html.dark .pagefind-ui .pagefind-ui__search-clear:hover { color: #e2e8f0 !important; }
+    html.dark .dd-search-meta { border-color: #4a5568; }
+    html.dark .pagefind-ui .pagefind-ui__result-link { color: #63b3ed !important; }
+    html.dark .pagefind-ui .pagefind-ui__result-excerpt { color: #a0aec0 !important; }
+    html.dark .pagefind-ui .pagefind-ui__result { border-color: #4a5568 !important; }
+    html.dark .dd-search-filter-pill { background: transparent; border-color: #4a5568; color: #a0aec0; }
+    html.dark .dd-search-filter-pill:hover { border-color: #63b3ed; color: #63b3ed; }
+    html.dark .dd-search-filter-pill.active { background: var(--reso-blue); border-color: var(--reso-blue); color: white; }
+    html.dark .dd-result-version { background: #2d3748; color: #a0aec0; }
 
     /* Footer */
     .site-footer {
@@ -513,6 +655,52 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
       outline: none;
       border-color: var(--reso-blue);
       box-shadow: 0 0 0 2px rgba(0,126,158,0.15);
+    }
+
+    .dd-sidebar-search {
+      position: relative;
+      padding: 0 1rem;
+      margin-bottom: 0.75rem;
+      cursor: pointer;
+    }
+    .dd-sidebar-search input {
+      width: 100%;
+      padding: 0.375rem 0.5rem 0.375rem 2rem;
+      border: 1px solid var(--reso-gray-300);
+      border-radius: 0.375rem;
+      font-size: 0.8125rem;
+      color: var(--reso-gray-600);
+      background: white;
+      cursor: pointer;
+    }
+    .dd-sidebar-search input:hover { border-color: var(--reso-blue); }
+    .dd-sidebar-search-icon {
+      position: absolute;
+      left: 1.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 14px;
+      height: 14px;
+      fill: none;
+      stroke: var(--reso-gray-500);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+    .dd-sidebar-search kbd {
+      position: absolute;
+      right: 1.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.625rem;
+      font-family: inherit;
+      color: var(--reso-gray-500);
+      background: var(--reso-gray-100);
+      border: 1px solid var(--reso-gray-300);
+      border-radius: 0.1875rem;
+      padding: 0.0625rem 0.375rem;
+      pointer-events: none;
     }
 
     .dd-nav-resources { list-style: none; padding: 0; margin: 0; }
@@ -826,6 +1014,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
     .badge-orange { background: var(--reso-orange); color: white; }
   </style>
   <link href="/pagefind/pagefind-ui.css" rel="stylesheet">
+  <script>(function(){var t=localStorage.getItem('dd-theme');if(t==='dark'||(t===null&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');})()</script>
 </head>
 <body>
   <header class="site-header">
@@ -844,6 +1033,10 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
         <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
         Search<kbd>/</kbd>
       </button>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
+        <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24"><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41M12 6a6 6 0 100 12 6 6 0 000-12z"/></svg>
+      </button>
     </nav>
   </header>
 
@@ -855,6 +1048,11 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
           ${versionOptions}
         </select>
       </div>
+      <div class="dd-sidebar-search" id="sidebarSearch">
+        <svg class="dd-sidebar-search-icon" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input type="text" placeholder="Search..." readonly />
+        <kbd>/</kbd>
+      </div>
       ${sidebarHtml}
     </aside>
 
@@ -863,19 +1061,26 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     </button>
 
-    <div class="dd-content" data-pagefind-body data-pagefind-filter-dd-version="${version}">
+    <div class="dd-content" data-pagefind-body data-pagefind-filter="dd-version:${version}" data-pagefind-meta="dd-version:DD ${version}"${pagefindWeight != null ? ` data-pagefind-weight="${pagefindWeight}"` : ''}>
       ${contentHtml}
     </div>
   </div>
 
   <!-- Search modal -->
   <div class="search-modal-overlay" id="searchOverlay">
-    <div class="search-modal">
-      <div class="search-modal-body">
-        <div id="search"></div>
-      </div>
+    <div class="search-modal" id="searchModal">
+      <div id="search"></div>
     </div>
   </div>
+  <template id="searchFiltersTemplate">
+    <div class="dd-search-meta">
+      <div class="dd-search-filters" id="ddSearchFilters">
+        <button class="dd-search-filter-pill" data-version="">All</button>
+        ${allVersions.map(v => `<button class="dd-search-filter-pill${v.version === version ? ' active' : ''}" data-version="${v.version}">DD ${v.version}</button>`).join('\n        ')}
+      </div>
+      <div class="dd-search-count" id="ddSearchCount"></div>
+    </div>
+  </template>
 
   <footer class="site-footer">
     <p>&copy; ${new Date().getFullYear()} <a href="https://reso.org">Real Estate Standards Organization (RESO)</a>. All rights reserved.</p>
@@ -886,17 +1091,113 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
     </p>
   </footer>
 
-  <script src="/pagefind/pagefind-ui.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       var currentVersion = '${version}';
-      var pf = new PagefindUI({
-        element: '#search',
-        showSubResults: true,
-        showImages: false,
-        resetStyles: false,
-        filters: { 'dd-version': currentVersion }
-      });
+      var activeFilter = currentVersion;
+      var pfUI = null;
+      var searchEl = document.getElementById('search');
+      var modalEl = document.getElementById('searchModal');
+      var countEl = null;
+      var filtersEl = null;
+
+      var observer = null;
+
+      function initPagefind(filterVersion) {
+        var prevTerm = '';
+        var prevInput = searchEl.querySelector('.pagefind-ui__search-input');
+        if (prevInput) prevTerm = prevInput.value || '';
+        if (observer) { observer.disconnect(); observer = null; }
+        searchEl.innerHTML = '';
+        var opts = { element: '#search', showSubResults: true, showImages: false, resetStyles: false };
+        if (filterVersion) opts.filters = { 'dd-version': filterVersion };
+        pfUI = new PagefindUI(opts);
+
+        // Inject filter pills before the drawer, attach scroll loader
+        injectFilters();
+        attachScrollLoader();
+
+        // Observe for version badges and result count — pause during DOM writes
+        var processing = false;
+        observer = new MutationObserver(function() {
+          if (processing) return;
+          processing = true;
+          requestAnimationFrame(function() {
+            searchEl.querySelectorAll('.pagefind-ui__result-link:not([data-badge])').forEach(function(link) {
+              link.setAttribute('data-badge', '1');
+              var url = link.getAttribute('href') || '';
+              var m = url.match(/\\/DD(\\d+\\.\\d+)\\//);
+              if (m) {
+                var badge = document.createElement('span');
+                badge.className = 'dd-result-version';
+                badge.textContent = 'DD ' + m[1];
+                link.appendChild(badge);
+              }
+            });
+            var msg = searchEl.querySelector('.pagefind-ui__message');
+            if (msg && countEl) {
+              var txt = msg.textContent || '';
+              var cm = txt.match(/(\\d+)\\s+result/);
+              var newCount = cm ? cm[1] + ' results' : '';
+              if (countEl.textContent !== newCount) countEl.textContent = newCount;
+            }
+            processing = false;
+          });
+        });
+        observer.observe(searchEl, { childList: true, subtree: true });
+
+        // Re-trigger previous search term if switching filters
+        if (prevTerm) {
+          setTimeout(function() { pfUI.triggerSearch(prevTerm); }, 100);
+        }
+      }
+
+      function injectFilters() {
+        var form = searchEl.querySelector('.pagefind-ui__form');
+        if (!form) return;
+        var tpl = document.getElementById('searchFiltersTemplate');
+        var clone = tpl.content.cloneNode(true);
+        // Insert pills BEFORE the drawer so they stay above results
+        var drawer = form.querySelector('.pagefind-ui__drawer');
+        if (drawer) form.insertBefore(clone, drawer);
+        else form.appendChild(clone);
+        filtersEl = form.querySelector('.dd-search-filters');
+        countEl = form.querySelector('.dd-search-count');
+
+        // Set active pill from activeFilter (not from template defaults)
+        if (filtersEl) {
+          filtersEl.querySelectorAll('.dd-search-filter-pill').forEach(function(b) {
+            b.classList.toggle('active', b.dataset.version === activeFilter);
+          });
+        }
+
+        filtersEl.addEventListener('click', function(e) {
+          var btn = e.target.closest('.dd-search-filter-pill');
+          if (!btn || typeof PagefindUI === 'undefined') return;
+          filtersEl.querySelectorAll('.dd-search-filter-pill').forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          activeFilter = btn.dataset.version;
+          initPagefind(activeFilter);
+        });
+      }
+
+      // Infinite scroll on the drawer (the scrollable results area)
+      function attachScrollLoader() {
+        var drawer = searchEl.querySelector('.pagefind-ui__drawer');
+        if (!drawer) return;
+        drawer.addEventListener('scroll', function() {
+          if (drawer.scrollTop + drawer.clientHeight >= drawer.scrollHeight - 300) {
+            var btn = searchEl.querySelector('.pagefind-ui__button');
+            if (btn) btn.click();
+          }
+        });
+      }
+
+      // Load Pagefind
+      var s = document.createElement('script');
+      s.src = '/pagefind/pagefind-ui.js';
+      s.onload = function() { if (typeof PagefindUI !== 'undefined') initPagefind(currentVersion); };
+      document.head.appendChild(s);
 
       // Header hamburger
       document.getElementById('menuToggle').addEventListener('click', function() {
@@ -905,16 +1206,21 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
 
       // Search modal
       var overlay = document.getElementById('searchOverlay');
-      document.getElementById('searchTrigger').addEventListener('click', function() {
+      function openSearch() {
         overlay.classList.add('active');
-        setTimeout(function() { var i = overlay.querySelector('.pagefind-ui__search-input'); if (i) i.focus(); }, 100);
-      });
+        setTimeout(function() {
+          var pfInput = searchEl.querySelector('.pagefind-ui__search-input');
+          if (pfInput) pfInput.focus();
+        }, 100);
+      }
+      document.getElementById('searchTrigger').addEventListener('click', openSearch);
+      var sidebarSearchEl = document.getElementById('sidebarSearch');
+      if (sidebarSearchEl) sidebarSearchEl.addEventListener('click', openSearch);
       overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.classList.remove('active'); });
       document.addEventListener('keydown', function(e) {
         if (e.key === '/' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
           e.preventDefault();
-          overlay.classList.add('active');
-          setTimeout(function() { var i = overlay.querySelector('.pagefind-ui__search-input'); if (i) i.focus(); }, 100);
+          openSearch();
         }
         if (e.key === 'Escape') overlay.classList.remove('active');
       });
@@ -939,6 +1245,12 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions) {
             li.classList.toggle('expanded');
           }
         });
+      });
+
+      // Theme toggle
+      document.getElementById('themeToggle').addEventListener('click', function() {
+        var isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('dd-theme', isDark ? 'dark' : 'light');
       });
 
       // Collapsible panels
@@ -1183,7 +1495,7 @@ function renderGroupedFields(version, resourceName, fields, tree, resourceStats)
 
   const hasGroupedSections = sections.some(s => s.path.length > 0);
 
-  let html = '<div class="dd-fields-table-wrapper">';
+  let html = '<div class="dd-fields-table-wrapper" data-pagefind-ignore>';
   for (const section of sections) {
     const groupPath = section.path.join(' > ');
     const groupId = 'group-' + section.path.join('-');
@@ -1255,7 +1567,7 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
   html += `<p class="dd-page-subtitle" data-pagefind-meta="description">${escapeHtml(resourceName)} field &mdash; ${escapeHtml(field.SimpleDataType || 'Unknown type')}</p></div>`;
 
   // Metadata
-  html += `<div class="dd-metadata-card"><h2>Details</h2><table class="dd-metadata-table">`;
+  html += `<div class="dd-metadata-card" data-pagefind-ignore><h2>Details</h2><table class="dd-metadata-table">`;
   const metaRows = [
     ['Standard Name', field.StandardName],
     ['Display Name', field.DisplayName],
@@ -1280,7 +1592,7 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
   html += `</table></div>`;
 
   // Usage
-  html += `<div class="dd-metadata-card"><h2>Usage</h2>${usageHtml(fieldStats)}</div>`;
+  html += `<div class="dd-metadata-card" data-pagefind-ignore><h2>Usage</h2>${usageHtml(fieldStats)}</div>`;
 
   // Lookups panel
   if (field.LookupStatus === 'Open with Enumerations' && field.LookupName) {
@@ -1289,7 +1601,7 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
 
     html += `<div class="dd-collapsible">`;
     html += `<button class="dd-collapsible-toggle">Lookups (${formatNumber(lookupValues.length)}) <span class="dd-toggle-icon">+</span></button>`;
-    html += `<div class="dd-collapsible-content">`;
+    html += `<div class="dd-collapsible-content" data-pagefind-ignore>`;
     html += `<table class="dd-lookups-table"><thead><tr>`;
     html += `<th>Standard Value</th><th>Legacy OData Value</th><th>Definition</th><th>Usage</th>`;
     html += `</tr></thead><tbody>`;
@@ -1315,7 +1627,7 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
     const expandedFields = data.resourceMap[field.SourceResource] || [];
     html += `<div class="dd-collapsible">`;
     html += `<button class="dd-collapsible-toggle">${escapeHtml(field.SourceResource)} Fields (${formatNumber(expandedFields.length)}) <span class="dd-toggle-icon">+</span></button>`;
-    html += `<div class="dd-collapsible-content">`;
+    html += `<div class="dd-collapsible-content" data-pagefind-ignore>`;
     html += `<table class="dd-fields-table"><thead><tr><th>Field</th><th>Definition</th><th>Type</th></tr></thead><tbody>`;
 
     for (const ef of expandedFields) {
@@ -1332,8 +1644,9 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
   const sidebarHtml = generateSidebarHtml(vCfg, data, resourceName);
   const dir = join(OUTPUT_DIR, `DD${version}`, resourceName, field.StandardName);
   mkdirSync(dir, { recursive: true });
+  const weight = fieldStats?.mean != null ? fieldStats.mean : undefined;
   writeFileSync(join(dir, 'index.html'), wrapPage(
-    `${field.DisplayName || field.StandardName} - ${resourceName}`, version, sidebarHtml, html, allVersions
+    `${field.DisplayName || field.StandardName} - ${resourceName}`, version, sidebarHtml, html, allVersions, { pagefindWeight: weight }
   ));
 }
 
@@ -1353,7 +1666,7 @@ function generateLookupPage(vCfg, data, resourceName, field, lookup, usageStats,
   html += `<p class="dd-page-subtitle" data-pagefind-meta="description">Lookup value for ${escapeHtml(field.DisplayName || field.StandardName)} (${escapeHtml(resourceName)})</p></div>`;
 
   // Metadata
-  html += `<div class="dd-metadata-card"><h2>Details</h2><table class="dd-metadata-table">`;
+  html += `<div class="dd-metadata-card" data-pagefind-ignore><h2>Details</h2><table class="dd-metadata-table">`;
   const metaRows = [
     ['Lookup Name', lookup.LookupName],
     ['Standard Value', lookup.StandardLookupValue],
@@ -1373,15 +1686,16 @@ function generateLookupPage(vCfg, data, resourceName, field, lookup, usageStats,
   html += `</table></div>`;
 
   // Usage
-  html += `<div class="dd-metadata-card"><h2>Usage</h2>`;
+  html += `<div class="dd-metadata-card" data-pagefind-ignore><h2>Usage</h2>`;
   html += `<h3>Standard Value</h3>${usageHtml(lookupStats)}`;
   html += `</div>`;
 
   const sidebarHtml = generateSidebarHtml(vCfg, data, resourceName);
   const dir = join(OUTPUT_DIR, `DD${version}`, resourceName, field.StandardName, lookup.StandardLookupValue);
   mkdirSync(dir, { recursive: true });
+  const weight = lookupStats?.mean != null ? lookupStats.mean : undefined;
   writeFileSync(join(dir, 'index.html'), wrapPage(
-    `${lookup.StandardLookupValue} - ${field.StandardName} - ${resourceName}`, version, sidebarHtml, html, allVersions
+    `${lookup.StandardLookupValue} - ${field.StandardName} - ${resourceName}`, version, sidebarHtml, html, allVersions, { pagefindWeight: weight }
   ));
 }
 
@@ -1723,8 +2037,59 @@ function generateDDLandingPage(allData) {
       font-size: 0.95rem;
       color: var(--reso-gray-500);
       margin-top: 0.375rem;
-      max-width: 600px;
+      max-width: 700px;
       line-height: 1.6;
+    }
+
+    .dd-hero-search {
+      margin-top: 1.25rem;
+      max-width: 520px;
+      position: relative;
+      cursor: pointer;
+    }
+    .dd-hero-search-input {
+      width: 100%;
+      padding: 0.75rem 1rem 0.75rem 2.75rem;
+      font-size: 0.9375rem;
+      border: 1.5px solid var(--reso-gray-300);
+      border-radius: 0.5rem;
+      background: white;
+      color: var(--reso-gray-600);
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .dd-hero-search-input:hover {
+      border-color: var(--reso-blue);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    html.dark .dd-hero-search-input { background: var(--reso-gray-100); }
+    .dd-hero-search-icon {
+      position: absolute;
+      left: 0.875rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: var(--reso-gray-500);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+    .dd-hero-search-kbd {
+      position: absolute;
+      right: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.6875rem;
+      font-family: inherit;
+      color: var(--reso-gray-500);
+      background: var(--reso-gray-100);
+      border: 1px solid var(--reso-gray-300);
+      border-radius: 0.25rem;
+      padding: 0.125rem 0.5rem;
+      pointer-events: none;
     }
 
     .dd-landing-note {
@@ -1785,7 +2150,7 @@ function generateDDLandingPage(allData) {
     .dd-landing-tile-header h2 {
       font-size: 1.25rem;
       font-weight: 700;
-      color: var(--reso-navy);
+      color: var(--reso-gray-800);
     }
 
     .dd-landing-badge {
@@ -1977,7 +2342,7 @@ function generateDDLandingPage(allData) {
       .search-trigger kbd { display: none; }
     }
 
-    /* Search modal */
+    /* Search modal — reuses same styles as version pages */
     .search-modal-overlay {
       display: none;
       position: fixed;
@@ -1995,32 +2360,66 @@ function generateDDLandingPage(allData) {
       width: 90%;
       max-width: 640px;
       max-height: 70vh;
-      overflow: hidden;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     }
     @media (max-width: 768px) {
       .search-modal-overlay { padding-top: 1rem; }
       .search-modal { width: calc(100% - 1.5rem); max-height: 85vh; border-radius: 0.5rem; }
     }
-    .search-modal-body {
-      padding: 1rem;
-      overflow-y: auto;
-      flex: 1;
+    /* Pagefind flexbox layout — input+pills stay fixed, drawer scrolls */
+    #search, .pagefind-ui, .pagefind-ui .pagefind-ui__form {
+      display: flex !important; flex-direction: column !important; flex: 1 !important; min-height: 0 !important;
     }
+    .pagefind-ui .pagefind-ui__form { padding: 1rem 1rem 0 !important; position: relative !important; }
+    .pagefind-ui .pagefind-ui__form::before { position: absolute !important; top: 1.875rem !important; left: 1.625rem !important; width: 18px !important; height: 18px !important; }
+    html.dark .pagefind-ui .pagefind-ui__form { background: #1e293b; }
     .pagefind-ui .pagefind-ui__search-input {
-      border-radius: 0.375rem !important;
-      border-color: var(--reso-gray-200) !important;
-      font-size: 1rem !important;
+      border: 1.5px solid var(--reso-gray-300) !important; border-radius: 0.5rem !important;
+      padding: 0.625rem 3.5rem 0.625rem 2.5rem !important; font-size: 1rem !important;
+      color: var(--reso-gray-800) !important; background: var(--reso-gray-50) !important;
+      font-family: inherit !important; height: auto !important;
     }
+    .pagefind-ui .pagefind-ui__search-input::placeholder { color: var(--reso-gray-500) !important; }
     .pagefind-ui .pagefind-ui__search-input:focus {
-      border-color: var(--reso-blue) !important;
-      box-shadow: 0 0 0 3px rgba(0,126,158,0.15) !important;
+      border-color: var(--reso-blue) !important; box-shadow: 0 0 0 3px rgba(0,126,158,0.15) !important; outline: none !important;
     }
-    .pagefind-ui .pagefind-ui__result-link {
-      color: var(--reso-navy) !important;
+    .pagefind-ui .pagefind-ui__search-clear {
+      position: absolute !important; top: 1rem !important; right: 1.5rem !important;
+      color: var(--reso-gray-500) !important; font-size: 0.8125rem !important; font-weight: 500 !important;
+      background: none !important; border: none !important; padding: 0.125rem 0.375rem !important; cursor: pointer !important;
     }
+    .pagefind-ui .pagefind-ui__search-clear:hover { color: var(--reso-gray-800) !important; }
+    .dd-search-meta { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0 0.75rem; border-bottom: 1px solid var(--reso-gray-200); }
+    .dd-search-filters { display: flex; gap: 0.375rem; flex-wrap: wrap; }
+    .dd-search-filter-pill { padding: 0.1875rem 0.625rem; border-radius: 0.25rem; border: 1px solid var(--reso-gray-200); background: transparent; color: var(--reso-gray-600); font-size: 0.6875rem; font-weight: 500; cursor: pointer; transition: all 0.1s; }
+    .dd-search-filter-pill:hover { border-color: var(--reso-blue); color: var(--reso-blue); }
+    .dd-search-filter-pill.active { background: var(--reso-blue); border-color: var(--reso-blue); color: white; }
+    .dd-search-count { font-size: 0.6875rem; color: var(--reso-gray-500); white-space: nowrap; }
+    .pagefind-ui .pagefind-ui__button { height: 0 !important; overflow: hidden !important; opacity: 0 !important; pointer-events: none !important; padding: 0 !important; margin: 0 !important; border: none !important; }
+    .pagefind-ui .pagefind-ui__message { display: none !important; }
+    .pagefind-ui .pagefind-ui__filter-panel { display: none !important; }
+    .pagefind-ui .pagefind-ui__drawer { padding: 0 1rem 1rem !important; overflow-y: auto !important; max-height: calc(70vh - 7.5rem) !important; }
+    .pagefind-ui .pagefind-ui__result-link { color: var(--reso-blue) !important; font-weight: 600 !important; }
+    .pagefind-ui .pagefind-ui__result-excerpt { font-size: 0.8125rem !important; color: var(--reso-gray-600) !important; line-height: 1.5 !important; }
+    .pagefind-ui .pagefind-ui__result-tags { display: none !important; }
+    .pagefind-ui .pagefind-ui__result { border-color: var(--reso-gray-200) !important; padding: 0.75rem 0 !important; }
+    .dd-result-version { display: inline-block; font-size: 0.625rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.125rem 0.4375rem; border-radius: 0.1875rem; background: var(--reso-gray-100); color: var(--reso-gray-500); margin-left: 0.5rem; vertical-align: middle; }
+    html.dark .search-modal { background: #1e293b !important; }
+    html.dark .pagefind-ui .pagefind-ui__search-input { background: #2d3748 !important; border-color: #4a5568 !important; color: #e2e8f0 !important; }
+    html.dark .pagefind-ui .pagefind-ui__search-input::placeholder { color: #718096 !important; }
+    html.dark .pagefind-ui .pagefind-ui__search-clear { color: #a0aec0 !important; }
+    html.dark .pagefind-ui .pagefind-ui__search-clear:hover { color: #e2e8f0 !important; }
+    html.dark .dd-search-meta { border-color: #4a5568; }
+    html.dark .pagefind-ui .pagefind-ui__result-link { color: #63b3ed !important; }
+    html.dark .pagefind-ui .pagefind-ui__result-excerpt { color: #a0aec0 !important; }
+    html.dark .pagefind-ui .pagefind-ui__result { border-color: #4a5568 !important; }
+    html.dark .dd-search-filter-pill { background: transparent; border-color: #4a5568; color: #a0aec0; }
+    html.dark .dd-search-filter-pill:hover { border-color: #63b3ed; color: #63b3ed; }
+    html.dark .dd-search-filter-pill.active { background: var(--reso-blue); border-color: var(--reso-blue); color: white; }
+    html.dark .dd-result-version { background: #2d3748; color: #a0aec0; }
   </style>
   <link href="/pagefind/pagefind-ui.css" rel="stylesheet">
   <script>(function(){var t=localStorage.getItem('dd-theme');if(t==='dark'||(t===null&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');})()</script>
@@ -2054,6 +2453,11 @@ function generateDDLandingPage(allData) {
     <div class="dd-landing-header">
       <h1>Data Dictionary</h1>
       <p>The RESO Data Dictionary defines standard resources, fields and lookups for the exchange of real estate data.</p>
+      <div class="dd-hero-search" id="heroSearch">
+        <svg class="dd-hero-search-icon" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input class="dd-hero-search-input" type="text" placeholder="Search fields, resources and lookups..." readonly />
+        <kbd class="dd-hero-search-kbd">/</kbd>
+      </div>
     </div>
 
     <div class="dd-landing-grid">
@@ -2112,12 +2516,19 @@ function generateDDLandingPage(allData) {
 
   <!-- Search modal -->
   <div class="search-modal-overlay" id="searchOverlay">
-    <div class="search-modal">
-      <div class="search-modal-body">
-        <div id="search"></div>
-      </div>
+    <div class="search-modal" id="searchModal">
+      <div id="search"></div>
     </div>
   </div>
+  <template id="searchFiltersTemplate">
+    <div class="dd-search-meta">
+      <div class="dd-search-filters" id="ddSearchFilters">
+        <button class="dd-search-filter-pill active" data-version="">All</button>
+        ${allData.map(({ vCfg }) => `<button class="dd-search-filter-pill" data-version="${vCfg.version}">DD ${vCfg.version}</button>`).join('\n        ')}
+      </div>
+      <div class="dd-search-count" id="ddSearchCount"></div>
+    </div>
+  </template>
 
   <footer class="site-footer">
     <p>&copy; ${new Date().getFullYear()} <a href="https://reso.org">Real Estate Standards Organization (RESO)</a>. All rights reserved.</p>
@@ -2128,18 +2539,105 @@ function generateDDLandingPage(allData) {
     </p>
   </footer>
 
-  <script src="/pagefind/pagefind-ui.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
-      // Pagefind search (no version filter on landing page)
-      if (typeof PagefindUI !== 'undefined') {
-        new PagefindUI({
-          element: '#search',
-          showSubResults: true,
-          showImages: false,
-          resetStyles: false
+      // Pagefind search
+      var activeFilter = '';
+      var pfUI = null;
+      var searchEl = document.getElementById('search');
+      var modalEl = document.getElementById('searchModal');
+      var countEl = null;
+      var filtersEl = null;
+      var observer = null;
+
+      function initPagefind(filterVersion) {
+        var prevTerm = '';
+        var prevInput = searchEl.querySelector('.pagefind-ui__search-input');
+        if (prevInput) prevTerm = prevInput.value || '';
+        if (observer) { observer.disconnect(); observer = null; }
+        searchEl.innerHTML = '';
+        var opts = { element: '#search', showSubResults: true, showImages: false, resetStyles: false };
+        if (filterVersion) opts.filters = { 'dd-version': filterVersion };
+        pfUI = new PagefindUI(opts);
+
+        injectFilters();
+        attachScrollLoader();
+
+        var processing = false;
+        observer = new MutationObserver(function() {
+          if (processing) return;
+          processing = true;
+          requestAnimationFrame(function() {
+            searchEl.querySelectorAll('.pagefind-ui__result-link:not([data-badge])').forEach(function(link) {
+              link.setAttribute('data-badge', '1');
+              var url = link.getAttribute('href') || '';
+              var m = url.match(/\\/DD(\\d+\\.\\d+)\\//);
+              if (m) {
+                var badge = document.createElement('span');
+                badge.className = 'dd-result-version';
+                badge.textContent = 'DD ' + m[1];
+                link.appendChild(badge);
+              }
+            });
+            var msg = searchEl.querySelector('.pagefind-ui__message');
+            if (msg && countEl) {
+              var txt = msg.textContent || '';
+              var cm = txt.match(/(\\d+)\\s+result/);
+              var newCount = cm ? cm[1] + ' results' : '';
+              if (countEl.textContent !== newCount) countEl.textContent = newCount;
+            }
+            processing = false;
+          });
+        });
+        observer.observe(searchEl, { childList: true, subtree: true });
+
+        if (prevTerm) {
+          setTimeout(function() { pfUI.triggerSearch(prevTerm); }, 100);
+        }
+      }
+
+      function injectFilters() {
+        var form = searchEl.querySelector('.pagefind-ui__form');
+        if (!form) return;
+        var tpl = document.getElementById('searchFiltersTemplate');
+        var clone = tpl.content.cloneNode(true);
+        var drawer = form.querySelector('.pagefind-ui__drawer');
+        if (drawer) form.insertBefore(clone, drawer);
+        else form.appendChild(clone);
+        filtersEl = form.querySelector('.dd-search-filters');
+        countEl = form.querySelector('.dd-search-count');
+
+        if (filtersEl) {
+          filtersEl.querySelectorAll('.dd-search-filter-pill').forEach(function(b) {
+            b.classList.toggle('active', b.dataset.version === activeFilter);
+          });
+        }
+
+        filtersEl.addEventListener('click', function(e) {
+          var btn = e.target.closest('.dd-search-filter-pill');
+          if (!btn || typeof PagefindUI === 'undefined') return;
+          filtersEl.querySelectorAll('.dd-search-filter-pill').forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          activeFilter = btn.dataset.version;
+          initPagefind(activeFilter);
         });
       }
+
+      function attachScrollLoader() {
+        var drawer = searchEl.querySelector('.pagefind-ui__drawer');
+        if (!drawer) return;
+        drawer.addEventListener('scroll', function() {
+          if (drawer.scrollTop + drawer.clientHeight >= drawer.scrollHeight - 300) {
+            var btn = searchEl.querySelector('.pagefind-ui__button');
+            if (btn) btn.click();
+          }
+        });
+      }
+
+      var s = document.createElement('script');
+      s.src = '/pagefind/pagefind-ui.js';
+      s.onload = function() { if (typeof PagefindUI !== 'undefined') initPagefind(''); };
+      document.head.appendChild(s);
 
       // Header hamburger
       document.getElementById('menuToggle').addEventListener('click', function() {
@@ -2148,16 +2646,20 @@ function generateDDLandingPage(allData) {
 
       // Search modal
       var overlay = document.getElementById('searchOverlay');
-      document.getElementById('searchTrigger').addEventListener('click', function() {
+      function openSearch() {
         overlay.classList.add('active');
-        setTimeout(function() { var i = overlay.querySelector('.pagefind-ui__search-input'); if (i) i.focus(); }, 100);
-      });
+        setTimeout(function() {
+          var pfInput = searchEl.querySelector('.pagefind-ui__search-input');
+          if (pfInput) pfInput.focus();
+        }, 100);
+      }
+      document.getElementById('searchTrigger').addEventListener('click', openSearch);
+      document.getElementById('heroSearch').addEventListener('click', openSearch);
       overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.classList.remove('active'); });
       document.addEventListener('keydown', function(e) {
         if (e.key === '/' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
           e.preventDefault();
-          overlay.classList.add('active');
-          setTimeout(function() { var i = overlay.querySelector('.pagefind-ui__search-input'); if (i) i.focus(); }, 100);
+          openSearch();
         }
         if (e.key === 'Escape') overlay.classList.remove('active');
       });
