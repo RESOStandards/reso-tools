@@ -1148,6 +1148,22 @@ function getPageCSS() {
       .dd-resource-sticky {
         position: static;
       }
+      .dd-fields-table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .dd-fields-table-wrapper .dd-fields-table,
+      .dd-lookups-table {
+        min-width: 600px;
+      }
+      .dd-collapsible-content { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .dd-field-def {
+        max-width: 200px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
       .dd-fields-table-wrapper .dd-fields-table th {
         top: 64px;
       }
