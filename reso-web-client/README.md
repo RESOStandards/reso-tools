@@ -101,9 +101,13 @@ All view state is stored in URL query parameters for shareable links and browser
 Build and run with Docker Compose (from the `reso-reference-server/` directory):
 
 ```bash
-docker-compose up -d
+docker compose up -d
 # UI: http://localhost:5173
 # API: http://localhost:8080
 ```
 
 The UI container uses nginx to serve the built React app and proxy API requests to the server container.
+
+## License
+
+See [LICENSE](../License.txt) in the repository root.

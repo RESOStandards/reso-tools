@@ -45,7 +45,6 @@ Validates resource-specific constraints:
 - Room counts (0 to 100): BedroomsTotal, BathroomsFull, BathroomsHalf, etc.
 - Expense/fee/amount fields ($0 to $10K): matched via `fieldPattern` regex `/(?:Expense|Amount|Fee\d?)$/`
 - Latitude and Longitude are exempt from the non-negative rule (negative coordinates are valid)
-- Cross-field: `ListPrice >= ListPriceLow`
 - Cross-field: `BathroomsTotalInteger = sum(BathroomsFull + BathroomsHalf + ...)`
 
 **Member:** Required MemberCity, MemberStateOrProvince, MemberPostalCode, MemberCountry
@@ -87,4 +86,8 @@ interface CrossFieldRule {
 
 ## Integration
 
-Used by both the reference server (request body validation on POST/PATCH) and the React UI (client-side form validation). Also used by `@reso-standards/certification-test-runner` for payload validation in compliance testing.
+Used by both the reference server (request body validation on POST/PATCH) and the React UI (client-side form validation). Also used by `@reso-standards/certification` for payload validation in compliance testing.
+
+## License
+
+See [LICENSE](../License.txt) in the repository root.

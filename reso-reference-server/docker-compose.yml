@@ -238,6 +238,8 @@ services:
     entrypoint: ["/bin/sh", "/config/entrypoint-dd.sh"]
     environment:
       SERVER_URL: http://server:8080
+      SEED_COUNTS: ${SEED_COUNTS:-}
+      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
       - compliance-dd-results:/reso-certification-utils/results
@@ -261,6 +263,8 @@ services:
       SERVER_URL: http://server:8080
       AUTH_TOKEN: admin-token
       ENUM_MODE: ${ENUM_MODE:-string}
+      SEED_COUNTS: ${SEED_COUNTS:-}
+      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
       - compliance-core-results:/commander/build/certification
@@ -282,6 +286,8 @@ services:
     entrypoint: ["/bin/sh", "/config/entrypoint-dd.sh"]
     environment:
       SERVER_URL: http://server-mongo:8080
+      SEED_COUNTS: ${SEED_COUNTS:-}
+      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
       - compliance-dd-mongo-results:/reso-certification-utils/results
@@ -305,6 +311,8 @@ services:
       SERVER_URL: http://server-mongo:8080
       AUTH_TOKEN: admin-token
       ENUM_MODE: ${ENUM_MODE:-string}
+      SEED_COUNTS: ${SEED_COUNTS:-}
+      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
       - compliance-core-mongo-results:/commander/build/certification
@@ -326,6 +334,8 @@ services:
     entrypoint: ["/bin/sh", "/config/entrypoint-dd.sh"]
     environment:
       SERVER_URL: http://server-sqlite:8080
+      SEED_COUNTS: ${SEED_COUNTS:-}
+      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
       - compliance-dd-sqlite-results:/reso-certification-utils/results
@@ -349,6 +359,8 @@ services:
       SERVER_URL: http://server-sqlite:8080
       AUTH_TOKEN: admin-token
       ENUM_MODE: ${ENUM_MODE:-string}
+      SEED_COUNTS: ${SEED_COUNTS:-}
+      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
       - compliance-core-sqlite-results:/commander/build/certification
@@ -410,6 +422,8 @@ services:
       SERVER_URL: http://server-entity-event:8080
       AUTH_TOKEN: admin-token
       MODE: full
+      SEED_COUNTS: ${SEED_COUNTS:-}
+      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:
@@ -465,6 +479,8 @@ services:
       SERVER_URL: http://server-entity-event-mongo:8080
       AUTH_TOKEN: admin-token
       MODE: full
+      SEED_COUNTS: ${SEED_COUNTS:-}
+      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:
@@ -509,6 +525,8 @@ services:
       SERVER_URL: http://server-entity-event-sqlite:8080
       AUTH_TOKEN: admin-token
       MODE: full
+      SEED_COUNTS: ${SEED_COUNTS:-}
+      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:
@@ -567,6 +585,8 @@ services:
       SERVER_URL: http://server-addedit:8080
       AUTH_TOKEN: admin-token
       RESOURCE: Property
+      SEED_COUNTS: ${SEED_COUNTS:-}
+      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:
@@ -621,6 +641,8 @@ services:
       SERVER_URL: http://server-addedit-mongo:8080
       AUTH_TOKEN: admin-token
       RESOURCE: Property
+      SEED_COUNTS: ${SEED_COUNTS:-}
+      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:

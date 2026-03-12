@@ -40,6 +40,22 @@ Second milestone release introducing a native desktop application, multi-server 
 - **Sidebar navigation polish** — Added Organizations link, replaced chevron arrows with semantic icons (search for Resources, code brackets for Metadata, gear for Admin, chart for Data Generator), renamed "Metadata Explorer" to "Metadata", consistent spacing via `space-y-4`.
 - **Metadata filter labels** — Renamed "Properties" filter to "Fields" to avoid ambiguity with the Property resource in real estate contexts.
 
+#### Data Dictionary Documentation Site
+
+- **Sticky column headers** — FIELD/DEFINITION/TYPE/USAGE headers stick below the sort controls as you scroll through fields, in both grouped and flat views.
+- **Group tree improvements** — Sidebar group tree syncs with content: hides when flat-sorting, reappears when Show Groups is toggled. Groups with subgroups show expand/collapse chevrons. Clicking a group scrolls to it with correct offset accounting for sticky headers.
+- **Parent-first group ordering** — Parent group fields now render before subgroups (e.g., Structure fields appear before Structure > Performance > GreenMarketing).
+- **Cross-reference links on lookup values** — The References field on lookup value pages now links to property type cross-reference pages.
+- **Terms and Definitions link** — Every resource, field, and lookup page links to the version-specific terms glossary.
+- **Mobile group indicator** — On mobile, a sticky chip below column headers shows the current group name during scroll.
+- **Show Groups toggle** — Now a proper toggle: click to activate groups, click again to deactivate and revert to flat Name sort.
+
+#### Monorepo Restructuring
+
+- **Flat package layout** — Extracted `reso-web-client/` and `reso-desktop-client/` to top-level packages (previously nested under `reso-reference-server/ui/` and `reso-reference-server/desktop/`).
+- **Updated READMEs** — All package READMEs reviewed and updated for the new layout: fixed stale paths, LICENSE links, package references, and CLI examples.
+- **Desktop client documentation** — Added prerequisites, local dev quick-start, architecture overview, packaging notes, and connection storage details.
+
 #### OData Client Improvements
 
 - **HTTP keep-alive and gzip compression** — Connection pooling and response compression for faster metadata and data fetching.

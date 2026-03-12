@@ -16,6 +16,9 @@ SERVER_URL="${SERVER_URL:-http://server:8080}"
 AUTH_TOKEN="${AUTH_TOKEN:-admin-token}"
 RESOURCE="${RESOURCE:-Property}"
 
+# Load shared seed helpers (seed_count function)
+. "$(dirname "$0")/seed-helpers.sh" 2>/dev/null || . /config/seed-helpers.sh
+
 echo "============================================"
 echo " RESO Add/Edit (RCP-010) Compliance Test"
 echo "============================================"
@@ -29,8 +32,9 @@ until wget -qO- "$SERVER_URL/health" > /dev/null 2>&1; do sleep 2; done
 echo "Server is ready."
 
 # --- 2. Seed minimal data ---
-echo "Seeding test data..."
-wget -qO- --post-data='{"resource":"Property","count":5,"resolveDependencies":true}' \
+PROP_COUNT=$(seed_count Property)
+echo "Seeding $PROP_COUNT Property records..."
+wget -qO- --post-data="{\"resource\":\"Property\",\"count\":$PROP_COUNT,\"resolveDependencies\":true}" \
   --header='Content-Type: application/json' \
   --header="Authorization: Bearer $AUTH_TOKEN" \
   "$SERVER_URL/admin/data-generator" || true

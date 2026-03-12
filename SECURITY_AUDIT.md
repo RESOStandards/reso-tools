@@ -4,6 +4,41 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
+## Audit: 2026-03-12 — v0.2 Full Codebase
+
+**Scope:** Full monorepo — all packages, Docker configs, Electron, web client, server
+**Auditor:** Claude Opus 4.6
+
+This audit covers the complete codebase as of the v0.2 release candidate. Findings from prior audits (2026-03-08, 2026-03-09) are confirmed and cross-referenced below.
+
+### New Observations
+
+| Area | Status |
+|------|--------|
+| SQL injection (all backends) | **Pass** — Parameterized queries throughout, field names validated against metadata whitelists |
+| Command injection | **Pass** — No shell execution with user input; `child_process.fork()` uses fixed module paths |
+| XSS | **Pass** — No `dangerouslySetInnerHTML`, `innerHTML`, `eval()`, or `new Function()` in web client |
+| Committed secrets | **Pass** — No credentials in source; `.gitignore` covers `.env`, `*.env`, `*.db` |
+| Electron sandbox | **Pass** — `nodeIntegration: false`, `contextIsolation: true`, external links open in system browser |
+| Security headers | **Pass** — `x-powered-by` disabled, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` |
+| Auth (core) | **Pass** — Timing-safe token comparison, 1-hour TTL with periodic cleanup, `crypto.randomUUID()` |
+
+### Confirmed Prior Findings
+
+All findings from the 2026-03-08 and 2026-03-09 audits remain valid. The five previously fixed findings (#5, #9, #12, #14, #15) are confirmed fixed in the current codebase:
+
+- **#5** Key value interpolation — quotes escaped before filter string interpolation
+- **#9** Token map memory leak — TTL and periodic sweep implemented
+- **#12** Missing security headers — `nosniff`, `DENY`, `x-powered-by` disabled
+- **#14** Non-constant-time token comparison — uses `crypto.timingSafeEqual`
+- **#15** LIKE wildcard injection — `escapeLikeWildcards` helper with `ESCAPE '\'`
+
+### Compliance Dockerfiles (Reiterated)
+
+Compliance Dockerfiles (`Dockerfile.core`, `Dockerfile.dd`) still run as root. The main server and certification Dockerfiles correctly use non-root users. These containers are ephemeral test runners, not deployed services, so the practical risk is low.
+
+---
+
 ## Audit: 2026-03-09 — v0.2 New Code
 
 **Scope:** `reso-reference-server/desktop/`, `reso-reference-server/ui/src/` (server switcher, context, metadata adapter), server proxy changes

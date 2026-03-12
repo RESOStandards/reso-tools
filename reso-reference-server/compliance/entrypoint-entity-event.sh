@@ -14,6 +14,9 @@ AUTH_TOKEN="${AUTH_TOKEN:-admin-token}"
 WRITABLE_RESOURCE="${WRITABLE_RESOURCE:-Property}"
 MODE="${MODE:-full}"
 
+# Load shared seed helpers (seed_count function)
+. "$(dirname "$0")/seed-helpers.sh" 2>/dev/null || . /config/seed-helpers.sh
+
 echo "============================================"
 echo " RESO EntityEvent (RCP-027) Compliance Test"
 echo "============================================"
@@ -28,8 +31,9 @@ until wget -qO- "$SERVER_URL/health" > /dev/null 2>&1; do sleep 2; done
 echo "Server is ready."
 
 # --- 2. Seed test data ---
-echo "Seeding test data (creates EntityEvent records)..."
-wget -qO- --post-data='{"resource":"Property","count":10,"resolveDependencies":true,"relatedRecords":{"Media":2,"OpenHouse":1,"PropertyRooms":2}}' \
+PROP_COUNT=$(seed_count Property)
+echo "Seeding $PROP_COUNT Property records (creates EntityEvent records)..."
+wget -qO- --post-data="{\"resource\":\"Property\",\"count\":$PROP_COUNT,\"resolveDependencies\":true,\"relatedRecords\":{\"Media\":$(seed_count Media),\"OpenHouse\":$(seed_count OpenHouse),\"PropertyRooms\":$(seed_count PropertyRooms)}}" \
   --header='Content-Type: application/json' \
   --header="Authorization: Bearer $AUTH_TOKEN" \
   "$SERVER_URL/admin/data-generator" || true

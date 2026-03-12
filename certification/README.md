@@ -337,4 +337,4 @@ npm test        # 60 tests
 
 ## License
 
-See [LICENSE](../../License.txt) in the repository root.
+See [LICENSE](../License.txt) in the repository root.

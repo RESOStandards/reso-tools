@@ -122,3 +122,7 @@ The CLI fetches field metadata and lookup values from the server's metadata API 
 ## Tests
 
 104 tests across 5 test files covering generators, field generation, FK resolution, dependency graph, and client output modes.
+
+## License
+
+See [LICENSE](../License.txt) in the repository root.

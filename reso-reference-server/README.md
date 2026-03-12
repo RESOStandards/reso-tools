@@ -9,7 +9,7 @@ The server supports three database backends: **PostgreSQL** (default), **MongoDB
 ### PostgreSQL (default)
 
 ```bash
-cd tools/reso-reference-server
+cd reso-reference-server
 docker compose up -d
 ```
 
@@ -27,7 +27,7 @@ docker compose --profile seed up seed
 ### MongoDB
 
 ```bash
-cd tools/reso-reference-server
+cd reso-reference-server
 docker compose --profile mongodb up -d mongodb server-mongo ui-mongo
 ```
 
@@ -45,7 +45,7 @@ docker compose --profile seed-mongo up seed-mongo
 ### SQLite
 
 ```bash
-cd tools/reso-reference-server
+cd reso-reference-server
 docker compose --profile sqlite up -d server-sqlite ui-sqlite
 ```
 
@@ -247,7 +247,7 @@ docker compose --profile sqlite --profile compliance-dd-sqlite up --build --exit
 
 ### Web API Add/Edit (RCP-010)
 
-Validates Create, Update, and Delete operations with representation and minimal response modes. Uses the custom `@reso-standards/certification-add-edit` test runner.
+Validates Create, Update, and Delete operations with representation and minimal response modes. Uses the custom [`@reso-standards/certification`](../certification/) test runner.
 
 **Current status: 8 passed, 0 failed**
 
@@ -256,10 +256,11 @@ Validates Create, Update, and Delete operations with representation and minimal 
 docker compose --profile compliance-addedit up --build --exit-code-from compliance-addedit
 
 # Local CLI
-cd ../certification/add-edit
-npx reso-cert-add-edit \
-  --server-url http://localhost:8080 \
+cd ../certification
+npx reso-cert \
+  --url http://localhost:8080 \
   --resource Property \
+  --payloads ./sample-payloads \
   --auth-token test \
   --compliance-report ./compliance-report.json \
   --spec-version 2.0.0

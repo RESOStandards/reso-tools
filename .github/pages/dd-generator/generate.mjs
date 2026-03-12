@@ -761,6 +761,19 @@ function getPageCSS() {
       padding-top: 0.75rem;
       font-size: 0.75rem;
       color: var(--reso-gray-400);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .dd-page-generated a {
+      color: var(--reso-gray-500);
+      text-decoration: none;
+    }
+    .dd-page-generated a:hover {
+      color: var(--reso-blue);
+      text-decoration: underline;
     }
 
     /* DD Layout */
@@ -889,7 +902,20 @@ function getPageCSS() {
       transition: background 0.1s;
     }
     .dd-nav-group-link:hover { background: var(--reso-gray-100); color: var(--reso-blue); }
-    .dd-nav-group-link.active { color: var(--reso-blue); font-weight: 600; background: var(--reso-gray-100); }
+    .dd-nav-group-link.active { color: var(--reso-blue); font-weight: 700; background: var(--reso-gray-100); }
+    .dd-nav-group.has-children > .dd-nav-group-link::after {
+      content: '\\25B6';
+      font-size: 0.75em;
+      margin-left: 0.5rem;
+      color: var(--reso-gray-500);
+      transition: transform 0.15s;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .dd-nav-group.has-children.expanded > .dd-nav-group-link::after {
+      transform: rotate(90deg);
+      color: var(--reso-blue);
+    }
     .dd-nav-subgroups .dd-nav-group-link { padding-left: 2.5rem; }
     .dd-nav-subgroups .dd-nav-subgroups .dd-nav-group-link { padding-left: 3.25rem; }
 
@@ -1006,7 +1032,7 @@ function getPageCSS() {
     .dd-resource-count { font-size: 0.75rem; color: var(--reso-gray-500); margin-top: 0.375rem; }
 
     /* Fields table */
-    .dd-fields-table-wrapper { margin-top: 1rem; overflow-x: auto; }
+    .dd-fields-table-wrapper { margin-top: 0.5rem; }
     .dd-group-heading {
       font-size: 1rem;
       font-weight: 600;
@@ -1014,16 +1040,18 @@ function getPageCSS() {
       margin: 1.5rem 0 0.5rem;
       padding-bottom: 0.375rem;
       border-bottom: 2px solid var(--reso-gray-200);
+      scroll-margin-top: calc(var(--sticky-thead-top, 180px) + 2.5rem);
     }
     .dd-group-heading:first-child { margin-top: 0; }
     .dd-group-depth-2 { font-size: 0.9375rem; border-bottom-width: 1px; }
     .dd-group-depth-3 { font-size: 0.875rem; border-bottom-width: 1px; }
     .dd-group-parent { color: var(--reso-gray-400); font-weight: 400; }
-    .dd-group-sep { color: var(--reso-gray-300); font-weight: 400; }
+    .dd-group-sep { color: var(--reso-gray-500); font-weight: 500; font-size: 1.1em; }
 
     .dd-fields-table, .dd-lookups-table {
       width: 100%;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
       font-size: 0.8125rem;
       background: white;
       border: 1px solid var(--reso-gray-200);
@@ -1045,8 +1073,89 @@ function getPageCSS() {
       text-transform: uppercase;
       letter-spacing: 0.03em;
     }
+    /* Sticky column headers — always active */
+    .dd-fields-table-wrapper .dd-fields-table {
+      overflow: visible;
+      border-radius: 0;
+    }
+    .dd-fields-table-wrapper .dd-fields-table th {
+      position: sticky;
+      top: var(--sticky-thead-top, 180px);
+      z-index: 5;
+      box-shadow: 0 1px 0 var(--reso-gray-200);
+    }
+    /* In grouped view, hide all table theads — sticky div header replaces them */
+    .dd-fields-table-wrapper.dd-grouped .dd-fields-table thead {
+      display: none;
+    }
+    /* Sticky column header bar for grouped view */
+    .dd-sticky-col-headers {
+      display: none;
+      position: sticky;
+      top: var(--sticky-thead-top, 180px);
+      z-index: 6;
+      grid-template-columns: 22% 1fr 17% 11%;
+      background: var(--reso-gray-50);
+      font-weight: 600;
+      color: var(--reso-gray-600);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 0.5rem 0.75rem;
+      margin: 0 1px;
+      border-bottom: 1px solid var(--reso-gray-200);
+      box-shadow: 0 1px 0 var(--reso-gray-200);
+    }
+    html.dark .dd-sticky-col-headers {
+      background: var(--reso-gray-50);
+      color: var(--reso-gray-500);
+      border-bottom-color: var(--reso-gray-200);
+    }
+    .dd-fields-table-wrapper.dd-grouped .dd-sticky-col-headers {
+      display: grid;
+    }
+    .dd-fields-table-wrapper.dd-grouped .dd-fields-table {
+      table-layout: fixed;
+    }
+    .dd-fields-table-wrapper.dd-grouped .dd-fields-table td:nth-child(1) { width: 22%; }
+    .dd-fields-table-wrapper.dd-grouped .dd-fields-table td:nth-child(2) { width: auto; }
+    .dd-fields-table-wrapper.dd-grouped .dd-fields-table td:nth-child(3) { width: 18%; }
+    .dd-fields-table-wrapper.dd-grouped .dd-fields-table td:nth-child(4) { width: 12%; }
+    /* Mobile group indicator — sticky chip below column headers */
+    .dd-mobile-group-indicator {
+      display: none;
+      position: sticky;
+      top: calc(var(--sticky-thead-top, 180px) + 1.75rem);
+      z-index: 4;
+      background: var(--reso-navy);
+      color: white;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      padding: 0.25rem 0.625rem;
+      border-radius: 0 0 0.375rem 0.375rem;
+      width: fit-content;
+      margin: 0 auto -0.5rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+      letter-spacing: 0.02em;
+      pointer-events: none;
+      transition: opacity 0.15s;
+    }
+    @media (max-width: 768px) {
+      .dd-resource-sticky {
+        position: static;
+      }
+      .dd-fields-table-wrapper .dd-fields-table th {
+        top: 64px;
+      }
+      .dd-mobile-group-indicator {
+        top: calc(64px + 1.75rem);
+      }
+      .dd-fields-table-wrapper.dd-grouped .dd-mobile-group-indicator {
+        display: block;
+      }
+    }
     .dd-fields-table tbody tr:nth-child(even), .dd-lookups-table tbody tr:nth-child(even) {
-      background: rgba(0, 0, 0, 0.025);
+      background: rgba(0, 0, 0, 0.04);
     }
     .dd-fields-table tbody tr:hover, .dd-lookups-table tbody tr:hover {
       background: var(--reso-blue-light);
@@ -1171,10 +1280,10 @@ function getPageCSS() {
       z-index: 10;
       background: var(--reso-gray-50);
       margin: -1.5rem -2rem 0;
-      padding: 1.5rem 2rem 0.5rem;
+      padding: 1.5rem 2rem 0.25rem;
     }
     @media (max-width: 768px) {
-      .dd-resource-sticky { margin: -1rem -1rem 0; padding: 1rem 1rem 0.5rem; }
+      .dd-resource-sticky { margin: -1rem -1rem 0; padding: 1rem 1rem 0.25rem; }
     }
     html.dark .dd-resource-sticky { background: var(--reso-gray-50); }
 
@@ -1183,7 +1292,7 @@ function getPageCSS() {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      margin-bottom: 1rem;
+      margin-bottom: 0.25rem;
       flex-wrap: wrap;
     }
     .dd-sort-controls label {
@@ -1685,6 +1794,19 @@ function getPageJS() {
         });
       });
 
+      // Toggle subgroup visibility in sidebar
+      document.querySelectorAll('.dd-nav-group.has-children > .dd-nav-group-link').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+          var li = link.closest('.dd-nav-group');
+          if (li.classList.contains('expanded')) {
+            e.preventDefault();
+            li.classList.remove('expanded');
+          } else {
+            li.classList.add('expanded');
+          }
+        });
+      });
+
       // Theme toggle
       document.getElementById('themeToggle').addEventListener('click', function() {
         var isDark = document.documentElement.classList.toggle('dark');
@@ -1781,6 +1903,18 @@ function getPageJS() {
         var originalHTML = wrapper.innerHTML;
         var groupsVisible = !!groupToggle;
 
+        // Calculate sticky offset from resource sticky header
+        function updateStickyOffset() {
+          var stickyHeader = document.querySelector('.dd-resource-sticky');
+          if (stickyHeader) {
+            var rect = stickyHeader.getBoundingClientRect();
+            var top = rect.height + 64;
+            wrapper.style.setProperty('--sticky-thead-top', top + 'px');
+          }
+        }
+        updateStickyOffset();
+        window.addEventListener('resize', updateStickyOffset);
+
         function flatSort(field, ascending) {
           var headings = wrapper.querySelectorAll('.dd-group-heading');
           var tables = wrapper.querySelectorAll('.dd-fields-table');
@@ -1814,7 +1948,11 @@ function getPageJS() {
             allRows.forEach(function(r) { mainTbody.appendChild(r); });
             for (var i = 1; i < tables.length; i++) tables[i].style.display = 'none';
           }
+          wrapper.classList.remove('dd-grouped');
         }
+
+        // Sidebar group tree for the active resource
+        var sidebarGroups = document.querySelector('.dd-nav-resource.expanded > .dd-nav-groups');
 
         var fieldSortContainer = document.querySelector('.dd-sort-controls');
         var resetPills = initSortPills(fieldSortContainer, function(field, ascending) {
@@ -1823,55 +1961,46 @@ function getPageJS() {
             groupToggle.classList.remove('active');
           }
           flatSort(field, ascending);
+          updateStickyOffset();
+          if (sidebarGroups) sidebarGroups.style.display = 'none';
         });
 
         if (groupToggle) {
           groupToggle.addEventListener('click', function() {
-            if (groupsVisible) return;
-            groupsVisible = true;
-            groupToggle.classList.add('active');
-            wrapper.innerHTML = originalHTML;
-            resetPills();
+            if (groupsVisible) {
+              groupsVisible = false;
+              groupToggle.classList.remove('active');
+              flatSort('name', true);
+              resetPills();
+              updateStickyOffset();
+              if (sidebarGroups) sidebarGroups.style.display = 'none';
+            } else {
+              groupsVisible = true;
+              groupToggle.classList.add('active');
+              wrapper.classList.add('dd-grouped');
+              wrapper.innerHTML = originalHTML;
+              resetPills();
+              updateStickyOffset();
+              initScrollSpy();
+              if (sidebarGroups) sidebarGroups.style.display = '';
+            }
           });
         }
       }
 
       // Scroll-spy: sync sidebar tree with visible group headings
-      var groupHeadings = document.querySelectorAll('.dd-group-heading');
-      if (groupHeadings.length > 0) {
-        var groupLinks = document.querySelectorAll('.dd-nav-group-link');
-        var activeGroupLink = null;
+      var groupLinks = document.querySelectorAll('.dd-nav-group-link');
+      var activeGroupLink = null;
+      var currentObserver = null;
 
-        function activateGroupLink(id) {
-          if (activeGroupLink) activeGroupLink.classList.remove('active');
-          var link = null;
-          for (var i = 0; i < groupLinks.length; i++) {
-            if (groupLinks[i].getAttribute('href') === '#' + id) {
-              link = groupLinks[i];
-              break;
-            }
-          }
-          if (!link) return;
-          activeGroupLink = link;
-          link.classList.add('active');
-          // Expand parent group nodes
-          var parent = link.closest('.dd-nav-group');
-          while (parent) {
-            parent.classList.add('expanded');
-            parent = parent.parentElement.closest('.dd-nav-group');
-          }
-          // Scroll sidebar to keep active link visible
-          var sidebar = document.getElementById('ddSidebar');
-          if (sidebar && link.offsetParent) {
-            var linkRect = link.getBoundingClientRect();
-            var sidebarRect = sidebar.getBoundingClientRect();
-            if (linkRect.top < sidebarRect.top || linkRect.bottom > sidebarRect.bottom) {
-              link.scrollIntoView({ block: 'center', behavior: 'smooth' });
-            }
-          }
-        }
+      function initScrollSpy() {
+        var groupHeadings = document.querySelectorAll('.dd-group-heading');
+        if (groupHeadings.length === 0) return;
+        var mobileGroupLabel = document.getElementById('ddMobileGroupLabel');
 
-        var observer = new IntersectionObserver(function(entries) {
+        if (currentObserver) currentObserver.disconnect();
+
+        currentObserver = new IntersectionObserver(function(entries) {
           var topEntry = null;
           entries.forEach(function(entry) {
             if (entry.isIntersecting) {
@@ -1880,11 +2009,46 @@ function getPageJS() {
               }
             }
           });
-          if (topEntry) activateGroupLink(topEntry.target.id);
+          if (topEntry) activateGroupLink(topEntry.target.id, mobileGroupLabel);
         }, { rootMargin: '-80px 0px -60% 0px' });
 
-        groupHeadings.forEach(function(h) { observer.observe(h); });
+        groupHeadings.forEach(function(h) { currentObserver.observe(h); });
       }
+
+      function activateGroupLink(id, mobileGroupLabel) {
+        if (activeGroupLink) activeGroupLink.classList.remove('active');
+        var link = null;
+        for (var i = 0; i < groupLinks.length; i++) {
+          if (groupLinks[i].getAttribute('href') === '#' + id) {
+            link = groupLinks[i];
+            break;
+          }
+        }
+        if (!link) return;
+        activeGroupLink = link;
+        link.classList.add('active');
+        // Update mobile group indicator
+        if (mobileGroupLabel) {
+          mobileGroupLabel.textContent = link.textContent.trim();
+        }
+        // Expand this group and all ancestor group nodes
+        var group = link.closest('.dd-nav-group');
+        while (group) {
+          group.classList.add('expanded');
+          group = group.parentElement.closest('.dd-nav-group');
+        }
+        // Scroll sidebar to keep active link visible
+        var sidebar = document.getElementById('ddSidebar');
+        if (sidebar && link.offsetParent) {
+          var linkRect = link.getBoundingClientRect();
+          var sidebarRect = sidebar.getBoundingClientRect();
+          if (linkRect.top < sidebarRect.top || linkRect.bottom > sidebarRect.bottom) {
+            link.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          }
+        }
+      }
+
+      initScrollSpy();
     });`;
 }
 
@@ -2763,7 +2927,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
 
     <div class="dd-content" data-pagefind-body data-pagefind-filter="dd-version:${version}" data-pagefind-meta="dd-version:DD ${version}"${pagefindWeight != null ? ` data-pagefind-weight="${pagefindWeight}"` : ''}>
       ${contentHtml}
-      <div class="dd-page-generated">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+      <div class="dd-page-generated"><a href="/dd/DD${version}/about/terms/" target="_blank">Terms and Definitions</a><span>Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
     </div>
   </div>
 
@@ -2861,7 +3025,7 @@ function renderSidebarGroups(version, resourceName, tree, path, anchorOnly) {
     const subGroups = Object.keys(tree[group]).filter(k => !k.startsWith('_'));
     const href = anchorOnly ? `#${groupId}` : `${ddUrl(version, resourceName)}#${groupId}`;
 
-    html += `    <li class="dd-nav-group">\n`;
+    html += `    <li class="dd-nav-group${subGroups.length > 0 ? ' has-children' : ''}">\n`;
     html += `      <a href="${href}" class="dd-nav-group-link">${escapeHtml(group)}</a>\n`;
     if (subGroups.length > 0) {
       html += `      <ul class="dd-nav-subgroups">\n`;
@@ -3040,7 +3204,6 @@ function aboutCertification() {
 
 function aboutTerms() {
   let html = '<div class="dd-about-section">';
-  html += '<h2>Terms and Definitions</h2>';
   html += '<p>Key terminology used throughout the Data Dictionary.</p>';
   html += '<dl class="dd-def-grid">';
 
@@ -3355,7 +3518,12 @@ function renderGroupedFields(version, resourceName, fields, tree, resourceStats)
 
   const hasGroupedSections = sections.some(s => s.path.length > 0);
 
-  let html = '<div class="dd-fields-table-wrapper" data-pagefind-ignore>';
+  const wrapperClasses = 'dd-fields-table-wrapper' + (hasGroupedSections ? ' dd-grouped' : '');
+  let html = `<div class="${wrapperClasses}" data-pagefind-ignore>`;
+  if (hasGroupedSections) {
+    html += `<div class="dd-sticky-col-headers"><span>Field</span><span>Definition</span><span>Type</span><span>Usage</span></div>`;
+    html += `<div class="dd-mobile-group-indicator" id="ddMobileGroupLabel"></div>`;
+  }
   for (const section of sections) {
     const groupId = 'group-' + section.path.join('-');
 
@@ -3403,17 +3571,18 @@ function renderGroupedFields(version, resourceName, fields, tree, resourceStats)
 
 function collectSections(tree, path, sections) {
   const childGroups = Object.keys(tree).filter(k => !k.startsWith('_')).sort();
+  const fieldNames = tree._fields || [];
+  const ungrouped = tree._ungrouped || [];
+
+  // Add this node's own fields first, then recurse into children
+  if (fieldNames.length > 0) {
+    sections.push({ path, fields: fieldNames.sort() });
+  }
 
   for (const group of childGroups) {
     collectSections(tree[group], [...path, group], sections);
   }
 
-  const fieldNames = tree._fields || [];
-  const ungrouped = tree._ungrouped || [];
-
-  if (fieldNames.length > 0) {
-    sections.push({ path, fields: fieldNames.sort() });
-  }
   if (ungrouped.length > 0 && path.length === 0) {
     sections.push({ path: [], fields: ungrouped.sort() });
   }
@@ -3577,7 +3746,7 @@ function generateLookupPage(vCfg, data, resourceName, field, lookup, usageStats,
     ['BEDES', lookup.BEDES],
   ];
   const lkRightRows = [
-    ['References', lookup.References],
+    ['References', lookup.References, 'PropertyTypes'],
     ['Spanish Value', lookup.SpanishLookupValue],
     ['French-Canadian Value', lookup.FrenchCanadianLookupValue],
     ['Status Change Date', lookup.StatusChangeDate],

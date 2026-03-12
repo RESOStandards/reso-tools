@@ -76,3 +76,13 @@ In a signed/packaged build, connection data (including bearer tokens) is encrypt
 **Development note:** In `npm run dev` mode, `safeStorage` encryption is unavailable because the app is not code-signed. Connections are still persisted but stored as **plain JSON**. Avoid saving real credentials when running in dev mode.
 
 The web UI uses browser `localStorage` instead — connections are ephemeral and do not persist across browser restarts.
+
+## Prerequisites
+
+- Node.js >= 22
+- The reference server must be built before installing the desktop client (see Quick Start above)
+- No Docker required -- the desktop client uses an embedded SQLite database
+
+## License
+
+See [LICENSE](../License.txt) in the repository root.

@@ -16,6 +16,8 @@
 
 **Browse RESO organizations.** A new Organizations page lets you browse and search the full RESO member directory — filterable by type, location, and certification status, with sortable columns, expandable detail rows showing endorsements, addresses, and certification summaries alongside an embedded map.
 
+**The Data Dictionary site got smarter.** Sticky column headers that stay visible as you scroll through hundreds of fields. Collapsible group trees in the sidebar that sync with the content view. Click a group to jump straight to it, click again to collapse. Cross-reference links on lookup values so you can trace property type references across the dictionary. A terms and definitions glossary linked from every page. And it all works on mobile.
+
 **The UI got a lot more polished.** Landing page, mobile-responsive layout, advanced search, human-friendly lookup values, loading spinners, password masking, friendly error pages with helpful navigation, and a cleaner sidebar with icons — the kind of details that make the difference between a demo and a product.
 
 ---
