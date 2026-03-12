@@ -27,6 +27,50 @@ const VERSIONS = [
 
 const DEFINITION_TRUNCATE_LENGTH = 150;
 
+// Resource descriptions sourced from the RESO Data Dictionary
+const RESOURCE_DESCRIPTIONS = {
+  Property: 'Fields commonly used in a Multiple Listing Service (MLS) listing.',
+  Association: 'Fields pertaining to the local real estate trade association.',
+  Caravan: 'Fields and lookups for the date, time, location and other particulars about caravan events.',
+  CaravanStop: 'Stops along a caravan tour, connecting Caravan records to Open House records.',
+  ContactListingNotes: 'Notes about a given listing from interactions between the contact and member within a consumer portal.',
+  ContactListings: 'Maintains the relationship between contacts and members around listings in consumer portals.',
+  Contacts: 'Information on client and other contacts of the member.',
+  EntityEvent: 'An event log offering an alternative to timestamps, providing an OData-compliant logical timestamp methodology.',
+  Field: 'Metadata about available fields on a given server in a predictable and user-friendly format.',
+  HistoryTransactional: 'A transactional history of the listing, showing before and after values of field changes.',
+  InternetTracking: 'A standard data set for recording and transfer of event-related information of real estate products.',
+  InternetTrackingSummary: 'Sum of specific tracking events over a period of time, such as listings viewed or shared.',
+  LockOrBox: 'Lockbox, smart lock and showing agent information.',
+  Lookup: 'Metadata about lookups (enumerations) available on a given server.',
+  Media: 'Photos, virtual tours, documents, supplements and other media related to listings.',
+  Member: 'Roster of agents, brokers, appraisers, assistants, affiliates and other MLS/association members.',
+  MemberAssociation: 'Joining information relating Member and Association records to each other.',
+  MemberStateLicense: 'Supports members that hold multiple state licenses.',
+  OUID: 'Organization Unique Identifier (UOI), a common ID system for organizations that exchange real estate data.',
+  Office: 'Roster of offices who are members of the MLS and/or association.',
+  OfficeAssociation: 'Joining information relating Office and Association records to each other.',
+  OfficeCorporateLicense: 'Supports offices that hold multiple state licenses.',
+  OpenHouse: 'Fields commonly used to record an open house event.',
+  OtherPhone: 'Additional phone numbers for contacts or members, with type information.',
+  PropertyGreenVerification: 'Multiple performance ratings applied to a property listing.',
+  PropertyPowerProduction: 'Different means of producing power on a property, such as solar and wind systems.',
+  PropertyPowerStorage: 'Different means of storing power on a property.',
+  PropertyRooms: 'Detailed information about separate rooms in a property.',
+  PropertyUnitTypes: 'Unit type details for residential income and multifamily properties.',
+  Prospecting: 'Automatic email connecting Contacts and SavedSearch resources to send results matching saved search criteria.',
+  Queue: 'Events that have occurred with records in other resources.',
+  Rules: 'Business and system rules transmitted from host to client application.',
+  SavedSearch: 'Saved search criteria and related data.',
+  ShowingAppointment: 'Fields associated with showing appointments, including method, date, time and more.',
+  ShowingAvailability: 'Fields associated with property availability for showings, including method, dates and duration.',
+  ShowingRequest: 'Fields associated with showing requests, including method, date, time and more.',
+  SocialMedia: 'Social media accounts for members, offices, contacts and other entities.',
+  TeamMembers: 'Fields tying Member records to related Teams records.',
+  Teams: 'Name and other information about teams of members who work together.',
+  TransactionManagement: 'Tracking different types of transactions such as listing for sale or listing for lease.',
+};
+
 // ---------------------------------------------------------------------------
 // CSV Parser — handles quoted fields with commas, newlines, escaped quotes
 // ---------------------------------------------------------------------------
@@ -146,14 +190,14 @@ function buildGroupTree(fields) {
 // Aggs API Client
 // ---------------------------------------------------------------------------
 
-async function fetchUsageStats(versionData) {
+async function fetchUsageStats(allData) {
   const { TOKEN_URI, CLIENT_ID, CLIENT_SECRET, RESO_AGGS_URL } = process.env;
   if (!TOKEN_URI || !CLIENT_ID || !CLIENT_SECRET || !RESO_AGGS_URL) {
-    console.log('  Aggs API credentials not found, skipping usage stats');
+    console.log('Aggs API credentials not found, skipping usage stats');
     return null;
   }
 
-  console.log('  Fetching OAuth2 token...');
+  console.log('Fetching OAuth2 token...');
   const tokenRes = await fetch(TOKEN_URI, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -164,33 +208,46 @@ async function fetchUsageStats(versionData) {
     }),
   });
   if (!tokenRes.ok) {
-    console.warn('  Failed to get OAuth2 token:', tokenRes.status);
+    console.warn('Failed to get OAuth2 token:', tokenRes.status);
     return null;
   }
   const { access_token } = await tokenRes.json();
 
-  const payload = [];
-  const { resourceMap, lookupMap } = versionData;
-
-  for (const [resourceName, fields] of Object.entries(resourceMap)) {
-    const fieldNames = fields.map(f => f.StandardName).filter(Boolean);
-    if (fieldNames.length > 0) {
-      payload.push({ resourceName, fieldNames });
-    }
-
-    for (const field of fields) {
-      if (field.LookupStatus === 'Open with Enumerations' && field.LookupName) {
-        const lookupValues = (lookupMap[field.LookupName] || [])
-          .map(lk => lk.StandardLookupValue)
-          .filter(Boolean);
-        if (lookupValues.length > 0) {
-          payload.push({ resourceName, fieldName: field.StandardName, lookupValues });
+  // Build a combined payload from all versions (union of resources/fields/lookups)
+  const fieldsByResource = {};
+  const lookupsByField = {};
+  for (const { data } of allData) {
+    for (const [resourceName, fields] of Object.entries(data.resourceMap)) {
+      if (!fieldsByResource[resourceName]) fieldsByResource[resourceName] = new Set();
+      for (const field of fields) {
+        if (field.StandardName) fieldsByResource[resourceName].add(field.StandardName);
+        if (field.LookupStatus === 'Open with Enumerations' && field.LookupName) {
+          const lkKey = `${resourceName}:${field.StandardName}`;
+          if (!lookupsByField[lkKey]) lookupsByField[lkKey] = new Set();
+          for (const lk of (data.lookupMap[field.LookupName] || [])) {
+            if (lk.StandardLookupValue) lookupsByField[lkKey].add(lk.StandardLookupValue);
+          }
         }
       }
     }
   }
 
-  console.log(`  Fetching usage stats (${payload.length} queries)...`);
+  const payload = [];
+  for (const [resourceName, fieldSet] of Object.entries(fieldsByResource)) {
+    const fieldNames = [...fieldSet];
+    if (fieldNames.length > 0) {
+      payload.push({ resourceName, fieldNames });
+    }
+  }
+  for (const [key, lookupSet] of Object.entries(lookupsByField)) {
+    const [resourceName, fieldName] = key.split(':');
+    const lookupValues = [...lookupSet];
+    if (lookupValues.length > 0) {
+      payload.push({ resourceName, fieldName, lookupValues });
+    }
+  }
+
+  console.log(`Fetching usage stats (${payload.length} queries)...`);
   const aggsRes = await fetch(RESO_AGGS_URL, {
     method: 'POST',
     headers: {
@@ -201,7 +258,7 @@ async function fetchUsageStats(versionData) {
   });
 
   if (!aggsRes.ok) {
-    console.warn('  Failed to fetch aggs:', aggsRes.status);
+    console.warn('Failed to fetch aggs:', aggsRes.status);
     return null;
   }
 
@@ -231,20 +288,23 @@ function formatNumber(n) {
 
 function formatPercent(mean) {
   if (mean === null || mean === undefined) return null;
-  return (mean * 100).toFixed(1) + '%';
+  return Math.round(mean * 100) + '%';
 }
 
-function usageHtml(stats) {
+function usageHtml(stats, totalProviders) {
   if (!stats) {
     return `<div class="dd-usage dd-usage-na">
-      <span class="dd-usage-label">Adoption</span><span class="dd-usage-value">&mdash;</span>
-      <span class="dd-usage-label">Providers</span><span class="dd-usage-value">&mdash;</span>
+      <span class="dd-usage-label">Adoption</span><span class="dd-usage-value">0%</span>
       <p class="dd-usage-note">Usage data not yet available</p>
     </div>`;
   }
+  const pct = Math.round(stats.mean * 100);
+  const total = totalProviders || 0;
+  const adoptionDetail = total ? `${formatNumber(stats.recipients)} of ${formatNumber(total)} providers` : '';
   return `<div class="dd-usage">
-    <span class="dd-usage-label">Adoption</span><span class="dd-usage-value">${formatPercent(stats.mean)}</span>
-    <span class="dd-usage-label">Providers</span><span class="dd-usage-value">${formatNumber(stats.recipients)}</span>
+    <span class="dd-usage-label">Adoption</span>
+    <span class="dd-usage-value">${pct}%</span>
+    ${adoptionDetail ? `<span class="dd-usage-detail">${adoptionDetail}</span>` : ''}
   </div>`;
 }
 
@@ -324,7 +384,36 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
       --reso-blue-light: rgba(0,126,158,0.15);
     }
     html.dark .dd-metadata-card,
+    html.dark .dd-resource-card,
     html.dark .search-modal { background: var(--reso-gray-100); }
+    html.dark .dd-resource-card { border-color: var(--reso-gray-200); }
+    html.dark .dd-resource-card h3 { color: #edf2f7; }
+    html.dark .dd-metadata-card h2 { color: #edf2f7; }
+    html.dark .dd-metadata-card h3 { color: #a0aec0; }
+    html.dark .dd-resource-count { color: var(--reso-gray-500); }
+    html.dark .dd-sidebar { background: var(--reso-gray-50); border-color: var(--reso-gray-200); }
+    html.dark .dd-sidebar-title { color: #edf2f7; }
+    html.dark .dd-sidebar-header { border-color: var(--reso-gray-200); }
+    html.dark .dd-version-select { background: var(--reso-gray-100); border-color: var(--reso-gray-200); color: var(--reso-gray-700); }
+    html.dark .dd-sidebar-search input { background: var(--reso-gray-100); border-color: var(--reso-gray-200); color: var(--reso-gray-700); }
+    html.dark .dd-definition-callout { background: var(--reso-gray-100); color: var(--reso-gray-600); border-left-color: var(--reso-blue); }
+    html.dark .dd-page-legacy-value { color: var(--reso-gray-500); }
+    html.dark .dd-page-legacy-value code { background: var(--reso-gray-200); color: var(--reso-gray-700); }
+    html.dark .dd-copy-btn { color: var(--reso-gray-500); }
+    html.dark .dd-copy-btn:hover { color: var(--reso-blue); background: var(--reso-gray-200); }
+    html.dark .dd-fields-table,
+    html.dark .dd-lookups-table { background: var(--reso-gray-100); border-color: var(--reso-gray-200); }
+    html.dark .dd-fields-table th,
+    html.dark .dd-lookups-table th { background: var(--reso-gray-50); color: var(--reso-gray-500); }
+    html.dark .dd-fields-table td,
+    html.dark .dd-lookups-table td { color: var(--reso-gray-600); }
+    html.dark .dd-fields-table th, html.dark .dd-fields-table td,
+    html.dark .dd-lookups-table th, html.dark .dd-lookups-table td { border-bottom-color: var(--reso-gray-200); }
+    html.dark .dd-fields-table tbody tr:nth-child(even),
+    html.dark .dd-lookups-table tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.03); }
+    html.dark .dd-fields-table tbody tr:hover,
+    html.dark .dd-lookups-table tbody tr:hover { background: var(--reso-gray-200); }
+    html.dark .dd-group-heading { color: #edf2f7; border-bottom-color: var(--reso-gray-200); }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html { overflow-x: hidden; }
@@ -678,6 +767,13 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
     }
     .site-footer a { color: rgba(255,255,255,0.8); text-decoration: none; }
     .site-footer a:hover { color: var(--reso-orange); }
+    .dd-page-generated {
+      border-top: 1px solid var(--reso-gray-200);
+      margin-top: 2rem;
+      padding-top: 0.75rem;
+      font-size: 0.75rem;
+      color: var(--reso-gray-400);
+    }
 
     /* DD Layout */
     .dd-layout {
@@ -805,6 +901,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
       transition: background 0.1s;
     }
     .dd-nav-group-link:hover { background: var(--reso-gray-100); color: var(--reso-blue); }
+    .dd-nav-group-link.active { color: var(--reso-blue); font-weight: 600; background: var(--reso-gray-100); }
     .dd-nav-subgroups .dd-nav-group-link { padding-left: 2.5rem; }
     .dd-nav-subgroups .dd-nav-subgroups .dd-nav-group-link { padding-left: 3.25rem; }
 
@@ -869,8 +966,35 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
 
     /* Page header */
     .dd-page-header { margin-bottom: 1.5rem; }
-    .dd-page-header h1 { font-size: 1.5rem; font-weight: 700; color: var(--reso-gray-800); }
+    .dd-page-header h1 { font-size: 1.5rem; font-weight: 700; color: var(--reso-gray-800); display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
     .dd-page-subtitle { font-size: 0.875rem; color: var(--reso-gray-500); margin-top: 0.25rem; }
+    .dd-page-legacy-value { font-size: 0.8125rem; color: var(--reso-gray-500); margin-top: 0.25rem; }
+    .dd-page-legacy-value code { background: var(--reso-gray-100); padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.8125rem; }
+    .dd-definition-callout {
+      background: var(--reso-gray-50);
+      border-left: 3px solid var(--reso-blue);
+      padding: 0.75rem 1rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+      color: var(--reso-gray-700);
+      border-radius: 0 0.375rem 0.375rem 0;
+    }
+    .dd-copy-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      padding: 0.25rem;
+      cursor: pointer;
+      color: var(--reso-gray-400);
+      border-radius: 0.25rem;
+      transition: color 0.15s, background 0.15s;
+      flex-shrink: 0;
+    }
+    .dd-copy-btn:hover { color: var(--reso-blue); background: var(--reso-gray-100); }
+    .dd-copy-btn.copied { color: var(--reso-green); }
     .dd-search-norm { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
 
     /* Resource grid */
@@ -890,7 +1014,8 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
     }
     .dd-resource-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-color: var(--reso-blue); }
     .dd-resource-card h3 { font-size: 0.9375rem; font-weight: 600; color: var(--reso-navy); }
-    .dd-resource-count { font-size: 0.75rem; color: var(--reso-gray-500); }
+    .dd-resource-desc { font-size: 0.75rem; color: var(--reso-gray-600); line-height: 1.4; margin-top: 0.25rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .dd-resource-count { font-size: 0.75rem; color: var(--reso-gray-500); margin-top: 0.375rem; }
 
     /* Fields table */
     .dd-fields-table-wrapper { margin-top: 1rem; overflow-x: auto; }
@@ -903,6 +1028,10 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
       border-bottom: 2px solid var(--reso-gray-200);
     }
     .dd-group-heading:first-child { margin-top: 0; }
+    .dd-group-depth-2 { font-size: 0.9375rem; border-bottom-width: 1px; }
+    .dd-group-depth-3 { font-size: 0.875rem; border-bottom-width: 1px; }
+    .dd-group-parent { color: var(--reso-gray-400); font-weight: 400; }
+    .dd-group-sep { color: var(--reso-gray-300); font-weight: 400; }
 
     .dd-fields-table, .dd-lookups-table {
       width: 100%;
@@ -927,6 +1056,9 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
       font-size: 0.75rem;
       text-transform: uppercase;
       letter-spacing: 0.03em;
+    }
+    .dd-fields-table tbody tr:nth-child(even), .dd-lookups-table tbody tr:nth-child(even) {
+      background: rgba(0, 0, 0, 0.025);
     }
     .dd-fields-table tbody tr:hover, .dd-lookups-table tbody tr:hover {
       background: var(--reso-blue-light);
@@ -968,6 +1100,9 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
     .dd-usage-badge { font-size: 0.75rem; font-weight: 600; color: var(--reso-green); }
     .dd-usage-badge-na { color: var(--reso-gray-400); }
 
+    .dd-usage-detail { font-size: 0.75rem; color: var(--reso-gray-400); grid-column: 1 / -1; }
+    html.dark .dd-usage-detail { color: #718096; }
+
     /* Metadata card */
     .dd-metadata-card {
       background: white;
@@ -996,8 +1131,19 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
       vertical-align: top;
       width: 160px;
     }
+    .dd-metadata-table th small { display: block; font-size: 0.625rem; font-weight: 400; color: var(--reso-gray-400); text-transform: none; letter-spacing: 0; margin-top: 0.0625rem; }
     .dd-metadata-table td { padding: 0.375rem 0; color: var(--reso-gray-700); }
     .dd-metadata-table tr { border-bottom: 1px solid var(--reso-gray-100); }
+
+    .dd-meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0 2rem;
+    }
+    @media (max-width: 768px) {
+      .dd-meta-grid { grid-template-columns: 1fr; }
+    }
+    .dd-meta-grid .dd-metadata-table { width: 100%; }
 
     .dd-no-enums p { font-size: 0.8125rem; color: var(--reso-gray-500); font-style: italic; }
 
@@ -1030,6 +1176,20 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
     .dd-collapsible-content { display: none; padding: 1rem 1.25rem; }
     .dd-collapsible.open .dd-collapsible-content { display: block; }
 
+    /* Sticky resource header */
+    .dd-resource-sticky {
+      position: sticky;
+      top: 64px;
+      z-index: 10;
+      background: var(--reso-gray-50);
+      margin: -1.5rem -2rem 0;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    @media (max-width: 768px) {
+      .dd-resource-sticky { margin: -1rem -1rem 0; padding: 1rem 1rem 0.5rem; }
+    }
+    html.dark .dd-resource-sticky { background: var(--reso-gray-50); }
+
     /* Sort controls */
     .dd-sort-controls {
       display: flex;
@@ -1045,30 +1205,35 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
       text-transform: uppercase;
       letter-spacing: 0.03em;
     }
-    .dd-sort-select {
-      padding: 0.375rem 0.5rem;
+    .dd-sort-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.3125rem 0.625rem;
       border: 1px solid var(--reso-gray-300);
       border-radius: 0.375rem;
-      font-size: 0.8125rem;
-      color: var(--reso-gray-700);
-      background: white;
-      cursor: pointer;
-    }
-    .dd-sort-select:focus {
-      outline: none;
-      border-color: var(--reso-blue);
-      box-shadow: 0 0 0 2px rgba(0,126,158,0.15);
-    }
-    .dd-sort-dir {
-      background: none;
-      border: 1px solid var(--reso-gray-300);
-      border-radius: 0.375rem;
-      padding: 0.375rem 0.5rem;
-      cursor: pointer;
-      font-size: 0.8125rem;
+      font-size: 0.75rem;
+      font-weight: 600;
       color: var(--reso-gray-600);
+      background: transparent;
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+      line-height: 1.2;
     }
-    .dd-sort-dir:hover { border-color: var(--reso-blue); color: var(--reso-blue); }
+    .dd-sort-pill:hover { border-color: var(--reso-blue); color: var(--reso-blue); }
+    .dd-sort-pill.active { background: var(--reso-blue); border-color: var(--reso-blue); color: white; }
+    .dd-sort-pill .dd-sort-arrow { margin-left: 0.25rem; font-size: 0.5rem; }
+    .dd-group-toggle {
+      margin-left: auto;
+      display: inline-flex; align-items: center;
+      padding: 0.3125rem 0.625rem; border: 1px solid var(--reso-gray-300);
+      border-radius: 0.375rem; font-size: 0.75rem; font-weight: 600;
+      color: var(--reso-gray-600); background: transparent; cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+      line-height: 1.2;
+    }
+    .dd-group-toggle:hover { border-color: var(--reso-blue); color: var(--reso-blue); }
+    .dd-group-toggle.active { background: var(--reso-blue); border-color: var(--reso-blue); color: white; }
 
     /* Badge */
     .badge {
@@ -1081,6 +1246,163 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
       white-space: nowrap;
     }
     .badge-orange { background: var(--reso-orange); color: white; }
+    .badge-green { background: var(--reso-green); color: white; }
+
+    /* Sidebar sections — collapsible accordion */
+    .dd-sidebar-section { margin-bottom: 0; border-bottom: 1px solid var(--reso-gray-200); }
+    .dd-sidebar-section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.625rem 1rem;
+      font-size: 0.625rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--reso-gray-500);
+      cursor: pointer;
+      user-select: none;
+    }
+    .dd-sidebar-section-title:hover { color: var(--reso-blue); }
+    .dd-sidebar-section-title .dd-section-arrow {
+      font-size: 0.5rem;
+      transition: transform 0.2s;
+    }
+    .dd-sidebar-section:not(.expanded) .dd-section-arrow { transform: rotate(-90deg); }
+    .dd-sidebar-section:not(.expanded) > .dd-nav-resources { display: none; }
+
+    /* About pages */
+    .dd-about-section { margin-bottom: 2rem; }
+    .dd-about-section h2 {
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--reso-gray-800);
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--reso-gray-200);
+    }
+    .dd-about-section h3 {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: var(--reso-gray-700);
+      margin: 1rem 0 0.5rem;
+    }
+    .dd-about-section p {
+      font-size: 0.875rem;
+      color: var(--reso-gray-700);
+      line-height: 1.7;
+      margin-bottom: 0.75rem;
+    }
+    .dd-about-section ul, .dd-about-section ol {
+      font-size: 0.875rem;
+      color: var(--reso-gray-700);
+      line-height: 1.7;
+      margin: 0 0 0.75rem 1.5rem;
+    }
+    .dd-about-section li { margin-bottom: 0.25rem; }
+
+    .dd-def-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .dd-def-item {
+      background: white;
+      border: 1px solid var(--reso-gray-200);
+      border-radius: 0.5rem;
+      padding: 1rem 1.25rem;
+    }
+    html.dark .dd-def-item { background: var(--reso-gray-100); border-color: var(--reso-gray-200); }
+    .dd-def-item dt {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: var(--reso-navy);
+      margin-bottom: 0.25rem;
+    }
+    html.dark .dd-def-item dt { color: #90cdf4; }
+    .dd-def-item dd {
+      font-size: 0.8125rem;
+      color: var(--reso-gray-600);
+      line-height: 1.6;
+      margin: 0;
+    }
+    .dd-def-item .dd-def-values {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.375rem;
+      margin-top: 0.375rem;
+    }
+    .dd-def-item .dd-def-tag {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.6875rem;
+      font-weight: 500;
+      background: var(--reso-gray-100);
+      color: var(--reso-gray-600);
+    }
+    html.dark .dd-def-item .dd-def-tag { background: var(--reso-gray-200); }
+
+    .dd-about-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+      background: white;
+      border: 1px solid var(--reso-gray-200);
+      border-radius: 0.375rem;
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+    html.dark .dd-about-table { background: var(--reso-gray-100); }
+    .dd-about-table th, .dd-about-table td {
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--reso-gray-100);
+    }
+    .dd-about-table th {
+      background: var(--reso-gray-50);
+      font-weight: 600;
+      color: var(--reso-gray-600);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .dd-about-table tbody tr:hover { background: var(--reso-blue-light); }
+    .dd-about-table a { color: var(--reso-blue); text-decoration: none; font-weight: 600; }
+    .dd-about-table a:hover { text-decoration: underline; }
+
+    .dd-about-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .dd-about-card {
+      background: white;
+      border: 1px solid var(--reso-gray-200);
+      border-radius: 0.5rem;
+      padding: 1rem 1.25rem;
+      text-decoration: none;
+      color: inherit;
+      transition: box-shadow 0.15s, border-color 0.15s;
+    }
+    .dd-about-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-color: var(--reso-blue); }
+    html.dark .dd-about-card { background: var(--reso-gray-100); border-color: var(--reso-gray-200); }
+    .dd-about-card h3 { font-size: 0.9375rem; font-weight: 600; color: var(--reso-navy); margin: 0 0 0.25rem; }
+    html.dark .dd-about-card h3 { color: #edf2f7; }
+    .dd-about-card p { font-size: 0.75rem; color: var(--reso-gray-600); line-height: 1.4; margin: 0; }
+
+    .dd-callout {
+      background: var(--reso-blue-light);
+      border-left: 4px solid var(--reso-blue);
+      border-radius: 0 0.375rem 0.375rem 0;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+      font-size: 0.8125rem;
+      color: var(--reso-gray-700);
+    }
+    .dd-callout strong { color: var(--reso-gray-800); }
   </style>
   <link href="/pagefind/pagefind-ui.css" rel="stylesheet">
   <script>(function(){var t=localStorage.getItem('dd-theme');if(t==='dark'||(t===null&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');})()</script>
@@ -1132,6 +1454,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
 
     <div class="dd-content" data-pagefind-body data-pagefind-filter="dd-version:${version}" data-pagefind-meta="dd-version:DD ${version}"${pagefindWeight != null ? ` data-pagefind-weight="${pagefindWeight}"` : ''}>
       ${contentHtml}
+      <div class="dd-page-generated">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
     </div>
   </div>
 
@@ -1412,6 +1735,18 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
         overlay.classList.remove('active');
         document.body.classList.remove('search-open');
       }
+      // Sidebar accordion — one open at a time
+      document.querySelectorAll('.dd-sidebar-section-title').forEach(function(title) {
+        title.addEventListener('click', function() {
+          var section = title.parentElement;
+          var wasExpanded = section.classList.contains('expanded');
+          document.querySelectorAll('.dd-sidebar-section').forEach(function(s) {
+            s.classList.remove('expanded');
+          });
+          if (!wasExpanded) section.classList.add('expanded');
+        });
+      });
+
       document.getElementById('searchTrigger').addEventListener('click', openSearch);
       var sidebarSearchEl = document.getElementById('sidebarSearch');
       if (sidebarSearchEl) sidebarSearchEl.addEventListener('click', openSearch);
@@ -1452,6 +1787,25 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
         localStorage.setItem('dd-theme', isDark ? 'dark' : 'light');
       });
 
+      // Copy-to-clipboard buttons
+      document.querySelectorAll('.dd-copy-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          var text = btn.getAttribute('data-copy');
+          if (!text) return;
+          navigator.clipboard.writeText(text).then(function() {
+            var svg = btn.querySelector('svg');
+            var origHTML = svg.outerHTML;
+            svg.outerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>';
+            btn.classList.add('copied');
+            setTimeout(function() {
+              btn.innerHTML = origHTML;
+              btn.classList.remove('copied');
+            }, 1500);
+          });
+        });
+      });
+
       // Collapsible panels
       document.querySelectorAll('.dd-collapsible-toggle').forEach(function(btn) {
         btn.addEventListener('click', function() {
@@ -1459,101 +1813,122 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
         });
       });
 
-      // Sort controls for version landing (resource grid)
-      var resSortField = document.getElementById('ddResourceSort');
-      var resSortDirBtn = document.getElementById('ddResourceSortDir');
-      var resGrid = document.getElementById('ddResourceGrid');
-      if (resSortField && resSortDirBtn && resGrid) {
-        var resAsc = true;
-        resSortDirBtn.addEventListener('click', function() {
-          resAsc = !resAsc;
-          resSortDirBtn.innerHTML = resAsc ? '&#9650;' : '&#9660;';
-          applyResSort();
+      // Pill-based sort helper — returns a reset function
+      function initSortPills(container, onSort) {
+        if (!container) return function() {};
+        var pills = Array.from(container.querySelectorAll('.dd-sort-pill'));
+        var currentField = pills.length ? pills[0].dataset.sort : '';
+        var ascending = true;
+        pills.forEach(function(pill) {
+          pill.addEventListener('click', function() {
+            var sf = pill.dataset.sort;
+            if (sf === currentField) {
+              ascending = !ascending;
+            } else {
+              currentField = sf;
+              ascending = true;
+              pills.forEach(function(p) { p.classList.remove('active'); });
+              pill.classList.add('active');
+            }
+            var arrow = pill.querySelector('.dd-sort-arrow');
+            pills.forEach(function(p) {
+              var a = p.querySelector('.dd-sort-arrow');
+              if (a) a.innerHTML = '&#9650;';
+            });
+            if (arrow) arrow.innerHTML = ascending ? '&#9650;' : '&#9660;';
+            onSort(currentField, ascending);
+          });
         });
-        resSortField.addEventListener('change', applyResSort);
-        function applyResSort() {
+        return function resetPills() {
+          currentField = pills.length ? pills[0].dataset.sort : '';
+          ascending = true;
+          pills.forEach(function(p) {
+            p.classList.remove('active');
+            var a = p.querySelector('.dd-sort-arrow');
+            if (a) a.innerHTML = '&#9650;';
+          });
+          if (pills.length) pills[0].classList.add('active');
+        };
+      }
+
+      // Sort controls for version landing (resource grid)
+      var resGrid = document.getElementById('ddResourceGrid');
+      if (resGrid) {
+        var resSortContainer = resGrid.previousElementSibling;
+        initSortPills(resSortContainer, function(field, asc) {
           var cards = Array.from(resGrid.querySelectorAll('.dd-resource-card'));
           cards.sort(function(a, b) {
-            var sf = resSortField.value;
-            if (sf === 'name') {
-              return resAsc ? a.dataset.name.localeCompare(b.dataset.name) : b.dataset.name.localeCompare(a.dataset.name);
-            } else if (sf === 'fields') {
+            if (field === 'name') {
+              return asc ? a.dataset.name.localeCompare(b.dataset.name) : b.dataset.name.localeCompare(a.dataset.name);
+            } else if (field === 'fields') {
               var fa = parseInt(a.dataset.fields), fb = parseInt(b.dataset.fields);
-              return resAsc ? fb - fa : fa - fb;
+              return asc ? fb - fa : fa - fb;
             }
             return 0;
           });
           cards.forEach(function(c) { resGrid.appendChild(c); });
-        }
+        });
       }
 
       // Sort controls for resource pages
-      var sortField = document.getElementById('ddSortField');
-      var sortDirBtn = document.getElementById('ddSortDir');
-      if (sortField && sortDirBtn) {
-        var ascending = true;
-        var wrapper = document.querySelector('.dd-fields-table-wrapper');
-        if (wrapper) {
-          sortDirBtn.addEventListener('click', function() {
-            ascending = !ascending;
-            sortDirBtn.innerHTML = ascending ? '&#9650;' : '&#9660;';
-            applySort();
+      var wrapper = document.querySelector('.dd-fields-table-wrapper');
+      if (wrapper) {
+        var groupToggle = document.getElementById('ddGroupToggle');
+        var originalHTML = wrapper.innerHTML;
+        var groupsVisible = !!groupToggle;
+
+        function flatSort(field, ascending) {
+          var headings = wrapper.querySelectorAll('.dd-group-heading');
+          var tables = wrapper.querySelectorAll('.dd-fields-table');
+          headings.forEach(function(h) { h.style.display = 'none'; });
+          var allRows = [];
+          tables.forEach(function(t) {
+            Array.from(t.querySelectorAll('tbody tr')).forEach(function(r) { allRows.push(r); });
           });
-          sortField.addEventListener('change', applySort);
-
-          function applySort() {
-            var field = sortField.value;
-            var headings = wrapper.querySelectorAll('.dd-group-heading');
-            var tables = wrapper.querySelectorAll('.dd-fields-table');
-
-            if (field === 'group') {
-              // Restore original group layout — reload page
-              window.location.reload();
-              return;
+          allRows.sort(function(a, b) {
+            var va, vb;
+            if (field === 'name') {
+              va = a.dataset.name || ''; vb = b.dataset.name || '';
+              return ascending ? va.localeCompare(vb) : vb.localeCompare(va);
+            } else if (field === 'usage') {
+              va = parseFloat(a.dataset.usage) || -1; vb = parseFloat(b.dataset.usage) || -1;
+              return ascending ? vb - va : va - vb;
+            } else if (field === 'added') {
+              va = a.dataset.added || ''; vb = b.dataset.added || '';
+              return ascending ? va.localeCompare(vb) : vb.localeCompare(va);
+            } else if (field === 'type') {
+              va = a.dataset.type || ''; vb = b.dataset.type || '';
+              return ascending ? va.localeCompare(vb) : vb.localeCompare(va);
+            } else if (field === 'revised') {
+              va = a.dataset.revised || ''; vb = b.dataset.revised || '';
+              return ascending ? vb.localeCompare(va) : va.localeCompare(vb);
             }
-
-            // Hide group headings when sorting by non-group
-            headings.forEach(function(h) { h.style.display = 'none'; });
-
-            // Collect all rows from all tables
-            var allRows = [];
-            tables.forEach(function(t) {
-              var rows = Array.from(t.querySelectorAll('tbody tr'));
-              rows.forEach(function(r) { allRows.push(r); });
-            });
-
-            // Sort
-            allRows.sort(function(a, b) {
-              var va, vb;
-              if (field === 'name') {
-                va = a.dataset.name || '';
-                vb = b.dataset.name || '';
-                return ascending ? va.localeCompare(vb) : vb.localeCompare(va);
-              } else if (field === 'usage') {
-                va = parseFloat(a.dataset.usage) || -1;
-                vb = parseFloat(b.dataset.usage) || -1;
-                return ascending ? vb - va : va - vb; // Default: highest usage first
-              } else if (field === 'added') {
-                va = a.dataset.added || '';
-                vb = b.dataset.added || '';
-                return ascending ? va.localeCompare(vb) : vb.localeCompare(va);
-              } else if (field === 'revised') {
-                va = a.dataset.revised || '';
-                vb = b.dataset.revised || '';
-                return ascending ? vb.localeCompare(va) : va.localeCompare(vb); // Default: newest first
-              }
-              return 0;
-            });
-
-            // Move all rows into the first table, hide others
-            if (tables.length > 0) {
-              var mainTbody = tables[0].querySelector('tbody');
-              allRows.forEach(function(r) { mainTbody.appendChild(r); });
-              for (var i = 1; i < tables.length; i++) {
-                tables[i].style.display = 'none';
-              }
-            }
+            return 0;
+          });
+          if (tables.length > 0) {
+            var mainTbody = tables[0].querySelector('tbody');
+            allRows.forEach(function(r) { mainTbody.appendChild(r); });
+            for (var i = 1; i < tables.length; i++) tables[i].style.display = 'none';
           }
+        }
+
+        var fieldSortContainer = document.querySelector('.dd-sort-controls');
+        var resetPills = initSortPills(fieldSortContainer, function(field, ascending) {
+          if (groupToggle && groupsVisible) {
+            groupsVisible = false;
+            groupToggle.classList.remove('active');
+          }
+          flatSort(field, ascending);
+        });
+
+        if (groupToggle) {
+          groupToggle.addEventListener('click', function() {
+            if (groupsVisible) return;
+            groupsVisible = true;
+            groupToggle.classList.add('active');
+            wrapper.innerHTML = originalHTML;
+            resetPills();
+          });
         }
       }
     });
@@ -1566,11 +1941,30 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
 // Sidebar HTML Generator
 // ---------------------------------------------------------------------------
 
-function generateSidebarHtml(vCfg, data, activeResource) {
+function generateSidebarHtml(vCfg, data, activeResource, activePage) {
   const { version } = vCfg;
-  const resources = Object.keys(data.resourceMap).sort();
+  const allResources = Object.keys(data.resourceMap).sort();
+  // Property first, then the rest alphabetically
+  const resources = allResources.includes('Property')
+    ? ['Property', ...allResources.filter(r => r !== 'Property')]
+    : allResources;
 
-  let html = '<ul class="dd-nav-resources">\n';
+  // About section (expanded if an about page is active)
+  const aboutPages = getAboutPages(version);
+  const aboutExpanded = activePage != null;
+  let html = `<div class="dd-sidebar-section${aboutExpanded ? ' expanded' : ''}" data-section="about">\n`;
+  html += '<div class="dd-sidebar-section-title">About <span class="dd-section-arrow">&#9660;</span></div>\n';
+  html += '<ul class="dd-nav-resources">\n';
+  for (const page of aboutPages) {
+    const isActive = activePage === page.slug;
+    html += `<li class="dd-nav-resource"><a href="/dd/DD${version}/about/${page.slug ? page.slug + '/' : ''}" class="dd-nav-resource-link${isActive ? ' active' : ''}">${escapeHtml(page.title)}</a></li>\n`;
+  }
+  html += '</ul>\n</div>\n';
+
+  // Resources section (expanded by default unless an about page is active)
+  html += `<div class="dd-sidebar-section${!aboutExpanded ? ' expanded' : ''}" data-section="resources">\n`;
+  html += '<div class="dd-sidebar-section-title">Resources <span class="dd-section-arrow">&#9660;</span></div>\n';
+  html += '<ul class="dd-nav-resources">\n';
   for (const rn of resources) {
     const fields = data.resourceMap[rn];
     const tree = buildGroupTree(fields);
@@ -1582,16 +1976,16 @@ function generateSidebarHtml(vCfg, data, activeResource) {
 
     if (childGroups.length > 0) {
       html += `  <ul class="dd-nav-groups">\n`;
-      html += renderSidebarGroups(version, rn, tree, []);
+      html += renderSidebarGroups(version, rn, tree, [], isActive);
       html += `  </ul>\n`;
     }
     html += `</li>\n`;
   }
-  html += '</ul>\n';
+  html += '</ul>\n</div>\n';
   return html;
 }
 
-function renderSidebarGroups(version, resourceName, tree, path) {
+function renderSidebarGroups(version, resourceName, tree, path, anchorOnly) {
   const childGroups = Object.keys(tree).filter(k => !k.startsWith('_')).sort();
   let html = '';
 
@@ -1599,16 +1993,411 @@ function renderSidebarGroups(version, resourceName, tree, path) {
     const groupPath = [...path, group];
     const groupId = 'group-' + groupPath.join('-');
     const subGroups = Object.keys(tree[group]).filter(k => !k.startsWith('_'));
+    const href = anchorOnly ? `#${groupId}` : `${ddUrl(version, resourceName)}#${groupId}`;
 
     html += `    <li class="dd-nav-group">\n`;
-    html += `      <a href="${ddUrl(version, resourceName)}#${groupId}" class="dd-nav-group-link">${escapeHtml(group)}</a>\n`;
+    html += `      <a href="${href}" class="dd-nav-group-link">${escapeHtml(group)}</a>\n`;
     if (subGroups.length > 0) {
       html += `      <ul class="dd-nav-subgroups">\n`;
-      html += renderSidebarGroups(version, resourceName, tree[group], groupPath);
+      html += renderSidebarGroups(version, resourceName, tree[group], groupPath, anchorOnly);
       html += `      </ul>\n`;
     }
     html += `    </li>\n`;
   }
+  return html;
+}
+
+// ---------------------------------------------------------------------------
+// About Pages Configuration
+// ---------------------------------------------------------------------------
+
+function getAboutPages(version) {
+  const pages = [
+    { slug: '', title: 'Introduction' },
+    { slug: 'changelog', title: 'Change Log' },
+    { slug: 'certification', title: 'Certification' },
+    { slug: 'terms', title: 'Terms and Definitions' },
+    { slug: 'deprecated', title: 'Deprecated Fields' },
+    { slug: 'resources', title: 'Resource Summary' },
+    { slug: 'search-tips', title: 'Search Tips' },
+  ];
+  if (version === '2.0' || version === '2.1') {
+    pages.splice(1, 0, { slug: 'release-guide', title: 'Release Guide' });
+  }
+  return pages;
+}
+
+function generateAboutPages(vCfg, data, allVersions) {
+  const { version, label, approved } = vCfg;
+  const is20 = version === '2.0' || version === '2.1';
+  const aboutDir = join(OUTPUT_DIR, `DD${version}`, 'about');
+  mkdirSync(aboutDir, { recursive: true });
+
+  const pages = getAboutPages(version);
+  let pageCount = 0;
+
+  for (const page of pages) {
+    const contentHtml = generateAboutContent(page.slug, vCfg, data, is20);
+    const bc = page.slug
+      ? breadcrumbHtml(version, label, [
+          { label: 'About', url: `/dd/DD${version}/about/` },
+          { label: page.title },
+        ])
+      : breadcrumbHtml(version, label, [{ label: 'About' }]);
+
+    let html = bc;
+    html += `<div class="dd-page-header"><h1>${escapeHtml(page.title)}</h1>`;
+    html += `<p class="dd-page-subtitle">${escapeHtml(label)} Documentation</p></div>`;
+    html += contentHtml;
+
+    const sidebarHtml = generateSidebarHtml(vCfg, data, null, page.slug);
+    const dir = page.slug ? join(aboutDir, page.slug) : aboutDir;
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'index.html'), wrapPage(
+      `${page.title} - ${label}`, version, sidebarHtml, html, allVersions
+    ));
+    pageCount++;
+  }
+  return pageCount;
+}
+
+function generateAboutContent(slug, vCfg, data, is20) {
+  switch (slug) {
+    case '': return aboutIntroduction(vCfg);
+    case 'changelog': return aboutChangelog(vCfg, is20);
+    case 'certification': return aboutCertification();
+    case 'terms': return aboutTerms();
+    case 'deprecated': return aboutDeprecated(vCfg);
+    case 'resources': return aboutResources(vCfg, data);
+    case 'search-tips': return aboutSearchTips();
+    case 'release-guide': return aboutReleaseGuide();
+    default: return '<p>Page not found.</p>';
+  }
+}
+
+function aboutIntroduction(vCfg) {
+  const { version, label, approved } = vCfg;
+  let html = '<div class="dd-about-section">';
+  html += '<h2>Purpose</h2>';
+  html += `<p>The RESO Data Dictionary is a common reference for fields and lookups (enumerations) found in RESO-certified data sources. It provides universal guidelines for MLS listing input modules. Standardized terminology prevents implementation errors, eases field mapping and fosters innovation across the real estate industry.</p>`;
+  html += '</div>';
+
+  html += '<div class="dd-about-section">';
+  html += '<h2>Structure</h2>';
+  html += `<p>The Data Dictionary is organized in a hierarchy:</p>`;
+  html += '<div class="dd-about-cards">';
+  html += '<div class="dd-about-card"><h3>Resources</h3><p>Top-level categories such as Property, Member, Office and Media</p></div>';
+  html += '<div class="dd-about-card"><h3>Groups</h3><p>Logical groupings of related fields within a resource</p></div>';
+  html += '<div class="dd-about-card"><h3>Fields</h3><p>Individual data elements with names, types and definitions</p></div>';
+  html += '<div class="dd-about-card"><h3>Lookups</h3><p>Enumerations of valid values for fields that accept a controlled list</p></div>';
+  html += '</div>';
+  html += '</div>';
+
+  html += '<div class="dd-about-section">';
+  html += '<h2>Contributing</h2>';
+  html += `<p>Proposed additions to the Data Dictionary require the following:</p>`;
+  html += '<ul>';
+  html += '<li>Name following RESO naming conventions</li>';
+  html += '<li>Definition describing the element</li>';
+  html += '<li>Data type and maximum length</li>';
+  html += '<li>Lookups, if applicable</li>';
+  html += '<li>Justification and utilization metrics</li>';
+  html += '<li>Review for duplication with existing elements</li>';
+  html += '</ul>';
+  html += '<p>Contact <a href="mailto:info@reso.org">info@reso.org</a> for more information about the contribution process.</p>';
+  html += '</div>';
+
+  if (vCfg.approved) {
+    html += `<div class="dd-callout"><strong>${escapeHtml(vCfg.label)}</strong> was approved on ${escapeHtml(vCfg.approved)}.</div>`;
+  }
+
+  return html;
+}
+
+function aboutChangelog(vCfg, is20) {
+  let html = '<div class="dd-about-section">';
+
+  if (is20) {
+    html += '<h2>DD 2.0 Changes (2021\u20132024)</h2>';
+    html += '<ul>';
+    html += '<li>Added <strong>ArchitecturalStyle</strong> field</li>';
+    html += '<li>Added showing resources: <strong>ShowingAvailability</strong>, <strong>ShowingAppointment</strong> and <strong>ShowingRequest</strong></li>';
+    html += '<li>Added <strong>French Canadian</strong> display names</li>';
+    html += '<li>Added <strong>PropertyTimeZone</strong> field</li>';
+    html += '<li>Deprecated repeating element <em>[type]</em> fields</li>';
+    html += '<li>Deprecated <strong>KeyNumeric</strong> fields</li>';
+    html += '<li>Stricter standard enforcement and certification tooling</li>';
+    html += '</ul>';
+    html += '</div>';
+  }
+
+  html += '<div class="dd-about-section">';
+  html += '<h2>DD 1.7 Changes (2017\u20132021)</h2>';
+  html += '<ul>';
+  html += '<li>Added new resources: <strong>Queue</strong>, <strong>Rules</strong>, <strong>SocialMedia</strong> and <strong>OtherPhone</strong></li>';
+  html += '<li>Added approximately 750 new lookup values</li>';
+  html += '<li>Added <strong>Spanish Standard Names</strong></li>';
+  html += '<li>Renamed <strong>PropertyID</strong> to <strong>UniversalPropertyId</strong></li>';
+  html += '<li>Board approved <strong>December 2018</strong></li>';
+  html += '</ul>';
+  html += '</div>';
+
+  return html;
+}
+
+function aboutCertification() {
+  let html = '<div class="dd-about-section">';
+  html += '<h2>Certification Model</h2>';
+  html += `<p>RESO replaced the previous metallic-tier certification system with a <strong>Core + Endorsements</strong> model. Core certification aligns with the RESO Web API specification and ensures baseline compliance.</p>`;
+  html += '</div>';
+
+  html += '<div class="dd-about-section">';
+  html += '<h2>Endorsements</h2>';
+  html += '<div class="dd-about-cards">';
+  html += '<div class="dd-about-card"><h3>IDX Payload</h3><p>Fields required for Internet Data Exchange</p></div>';
+  html += '<div class="dd-about-card"><h3>BBO Payload</h3><p>Fields required for Broker Back Office operations</p></div>';
+  html += '<div class="dd-about-card"><h3>JSON DD</h3><p>Data Dictionary metadata served via JSON</p></div>';
+  html += '</div>';
+  html += '</div>';
+
+  html += '<div class="dd-about-section">';
+  html += '<h2>Process</h2>';
+  html += '<ul>';
+  html += '<li>Certifications expire after two Data Dictionary versions</li>';
+  html += '<li>Testing is conducted using RESO certification tools</li>';
+  html += '<li>Contact <a href="mailto:dev@reso.org">dev@reso.org</a> for certification inquiries</li>';
+  html += '</ul>';
+  html += '</div>';
+
+  return html;
+}
+
+function aboutTerms() {
+  let html = '<div class="dd-about-section">';
+  html += '<h2>Terms and Definitions</h2>';
+  html += '<p>Key terminology used throughout the Data Dictionary.</p>';
+  html += '<dl class="dd-def-grid">';
+
+  const terms = [
+    { term: 'Standard Name', def: 'The canonical machine-readable name for a field or lookup value.' },
+    { term: 'Definition', def: 'A human-readable description of what an element represents.' },
+    { term: 'Added in Version', def: 'The Data Dictionary version in which the element was first introduced.' },
+    { term: 'BEDES', def: 'Building Energy Data Exchange Specification \u2014 a related standard referenced by some DD elements.' },
+    { term: 'Collection', def: 'A set of related records accessible via the Web API (typically maps to a resource).' },
+    { term: 'Groups', def: 'Logical groupings of fields within a resource (e.g., Listing, Location, Tax).' },
+    { term: 'Synonym', def: 'An alternative display name for a standard field or lookup value.' },
+    { term: 'Lookup Name', def: 'The identifier for a lookup (enumeration) that a field references.' },
+  ];
+
+  for (const t of terms) {
+    html += '<div class="dd-def-item"><dl>';
+    html += `<dt>${escapeHtml(t.term)}</dt>`;
+    html += `<dd>${escapeHtml(t.def)}</dd>`;
+    html += '</dl></div>';
+  }
+  html += '</dl>';
+  html += '</div>';
+
+  // Element Status
+  html += '<div class="dd-about-section">';
+  html += '<h2>Element Status</h2>';
+  html += '<dl class="dd-def-grid">';
+  const statuses = [
+    { term: 'Active', def: 'The element is part of the current Data Dictionary and may be used in certification.' },
+    { term: 'Deprecated', def: 'The element is scheduled for removal. It is still recognized but should not be used in new implementations.' },
+    { term: 'Deleted', def: 'The element has been removed from the Data Dictionary.' },
+    { term: 'Proposed', def: 'The element is under consideration and has not yet been approved.' },
+  ];
+  for (const s of statuses) {
+    html += '<div class="dd-def-item"><dl>';
+    html += `<dt>${escapeHtml(s.term)}</dt>`;
+    html += `<dd>${escapeHtml(s.def)}</dd>`;
+    html += '</dl></div>';
+  }
+  html += '</dl>';
+  html += '</div>';
+
+  // Lookup Status
+  html += '<div class="dd-about-section">';
+  html += '<h2>Lookup Status</h2>';
+  html += '<dl class="dd-def-grid">';
+  const lookupStatuses = [
+    { term: 'Open', def: 'Any value is allowed. No standard enumeration is defined.' },
+    { term: 'Open with Enumerations', def: 'Standard lookup values are defined but providers may also include additional local values.' },
+    { term: 'Locked', def: 'Only the standard lookup values are allowed.' },
+  ];
+  for (const ls of lookupStatuses) {
+    html += '<div class="dd-def-item"><dl>';
+    html += `<dt>${escapeHtml(ls.term)}</dt>`;
+    html += `<dd>${escapeHtml(ls.def)}</dd>`;
+    html += '</dl></div>';
+  }
+  html += '</dl>';
+  html += '</div>';
+
+  // Property Types
+  html += '<div class="dd-about-section">';
+  html += '<h2>Property Types</h2>';
+  html += '<dl class="dd-def-grid">';
+  const propTypes = [
+    { code: 'RESI', name: 'Residential' },
+    { code: 'RLSE', name: 'Residential Lease' },
+    { code: 'RINC', name: 'Residential Income' },
+    { code: 'LAND', name: 'Land' },
+    { code: 'MOBI', name: 'Mobile Home' },
+    { code: 'FARM', name: 'Farm' },
+    { code: 'COMS', name: 'Commercial Sale' },
+    { code: 'COML', name: 'Commercial Lease' },
+    { code: 'BUSO', name: 'Business Opportunity' },
+  ];
+  for (const pt of propTypes) {
+    html += '<div class="dd-def-item"><dl>';
+    html += `<dt>${escapeHtml(pt.code)}</dt>`;
+    html += `<dd>${escapeHtml(pt.name)}</dd>`;
+    html += '</dl></div>';
+  }
+  html += '</dl>';
+  html += '</div>';
+
+  // Simple Data Types
+  html += '<div class="dd-about-section">';
+  html += '<h2>Simple Data Types</h2>';
+  html += '<div class="dd-about-section">';
+  const dataTypes = [
+    { type: 'Boolean', def: 'True or false value.' },
+    { type: 'Collection', def: 'A multi-valued field referencing a set of lookup values.' },
+    { type: 'Date', def: 'A calendar date without time.' },
+    { type: 'Number', def: 'A numeric value (integer or decimal).' },
+    { type: 'String', def: 'A sequence of characters with a defined maximum length.' },
+    { type: 'String List, Single', def: 'A single value selected from a lookup.' },
+    { type: 'String List, Multi', def: 'Multiple values selected from a lookup, represented as a collection.' },
+    { type: 'Timestamp', def: 'A date and time value, typically in ISO 8601 format.' },
+  ];
+  html += '<dl class="dd-def-grid">';
+  for (const dt of dataTypes) {
+    html += '<div class="dd-def-item"><dl>';
+    html += `<dt>${escapeHtml(dt.type)}</dt>`;
+    html += `<dd>${escapeHtml(dt.def)}</dd>`;
+    html += '</dl></div>';
+  }
+  html += '</dl>';
+  html += '</div></div>';
+
+  return html;
+}
+
+function aboutDeprecated(vCfg) {
+  let html = '';
+
+  html += '<div class="dd-about-section">';
+  html += '<h2>Deprecated in DD 2.0</h2>';
+  html += '<p>The following categories of fields were deprecated in DD 2.0:</p>';
+  html += '<h3>Repeating Element Fields</h3>';
+  html += '<p>Fields that followed the pattern <code>[Type]1</code>, <code>[Type]2</code>, <code>[Type]3</code> (e.g., <code>Appliances1</code>) were deprecated in favor of collection-typed fields.</p>';
+  html += '<h3>KeyNumeric Fields</h3>';
+  html += '<p>Fields ending in <code>KeyNumeric</code> were deprecated. Use the standard key fields instead.</p>';
+  html += '</div>';
+
+  html += '<div class="dd-about-section">';
+  html += '<h2>Deprecated in DD 1.7</h2>';
+  html += '<p>No fields were deprecated in DD 1.7.</p>';
+  html += '</div>';
+
+  html += '<div class="dd-about-section">';
+  html += '<h2>Deprecated in DD 1.6</h2>';
+  html += '<p>The following fields were removed in DD 1.6:</p>';
+  html += '<table class="dd-about-table"><thead><tr><th>Field</th></tr></thead><tbody>';
+  const deprecated16 = ['ApprovalStatus', 'Gas', 'Gender', 'Group', 'Groups', 'TaxExemptions', 'Telephone'];
+  for (const f of deprecated16) {
+    html += `<tr><td>${escapeHtml(f)}</td></tr>`;
+  }
+  html += '</tbody></table>';
+  html += '</div>';
+
+  return html;
+}
+
+function aboutResources(vCfg, data) {
+  const { version, label } = vCfg;
+  const allResources = Object.keys(data.resourceMap).sort();
+  // Property first
+  const resources = allResources.includes('Property')
+    ? ['Property', ...allResources.filter(r => r !== 'Property')]
+    : allResources;
+
+  let html = '<div class="dd-about-section">';
+  html += '<h2>Resource Summary</h2>';
+  html += `<p>${escapeHtml(label)} contains ${formatNumber(resources.length)} resources and ${formatNumber(data.fields.length)} total fields.</p>`;
+  html += '<table class="dd-about-table"><thead><tr><th>Resource</th><th>Description</th><th>Fields</th></tr></thead><tbody>';
+  for (const rn of resources) {
+    const fieldCount = data.resourceMap[rn].length;
+    const desc = RESOURCE_DESCRIPTIONS[rn] || '';
+    html += `<tr>`;
+    html += `<td><a href="${ddUrl(version, rn)}">${escapeHtml(rn)}</a></td>`;
+    html += `<td>${escapeHtml(desc)}</td>`;
+    html += `<td>${formatNumber(fieldCount)}</td>`;
+    html += `</tr>`;
+  }
+  html += '</tbody></table>';
+  html += '</div>';
+
+  return html;
+}
+
+function aboutSearchTips() {
+  let html = '<div class="dd-about-section">';
+  html += '<h2>Using Site Search</h2>';
+  html += '<p>Press <kbd>/</kbd> or click the search button in the header to open the search modal. Search works across all Data Dictionary resources, fields and lookup values.</p>';
+  html += '</div>';
+
+  html += '<div class="dd-about-section">';
+  html += '<h2>How Search Works</h2>';
+  html += '<p>Search input is normalized to match Data Dictionary naming conventions. Punctuation and special characters are stripped so that terms like <code>ListPrice</code>, <code>list price</code> and <code>list-price</code> all produce the same results.</p>';
+  html += '<p>When you enter multiple words, all terms must be present in a page for it to appear in results (implicit AND). Results are ranked by relevance, with page titles weighted highest.</p>';
+  html += '</div>';
+
+  html += '<div class="dd-about-section">';
+  html += '<h2>Version Filtering</h2>';
+  html += '<p>When search results appear, use the version filter pills at the top to narrow results to a specific Data Dictionary version.</p>';
+  html += '</div>';
+
+  return html;
+}
+
+function aboutReleaseGuide() {
+  let html = '<div class="dd-about-section">';
+  html += '<h2>DD 2.0 Release Overview</h2>';
+  html += '<p>DD 2.0 is a major release with stricter enforcement of standard field names, types and lookups. It introduces an updated certification framework and a formal process for handling field name variations.</p>';
+  html += '</div>';
+
+  html += '<div class="dd-about-section">';
+  html += '<h2>Certification Testing Stages</h2>';
+  html += '<p>DD 2.0 certification involves four testing stages:</p>';
+  html += '<div class="dd-about-cards">';
+  html += '<div class="dd-about-card"><h3>1. Metadata Validation</h3><p>Verify server metadata matches expected schema structure</p></div>';
+  html += '<div class="dd-about-card"><h3>2. Variations Report</h3><p>Map local field names to standard names using variation strategies</p></div>';
+  html += '<div class="dd-about-card"><h3>3. Sampling &amp; Data Availability</h3><p>Check that advertised fields contain actual data</p></div>';
+  html += '<div class="dd-about-card"><h3>4. Schema Validation</h3><p>Confirm field types, lengths and lookups match the standard</p></div>';
+  html += '</div>';
+  html += '</div>';
+
+  html += '<div class="dd-about-section">';
+  html += '<h2>Variation Matching</h2>';
+  html += '<p>Five strategies are used to match local field names to Data Dictionary standard names:</p>';
+  html += '<ol>';
+  html += '<li>Exact match on standard name</li>';
+  html += '<li>Case-insensitive match</li>';
+  html += '<li>Match on display name or synonym</li>';
+  html += '<li>Fuzzy match using edit distance</li>';
+  html += '<li>Manual mapping via configuration</li>';
+  html += '</ol>';
+  html += '</div>';
+
+  html += '<div class="dd-about-section">';
+  html += '<h2>Resources</h2>';
+  html += '<p>Certification tools are available on <a href="https://github.com/RESOStandards">GitHub</a>. For questions about DD 2.0 certification, contact <a href="mailto:dev@reso.org">dev@reso.org</a>.</p>';
+  html += '</div>';
+
   return html;
 }
 
@@ -1627,18 +2416,17 @@ function generateVersionLanding(vCfg, data, allVersions) {
 
   html += `<div class="dd-sort-controls">
     <label>Sort by</label>
-    <select class="dd-sort-select" id="ddResourceSort">
-      <option value="name">Name</option>
-      <option value="fields">Field Count</option>
-    </select>
-    <button class="dd-sort-dir" id="ddResourceSortDir" type="button" title="Toggle sort direction">&#9650;</button>
+    <button class="dd-sort-pill active" data-sort="name">Name <span class="dd-sort-arrow">&#9650;</span></button>
+    <button class="dd-sort-pill" data-sort="fields">Field Count <span class="dd-sort-arrow">&#9650;</span></button>
   </div>`;
 
   html += `<div class="dd-resource-grid" id="ddResourceGrid">`;
   for (const rn of resources) {
     const fieldCount = resourceMap[rn].length;
+    const desc = RESOURCE_DESCRIPTIONS[rn];
     html += `<a href="${ddUrl(version, rn)}" class="dd-resource-card" data-name="${escapeHtml(rn)}" data-fields="${fieldCount}">`;
     html += `<h3>${escapeHtml(rn)}</h3>`;
+    if (desc) html += `<p class="dd-resource-desc">${escapeHtml(desc)}</p>`;
     html += `<span class="dd-resource-count">${formatNumber(fieldCount)} field${fieldCount !== 1 ? 's' : ''}</span>`;
     html += `</a>`;
   }
@@ -1650,15 +2438,17 @@ function generateVersionLanding(vCfg, data, allVersions) {
   writeFileSync(join(dir, 'index.html'), wrapPage(label, version, sidebarHtml, html, allVersions));
 }
 
-function generateResourcePage(vCfg, data, resourceName, usageStats, allVersions) {
+function generateResourcePage(vCfg, data, resourceName, usageStats, allVersions, totalProviders) {
   const { version, label } = vCfg;
   const fields = data.resourceMap[resourceName];
   const groupTree = buildGroupTree(fields);
   const resourceStats = usageStats?.[resourceName];
 
-  let html = breadcrumbHtml(version, label, [{ label: resourceName }]);
+  let html = '<div class="dd-resource-sticky">';
+  html += breadcrumbHtml(version, label, [{ label: resourceName }]);
   const resNorm = resourceName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-  html += `<div class="dd-page-header"><h1 data-pagefind-meta="title" data-pagefind-weight="10">${escapeHtml(resourceName)}</h1>`;
+  const resDesc = RESOURCE_DESCRIPTIONS[resourceName];
+  html += `<div class="dd-page-header"><h1 data-pagefind-meta="title" data-pagefind-weight="10">${escapeHtml(resourceName)} Resource <button class="dd-copy-btn" data-copy="${escapeHtml(resourceName)}" title="Copy name"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button></h1>`;
   html += `<span class="dd-search-norm" data-pagefind-weight="100">${resNorm}</span>`;
   const latestRevised = fields.reduce((latest, f) => {
     if (f.RevisedDate && (!latest || f.RevisedDate > latest)) return f.RevisedDate;
@@ -1669,18 +2459,19 @@ function generateResourcePage(vCfg, data, resourceName, usageStats, allVersions)
   html += `</p>`;
   if (latestRevised) html += `<span class="dd-search-norm" data-pagefind-meta="date">${escapeHtml(latestRevised)}</span>`;
   html += `</div>`;
+  if (resDesc) html += `<div class="dd-definition-callout">${escapeHtml(resDesc)}</div>`;
 
+  const hasGroups = Object.keys(groupTree).some(k => !k.startsWith('_'));
   html += `<div class="dd-sort-controls">
     <label>Sort by</label>
-    <select class="dd-sort-select" id="ddSortField">
-      <option value="group">Group</option>
-      <option value="name">Name</option>
-      <option value="usage">Usage</option>
-      <option value="added">Date Added</option>
-      <option value="revised">Revised Date</option>
-    </select>
-    <button class="dd-sort-dir" id="ddSortDir" type="button" title="Toggle sort direction">&#9650;</button>
+    <button class="dd-sort-pill active" data-sort="name">Name <span class="dd-sort-arrow">&#9650;</span></button>
+    <button class="dd-sort-pill" data-sort="type">Type <span class="dd-sort-arrow">&#9650;</span></button>
+    <button class="dd-sort-pill" data-sort="usage">Usage <span class="dd-sort-arrow">&#9650;</span></button>
+    <button class="dd-sort-pill" data-sort="added">Date Added <span class="dd-sort-arrow">&#9650;</span></button>
+    <button class="dd-sort-pill" data-sort="revised">Revised <span class="dd-sort-arrow">&#9650;</span></button>
+    ${hasGroups ? '<button class="dd-group-toggle active" id="ddGroupToggle">Show Groups</button>' : ''}
   </div>`;
+  html += '</div>';
 
   html += renderGroupedFields(version, resourceName, fields, groupTree, resourceStats);
 
@@ -1700,11 +2491,17 @@ function renderGroupedFields(version, resourceName, fields, tree, resourceStats)
 
   let html = '<div class="dd-fields-table-wrapper" data-pagefind-ignore>';
   for (const section of sections) {
-    const groupPath = section.path.join(' > ');
     const groupId = 'group-' + section.path.join('-');
 
     if (section.path.length > 0) {
-      html += `<h2 class="dd-group-heading" id="${escapeHtml(groupId)}">${escapeHtml(groupPath)}</h2>`;
+      const depth = section.path.length;
+      const headingContent = section.path.map((part, i) => {
+        if (i < section.path.length - 1) {
+          return `<span class="dd-group-parent">${escapeHtml(part)}</span>`;
+        }
+        return escapeHtml(part);
+      }).join(' <span class="dd-group-sep">&rsaquo;</span> ');
+      html += `<h2 class="dd-group-heading dd-group-depth-${depth}" id="${escapeHtml(groupId)}">${headingContent}</h2>`;
     } else if (hasGroupedSections) {
       html += `<h2 class="dd-group-heading" id="group-ungrouped">Other Fields</h2>`;
     }
@@ -1720,7 +2517,7 @@ function renderGroupedFields(version, resourceName, fields, tree, resourceStats)
       const stats = resourceStats?.[field.StandardName];
       const usageVal = stats?.mean != null ? stats.mean : -1;
 
-      html += `<tr data-name="${escapeHtml(field.StandardName)}" data-usage="${usageVal}" data-added="${escapeHtml(field.AddedInVersion || '')}" data-revised="${escapeHtml(field.RevisedDate || '')}" data-group="${escapeHtml(section.path.join(' > '))}">`;
+      html += `<tr data-name="${escapeHtml(field.StandardName)}" data-type="${escapeHtml(field.SimpleDataType || '')}" data-usage="${usageVal}" data-added="${escapeHtml(field.AddedInVersion || '')}" data-revised="${escapeHtml(field.RevisedDate || '')}" data-group="${escapeHtml(section.path.join(' > '))}">`;
       html += `<td><a href="${fieldUrl}" class="dd-field-link">${escapeHtml(field.DisplayName || field.StandardName)}</a>`;
       html += `<div class="dd-field-standard-name">${escapeHtml(field.StandardName)}</div></td>`;
       html += `<td class="dd-field-def">${escapeHtml(truncate(field.Definition, DEFINITION_TRUNCATE_LENGTH))}`;
@@ -1756,7 +2553,7 @@ function collectSections(tree, path, sections) {
   }
 }
 
-function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersions) {
+function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersions, totalProviders) {
   const { version, label } = vCfg;
   const resourceStats = usageStats?.[resourceName];
   const fieldStats = resourceStats?.[field.StandardName];
@@ -1766,42 +2563,62 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
     { label: field.DisplayName || field.StandardName },
   ]);
 
-  const fieldTitle = field.DisplayName || field.StandardName;
-  const fieldNorm = fieldTitle.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-  html += `<div class="dd-page-header"><h1 data-pagefind-meta="title" data-pagefind-weight="10">${escapeHtml(fieldTitle)}</h1>`;
+  const fieldNorm = field.StandardName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  html += `<div class="dd-page-header"><h1 data-pagefind-meta="title" data-pagefind-weight="10">${escapeHtml(field.StandardName)} Field <button class="dd-copy-btn" data-copy="${escapeHtml(field.StandardName)}" title="Copy name"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button></h1>`;
   html += `<span class="dd-search-norm" data-pagefind-weight="100">${fieldNorm}</span>`;
-  html += `<p class="dd-page-subtitle" data-pagefind-meta="description">${escapeHtml(resourceName)} field &mdash; ${escapeHtml(field.SimpleDataType || 'Unknown type')}</p>`;
+  html += `<p class="dd-page-subtitle" data-pagefind-meta="description">${escapeHtml(resourceName)} Resource</p>`;
   if (field.Definition) html += `<span class="dd-search-norm" data-pagefind-meta="definition">${escapeHtml(truncate(field.Definition, 200))}</span>`;
   if (field.RevisedDate) html += `<span class="dd-search-norm" data-pagefind-meta="date">${escapeHtml(field.RevisedDate)}</span>`;
   html += `</div>`;
+  if (field.Definition) html += `<div class="dd-definition-callout">${escapeHtml(field.Definition)}</div>`;
 
-  // Metadata — indexed so Pagefind can match on field name, definition, etc.
-  html += `<div class="dd-metadata-card"><h2>Details</h2><table class="dd-metadata-table">`;
-  const metaRows = [
+  // Metadata — two-column grid, indexed so Pagefind can match on field name, definition, etc.
+  const leftRows = [
     ['Standard Name', field.StandardName],
     ['Display Name', field.DisplayName],
-    ['Definition', field.Definition],
-    ['Data Type', field.SimpleDataType],
-    ['Max Length', field.SugMaxLength],
-    ['Max Precision', field.SugMaxPrecision],
-    ['Property Types', field.PropertyTypes, 'PropertyTypes'],
-    ['Payloads', field.Payloads, 'Payloads'],
+    ['Group', field.Groups],
+    ['Simple Data Type', field.SimpleDataType],
+    ['Max Length<small>suggested</small>', field.SugMaxLength],
+    ['Max Precision<small>suggested</small>', field.SugMaxPrecision],
+    ['Synonyms', field.Synonyms],
     ['Status', field.ElementStatus, 'ElementStatus'],
-    ['Added in Version', field.AddedInVersion, 'AddedInVersion'],
-    ['Revised Date', field.RevisedDate],
-    ['Repeating Element', field.RepeatingElement],
-    ['Source Resource', field.SourceResource],
     ['BEDES', field.BEDES],
   ];
-  for (const [lbl, value, xrefKey] of metaRows) {
-    if (!value) continue;
-    const rendered = xrefKey ? xrefLinksForField(version, xrefKey, value) : escapeHtml(value);
-    html += `<tr><th>${escapeHtml(lbl)}</th><td>${rendered}</td></tr>`;
+  const rightRows = [
+    ['Lookup Status', field.LookupStatus],
+    ['Lookup', field.LookupName],
+    ['Property Types', field.PropertyTypes, 'PropertyTypes'],
+    ['Payloads', field.Payloads, 'Payloads'],
+    ['Spanish Name', field.SpanishDisplayName],
+    ['French-Canadian Name', field.FrenchCanadianDisplayName],
+    ['Status Change Date', field.StatusChangeDate],
+    ['Revised Date', field.RevisedDate],
+    ['Added in Version', field.AddedInVersion, 'AddedInVersion'],
+    ['Source Resource', field.SourceResource],
+    ['Repeating Element', field.RepeatingElement],
+  ];
+
+  function renderMetaTable(rows) {
+    let t = '<table class="dd-metadata-table">';
+    for (const [lbl, value, xrefKey] of rows) {
+      const display = value || '\u2014';
+      const rendered = (value && xrefKey) ? xrefLinksForField(version, xrefKey, value) : escapeHtml(display);
+      // Labels may contain <small> tags for subtitles
+      const labelHtml = lbl.includes('<') ? lbl : escapeHtml(lbl);
+      t += `<tr><th>${labelHtml}</th><td>${rendered}</td></tr>`;
+    }
+    t += '</table>';
+    return t;
   }
-  html += `</table></div>`;
+
+  html += `<div class="dd-metadata-card"><h2>Details</h2>`;
+  html += `<div class="dd-meta-grid">`;
+  html += renderMetaTable(leftRows);
+  html += renderMetaTable(rightRows);
+  html += `</div></div>`;
 
   // Usage
-  html += `<div class="dd-metadata-card" data-pagefind-ignore><h2>Usage</h2>${usageHtml(fieldStats)}</div>`;
+  html += `<div class="dd-metadata-card" data-pagefind-ignore><h2>Usage</h2>${usageHtml(fieldStats, totalProviders)}</div>`;
 
   // Lookups panel
   if (field.LookupStatus === 'Open with Enumerations' && field.LookupName) {
@@ -1859,7 +2676,7 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
   ));
 }
 
-function generateLookupPage(vCfg, data, resourceName, field, lookup, usageStats, allVersions) {
+function generateLookupPage(vCfg, data, resourceName, field, lookup, usageStats, allVersions, totalProviders) {
   const { version, label } = vCfg;
   const resourceStats = usageStats?.[resourceName];
   const fieldStats = resourceStats?.[field.StandardName];
@@ -1871,37 +2688,57 @@ function generateLookupPage(vCfg, data, resourceName, field, lookup, usageStats,
     { label: lookup.StandardLookupValue },
   ]);
 
+  const lookupDisplay = lookup.StandardLookupValue.replace(/([a-z])([A-Z])/g, '$1 $2');
   const lookupNorm = lookup.StandardLookupValue.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-  html += `<div class="dd-page-header"><h1 data-pagefind-meta="title" data-pagefind-weight="10">${escapeHtml(lookup.StandardLookupValue)}</h1>`;
+  html += `<div class="dd-page-header"><h1 data-pagefind-meta="title" data-pagefind-weight="10">${escapeHtml(lookupDisplay)} Lookup <button class="dd-copy-btn" data-copy="${escapeHtml(lookup.StandardLookupValue)}" title="Copy value"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button></h1>`;
   html += `<span class="dd-search-norm" data-pagefind-weight="100">${lookupNorm}</span>`;
+  if (lookup.LegacyODataValue && lookup.LegacyODataValue !== lookup.StandardLookupValue) {
+    html += `<p class="dd-page-legacy-value">Legacy OData Value: <code>${escapeHtml(lookup.LegacyODataValue)}</code></p>`;
+  }
   html += `<p class="dd-page-subtitle" data-pagefind-meta="description">Lookup value for ${escapeHtml(field.DisplayName || field.StandardName)} (${escapeHtml(resourceName)})</p>`;
   if (lookup.Definition) html += `<span class="dd-search-norm" data-pagefind-meta="definition">${escapeHtml(truncate(lookup.Definition, 200))}</span>`;
   if (lookup.RevisedDate) html += `<span class="dd-search-norm" data-pagefind-meta="date">${escapeHtml(lookup.RevisedDate)}</span>`;
   html += `</div>`;
+  if (lookup.Definition) html += `<div class="dd-definition-callout">${escapeHtml(lookup.Definition)}</div>`;
 
-  // Metadata — indexed so Pagefind can match on lookup value, definition, etc.
-  html += `<div class="dd-metadata-card"><h2>Details</h2><table class="dd-metadata-table">`;
-  const metaRows = [
+  // Metadata — two-column grid
+  const lkLeftRows = [
     ['Lookup Name', lookup.LookupName],
     ['Standard Value', lookup.StandardLookupValue],
     ['Legacy OData Value', lookup.LegacyODataValue],
-    ['Definition', lookup.Definition],
-    ['References', lookup.References],
+    ['Synonyms', lookup.Synonyms],
     ['Status', lookup.ElementStatus, 'ElementStatus'],
-    ['Added in Version', lookup.AddedInVersion, 'AddedInVersion'],
-    ['Revised Date', lookup.RevisedDate],
     ['BEDES', lookup.BEDES],
   ];
-  for (const [lbl, value, xrefKey] of metaRows) {
-    if (!value) continue;
-    const rendered = xrefKey ? xrefLinksForField(version, xrefKey, value) : escapeHtml(value);
-    html += `<tr><th>${escapeHtml(lbl)}</th><td>${rendered}</td></tr>`;
+  const lkRightRows = [
+    ['References', lookup.References],
+    ['Spanish Value', lookup.SpanishLookupValue],
+    ['French-Canadian Value', lookup.FrenchCanadianLookupValue],
+    ['Status Change Date', lookup.StatusChangeDate],
+    ['Revised Date', lookup.RevisedDate],
+    ['Added in Version', lookup.AddedInVersion, 'AddedInVersion'],
+  ];
+
+  function renderLkMetaTable(rows) {
+    let t = '<table class="dd-metadata-table">';
+    for (const [lbl, value, xrefKey] of rows) {
+      const display = value || '\u2014';
+      const rendered = (value && xrefKey) ? xrefLinksForField(version, xrefKey, value) : escapeHtml(display);
+      t += `<tr><th>${escapeHtml(lbl)}</th><td>${rendered}</td></tr>`;
+    }
+    t += '</table>';
+    return t;
   }
-  html += `</table></div>`;
+
+  html += `<div class="dd-metadata-card"><h2>Details</h2>`;
+  html += `<div class="dd-meta-grid">`;
+  html += renderLkMetaTable(lkLeftRows);
+  html += renderLkMetaTable(lkRightRows);
+  html += `</div></div>`;
 
   // Usage
   html += `<div class="dd-metadata-card" data-pagefind-ignore><h2>Usage</h2>`;
-  html += `<h3>Standard Value</h3>${usageHtml(lookupStats)}`;
+  html += `<h3>Standard Value</h3>${usageHtml(lookupStats, totalProviders)}`;
   html += `</div>`;
 
   const sidebarHtml = generateSidebarHtml(vCfg, data, resourceName);
@@ -2706,12 +3543,12 @@ function generateDDLandingPage(allData) {
     <div class="dd-landing-related">
       <h3>Related Resources</h3>
       <div class="dd-landing-related-grid">
-        <a href="https://ddwiki.reso.org" class="dd-landing-related-item">
+        <a href="/dd/" class="dd-landing-related-item">
           <div class="dd-landing-related-icon dd-landing-related-icon-navy">
             <svg viewBox="0 0 24 24"><path d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3zm5 1h6m-6 3h6m-6 3h4"/></svg>
           </div>
           <div class="dd-landing-related-text">
-            <h4>Data Dictionary Wiki</h4>
+            <h4>Data Dictionary Documentation</h4>
             <p>Browse all standard fields, resources and lookups</p>
           </div>
         </a>
@@ -3061,41 +3898,64 @@ async function main() {
     allData.push({ vCfg, data });
   }
 
+  // Fetch usage stats once (version-agnostic, covers all resources/fields/lookups)
+  let usageStats = null;
+  const totalProvidersByResource = {};
+  try {
+    usageStats = await fetchUsageStats(allData);
+  } catch (err) {
+    console.warn('Error fetching usage stats:', err.message);
+  }
+
+  // Derive total providers per resource: pick field with most recipients,
+  // break ties by highest mean (most reliable estimate)
+  if (usageStats) {
+    for (const [resourceName, resource] of Object.entries(usageStats)) {
+      let maxRecipients = 0;
+      let bestMean = 0;
+      for (const [key, stats] of Object.entries(resource)) {
+        if (key === 'lookups' || !stats?.recipients || !stats?.mean) continue;
+        if (stats.recipients > maxRecipients || (stats.recipients === maxRecipients && stats.mean > bestMean)) {
+          maxRecipients = stats.recipients;
+          bestMean = stats.mean;
+          totalProvidersByResource[resourceName] = Math.round(stats.recipients / stats.mean);
+        }
+      }
+    }
+  }
+
   for (const { vCfg, data } of allData) {
     console.log(`\nGenerating ${vCfg.label}...`);
-
-    let usageStats = null;
-    try {
-      usageStats = await fetchUsageStats(data);
-    } catch (err) {
-      console.warn('  Error fetching usage stats:', err.message);
-    }
 
     generateVersionLanding(vCfg, data, VERSIONS);
 
     let pageCount = 1;
     for (const [resourceName, fields] of Object.entries(data.resourceMap)) {
-      generateResourcePage(vCfg, data, resourceName, usageStats, VERSIONS);
+      const totalProviders = totalProvidersByResource[resourceName] || 0;
+      generateResourcePage(vCfg, data, resourceName, usageStats, VERSIONS, totalProviders);
       pageCount++;
 
       for (const field of fields) {
-        generateFieldPage(vCfg, data, resourceName, field, usageStats, VERSIONS);
+        generateFieldPage(vCfg, data, resourceName, field, usageStats, VERSIONS, totalProviders);
         pageCount++;
 
         if (field.LookupStatus === 'Open with Enumerations' && field.LookupName) {
           const lookupValues = data.lookupMap[field.LookupName] || [];
           for (const lk of lookupValues) {
-            generateLookupPage(vCfg, data, resourceName, field, lk, usageStats, VERSIONS);
+            generateLookupPage(vCfg, data, resourceName, field, lk, usageStats, VERSIONS, totalProviders);
             pageCount++;
           }
         }
       }
     }
 
+    const aboutCount = generateAboutPages(vCfg, data, VERSIONS);
+    pageCount += aboutCount;
+
     const xrefCount = generateXrefPages(vCfg, data, VERSIONS);
     pageCount += xrefCount;
 
-    console.log(`  Generated ${pageCount} pages (${xrefCount} cross-reference)`);
+    console.log(`  Generated ${pageCount} pages (${aboutCount} about, ${xrefCount} cross-reference)`);
   }
 
   // Generate DD landing page
