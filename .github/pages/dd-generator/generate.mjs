@@ -1162,9 +1162,8 @@ function getPageCSS() {
         min-width: 600px;
       }
       .dd-field-def {
-        max-width: 200px;
         display: -webkit-box;
-        -webkit-line-clamp: 2;
+        -webkit-line-clamp: 3;
         -webkit-box-orient: vertical;
         overflow: hidden;
       }
