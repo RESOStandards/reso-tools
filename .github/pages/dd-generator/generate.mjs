@@ -402,6 +402,9 @@ function getPageCSS() {
     html.dark .dd-lookups-table tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.03); }
     html.dark .dd-fields-table tbody tr:hover,
     html.dark .dd-lookups-table tbody tr:hover { background: var(--reso-gray-200); }
+    html.dark .dd-field-link,
+    html.dark .dd-lookups-table a,
+    html.dark .dd-more-link { color: #63b3ed; }
     html.dark .dd-group-heading { color: #edf2f7; border-bottom-color: var(--reso-gray-200); }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
