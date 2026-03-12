@@ -1164,7 +1164,7 @@ function getPageCSS() {
       /* Lookup tables keep all columns but scroll */
       .dd-lookups-table { min-width: 600px; }
       .dd-fields-table-wrapper .dd-fields-table th {
-        top: 64px;
+        position: static;
       }
       .dd-mobile-group-indicator {
         top: calc(64px + 1.75rem);
