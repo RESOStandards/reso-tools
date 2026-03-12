@@ -221,7 +221,7 @@ async function fetchUsageStats(allData) {
       if (!fieldsByResource[resourceName]) fieldsByResource[resourceName] = new Set();
       for (const field of fields) {
         if (field.StandardName) fieldsByResource[resourceName].add(field.StandardName);
-        if (field.LookupStatus === 'Open with Enumerations' && field.LookupName) {
+        if (field.LookupStatus?.includes('with Enumerations') && field.LookupName) {
           const lkKey = `${resourceName}:${field.StandardName}`;
           if (!lookupsByField[lkKey]) lookupsByField[lkKey] = new Set();
           for (const lk of (data.lookupMap[field.LookupName] || [])) {
@@ -3656,7 +3656,7 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
   html += `<div class="dd-metadata-card" data-pagefind-ignore><h2>Usage</h2>${usageHtml(fieldStats, totalProviders)}</div>`;
 
   // Lookups panel
-  if (field.LookupStatus === 'Open with Enumerations' && field.LookupName) {
+  if (field.LookupStatus?.includes('with Enumerations') && field.LookupName) {
     const lookupValues = data.lookupMap[field.LookupName] || [];
     const lookupStats = fieldStats?.lookups;
 
@@ -4170,7 +4170,7 @@ async function main() {
         generateFieldPage(vCfg, data, resourceName, field, usageStats, VERSIONS, totalProviders);
         pageCount++;
 
-        if (field.LookupStatus === 'Open with Enumerations' && field.LookupName) {
+        if (field.LookupStatus?.includes('with Enumerations') && field.LookupName) {
           const lookupValues = data.lookupMap[field.LookupName] || [];
           for (const lk of lookupValues) {
             generateLookupPage(vCfg, data, resourceName, field, lk, usageStats, VERSIONS, totalProviders);
