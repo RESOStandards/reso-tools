@@ -979,7 +979,7 @@ function getPageCSS() {
       max-width: 1100px;
     }
     @media (max-width: 768px) {
-      .dd-content { padding: 1rem; max-width: 100vw; overflow-x: auto; }
+      .dd-content { padding: 0 1rem 1rem; max-width: 100vw; overflow-x: auto; }
       .dd-metadata-card { overflow-x: auto; }
       .dd-resource-grid { grid-template-columns: 1fr; }
     }
@@ -1005,6 +1005,12 @@ function getPageCSS() {
       line-height: 1.5;
       color: var(--reso-gray-700);
       border-radius: 0 0.375rem 0.375rem 0;
+    }
+    @media (max-width: 768px) {
+      .dd-breadcrumb { margin-bottom: 0.5rem; }
+      .dd-page-header { margin-bottom: 0.75rem; }
+      .dd-page-header h1 { font-size: 1.25rem; }
+      .dd-definition-callout { padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; font-size: 0.875rem; }
     }
     .dd-copy-btn {
       display: inline-flex;
@@ -1153,9 +1159,6 @@ function getPageCSS() {
       transition: opacity 0.15s;
     }
     @media (max-width: 768px) {
-      .dd-resource-sticky {
-        position: static;
-      }
       .dd-fields-table-wrapper,
       .dd-collapsible-content,
       .dd-content { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -1312,7 +1315,7 @@ function getPageCSS() {
       padding: 1.5rem 2rem 0.25rem;
     }
     @media (max-width: 768px) {
-      .dd-resource-sticky { margin: -1rem -1rem 0; padding: 1rem 1rem 0.25rem; }
+      .dd-resource-sticky { position: static; top: auto; margin: 0 -1rem; padding: 0.25rem 1rem; }
     }
     html.dark .dd-resource-sticky { background: var(--reso-gray-50); }
 
