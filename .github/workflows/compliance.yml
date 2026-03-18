@@ -44,6 +44,16 @@ jobs:
         working-directory: reso-reference-server
         run: docker compose --profile compliance-entity-event up --build --exit-code-from compliance-entity-event db-entity-event server-entity-event compliance-entity-event
 
+      - name: Collect results
+        if: always()
+        working-directory: reso-reference-server
+        run: |
+          mkdir -p compliance/results
+          for c in compliance-dd compliance-core; do
+            docker cp "reso-reference-server-${c}-1:/reso-certification-utils/results/." compliance/results/ 2>/dev/null || true
+            docker cp "reso-reference-server-${c}-1:/commander/build/certification/." compliance/results/ 2>/dev/null || true
+          done
+
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
@@ -78,6 +88,16 @@ jobs:
         working-directory: reso-reference-server
         run: docker compose --profile mongodb --profile compliance-entity-event-mongo up --build --exit-code-from compliance-entity-event-mongo mongodb-entity-event server-entity-event-mongo compliance-entity-event-mongo
 
+      - name: Collect results
+        if: always()
+        working-directory: reso-reference-server
+        run: |
+          mkdir -p compliance/results
+          for c in compliance-dd-mongo compliance-core-mongo; do
+            docker cp "reso-reference-server-${c}-1:/reso-certification-utils/results/." compliance/results/ 2>/dev/null || true
+            docker cp "reso-reference-server-${c}-1:/commander/build/certification/." compliance/results/ 2>/dev/null || true
+          done
+
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
@@ -107,6 +127,16 @@ jobs:
       - name: EntityEvent RCP-027 compliance (SQLite)
         working-directory: reso-reference-server
         run: docker compose --profile compliance-entity-event-sqlite up --build --exit-code-from compliance-entity-event-sqlite server-entity-event-sqlite compliance-entity-event-sqlite
+
+      - name: Collect results
+        if: always()
+        working-directory: reso-reference-server
+        run: |
+          mkdir -p compliance/results
+          for c in compliance-dd-sqlite compliance-core-sqlite; do
+            docker cp "reso-reference-server-${c}-1:/reso-certification-utils/results/." compliance/results/ 2>/dev/null || true
+            docker cp "reso-reference-server-${c}-1:/commander/build/certification/." compliance/results/ 2>/dev/null || true
+          done
 
       - name: Upload results
         if: always()
