@@ -979,7 +979,7 @@ function getPageCSS() {
       max-width: 1100px;
     }
     @media (max-width: 768px) {
-      .dd-content { padding: 0 1rem 1rem; max-width: 100vw; overflow-x: auto; }
+      .dd-content { padding: 0 1rem 1rem; max-width: 100vw; overflow-x: clip; }
       .dd-metadata-card { overflow-x: auto; }
       .dd-resource-grid { grid-template-columns: 1fr; }
     }
@@ -1010,7 +1010,20 @@ function getPageCSS() {
       .dd-breadcrumb { margin-bottom: 0.5rem; }
       .dd-page-header { margin-bottom: 0.75rem; }
       .dd-page-header h1 { font-size: 1.25rem; }
-      .dd-definition-callout { padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; font-size: 0.875rem; }
+      .dd-definition-callout {
+        padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; font-size: 0.875rem;
+        position: relative;
+      }
+      .dd-callout-text {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .dd-definition-callout.expanded .dd-callout-text {
+        -webkit-line-clamp: unset;
+        overflow: visible;
+      }
     }
     .dd-copy-btn {
       display: inline-flex;
@@ -1027,6 +1040,19 @@ function getPageCSS() {
     }
     .dd-copy-btn:hover { color: var(--reso-blue); background: var(--reso-gray-100); }
     .dd-copy-btn.copied { color: var(--reso-green); }
+    .dd-callout-toggle { display: none; }
+    @media (max-width: 768px) {
+      .dd-definition-callout.needs-toggle .dd-callout-toggle {
+        display: inline;
+        background: none;
+        border: none;
+        color: var(--reso-blue);
+        font-size: 0.8125rem;
+        cursor: pointer;
+        padding: 0;
+        margin-left: 0.25rem;
+      }
+    }
     .dd-search-norm { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
 
     /* Resource grid */
@@ -1060,7 +1086,7 @@ function getPageCSS() {
       border-bottom: 2px solid var(--reso-gray-200);
       scroll-margin-top: calc(var(--sticky-thead-top, 180px) + 2.5rem);
     }
-    .dd-group-heading:first-child { margin-top: 0; }
+    .dd-group-heading:first-of-type { margin-top: 0; }
     .dd-group-depth-2 { font-size: 0.9375rem; border-bottom-width: 1px; }
     .dd-group-depth-3 { font-size: 0.875rem; border-bottom-width: 1px; }
     .dd-group-parent { color: var(--reso-gray-400); font-weight: 400; }
@@ -1159,31 +1185,37 @@ function getPageCSS() {
       transition: opacity 0.15s;
     }
     @media (max-width: 768px) {
-      .dd-fields-table-wrapper,
-      .dd-collapsible-content,
-      .dd-content { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .dd-collapsible-content { overflow-x: auto; -webkit-overflow-scrolling: touch; }
       /* Hide Type and Usage columns on mobile (3rd and 4th) */
       .dd-fields-table th:nth-child(n+3),
       .dd-fields-table td:nth-child(n+3) { display: none; }
       .dd-field-def { max-width: none; }
-      /* Lookup tables keep all columns but scroll */
+      /* Lookup tables keep all columns but scroll horizontally */
+      .dd-lookups-table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
       .dd-lookups-table { min-width: 600px; }
-      /* Disable sticky headers and reset overflow on mobile */
-      .dd-fields-table-wrapper .dd-fields-table {
-        overflow: hidden;
-      }
+      /* Sticky column headers on mobile */
       .dd-fields-table-wrapper .dd-fields-table th {
-        position: static;
-        box-shadow: none;
+        position: sticky;
+        top: 64px;
+        z-index: 5;
+        box-shadow: 0 1px 0 var(--reso-gray-200);
       }
       .dd-fields-table-wrapper .dd-sticky-col-headers {
         display: none !important;
       }
-      .dd-mobile-group-indicator {
-        top: calc(64px + 1.75rem);
+      /* Show thead in grouped mode on mobile (overrides desktop hide) */
+      .dd-fields-table-wrapper.dd-grouped .dd-fields-table thead {
+        display: table-header-group;
       }
+      /* Reset table-layout for grouped tables on mobile (desktop uses fixed for 4 cols) */
+      .dd-fields-table-wrapper.dd-grouped .dd-fields-table {
+        table-layout: auto;
+      }
+      .dd-fields-table-wrapper.dd-grouped .dd-fields-table td:nth-child(1) { width: 35%; }
+      .dd-fields-table-wrapper.dd-grouped .dd-fields-table td:nth-child(2) { width: auto; }
+      /* Hide mobile group indicator — sticky column headers suffice */
       .dd-fields-table-wrapper.dd-grouped .dd-mobile-group-indicator {
-        display: block;
+        display: none;
       }
     }
     .dd-fields-table tbody tr:nth-child(even), .dd-lookups-table tbody tr:nth-child(even) {
@@ -1199,6 +1231,14 @@ function getPageCSS() {
       font-size: 0.6875rem;
       color: var(--reso-gray-500);
       font-family: 'SFMono-Regular', Consolas, monospace;
+    }
+    @media (max-width: 768px) {
+      .dd-field-standard-name {
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
     }
     .dd-field-def { color: var(--reso-gray-600); max-width: 400px; }
     .dd-more-link { color: var(--reso-blue); text-decoration: none; font-size: 0.75rem; }
@@ -1316,6 +1356,8 @@ function getPageCSS() {
     }
     @media (max-width: 768px) {
       .dd-resource-sticky { position: static; top: auto; margin: 0 -1rem; padding: 0.25rem 1rem; }
+      .dd-sort-controls { gap: 0.25rem; margin-bottom: 0.5rem; }
+      .dd-group-toggle { margin-left: auto; padding: 0.25rem 0.5rem; font-size: 0.6875rem; }
     }
     html.dark .dd-resource-sticky { background: var(--reso-gray-50); }
 
@@ -1363,6 +1405,47 @@ function getPageCSS() {
     }
     .dd-group-toggle:hover { border-color: var(--reso-blue); color: var(--reso-blue); }
     .dd-group-toggle.active { background: var(--reso-blue); border-color: var(--reso-blue); color: white; }
+    /* Mobile sort dropdown — hidden on desktop */
+    .dd-sort-select, .dd-sort-dir-btn, .dd-sort-mobile-label { display: none; }
+    @media (max-width: 768px) {
+      .dd-sort-pill { display: none; }
+      .dd-sort-controls label { display: none; }
+      .dd-sort-mobile-label {
+        display: inline;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--reso-gray-500);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      .dd-sort-select {
+        display: inline-block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.25rem 0.375rem;
+        border: 1px solid var(--reso-gray-300);
+        border-radius: 0.375rem;
+        background: white;
+        color: var(--reso-gray-700);
+        cursor: pointer;
+      }
+      html.dark .dd-sort-select { background: var(--reso-gray-100); color: var(--reso-gray-700); border-color: var(--reso-gray-300); }
+      .dd-sort-dir-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.625rem;
+        width: 1.5rem;
+        height: 1.5rem;
+        border: 1px solid var(--reso-gray-300);
+        border-radius: 0.375rem;
+        background: white;
+        color: var(--reso-gray-600);
+        cursor: pointer;
+        padding: 0;
+      }
+      html.dark .dd-sort-dir-btn { background: var(--reso-gray-100); color: var(--reso-gray-700); border-color: var(--reso-gray-300); }
+    }
 
     /* Badge */
     .badge {
@@ -1875,6 +1958,26 @@ function getPageJS() {
         });
       });
 
+      // Definition callout toggle — only show button when text is actually clamped
+      document.querySelectorAll('.dd-definition-callout').forEach(function(callout) {
+        var textEl = callout.querySelector('.dd-callout-text');
+        var btn = callout.querySelector('.dd-callout-toggle');
+        if (!textEl || !btn) return;
+        function checkOverflow() {
+          if (window.innerWidth > 768) { callout.classList.remove('needs-toggle'); return; }
+          callout.classList.remove('expanded');
+          btn.textContent = '... more';
+          var isOverflowing = textEl.scrollHeight > textEl.clientHeight + 1;
+          callout.classList.toggle('needs-toggle', isOverflowing);
+        }
+        btn.addEventListener('click', function() {
+          var expanded = callout.classList.toggle('expanded');
+          btn.textContent = expanded ? 'less' : '... more';
+        });
+        checkOverflow();
+        window.addEventListener('resize', checkOverflow);
+      });
+
       // Pill-based sort helper — returns a reset function
       function initSortPills(container, onSort) {
         if (!container) return function() {};
@@ -1991,7 +2094,11 @@ function getPageJS() {
         var sidebarGroups = document.querySelector('.dd-nav-resource.expanded > .dd-nav-groups');
 
         var fieldSortContainer = document.querySelector('.dd-sort-controls');
-        var resetPills = initSortPills(fieldSortContainer, function(field, ascending) {
+        var mobileSortAscending = true;
+        var mobileSortSelect = fieldSortContainer ? fieldSortContainer.querySelector('.dd-sort-select') : null;
+        var mobileSortDirBtn = fieldSortContainer ? fieldSortContainer.querySelector('.dd-sort-dir-btn') : null;
+
+        function doSort(field, ascending) {
           if (groupToggle && groupsVisible) {
             groupsVisible = false;
             groupToggle.classList.remove('active');
@@ -1999,7 +2106,42 @@ function getPageJS() {
           flatSort(field, ascending);
           updateStickyOffset();
           if (sidebarGroups) sidebarGroups.style.display = 'none';
+        }
+
+        var resetPills = initSortPills(fieldSortContainer, function(field, ascending) {
+          doSort(field, ascending);
+          // Sync mobile select
+          if (mobileSortSelect) mobileSortSelect.value = field;
+          mobileSortAscending = ascending;
+          if (mobileSortDirBtn) mobileSortDirBtn.innerHTML = ascending ? '&#9650;' : '&#9660;';
         });
+
+        // Mobile sort dropdown
+        if (mobileSortSelect) {
+          mobileSortSelect.addEventListener('change', function() {
+            mobileSortAscending = true;
+            if (mobileSortDirBtn) mobileSortDirBtn.innerHTML = '&#9650;';
+            doSort(mobileSortSelect.value, true);
+            // Sync desktop pills
+            var pills = fieldSortContainer.querySelectorAll('.dd-sort-pill');
+            pills.forEach(function(p) { p.classList.remove('active'); var a = p.querySelector('.dd-sort-arrow'); if (a) a.innerHTML = '&#9650;'; });
+            var matchPill = fieldSortContainer.querySelector('.dd-sort-pill[data-sort="' + mobileSortSelect.value + '"]');
+            if (matchPill) matchPill.classList.add('active');
+          });
+        }
+        if (mobileSortDirBtn) {
+          mobileSortDirBtn.addEventListener('click', function() {
+            mobileSortAscending = !mobileSortAscending;
+            mobileSortDirBtn.innerHTML = mobileSortAscending ? '&#9650;' : '&#9660;';
+            doSort(mobileSortSelect ? mobileSortSelect.value : 'name', mobileSortAscending);
+          });
+        }
+
+        function resetMobileSort() {
+          mobileSortAscending = true;
+          if (mobileSortSelect) mobileSortSelect.value = 'name';
+          if (mobileSortDirBtn) mobileSortDirBtn.innerHTML = '&#9650;';
+        }
 
         if (groupToggle) {
           groupToggle.addEventListener('click', function() {
@@ -2008,6 +2150,7 @@ function getPageJS() {
               groupToggle.classList.remove('active');
               flatSort('name', true);
               resetPills();
+              resetMobileSort();
               updateStickyOffset();
               if (sidebarGroups) sidebarGroups.style.display = 'none';
             } else {
@@ -2016,6 +2159,7 @@ function getPageJS() {
               wrapper.classList.add('dd-grouped');
               wrapper.innerHTML = originalHTML;
               resetPills();
+              resetMobileSort();
               updateStickyOffset();
               initScrollSpy();
               if (sidebarGroups) sidebarGroups.style.display = '';
@@ -3524,7 +3668,7 @@ function generateResourcePage(vCfg, data, resourceName, usageStats, allVersions,
   html += `</p>`;
   if (latestRevised) html += `<span class="dd-search-norm" data-pagefind-meta="date">${escapeHtml(latestRevised)}</span>`;
   html += `</div>`;
-  if (resDesc) html += `<div class="dd-definition-callout">${escapeHtml(resDesc)}</div>`;
+  if (resDesc) html += `<div class="dd-definition-callout"><span class="dd-callout-text">${escapeHtml(resDesc)}</span><button class="dd-callout-toggle">... more</button></div>`;
 
   const hasGroups = Object.keys(groupTree).some(k => !k.startsWith('_'));
   html += `<div class="dd-sort-controls">
@@ -3534,6 +3678,15 @@ function generateResourcePage(vCfg, data, resourceName, usageStats, allVersions,
     <button class="dd-sort-pill" data-sort="usage">Usage <span class="dd-sort-arrow">&#9650;</span></button>
     <button class="dd-sort-pill" data-sort="added">Date Added <span class="dd-sort-arrow">&#9650;</span></button>
     <button class="dd-sort-pill" data-sort="revised">Revised <span class="dd-sort-arrow">&#9650;</span></button>
+    <label class="dd-sort-mobile-label">Sort</label>
+    <select class="dd-sort-select">
+      <option value="name" selected>Name</option>
+      <option value="type">Type</option>
+      <option value="usage">Usage</option>
+      <option value="added">Date Added</option>
+      <option value="revised">Revised</option>
+    </select>
+    <button class="dd-sort-dir-btn" title="Toggle sort direction">&#9650;</button>
     ${hasGroups ? '<button class="dd-group-toggle active" id="ddGroupToggle">Show Groups</button>' : ''}
   </div>`;
   html += '</div>';
