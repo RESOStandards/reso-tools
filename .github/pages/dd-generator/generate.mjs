@@ -2626,6 +2626,14 @@ function getLandingCSS() {
     .dd-landing-related-icon-orange svg { fill: var(--reso-orange); }
     .dd-landing-related-icon-green { background: rgba(56,161,105,0.1); }
     .dd-landing-related-icon-green svg { fill: var(--reso-green); }
+    html.dark .dd-landing-related-icon-navy { background: rgba(99,179,237,0.15); }
+    html.dark .dd-landing-related-icon-navy svg { fill: #63b3ed; }
+    html.dark .dd-landing-related-icon-blue { background: rgba(99,179,237,0.15); }
+    html.dark .dd-landing-related-icon-blue svg { fill: #4fd1c5; }
+    html.dark .dd-landing-related-icon-orange { background: rgba(255,153,0,0.15); }
+    html.dark .dd-landing-related-icon-orange svg { fill: #fbd38d; }
+    html.dark .dd-landing-related-icon-green { background: rgba(72,187,120,0.15); }
+    html.dark .dd-landing-related-icon-green svg { fill: #68d391; }
     .dd-landing-related-text h4 {
       font-size: 0.875rem;
       font-weight: 600;
