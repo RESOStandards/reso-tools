@@ -3179,7 +3179,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
 // Sidebar HTML Generator
 // ---------------------------------------------------------------------------
 
-function generateSidebarHtml(vCfg, data, activeResource, activePage, { anchorGroups = false } = {}) {
+function generateSidebarHtml(vCfg, data, activeResource, activePage, { anchorGroups = false, activeGroupPath = null } = {}) {
   const { version } = vCfg;
   const allResources = Object.keys(data.resourceMap).sort();
   // Property first, then the rest alphabetically
@@ -3214,7 +3214,7 @@ function generateSidebarHtml(vCfg, data, activeResource, activePage, { anchorGro
 
     if (childGroups.length > 0) {
       html += `  <ul class="dd-nav-groups">\n`;
-      html += renderSidebarGroups(version, rn, tree, [], anchorGroups && isActive);
+      html += renderSidebarGroups(version, rn, tree, [], anchorGroups && isActive, isActive ? activeGroupPath : null);
       html += `  </ul>\n`;
     }
     html += `</li>\n`;
@@ -3223,7 +3223,7 @@ function generateSidebarHtml(vCfg, data, activeResource, activePage, { anchorGro
   return html;
 }
 
-function renderSidebarGroups(version, resourceName, tree, path, anchorOnly) {
+function renderSidebarGroups(version, resourceName, tree, path, anchorOnly, activeGroupPath) {
   const childGroups = Object.keys(tree).filter(k => !k.startsWith('_')).sort();
   let html = '';
 
@@ -3233,11 +3233,20 @@ function renderSidebarGroups(version, resourceName, tree, path, anchorOnly) {
     const subGroups = Object.keys(tree[group]).filter(k => !k.startsWith('_'));
     const href = anchorOnly ? `#${groupId}` : `${ddUrl(version, resourceName)}#${groupId}`;
 
-    html += `    <li class="dd-nav-group${subGroups.length > 0 ? ' has-children' : ''}">\n`;
-    html += `      <a href="${href}" class="dd-nav-group-link">${escapeHtml(group)}</a>\n`;
+    // Check if this group is on the active path
+    const isOnActivePath = activeGroupPath != null && activeGroupPath.length >= groupPath.length &&
+      groupPath.every((seg, i) => seg === activeGroupPath[i]);
+    const isActiveGroup = activeGroupPath != null && activeGroupPath.length === groupPath.length && isOnActivePath;
+
+    const classes = ['dd-nav-group'];
+    if (subGroups.length > 0) classes.push('has-children');
+    if (isOnActivePath && subGroups.length > 0) classes.push('expanded');
+
+    html += `    <li class="${classes.join(' ')}">\n`;
+    html += `      <a href="${href}" class="dd-nav-group-link${isActiveGroup ? ' active' : ''}">${escapeHtml(group)}</a>\n`;
     if (subGroups.length > 0) {
       html += `      <ul class="dd-nav-subgroups">\n`;
-      html += renderSidebarGroups(version, resourceName, tree[group], groupPath, anchorOnly);
+      html += renderSidebarGroups(version, resourceName, tree[group], groupPath, anchorOnly, activeGroupPath);
       html += `      </ul>\n`;
     }
     html += `    </li>\n`;
@@ -3832,8 +3841,8 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
     ['Display Name', field.DisplayName, null, true],
     ['Group', field.Groups],
     ['Simple Data Type', field.SimpleDataType],
-    ['Max Length<small>suggested</small>', field.SugMaxLength],
-    ['Max Precision<small>suggested</small>', field.SugMaxPrecision],
+    ['Max Length<small>Suggested</small>', field.SugMaxLength],
+    ['Max Precision<small>Suggested</small>', field.SugMaxPrecision],
     ['Synonyms', field.Synonyms],
     ['Status', field.ElementStatus, 'ElementStatus'],
     ['BEDES', field.BEDES],
@@ -3920,7 +3929,8 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
     html += `</tbody></table></div></div>`;
   }
 
-  const sidebarHtml = generateSidebarHtml(vCfg, data, resourceName);
+  const groupPath = (field.Groups || '').split(',').map(g => g.trim()).filter(Boolean);
+  const sidebarHtml = generateSidebarHtml(vCfg, data, resourceName, undefined, { activeGroupPath: groupPath.length > 0 ? groupPath : null });
   const dir = join(OUTPUT_DIR, `DD${version}`, resourceName, field.StandardName);
   mkdirSync(dir, { recursive: true });
   const weight = fieldStats?.recipients != null && totalProviders ? fieldStats.recipients / totalProviders : undefined;
@@ -3997,7 +4007,8 @@ function generateLookupPage(vCfg, data, resourceName, field, lookup, usageStats,
   html += `<h3>Standard Value</h3>${usageHtml(lookupStats, totalProviders)}`;
   html += `</div>`;
 
-  const sidebarHtml = generateSidebarHtml(vCfg, data, resourceName);
+  const groupPath = (field.Groups || '').split(',').map(g => g.trim()).filter(Boolean);
+  const sidebarHtml = generateSidebarHtml(vCfg, data, resourceName, undefined, { activeGroupPath: groupPath.length > 0 ? groupPath : null });
   const dir = join(OUTPUT_DIR, `DD${version}`, resourceName, field.StandardName, lookup.StandardLookupValue);
   mkdirSync(dir, { recursive: true });
   const weight = lookupStats?.recipients != null && totalProviders ? lookupStats.recipients / totalProviders : undefined;
