@@ -470,7 +470,8 @@ function getPageCSS() {
 
     @media (max-width: 768px) {
       .site-header { flex-wrap: wrap; height: auto; min-height: 64px; max-width: 100vw; overflow: hidden; }
-      .menu-toggle { display: block; }
+      .menu-toggle { display: block; order: 3; }
+      .theme-toggle { order: 2; margin-left: auto; }
       .header-nav {
         display: none;
         flex-direction: column;
@@ -478,6 +479,7 @@ function getPageCSS() {
         gap: 0;
         padding: 0.5rem 0 1rem;
         border-top: 1px solid rgba(255,255,255,0.15);
+        order: 4;
       }
       .header-nav.open { display: flex; }
       .header-nav a {
@@ -979,7 +981,7 @@ function getPageCSS() {
       max-width: 1100px;
     }
     @media (max-width: 768px) {
-      .dd-content { padding: 0 1rem 1rem; max-width: 100vw; overflow-x: clip; }
+      .dd-content { padding: 0 1rem 1rem; max-width: 100vw; }
       .dd-metadata-card { overflow-x: auto; }
       .dd-resource-grid { grid-template-columns: 1fr; }
     }
@@ -1193,10 +1195,10 @@ function getPageCSS() {
       /* Lookup tables keep all columns but scroll horizontally */
       .dd-lookups-table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
       .dd-lookups-table { min-width: 600px; }
-      /* Sticky column headers on mobile */
+      /* Sticky column headers on mobile — offset calculated by JS */
       .dd-fields-table-wrapper .dd-fields-table th {
         position: sticky;
-        top: 64px;
+        top: var(--sticky-thead-top, 180px);
         z-index: 5;
         box-shadow: 0 1px 0 var(--reso-gray-200);
       }
@@ -1355,8 +1357,8 @@ function getPageCSS() {
       padding: 1.5rem 2rem 0.25rem;
     }
     @media (max-width: 768px) {
-      .dd-resource-sticky { position: static; top: auto; margin: 0 -1rem; padding: 0.25rem 1rem; }
-      .dd-sort-controls { gap: 0.25rem; margin-bottom: 0.5rem; }
+      .dd-resource-sticky { margin: 0; padding: 0.25rem 0 0.625rem; }
+      .dd-sort-controls { gap: 0.25rem; margin-bottom: 0; }
       .dd-group-toggle { margin-left: auto; padding: 0.25rem 0.5rem; font-size: 0.6875rem; }
     }
     html.dark .dd-resource-sticky { background: var(--reso-gray-50); }
@@ -2329,7 +2331,8 @@ function getLandingCSS() {
 
     @media (max-width: 768px) {
       .site-header { flex-wrap: wrap; height: auto; min-height: 64px; }
-      .menu-toggle { display: block; }
+      .menu-toggle { display: block; order: 3; }
+      .theme-toggle { order: 2; margin-left: auto; }
       .header-nav {
         display: none;
         flex-direction: column;
@@ -2337,6 +2340,7 @@ function getLandingCSS() {
         gap: 0;
         padding: 0.5rem 0 1rem;
         border-top: 1px solid rgba(255,255,255,0.15);
+        order: 4;
       }
       .header-nav.open { display: flex; }
       .header-nav a {
@@ -3065,6 +3069,10 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
     <a href="/" class="header-logo">
       <img src="/assets/reso-logo-white.png" alt="RESO" />
     </a>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
+      <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24"><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41M12 6a6 6 0 100 12 6 6 0 000-12z"/></svg>
+    </button>
     <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle menu">
       <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
     </button>
@@ -3076,10 +3084,6 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
       <button class="search-trigger" id="searchTrigger" type="button">
         <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
         Search<kbd>/</kbd>
-      </button>
-      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
-        <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
-        <svg class="icon-sun" viewBox="0 0 24 24"><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41M12 6a6 6 0 100 12 6 6 0 000-12z"/></svg>
       </button>
     </nav>
   </header>
@@ -4173,6 +4177,10 @@ function generateDDLandingPage(allData) {
     <a href="/" class="header-logo">
       <img src="/assets/reso-logo-white.png" alt="RESO" />
     </a>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
+      <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24"><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41M12 6a6 6 0 100 12 6 6 0 000-12z"/></svg>
+    </button>
     <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle menu">
       <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
     </button>
@@ -4185,10 +4193,6 @@ function generateDDLandingPage(allData) {
       <button class="search-trigger" id="searchTrigger" type="button">
         <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
         Search<kbd>/</kbd>
-      </button>
-      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
-        <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
-        <svg class="icon-sun" viewBox="0 0 24 24"><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41M12 6a6 6 0 100 12 6 6 0 000-12z"/></svg>
       </button>
     </nav>
   </header>
