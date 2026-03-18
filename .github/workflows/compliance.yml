@@ -26,23 +26,23 @@ jobs:
 
       - name: Build and start (PostgreSQL)
         working-directory: reso-reference-server
-        run: docker compose up -d --build --wait
+        run: docker compose up -d --build --wait db server
 
       - name: Data Dictionary 2.0 compliance
         working-directory: reso-reference-server
-        run: docker compose --profile compliance-dd up --build --exit-code-from compliance-dd
+        run: docker compose --profile compliance-dd up --build --exit-code-from compliance-dd compliance-dd
 
       - name: Web API Core 2.0.0 compliance
         working-directory: reso-reference-server
-        run: docker compose --profile compliance-core up --build --exit-code-from compliance-core
+        run: docker compose --profile compliance-core up --build --exit-code-from compliance-core compliance-core
 
       - name: Add/Edit RCP-010 compliance
         working-directory: reso-reference-server
-        run: docker compose --profile compliance-addedit up --build --exit-code-from compliance-addedit
+        run: docker compose --profile compliance-addedit up --build --exit-code-from compliance-addedit db-addedit server-addedit compliance-addedit
 
       - name: EntityEvent RCP-027 compliance
         working-directory: reso-reference-server
-        run: docker compose --profile compliance-entity-event up --build --exit-code-from compliance-entity-event
+        run: docker compose --profile compliance-entity-event up --build --exit-code-from compliance-entity-event db-entity-event server-entity-event compliance-entity-event
 
       - name: Upload results
         if: always()
@@ -60,23 +60,23 @@ jobs:
 
       - name: Build and start (MongoDB)
         working-directory: reso-reference-server
-        run: docker compose --profile mongodb up -d --build --wait
+        run: docker compose --profile mongodb up -d --build --wait mongodb server-mongo
 
       - name: Data Dictionary 2.0 compliance (MongoDB)
         working-directory: reso-reference-server
-        run: docker compose --profile mongodb --profile compliance-dd-mongo up --build --exit-code-from compliance-dd-mongo
+        run: docker compose --profile mongodb --profile compliance-dd-mongo up --build --exit-code-from compliance-dd-mongo compliance-dd-mongo
 
       - name: Web API Core 2.0.0 compliance (MongoDB)
         working-directory: reso-reference-server
-        run: docker compose --profile mongodb --profile compliance-core-mongo up --build --exit-code-from compliance-core-mongo
+        run: docker compose --profile mongodb --profile compliance-core-mongo up --build --exit-code-from compliance-core-mongo compliance-core-mongo
 
       - name: Add/Edit RCP-010 compliance (MongoDB)
         working-directory: reso-reference-server
-        run: docker compose --profile compliance-addedit-mongo up --build --exit-code-from compliance-addedit-mongo
+        run: docker compose --profile compliance-addedit-mongo up --build --exit-code-from compliance-addedit-mongo mongodb-addedit server-addedit-mongo compliance-addedit-mongo
 
       - name: EntityEvent RCP-027 compliance (MongoDB)
         working-directory: reso-reference-server
-        run: docker compose --profile mongodb --profile compliance-entity-event-mongo up --build --exit-code-from compliance-entity-event-mongo
+        run: docker compose --profile mongodb --profile compliance-entity-event-mongo up --build --exit-code-from compliance-entity-event-mongo mongodb-entity-event server-entity-event-mongo compliance-entity-event-mongo
 
       - name: Upload results
         if: always()
@@ -98,15 +98,15 @@ jobs:
 
       - name: Data Dictionary 2.0 compliance (SQLite)
         working-directory: reso-reference-server
-        run: docker compose --profile sqlite --profile compliance-dd-sqlite up --build --exit-code-from compliance-dd-sqlite
+        run: docker compose --profile sqlite --profile compliance-dd-sqlite up --build --exit-code-from compliance-dd-sqlite compliance-dd-sqlite
 
       - name: Web API Core 2.0.0 compliance (SQLite)
         working-directory: reso-reference-server
-        run: docker compose --profile sqlite --profile compliance-core-sqlite up --build --exit-code-from compliance-core-sqlite
+        run: docker compose --profile sqlite --profile compliance-core-sqlite up --build --exit-code-from compliance-core-sqlite compliance-core-sqlite
 
       - name: EntityEvent RCP-027 compliance (SQLite)
         working-directory: reso-reference-server
-        run: docker compose --profile compliance-entity-event-sqlite up --build --exit-code-from compliance-entity-event-sqlite
+        run: docker compose --profile compliance-entity-event-sqlite up --build --exit-code-from compliance-entity-event-sqlite server-entity-event-sqlite compliance-entity-event-sqlite
 
       - name: Upload results
         if: always()
