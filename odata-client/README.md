@@ -249,7 +249,7 @@ Runnable examples are in the [examples/](examples/) directory. Each requires the
 
 ```bash
 # Start the reference server first
-cd ../reso-reference-server && docker-compose up -d
+cd ../reso-reference-server && docker compose up -d
 
 # Run an example
 npx tsx examples/query-with-filter.ts
@@ -265,4 +265,4 @@ npm test        # 118 tests
 
 ## License
 
-See [LICENSE](../License.txt) in the repository root.
+See [LICENSE](../LICENSE) in the repository root.

@@ -47,7 +47,10 @@ Second milestone release introducing a native desktop application, multi-server 
 - **Parent-first group ordering** — Parent group fields now render before subgroups (e.g., Structure fields appear before Structure > Performance > GreenMarketing).
 - **Cross-reference links on lookup values** — The References field on lookup value pages now links to property type cross-reference pages.
 - **Terms and Definitions link** — Every resource, field, and lookup page links to the version-specific terms glossary.
-- **Mobile group indicator** — On mobile, a sticky chip below column headers shows the current group name during scroll.
+- **Mobile layout overhaul** — Sticky resource header pins breadcrumb, title, definition and sort controls below the nav bar. Sort pills replaced with a compact dropdown + direction toggle. Sticky column headers in both grouped and ungrouped modes. StandardName truncation with ellipsis. Definition callout collapses to 2 lines with overflow-aware "... more" toggle.
+- **Dark/light mode toggle** — Moved out of the hamburger menu and placed in the header bar, always accessible.
+- **404 page** — Real estate dad jokes with a "tell me another one" button.
+- **Copy buttons on detail pages** — Clipboard icons on Standard Name and Display Name (fields) and Lookup Name, Standard Value, and Legacy OData Value (lookups).
 - **Show Groups toggle** — Now a proper toggle: click to activate groups, click again to deactivate and revert to flat Name sort.
 
 #### Monorepo Restructuring
@@ -68,13 +71,25 @@ All four RESO certification suites pass against the reference server with Postgr
 
 | Suite | Result |
 |-------|--------|
-| Data Dictionary 2.0 | 1038 passed, 0 failed |
+| Data Dictionary 2.0 | 1034 passed, 0 failed (10,390 Property records) |
 | Web API Core 2.0 | 42 passed, 0 failed |
 | Add/Edit (RCP-010) | All passed |
 | EntityEvent (RCP-027) | All passed, 1000 events validated |
 
 - **Docker compliance infrastructure** — Added data seeding to DD and Web API Core compliance entrypoints. Fixed Dockerfile runtime stage to include server config files required by `import.meta.dirname` resolution.
 - **Fixed OData `$skip` handling** — `$top` is now correctly treated as a per-page limit per the OData spec, independent of `$skip`. Previously, `$top=5&$skip=5` returned empty results because the handler calculated `remaining = 5-5 = 0`.
+
+#### CI/CD
+
+- **Compliance workflow on PR** — GitHub Actions runs all four compliance suites (DD 2.0, Web API Core, Add/Edit, EntityEvent) against PostgreSQL, MongoDB, and SQLite on every pull request. Seeds 1K Property records per backend.
+- **GitHub Pages on merge** — Pages workflow triggers on merge to `main` (was temporarily set to `v0.2` during development). DD documentation auto-generated from CSV data.
+
+#### Housekeeping
+
+- **Root CLAUDE.md** — Added project-wide coding standards (functional/declarative, no classes, no `any`, arrow functions, immutability). Removed redundant package-level CLAUDE.md files.
+- **LICENSE** — Renamed from `License.txt`; updated all package README references.
+- **README badges** — Tests (856 passed), coverage (97%), RESO compliance (4/4 suites).
+- **Doc/ cleanup** — Removed stale project summary files.
 
 #### Security
 

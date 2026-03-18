@@ -110,4 +110,4 @@ The UI container uses nginx to serve the built React app and proxy API requests 
 
 ## License
 
-See [LICENSE](../License.txt) in the repository root.
+See [LICENSE](../LICENSE) in the repository root.

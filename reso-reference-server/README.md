@@ -284,4 +284,4 @@ npm start      # node dist/index.js
 
 ## License
 
-See [LICENSE](../License.txt) in the repository root.
+See [LICENSE](../LICENSE) in the repository root.

@@ -90,4 +90,4 @@ Used by both the reference server (request body validation on POST/PATCH) and th
 
 ## License
 
-See [LICENSE](../License.txt) in the repository root.
+See [LICENSE](../LICENSE) in the repository root.

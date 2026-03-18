@@ -2,9 +2,7 @@ name: GitHub Pages
 
 on:
   push:
-    # TODO: Change back to main after v0.2 merge
-    # branches: [main]
-    branches: [v0.2]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -33,6 +31,8 @@ jobs:
             "data-generator:@reso-standards/data-generator:Test data generator"
             "certification:@reso-standards/certification:Certification testing tools"
             "reso-reference-server:reso-reference-server:OData reference server"
+            "reso-web-client:@reso/web-client:React browser UI"
+            "reso-desktop-client:@reso/desktop-client:Electron desktop shell"
           )
 
           mkdir -p .github/pages/_packages

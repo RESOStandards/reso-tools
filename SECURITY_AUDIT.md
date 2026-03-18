@@ -4,6 +4,50 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
+## Audit: 2026-03-17 — v0.2 Pre-Release npm Audit
+
+**Scope:** `npm audit` across all 9 packages
+**Auditor:** Claude Opus 4.6
+
+### Summary
+
+| Package | Vulnerabilities | Severity |
+|---------|:-:|----------|
+| Root | 0 | Clean |
+| reso-reference-server | 6 | 5 moderate, 1 high |
+| reso-web-client | 0 | Clean |
+| reso-desktop-client | 0 | Clean |
+| odata-client | 1 | 1 high |
+| odata-expression-parser | 0 | Clean |
+| validation | 0 | Clean |
+| data-generator | 0 | Clean |
+| certification | 5 | 5 moderate |
+
+### HIGH: fast-xml-parser (CVE-2026-26278) — FIXED
+
+- **Affected packages**: reso-reference-server, odata-client
+- **Versions**: 4.0.0-beta.3 – 5.5.5
+- **Advisory**: [GHSA-8gc5-j5rx-235r](https://github.com/advisories/GHSA-8gc5-j5rx-235r)
+- **Description**: Numeric entity expansion bypasses all entity expansion limits
+- **Fix**: Updated via `npm audit fix` in both packages (2026-03-17)
+- **Risk**: Used for CSDL metadata parsing. Limited exposure — metadata is from trusted sources.
+
+### MODERATE: esbuild (dev dependency only)
+
+- **Affected packages**: reso-reference-server, certification
+- **Versions**: <= 0.24.2
+- **Advisory**: [GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99)
+- **Description**: esbuild dev server allows any website to send requests and read responses
+- **Fix**: Requires vitest major version upgrade (breaking change)
+- **Risk**: Dev-only dependency, not present in production. No user-facing risk.
+
+### Recommended Actions
+
+1. Run `npm audit fix` in `reso-reference-server/` and `odata-client/` to patch fast-xml-parser
+2. esbuild/vite/vitest findings are dev-only — track for next major dependency update
+
+---
+
 ## Audit: 2026-03-12 — v0.2 Full Codebase
 
 **Scope:** Full monorepo — all packages, Docker configs, Electron, web client, server

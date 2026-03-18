@@ -4,12 +4,15 @@ node_modules/
 dist/
 results.*
 lefthook-local.yml
-tools/PLAN.md
-tools/PR.md
+PLAN.md
+PR.md
 *.db
 *.db-shm
 *.db-wal
 .github/pages/dd-output/
+.github/pages/dd
+.github/pages/pagefind/
+compliance-results.zip
 .env
 .env.*
 *.env

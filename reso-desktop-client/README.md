@@ -85,4 +85,4 @@ The web UI uses browser `localStorage` instead — connections are ephemeral and
 
 ## License
 
-See [LICENSE](../License.txt) in the repository root.
+See [LICENSE](../LICENSE) in the repository root.
