@@ -471,7 +471,7 @@ function getPageCSS() {
     @media (max-width: 768px) {
       .site-header { flex-wrap: wrap; height: auto; min-height: 64px; max-width: 100vw; overflow: hidden; }
       .menu-toggle { display: block; order: 3; }
-      .theme-toggle { order: 2; margin-left: auto; }
+      .theme-toggle { margin-top: 0.5rem; justify-content: center; }
       .header-nav {
         display: none;
         flex-direction: column;
@@ -521,13 +521,13 @@ function getPageCSS() {
 
     /* Theme toggle */
     .theme-toggle {
-      background: none;
-      border: none;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
       color: rgba(255,255,255,0.7);
       cursor: pointer;
-      padding: 0.375rem;
+      padding: 0.375rem 0.5rem;
       border-radius: 0.375rem;
-      transition: all 0.15s;
+      transition: background 0.15s;
       display: flex;
       align-items: center;
     }
@@ -2349,7 +2349,7 @@ function getLandingCSS() {
     @media (max-width: 768px) {
       .site-header { flex-wrap: wrap; height: auto; min-height: 64px; }
       .menu-toggle { display: block; order: 3; }
-      .theme-toggle { order: 2; margin-left: auto; }
+      .theme-toggle { margin-top: 0.5rem; justify-content: center; }
       .header-nav {
         display: none;
         flex-direction: column;
@@ -2661,11 +2661,10 @@ function getLandingCSS() {
       border: 1px solid rgba(255,255,255,0.25);
       border-radius: 0.375rem;
       color: rgba(255,255,255,0.7);
-      padding: 0.375rem;
+      padding: 0.375rem 0.5rem;
       cursor: pointer;
       display: flex;
       align-items: center;
-      justify-content: center;
       transition: background 0.15s;
     }
     .theme-toggle:hover { background: rgba(255,255,255,0.25); color: white; }
@@ -3086,10 +3085,6 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
     <a href="/" class="header-logo">
       <img src="/assets/reso-logo-white.png" alt="RESO" />
     </a>
-    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
-      <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
-      <svg class="icon-sun" viewBox="0 0 24 24"><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41M12 6a6 6 0 100 12 6 6 0 000-12z"/></svg>
-    </button>
     <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle menu">
       <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
     </button>
@@ -3101,6 +3096,10 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
       <button class="search-trigger" id="searchTrigger" type="button">
         <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
         Search<kbd>/</kbd>
+      </button>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
+        <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
       </button>
     </nav>
   </header>
@@ -4198,10 +4197,6 @@ function generateDDLandingPage(allData) {
     <a href="/" class="header-logo">
       <img src="/assets/reso-logo-white.png" alt="RESO" />
     </a>
-    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
-      <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
-      <svg class="icon-sun" viewBox="0 0 24 24"><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41M12 6a6 6 0 100 12 6 6 0 000-12z"/></svg>
-    </button>
     <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle menu">
       <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
     </button>
@@ -4214,6 +4209,10 @@ function generateDDLandingPage(allData) {
       <button class="search-trigger" id="searchTrigger" type="button">
         <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
         Search<kbd>/</kbd>
+      </button>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
+        <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
       </button>
     </nav>
   </header>
@@ -4409,10 +4408,6 @@ function generate404Page() {
     <a href="/" class="header-logo">
       <img src="/assets/reso-logo-white.png" alt="RESO" />
     </a>
-    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
-      <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
-      <svg class="icon-sun" viewBox="0 0 24 24"><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41M12 6a6 6 0 100 12 6 6 0 000-12z"/></svg>
-    </button>
     <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle menu">
       <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
     </button>
@@ -4421,6 +4416,10 @@ function generate404Page() {
       <a href="/dd/">Data Dictionary</a>
       <a href="https://github.com/RESOStandards/reso-tools">GitHub</a>
       <a href="https://reso.org">RESO.org</a>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
+        <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      </button>
     </nav>
   </header>
   <div class="dd-404">
