@@ -2617,23 +2617,23 @@ function getLandingCSS() {
       justify-content: center;
       flex-shrink: 0;
     }
-    .dd-landing-related-icon svg { width: 18px; height: 18px; }
+    .dd-landing-related-icon svg { width: 18px; height: 18px; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .dd-landing-related-icon-navy { background: rgba(26,47,88,0.1); }
-    .dd-landing-related-icon-navy svg { fill: var(--reso-navy); }
+    .dd-landing-related-icon-navy svg { stroke: var(--reso-navy); }
     .dd-landing-related-icon-blue { background: rgba(0,126,158,0.1); }
-    .dd-landing-related-icon-blue svg { fill: var(--reso-blue); }
+    .dd-landing-related-icon-blue svg { stroke: var(--reso-blue); }
     .dd-landing-related-icon-orange { background: rgba(255,153,0,0.1); }
-    .dd-landing-related-icon-orange svg { fill: var(--reso-orange); }
+    .dd-landing-related-icon-orange svg { stroke: var(--reso-orange); }
     .dd-landing-related-icon-green { background: rgba(56,161,105,0.1); }
-    .dd-landing-related-icon-green svg { fill: var(--reso-green); }
+    .dd-landing-related-icon-green svg { stroke: var(--reso-green); }
     html.dark .dd-landing-related-icon-navy { background: rgba(99,179,237,0.15); }
-    html.dark .dd-landing-related-icon-navy svg { fill: #63b3ed; }
+    html.dark .dd-landing-related-icon-navy svg { stroke: #63b3ed; }
     html.dark .dd-landing-related-icon-blue { background: rgba(99,179,237,0.15); }
-    html.dark .dd-landing-related-icon-blue svg { fill: #4fd1c5; }
+    html.dark .dd-landing-related-icon-blue svg { stroke: #4fd1c5; }
     html.dark .dd-landing-related-icon-orange { background: rgba(255,153,0,0.15); }
-    html.dark .dd-landing-related-icon-orange svg { fill: #fbd38d; }
+    html.dark .dd-landing-related-icon-orange svg { stroke: #fbd38d; }
     html.dark .dd-landing-related-icon-green { background: rgba(72,187,120,0.15); }
-    html.dark .dd-landing-related-icon-green svg { fill: #68d391; }
+    html.dark .dd-landing-related-icon-green svg { stroke: #68d391; }
     .dd-landing-related-text h4 {
       font-size: 0.875rem;
       font-weight: 600;
@@ -3179,7 +3179,7 @@ function wrapPage(title, version, sidebarHtml, contentHtml, allVersions, { pagef
 // Sidebar HTML Generator
 // ---------------------------------------------------------------------------
 
-function generateSidebarHtml(vCfg, data, activeResource, activePage) {
+function generateSidebarHtml(vCfg, data, activeResource, activePage, { anchorGroups = false } = {}) {
   const { version } = vCfg;
   const allResources = Object.keys(data.resourceMap).sort();
   // Property first, then the rest alphabetically
@@ -3214,7 +3214,7 @@ function generateSidebarHtml(vCfg, data, activeResource, activePage) {
 
     if (childGroups.length > 0) {
       html += `  <ul class="dd-nav-groups">\n`;
-      html += renderSidebarGroups(version, rn, tree, [], isActive);
+      html += renderSidebarGroups(version, rn, tree, [], anchorGroups && isActive);
       html += `  </ul>\n`;
     }
     html += `</li>\n`;
@@ -3721,7 +3721,7 @@ function generateResourcePage(vCfg, data, resourceName, usageStats, allVersions,
 
   html += renderGroupedFields(version, resourceName, fields, groupTree, resourceStats, totalProviders);
 
-  const sidebarHtml = generateSidebarHtml(vCfg, data, resourceName);
+  const sidebarHtml = generateSidebarHtml(vCfg, data, resourceName, undefined, { anchorGroups: true });
   const dir = join(OUTPUT_DIR, `DD${version}`, resourceName);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'index.html'), wrapPage(
