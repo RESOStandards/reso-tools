@@ -124,6 +124,10 @@ jobs:
         working-directory: reso-reference-server
         run: docker compose --profile sqlite --profile compliance-core-sqlite up --build --exit-code-from compliance-core-sqlite compliance-core-sqlite
 
+      - name: Add/Edit RCP-010 compliance (SQLite)
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-addedit-sqlite up --build --exit-code-from compliance-addedit-sqlite server-addedit-sqlite compliance-addedit-sqlite
+
       - name: EntityEvent RCP-027 compliance (SQLite)
         working-directory: reso-reference-server
         run: docker compose --profile compliance-entity-event-sqlite up --build --exit-code-from compliance-entity-event-sqlite server-entity-event-sqlite compliance-entity-event-sqlite
