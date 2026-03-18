@@ -85,21 +85,6 @@ const BATHROOM_PARTS = ['BathroomsFull', 'BathroomsHalf', 'BathroomsPartial', 'B
 /** Cross-field rules for the Property resource. */
 export const PROPERTY_CROSS_RULES: ReadonlyArray<CrossFieldRule> = [
   {
-    name: 'ListPrice >= ListPriceLow',
-    validate: body => {
-      const listPrice = numericField(body, 'ListPrice');
-      const listPriceLow = numericField(body, 'ListPriceLow');
-      if (listPrice === null || listPriceLow === null) return null;
-      if (listPrice < listPriceLow) {
-        return {
-          field: 'ListPrice',
-          reason: `ListPrice ($${listPrice.toLocaleString('en-US')}) must be greater than or equal to ListPriceLow ($${listPriceLow.toLocaleString('en-US')}).`
-        };
-      }
-      return null;
-    }
-  },
-  {
     name: 'BathroomsTotalInteger = sum of parts',
     validate: body => {
       const total = numericField(body, 'BathroomsTotalInteger');

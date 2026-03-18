@@ -1,4 +1,124 @@
-# RESO Transport Tools — Release Notes
+# RESO Tools — Release Notes
+
+---
+
+## v0.2 — 2026-03-10
+
+### RESO Desktop Client and Other Improvements
+
+Second milestone release introducing a native desktop application, multi-server connectivity, a full-featured metadata explorer, and comprehensive compliance testing across all four RESO certification suites.
+
+#### Desktop Client (New)
+
+- **Electron desktop application** — Native app wrapping the reference server and UI for macOS, Windows, and Linux. Dual-process architecture: CJS main process for window management, ESM child process for the server (avoids Electron's CJS/ESM interop issues).
+- **Native menus and navigation** — Full menu bar (File, Edit, View, Navigate, Window, Help), keyboard shortcuts (Cmd/Ctrl+[/] for back/forward), three-finger swipe gestures, and trackpad scroll navigation.
+- **RESO-branded icons** — Custom `.icns` (macOS), `.ico` (Windows), and `.png` (Linux) app icons.
+- **Automatic port discovery** — Server starts on a random available port and communicates readiness via IPC.
+- **SQLite backend** — Persistent storage in the user data directory, no external database required.
+
+#### Server Switcher & External Server Support
+
+- **Multi-server connectivity** — New server switcher component allows connecting to external OData servers alongside the built-in reference server. Supports Bearer token and Client Credentials OAuth2 authentication.
+- **Server connection modal** — Add/edit/remove server connections with live connection testing. Stored in React context with localStorage persistence.
+- **Server-aware proxy** — Backend proxy endpoint forwards OData requests to external servers, handling authentication and CORS transparently.
+- **Metadata adapter** — Translates external server CSDL metadata into the internal format, enabling the full UI (search, detail, CRUD) against any OData-compliant server.
+- **Granular permissions** — Server context tracks per-server capabilities (read, create, update, delete) and the UI adapts accordingly (hides Add/Edit/Delete for read-only servers).
+
+#### UI Enhancements
+
+- **Landing page** — New home page with server status, resource overview cards, and quick navigation.
+- **Metadata Explorer** — Browse entity types, fields, navigation properties, and enumerations from the server's `$metadata`. Searchable and filterable.
+- **Mobile responsive layout** — Collapsible sidebar, responsive grid layouts, and touch-friendly controls.
+- **Advanced search overlay** — Full-screen search panel with field-type-aware inputs, date pickers, and lookup dropdowns.
+- **Human-friendly lookups** — Unified lookup resolver translates enum values to display names throughout the UI.
+- **Loading spinner** — Consistent loading state across all pages.
+- **Password field masking** — Sensitive fields (tokens, passwords) masked by default with toggle to reveal.
+- **Dynamic key discovery** — Detail/edit pages work with any key field, not just hardcoded `ListingKey`.
+- **Generic media display** — Media carousel works with any resource that has navigation to Media, not just Property.
+- **Organizations page** — Browse the RESO member directory with multi-select filters (type, location, status), sortable columns, sticky table header, zebra-striped rows, and expandable detail rows with endorsements, address, certification link, and embedded OpenStreetMap.
+- **Friendly error pages** — Reusable `FriendlyError` component and redesigned 404 page with real-estate quips, styled server message blocks, navigation buttons, and Contact Support link. Applied consistently across all page-level error states.
+- **Sidebar navigation polish** — Added Organizations link, replaced chevron arrows with semantic icons (search for Resources, code brackets for Metadata, gear for Admin, chart for Data Generator), renamed "Metadata Explorer" to "Metadata", consistent spacing via `space-y-4`.
+- **Metadata filter labels** — Renamed "Properties" filter to "Fields" to avoid ambiguity with the Property resource in real estate contexts.
+
+#### Data Dictionary Documentation Site
+
+- **Sticky column headers** — FIELD/DEFINITION/TYPE/USAGE headers stick below the sort controls as you scroll through fields, in both grouped and flat views.
+- **Group tree improvements** — Sidebar group tree syncs with content: hides when flat-sorting, reappears when Show Groups is toggled. Groups with subgroups show expand/collapse chevrons. Clicking a group scrolls to it with correct offset accounting for sticky headers.
+- **Parent-first group ordering** — Parent group fields now render before subgroups (e.g., Structure fields appear before Structure > Performance > GreenMarketing).
+- **Cross-reference links on lookup values** — The References field on lookup value pages now links to property type cross-reference pages.
+- **Terms and Definitions link** — Every resource, field, and lookup page links to the version-specific terms glossary.
+- **Mobile layout overhaul** — Sticky resource header pins breadcrumb, title, definition and sort controls below the nav bar. Sort pills replaced with a compact dropdown + direction toggle. Sticky column headers in both grouped and ungrouped modes. StandardName truncation with ellipsis. Definition callout collapses to 2 lines with overflow-aware "... more" toggle.
+- **Dark/light mode toggle** — Moved out of the hamburger menu and placed in the header bar, always accessible.
+- **404 page** — Real estate dad jokes with a "tell me another one" button.
+- **Copy buttons on detail pages** — Clipboard icons on Standard Name and Display Name (fields) and Lookup Name, Standard Value, and Legacy OData Value (lookups).
+- **Show Groups toggle** — Now a proper toggle: click to activate groups, click again to deactivate and revert to flat Name sort.
+
+#### Monorepo Restructuring
+
+- **Flat package layout** — Extracted `reso-web-client/` and `reso-desktop-client/` to top-level packages (previously nested under `reso-reference-server/ui/` and `reso-reference-server/desktop/`).
+- **Updated READMEs** — All package READMEs reviewed and updated for the new layout: fixed stale paths, LICENSE links, package references, and CLI examples.
+- **Desktop client documentation** — Added prerequisites, local dev quick-start, architecture overview, packaging notes, and connection storage details.
+
+#### OData Client Improvements
+
+- **HTTP keep-alive and gzip compression** — Connection pooling and response compression for faster metadata and data fetching.
+- **CSDL parser enhancements** — Extended parser handles navigation property bindings, enum type members, and complex type definitions from external servers.
+- **Lookup resolver library** — New `@reso-standards/odata-client` export for resolving human-friendly lookup values from CSDL metadata.
+
+#### Compliance Testing
+
+All four RESO certification suites pass against the reference server with PostgreSQL backend and string enumerations:
+
+| Suite | Result |
+|-------|--------|
+| Data Dictionary 2.0 | 1034 passed, 0 failed (10,390 Property records) |
+| Web API Core 2.0 | 42 passed, 0 failed |
+| Add/Edit (RCP-010) | All passed |
+| EntityEvent (RCP-027) | All passed, 1000 events validated |
+
+- **Docker compliance infrastructure** — Added data seeding to DD and Web API Core compliance entrypoints. Fixed Dockerfile runtime stage to include server config files required by `import.meta.dirname` resolution.
+- **Fixed OData `$skip` handling** — `$top` is now correctly treated as a per-page limit per the OData spec, independent of `$skip`. Previously, `$top=5&$skip=5` returned empty results because the handler calculated `remaining = 5-5 = 0`.
+
+#### CI/CD
+
+- **Compliance workflow on PR** — GitHub Actions runs all four compliance suites (DD 2.0, Web API Core, Add/Edit, EntityEvent) against PostgreSQL, MongoDB, and SQLite on every pull request. Seeds 1K Property records per backend.
+- **GitHub Pages on merge** — Pages workflow triggers on merge to `main` (was temporarily set to `v0.2` during development). DD documentation auto-generated from CSV data.
+
+#### Housekeeping
+
+- **Root CLAUDE.md** — Added project-wide coding standards (functional/declarative, no classes, no `any`, arrow functions, immutability). Removed redundant package-level CLAUDE.md files.
+- **LICENSE** — Renamed from `License.txt`; updated all package README references.
+- **README badges** — Tests (856 passed), coverage (97%), RESO compliance (4/4 suites).
+- **Doc/ cleanup** — Removed stale project summary files.
+
+#### Security
+
+- **v0.2 security audit** — 11 new findings across desktop client, server switcher, proxy, and UI. 3 High, 5 Medium, 3 Low severity.
+- **5 prior findings confirmed fixed** — Token expiry, timing-safe auth, LIKE escaping, key interpolation, and security headers (matching closed GitHub issues).
+
+#### Bug Fixes
+
+- **Fix detail page summary fields** — Summary section now displays correctly with proper field resolution.
+- **Fix expansion card layout** — Related record cards handle non-entity-set expansions with key field fallback.
+- **Fix search lookups** — Lookup fields in search filters resolve to correct display values.
+- **Fix MongoDB Add/Edit compliance** — CRUD operations work correctly with MongoDB backend.
+- **Remove `ListPrice >= ListPriceLow` cross-field rule** — The comparison prevented setting a low list price. Both fields are now validated independently as > 0, which is sufficient. A proper RESO Validation Expressions engine will replace hardcoded rules in a future release.
+
+| SHA | Description |
+|-----|-------------|
+| 0f4715b | Add HTTP keep-alive and gzip compression to OData client |
+| fa06efa | Add server switcher, external OData server support, and MongoDB Add/Edit compliance |
+| 3039ada | Add generic media display, navigation guard, and resource-aware data generation |
+| de0c1e7 | Add granular server permissions, static DD field groups, and external server UI improvements |
+| d90f81f | Add unified lookup resolver, loading spinner, and permission-aware nav |
+| a2de8e2 | Add Metadata Explorer, dynamic key discovery, and human-friendly lookups |
+| 65cfa3c | Fix detail page summary fields, expansion card layout, and search lookups |
+| 982d98d | Add key field fallback for non-entity-set expansion cards |
+| a9e8620 | Fix security findings: token expiry, timing-safe auth, LIKE escaping, key interpolation, security headers |
+| fb4a383 | Update SECURITY_AUDIT.md: mark 5 findings as fixed |
+| fbd0b3c | Add landing page, mobile responsive layout, and password field masking |
+| d2b5bca | Improve UI: advanced search overlay, landing page fixes, error messages, and dev proxy |
+| 9344ebd | Add Electron desktop client with native menus, navigation, and app icons |
 
 ---
 
@@ -597,12 +717,12 @@ scroll container. This enables per-page pinning without `position: sticky` hacks
 
 | Package | Tests |
 |---------|------:|
-| `@reso/validation` | 103 |
-| `@reso/odata-expression-parser` | 152 |
-| `@reso/odata-client` | 101 |
-| `@reso/data-generator` | 76 |
-| `@reso/reference-server` | 137 |
-| `@reso/certification-add-edit` | 49 |
+| `@reso-standards/validation` | 103 |
+| `@reso-standards/odata-expression-parser` | 152 |
+| `@reso-standards/odata-client` | 101 |
+| `@reso-standards/data-generator` | 76 |
+| `@reso-standards/reference-server` | 137 |
+| `@reso-standards/certification-add-edit` | 49 |
 | **Total** | **618** |
 
 ---
@@ -666,12 +786,12 @@ variations, 0 schema validation errors) and fixed several OData spec issues.
 
 | Package | Tests |
 |---------|------:|
-| `@reso/validation` | 91 |
-| `@reso/odata-expression-parser` | 152 |
-| `@reso/odata-client` | 101 |
-| `@reso/data-generator` | 73 |
-| `@reso/reference-server` | 137 |
-| `@reso/certification-add-edit` | 49 |
+| `@reso-standards/validation` | 91 |
+| `@reso-standards/odata-expression-parser` | 152 |
+| `@reso-standards/odata-client` | 101 |
+| `@reso-standards/data-generator` | 73 |
+| `@reso-standards/reference-server` | 137 |
+| `@reso-standards/certification-add-edit` | 49 |
 | **Total** | **603** |
 
 ---
@@ -708,12 +828,12 @@ Fixed two OData spec compliance issues in the generated EDMX XML metadata
 
 | Package | Tests |
 |---------|------:|
-| `@reso/validation` | 91 |
-| `@reso/odata-expression-parser` | 151 |
-| `@reso/odata-client` | 101 |
-| `@reso/data-generator` | 71 |
-| `@reso/reference-server` | 130 |
-| `@reso/certification-add-edit` | 49 |
+| `@reso-standards/validation` | 91 |
+| `@reso-standards/odata-expression-parser` | 151 |
+| `@reso-standards/odata-client` | 101 |
+| `@reso-standards/data-generator` | 71 |
+| `@reso-standards/reference-server` | 130 |
+| `@reso-standards/certification-add-edit` | 49 |
 | **Total** | **593** |
 
 ---
@@ -728,7 +848,7 @@ parser.
 
 **AST serializer (`astToFilterString`):**
 
-- New `serializer.ts` in `@reso/odata-expression-parser` — walks the AST and
+- New `serializer.ts` in `@reso-standards/odata-expression-parser` — walks the AST and
   produces a canonical OData `$filter` string
 - Handles all node types: comparison, logical, not, arithmetic, function,
   lambda, literal, property, collection
@@ -769,7 +889,7 @@ parser.
 - `odata-expression-parser/src/serializer.ts` — New
 - `odata-expression-parser/src/index.ts` — Added export
 - `odata-expression-parser/tests/serializer.test.ts` — New (54 tests)
-- `ui/package.json` — Added `@reso/odata-expression-parser` dependency
+- `ui/package.json` — Added `@reso-standards/odata-expression-parser` dependency
 - `ui/Dockerfile` — Copy parser into Docker build
 - `ui/src/utils/filter-sync.ts` — New
 - `ui/src/pages/search-page.tsx` — Lifted state, validation
@@ -781,12 +901,12 @@ parser.
 
 | Package | Tests |
 |---------|------:|
-| `@reso/validation` | 91 |
-| `@reso/odata-expression-parser` | 151 |
-| `@reso/odata-client` | 101 |
-| `@reso/data-generator` | 71 |
-| `@reso/reference-server` | 126 |
-| `@reso/certification-add-edit` | 49 |
+| `@reso-standards/validation` | 91 |
+| `@reso-standards/odata-expression-parser` | 151 |
+| `@reso-standards/odata-client` | 101 |
+| `@reso-standards/data-generator` | 71 |
+| `@reso-standards/reference-server` | 126 |
+| `@reso-standards/certification-add-edit` | 49 |
 | **Total** | **589** |
 
 ---
@@ -856,7 +976,7 @@ Added generators for 4 new child resources and made the seed plan dynamic.
 - `admin-client.ts` — Added `RelatedResourceInfo` type and `relatedResources`
   field to `ResourceStatus`
 - `data-generator.ts` (server) — Status endpoint returns `relatedResources`
-  per resource using `getRelatedResources()` from `@reso/data-generator`
+  per resource using `getRelatedResources()` from `@reso-standards/data-generator`
 - `data-generator-page.tsx` — Context-sensitive related records UI
 
 ### nginx SPA Routing Fix
@@ -873,12 +993,12 @@ to the OData entity and collection regex patterns.
 
 | Package | Tests |
 |---------|------:|
-| `@reso/validation` | 91 |
-| `@reso/odata-expression-parser` | 97 |
-| `@reso/odata-client` | 101 |
-| `@reso/data-generator` | 71 |
-| `@reso/reference-server` | 126 |
-| `@reso/certification-add-edit` | 49 |
+| `@reso-standards/validation` | 91 |
+| `@reso-standards/odata-expression-parser` | 97 |
+| `@reso-standards/odata-client` | 101 |
+| `@reso-standards/data-generator` | 71 |
+| `@reso-standards/reference-server` | 126 |
+| `@reso-standards/certification-add-edit` | 49 |
 | **Total** | **535** |
 
 ---
@@ -968,8 +1088,8 @@ the `DB_BACKEND` environment variable.
 - Updated server README with MongoDB backend docs (env vars, project structure,
   DAL adapter comparison, filter translation, MongoDB-specific behavior)
 - Updated reference-server README with Docker instructions for both backends
-- Created READMEs for `@reso/validation`, `@reso/data-generator`, and
-  `@reso/certification-test-runner`
+- Created READMEs for `@reso-standards/validation`, `@reso-standards/data-generator`, and
+  `@reso-standards/certification-test-runner`
 
 ---
 
@@ -1059,12 +1179,12 @@ Fixed USPS-format address separators in the UI:
 
 | Package | Tests |
 |---------|------:|
-| `@reso/validation` | 91 |
-| `@reso/odata-expression-parser` | 97 |
-| `@reso/odata-client` | 101 |
-| `@reso/data-generator` | 71 |
-| `@reso/reference-server` | 76 |
-| `@reso/certification-add-edit` | 49 |
+| `@reso-standards/validation` | 91 |
+| `@reso-standards/odata-expression-parser` | 97 |
+| `@reso-standards/odata-client` | 101 |
+| `@reso-standards/data-generator` | 71 |
+| `@reso-standards/reference-server` | 76 |
+| `@reso-standards/certification-add-edit` | 49 |
 | **Total** | **485** |
 
 ---
@@ -1073,7 +1193,7 @@ Fixed USPS-format address separators in the UI:
 
 ### Business Rules Validation
 
-Added field-specific business rules to the `@reso/validation` package in a new
+Added field-specific business rules to the `@reso-standards/validation` package in a new
 `business-rules/` subfolder. Rules are enforced on both the server API (POST/PATCH)
 and the UI input forms.
 
@@ -1127,12 +1247,12 @@ from TOAST for large values.
 
 | Package | Tests |
 |---------|------:|
-| `@reso/validation` | 65 |
-| `@reso/odata-expression-parser` | 97 |
-| `@reso/odata-client` | 101 |
-| `@reso/data-generator` | 71 |
-| `@reso/reference-server` | 76 |
-| `@reso/certification-add-edit` | 49 |
+| `@reso-standards/validation` | 65 |
+| `@reso-standards/odata-expression-parser` | 97 |
+| `@reso-standards/odata-client` | 101 |
+| `@reso-standards/data-generator` | 71 |
+| `@reso-standards/reference-server` | 76 |
+| `@reso-standards/certification-add-edit` | 49 |
 | **Total** | **459** |
 
 ---
@@ -1165,19 +1285,19 @@ resources vs 1,316 fields, 2,951 lookups in 1.7).
 
 | Package | Tests |
 |---------|------:|
-| `@reso/validation` | 41 |
-| `@reso/odata-expression-parser` | 97 |
-| `@reso/odata-client` | 101 |
-| `@reso/data-generator` | 71 |
-| `@reso/reference-server` | 76 |
-| `@reso/certification-add-edit` | 49 |
+| `@reso-standards/validation` | 41 |
+| `@reso-standards/odata-expression-parser` | 97 |
+| `@reso-standards/odata-client` | 101 |
+| `@reso-standards/data-generator` | 71 |
+| `@reso-standards/reference-server` | 76 |
+| `@reso-standards/certification-add-edit` | 49 |
 | **Total** | **435** |
 
 ---
 
 ## v0.0.5 — 2026-03-03
 
-### Data Generator: `@reso/data-generator`
+### Data Generator: `@reso-standards/data-generator`
 
 New standalone package at `tools/data-generator/` that generates realistic RESO Data
 Dictionary records for seeding OData servers with test data.
@@ -1219,7 +1339,7 @@ npx reso-data-generator -r Property -n 50 -f json -o ./seed-data \
 
 ### Auth System for Reference Server
 
-Added role-based authentication to `@reso/reference-server`.
+Added role-based authentication to `@reso-standards/reference-server`.
 
 - **Three roles**: `read`, `write`, `admin` with hierarchy (admin > write > read)
 - **Static tokens** from environment variables (`ADMIN_TOKEN`, `WRITE_TOKEN`, `READ_TOKEN`)
@@ -1263,19 +1383,19 @@ Added role-based authentication to `@reso/reference-server`.
 
 | Package | Tests |
 |---------|------:|
-| `@reso/validation` | 41 |
-| `@reso/odata-expression-parser` | 97 |
-| `@reso/odata-client` | 101 |
-| `@reso/data-generator` | 69 |
-| `@reso/reference-server` | 76 |
-| `@reso/certification-add-edit` | 49 |
+| `@reso-standards/validation` | 41 |
+| `@reso-standards/odata-expression-parser` | 97 |
+| `@reso-standards/odata-client` | 101 |
+| `@reso-standards/data-generator` | 69 |
+| `@reso-standards/reference-server` | 76 |
+| `@reso-standards/certification-add-edit` | 49 |
 | **Total** | **433** |
 
 ---
 
 ## v0.0.4 — 2026-03-03
 
-### Certification Test Runner: `@reso/certification-test-runner`
+### Certification Test Runner: `@reso-standards/certification-test-runner`
 
 Extracted generic OData certification test infrastructure from `certification/add-edit`
 into a reusable package at `tools/certification/test-runner/`. Future certification
@@ -1286,16 +1406,16 @@ duplicating test logic.
   EntityId, Preference-Applied), response body validators (JSON, annotations, etag,
   error format), payload echo checks
 - **Reporter** — console (human-readable) and JSON output formats
-- **HTTP client** — OData request wrapper delegating to `@reso/odata-client`
+- **HTTP client** — OData request wrapper delegating to `@reso-standards/odata-client`
 - **Auth helpers** — bearer token and OAuth2 Client Credentials resolution
 - **Metadata helpers** — CSDL parsing, entity type lookup, payload validation
-  against metadata using `@reso/validation`
+  against metadata using `@reso-standards/validation`
 - **Generic test helpers** — primary key extraction, schema assertions, scenario
   result building
 
 ### Validation Integration in Certification
 
-`certification/add-edit` now uses `@reso/validation` for metadata-driven field
+`certification/add-edit` now uses `@reso-standards/validation` for metadata-driven field
 validation. The `validatePayloadAgainstMetadata()` function performs full type
 checking (unknown fields, Edm type mismatches, negative numerics, MaxLength,
 integer enforcement, collection/enum checks) via the shared validation package.
@@ -1307,7 +1427,7 @@ exercised by the failure test scenarios.
 ### Package Restructure
 
 - `certification/add-edit` lib files are now thin re-exports from
-  `@reso/certification-test-runner`, keeping only add-edit-specific scenario
+  `@reso-standards/certification-test-runner`, keeping only add-edit-specific scenario
   implementations (8 scenarios), types (PayloadSet, DeletePayload, ScenarioName),
   mock server, and CLI
 - Updated build order: `test-runner` builds before `add-edit`
@@ -1317,18 +1437,18 @@ exercised by the failure test scenarios.
 
 | Package | Tests |
 |---------|------:|
-| `@reso/validation` | 41 |
-| `@reso/odata-expression-parser` | 97 |
-| `@reso/odata-client` | 101 |
-| `@reso/reference-server` | 67 |
-| `@reso/certification-add-edit` | 49 |
+| `@reso-standards/validation` | 41 |
+| `@reso-standards/odata-expression-parser` | 97 |
+| `@reso-standards/odata-client` | 101 |
+| `@reso-standards/reference-server` | 67 |
+| `@reso-standards/certification-add-edit` | 49 |
 | **Total** | **355** |
 
 ---
 
 ## v0.0.3 — 2026-03-03
 
-### Shared Validation Package: `@reso/validation`
+### Shared Validation Package: `@reso-standards/validation`
 
 Extracted field validation logic into a standalone isomorphic package at
 `tools/validation/`. Both the reference server API and the React UI now import
@@ -1338,8 +1458,8 @@ from this single source of truth.
 - **Metadata-driven** field validation: unknown field detection, type checking
   for all Edm types, negative number rejection, MaxLength enforcement,
   integer-only enforcement for Int types, collection and enum validation
-- **Subpath exports** — `@reso/validation` (top-level barrel) and
-  `@reso/validation/metadata` (direct subpath) for future extensibility
+- **Subpath exports** — `@reso-standards/validation` (top-level barrel) and
+  `@reso-standards/validation/metadata` (direct subpath) for future extensibility
 - **41 tests** — [tests/validate.test.ts](validation/tests/validate.test.ts)
 - `// TODO: Add executable business rules validation` placeholder for future
   grammar-based rules engine
@@ -1356,7 +1476,7 @@ Added a React UI for the reference server at `tools/reso-reference-server/ui/`.
 - Advanced search with grouped field filters that build OData `$filter` expressions
 - Delete confirmation with key prompt
 - Dark mode toggle (system preference + manual override)
-- Client-side validation using `@reso/validation` with per-field error display
+- Client-side validation using `@reso-standards/validation` with per-field error display
   that clears as fields are corrected
 
 ### Improved Error Messages
@@ -1371,11 +1491,11 @@ Added a React UI for the reference server at `tools/reso-reference-server/ui/`.
 
 | Package | Tests |
 |---------|------:|
-| `@reso/validation` | 41 |
-| `@reso/odata-expression-parser` | 97 |
-| `@reso/odata-client` | 101 |
-| `@reso/reference-server` | 67 |
-| `@reso/certification-add-edit` | 49 |
+| `@reso-standards/validation` | 41 |
+| `@reso-standards/odata-expression-parser` | 97 |
+| `@reso-standards/odata-client` | 101 |
+| `@reso-standards/reference-server` | 67 |
+| `@reso-standards/certification-add-edit` | 49 |
 | **Total** | **355** |
 
 ---
@@ -1426,7 +1546,7 @@ the RESO Data Dictionary and Web API specifications.
 
 ### New Packages
 
-#### `@reso/odata-expression-parser` — [odata-expression-parser/](odata-expression-parser/)
+#### `@reso-standards/odata-expression-parser` — [odata-expression-parser/](odata-expression-parser/)
 
 Standalone, zero-dependency library for parsing OData `$filter` expressions into a
 typed AST. Shared by both the client SDK (query validation) and the reference server
@@ -1444,7 +1564,7 @@ typed AST. Shared by both the client SDK (query validation) and the reference se
   duration, guid, enum
 - **97 tests** — [tests/filter-parser.test.ts](odata-expression-parser/tests/filter-parser.test.ts)
 
-#### `@reso/odata-client` — [odata-client/](odata-client/)
+#### `@reso-standards/odata-client` — [odata-client/](odata-client/)
 
 OData 4.01 client SDK for TypeScript, inspired by
 [Apache Olingo](https://olingo.apache.org/doc/odata4/index.html). Provides URI
@@ -1481,7 +1601,7 @@ and response parsing.
   - [Validate CSDL metadata](odata-client/examples/validate-metadata.ts)
   - [OAuth2 Client Credentials flow](odata-client/examples/oauth-flow.ts)
 
-#### `@reso/reference-server` — [reso-reference-server/](reso-reference-server/)
+#### `@reso-standards/reference-server` — [reso-reference-server/](reso-reference-server/)
 
 Metadata-driven OData 4.01 reference server for the RESO Data Dictionary. Reads
 RESO JSON metadata and dynamically generates PostgreSQL tables, OData CRUD endpoints,
@@ -1493,7 +1613,7 @@ EDMX metadata, and OpenAPI documentation.
   — [server/src/db/postgres-dal.ts](reso-reference-server/server/src/db/postgres-dal.ts)
 - **MongoDB example** demonstrating batch-query pattern for document stores
   — [server/src/db/mongo-dal.example.ts](reso-reference-server/server/src/db/mongo-dal.example.ts)
-- **`$filter` → SQL translation** using `@reso/odata-expression-parser` AST with
+- **`$filter` → SQL translation** using `@reso-standards/odata-expression-parser` AST with
   parameterized queries (SQL injection safe)
   — [server/src/db/filter-to-sql.ts](reso-reference-server/server/src/db/filter-to-sql.ts)
 - **Collection GET handler** with `$filter`, `$select`, `$orderby`, `$top`, `$skip`,
@@ -1506,13 +1626,13 @@ EDMX metadata, and OpenAPI documentation.
   (1,316 fields, 2,951 lookup values)
 - **67 tests** across 5 test files
 
-#### `@reso/certification-add-edit` — [certification/add-edit/](certification/add-edit/)
+#### `@reso-standards/certification-add-edit` — [certification/add-edit/](certification/add-edit/)
 
 RESO Web API Add/Edit Endorsement (RCP-010) compliance testing tool. Sends
 known-good and known-bad JSON payloads to OData servers and validates responses
 against 8 Gherkin BDD certification scenarios.
 
-- **Refactored** to use `@reso/odata-client` for HTTP, authentication, and
+- **Refactored** to use `@reso-standards/odata-client` for HTTP, authentication, and
   CSDL metadata parsing (previously used raw `fetch` and `fast-xml-parser` directly)
 - **49 tests** across 4 test files — all passing after refactoring
 
@@ -1551,8 +1671,8 @@ tracked in [TODO.md](TODO.md).
 
 | Package | Tests |
 |---------|------:|
-| `@reso/odata-expression-parser` | 97 |
-| `@reso/odata-client` | 101 |
-| `@reso/reference-server` | 67 |
-| `@reso/certification-add-edit` | 49 |
+| `@reso-standards/odata-expression-parser` | 97 |
+| `@reso-standards/odata-client` | 101 |
+| `@reso-standards/reference-server` | 67 |
+| `@reso-standards/certification-add-edit` | 49 |
 | **Total** | **314** |

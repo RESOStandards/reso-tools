@@ -1,13 +1,20 @@
 name: Compliance Tests
 
 on:
+  pull_request:
+    paths:
+      - reso-reference-server/**
+      - certification/**
+      - odata-client/**
+      - odata-expression-parser/**
+      - validation/**
+      - data-generator/**
   push:
     branches: [main]
-    paths: [tools/**]
-  # TODO: Re-enable pull_request trigger once compliance tests are stable in CI
-  # pull_request:
-  #   paths: [tools/**]
   workflow_dispatch:
+
+env:
+  SEED_COUNTS: Property=1000,Media=5,OpenHouse=2,Showing=2,PropertyRooms=3,PropertyGreenVerification=1,PropertyPowerProduction=1,PropertyUnitTypes=2
 
 jobs:
   compliance-postgres:
@@ -18,27 +25,41 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build and start (PostgreSQL)
-        working-directory: tools/reso-reference-server
-        run: docker compose up -d --build --wait
-
-      - name: Seed test data
-        working-directory: tools/reso-reference-server
-        run: docker compose --profile seed up --exit-code-from seed
+        working-directory: reso-reference-server
+        run: docker compose up -d --build --wait db server
 
       - name: Data Dictionary 2.0 compliance
-        working-directory: tools/reso-reference-server
-        run: docker compose --profile compliance-dd up --build --exit-code-from compliance-dd
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-dd up --build --exit-code-from compliance-dd compliance-dd
 
       - name: Web API Core 2.0.0 compliance
-        working-directory: tools/reso-reference-server
-        run: docker compose --profile compliance-core up --build --exit-code-from compliance-core
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-core up --build --exit-code-from compliance-core compliance-core
+
+      - name: Add/Edit RCP-010 compliance
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-addedit up --build --exit-code-from compliance-addedit db-addedit server-addedit compliance-addedit
+
+      - name: EntityEvent RCP-027 compliance
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-entity-event up --build --exit-code-from compliance-entity-event db-entity-event server-entity-event compliance-entity-event
+
+      - name: Collect results
+        if: always()
+        working-directory: reso-reference-server
+        run: |
+          mkdir -p compliance/results
+          for c in compliance-dd compliance-core; do
+            docker cp "reso-reference-server-${c}-1:/reso-certification-utils/results/." compliance/results/ 2>/dev/null || true
+            docker cp "reso-reference-server-${c}-1:/commander/build/certification/." compliance/results/ 2>/dev/null || true
+          done
 
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: compliance-results-postgres
-          path: tools/reso-reference-server/compliance/results/
+          path: reso-reference-server/compliance/results/
 
   compliance-mongodb:
     name: Compliance (MongoDB)
@@ -48,24 +69,82 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build and start (MongoDB)
-        working-directory: tools/reso-reference-server
-        run: docker compose --profile mongodb up -d --build --wait
-
-      - name: Seed test data
-        working-directory: tools/reso-reference-server
-        run: docker compose --profile mongodb --profile seed-mongo up --exit-code-from seed-mongo
+        working-directory: reso-reference-server
+        run: docker compose --profile mongodb up -d --build --wait mongodb server-mongo
 
       - name: Data Dictionary 2.0 compliance (MongoDB)
-        working-directory: tools/reso-reference-server
-        run: docker compose --profile compliance-dd-mongo up --build --exit-code-from compliance-dd-mongo
+        working-directory: reso-reference-server
+        run: docker compose --profile mongodb --profile compliance-dd-mongo up --build --exit-code-from compliance-dd-mongo compliance-dd-mongo
 
       - name: Web API Core 2.0.0 compliance (MongoDB)
-        working-directory: tools/reso-reference-server
-        run: docker compose --profile compliance-core-mongo up --build --exit-code-from compliance-core-mongo
+        working-directory: reso-reference-server
+        run: docker compose --profile mongodb --profile compliance-core-mongo up --build --exit-code-from compliance-core-mongo compliance-core-mongo
+
+      - name: Add/Edit RCP-010 compliance (MongoDB)
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-addedit-mongo up --build --exit-code-from compliance-addedit-mongo mongodb-addedit server-addedit-mongo compliance-addedit-mongo
+
+      - name: EntityEvent RCP-027 compliance (MongoDB)
+        working-directory: reso-reference-server
+        run: docker compose --profile mongodb --profile compliance-entity-event-mongo up --build --exit-code-from compliance-entity-event-mongo mongodb-entity-event server-entity-event-mongo compliance-entity-event-mongo
+
+      - name: Collect results
+        if: always()
+        working-directory: reso-reference-server
+        run: |
+          mkdir -p compliance/results
+          for c in compliance-dd-mongo compliance-core-mongo; do
+            docker cp "reso-reference-server-${c}-1:/reso-certification-utils/results/." compliance/results/ 2>/dev/null || true
+            docker cp "reso-reference-server-${c}-1:/commander/build/certification/." compliance/results/ 2>/dev/null || true
+          done
 
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: compliance-results-mongodb
-          path: tools/reso-reference-server/compliance/results/
+          path: reso-reference-server/compliance/results/
+
+  compliance-sqlite:
+    name: Compliance (SQLite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start (SQLite)
+        working-directory: reso-reference-server
+        run: docker compose --profile sqlite up -d --build --wait server-sqlite
+
+      - name: Data Dictionary 2.0 compliance (SQLite)
+        working-directory: reso-reference-server
+        run: docker compose --profile sqlite --profile compliance-dd-sqlite up --build --exit-code-from compliance-dd-sqlite compliance-dd-sqlite
+
+      - name: Web API Core 2.0.0 compliance (SQLite)
+        working-directory: reso-reference-server
+        run: docker compose --profile sqlite --profile compliance-core-sqlite up --build --exit-code-from compliance-core-sqlite compliance-core-sqlite
+
+      - name: Add/Edit RCP-010 compliance (SQLite)
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-addedit-sqlite up --build --exit-code-from compliance-addedit-sqlite server-addedit-sqlite compliance-addedit-sqlite
+
+      - name: EntityEvent RCP-027 compliance (SQLite)
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-entity-event-sqlite up --build --exit-code-from compliance-entity-event-sqlite server-entity-event-sqlite compliance-entity-event-sqlite
+
+      - name: Collect results
+        if: always()
+        working-directory: reso-reference-server
+        run: |
+          mkdir -p compliance/results
+          for c in compliance-dd-sqlite compliance-core-sqlite; do
+            docker cp "reso-reference-server-${c}-1:/reso-certification-utils/results/." compliance/results/ 2>/dev/null || true
+            docker cp "reso-reference-server-${c}-1:/commander/build/certification/." compliance/results/ 2>/dev/null || true
+          done
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-results-sqlite
+          path: reso-reference-server/compliance/results/

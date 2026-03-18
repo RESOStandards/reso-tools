@@ -1,5 +1,5 @@
 {
-  "name": "@reso/validation",
+  "name": "@reso-standards/validation",
   "version": "0.1.0",
   "description": "RESO validation library — isomorphic, no Node/browser APIs.",
   "type": "module",
@@ -29,6 +29,7 @@
     "node": ">=22"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.4",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   }

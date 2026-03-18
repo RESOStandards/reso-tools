@@ -9,9 +9,20 @@ SERVER_URL="${SERVER_URL:-http://server:8080}"
 AUTH_TOKEN="${AUTH_TOKEN:-admin-token}"
 ENUM_MODE="${ENUM_MODE:-string}"
 
+# Load shared seed helpers (seed_count function)
+. "$(dirname "$0")/seed-helpers.sh" 2>/dev/null || . /config/seed-helpers.sh
+
 echo "Waiting for server at $SERVER_URL..."
 until wget -qO- "$SERVER_URL/health" > /dev/null 2>&1; do sleep 2; done
 echo "Server ready."
+
+# Seed test data so there are records for compliance queries
+PROP_COUNT=$(seed_count Property)
+echo "Seeding $PROP_COUNT Property records..."
+wget -qO- --post-data="{\"resource\":\"Property\",\"count\":$PROP_COUNT,\"resolveDependencies\":true,\"relatedRecords\":{\"Media\":$(seed_count Media),\"OpenHouse\":$(seed_count OpenHouse),\"Showing\":$(seed_count Showing),\"PropertyRooms\":$(seed_count PropertyRooms),\"PropertyGreenVerification\":$(seed_count PropertyGreenVerification),\"PropertyPowerProduction\":$(seed_count PropertyPowerProduction),\"PropertyUnitTypes\":$(seed_count PropertyUnitTypes)}}" \
+  --header='Content-Type: application/json' --header="Authorization: Bearer $AUTH_TOKEN" \
+  "$SERVER_URL/admin/data-generator" || echo "WARNING: Seed failed, continuing anyway"
+echo "Seed complete."
 
 # Generate RESOScripts from live server data
 echo "Generating RESOScript configs from live server..."

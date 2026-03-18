@@ -1,5 +1,5 @@
 /**
- * @reso/odata-expression-parser
+ * @reso-standards/odata-expression-parser
  *
  * OData expression parsers for $filter and $expand. Tokenizes and parses
  * expression strings into typed ASTs (discriminated unions). Zero runtime
@@ -12,7 +12,7 @@
  *
  * @example
  * ```ts
- * import { parseFilter, parseExpand } from "@reso/odata-expression-parser";
+ * import { parseFilter, parseExpand } from "@reso-standards/odata-expression-parser";
  *
  * const filterAst = parseFilter("ListPrice gt 200000 and City eq 'Austin'");
  * const expandAst = parseExpand("Media($select=MediaURL),Rooms($expand=Listing)");

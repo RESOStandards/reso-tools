@@ -1,0 +1,395 @@
+{
+  "Association": [
+    "AssociationName",
+    "ModificationTimestamp",
+    "OriginalEntryTimestamp",
+    "OriginatingSystemId",
+    "OriginatingSystemName"
+  ],
+  "Caravan": [
+    "CancellationPolicyUrl",
+    "CaravanAllowedClassNames",
+    "CaravanAllowedStatuses",
+    "CaravanAreaDescription",
+    "CaravanBlackoutDates",
+    "CaravanDate",
+    "CaravanDaysRecurring",
+    "CaravanEndTime",
+    "CaravanInputDeadlineDescription",
+    "CaravanInputDeadlineTimestamp"
+  ],
+  "CaravanStop": [
+    "ModificationTimestamp",
+    "OriginalEntryTimestamp",
+    "OriginatingSystemId",
+    "OriginatingSystemName",
+    "SourceSystemId",
+    "SourceSystemName",
+    "StopAttendedBy",
+    "StopClassName",
+    "StopDate",
+    "StopEndTime"
+  ],
+  "ContactListingNotes": [
+    "Contact",
+    "HistoryTransactional",
+    "Listing",
+    "ListingId",
+    "ModificationTimestamp",
+    "NoteContents",
+    "NotedBy"
+  ],
+  "ContactListings": [
+    "AgentNotesUnreadYN",
+    "ClassName",
+    "Contact",
+    "ContactListingPreference",
+    "ContactLoginId",
+    "ContactNotesUnreadYN",
+    "DirectEmailYN",
+    "HistoryTransactional",
+    "LastAgentNoteTimestamp",
+    "LastContactNoteTimestamp"
+  ],
+  "Contacts": [
+    "ModificationTimestamp"
+  ],
+  "EntityEvent": [
+    "EntityEventSequence",
+    "ResourceName"
+  ],
+  "Field": [
+    "ModificationTimestamp",
+    "FieldName",
+    "ResourceName"
+  ],
+  "HistoryTransactional": [
+    "EntityEventSequence",
+    "ModificationTimestamp",
+    "ResourceName",
+    "SourceSystemID",
+    "SourceSystemName",
+    "OriginatingSystemName",
+    "ChangedByMemberID",
+    "ResourceRecordID",
+    "ChangeType",
+    "NewValue"
+  ],
+  "InternetTracking": [
+    "ActorCity",
+    "ActorEmail",
+    "ActorID",
+    "ActorIP",
+    "ActorLatitude",
+    "ActorLongitude",
+    "ActorOriginatingSystem",
+    "ActorOriginatingSystemID",
+    "ActorOriginatingSystemName",
+    "ActorPhone"
+  ],
+  "InternetTrackingSummary": [
+    "CmaCreatedCount",
+    "CmaEmailedCount",
+    "CmaRanCount",
+    "CmaSharedCount",
+    "EndTimestamp",
+    "FavoritedCount",
+    "ImpressionCount",
+    "InquiryCount",
+    "ListingId",
+    "ListingsEmailedCount"
+  ],
+  "LockOrBox": [
+    "HistoryTransactional",
+    "KeyOrCredentialId",
+    "ListAgentFullName",
+    "ListingAddress1",
+    "ListingAddress2",
+    "ListingCity",
+    "ListingCountry",
+    "ListingId",
+    "ListingLatitude",
+    "ListingLongitude"
+  ],
+  "Lookup": [
+    "LookupName",
+    "ModificationTimestamp",
+    "LookupValue",
+    "LegacyODataValue",
+    "StandardLookupValue"
+  ],
+  "Media": [
+    "ResourceName",
+    "SourceSystemID",
+    "ModificationTimestamp",
+    "OriginatingSystemName",
+    "MediaType",
+    "MediaModificationTimestamp",
+    "MediaObjectID",
+    "MediaURL",
+    "ResourceRecordID",
+    "Order"
+  ],
+  "Member": [
+    "MemberMlsId",
+    "ModificationTimestamp",
+    "MemberFirstName",
+    "MemberStatus",
+    "MemberLastName",
+    "SourceSystemID",
+    "OfficeMlsId",
+    "OfficeName",
+    "MemberFullName",
+    "OriginatingSystemName"
+  ],
+  "MemberAssociation": [
+    "MemberAssociationStatusDate",
+    "ModificationTimestamp",
+    "MemberMlsId",
+    "MemberAssociationStatus"
+  ],
+  "MemberStateLicense": [
+    "HistoryTransactional",
+    "Member",
+    "MemberMlsId",
+    "MemberStateLicense",
+    "MemberStateLicenseExpirationDate",
+    "MemberStateLicenseState",
+    "MemberStateLicenseType",
+    "ModificationTimestamp"
+  ],
+  "OUID": [
+    "ModificationTimestamp",
+    "OrganizationAddress1",
+    "OrganizationCity",
+    "OrganizationCountry",
+    "OrganizationName",
+    "OrganizationPostalCode",
+    "OrganizationStateOrProvince",
+    "OrganizationStatus",
+    "OrganizationUniqueId",
+    "OriginalEntryTimestamp"
+  ],
+  "Office": [
+    "OfficeMlsId",
+    "MainOffice",
+    "ModificationTimestamp",
+    "OfficeName",
+    "OfficeStatus",
+    "SourceSystemID",
+    "OriginatingSystemName",
+    "OfficePostalCode",
+    "OfficeAddress1",
+    "OfficeCity"
+  ],
+  "OfficeAssociation": [
+    "BillStatus",
+    "JoinDate",
+    "ModificationTimestamp",
+    "OfficeAssociationStatusDate",
+    "OfficeMlsId"
+  ],
+  "OfficeCorporateLicense": [
+    "HistoryTransactional",
+    "ModificationTimestamp",
+    "Office",
+    "OfficeCorporateLicense",
+    "OfficeCorporateLicenseExpirationDate",
+    "OfficeCorporateLicenseState",
+    "OfficeCorporateLicenseType",
+    "OfficeMlsId"
+  ],
+  "OpenHouse": [
+    "OpenHouseId",
+    "OriginatingSystemName",
+    "SourceSystemID",
+    "OpenHouseStatus",
+    "OpenHouseType",
+    "OpenHouseEndTime",
+    "ModificationTimestamp",
+    "OpenHouseStartTime",
+    "OpenHouseDate",
+    "ListingId"
+  ],
+  "OtherPhone": [
+    "ModificationTimestamp",
+    "OtherPhoneType",
+    "ResourceName",
+    "ResourceRecordID",
+    "OtherPhoneNumber",
+    "OtherPhoneExt"
+  ],
+  "Property": [
+    "ListingId",
+    "UnparsedAddress",
+    "ModificationTimestamp",
+    "PropertyType",
+    "ListOfficeName",
+    "StandardStatus",
+    "StreetName",
+    "ListPrice",
+    "ListAgentMlsId",
+    "ListOfficeMlsId"
+  ],
+  "PropertyGreenVerification": [
+    "ModificationTimestamp",
+    "ListingId",
+    "GreenBuildingVerificationType",
+    "GreenVerificationMetric",
+    "GreenVerificationYear",
+    "GreenVerificationSource",
+    "GreenVerificationStatus",
+    "GreenVerificationRating",
+    "GreenVerificationURL",
+    "GreenVerificationVersion"
+  ],
+  "PropertyPowerProduction": [
+    "ListingId",
+    "ModificationTimestamp",
+    "PowerProductionType",
+    "PowerProductionOwnership"
+  ],
+  "PropertyPowerStorage": [
+    "DateOfInstallation",
+    "InformationSource",
+    "ModificationTimestamp",
+    "NameplateCapacity",
+    "PowerStorageType"
+  ],
+  "PropertyRooms": [
+    "ListingId",
+    "ModificationTimestamp",
+    "RoomType",
+    "RoomLevel",
+    "RoomDimensions",
+    "RoomLength",
+    "RoomWidth",
+    "RoomDescription",
+    "RoomFeatures",
+    "RoomAreaUnits"
+  ],
+  "PropertyUnitTypes": [
+    "ModificationTimestamp",
+    "ListingId",
+    "UnitTypeBathsTotal",
+    "UnitTypeBedsTotal",
+    "UnitTypeActualRent",
+    "UnitTypeDescription",
+    "UnitTypeType",
+    "UnitTypeUnitsTotal",
+    "UnitTypeTotalRent",
+    "UnitTypeFurnished"
+  ],
+  "Prospecting": [
+    "ModificationTimestamp"
+  ],
+  "Queue": [
+    "ClassName",
+    "HistoryTransactional",
+    "ModificationTimestamp",
+    "OriginatingSystem",
+    "OriginatingSystemID",
+    "OriginatingSystemName",
+    "QueueTransactionType",
+    "ResourceName",
+    "ResourceRecordID",
+    "SourceSystem"
+  ],
+  "Rules": [
+    "ClassName",
+    "FieldName",
+    "HistoryTransactional",
+    "ModificationTimestamp",
+    "OriginalEntryTimestamp",
+    "OriginatingSystem",
+    "OriginatingSystemID",
+    "OriginatingSystemName",
+    "ResourceName",
+    "RuleAction"
+  ],
+  "SavedSearch": [
+    "ModificationTimestamp"
+  ],
+  "Showing": [
+    "AgentOriginatingSystem",
+    "AgentOriginatingSystemID",
+    "AgentOriginatingSystemName",
+    "AgentSourceSystem",
+    "AgentSourceSystemID",
+    "AgentSourceSystemName",
+    "HistoryTransactional",
+    "Listing",
+    "ListingId",
+    "ListingOriginatingSystem"
+  ],
+  "ShowingAppointment": [
+    "ModificationTimestamp",
+    "ShowingAgentMlsId",
+    "ShowingAppointmentDate",
+    "ShowingAppointmentEndTime",
+    "ShowingAppointmentId",
+    "ShowingAppointmentMethod",
+    "ShowingAppointmentStartTime",
+    "ShowingAppointmentStatus",
+    "ShowingId"
+  ],
+  "ShowingAvailability": [
+    "ModificationTimestamp",
+    "ShowingAvailableEndTime",
+    "ShowingAvailableStartTime",
+    "ShowingDate",
+    "ShowingId",
+    "ShowingMaximumDuration",
+    "ShowingMethod",
+    "ShowingMinimumDuration",
+    "UniqueOrganizationIdentifier",
+    "UniversalPropertyId"
+  ],
+  "ShowingRequest": [
+    "ModificationTimestamp",
+    "ShowingAgentMlsId",
+    "ShowingId",
+    "ShowingMethodRequest",
+    "ShowingRequestDate",
+    "ShowingRequestDuration",
+    "ShowingRequestEndTime",
+    "ShowingRequestId",
+    "ShowingRequestNotes",
+    "ShowingRequestStartTime"
+  ],
+  "SocialMedia": [
+    "ClassName",
+    "ModificationTimestamp",
+    "ResourceName",
+    "SocialMediaType",
+    "DisplayName",
+    "ResourceRecordID",
+    "SocialMediaUrlOrId"
+  ],
+  "TeamMembers": [
+    "MemberLoginId",
+    "MemberMlsId",
+    "ModificationTimestamp",
+    "OriginalEntryTimestamp",
+    "SourceSystemName",
+    "TeamImpersonationLevel",
+    "TeamMemberType"
+  ],
+  "Teams": [
+    "ModificationTimestamp",
+    "OriginalEntryTimestamp",
+    "OriginatingSystemName",
+    "SourceSystemID",
+    "TeamLeadLoginId",
+    "TeamLeadMlsId",
+    "TeamStateOrProvince",
+    "TeamStatus",
+    "TeamAddress1",
+    "TeamCity"
+  ],
+  "TransactionManagement": [
+    "ModificationTimestamp",
+    "TransactionId",
+    "TransactionType"
+  ]
+}

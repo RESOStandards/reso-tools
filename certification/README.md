@@ -1,13 +1,13 @@
-# @reso/certification
+# @reso-standards/certification
 
 RESO certification testing toolkit for validating OData 4.01 server compliance against RESO Web API endorsement specifications. Ships as a single package with spec-specific modules for Add/Edit (RCP-010), Web API Core, and Data Dictionary.
 
-Uses shared test infrastructure (`src/test-runner/`) providing OData protocol validators, metadata parsing (via [`@reso/odata-client`](../odata-client/)), field validation (via [`@reso/validation`](../validation/)), reporting, and HTTP client helpers.
+Uses shared test infrastructure (`src/test-runner/`) providing OData protocol validators, metadata parsing (via [`@reso-standards/odata-client`](../odata-client/)), field validation (via [`@reso-standards/validation`](../validation/)), reporting, and HTTP client helpers.
 
 ## Install
 
 ```bash
-npm install @reso/certification
+npm install @reso-standards/certification
 ```
 
 ## Project Structure
@@ -21,7 +21,7 @@ certification/
 │   ├── add-edit/             # RCP-010 Add/Edit scenarios + mock server
 │   ├── web-api-core/         # Web API Core 2.0.0 (stub)
 │   └── data-dictionary/      # Data Dictionary 2.0 (stub)
-├── tests/                    # 60 Vitest tests
+├── tests/                    # 102 Vitest tests
 ├── sample-payloads/          # JSON payload files for Add/Edit testing
 ├── sample-metadata.xml       # Sample EDMX metadata for mock server
 └── Dockerfile                # Multi-stage Docker build for CI
@@ -119,7 +119,7 @@ import {
   generateComplianceReport,
   startMockServer,
   stopMockServer
-} from '@reso/certification';
+} from '@reso-standards/certification';
 
 // Run all 8 Add/Edit scenarios
 const report = await runAllScenarios({
@@ -166,7 +166,7 @@ import {
   // Helpers
   extractPrimaryKey,
   buildScenarioResult
-} from '@reso/certification';
+} from '@reso-standards/certification';
 ```
 
 ## Docker Compliance Testing
@@ -337,4 +337,4 @@ npm test        # 60 tests
 
 ## License
 
-See [LICENSE](../../License.txt) in the repository root.
+See [LICENSE](../LICENSE) in the repository root.

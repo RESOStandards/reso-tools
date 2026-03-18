@@ -1,5 +1,5 @@
 /**
- * @reso/odata-client
+ * @reso-standards/odata-client
  *
  * OData 4.01 client SDK for TypeScript. Provides URI building, CRUD helpers,
  * CSDL metadata parsing/validation, query option validation, and response
@@ -11,7 +11,7 @@
  *
  * @example
  * ```ts
- * import { createClient, createEntity, readEntity, buildUri } from "@reso/odata-client";
+ * import { createClient, createEntity, readEntity, buildUri } from "@reso-standards/odata-client";
  *
  * const client = await createClient({
  *   baseUrl: "http://localhost:8080",
@@ -49,7 +49,7 @@ export type { UriBuilder } from './uri/builder.js';
 export { parseQueryString } from './uri/parser.js';
 
 // CSDL parser & validator
-export { parseCsdlXml, getEntityType, getEnumType } from './csdl/parser.js';
+export { parseCsdlXml, discoverResources, getEntityType, getEnumType, getComplexType, getFieldsForResource, getFieldsForEntityType, getAllFields } from './csdl/parser.js';
 export { validateCsdl } from './csdl/validator.js';
 export type {
   CsdlSchema,
@@ -71,7 +71,10 @@ export type {
   CsdlAction,
   CsdlFunction,
   CsdlValidationError,
-  CsdlValidationResult
+  CsdlResourceInfo,
+  CsdlValidationResult,
+  FieldAnnotation,
+  FieldInfo
 } from './csdl/types.js';
 
 // Query validator
@@ -101,6 +104,10 @@ export { isODataError, parseODataError, getErrorTargets } from './response/error
 // Metadata fetcher
 export { fetchRawMetadata, fetchAndParseMetadata } from './metadata/fetcher.js';
 
+// Lookup resolver
+export { createLookupResolver } from './lookup/resolver.js';
+export type { LookupValue, LookupResolverConfig, LookupResolver } from './lookup/types.js';
+
 // Re-export expression parser types for convenience
 export type {
   FilterExpression,
@@ -115,5 +122,5 @@ export type {
   PropertyExpr,
   ExpandExpression,
   ExpandQueryOptions
-} from '@reso/odata-expression-parser';
-export { parseFilter, parseExpand } from '@reso/odata-expression-parser';
+} from '@reso-standards/odata-expression-parser';
+export { parseFilter, parseExpand } from '@reso-standards/odata-expression-parser';

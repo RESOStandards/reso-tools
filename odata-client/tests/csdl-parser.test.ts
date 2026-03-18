@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { getEntityType, getEnumType, parseCsdlXml } from '../src/csdl/parser.js';
+import { discoverResources, getEntityType, getEnumType, parseCsdlXml } from '../src/csdl/parser.js';
 
 // Minimal EDMX for unit tests (includes NavigationProperty)
 const minimalEdmx = `<?xml version="1.0" encoding="utf-8"?>
@@ -528,6 +528,81 @@ describe('getEnumType', () => {
   it('returns undefined for unknown name', () => {
     const schema = parseCsdlXml(minimalEdmx);
     expect(getEnumType(schema, 'Unknown')).toBeUndefined();
+  });
+});
+
+describe('discoverResources', () => {
+  it('discovers resources with key fields from minimal schema', () => {
+    const schema = parseCsdlXml(minimalEdmx);
+    const resources = discoverResources(schema);
+    expect(resources).toHaveLength(3);
+
+    expect(resources[0]).toEqual({
+      name: 'Property',
+      entityType: 'org.reso.metadata.Property',
+      keyField: 'ListingKey',
+      navigationProperties: ['Media', 'ListAgent']
+    });
+    expect(resources[1]).toEqual({
+      name: 'Member',
+      entityType: 'org.reso.metadata.Member',
+      keyField: 'MemberKey',
+      navigationProperties: ['Listings']
+    });
+    expect(resources[2]).toEqual({
+      name: 'Media',
+      entityType: 'org.reso.metadata.Media',
+      keyField: 'MediaKey',
+      navigationProperties: []
+    });
+  });
+
+  it('discovers resources from extended schema', () => {
+    const schema = parseCsdlXml(extendedEdmx);
+    const resources = discoverResources(schema);
+    expect(resources).toHaveLength(4);
+
+    const customers = resources.find(r => r.name === 'Customers');
+    expect(customers?.keyField).toBe('Id');
+    expect(customers?.navigationProperties).toEqual(['Orders']);
+
+    const orders = resources.find(r => r.name === 'Orders');
+    expect(orders?.keyField).toBe('OrderId');
+    expect(orders?.navigationProperties).toEqual(['Customer', 'Items']);
+  });
+
+  it('falls back to {TypeName}Key when entity type is missing', () => {
+    const edmx = `<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:DataServices>
+    <Schema Namespace="test" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityContainer Name="Default">
+        <EntitySet Name="Widget" EntityType="test.Widget" />
+      </EntityContainer>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>`;
+    const schema = parseCsdlXml(edmx);
+    const resources = discoverResources(schema);
+    expect(resources).toHaveLength(1);
+    expect(resources[0].keyField).toBe('WidgetKey');
+    expect(resources[0].navigationProperties).toEqual([]);
+  });
+
+  it('throws when schema has no EntityContainer', () => {
+    const edmx = `<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:DataServices>
+    <Schema Namespace="test" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityType Name="Foo">
+        <Key><PropertyRef Name="Id" /></Key>
+        <Property Name="Id" Type="Edm.String" />
+      </EntityType>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>`;
+    const schema = parseCsdlXml(edmx);
+    expect(() => discoverResources(schema)).toThrow('No EntityContainer found in metadata');
   });
 });
 

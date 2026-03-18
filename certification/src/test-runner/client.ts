@@ -1,11 +1,11 @@
 /**
- * OData HTTP client — delegates to @reso/odata-client.
+ * OData HTTP client — delegates to @reso-standards/odata-client.
  *
  * Preserves the same exported interface (odataRequest, buildResourceUrl)
  * so that certification test scenarios require no changes.
  */
 
-import { buildUri, createClient } from '@reso/odata-client';
+import { buildUri, createClient } from '@reso-standards/odata-client';
 import type { ODataResponse } from './types.js';
 
 /** Options for making an OData HTTP request. */
@@ -20,7 +20,7 @@ export interface RequestOptions {
 /**
  * Sends an HTTP request with OData-standard headers and returns a normalized response.
  *
- * Uses @reso/odata-client's createClient under the hood. Creates a lightweight
+ * Uses @reso-standards/odata-client's createClient under the hood. Creates a lightweight
  * client per call since the auth token may vary between requests.
  */
 export const odataRequest = async (options: RequestOptions): Promise<ODataResponse> => {

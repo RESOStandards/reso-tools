@@ -38,6 +38,7 @@ export const createClient = async (config: ClientConfig): Promise<ODataClient> =
       'OData-Version': '4.01',
       'Content-Type': 'application/json',
       Accept: 'application/json',
+      'Accept-Encoding': 'gzip, deflate',
       Authorization: `Bearer ${token}`,
       ...config.defaultHeaders,
       ...options?.headers
@@ -46,7 +47,8 @@ export const createClient = async (config: ClientConfig): Promise<ODataClient> =
     const response = await fetch(url, {
       method,
       headers,
-      body: options?.body ? JSON.stringify(options.body) : undefined
+      body: options?.body ? JSON.stringify(options.body) : undefined,
+      keepalive: true
     });
 
     const rawBody = await response.text();

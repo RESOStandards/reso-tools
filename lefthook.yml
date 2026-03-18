@@ -26,7 +26,7 @@ pre-commit:
       priority: 2
 
     typecheck-server:
-      root: "tools/reso-reference-server/server/"
+      root: "tools/reso-reference-server/"
       run: npx tsc --noEmit
       priority: 2
 
@@ -36,7 +36,7 @@ pre-commit:
       priority: 3
 
     typecheck-ui:
-      root: "tools/reso-reference-server/ui/"
+      root: "tools/reso-web-client/"
       run: npx tsc --noEmit
       priority: 2
 
@@ -61,7 +61,7 @@ pre-commit:
       priority: 4
 
     test-server:
-      root: "tools/reso-reference-server/server/"
+      root: "tools/reso-reference-server/"
       run: npx vitest run
       priority: 4
 

@@ -1,0 +1,1210 @@
+{
+  "info": {
+    "name": "RESO Reference Server",
+    "description": "Comprehensive API collection for the RESO Reference Server — an OData 4.0 compliant server implementing the RESO Data Dictionary.\n\nDefault tokens:\n- admin-token (admin role: full access)\n- write-token (write role: CRUD)\n- read-token (read role: queries only)\n\nSet {{base_url}} and {{auth_token}} in the collection variables or an environment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "admin-token",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health & Service Info",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Returns server health status and metadata version."
+          }
+        },
+        {
+          "name": "OData Service Document",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "Returns the OData service document listing all available entity sets."
+          }
+        },
+        {
+          "name": "OData $metadata (EDMX XML)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/$metadata",
+              "host": ["{{base_url}}"],
+              "path": ["$metadata"]
+            },
+            "description": "Returns the EDMX XML metadata document describing all entity types, properties and enumerations."
+          }
+        },
+        {
+          "name": "OpenAPI Spec (JSON)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api-docs/spec.json",
+              "host": ["{{base_url}}"],
+              "path": ["api-docs", "spec.json"]
+            },
+            "description": "Returns the raw OpenAPI 3.0 specification in JSON format."
+          }
+        },
+        {
+          "name": "UI Config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/ui-config",
+              "host": ["{{base_url}}"],
+              "path": ["ui-config"]
+            },
+            "description": "Returns summary field configuration used by the web UI."
+          }
+        },
+        {
+          "name": "Field Groups",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/field-groups",
+              "host": ["{{base_url}}"],
+              "path": ["field-groups"]
+            },
+            "description": "Returns RESO Data Dictionary field groupings used by the web UI."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "OAuth2 Token (Client Credentials)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "my-client-id"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "my-client-secret"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/oauth/token",
+              "host": ["{{base_url}}"],
+              "path": ["oauth", "token"]
+            },
+            "description": "Mock OAuth2 Client Credentials endpoint. Accepts any client_id/client_secret and returns a bearer token with 'write' role by default."
+          }
+        },
+        {
+          "name": "OAuth2 Token (Admin Role)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "my-client-id"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "my-client-secret"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/oauth/token?role=admin",
+              "host": ["{{base_url}}"],
+              "path": ["oauth", "token"],
+              "query": [
+                {
+                  "key": "role",
+                  "value": "admin"
+                }
+              ]
+            },
+            "description": "Mock OAuth2 endpoint with ?role=admin to get an admin-level token. Roles: read, write, admin."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Metadata API (JSON)",
+      "item": [
+        {
+          "name": "Fields for Resource",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/metadata/fields?resource=Property",
+              "host": ["{{base_url}}"],
+              "path": ["api", "metadata", "fields"],
+              "query": [
+                {
+                  "key": "resource",
+                  "value": "Property"
+                }
+              ]
+            },
+            "description": "Returns JSON array of field definitions for a given resource. Lighter-weight alternative to EDMX."
+          }
+        },
+        {
+          "name": "Lookups by Type",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/metadata/lookups?type=StandardStatus",
+              "host": ["{{base_url}}"],
+              "path": ["api", "metadata", "lookups"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "StandardStatus"
+                }
+              ]
+            },
+            "description": "Returns lookup values for a specific enumeration type (e.g., StandardStatus, PropertyType)."
+          }
+        },
+        {
+          "name": "Lookups for Resource",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/metadata/lookups-for-resource?resource=Property",
+              "host": ["{{base_url}}"],
+              "path": ["api", "metadata", "lookups-for-resource"],
+              "query": [
+                {
+                  "key": "resource",
+                  "value": "Property"
+                }
+              ]
+            },
+            "description": "Returns all lookup values grouped by enumeration type for every enum field in the given resource."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Property",
+      "item": [
+        {
+          "name": "List Properties",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Property",
+              "host": ["{{base_url}}"],
+              "path": ["Property"]
+            },
+            "description": "Returns the Property collection with default server paging."
+          }
+        },
+        {
+          "name": "List Properties — $top & $skip",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Property?$top=5&$skip=0",
+              "host": ["{{base_url}}"],
+              "path": ["Property"],
+              "query": [
+                {
+                  "key": "$top",
+                  "value": "5"
+                },
+                {
+                  "key": "$skip",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Paginate through properties: fetch 5 records starting at offset 0."
+          }
+        },
+        {
+          "name": "List Properties — $count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Property?$count=true&$top=0",
+              "host": ["{{base_url}}"],
+              "path": ["Property"],
+              "query": [
+                {
+                  "key": "$count",
+                  "value": "true"
+                },
+                {
+                  "key": "$top",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Returns the total count of Property records without returning any records (top=0)."
+          }
+        },
+        {
+          "name": "List Properties — $select",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Property?$select=ListingKey,ListPrice,StandardStatus,City,StateOrProvince&$top=10",
+              "host": ["{{base_url}}"],
+              "path": ["Property"],
+              "query": [
+                {
+                  "key": "$select",
+                  "value": "ListingKey,ListPrice,StandardStatus,City,StateOrProvince"
+                },
+                {
+                  "key": "$top",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Select only specific fields to reduce payload size."
+          }
+        },
+        {
+          "name": "List Properties — $filter",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Property?$filter=ListPrice gt 500000 and StandardStatus eq 'Active'&$top=10",
+              "host": ["{{base_url}}"],
+              "path": ["Property"],
+              "query": [
+                {
+                  "key": "$filter",
+                  "value": "ListPrice gt 500000 and StandardStatus eq 'Active'"
+                },
+                {
+                  "key": "$top",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Filter properties with price above 500k and Active status."
+          }
+        },
+        {
+          "name": "List Properties — $orderby",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Property?$orderby=ListPrice desc&$top=10",
+              "host": ["{{base_url}}"],
+              "path": ["Property"],
+              "query": [
+                {
+                  "key": "$orderby",
+                  "value": "ListPrice desc"
+                },
+                {
+                  "key": "$top",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Sort properties by ListPrice in descending order."
+          }
+        },
+        {
+          "name": "List Properties — $expand Media",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Property?$expand=Media&$top=5",
+              "host": ["{{base_url}}"],
+              "path": ["Property"],
+              "query": [
+                {
+                  "key": "$expand",
+                  "value": "Media"
+                },
+                {
+                  "key": "$top",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Expand the Media navigation property to include associated media records inline."
+          }
+        },
+        {
+          "name": "List Properties — Combined Query",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Property?$filter=ListPrice gt 200000&$select=ListingKey,ListPrice,City,StandardStatus&$orderby=ModificationTimestamp desc&$top=10&$count=true",
+              "host": ["{{base_url}}"],
+              "path": ["Property"],
+              "query": [
+                {
+                  "key": "$filter",
+                  "value": "ListPrice gt 200000"
+                },
+                {
+                  "key": "$select",
+                  "value": "ListingKey,ListPrice,City,StandardStatus"
+                },
+                {
+                  "key": "$orderby",
+                  "value": "ModificationTimestamp desc"
+                },
+                {
+                  "key": "$top",
+                  "value": "10"
+                },
+                {
+                  "key": "$count",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Combined query: filter + select + orderby + top + count."
+          }
+        },
+        {
+          "name": "Get Property by Key",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Property('{{listing_key}}')",
+              "host": ["{{base_url}}"],
+              "path": ["Property('{{listing_key}}')"]
+            },
+            "description": "Retrieve a single Property by its ListingKey. Replace {{listing_key}} with an actual key."
+          }
+        },
+        {
+          "name": "Create Property",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ListPrice\": 450000,\n  \"StandardStatus\": \"Active\",\n  \"PropertyType\": \"Residential\",\n  \"City\": \"Austin\",\n  \"StateOrProvince\": \"TX\",\n  \"PostalCode\": \"78701\",\n  \"StreetName\": \"Main St\",\n  \"StreetNumber\": \"123\",\n  \"BedroomsTotal\": 3,\n  \"BathroomsTotalInteger\": 2,\n  \"LivingArea\": 1800\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/Property",
+              "host": ["{{base_url}}"],
+              "path": ["Property"]
+            },
+            "description": "Create a new Property record. The server will assign a ListingKey and ModificationTimestamp."
+          }
+        },
+        {
+          "name": "Update Property",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ListPrice\": 475000,\n  \"StandardStatus\": \"Pending\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/Property('{{listing_key}}')",
+              "host": ["{{base_url}}"],
+              "path": ["Property('{{listing_key}}')"]
+            },
+            "description": "Update an existing Property. Only the supplied fields are changed (PATCH merge semantics)."
+          }
+        },
+        {
+          "name": "Delete Property",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Property('{{listing_key}}')",
+              "host": ["{{base_url}}"],
+              "path": ["Property('{{listing_key}}')"]
+            },
+            "description": "Delete a Property by its ListingKey."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Member",
+      "item": [
+        {
+          "name": "List Members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Member",
+              "host": ["{{base_url}}"],
+              "path": ["Member"]
+            }
+          }
+        },
+        {
+          "name": "List Members — $filter & $select",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Member?$filter=MemberStatus eq 'Active'&$select=MemberKey,MemberFirstName,MemberLastName,MemberEmail&$top=10",
+              "host": ["{{base_url}}"],
+              "path": ["Member"],
+              "query": [
+                {
+                  "key": "$filter",
+                  "value": "MemberStatus eq 'Active'"
+                },
+                {
+                  "key": "$select",
+                  "value": "MemberKey,MemberFirstName,MemberLastName,MemberEmail"
+                },
+                {
+                  "key": "$top",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Member by Key",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Member('{{member_key}}')",
+              "host": ["{{base_url}}"],
+              "path": ["Member('{{member_key}}')"]
+            }
+          }
+        },
+        {
+          "name": "Create Member",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"MemberFirstName\": \"Jane\",\n  \"MemberLastName\": \"Doe\",\n  \"MemberEmail\": \"jane.doe@example.com\",\n  \"MemberStatus\": \"Active\",\n  \"MemberType\": \"Agent\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/Member",
+              "host": ["{{base_url}}"],
+              "path": ["Member"]
+            }
+          }
+        },
+        {
+          "name": "Update Member",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"MemberEmail\": \"jane.doe.updated@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/Member('{{member_key}}')",
+              "host": ["{{base_url}}"],
+              "path": ["Member('{{member_key}}')"]
+            }
+          }
+        },
+        {
+          "name": "Delete Member",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Member('{{member_key}}')",
+              "host": ["{{base_url}}"],
+              "path": ["Member('{{member_key}}')"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Office",
+      "item": [
+        {
+          "name": "List Offices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Office",
+              "host": ["{{base_url}}"],
+              "path": ["Office"]
+            }
+          }
+        },
+        {
+          "name": "List Offices — $filter & $orderby",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Office?$filter=OfficeStatus eq 'Active'&$orderby=OfficeName asc&$top=10",
+              "host": ["{{base_url}}"],
+              "path": ["Office"],
+              "query": [
+                {
+                  "key": "$filter",
+                  "value": "OfficeStatus eq 'Active'"
+                },
+                {
+                  "key": "$orderby",
+                  "value": "OfficeName asc"
+                },
+                {
+                  "key": "$top",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Office by Key",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Office('{{office_key}}')",
+              "host": ["{{base_url}}"],
+              "path": ["Office('{{office_key}}')"]
+            }
+          }
+        },
+        {
+          "name": "Create Office",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"OfficeName\": \"Acme Realty\",\n  \"OfficeStatus\": \"Active\",\n  \"OfficePhone\": \"512-555-0100\",\n  \"OfficeCity\": \"Austin\",\n  \"OfficeStateOrProvince\": \"TX\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/Office",
+              "host": ["{{base_url}}"],
+              "path": ["Office"]
+            }
+          }
+        },
+        {
+          "name": "Update Office",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"OfficeName\": \"Acme Realty — Downtown\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/Office('{{office_key}}')",
+              "host": ["{{base_url}}"],
+              "path": ["Office('{{office_key}}')"]
+            }
+          }
+        },
+        {
+          "name": "Delete Office",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Office('{{office_key}}')",
+              "host": ["{{base_url}}"],
+              "path": ["Office('{{office_key}}')"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Media",
+      "item": [
+        {
+          "name": "List Media",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Media",
+              "host": ["{{base_url}}"],
+              "path": ["Media"]
+            }
+          }
+        },
+        {
+          "name": "List Media — $filter by ResourceName",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Media?$filter=ResourceName eq 'Property' and ResourceRecordKey eq '{{listing_key}}'&$orderby=Order asc",
+              "host": ["{{base_url}}"],
+              "path": ["Media"],
+              "query": [
+                {
+                  "key": "$filter",
+                  "value": "ResourceName eq 'Property' and ResourceRecordKey eq '{{listing_key}}'"
+                },
+                {
+                  "key": "$orderby",
+                  "value": "Order asc"
+                }
+              ]
+            },
+            "description": "Filter media records belonging to a specific Property listing."
+          }
+        },
+        {
+          "name": "Get Media by Key",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Media('{{media_key}}')",
+              "host": ["{{base_url}}"],
+              "path": ["Media('{{media_key}}')"]
+            }
+          }
+        },
+        {
+          "name": "Create Media",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ResourceName\": \"Property\",\n  \"ResourceRecordKey\": \"{{listing_key}}\",\n  \"MediaURL\": \"https://example.com/photos/front.jpg\",\n  \"MediaType\": \"image/jpeg\",\n  \"ShortDescription\": \"Front exterior\",\n  \"Order\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/Media",
+              "host": ["{{base_url}}"],
+              "path": ["Media"]
+            }
+          }
+        },
+        {
+          "name": "Delete Media",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Media('{{media_key}}')",
+              "host": ["{{base_url}}"],
+              "path": ["Media('{{media_key}}')"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "OpenHouse",
+      "item": [
+        {
+          "name": "List Open Houses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/OpenHouse",
+              "host": ["{{base_url}}"],
+              "path": ["OpenHouse"]
+            }
+          }
+        },
+        {
+          "name": "List Open Houses — $filter & $select",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/OpenHouse?$select=OpenHouseKey,ListingKey,OpenHouseDate,OpenHouseStartTime,OpenHouseEndTime&$top=10",
+              "host": ["{{base_url}}"],
+              "path": ["OpenHouse"],
+              "query": [
+                {
+                  "key": "$select",
+                  "value": "OpenHouseKey,ListingKey,OpenHouseDate,OpenHouseStartTime,OpenHouseEndTime"
+                },
+                {
+                  "key": "$top",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get OpenHouse by Key",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/OpenHouse('{{open_house_key}}')",
+              "host": ["{{base_url}}"],
+              "path": ["OpenHouse('{{open_house_key}}')"]
+            }
+          }
+        },
+        {
+          "name": "Create OpenHouse",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ListingKey\": \"{{listing_key}}\",\n  \"OpenHouseDate\": \"2026-04-15\",\n  \"OpenHouseStartTime\": \"10:00:00\",\n  \"OpenHouseEndTime\": \"14:00:00\",\n  \"OpenHouseRemarks\": \"Spring open house event\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/OpenHouse",
+              "host": ["{{base_url}}"],
+              "path": ["OpenHouse"]
+            }
+          }
+        },
+        {
+          "name": "Delete OpenHouse",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/OpenHouse('{{open_house_key}}')",
+              "host": ["{{base_url}}"],
+              "path": ["OpenHouse('{{open_house_key}}')"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Showing",
+      "item": [
+        {
+          "name": "List Showings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Showing",
+              "host": ["{{base_url}}"],
+              "path": ["Showing"]
+            }
+          }
+        },
+        {
+          "name": "Get Showing by Key",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Showing('{{showing_key}}')",
+              "host": ["{{base_url}}"],
+              "path": ["Showing('{{showing_key}}')"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Teams & TeamMembers",
+      "item": [
+        {
+          "name": "List Teams",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Teams",
+              "host": ["{{base_url}}"],
+              "path": ["Teams"]
+            }
+          }
+        },
+        {
+          "name": "List TeamMembers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/TeamMembers",
+              "host": ["{{base_url}}"],
+              "path": ["TeamMembers"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Other Resources",
+      "item": [
+        {
+          "name": "List OUID (Organizations)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/OUID",
+              "host": ["{{base_url}}"],
+              "path": ["OUID"]
+            }
+          }
+        },
+        {
+          "name": "List PropertyRooms",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/PropertyRooms",
+              "host": ["{{base_url}}"],
+              "path": ["PropertyRooms"]
+            }
+          }
+        },
+        {
+          "name": "List PropertyGreenVerification",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/PropertyGreenVerification",
+              "host": ["{{base_url}}"],
+              "path": ["PropertyGreenVerification"]
+            }
+          }
+        },
+        {
+          "name": "List PropertyPowerProduction",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/PropertyPowerProduction",
+              "host": ["{{base_url}}"],
+              "path": ["PropertyPowerProduction"]
+            }
+          }
+        },
+        {
+          "name": "List PropertyUnitTypes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/PropertyUnitTypes",
+              "host": ["{{base_url}}"],
+              "path": ["PropertyUnitTypes"]
+            }
+          }
+        },
+        {
+          "name": "List Lookup (String Enum Mode)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/Lookup?$top=20",
+              "host": ["{{base_url}}"],
+              "path": ["Lookup"],
+              "query": [
+                {
+                  "key": "$top",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Available only when the server is running in string enum mode. The Lookup resource is read-only."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Data Generator — Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/data-generator/status",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "data-generator", "status"]
+            },
+            "description": "Returns available resources, field counts, current record counts and related resource info. Requires admin role."
+          }
+        },
+        {
+          "name": "Data Generator — Generate Properties",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resource\": \"Property\",\n  \"count\": 10\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/data-generator",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "data-generator"]
+            },
+            "description": "Generate synthetic Property records. Requires admin role."
+          }
+        },
+        {
+          "name": "Data Generator — With Related Records",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resource\": \"Property\",\n  \"count\": 5,\n  \"relatedRecords\": {\n    \"Media\": 3,\n    \"OpenHouse\": 1\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/data-generator",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "data-generator"]
+            },
+            "description": "Generate Properties with related Media and OpenHouse records."
+          }
+        },
+        {
+          "name": "Data Generator — With Dependencies",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resource\": \"Property\",\n  \"count\": 10,\n  \"resolveDependencies\": true,\n  \"relatedRecords\": {\n    \"Media\": 3,\n    \"OpenHouse\": 1\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/data-generator",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "data-generator"]
+            },
+            "description": "Generate Properties with FK dependency resolution (creates Members and Offices first, then links them). Requires admin role."
+          }
+        },
+        {
+          "name": "Data Generator — Generate Members",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resource\": \"Member\",\n  \"count\": 10\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/data-generator",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "data-generator"]
+            },
+            "description": "Generate synthetic Member records. Requires admin role."
+          }
+        },
+        {
+          "name": "Data Generator — Generate Offices",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resource\": \"Office\",\n  \"count\": 5\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/data-generator",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "data-generator"]
+            },
+            "description": "Generate synthetic Office records. Requires admin role."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Proxy",
+      "item": [
+        {
+          "name": "Proxy — Forward to External OData Server",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/proxy?url=https://example.com/odata/Property",
+              "host": ["{{base_url}}"],
+              "path": ["api", "proxy"],
+              "query": [
+                {
+                  "key": "url",
+                  "value": "https://example.com/odata/Property"
+                }
+              ]
+            },
+            "description": "Proxies a request to an external OData server to avoid browser CORS restrictions. Replace the url parameter with the target endpoint."
+          }
+        }
+      ]
+    }
+  ]
+}

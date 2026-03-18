@@ -1,0 +1,121 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router';
+import { readEntity } from '../api/client';
+import { DeleteDialog } from '../components/delete-dialog';
+import { KeyPrompt } from '../components/key-prompt';
+import { LoadingSpinner } from '../components/loading-spinner';
+import { useServer } from '../context/server-context';
+import { NotFoundPage } from './not-found-page';
+
+/** Page for deleting a record. Prompts for key, loads record, shows confirmation dialog. */
+export const DeletePage = () => {
+  const { resource } = useParams<{ resource: string }>();
+  const navigate = useNavigate();
+  const { resources, isLoadingResources, permissions } = useServer();
+  const resourceName = resource ?? '';
+
+  const [key, setKey] = useState<string | null>(null);
+  const [record, setRecord] = useState<Record<string, unknown> | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load record when key is set
+  useEffect(() => {
+    if (!key) return;
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+
+    const load = async () => {
+      try {
+        const result = await readEntity(resourceName, key);
+        if (!cancelled) setRecord(result);
+      } catch (err) {
+        if (!cancelled) {
+          const msg =
+            err instanceof Error ? err.message : ((err as { error?: { message?: string } })?.error?.message ?? 'Record not found');
+          setError(msg);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [resourceName, key]);
+
+  const handleKeySubmit = useCallback((submittedKey: string) => {
+    setKey(submittedKey);
+    setRecord(null);
+    setError(null);
+  }, []);
+
+  // Validate resource exists (after all hooks)
+  const isValidResource = resources?.some(r => r.name === resourceName) ?? null;
+  if (isValidResource === null || isLoadingResources) {
+    return <LoadingSpinner />;
+  }
+  if (!isValidResource) {
+    return <NotFoundPage />;
+  }
+  if (!permissions.canDelete) {
+    return (
+      <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">
+        This server does not support deleting records.{' '}
+        <button type="button" onClick={() => navigate(`/${resourceName}`)} className="text-blue-600 hover:text-blue-800">
+          Back to {resourceName}
+        </button>
+      </div>
+    );
+  }
+
+  // No key yet — show prompt
+  if (!key) {
+    return (
+      <div className="h-full overflow-y-auto p-4 sm:p-6">
+        <div className="space-y-4">
+          <button type="button" onClick={() => navigate(`/${resourceName}`)} className="text-sm text-blue-600 hover:text-blue-800">
+            &larr; Back to {resourceName}
+          </button>
+          <KeyPrompt resource={resourceName} onSubmit={handleKeySubmit} action="delete" />
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) return <div className="p-4 sm:p-6 text-sm text-gray-500 dark:text-gray-400">Looking up record...</div>;
+
+  if (error) {
+    return (
+      <div className="h-full overflow-y-auto p-4 sm:p-6">
+        <div className="space-y-4">
+          <button type="button" onClick={() => navigate(`/${resourceName}`)} className="text-sm text-blue-600 hover:text-blue-800">
+            &larr; Back to {resourceName}
+          </button>
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded px-3 py-2 text-sm">
+            {error}
+          </div>
+          <button type="button" onClick={() => setKey(null)} className="text-sm text-blue-600 hover:text-blue-800">
+            Try a different key
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (record) {
+    return (
+      <DeleteDialog
+        resource={resourceName}
+        record={record}
+        onDeleted={() => navigate(`/${resourceName}`)}
+        onCancel={() => navigate(`/${resourceName}`)}
+      />
+    );
+  }
+
+  return null;
+};
