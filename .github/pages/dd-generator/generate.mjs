@@ -1303,7 +1303,8 @@ function getPageCSS() {
       width: 160px;
     }
     .dd-metadata-table th small { display: block; font-size: 0.625rem; font-weight: 400; color: var(--reso-gray-400); text-transform: none; letter-spacing: 0; margin-top: 0.0625rem; }
-    .dd-metadata-table td { padding: 0.375rem 0; color: var(--reso-gray-700); }
+    .dd-metadata-table td { padding: 0.375rem 0; color: var(--reso-gray-700); vertical-align: top; }
+    .dd-metadata-table td .dd-copy-btn { vertical-align: middle; margin-left: 0.25rem; }
     .dd-metadata-table tr { border-bottom: 1px solid var(--reso-gray-100); }
 
     .dd-meta-grid {
@@ -1362,6 +1363,20 @@ function getPageCSS() {
       .dd-group-toggle { margin-left: auto; padding: 0.25rem 0.5rem; font-size: 0.6875rem; }
     }
     html.dark .dd-resource-sticky { background: var(--reso-gray-50); }
+
+    /* Sticky header for field/lookup detail pages */
+    .dd-detail-sticky {
+      position: sticky;
+      top: 64px;
+      z-index: 10;
+      background: var(--reso-gray-50);
+      margin: -1.5rem -2rem 0;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    @media (max-width: 768px) {
+      .dd-detail-sticky { margin: 0; padding: 0.25rem 0 0.5rem; }
+    }
+    html.dark .dd-detail-sticky { background: var(--reso-gray-50); }
 
     /* Sort controls */
     .dd-sort-controls {
@@ -1943,7 +1958,9 @@ function getPageJS() {
           navigator.clipboard.writeText(text).then(function() {
             var svg = btn.querySelector('svg');
             var origHTML = svg.outerHTML;
-            svg.outerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>';
+            var w = svg.getAttribute('width') || '18';
+            var h = svg.getAttribute('height') || '18';
+            svg.outerHTML = '<svg viewBox="0 0 24 24" width="' + w + '" height="' + h + '" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>';
             btn.classList.add('copied');
             setTimeout(function() {
               btn.innerHTML = origHTML;
@@ -3786,7 +3803,8 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
   const resourceStats = usageStats?.[resourceName];
   const fieldStats = resourceStats?.[field.StandardName];
 
-  let html = breadcrumbHtml(version, label, [
+  let html = '<div class="dd-detail-sticky">';
+  html += breadcrumbHtml(version, label, [
     { label: resourceName, url: ddUrl(version, resourceName) },
     { label: field.DisplayName || field.StandardName },
   ]);
@@ -3798,12 +3816,13 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
   if (field.Definition) html += `<span class="dd-search-norm" data-pagefind-meta="definition">${escapeHtml(truncate(field.Definition, 200))}</span>`;
   if (field.RevisedDate) html += `<span class="dd-search-norm" data-pagefind-meta="date">${escapeHtml(field.RevisedDate)}</span>`;
   html += `</div>`;
+  html += '</div>';
   if (field.Definition) html += `<div class="dd-definition-callout">${escapeHtml(field.Definition)}</div>`;
 
   // Metadata — two-column grid, indexed so Pagefind can match on field name, definition, etc.
   const leftRows = [
-    ['Standard Name', field.StandardName],
-    ['Display Name', field.DisplayName],
+    ['Standard Name', field.StandardName, null, true],
+    ['Display Name', field.DisplayName, null, true],
     ['Group', field.Groups],
     ['Simple Data Type', field.SimpleDataType],
     ['Max Length<small>suggested</small>', field.SugMaxLength],
@@ -3828,12 +3847,12 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
 
   function renderMetaTable(rows) {
     let t = '<table class="dd-metadata-table">';
-    for (const [lbl, value, xrefKey] of rows) {
+    for (const [lbl, value, xrefKey, copyable] of rows) {
       const display = value || '\u2014';
       const rendered = (value && xrefKey) ? xrefLinksForField(version, xrefKey, value) : escapeHtml(display);
-      // Labels may contain <small> tags for subtitles
       const labelHtml = lbl.includes('<') ? lbl : escapeHtml(lbl);
-      t += `<tr><th>${labelHtml}</th><td>${rendered}</td></tr>`;
+      const copyBtn = (copyable && value) ? ` <button class="dd-copy-btn" data-copy="${escapeHtml(value)}" title="Copy"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>` : '';
+      t += `<tr><th>${labelHtml}</th><td>${rendered}${copyBtn}</td></tr>`;
     }
     t += '</table>';
     return t;
@@ -3857,7 +3876,7 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
     html += `<button class="dd-collapsible-toggle">Lookups (${formatNumber(lookupValues.length)}) <span class="dd-toggle-icon">+</span></button>`;
     html += `<div class="dd-collapsible-content" data-pagefind-ignore>`;
     html += `<table class="dd-lookups-table"><thead><tr>`;
-    html += `<th>Standard Value</th><th>Legacy OData Value</th><th>Definition</th><th>Usage</th>`;
+    html += `<th>Standard Value</th><th>Definition</th><th>Usage</th>`;
     html += `</tr></thead><tbody>`;
 
     for (const lk of lookupValues) {
@@ -3865,7 +3884,6 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
       const lkStats = lookupStats?.[lk.StandardLookupValue];
       html += `<tr>`;
       html += `<td><a href="${lkUrl}">${escapeHtml(lk.StandardLookupValue)}</a></td>`;
-      html += `<td>${escapeHtml(lk.LegacyODataValue)}</td>`;
       html += `<td class="dd-field-def">${escapeHtml(truncate(lk.Definition, DEFINITION_TRUNCATE_LENGTH))}</td>`;
       html += `<td>${usageBadge(lkStats, totalProviders)}</td>`;
       html += `</tr>`;
@@ -3910,7 +3928,8 @@ function generateLookupPage(vCfg, data, resourceName, field, lookup, usageStats,
   const fieldStats = resourceStats?.[field.StandardName];
   const lookupStats = fieldStats?.lookups?.[lookup.StandardLookupValue];
 
-  let html = breadcrumbHtml(version, label, [
+  let html = '<div class="dd-detail-sticky">';
+  html += breadcrumbHtml(version, label, [
     { label: resourceName, url: ddUrl(version, resourceName) },
     { label: field.DisplayName || field.StandardName, url: ddUrl(version, resourceName, field.StandardName) },
     { label: lookup.StandardLookupValue },
@@ -3927,13 +3946,14 @@ function generateLookupPage(vCfg, data, resourceName, field, lookup, usageStats,
   if (lookup.Definition) html += `<span class="dd-search-norm" data-pagefind-meta="definition">${escapeHtml(truncate(lookup.Definition, 200))}</span>`;
   if (lookup.RevisedDate) html += `<span class="dd-search-norm" data-pagefind-meta="date">${escapeHtml(lookup.RevisedDate)}</span>`;
   html += `</div>`;
+  html += '</div>';
   if (lookup.Definition) html += `<div class="dd-definition-callout">${escapeHtml(lookup.Definition)}</div>`;
 
   // Metadata — two-column grid
   const lkLeftRows = [
-    ['Lookup Name', lookup.LookupName],
-    ['Standard Value', lookup.StandardLookupValue],
-    ['Legacy OData Value', lookup.LegacyODataValue],
+    ['Lookup Name', lookup.LookupName, null, true],
+    ['Standard Value', lookup.StandardLookupValue, null, true],
+    ['Legacy OData Value', lookup.LegacyODataValue, null, true],
     ['Synonyms', lookup.Synonyms],
     ['Status', lookup.ElementStatus, 'ElementStatus'],
     ['BEDES', lookup.BEDES],
@@ -3949,10 +3969,11 @@ function generateLookupPage(vCfg, data, resourceName, field, lookup, usageStats,
 
   function renderLkMetaTable(rows) {
     let t = '<table class="dd-metadata-table">';
-    for (const [lbl, value, xrefKey] of rows) {
+    for (const [lbl, value, xrefKey, copyable] of rows) {
       const display = value || '\u2014';
       const rendered = (value && xrefKey) ? xrefLinksForField(version, xrefKey, value) : escapeHtml(display);
-      t += `<tr><th>${escapeHtml(lbl)}</th><td>${rendered}</td></tr>`;
+      const copyBtn = (copyable && value) ? ` <button class="dd-copy-btn" data-copy="${escapeHtml(value)}" title="Copy"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>` : '';
+      t += `<tr><th>${escapeHtml(lbl)}</th><td>${rendered}${copyBtn}</td></tr>`;
     }
     t += '</table>';
     return t;
@@ -4302,6 +4323,140 @@ function generateDDLandingPage(allData) {
 }
 
 // ---------------------------------------------------------------------------
+// 404 Page
+// ---------------------------------------------------------------------------
+
+function generate404Page() {
+  const jokes = [
+    { setup: "This page has been delisted.", punchline: "Maybe it was never on the market to begin with." },
+    { setup: "Looks like this listing has expired.", punchline: "The page you're looking for is no longer available." },
+    { setup: "This property is off-market.", punchline: "We couldn't find what you were looking for." },
+    { setup: "404: Lot Not Found.", punchline: "Looks like this one's still a vacant lot." },
+    { setup: "Under construction.", punchline: "This page hasn't been built yet. Check back after closing." },
+    { setup: "This page failed inspection.", punchline: "We found some issues... mainly that it doesn't exist." },
+    { setup: "Bad address.", punchline: "Even the best GPS can't find a page that doesn't exist." },
+    { setup: "Zoning violation.", punchline: "This URL isn't zoned for the content you expected." },
+    { setup: "Appraisal came in low.", punchline: "Actually, it came in at zero. This page has no value because it doesn't exist." },
+    { setup: "The seller accepted another offer.", punchline: "This page went to someone else. Or nowhere at all." },
+    { setup: "Deed restricted.", punchline: "Access to this page is restricted... by its nonexistence." },
+    { setup: "This page is in escrow.", punchline: "Just kidding. It simply doesn't exist." },
+  ];
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>404 - Page Not Found - RESO Data Dictionary</title>
+  <link rel="stylesheet" href="/dd/assets/dd-landing.css">
+  <script>(function(){var t=localStorage.getItem('dd-theme');if(t==='dark'||(t===null&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');})()</script>
+  <style>
+    .dd-404 {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 64px);
+      text-align: center;
+      padding: 2rem;
+    }
+    .dd-404-code {
+      font-size: 6rem;
+      font-weight: 800;
+      color: var(--reso-blue);
+      line-height: 1;
+      margin-bottom: 1rem;
+      letter-spacing: -0.05em;
+    }
+    .dd-404-setup {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--reso-gray-800);
+      margin-bottom: 0.5rem;
+    }
+    .dd-404-punchline {
+      font-size: 1rem;
+      color: var(--reso-gray-500);
+      margin-bottom: 2rem;
+      max-width: 400px;
+    }
+    .dd-404-link {
+      display: inline-block;
+      padding: 0.625rem 1.5rem;
+      background: var(--reso-blue);
+      color: white;
+      text-decoration: none;
+      border-radius: 0.375rem;
+      font-weight: 600;
+      font-size: 0.875rem;
+      transition: background 0.15s;
+    }
+    .dd-404-link:hover { background: var(--reso-navy); }
+    .dd-404-refresh {
+      margin-top: 1rem;
+      background: none;
+      border: none;
+      color: var(--reso-gray-400);
+      font-size: 0.75rem;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    .dd-404-refresh:hover { color: var(--reso-blue); }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a href="/" class="header-logo">
+      <img src="/assets/reso-logo-white.png" alt="RESO" />
+    </a>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
+      <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24"><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41M12 6a6 6 0 100 12 6 6 0 000-12z"/></svg>
+    </button>
+    <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle menu">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+    </button>
+    <nav class="header-nav" id="headerNav">
+      <a href="/">Home</a>
+      <a href="/dd/">Data Dictionary</a>
+      <a href="https://github.com/RESOStandards/reso-tools">GitHub</a>
+      <a href="https://reso.org">RESO.org</a>
+    </nav>
+  </header>
+  <div class="dd-404">
+    <div class="dd-404-code">404</div>
+    <div class="dd-404-setup" id="dd404Setup"></div>
+    <div class="dd-404-punchline" id="dd404Punchline"></div>
+    <a href="/dd/" class="dd-404-link">Back to Data Dictionary</a>
+    <button class="dd-404-refresh" onclick="showJoke()">Tell me another one</button>
+  </div>
+  <script>
+    var jokes = ${JSON.stringify(jokes)};
+    var lastIndex = -1;
+    function showJoke() {
+      var idx;
+      do { idx = Math.floor(Math.random() * jokes.length); } while (idx === lastIndex && jokes.length > 1);
+      lastIndex = idx;
+      document.getElementById('dd404Setup').textContent = jokes[idx].setup;
+      document.getElementById('dd404Punchline').textContent = jokes[idx].punchline;
+    }
+    showJoke();
+    document.getElementById('themeToggle').addEventListener('click', function() {
+      var isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('dd-theme', isDark ? 'dark' : 'light');
+    });
+    document.getElementById('menuToggle').addEventListener('click', function() {
+      document.getElementById('headerNav').classList.toggle('open');
+    });
+  </script>
+</body>
+</html>`;
+
+  writeFileSync(join(OUTPUT_DIR, '404.html'), html);
+  console.log('  Generated 404 page');
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -4382,6 +4537,9 @@ async function main() {
 
   // Generate DD landing page
   generateDDLandingPage(allData);
+
+  // Generate 404 page
+  generate404Page();
 
   // Write shared assets
   const assetsDir = join(OUTPUT_DIR, 'assets');
