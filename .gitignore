@@ -2,6 +2,7 @@
 .DS_Store
 node_modules/
 dist/
+coverage/
 results.*
 lefthook-local.yml
 PLAN.md
