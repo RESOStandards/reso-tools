@@ -993,11 +993,20 @@ function getPageCSS() {
     .dd-breadcrumb-sep { margin: 0 0.375rem; color: var(--reso-gray-300); }
 
     /* Page header */
-    .dd-page-header { margin-bottom: 1.5rem; }
+    .dd-page-header { margin-bottom: 0.75rem; }
     .dd-page-header h1 { font-size: 1.5rem; font-weight: 700; color: var(--reso-gray-800); display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
     .dd-page-subtitle { font-size: 0.875rem; color: var(--reso-gray-500); margin-top: 0.25rem; }
     .dd-page-legacy-value { font-size: 0.8125rem; color: var(--reso-gray-500); margin-top: 0.25rem; }
     .dd-page-legacy-value code { background: var(--reso-gray-100); padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.8125rem; }
+    .dd-callout-label {
+      display: block;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--reso-gray-500);
+      margin-bottom: 0.25rem;
+    }
     .dd-definition-callout {
       background: var(--reso-gray-50);
       border-left: 3px solid var(--reso-blue);
@@ -1078,7 +1087,7 @@ function getPageCSS() {
     .dd-resource-count { font-size: 0.75rem; color: var(--reso-gray-500); margin-top: 0.375rem; }
 
     /* Fields table */
-    .dd-fields-table-wrapper { margin-top: 0.5rem; }
+    .dd-fields-table-wrapper { padding-top: 0; }
     .dd-group-heading {
       font-size: 1rem;
       font-weight: 600;
@@ -1089,6 +1098,7 @@ function getPageCSS() {
       scroll-margin-top: calc(var(--sticky-thead-top, 180px) + 2.5rem);
     }
     .dd-group-heading:first-of-type { margin-top: 0; }
+    .dd-group-label { font-weight: 400; color: var(--reso-gray-400); font-size: 0.875em; }
     .dd-group-depth-2 { font-size: 0.9375rem; border-bottom-width: 1px; }
     .dd-group-depth-3 { font-size: 0.875rem; border-bottom-width: 1px; }
     .dd-group-parent { color: var(--reso-gray-400); font-weight: 400; }
@@ -1127,8 +1137,8 @@ function getPageCSS() {
     .dd-fields-table-wrapper .dd-fields-table th {
       position: sticky;
       top: var(--sticky-thead-top, 180px);
-      z-index: 5;
-      box-shadow: 0 1px 0 var(--reso-gray-200);
+      z-index: 11;
+      box-shadow: 0 -1px 0 var(--reso-gray-200), 0 1px 0 var(--reso-gray-200);
     }
     /* In grouped view, hide all table theads — sticky div header replaces them */
     .dd-fields-table-wrapper.dd-grouped .dd-fields-table thead {
@@ -1139,7 +1149,7 @@ function getPageCSS() {
       display: none;
       position: sticky;
       top: var(--sticky-thead-top, 180px);
-      z-index: 6;
+      z-index: 12;
       grid-template-columns: 22% 1fr 17% 11%;
       background: var(--reso-gray-50);
       font-weight: 600;
@@ -1149,6 +1159,7 @@ function getPageCSS() {
       letter-spacing: 0.03em;
       padding: 0.5rem 0.75rem;
       margin: 0 1px;
+      border-top: 1px solid var(--reso-gray-200);
       border-bottom: 1px solid var(--reso-gray-200);
       box-shadow: 0 1px 0 var(--reso-gray-200);
     }
@@ -1159,9 +1170,14 @@ function getPageCSS() {
     }
     .dd-fields-table-wrapper.dd-grouped .dd-sticky-col-headers {
       display: grid;
+      border-left: 1px solid var(--reso-gray-200);
+      border-right: 1px solid var(--reso-gray-200);
+      margin: 0;
     }
     .dd-fields-table-wrapper.dd-grouped .dd-fields-table {
       table-layout: fixed;
+      border-left: 1px solid var(--reso-gray-200);
+      border-right: 1px solid var(--reso-gray-200);
     }
     .dd-fields-table-wrapper.dd-grouped .dd-fields-table td:nth-child(1) { width: 22%; }
     .dd-fields-table-wrapper.dd-grouped .dd-fields-table td:nth-child(2) { width: auto; }
@@ -1355,7 +1371,8 @@ function getPageCSS() {
       z-index: 10;
       background: var(--reso-gray-50);
       margin: -1.5rem -2rem 0;
-      padding: 1.5rem 2rem 0.25rem;
+      padding: 1.5rem 2rem 0.75rem;
+      display: flow-root;
     }
     @media (max-width: 768px) {
       .dd-resource-sticky { margin: 0; padding: 0.25rem 0 0.625rem; }
@@ -2065,8 +2082,7 @@ function getPageJS() {
         function updateStickyOffset() {
           var stickyHeader = document.querySelector('.dd-resource-sticky');
           if (stickyHeader) {
-            var rect = stickyHeader.getBoundingClientRect();
-            var top = rect.height + 64;
+            var top = stickyHeader.offsetHeight + 64;
             wrapper.style.setProperty('--sticky-thead-top', top + 'px');
           }
         }
@@ -3705,7 +3721,7 @@ function generateResourcePage(vCfg, data, resourceName, usageStats, allVersions,
   html += `</p>`;
   if (latestRevised) html += `<span class="dd-search-norm" data-pagefind-meta="date">${escapeHtml(latestRevised)}</span>`;
   html += `</div>`;
-  if (resDesc) html += `<div class="dd-definition-callout"><span class="dd-callout-text">${escapeHtml(resDesc)}</span><button class="dd-callout-toggle">... more</button></div>`;
+  if (resDesc) html += `<div class="dd-definition-callout"><span class="dd-callout-label">Definition</span><span class="dd-callout-text">${escapeHtml(resDesc)}</span><button class="dd-callout-toggle">... more</button></div>`;
 
   const hasGroups = Object.keys(groupTree).some(k => !k.startsWith('_'));
   html += `<div class="dd-sort-controls">
@@ -3761,7 +3777,7 @@ function renderGroupedFields(version, resourceName, fields, tree, resourceStats,
         }
         return escapeHtml(part);
       }).join(' <span class="dd-group-sep">&rsaquo;</span> ');
-      html += `<h2 class="dd-group-heading dd-group-depth-${depth}" id="${escapeHtml(groupId)}">${headingContent}</h2>`;
+      html += `<h2 class="dd-group-heading dd-group-depth-${depth}" id="${escapeHtml(groupId)}">${headingContent} <span class="dd-group-label">Group</span></h2>`;
     } else if (hasGroupedSections) {
       html += `<h2 class="dd-group-heading" id="group-ungrouped">Other Fields</h2>`;
     }
@@ -3833,7 +3849,7 @@ function generateFieldPage(vCfg, data, resourceName, field, usageStats, allVersi
   if (field.RevisedDate) html += `<span class="dd-search-norm" data-pagefind-meta="date">${escapeHtml(field.RevisedDate)}</span>`;
   html += `</div>`;
   html += '</div>';
-  if (field.Definition) html += `<div class="dd-definition-callout">${escapeHtml(field.Definition)}</div>`;
+  if (field.Definition) html += `<div class="dd-definition-callout"><span class="dd-callout-label">Definition</span>${escapeHtml(field.Definition)}</div>`;
 
   // Metadata — two-column grid, indexed so Pagefind can match on field name, definition, etc.
   const leftRows = [
@@ -3964,7 +3980,7 @@ function generateLookupPage(vCfg, data, resourceName, field, lookup, usageStats,
   if (lookup.RevisedDate) html += `<span class="dd-search-norm" data-pagefind-meta="date">${escapeHtml(lookup.RevisedDate)}</span>`;
   html += `</div>`;
   html += '</div>';
-  if (lookup.Definition) html += `<div class="dd-definition-callout">${escapeHtml(lookup.Definition)}</div>`;
+  if (lookup.Definition) html += `<div class="dd-definition-callout"><span class="dd-callout-label">Definition</span>${escapeHtml(lookup.Definition)}</div>`;
 
   // Metadata — two-column grid
   const lkLeftRows = [
@@ -4063,7 +4079,7 @@ function xrefLinksForField(version, dimKey, rawValue) {
   return values.map(v => xrefLink(version, dim.slug, v)).join(', ');
 }
 
-function generateXrefPages(vCfg, data, allVersions) {
+function generateXrefPages(vCfg, data, allVersions, usageStats, totalProvidersByResource) {
   const { version, label } = vCfg;
   const xrefIndex = buildXrefIndex(data.fields);
   let pageCount = 0;
@@ -4119,28 +4135,35 @@ function generateXrefPages(vCfg, data, allVersions) {
     // Per-value pages
     for (const val of values) {
       const matchingFields = xrefIndex[dim.key][val];
-      let valHtml = breadcrumbHtml(version, label, [
+      let valHtml = '<div class="dd-resource-sticky">';
+      valHtml += breadcrumbHtml(version, label, [
         { label: 'Cross Reference', url: `/dd/DD${version}/xref/` },
         { label: dim.label, url: `/dd/DD${version}/xref/${dim.slug}/` },
         { label: val },
       ]);
       valHtml += `<div class="dd-page-header"><h1>${escapeHtml(val)}</h1>`;
       valHtml += `<p class="dd-page-subtitle">${escapeHtml(dim.label)} &mdash; ${formatNumber(matchingFields.length)} fields</p></div>`;
+      valHtml += `</div>`;
 
+      valHtml += `<div class="dd-fields-table-wrapper">`;
       valHtml += `<table class="dd-fields-table"><thead><tr>`;
-      valHtml += `<th>Resource</th><th>Field</th><th>Definition</th><th>Type</th>`;
+      valHtml += `<th>Resource</th><th>Field</th><th>Definition</th><th>Type</th><th>Usage</th>`;
       valHtml += `</tr></thead><tbody>`;
       for (const field of matchingFields) {
         const fieldUrl = ddUrl(version, field.ResourceName, field.StandardName);
+        const totalProviders = totalProvidersByResource?.[field.ResourceName] || 0;
+        const resourceUsage = usageStats?.[field.ResourceName];
+        const stats = resourceUsage?.[field.StandardName];
         valHtml += `<tr>`;
         valHtml += `<td><a href="${ddUrl(version, field.ResourceName)}" class="dd-field-link">${escapeHtml(field.ResourceName)}</a></td>`;
         valHtml += `<td><a href="${fieldUrl}" class="dd-field-link">${escapeHtml(field.DisplayName || field.StandardName)}</a>`;
         valHtml += `<div class="dd-field-standard-name">${escapeHtml(field.StandardName)}</div></td>`;
         valHtml += `<td class="dd-field-def">${escapeHtml(truncate(field.Definition, DEFINITION_TRUNCATE_LENGTH))}</td>`;
         valHtml += `<td><span class="dd-type-badge">${escapeHtml(field.SimpleDataType)}</span></td>`;
+        valHtml += `<td>${usageBadge(stats, totalProviders)}</td>`;
         valHtml += `</tr>`;
       }
-      valHtml += `</tbody></table>`;
+      valHtml += `</tbody></table></div>`;
 
       const valDir = join(dimDir, encodeURIComponent(val));
       mkdirSync(valDir, { recursive: true });
@@ -4547,7 +4570,7 @@ async function main() {
     const aboutCount = generateAboutPages(vCfg, data, VERSIONS);
     pageCount += aboutCount;
 
-    const xrefCount = generateXrefPages(vCfg, data, VERSIONS);
+    const xrefCount = generateXrefPages(vCfg, data, VERSIONS, usageStats, totalProvidersByResource);
     pageCount += xrefCount;
 
     console.log(`  Generated ${pageCount} pages (${aboutCount} about, ${xrefCount} cross-reference)`);
