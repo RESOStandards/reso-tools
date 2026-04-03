@@ -50,7 +50,7 @@ export const useMetadata = (resource: string): UseMetadataResult => {
     return () => {
       cancelled = true;
     };
-  }, [resource, activeServer.id, isLocal]);
+  }, [resource, activeServer.id, isLocal, currentToken]);
 
   return { fields, lookups, isLoading, error };
 };

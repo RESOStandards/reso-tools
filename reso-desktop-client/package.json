@@ -13,6 +13,7 @@
     "package": "npm run build && npm run build:server-bundle && electron-builder"
   },
   "dependencies": {
+    "@reso-standards/web-api-proxy": "file:../reso-web-api-proxy",
     "@reso-standards/reference-server": "file:../reso-reference-server"
   },
   "devDependencies": {
