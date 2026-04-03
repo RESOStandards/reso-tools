@@ -61,6 +61,28 @@ jobs:
             cat "$readme" >> ".github/pages/_packages/$dir.md"
           done
 
+      - name: Sync project docs into site
+        run: |
+          docs=(
+            "RELEASES.md:Release Notes:releases"
+            "ANNOUNCEMENTS.md:Announcements:announcements"
+            "SECURITY_AUDIT.md:Security Audit:security"
+          )
+          for entry in "${docs[@]}"; do
+            IFS=':' read -r file title slug <<< "$entry"
+            if [ -f "$file" ]; then
+              cat > ".github/pages/${slug}.md" <<FRONT
+          ---
+          title: "${title}"
+          layout: default
+          permalink: /${slug}/
+          ---
+
+          FRONT
+              cat "$file" >> ".github/pages/${slug}.md"
+            fi
+          done
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
