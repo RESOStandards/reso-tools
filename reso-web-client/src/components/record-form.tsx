@@ -69,7 +69,6 @@ export const RecordForm = ({
   const [errors, setErrors] = useState<Map<string, string>>(new Map());
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [keyCopied, setKeyCopied] = useState(false);
-  const [errorNavIndex, setErrorNavIndex] = useState(0);
   const formRef = useRef<HTMLFormElement>(null);
 
   const { getKeyField } = useServer();
@@ -97,34 +96,46 @@ export const RecordForm = ({
     return ordered;
   }, [errors, sortedGroups, ungrouped]);
 
-  // Clamp nav index when errors are fixed (list shrinks)
-  const clampedIndex = errorFields.length > 0
-    ? Math.min(errorNavIndex, errorFields.length - 1)
-    : 0;
-  if (clampedIndex !== errorNavIndex) setErrorNavIndex(clampedIndex);
-
-  const scrollToError = useCallback((index: number) => {
-    const fieldName = errorFields[index];
-    if (!fieldName || !formRef.current) return;
+  /** Scroll to and focus an error field by name. */
+  const scrollToField = useCallback((fieldName: string) => {
+    if (!formRef.current) return;
     const el = formRef.current.querySelector(`[id="field-${fieldName}"]`)
       ?? formRef.current.querySelector(`[data-field="${fieldName}"]`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       if (el instanceof HTMLElement) el.focus();
     }
-  }, [errorFields]);
+  }, []);
 
-  const handlePrevError = useCallback(() => {
-    const next = clampedIndex > 0 ? clampedIndex - 1 : errorFields.length - 1;
-    setErrorNavIndex(next);
-    scrollToError(next);
-  }, [clampedIndex, errorFields.length, scrollToError]);
+  /**
+   * Find which error field is closest to the current scroll position,
+   * then navigate to the next or previous one in the ordered list.
+   */
+  const navigateError = useCallback((direction: 'next' | 'prev') => {
+    if (errorFields.length === 0) return;
+    if (errorFields.length === 1) { scrollToField(errorFields[0]); return; }
 
-  const handleNextError = useCallback(() => {
-    const next = clampedIndex < errorFields.length - 1 ? clampedIndex + 1 : 0;
-    setErrorNavIndex(next);
-    scrollToError(next);
-  }, [clampedIndex, errorFields.length, scrollToError]);
+    // Find which error field is currently visible/focused
+    const active = document.activeElement;
+    const activeFieldName = active?.id?.replace('field-', '')
+      ?? active?.closest('[data-field]')?.getAttribute('data-field');
+    const currentIdx = activeFieldName ? errorFields.indexOf(activeFieldName) : -1;
+
+    let targetIdx: number;
+    if (currentIdx === -1) {
+      // No error field focused — go to first or last
+      targetIdx = direction === 'next' ? 0 : errorFields.length - 1;
+    } else if (direction === 'next') {
+      targetIdx = currentIdx < errorFields.length - 1 ? currentIdx + 1 : 0;
+    } else {
+      targetIdx = currentIdx > 0 ? currentIdx - 1 : errorFields.length - 1;
+    }
+
+    scrollToField(errorFields[targetIdx]);
+  }, [errorFields, scrollToField]);
+
+  const handlePrevError = useCallback(() => navigateError('prev'), [navigateError]);
+  const handleNextError = useCallback(() => navigateError('next'), [navigateError]);
 
   const handleChange = useCallback((fieldName: string, value: unknown) => {
     setValues(prev => ({ ...prev, [fieldName]: value }));
@@ -156,15 +167,9 @@ export const RecordForm = ({
         errorMap.set(f.field, f.reason);
       }
       setErrors(errorMap);
-      setErrorNavIndex(0);
       setSubmitError('validation');
-      // Scroll to the first error
-      setTimeout(() => {
-        const firstField = failures[0].field;
-        const el = formRef.current?.querySelector(`[id="field-${firstField}"]`)
-          ?? formRef.current?.querySelector(`[data-field="${firstField}"]`);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 100);
+      // Scroll to and focus the first error so Next starts from there
+      setTimeout(() => scrollToField(failures[0].field), 100);
       return;
     }
 
@@ -272,36 +277,36 @@ export const RecordForm = ({
         </FieldGroupSection>
       )}
 
-      <div className="sticky bottom-0 z-10 pt-2 pb-2 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 -mx-4 px-4 sm:-mx-6 sm:px-6">
-        {submitError && errorFields.length > 0 && (
-          <div className="flex items-center justify-between gap-2 mb-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded px-3 py-1.5 text-sm">
+      <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 pt-2 pb-2 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 -mx-4 px-4 sm:-mx-6 sm:px-6">
+        {submitError && errorFields.length > 0 ? (
+          <div className="flex items-center gap-3 text-sm text-red-600 dark:text-red-400">
             <span>
               {submitError === 'validation'
                 ? `${errorFields.length} ${errorFields.length === 1 ? 'error' : 'errors'} remaining`
                 : submitError}
             </span>
             {errorFields.length > 1 && (
-              <div className="flex items-center gap-2 shrink-0">
+              <>
                 <button
                   type="button"
                   onClick={handlePrevError}
-                  className="text-xs text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">
+                  className="text-xs hover:text-red-800 dark:hover:text-red-300 underline">
                   Previous
                 </button>
                 <button
                   type="button"
                   onClick={handleNextError}
-                  className="text-xs text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">
+                  className="text-xs hover:text-red-800 dark:hover:text-red-300 underline">
                   Next
                 </button>
-              </div>
+              </>
             )}
           </div>
-        )}
+        ) : <div />}
         <button
           type="submit"
           disabled={isLoading}
-          className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50">
+          className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 shrink-0">
           {isLoading ? 'Saving...' : isEdit ? 'Update' : 'Create'}
         </button>
       </div>

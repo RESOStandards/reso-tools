@@ -16,14 +16,21 @@ export const useMetadata = (resource: string): UseMetadataResult => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // For Client Credentials servers, wait until the token is available before fetching.
+  // Otherwise we'd make an unauthenticated request that returns 401.
+  const needsToken = activeServer.authMode === 'client_credentials';
+  const token = currentToken ?? activeServer.token;
+  const ready = isLocal || !needsToken || !!token;
+
   useEffect(() => {
+    if (!ready) return;
     let cancelled = false;
     setIsLoading(true);
     setError(null);
 
     const metaOptions = isLocal
       ? undefined
-      : { baseUrl: activeServer.baseUrl, token: currentToken ?? activeServer.token };
+      : { baseUrl: activeServer.baseUrl, token };
 
     const load = async () => {
       try {
@@ -40,7 +47,7 @@ export const useMetadata = (resource: string): UseMetadataResult => {
 
     load();
     return () => { cancelled = true; };
-  }, [resource, activeServer.id, isLocal, currentToken]);
+  }, [resource, activeServer.id, isLocal, token, ready]);
 
   return { fields, isLoading, error };
 };

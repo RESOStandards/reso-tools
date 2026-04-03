@@ -40,6 +40,26 @@ const SECRETS_KEY = 'reso-server-secrets';
 const ACTIVE_KEY = 'reso-active-server';
 
 const SECRET_FIELDS = ['token', 'clientSecret'] as const;
+const TOKEN_KEY = 'reso-current-token';
+
+/** Persist the current access token. Electron uses secure storage, browser uses sessionStorage. */
+const persistToken = async (token: string | null): Promise<void> => {
+  if (isElectron()) {
+    if (token) await electronStorage().set(TOKEN_KEY, token);
+    else await electronStorage().remove(TOKEN_KEY);
+  } else {
+    if (token) sessionStorage.setItem(TOKEN_KEY, token);
+    else sessionStorage.removeItem(TOKEN_KEY);
+  }
+};
+
+/** Load a previously persisted access token. */
+const loadPersistedToken = async (): Promise<string | null> => {
+  if (isElectron()) {
+    return electronStorage().get(TOKEN_KEY);
+  }
+  return sessionStorage.getItem(TOKEN_KEY);
+};
 
 // ── Storage abstraction: Electron secure storage or browser localStorage ──
 
@@ -280,7 +300,22 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
   const [loadingStatus, setLoadingStatus] = useState<string | null>(null);
   const [resourceError, setResourceError] = useState<string | null>(null);
   const [hasProxy, setHasProxy] = useState(false);
-  const [currentToken, setCurrentToken] = useState<string | null>(null);
+  const [currentToken, _setCurrentToken] = useState<string | null>(null);
+
+  /** Set the current token and persist it. */
+  const setCurrentToken = useCallback((token: string | null) => {
+    _setCurrentToken(token);
+    persistToken(token).catch(() => {});
+  }, []);
+
+  // Hydrate persisted token on mount
+  useEffect(() => {
+    let cancelled = false;
+    loadPersistedToken().then(token => {
+      if (!cancelled && token) _setCurrentToken(token);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // Detect whether a proxy backend is available (reference server running)
   useEffect(() => {

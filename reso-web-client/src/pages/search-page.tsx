@@ -20,7 +20,7 @@ export const SearchPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const { resources, isLoadingResources, loadingStatus, resourceError, permissions, activeServer } = useServer();
+  const { resources, isLoadingResources, loadingStatus, resourceError, permissions, activeServer, currentToken } = useServer();
   const resourceName = resource ?? '';
 
   const filter = searchParams.get('$filter') ?? '';
@@ -41,8 +41,8 @@ export const SearchPage = () => {
     setValidationError(null);
   }, [filter]);
 
-  const { config, fieldGroups, summaryFieldsConfig } = useUiConfig();
-  const { fields, error: metaError } = useMetadata(resourceName);
+  const { config, fieldGroups, summaryFieldsConfig, isLoading: configLoading } = useUiConfig();
+  const { fields, isLoading: metaLoading, error: metaError } = useMetadata(resourceName);
 
   // Resolve summary fields from config
   // Priority: server-specific config > bundled summary-fields.json > all fields
@@ -62,12 +62,16 @@ export const SearchPage = () => {
   const hasMediaExpansion = resourceInfo?.navigationProperties.includes('Media') ?? false;
   const selectFields = isAllFields ? undefined : summaryFields.join(',');
 
+  // Don't fetch data until resources are discovered and token is ready for Client Credentials servers
+  const needsToken = activeServer.authMode === 'client_credentials';
+  const collectionReady = !isLoadingResources && (!needsToken || !!currentToken);
+
   const { rows, count, isLoading, hasMore, error, loadMore } = useCollection(resourceName, {
     $filter: filter || undefined,
     $orderby: orderby || undefined,
     $select: selectFields,
     $expand: hasMediaExpansion ? 'Media' : undefined
-  }, !isLoadingResources);
+  }, collectionReady);
   const handleSearch = useCallback(
     (newFilter: string) => {
       const params = new URLSearchParams(searchParams);
@@ -208,6 +212,7 @@ export const SearchPage = () => {
           <BasicSearch
             resource={resourceName}
             fields={fields}
+            isLoadingFields={metaLoading || configLoading}
             rankedFieldNames={defaultSummaryFields}
             filterString={draftFilter}
             onFilterChange={setDraftFilter}

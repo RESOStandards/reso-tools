@@ -167,6 +167,8 @@ const parseBasicFilter = (
 interface BasicSearchProps {
   readonly resource: string;
   readonly fields: ReadonlyArray<ResoField>;
+  /** Whether field metadata is still loading. */
+  readonly isLoadingFields?: boolean;
   /** Ranked field names from analytics data (summary-fields.json). */
   readonly rankedFieldNames?: ReadonlyArray<string>;
   readonly filterString: string;
@@ -179,6 +181,7 @@ interface BasicSearchProps {
 export const BasicSearch = ({
   resource,
   fields,
+  isLoadingFields = false,
   rankedFieldNames,
   filterString,
   onFilterChange,
@@ -244,6 +247,21 @@ export const BasicSearch = ({
 
   const hasActiveFilters = Object.values(values).some(v => v.trim());
 
+  // Fields still loading — show inline loading indicator
+  if (isLoadingFields) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500 py-1.5">
+        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+          <title>Loading</title>
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        Loading {resource} metadata...
+      </div>
+    );
+  }
+
+  // Fields loaded but no searchable fields match this server
   if (activeFields.length === 0) {
     return (
       <button
