@@ -1,20 +1,18 @@
 import { useEffect, useState } from 'react';
-import { fetchFieldsForResource, fetchLookupsForResource } from '../api/metadata';
+import { fetchFieldsForResource } from '../api/metadata';
 import { useServer } from '../context/server-context';
-import type { ResoField, ResoLookup } from '../types';
+import type { ResoField } from '../types';
 
 export interface UseMetadataResult {
   readonly fields: ReadonlyArray<ResoField>;
-  readonly lookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>>;
   readonly isLoading: boolean;
   readonly error: string | null;
 }
 
-/** Fetches and caches field definitions and lookups for a resource. */
+/** Fetches and caches field definitions for a resource from $metadata. */
 export const useMetadata = (resource: string): UseMetadataResult => {
   const { activeServer, isLocal, currentToken } = useServer();
   const [fields, setFields] = useState<ReadonlyArray<ResoField>>([]);
-  const [lookups, setLookups] = useState<Readonly<Record<string, ReadonlyArray<ResoLookup>>>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,14 +27,8 @@ export const useMetadata = (resource: string): UseMetadataResult => {
 
     const load = async () => {
       try {
-        const [fieldsResult, lookupsResult] = await Promise.all([
-          fetchFieldsForResource(resource, metaOptions),
-          fetchLookupsForResource(resource, metaOptions)
-        ]);
-        if (!cancelled) {
-          setFields(fieldsResult);
-          setLookups(lookupsResult);
-        }
+        const fieldsResult = await fetchFieldsForResource(resource, metaOptions);
+        if (!cancelled) setFields(fieldsResult);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load metadata');
@@ -47,10 +39,8 @@ export const useMetadata = (resource: string): UseMetadataResult => {
     };
 
     load();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [resource, activeServer.id, isLocal, currentToken]);
 
-  return { fields, lookups, isLoading, error };
+  return { fields, isLoading, error };
 };

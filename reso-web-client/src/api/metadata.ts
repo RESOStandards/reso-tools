@@ -140,6 +140,29 @@ export const fetchFieldsForResource = async (
 };
 
 /**
+ * Fetch lookup values for specific lookup names. Returns a map of lookupName → values.
+ * Uses the resolver's per-name cache — previously fetched names return instantly.
+ */
+export const fetchLookupsByName = async (
+  lookupNames: ReadonlyArray<string>,
+  options?: { baseUrl?: string; token?: string }
+): Promise<Readonly<Record<string, ReadonlyArray<ResoLookup>>>> => {
+  if (lookupNames.length === 0) return {};
+
+  const baseUrl = options?.baseUrl || window.location.origin;
+  const resolver = await getResolver(baseUrl, options?.token);
+
+  const entries = await Promise.all(
+    lookupNames.map(async (name) => {
+      const values = await resolver.resolveLookups(name);
+      return [name, values.map(toLookup)] as const;
+    })
+  );
+
+  return Object.fromEntries(entries.filter(([, values]) => values.length > 0));
+};
+
+/**
  * Fetches all lookup values for all enum/lookup fields in a resource.
  * Always returns lookups keyed by **field name**.
  */

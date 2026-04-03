@@ -1,7 +1,8 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ResoField, ResoLookup } from '../types';
+import type { ResoField } from '../types';
 import { isEnumType, isNumericEdmType } from '../types';
 import { getDisplayName } from '../utils/format';
+import { useLookups } from '../hooks/use-lookups';
 
 /** Definition of a single field in the basic search bar. */
 interface BasicSearchFieldDef {
@@ -182,7 +183,6 @@ const parseBasicFilter = (
 interface BasicSearchProps {
   readonly resource: string;
   readonly fields: ReadonlyArray<ResoField>;
-  readonly lookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>>;
   readonly filterString: string;
   readonly onFilterChange: (filter: string) => void;
   readonly onSearch: () => void;
@@ -193,7 +193,6 @@ interface BasicSearchProps {
 export const BasicSearch = ({
   resource,
   fields,
-  lookups,
   filterString,
   onFilterChange,
   onSearch,
@@ -205,6 +204,18 @@ export const BasicSearch = ({
     const fieldNameSet = new Set(fields.map(f => f.fieldName));
     return defs.filter(sf => fieldNameSet.has(sf.fieldName));
   }, [resource, fields]);
+
+  // Lazy-fetch lookups for only the enum fields in the search bar
+  const { lookups, fetchLookups } = useLookups();
+  const fieldMap = new Map(fields.map(f => [f.fieldName, f]));
+
+  useEffect(() => {
+    const enumLookupNames = activeFields
+      .filter(sf => sf.inputType === 'enum')
+      .map(sf => fieldMap.get(sf.fieldName)?.lookupName)
+      .filter((name): name is string => !!name);
+    if (enumLookupNames.length > 0) fetchLookups(enumLookupNames);
+  }, [activeFields]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [values, setValues] = useState<Record<string, string>>({});
   const lastEmittedRef = useRef('');
@@ -241,7 +252,6 @@ export const BasicSearch = ({
     onSearch();
   }, [onFilterChange, onSearch]);
 
-  const fieldMap = new Map(fields.map(f => [f.fieldName, f]));
   const hasActiveFilters = Object.values(values).some(v => v.trim());
 
   if (activeFields.length === 0) {
@@ -263,7 +273,8 @@ export const BasicSearch = ({
       <div className="flex flex-wrap gap-2 items-end">
         {activeFields.map(sf => {
           const field = fieldMap.get(sf.fieldName);
-          const fieldLookups = lookups[sf.fieldName];
+          const lookupName = field?.lookupName;
+          const fieldLookups = lookupName ? lookups[lookupName] : undefined;
 
           return (
             <div key={sf.id} className="flex flex-col gap-0.5 min-w-0">

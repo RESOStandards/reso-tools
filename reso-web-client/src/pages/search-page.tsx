@@ -42,7 +42,7 @@ export const SearchPage = () => {
   }, [filter]);
 
   const { config, fieldGroups, summaryFieldsConfig } = useUiConfig();
-  const { fields, lookups, isLoading: metaLoading } = useMetadata(resourceName);
+  const { fields, error: metaError } = useMetadata(resourceName);
 
   // Resolve summary fields from config
   // Priority: server-specific config > bundled summary-fields.json > all fields
@@ -145,14 +145,11 @@ export const SearchPage = () => {
   // Validate resource exists in discovered metadata
   const isValidResource = resources?.some(r => r.name === resourceName) ?? null;
 
-  if (isLoadingResources || isValidResource === null || metaLoading) {
-    const label = isLoadingResources
-      ? (loadingStatus ?? 'Connecting...')
-      : `Loading ${resourceName} metadata...`;
-    return <LoadingSpinner label={label} subtitle={activeServer.name} />;
-  }
   if (resourceError) {
     return <FriendlyError title="Failed to Load Metadata" message={resourceError} />;
+  }
+  if (isLoadingResources || isValidResource === null) {
+    return <LoadingSpinner label={loadingStatus ?? 'Connecting...'} subtitle={activeServer.name} />;
   }
 
   if (!isValidResource) {
@@ -211,7 +208,6 @@ export const SearchPage = () => {
           <BasicSearch
             resource={resourceName}
             fields={fields}
-            lookups={lookups}
             filterString={draftFilter}
             onFilterChange={setDraftFilter}
             onSearch={handleSubmit}
@@ -254,7 +250,7 @@ export const SearchPage = () => {
             <AdvancedSearch
               resource={resourceName}
               fields={fields}
-              lookups={lookups}
+              lookups={{}}
               fieldGroups={fieldGroups}
               filterString={draftFilter}
               onFilterChange={setDraftFilter}

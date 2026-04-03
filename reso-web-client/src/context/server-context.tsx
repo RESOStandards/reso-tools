@@ -392,7 +392,11 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
         }
       } catch (err) {
         if (!controller.signal.aborted) {
-          setResourceError(err instanceof Error ? err.message : 'Failed to load server metadata');
+          const message = err instanceof Error ? err.message : 'Failed to load server metadata';
+          const is429 = message.includes('429');
+          setResourceError(is429
+            ? 'You have exceeded the maximum number of requests allowed by this provider. Please try again in a few minutes or contact the provider.'
+            : message);
           setLoadingStatus(null);
         }
       } finally {

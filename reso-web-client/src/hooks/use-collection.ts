@@ -23,6 +23,9 @@ const getHttpStatus = (err: unknown): number | undefined => {
 
 /** Transforms raw server error messages into user-friendly descriptions. */
 const humanizeError = (raw: string, statusCode?: number): string => {
+  if (statusCode === 429) {
+    return `You have exceeded the maximum number of requests allowed by this provider. Please try again in a few minutes or contact the provider.\n\nServer response: ${raw}`;
+  }
   if (statusCode && statusCode >= 500) {
     return `The remote server returned an error (${statusCode}). This is a problem with the server, not the client.\n\nServer response: ${raw}`;
   }

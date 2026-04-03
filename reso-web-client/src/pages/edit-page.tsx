@@ -5,6 +5,7 @@ import { KeyPrompt } from '../components/key-prompt';
 import { LoadingSpinner } from '../components/loading-spinner';
 import { RecordForm } from '../components/record-form';
 import { useMetadata } from '../hooks/use-metadata';
+import { useLookups } from '../hooks/use-lookups';
 import { useUiConfig } from '../hooks/use-ui-config';
 import { useServer } from '../context/server-context';
 import { NotFoundPage } from './not-found-page';
@@ -21,8 +22,17 @@ export const EditPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { fields, lookups, isLoading: metaLoading } = useMetadata(resourceName);
+  const { fields, isLoading: metaLoading } = useMetadata(resourceName);
+  const { fetchLookups, lookupsByField } = useLookups();
   const { fieldGroups } = useUiConfig();
+
+  // Fetch lookups for all enum fields on the form
+  useEffect(() => {
+    const enumNames = fields
+      .filter(f => f.lookupName && !f.isExpansion)
+      .map(f => f.lookupName as string);
+    if (enumNames.length > 0) fetchLookups(enumNames);
+  }, [fields]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load record when key is provided
   useEffect(() => {
@@ -132,7 +142,7 @@ export const EditPage = () => {
         <RecordForm
           resource={resourceName}
           fields={fields}
-          lookups={lookups}
+          lookups={lookupsByField(fields)}
           fieldGroups={fieldGroups}
           initialValues={record}
           isEdit
