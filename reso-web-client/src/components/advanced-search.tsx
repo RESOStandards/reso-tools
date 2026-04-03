@@ -178,13 +178,21 @@ export const AdvancedSearch = ({ resource, fields, fieldGroups, filterString, on
   const lastEmittedRef = useRef('');
   const { grouped, ungrouped } = groupFields(fields, resource, fieldGroups);
 
-  // Fetch lookups for all enum fields
+  // Lazy-fetch lookups per group when expanded
   const { fetchLookups, lookupsByField } = useLookups();
-  useEffect(() => {
-    const enumNames = fields.map(getLookupName).filter((n): n is string => !!n);
-    if (enumNames.length > 0) fetchLookups(enumNames);
-  }, [fields]); // eslint-disable-line react-hooks/exhaustive-deps
   const lookups = lookupsByField(fields);
+
+  const fetchLookupsForFields = useCallback((groupFields: ReadonlyArray<ResoField>) => {
+    const names = groupFields.map(getLookupName).filter((n): n is string => !!n);
+    if (names.length > 0) fetchLookups(names);
+  }, [fetchLookups]);
+
+  // When there are no groups, all fields are visible — fetch lookups immediately
+  useEffect(() => {
+    if (grouped.size === 0 && ungrouped.length > 0) {
+      fetchLookupsForFields(ungrouped);
+    }
+  }, [grouped.size, ungrouped.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Derive form state from incoming filter string (e.g. typed in search bar)
   useEffect(() => {
@@ -279,7 +287,7 @@ export const AdvancedSearch = ({ resource, fields, fieldGroups, filterString, on
       {/* Scrollable field groups */}
       <div className="flex-1 overflow-y-auto min-h-0 space-y-3">
         {sortedGroups.map(([group, groupFields]) => (
-          <FieldGroupSection key={group} title={group}>
+          <FieldGroupSection key={group} title={group} onExpand={() => fetchLookupsForFields(groupFields)}>
             {groupFields.map(renderFieldRow)}
           </FieldGroupSection>
         ))}
@@ -287,7 +295,9 @@ export const AdvancedSearch = ({ resource, fields, fieldGroups, filterString, on
         {/* Ungrouped fields — flat list when no groupings exist, "Other" section otherwise */}
         {ungrouped.length > 0 && sortedGroups.length === 0 && <div>{ungrouped.map(renderFieldRow)}</div>}
         {ungrouped.length > 0 && sortedGroups.length > 0 && (
-          <FieldGroupSection title="Other">{ungrouped.map(renderFieldRow)}</FieldGroupSection>
+          <FieldGroupSection title="Other" onExpand={() => fetchLookupsForFields(ungrouped)}>
+            {ungrouped.map(renderFieldRow)}
+          </FieldGroupSection>
         )}
       </div>
 

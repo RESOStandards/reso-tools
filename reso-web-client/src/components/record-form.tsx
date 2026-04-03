@@ -1,5 +1,5 @@
 import { type ValidationFailure, validateRecord } from '@reso-standards/validation';
-import { type FormEvent, useCallback, useMemo, useState } from 'react';
+import { type FormEvent, useCallback, useMemo, useRef, useState } from 'react';
 import { useServer } from '../context/server-context';
 import type { FieldGroups, ResoField, ResoLookup } from '../types';
 import { FieldGroupSection } from './field-group-section';
@@ -69,11 +69,39 @@ export const RecordForm = ({
   const [errors, setErrors] = useState<Map<string, string>>(new Map());
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [keyCopied, setKeyCopied] = useState(false);
+  const [errorNavIndex, setErrorNavIndex] = useState(0);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const { getKeyField } = useServer();
   const keyField = getKeyField(resource);
   const excludeFields = new Set(['ModificationTimestamp', ...(isEdit ? [] : [keyField])]);
   const { grouped, ungrouped } = groupFields(fields, resource, fieldGroups, excludeFields);
+
+  // Ordered list of field names with errors (stable across renders)
+  const errorFields = useMemo(() => [...errors.keys()], [errors]);
+
+  const scrollToError = useCallback((index: number) => {
+    const fieldName = errorFields[index];
+    if (!fieldName || !formRef.current) return;
+    const el = formRef.current.querySelector(`[id="field-${fieldName}"]`)
+      ?? formRef.current.querySelector(`[data-field="${fieldName}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (el instanceof HTMLElement) el.focus();
+    }
+  }, [errorFields]);
+
+  const handlePrevError = useCallback(() => {
+    const next = errorNavIndex > 0 ? errorNavIndex - 1 : errorFields.length - 1;
+    setErrorNavIndex(next);
+    scrollToError(next);
+  }, [errorNavIndex, errorFields.length, scrollToError]);
+
+  const handleNextError = useCallback(() => {
+    const next = errorNavIndex < errorFields.length - 1 ? errorNavIndex + 1 : 0;
+    setErrorNavIndex(next);
+    scrollToError(next);
+  }, [errorNavIndex, errorFields.length, scrollToError]);
 
   const handleChange = useCallback((fieldName: string, value: unknown) => {
     setValues(prev => ({ ...prev, [fieldName]: value }));
@@ -105,11 +133,19 @@ export const RecordForm = ({
         errorMap.set(f.field, f.reason);
       }
       setErrors(errorMap);
+      setErrorNavIndex(0);
       setSubmitError(
         failures.length === 1
           ? `Please fix the error in ${failures[0].field} before submitting.`
           : `Please fix the ${failures.length} field errors highlighted below before submitting.`
       );
+      // Scroll to the first error
+      setTimeout(() => {
+        const firstField = failures[0].field;
+        const el = formRef.current?.querySelector(`[id="field-${firstField}"]`)
+          ?? formRef.current?.querySelector(`[data-field="${firstField}"]`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
       return;
     }
 
@@ -169,7 +205,7 @@ export const RecordForm = ({
   }, [sortedGroups, ungrouped, errors]);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
       {/* Key field shown as read-only in edit mode */}
       {isEdit && (
         <div className="bg-gray-50 dark:bg-gray-900 rounded px-4 py-2 flex items-center">
@@ -205,12 +241,6 @@ export const RecordForm = ({
         </div>
       )}
 
-      {submitError && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded px-3 py-2 text-sm">
-          {submitError}
-        </div>
-      )}
-
       {/* Grouped fields */}
       {sortedGroups.map(([group, groupFields]) => (
         <FieldGroupSection key={group} title={group} defaultOpen={sortedGroups.length <= 3} errorCount={groupErrorCounts.get(group) ?? 0}>
@@ -226,7 +256,39 @@ export const RecordForm = ({
         </FieldGroupSection>
       )}
 
-      <div className="sticky bottom-0 z-10 flex gap-2 pt-2 pb-2 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 -mx-4 px-4 sm:-mx-6 sm:px-6">
+      <div className="sticky bottom-0 z-10 pt-2 pb-2 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 -mx-4 px-4 sm:-mx-6 sm:px-6">
+        {submitError && (
+          <div className="flex items-center justify-between gap-2 mb-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded px-3 py-1.5 text-sm">
+            <span>{submitError}</span>
+            {errorFields.length > 1 && (
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-xs text-red-500 dark:text-red-400">
+                  {errorNavIndex + 1} / {errorFields.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={handlePrevError}
+                  className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/40"
+                  title="Previous error">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <title>Previous</title>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextError}
+                  className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/40"
+                  title="Next error">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <title>Next</title>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         <button
           type="submit"
           disabled={isLoading}

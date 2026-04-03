@@ -4,17 +4,24 @@ interface FieldGroupSectionProps {
   readonly title: string;
   readonly defaultOpen?: boolean;
   readonly errorCount?: number;
+  /** Called when the section is expanded. Use for lazy loading. */
+  readonly onExpand?: () => void;
   readonly children: ReactNode;
 }
 
 /** Collapsible section for grouping fields by RESO Data Dictionary category. */
-export const FieldGroupSection = ({ title, defaultOpen = false, errorCount = 0, children }: FieldGroupSectionProps) => {
+export const FieldGroupSection = ({ title, defaultOpen = false, errorCount = 0, onExpand, children }: FieldGroupSectionProps) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   // Auto-expand when errors appear in this group
   useEffect(() => {
     if (errorCount > 0) setIsOpen(true);
   }, [errorCount]);
+
+  // Notify parent when expanded (for lazy loading)
+  useEffect(() => {
+    if (isOpen && onExpand) onExpand();
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div

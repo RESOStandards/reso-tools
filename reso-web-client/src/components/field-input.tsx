@@ -29,7 +29,7 @@ export const FieldInput = ({ field, value, onChange, lookups, disabled = false, 
       onChange(field.fieldName, next.size > 0 ? [...next].join(',') : null);
     };
     return (
-      <div>
+      <div data-field={field.fieldName}>
         <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1" title={getDisplayName(field)}>
           {getDisplayName(field)}
         </label>
