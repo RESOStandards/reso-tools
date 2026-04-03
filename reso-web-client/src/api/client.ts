@@ -120,20 +120,22 @@ const buildQueryString = (params: CollectionParams): string => {
   return parts.length > 0 ? `?${parts.join('&')}` : '';
 };
 
-/** Extracts an OData error from a failed response, or builds a generic one. */
-const parseError = async (res: Response): Promise<ODataError> => {
+/** Extracts an OData error from a failed response, or builds a generic one. Always includes httpStatus. */
+const parseError = async (res: Response): Promise<ODataError & { httpStatus: number }> => {
+  const httpStatus = res.status;
   try {
     const body = await res.json();
-    if (body?.error) return body as ODataError;
+    if (body?.error) return { ...body as ODataError, httpStatus };
   } catch {
     // Ignore parse errors
   }
   return {
     error: {
-      code: String(res.status),
+      code: String(httpStatus),
       message: res.statusText || 'Request failed',
       details: []
-    }
+    },
+    httpStatus
   };
 };
 

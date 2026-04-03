@@ -154,6 +154,8 @@ export interface ServerContextValue {
   readonly resources: ReadonlyArray<ResourceInfo> | null;
   /** Whether metadata is currently being loaded for the active server. */
   readonly isLoadingResources: boolean;
+  /** Human-readable loading step (e.g., "Fetching token...", "Loading metadata..."). */
+  readonly loadingStatus: string | null;
   /** Error from metadata loading, if any. */
   readonly resourceError: string | null;
   /** Switch to a different server by ID. */
@@ -166,6 +168,8 @@ export interface ServerContextValue {
   readonly updateServer: (id: string, updates: Partial<Omit<ServerConfig, 'id' | 'type'>>) => void;
   /** Whether the active server is the local reference server. */
   readonly isLocal: boolean;
+  /** Whether a proxy backend is available (required for external servers and Client Credentials). */
+  readonly hasProxy: boolean;
   /** Resolved permissions for the active server. */
   readonly permissions: ServerPermissions;
   /** Get the key field name for a resource (discovered from $metadata). */
@@ -174,6 +178,8 @@ export interface ServerContextValue {
   readonly getAlternateKeyField: (resource: string) => string | undefined;
   /** Whether the server has a Lookup entity set (for Lookup Resource enum fields). */
   readonly hasLookupResource: boolean;
+  /** The current access token for the active server (static bearer or fetched via Client Credentials). */
+  readonly currentToken: string | null;
 }
 
 const ServerContext = createContext<ServerContextValue | null>(null);
@@ -191,6 +197,58 @@ const generateId = (): string => crypto.randomUUID().slice(0, 8);
 export interface ServerProviderProps {
   readonly children: ReactNode;
 }
+
+/** Check whether a proxy backend is available by probing /health. */
+const checkProxyAvailable = async (): Promise<boolean> => {
+  try {
+    const res = await fetch('/health', { signal: AbortSignal.timeout(2000) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Fetch an OAuth2 access token via Client Credentials, routing through the proxy to avoid CORS.
+ * Mirrors the grant logic in reso-client's fetchAccessToken but sends through /api/proxy.
+ */
+const fetchTokenViaProxy = async (config: {
+  readonly clientId: string;
+  readonly clientSecret: string;
+  readonly tokenUrl: string;
+  readonly scope?: string;
+}, signal?: AbortSignal): Promise<string> => {
+  const params = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
+  });
+  if (config.scope) params.set('scope', config.scope);
+
+  const proxyUrl = `/api/proxy?url=${encodeURIComponent(config.tokenUrl)}`;
+  const res = await fetch(proxyUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
+    },
+    body: params.toString(),
+    cache: 'no-store',
+    signal,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Token request failed: ${res.status} ${res.statusText}${text ? ` — ${text}` : ''}`);
+  }
+
+  const json = await res.json() as Record<string, unknown>;
+  const accessToken = json.access_token;
+  if (typeof accessToken !== 'string' || accessToken.length === 0) {
+    throw new Error('Token response missing or empty access_token');
+  }
+  return accessToken;
+};
 
 /**
  * Resolve the $metadata URL for fetching.
@@ -218,7 +276,19 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
   const [storageReady, setStorageReady] = useState(!isElectron());
   const [resources, setResources] = useState<ReadonlyArray<ResourceInfo> | null>(null);
   const [isLoadingResources, setIsLoadingResources] = useState(true);
+  const [loadingStatus, setLoadingStatus] = useState<string | null>(null);
   const [resourceError, setResourceError] = useState<string | null>(null);
+  const [hasProxy, setHasProxy] = useState(false);
+  const [currentToken, setCurrentToken] = useState<string | null>(null);
+
+  // Detect whether a proxy backend is available (reference server running)
+  useEffect(() => {
+    let cancelled = false;
+    checkProxyAvailable().then(available => {
+      if (!cancelled) setHasProxy(available);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // Hydrate state from storage (async for Electron secure storage, instant for localStorage)
   useEffect(() => {
@@ -243,7 +313,19 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed: unknown = JSON.parse(raw);
-        if (Array.isArray(parsed)) setExternalConfigs(parsed as ReadonlyArray<ServerConfig>);
+        if (Array.isArray(parsed)) {
+          const configs = parsed as ReadonlyArray<ServerConfig>;
+          // Merge secrets from sessionStorage (clientSecret, token are stripped from localStorage)
+          const secretsRaw = sessionStorage.getItem(SECRETS_KEY);
+          const secrets = secretsRaw
+            ? JSON.parse(secretsRaw) as Record<string, Record<string, string>>
+            : {};
+          const merged = configs.map(c => {
+            const s = secrets[c.id];
+            return s ? { ...c, ...s } : c;
+          });
+          setExternalConfigs(merged);
+        }
       }
       const activeId = localStorage.getItem(ACTIVE_KEY);
       if (activeId) setActiveServerId(activeId);
@@ -266,16 +348,30 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     setIsLoadingResources(true);
     setResourceError(null);
     setResources(null);
+    setCurrentToken(null);
+    setLoadingStatus('Connecting...');
 
     const loadMetadata = async () => {
       try {
         const { parseCsdlXml, discoverResources } = await import('@reso-standards/reso-client');
 
         const headers: Record<string, string> = { Accept: 'application/xml' };
-        if (activeServer.token) {
+        if (activeServer.authMode === 'client_credentials' && activeServer.clientId && activeServer.clientSecret && activeServer.tokenUrl) {
+          setLoadingStatus('Fetching access token...');
+          const accessToken = await fetchTokenViaProxy({
+            clientId: activeServer.clientId,
+            clientSecret: activeServer.clientSecret,
+            tokenUrl: activeServer.tokenUrl,
+            scope: activeServer.scope,
+          }, controller.signal);
+          if (!controller.signal.aborted) setCurrentToken(accessToken);
+          headers['Authorization'] = `Bearer ${accessToken}`;
+        } else if (activeServer.token) {
+          if (!controller.signal.aborted) setCurrentToken(activeServer.token);
           headers['Authorization'] = `Bearer ${activeServer.token}`;
         }
 
+        setLoadingStatus('Loading metadata...');
         const metadataUrl = resolveMetadataUrl(activeServer.baseUrl);
         const needsCacheBust = metadataUrl.startsWith('/api/proxy');
         const res = await fetch(metadataUrl, {
@@ -285,16 +381,19 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
         });
         if (!res.ok) throw new Error(`Failed to fetch metadata: ${res.status} ${res.statusText}`);
 
+        setLoadingStatus('Parsing metadata...');
         const xml = await res.text();
         const schema = parseCsdlXml(xml);
         const discovered = discoverResources(schema);
 
         if (!controller.signal.aborted) {
           setResources(discovered);
+          setLoadingStatus(null);
         }
       } catch (err) {
         if (!controller.signal.aborted) {
           setResourceError(err instanceof Error ? err.message : 'Failed to load server metadata');
+          setLoadingStatus(null);
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -375,18 +474,21 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
       servers,
       resources,
       isLoadingResources,
+      loadingStatus,
       resourceError,
       switchServer,
       addServer,
       removeServer,
       updateServer,
       isLocal,
+      hasProxy,
       permissions,
       getKeyField,
       getAlternateKeyField,
-      hasLookupResource
+      hasLookupResource,
+      currentToken
     }),
-    [activeServer, servers, resources, isLoadingResources, resourceError, switchServer, addServer, removeServer, updateServer, isLocal, permissions, getKeyField, getAlternateKeyField, hasLookupResource]
+    [activeServer, servers, resources, isLoadingResources, loadingStatus, resourceError, switchServer, addServer, removeServer, updateServer, isLocal, hasProxy, permissions, getKeyField, getAlternateKeyField, hasLookupResource, currentToken]
   );
 
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;

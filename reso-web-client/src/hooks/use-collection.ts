@@ -13,12 +13,26 @@ const UNSUPPORTED_QUERY_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
   [/syntax error/i, 'The server could not parse this query. Check the filter syntax and try again.'],
 ];
 
+/** Extract the HTTP status code from a thrown error. */
+const getHttpStatus = (err: unknown): number | undefined => {
+  const status = (err as { httpStatus?: number })?.httpStatus;
+  if (typeof status === 'number') return status;
+  const code = (err as { error?: { code?: string } })?.error?.code;
+  return code ? Number(code) || undefined : undefined;
+};
+
 /** Transforms raw server error messages into user-friendly descriptions. */
-const humanizeError = (raw: string): string => {
+const humanizeError = (raw: string, statusCode?: number): string => {
+  if (statusCode && statusCode >= 500) {
+    return `The remote server returned an error (${statusCode}). This is a problem with the server, not the client.\n\nServer response: ${raw}`;
+  }
   for (const [pattern, friendly] of UNSUPPORTED_QUERY_PATTERNS) {
     if (pattern.test(raw)) return `${friendly}\n\nServer response: ${raw}`;
   }
-  return raw;
+  if (statusCode) {
+    return `The remote server returned an error (${statusCode}).\n\nServer response: ${raw}`;
+  }
+  return `Server response: ${raw}`;
 };
 
 export interface UseCollectionResult {
@@ -80,9 +94,10 @@ export const useCollection = (
         nextLinkRef.current = result['@odata.nextLink'] ?? null;
         setHasMore(nextLinkRef.current !== null);
       } catch (err) {
+        const statusCode = getHttpStatus(err);
         const msg =
           err instanceof Error ? err.message : ((err as { error?: { message?: string } })?.error?.message ?? 'Failed to load data');
-        setError(humanizeError(msg));
+        setError(humanizeError(msg, statusCode));
       } finally {
         setIsLoading(false);
       }
@@ -106,9 +121,10 @@ export const useCollection = (
       nextLinkRef.current = result['@odata.nextLink'] ?? null;
       setHasMore(nextLinkRef.current !== null);
     } catch (err) {
+      const statusCode = getHttpStatus(err);
       const msg =
         err instanceof Error ? err.message : ((err as { error?: { message?: string } })?.error?.message ?? 'Failed to load more data');
-      setError(humanizeError(msg));
+      setError(humanizeError(msg, statusCode));
     } finally {
       setIsLoading(false);
     }

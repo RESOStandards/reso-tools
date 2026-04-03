@@ -25,6 +25,8 @@ interface ServerConnectionModalProps {
   /** Pre-fill for editing an existing connection. */
   readonly initial?: ServerFormData;
   readonly title?: string;
+  /** Whether a proxy backend is available (required for Client Credentials). */
+  readonly hasProxy?: boolean;
 }
 
 const inputClass = 'w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500';
@@ -44,7 +46,8 @@ export const ServerConnectionModal = ({
   onClose,
   onSubmit,
   initial,
-  title = 'Add Server Connection'
+  title = 'Add Server Connection',
+  hasProxy = false
 }: ServerConnectionModalProps) => {
   const [name, setName] = useState(initial?.name ?? '');
   const [baseUrl, setBaseUrl] = useState(initial?.baseUrl ?? '');
@@ -179,16 +182,21 @@ export const ServerConnectionModal = ({
               </button>
               <button
                 type="button"
+                disabled={!hasProxy}
                 onClick={() => setAuthMode(AUTH_MODE_CLIENT_CREDENTIALS)}
-                className={toggleBtnClass(authMode === AUTH_MODE_CLIENT_CREDENTIALS)}>
+                className={`${toggleBtnClass(authMode === AUTH_MODE_CLIENT_CREDENTIALS)} ${!hasProxy ? 'opacity-40 cursor-not-allowed' : ''}`}
+                title={!hasProxy ? 'Client Credentials requires a proxy backend (run the reference server or desktop app)' : undefined}>
                 Client Credentials
               </button>
             </div>
+            {!hasProxy && authMode === AUTH_MODE_TOKEN && (
+              <p className={hintClass}>Client Credentials requires a running backend to proxy token requests</p>
+            )}
 
             {authMode === AUTH_MODE_TOKEN ? (
               <div>
                 <label htmlFor="server-token" className={labelClass}>
-                  Bearer Token <span className="text-gray-400 font-normal">(optional)</span>
+                  Bearer Token
                 </label>
                 <input
                   id="server-token"
@@ -202,53 +210,57 @@ export const ServerConnectionModal = ({
               </div>
             ) : (
               <div className="space-y-3">
-                <div>
-                  <label htmlFor="client-id" className={labelClass}>Client ID</label>
-                  <input
-                    id="client-id"
-                    type="text"
-                    autoComplete="username"
-                    value={clientId}
-                    onChange={e => setClientId(e.target.value)}
-                    placeholder="Enter client ID"
-                    className={inputClass}
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="client-id" className={labelClass}>Client ID</label>
+                    <input
+                      id="client-id"
+                      type="text"
+                      autoComplete="username"
+                      value={clientId}
+                      onChange={e => setClientId(e.target.value)}
+                      placeholder="Enter client ID"
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="client-secret" className={labelClass}>Client Secret</label>
+                    <input
+                      id="client-secret"
+                      type="password"
+                      autoComplete="current-password"
+                      value={clientSecret}
+                      onChange={e => setClientSecret(e.target.value)}
+                      placeholder="Enter client secret"
+                      className={inputClass}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label htmlFor="client-secret" className={labelClass}>Client Secret</label>
-                  <input
-                    id="client-secret"
-                    type="password"
-                    autoComplete="current-password"
-                    value={clientSecret}
-                    onChange={e => setClientSecret(e.target.value)}
-                    placeholder="Enter client secret"
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="token-url" className={labelClass}>Token URI</label>
-                  <input
-                    id="token-url"
-                    type="text"
-                    value={tokenUrl}
-                    onChange={e => setTokenUrl(e.target.value)}
-                    placeholder="https://auth.example.com/oauth/token"
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="scope" className={labelClass}>
-                    Scope <span className="text-gray-400 font-normal">(optional)</span>
-                  </label>
-                  <input
-                    id="scope"
-                    type="text"
-                    value={scope}
-                    onChange={e => setScope(e.target.value)}
-                    placeholder="e.g., api"
-                    className={inputClass}
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="token-url" className={labelClass}>Token URI</label>
+                    <input
+                      id="token-url"
+                      type="text"
+                      value={tokenUrl}
+                      onChange={e => setTokenUrl(e.target.value)}
+                      placeholder="https://auth.example.com/token"
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="scope" className={labelClass}>
+                      Scope <span className="text-gray-400 font-normal">(optional)</span>
+                    </label>
+                    <input
+                      id="scope"
+                      type="text"
+                      value={scope}
+                      onChange={e => setScope(e.target.value)}
+                      placeholder="e.g., api"
+                      className={inputClass}
+                    />
+                  </div>
                 </div>
               </div>
             )}

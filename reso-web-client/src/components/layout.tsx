@@ -32,7 +32,7 @@ export const Layout = () => {
   const location = useLocation();
   const pageIndicator = getPageIndicator(location.pathname, resource);
   const navigate = useNavigate();
-  const { activeServer, resources } = useServer();
+  const { activeServer, resources, currentToken } = useServer();
   const prevServerIdRef = useRef(activeServer.id);
 
   // Close sidebar on navigation (mobile)
@@ -40,12 +40,12 @@ export const Layout = () => {
     setSidebarOpen(false);
   }, [location.pathname]);
 
-  // Sync API client config and clear caches when server changes
+  // Sync API client config and clear caches when server changes or token is fetched
   useEffect(() => {
-    setApiConfig(activeServer.baseUrl, activeServer.token);
+    setApiConfig(activeServer.baseUrl, currentToken ?? activeServer.token);
     clearMetadataCache();
     clearConfigCache();
-  }, [activeServer.id]);
+  }, [activeServer.id, currentToken]);
 
   // Guard: when server changes and new resources load, validate the current route
   useEffect(() => {

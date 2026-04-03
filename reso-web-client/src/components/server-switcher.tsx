@@ -6,7 +6,7 @@ import type { ServerConfig } from '../context/server-context';
 
 /** Server switcher dropdown in the header — lets users switch between connections. */
 export const ServerSwitcher = () => {
-  const { activeServer, servers, switchServer, addServer, removeServer, updateServer, isLoadingResources } = useServer();
+  const { activeServer, servers, switchServer, addServer, removeServer, updateServer, isLoadingResources, hasProxy } = useServer();
   const [isOpen, setIsOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingServer, setEditingServer] = useState<ServerConfig | null>(null);
@@ -185,6 +185,7 @@ export const ServerSwitcher = () => {
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         onSubmit={handleAddConnection}
+        hasProxy={hasProxy}
       />
 
       {/* Edit existing connection modal */}
@@ -195,6 +196,7 @@ export const ServerSwitcher = () => {
           onSubmit={handleEditConnection}
           initial={{ name: editingServer.name, baseUrl: editingServer.baseUrl, authMode: editingServer.authMode ?? 'token', token: editingServer.token ?? '', clientId: editingServer.clientId ?? '', clientSecret: editingServer.clientSecret ?? '', tokenUrl: editingServer.tokenUrl ?? '', scope: editingServer.scope ?? '', permissions: editingServer.permissions ?? { canAdd: false, canEdit: false, canDelete: false } }}
           title="Edit Connection"
+          hasProxy={hasProxy}
         />
       )}
     </>

@@ -184,6 +184,7 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: false }));
 
   // OData version + CORS headers
   app.use((_req, res, next) => {
@@ -225,6 +226,24 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
 
   // OAuth2 mock token endpoint
   app.use(createMockOAuthRouter());
+
+  // SPA routing: when a UI is available, serve index.html for browser navigations
+  // to resource paths (Accept: text/html). API requests (Accept: application/json) fall through to OData.
+  if (options.uiDistPath) {
+    const spaIndexPath = resolve(options.uiDistPath, 'index.html');
+    const resourceSet = new Set(activeResources);
+    app.use((req, res, next) => {
+      if (req.method !== 'GET') return next();
+      const segment = req.path.split('/')[1];
+      if (!segment || !resourceSet.has(segment)) return next();
+      const accept = req.headers.accept ?? '';
+      if (accept.includes('text/html') && !accept.includes('application/json')) {
+        res.sendFile(spaIndexPath);
+        return;
+      }
+      next();
+    });
+  }
 
   // OData CRUD + collection routes (using DAL instead of direct pool access)
   const odataRouter = createODataRouter(metadata, dal, config.baseUrl, activeResources, readOnlyResources);
@@ -335,7 +354,11 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
       const upstream = await fetch(targetUrl, {
         method: req.method,
         headers,
-        body: ['POST', 'PATCH', 'PUT'].includes(req.method) ? JSON.stringify(req.body) : undefined
+        body: ['POST', 'PATCH', 'PUT'].includes(req.method)
+          ? (req.headers['content-type']?.includes('application/x-www-form-urlencoded')
+            ? new URLSearchParams(req.body as Record<string, string>).toString()
+            : JSON.stringify(req.body))
+          : undefined
       });
 
       // Prevent browser from caching proxy responses (avoids stale 304s)

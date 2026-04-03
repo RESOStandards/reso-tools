@@ -9,7 +9,7 @@ type Section = 'home' | 'organizations' | 'resources' | 'metadata';
 export const ResourceNav = () => {
   const { resource: activeResource } = useParams<{ resource: string }>();
   const location = useLocation();
-  const { resources, isLocal, isLoadingResources, permissions } = useServer();
+  const { resources, isLocal, isLoadingResources, loadingStatus, permissions } = useServer();
 
   const resourceNames = useMemo(
     () => resources?.map(r => r.name) ?? [],
@@ -69,7 +69,7 @@ export const ResourceNav = () => {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              Loading...
+              {loadingStatus ?? 'Loading...'}
             </div>
           )}
 
@@ -140,7 +140,7 @@ export const ResourceNav = () => {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                Loading...
+                {loadingStatus ?? 'Loading...'}
               </div>
             )}
 

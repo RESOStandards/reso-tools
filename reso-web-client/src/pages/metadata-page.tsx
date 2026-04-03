@@ -284,7 +284,7 @@ const ResourceCard = ({
 export const MetadataPage = () => {
   const { resource } = useParams<{ resource?: string }>();
   const navigate = useNavigate();
-  const { resources, isLoadingResources, activeServer, isLocal } = useServer();
+  const { resources, isLoadingResources, loadingStatus, activeServer, isLocal, currentToken } = useServer();
 
   const [schema, setSchema] = useState<CsdlSchema | null>(null);
   const [fields, setFields] = useState<ReadonlyArray<FieldInfo>>([]);
@@ -301,7 +301,7 @@ export const MetadataPage = () => {
     const load = async () => {
       try {
         const baseUrl = isLocal ? undefined : activeServer.baseUrl;
-        const s = await fetchSchema(baseUrl, activeServer.token);
+        const s = await fetchSchema(baseUrl, currentToken ?? activeServer.token);
         if (!cancelled) setSchema(s);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load metadata');
@@ -326,7 +326,7 @@ export const MetadataPage = () => {
         const { getFieldsForResource } = await import('@reso-standards/reso-client');
         const { fetchLookupsForResource } = await import('../api/metadata');
         const f = getFieldsForResource(schema, resource);
-        const metaOptions = isLocal ? undefined : { baseUrl: activeServer.baseUrl, token: activeServer.token };
+        const metaOptions = isLocal ? undefined : { baseUrl: activeServer.baseUrl, token: currentToken ?? activeServer.token };
         const l = await fetchLookupsForResource(resource, metaOptions);
         if (!cancelled) {
           setFields(f);
@@ -357,7 +357,7 @@ export const MetadataPage = () => {
       if (lowerSearch && !f.fieldName.toLowerCase().includes(lowerSearch)) return false;
       if (typeFilter === 'properties' && f.isExpansion) return false;
       if (typeFilter === 'expansions' && !f.isExpansion) return false;
-      if (typeFilter === 'enums' && !f.lookupName && !f.typeName) return false;
+      if (typeFilter === 'enums' && (f.isExpansion || (!f.lookupName && !f.typeName))) return false;
       return true;
     });
   }, [fields, search, typeFilter]);
@@ -378,10 +378,10 @@ export const MetadataPage = () => {
     all: fields.length,
     properties: fields.filter(f => !f.isExpansion).length,
     expansions: fields.filter(f => f.isExpansion).length,
-    enums: fields.filter(f => f.lookupName || (!f.isExpansion && f.typeName)).length
+    enums: fields.filter(f => !f.isExpansion && (f.lookupName || f.typeName)).length
   }), [fields]);
 
-  if (isLoadingResources) return <LoadingSpinner />;
+  if (isLoadingResources) return <LoadingSpinner label={loadingStatus ?? 'Connecting...'} subtitle={activeServer.name} />;
   if (error && !resource) return <FriendlyError title="Metadata Error" message={error} />;
 
   // Resource grid view
