@@ -105,6 +105,10 @@ export { queryEntities } from './crud/query.js';
 export { extractAnnotations, isODataCollection, extractEntityData, getNextLink, followAllPages } from './response/parser.js';
 export { isODataError, parseODataError, getErrorTargets } from './response/error.js';
 
+// Environment config
+export { authConfigFromEnv, configFromEnv } from './env.js';
+export type { EnvConfig } from './env.js';
+
 // Metadata fetcher
 export { fetchRawMetadata, fetchAndParseMetadata } from './metadata/fetcher.js';
 

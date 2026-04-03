@@ -20,10 +20,16 @@ import {
   isODataCollection,
 } from "@reso-standards/reso-client";
 
-// Create a client with bearer token auth
+// Create a client with OAuth2 Client Credentials
 const client = await createClient({
   baseUrl: "http://localhost:8080",
-  auth: { mode: "token", authToken: "test" },
+  auth: {
+    mode: "client_credentials",
+    clientId: "my-client-id",
+    clientSecret: "my-client-secret",
+    tokenUrl: "https://auth.example.com/oauth/token",
+    scope: "api",
+  },
 });
 
 // Create a record
@@ -50,6 +56,88 @@ if (response.status === 200 && isODataCollection(response.body)) {
 ```
 
 ## Features
+
+### Authentication
+
+The client supports two authentication modes.
+
+#### OAuth2 Client Credentials
+
+Tokens are managed automatically — fetched on first use, refreshed proactively at 90% of TTL, and retried once on 401 responses.
+
+```typescript
+const client = await createClient({
+  baseUrl: "http://localhost:8080",
+  auth: {
+    mode: "client_credentials",
+    clientId: "my-client-id",
+    clientSecret: "my-client-secret",
+    tokenUrl: "https://auth.example.com/oauth/token",
+    scope: "api",                  // optional
+    defaultExpiresIn: 3600,        // optional, default 1 hour
+    credentialTransport: "body",   // optional: "body" (default), "header", "query"
+  },
+});
+```
+
+Credential transport options:
+- **`body`** (default): Client ID and secret sent as form parameters
+- **`header`**: Basic auth header (`Authorization: Basic base64(id:secret)`)
+- **`query`**: Client ID and secret appended as URL query parameters
+
+#### Bearer Token
+
+For static tokens or when managing token lifecycle externally.
+
+```typescript
+const client = await createClient({
+  baseUrl: "http://localhost:8080",
+  auth: { mode: "token", authToken: "my-bearer-token" },
+});
+```
+
+#### Environment Variables
+
+Build auth configuration from environment variables — no code changes needed to switch between token and client credentials.
+
+```typescript
+import { authConfigFromEnv, configFromEnv } from "@reso-standards/reso-client";
+
+// Auth config only
+const auth = authConfigFromEnv();
+const client = await createClient({ baseUrl: "http://localhost:8080", auth });
+
+// Full config (base URL + auth)
+const config = configFromEnv();
+const client = await createClient(config);
+```
+
+| Variable | Description |
+|----------|-------------|
+| `RESO_BASE_URL` | Server base URL (required for `configFromEnv`) |
+| `RESO_AUTH_TOKEN` | Bearer token (token mode) |
+| `RESO_CLIENT_ID` | OAuth2 client ID (client credentials mode) |
+| `RESO_CLIENT_SECRET` | OAuth2 client secret |
+| `RESO_TOKEN_URI` | OAuth2 token endpoint URL |
+| `RESO_SCOPE` | OAuth2 scope (optional) |
+| `RESO_EXPIRES_IN` | Default token TTL in seconds (optional, default 3600) |
+
+When `RESO_CLIENT_ID`, `RESO_CLIENT_SECRET` and `RESO_TOKEN_URI` are all set, client credentials mode is used. Otherwise falls back to `RESO_AUTH_TOKEN`.
+
+**Using a `.env` file** (Node 22+):
+
+```bash
+# .env
+RESO_BASE_URL=http://localhost:8080
+RESO_CLIENT_ID=my-client-id
+RESO_CLIENT_SECRET=my-client-secret
+RESO_TOKEN_URI=https://auth.example.com/oauth/token
+RESO_SCOPE=api
+```
+
+```bash
+node --env-file=.env script.js
+```
 
 ### URI Builder
 
@@ -113,29 +201,6 @@ await deleteEntity(client, "Property", "ABC123");
 await queryEntities(client, "Property", {
   $filter: "City eq 'Austin'",
   $top: 25,
-});
-```
-
-### Authentication
-
-Bearer token or OAuth2 Client Credentials.
-
-```typescript
-// Bearer token
-const client = await createClient({
-  baseUrl: "http://localhost:8080",
-  auth: { mode: "token", authToken: "my-token" },
-});
-
-// OAuth2 Client Credentials
-const client = await createClient({
-  baseUrl: "http://localhost:8080",
-  auth: {
-    mode: "client_credentials",
-    clientId: "my-client",
-    clientSecret: "my-secret",
-    tokenUrl: "https://auth.example.com/oauth/token",
-  },
 });
 ```
 
@@ -251,8 +316,11 @@ Runnable examples are in the [examples/](examples/) directory. Each requires the
 # Start the reference server first
 cd ../reso-reference-server && docker compose up -d
 
-# Run an example
-npx tsx examples/query-with-filter.ts
+# Run an example with bearer token
+RESO_AUTH_TOKEN=test npx tsx examples/query-with-filter.ts
+
+# Run with client credentials via .env file
+node --env-file=.env npx tsx examples/oauth-flow.ts
 ```
 
 ## Development
