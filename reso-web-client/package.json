@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@reso-standards/odata-client": "file:../odata-client",
+    "@reso-standards/reso-client": "file:../reso-client",
     "@reso-standards/odata-expression-parser": "file:../odata-expression-parser",
     "@reso-standards/validation": "file:../validation",
     "react": "^19.0.0",

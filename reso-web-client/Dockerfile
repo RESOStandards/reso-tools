@@ -5,20 +5,20 @@ WORKDIR /app
 # Copy file: dependencies
 COPY validation/ /deps/validation/
 COPY odata-expression-parser/ /deps/odata-expression-parser/
-COPY odata-client/ /deps/odata-client/
+COPY reso-client/ /deps/reso-client/
 
 COPY reso-web-client/package.json reso-web-client/package-lock.json* ./
 
 # Rewrite file: dependency paths for the Docker build context
 RUN sed -i 's|file:../validation|file:/deps/validation|' package.json && \
     sed -i 's|file:../odata-expression-parser|file:/deps/odata-expression-parser|' package.json && \
-    sed -i 's|file:../odata-client|file:/deps/odata-client|' package.json && \
-    sed -i 's|file:../odata-expression-parser|file:/deps/odata-expression-parser|' /deps/odata-client/package.json
+    sed -i 's|file:../reso-client|file:/deps/reso-client|' package.json && \
+    sed -i 's|file:../odata-expression-parser|file:/deps/odata-expression-parser|' /deps/reso-client/package.json
 
 # Build dependencies first so dist/ exists when npm resolves file: links
 RUN cd /deps/validation && npm install && npx tsc && \
     cd /deps/odata-expression-parser && npm install && npx tsc && \
-    cd /deps/odata-client && npm install && npx tsc
+    cd /deps/reso-client && npm install && npx tsc
 
 RUN npm ci --ignore-scripts || npm install
 

@@ -38,7 +38,7 @@ jobs:
       - name: Install all package dependencies
         run: |
           npm install
-          for dir in validation odata-expression-parser odata-client data-generator reso-reference-server certification; do
+          for dir in validation odata-expression-parser reso-client data-generator reso-reference-server certification; do
             (cd "$dir" && npm install)
           done
 

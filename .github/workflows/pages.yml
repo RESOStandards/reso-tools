@@ -27,7 +27,7 @@ jobs:
           packages=(
             "validation:@reso-standards/validation:Isomorphic validation library"
             "odata-expression-parser:@reso-standards/odata-expression-parser:OData filter parser"
-            "odata-client:@reso-standards/odata-client:OData client SDK"
+            "reso-client:@reso-standards/reso-client:RESO Client SDK"
             "data-generator:@reso-standards/data-generator:Test data generator"
             "certification:@reso-standards/certification:Certification testing tools"
             "reso-reference-server:reso-reference-server:OData reference server"

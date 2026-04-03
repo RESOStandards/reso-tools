@@ -16,7 +16,7 @@ pre-commit:
       priority: 1
 
     typecheck-client:
-      root: "tools/odata-client/"
+      root: "tools/reso-client/"
       run: npx tsc --noEmit
       priority: 2
 
@@ -51,7 +51,7 @@ pre-commit:
       priority: 3
 
     test-client:
-      root: "tools/odata-client/"
+      root: "tools/reso-client/"
       run: npx vitest run
       priority: 4
 

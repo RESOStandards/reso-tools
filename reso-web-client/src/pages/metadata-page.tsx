@@ -1,4 +1,4 @@
-import type { CsdlComplexType, CsdlEnumType, CsdlNavigationProperty, CsdlSchema, FieldInfo } from '@reso-standards/odata-client';
+import type { CsdlComplexType, CsdlEnumType, CsdlNavigationProperty, CsdlSchema, FieldInfo } from '@reso-standards/reso-client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { FriendlyError } from '../components/friendly-error';
@@ -8,7 +8,7 @@ import type { ResoLookup } from '../types';
 
 /** Fetch CSDL schema, with caching handled by metadata.ts internals. */
 const fetchSchema = async (baseUrl?: string, token?: string): Promise<CsdlSchema> => {
-  const { parseCsdlXml } = await import('@reso-standards/odata-client');
+  const { parseCsdlXml } = await import('@reso-standards/reso-client');
 
   const isLocalhost = (url: string): boolean => {
     try { return ['localhost', '127.0.0.1', '::1'].includes(new URL(url).hostname); }
@@ -323,7 +323,7 @@ export const MetadataPage = () => {
 
     const load = async () => {
       try {
-        const { getFieldsForResource } = await import('@reso-standards/odata-client');
+        const { getFieldsForResource } = await import('@reso-standards/reso-client');
         const { fetchLookupsForResource } = await import('../api/metadata');
         const f = getFieldsForResource(schema, resource);
         const metaOptions = isLocal ? undefined : { baseUrl: activeServer.baseUrl, token: activeServer.token };

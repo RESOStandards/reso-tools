@@ -1,7 +1,7 @@
 {
-  "name": "@reso-standards/odata-client",
+  "name": "@reso-standards/reso-client",
   "version": "0.1.0",
-  "description": "OData 4.01 client SDK for TypeScript — URI builder, CRUD helpers, CSDL metadata validation, and query parsing. Inspired by Apache Olingo's Java Client.",
+  "description": "RESO Client SDK for TypeScript — OData 4.01 URI builder, CRUD helpers, CSDL metadata validation, and query parsing.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

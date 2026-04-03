@@ -1,4 +1,4 @@
-import type { CsdlSchema, LookupResolver, LookupValue } from '@reso-standards/odata-client';
+import type { CsdlSchema, LookupResolver, LookupValue } from '@reso-standards/reso-client';
 import { entityTypeToFields } from './metadata-adapter';
 import type { ResoField, ResoLookup } from '../types';
 
@@ -52,7 +52,7 @@ const fetchCsdlSchema = async (baseUrl: string, token?: string): Promise<CsdlSch
   const cached = csdlSchemaCache.get(cacheKey);
   if (cached) return cached;
 
-  const { parseCsdlXml } = await import('@reso-standards/odata-client');
+  const { parseCsdlXml } = await import('@reso-standards/reso-client');
 
   const headers: Record<string, string> = { Accept: 'application/xml' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -79,7 +79,7 @@ const getResolver = async (baseUrl: string, token?: string): Promise<LookupResol
   const cached = lookupResolverCache.get(baseUrl);
   if (cached) return cached;
 
-  const { createLookupResolver } = await import('@reso-standards/odata-client');
+  const { createLookupResolver } = await import('@reso-standards/reso-client');
   const schema = await fetchCsdlSchema(baseUrl, token);
   const resolver = createLookupResolver({
     schema,
@@ -91,7 +91,7 @@ const getResolver = async (baseUrl: string, token?: string): Promise<LookupResol
   return resolver;
 };
 
-/** Convert LookupValue (odata-client) to ResoLookup (UI type). */
+/** Convert LookupValue (reso-client) to ResoLookup (UI type). */
 const toLookup = (lv: LookupValue): ResoLookup => ({
   lookupName: lv.lookupName,
   lookupValue: lv.lookupValue,
@@ -147,7 +147,7 @@ export const fetchLookupsForResource = async (
   resource: string,
   options?: { baseUrl?: string; token?: string }
 ): Promise<Readonly<Record<string, ReadonlyArray<ResoLookup>>>> => {
-  // External server path — use the odata-client lookup resolver
+  // External server path — use the reso-client lookup resolver
   if (options?.baseUrl) {
     const resolver = await getResolver(options.baseUrl, options.token);
     const result = await resolver.resolveLookupsForResource(resource);

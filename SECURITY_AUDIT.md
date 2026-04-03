@@ -17,7 +17,7 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 | reso-reference-server | 6 | 5 moderate, 1 high |
 | reso-web-client | 0 | Clean |
 | reso-desktop-client | 0 | Clean |
-| odata-client | 1 | 1 high |
+| reso-client | 1 | 1 high |
 | odata-expression-parser | 0 | Clean |
 | validation | 0 | Clean |
 | data-generator | 0 | Clean |
@@ -25,7 +25,7 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ### HIGH: fast-xml-parser (CVE-2026-26278) — FIXED
 
-- **Affected packages**: reso-reference-server, odata-client
+- **Affected packages**: reso-reference-server, reso-client
 - **Versions**: 4.0.0-beta.3 – 5.5.5
 - **Advisory**: [GHSA-8gc5-j5rx-235r](https://github.com/advisories/GHSA-8gc5-j5rx-235r)
 - **Description**: Numeric entity expansion bypasses all entity expansion limits
@@ -43,7 +43,7 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ### Recommended Actions
 
-1. Run `npm audit fix` in `reso-reference-server/` and `odata-client/` to patch fast-xml-parser
+1. Run `npm audit fix` in `reso-reference-server/` and `reso-client/` to patch fast-xml-parser
 2. esbuild/vite/vitest findings are dev-only — track for next major dependency update
 
 ---

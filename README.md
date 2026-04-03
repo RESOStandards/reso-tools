@@ -10,7 +10,7 @@ Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compl
 
 | Package | Description |
 |---------|-------------|
-| [`odata-client/`](odata-client/) | OData 4.01 client SDK -- URI builder, CRUD helpers, CSDL metadata parsing |
+| [`reso-client/`](reso-client/) | OData 4.01 client SDK -- URI builder, CRUD helpers, CSDL metadata parsing |
 | [`odata-expression-parser/`](odata-expression-parser/) | Zero-dependency `$filter` and `$expand` expression parser |
 | [`validation/`](validation/) | Isomorphic field and business-rule validation for RESO Data Dictionary records |
 | [`data-generator/`](data-generator/) | Realistic test data generator with FK dependency resolution |
