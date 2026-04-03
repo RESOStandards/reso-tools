@@ -1,39 +1,49 @@
 /**
- * Authentication helpers — OAuth2 Client Credentials grant and bearer token
- * resolution. Adapted from certification/add-edit/src/lib/auth.ts.
+ * Authentication helpers — OAuth2 Client Credentials grant with proactive
+ * token refresh, concurrent deduplication, and bearer token passthrough.
  */
 
-import type { AuthConfig } from '../types.js';
+import type { AuthConfig, ClientCredentialsAuth, TokenProvider, TokenResponse, TokenState } from '../types.js';
 
-/**
- * Resolve an AuthConfig to a bearer token string.
- * For "token" mode, returns the token directly.
- * For "client_credentials" mode, performs the OAuth2 token exchange.
- */
-export const resolveToken = async (auth: AuthConfig): Promise<string> => {
-  if (auth.mode === 'token') {
-    return auth.authToken;
-  }
-  return fetchAccessToken(auth.clientId, auth.clientSecret, auth.tokenUrl);
-};
+const DEFAULT_EXPIRES_IN = 3600;
+const REFRESH_THRESHOLD = 0.9;
+
+const TRANSPORT_BODY = 'body' as const;
+const TRANSPORT_HEADER = 'header' as const;
+const TRANSPORT_QUERY = 'query' as const;
+const AUTH_MODE_TOKEN = 'token' as const;
 
 /**
  * Perform an OAuth2 Client Credentials grant to obtain an access token.
+ * Supports three credential transport modes: body (default), header (Basic), query.
  */
-export const fetchAccessToken = async (clientId: string, clientSecret: string, tokenUrl: string): Promise<string> => {
-  const body = new URLSearchParams({
-    grant_type: 'client_credentials',
-    client_id: clientId,
-    client_secret: clientSecret
-  });
+export const fetchAccessToken = async (auth: ClientCredentialsAuth): Promise<TokenResponse> => {
+  const transport = auth.credentialTransport ?? TRANSPORT_BODY;
+  const params = new URLSearchParams({ grant_type: 'client_credentials' });
+  if (auth.scope) params.set('scope', auth.scope);
 
-  const response = await fetch(tokenUrl, {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    Accept: 'application/json',
+  };
+
+  let url = auth.tokenUrl;
+
+  if (transport === TRANSPORT_BODY) {
+    params.set('client_id', auth.clientId);
+    params.set('client_secret', auth.clientSecret);
+  } else if (transport === TRANSPORT_HEADER) {
+    const encoded = btoa(`${auth.clientId}:${auth.clientSecret}`);
+    headers.Authorization = `Basic ${encoded}`;
+  } else if (transport === TRANSPORT_QUERY) {
+    const sep = url.includes('?') ? '&' : '?';
+    url = `${url}${sep}client_id=${encodeURIComponent(auth.clientId)}&client_secret=${encodeURIComponent(auth.clientSecret)}`;
+  }
+
+  const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Accept: 'application/json'
-    },
-    body: body.toString()
+    headers,
+    body: params.toString(),
   });
 
   if (!response.ok) {
@@ -47,5 +57,80 @@ export const fetchAccessToken = async (clientId: string, clientSecret: string, t
     throw new Error('OAuth2 token response missing or empty access_token field');
   }
 
-  return accessToken;
+  return {
+    access_token: accessToken,
+    token_type: typeof json.token_type === 'string' ? json.token_type : 'bearer',
+    expires_in: typeof json.expires_in === 'number' ? json.expires_in : undefined,
+    scope: typeof json.scope === 'string' ? json.scope : undefined,
+  };
+};
+
+/**
+ * Create a token provider for Client Credentials auth.
+ * Caches tokens, refreshes proactively at 90% of TTL, and deduplicates
+ * concurrent refresh requests.
+ */
+const createClientCredentialsProvider = (auth: ClientCredentialsAuth): TokenProvider => {
+  const ref: { current: TokenState | null; pending: Promise<TokenState> | null } = {
+    current: null,
+    pending: null,
+  };
+
+  const expiresIn = auth.defaultExpiresIn ?? DEFAULT_EXPIRES_IN;
+
+  const refresh = (): Promise<TokenState> => {
+    if (ref.pending) return ref.pending;
+    ref.pending = fetchAccessToken(auth).then(tokenResponse => {
+      const ttl = tokenResponse.expires_in ?? expiresIn;
+      const state: TokenState = {
+        accessToken: tokenResponse.access_token,
+        expiresAt: Date.now() + ttl * 1000,
+      };
+      ref.current = state;
+      ref.pending = null;
+      return state;
+    }).catch(err => {
+      ref.pending = null;
+      throw err;
+    });
+    return ref.pending;
+  };
+
+  return async (forceRefresh = false): Promise<string> => {
+    if (forceRefresh || !ref.current) {
+      const state = await refresh();
+      return state.accessToken;
+    }
+
+    const ttlMs = expiresIn * 1000;
+    const issuedAt = ref.current.expiresAt - ttlMs;
+    const refreshAt = issuedAt + ttlMs * REFRESH_THRESHOLD;
+    if (Date.now() >= refreshAt) {
+      const state = await refresh();
+      return state.accessToken;
+    }
+
+    return ref.current.accessToken;
+  };
+};
+
+/**
+ * Create a token provider for any auth configuration.
+ * For bearer tokens, returns the static token.
+ * For client credentials, returns a managed provider with refresh.
+ */
+export const createTokenProvider = (auth: AuthConfig): TokenProvider => {
+  if (auth.mode === AUTH_MODE_TOKEN) {
+    return async () => auth.authToken;
+  }
+  return createClientCredentialsProvider(auth);
+};
+
+/**
+ * Resolve an AuthConfig to a bearer token string (one-shot).
+ * Kept for backward compatibility. For long-lived clients, use createTokenProvider.
+ */
+export const resolveToken = async (auth: AuthConfig): Promise<string> => {
+  const provider = createTokenProvider(auth);
+  return provider();
 };

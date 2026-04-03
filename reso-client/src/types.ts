@@ -88,13 +88,37 @@ export interface TokenAuth {
   readonly authToken: string;
 }
 
+/** How to send client credentials to the token endpoint. */
+export type CredentialTransport = 'body' | 'header' | 'query';
+
 /** OAuth2 Client Credentials authentication. */
 export interface ClientCredentialsAuth {
   readonly mode: 'client_credentials';
   readonly clientId: string;
   readonly clientSecret: string;
   readonly tokenUrl: string;
+  readonly scope?: string;
+  readonly credentialTransport?: CredentialTransport;
+  /** Default TTL in seconds when server omits expires_in. Default: 3600. */
+  readonly defaultExpiresIn?: number;
 }
+
+/** OAuth2 token endpoint response. */
+export interface TokenResponse {
+  readonly access_token: string;
+  readonly token_type: string;
+  readonly expires_in?: number;
+  readonly scope?: string;
+}
+
+/** Immutable snapshot of a cached token and its expiry. */
+export interface TokenState {
+  readonly accessToken: string;
+  readonly expiresAt: number;
+}
+
+/** Returns a valid access token, refreshing proactively or on demand. */
+export type TokenProvider = (forceRefresh?: boolean) => Promise<string>;
 
 /** Discriminated union for authentication configuration. */
 export type AuthConfig = TokenAuth | ClientCredentialsAuth;

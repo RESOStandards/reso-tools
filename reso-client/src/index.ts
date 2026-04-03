@@ -37,6 +37,10 @@ export type {
   AuthConfig,
   TokenAuth,
   ClientCredentialsAuth,
+  CredentialTransport,
+  TokenResponse,
+  TokenState,
+  TokenProvider,
   ClientConfig,
   PreferReturn,
   WriteOptions,
@@ -86,7 +90,7 @@ export type {
 
 // HTTP client & auth
 export { createClient } from './http/client.js';
-export { resolveToken, fetchAccessToken } from './http/auth.js';
+export { createTokenProvider, resolveToken, fetchAccessToken } from './http/auth.js';
 
 // CRUD helpers
 export { createEntity } from './crud/create.js';
