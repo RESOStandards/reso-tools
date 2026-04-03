@@ -12,10 +12,14 @@ import { isEnumType } from '../types';
  */
 export const getLookupName = (field: ResoField): string | undefined => {
   if (field.lookupName) return field.lookupName;
-  if (field.isExpansion || field.isCollection) return undefined;
-  if (isEnumType(field.type)) {
-    const dotIndex = field.type.lastIndexOf('.');
-    return dotIndex >= 0 ? field.type.slice(dotIndex + 1) : field.type;
+  if (field.isExpansion) return undefined;
+  // Handle Collection(org.reso.metadata.EnumName) — unwrap the Collection() wrapper
+  const rawType = field.type.startsWith('Collection(') && field.type.endsWith(')')
+    ? field.type.slice('Collection('.length, -1)
+    : field.type;
+  if (!rawType.startsWith('Edm.')) {
+    const dotIndex = rawType.lastIndexOf('.');
+    return dotIndex >= 0 ? rawType.slice(dotIndex + 1) : rawType;
   }
   return undefined;
 };

@@ -94,11 +94,14 @@ export const Layout = () => {
                 </svg>
               )}
             </button>
-            {/* RESO Logo — links to home */}
-            <NavLink to="/" className="shrink-0">
-              <img src={isDark ? LOGO_DARK : LOGO_LIGHT} alt="RESO" className="h-8 sm:h-10" />
+            {/* RESO Logo — fixed width matches sidebar so switcher aligns with content */}
+            <NavLink to="/" className="shrink-0 hidden sm:flex sm:w-44 sm:items-center">
+              <img src={isDark ? LOGO_DARK : LOGO_LIGHT} alt="RESO" className="h-10" />
             </NavLink>
-            {/* Server switcher replaces static title */}
+            <NavLink to="/" className="shrink-0 sm:hidden">
+              <img src={isDark ? LOGO_DARK : LOGO_LIGHT} alt="RESO" className="h-8" />
+            </NavLink>
+            {/* Server switcher — aligns with main content area */}
             <ServerSwitcher />
             {pageIndicator && <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">/ {pageIndicator}</span>}
           </div>

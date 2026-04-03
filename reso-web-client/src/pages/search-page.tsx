@@ -251,7 +251,6 @@ export const SearchPage = () => {
             <AdvancedSearch
               resource={resourceName}
               fields={fields}
-              lookups={{}}
               fieldGroups={fieldGroups}
               filterString={draftFilter}
               onFilterChange={setDraftFilter}

@@ -4,11 +4,11 @@ import { isEnumType, isNumericEdmType } from '../types';
 import { type FilterEntry, buildFilterString, parseFilterToEntries } from '../utils/filter-sync.js';
 import { getDisplayName } from '../utils/format';
 import { FieldGroupSection } from './field-group-section';
+import { getLookupName, useLookups } from '../hooks/use-lookups';
 
 interface AdvancedSearchProps {
   readonly resource: string;
   readonly fields: ReadonlyArray<ResoField>;
-  readonly lookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>>;
   readonly fieldGroups: FieldGroups | null;
   readonly filterString: string;
   readonly onFilterChange: (filter: string) => void;
@@ -172,11 +172,19 @@ const FieldRow = memo(({ field, index, entry, fieldLookups, onChange }: FieldRow
 });
 
 /** Advanced search form with fields organized by RESO Data Dictionary groups. */
-export const AdvancedSearch = ({ resource, fields, lookups, fieldGroups, filterString, onFilterChange, onSearch, onClose }: AdvancedSearchProps) => {
+export const AdvancedSearch = ({ resource, fields, fieldGroups, filterString, onFilterChange, onSearch, onClose }: AdvancedSearchProps) => {
   const [filters, setFilters] = useState<Map<string, FilterEntry>>(new Map());
   const [hasUnrepresentable, setHasUnrepresentable] = useState(false);
   const lastEmittedRef = useRef('');
   const { grouped, ungrouped } = groupFields(fields, resource, fieldGroups);
+
+  // Fetch lookups for all enum fields
+  const { fetchLookups, lookupsByField } = useLookups();
+  useEffect(() => {
+    const enumNames = fields.map(getLookupName).filter((n): n is string => !!n);
+    if (enumNames.length > 0) fetchLookups(enumNames);
+  }, [fields]); // eslint-disable-line react-hooks/exhaustive-deps
+  const lookups = lookupsByField(fields);
 
   // Derive form state from incoming filter string (e.g. typed in search bar)
   useEffect(() => {

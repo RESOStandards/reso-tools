@@ -157,6 +157,7 @@ export const fetchFieldsForResource = async (
 /**
  * Fetch lookup values for specific lookup names. Returns a map of lookupName → values.
  * Uses the resolver's per-name cache — previously fetched names return instantly.
+ * Deduplicates by lookupValue within each name.
  */
 export const fetchLookupsByName = async (
   lookupNames: ReadonlyArray<string>,
@@ -170,7 +171,14 @@ export const fetchLookupsByName = async (
   const entries = await Promise.all(
     lookupNames.map(async (name) => {
       const values = await resolver.resolveLookups(name);
-      return [name, values.map(toLookup)] as const;
+      // Deduplicate by lookupValue (some servers return duplicates)
+      const seen = new Set<string>();
+      const unique = values.filter(v => {
+        if (seen.has(v.lookupValue)) return false;
+        seen.add(v.lookupValue);
+        return true;
+      });
+      return [name, unique.map(toLookup)] as const;
     })
   );
 
