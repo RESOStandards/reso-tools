@@ -40,25 +40,32 @@ const SECRETS_KEY = 'reso-server-secrets';
 const ACTIVE_KEY = 'reso-active-server';
 
 const SECRET_FIELDS = ['token', 'clientSecret'] as const;
-const TOKEN_KEY = 'reso-current-token';
+const TOKENS_KEY = 'reso-server-tokens';
 
-/** Persist the current access token. Electron uses secure storage, browser uses sessionStorage. */
-const persistToken = async (token: string | null): Promise<void> => {
+/** Persist the token map. Electron uses secure storage, browser uses sessionStorage. */
+const persistTokens = async (tokens: Readonly<Record<string, string>>): Promise<void> => {
+  const json = JSON.stringify(tokens);
   if (isElectron()) {
-    if (token) await electronStorage().set(TOKEN_KEY, token);
-    else await electronStorage().remove(TOKEN_KEY);
+    await electronStorage().set(TOKENS_KEY, json);
   } else {
-    if (token) sessionStorage.setItem(TOKEN_KEY, token);
-    else sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.setItem(TOKENS_KEY, json);
   }
 };
 
-/** Load a previously persisted access token. */
-const loadPersistedToken = async (): Promise<string | null> => {
-  if (isElectron()) {
-    return electronStorage().get(TOKEN_KEY);
+/** Load the persisted token map. */
+const loadPersistedTokens = async (): Promise<Readonly<Record<string, string>>> => {
+  try {
+    const raw = isElectron()
+      ? await electronStorage().get(TOKENS_KEY)
+      : sessionStorage.getItem(TOKENS_KEY);
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    return (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed))
+      ? parsed as Record<string, string>
+      : {};
+  } catch {
+    return {};
   }
-  return sessionStorage.getItem(TOKEN_KEY);
 };
 
 // ── Storage abstraction: Electron secure storage or browser localStorage ──
@@ -300,19 +307,22 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
   const [loadingStatus, setLoadingStatus] = useState<string | null>(null);
   const [resourceError, setResourceError] = useState<string | null>(null);
   const [hasProxy, setHasProxy] = useState(false);
-  const [currentToken, _setCurrentToken] = useState<string | null>(null);
+  const [serverTokens, setServerTokens] = useState<Readonly<Record<string, string>>>({});
 
-  /** Set the current token and persist it. */
-  const setCurrentToken = useCallback((token: string | null) => {
-    _setCurrentToken(token);
-    persistToken(token).catch(() => {});
+  /** Set the token for a specific server and persist the map. */
+  const setTokenForServer = useCallback((serverId: string, token: string) => {
+    setServerTokens(prev => {
+      const next = { ...prev, [serverId]: token };
+      persistTokens(next).catch(() => {});
+      return next;
+    });
   }, []);
 
-  // Hydrate persisted token on mount
+  // Hydrate persisted tokens on mount
   useEffect(() => {
     let cancelled = false;
-    loadPersistedToken().then(token => {
-      if (!cancelled && token) _setCurrentToken(token);
+    loadPersistedTokens().then(tokens => {
+      if (!cancelled && Object.keys(tokens).length > 0) setServerTokens(tokens);
     });
     return () => { cancelled = true; };
   }, []);
@@ -377,14 +387,18 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
 
   const isLocal = activeServer.type === 'local';
 
+  /** The current access token for the active server — from the token map or the static bearer token. */
+  const currentToken = serverTokens[activeServer.id] ?? activeServer.token ?? null;
+
   // Fetch $metadata to discover resources and keys (wait for storage hydration)
   useEffect(() => {
     if (!storageReady) return;
     const controller = new AbortController();
+
     setIsLoadingResources(true);
     setResourceError(null);
     setResources(null);
-    setCurrentToken(null);
+    // Only clear token when switching to a different server, not on reload
     setLoadingStatus('Connecting...');
 
     const loadMetadata = async () => {
@@ -406,9 +420,9 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
               tokenUrl: activeServer.tokenUrl,
               scope: activeServer.scope,
             }, controller.signal);
-            if (!controller.signal.aborted) setCurrentToken(accessToken);
+            if (!controller.signal.aborted) setTokenForServer(activeServer.id, accessToken);
           } else if (activeServer.token) {
-            if (!controller.signal.aborted) setCurrentToken(activeServer.token);
+            if (!controller.signal.aborted && activeServer.token) setTokenForServer(activeServer.id, activeServer.token);
           }
 
           const discovered = discoverResources(cachedSchema);
@@ -429,10 +443,10 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
             tokenUrl: activeServer.tokenUrl,
             scope: activeServer.scope,
           }, controller.signal);
-          if (!controller.signal.aborted) setCurrentToken(accessToken);
+          if (!controller.signal.aborted) setTokenForServer(activeServer.id, accessToken);
           headers['Authorization'] = `Bearer ${accessToken}`;
         } else if (activeServer.token) {
-          if (!controller.signal.aborted) setCurrentToken(activeServer.token);
+          if (!controller.signal.aborted) setTokenForServer(activeServer.id, activeServer.token);
           headers['Authorization'] = `Bearer ${activeServer.token}`;
         }
 
