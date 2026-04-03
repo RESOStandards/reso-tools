@@ -2,8 +2,7 @@ name: GitHub Pages
 
 on:
   push:
-    # TODO: Change back to main after v0.3 merge
-    branches: [v0.3]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -62,19 +61,6 @@ jobs:
             cat "$readme" >> ".github/pages/_packages/$dir.md"
           done
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Generate DD documentation
-        run: node .github/pages/dd-generator/generate.mjs
-        env:
-          TOKEN_URI: ${{ secrets.TOKEN_URI }}
-          CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-          RESO_AGGS_URL: ${{ secrets.RESO_AGGS_URL }}
-
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
@@ -84,17 +70,10 @@ jobs:
           source: ./.github/pages
           destination: ./_site
 
-      - name: Build search index with Pagefind
-        run: |
-          cp -r ./_site ./_site_searchable
-          mkdir -p ./_site_searchable/dd
-          cp -r .github/pages/dd-output/* ./_site_searchable/dd/
-          npx pagefind --site ./_site_searchable
-
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./_site_searchable
+          path: ./_site
 
   deploy:
     environment:
