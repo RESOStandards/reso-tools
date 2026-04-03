@@ -1,5 +1,5 @@
 import { type ValidationFailure, validateRecord } from '@reso-standards/validation';
-import { type FormEvent, useCallback, useMemo, useRef, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useServer } from '../context/server-context';
 import type { FieldGroups, ResoField, ResoLookup } from '../types';
 import { FieldGroupSection } from './field-group-section';
@@ -96,46 +96,65 @@ export const RecordForm = ({
     return ordered;
   }, [errors, sortedGroups, ungrouped]);
 
-  /** Scroll to and focus an error field by name. */
+  /** Track which error field we last navigated to. */
+  const [focusedError, setFocusedError] = useState<string | null>(null);
+
+  /** Scroll to and focus an error field by name. Waits for the element if not yet in the DOM. */
   const scrollToField = useCallback((fieldName: string) => {
     if (!formRef.current) return;
-    const el = formRef.current.querySelector(`[id="field-${fieldName}"]`)
-      ?? formRef.current.querySelector(`[data-field="${fieldName}"]`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      if (el instanceof HTMLElement) el.focus();
-    }
+    setFocusedError(fieldName);
+
+    const findAndScroll = () => {
+      const el = formRef.current?.querySelector(`[id="field-${fieldName}"]`)
+        ?? formRef.current?.querySelector(`[data-field="${fieldName}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (el instanceof HTMLElement) el.focus();
+        return true;
+      }
+      return false;
+    };
+
+    // Try immediately — works if the element is already rendered
+    if (findAndScroll()) return;
+
+    // Element not in DOM yet (collapsed panel expanding) — observe until it appears
+    const observer = new MutationObserver(() => {
+      if (findAndScroll()) observer.disconnect();
+    });
+    observer.observe(formRef.current, { childList: true, subtree: true });
+    // Safety timeout to avoid leaking the observer
+    setTimeout(() => observer.disconnect(), 2000);
   }, []);
 
-  /**
-   * Find which error field is closest to the current scroll position,
-   * then navigate to the next or previous one in the ordered list.
-   */
-  const navigateError = useCallback((direction: 'next' | 'prev') => {
+  const handleNextError = useCallback(() => {
     if (errorFields.length === 0) return;
-    if (errorFields.length === 1) { scrollToField(errorFields[0]); return; }
+    // Find where we are in the error list
+    const currentIdx = focusedError ? errorFields.indexOf(focusedError) : -1;
+    // If the focused field was fixed (not in list anymore) or not set, go to first
+    const nextIdx = currentIdx === -1 ? 0
+      : currentIdx < errorFields.length - 1 ? currentIdx + 1
+      : 0;
+    scrollToField(errorFields[nextIdx]);
+  }, [errorFields, focusedError, scrollToField]);
 
-    // Find which error field is currently visible/focused
-    const active = document.activeElement;
-    const activeFieldName = active?.id?.replace('field-', '')
-      ?? active?.closest('[data-field]')?.getAttribute('data-field');
-    const currentIdx = activeFieldName ? errorFields.indexOf(activeFieldName) : -1;
+  const handlePrevError = useCallback(() => {
+    if (errorFields.length === 0) return;
+    const currentIdx = focusedError ? errorFields.indexOf(focusedError) : -1;
+    const prevIdx = currentIdx === -1 ? errorFields.length - 1
+      : currentIdx > 0 ? currentIdx - 1
+      : errorFields.length - 1;
+    scrollToField(errorFields[prevIdx]);
+  }, [errorFields, focusedError, scrollToField]);
 
-    let targetIdx: number;
-    if (currentIdx === -1) {
-      // No error field focused — go to first or last
-      targetIdx = direction === 'next' ? 0 : errorFields.length - 1;
-    } else if (direction === 'next') {
-      targetIdx = currentIdx < errorFields.length - 1 ? currentIdx + 1 : 0;
-    } else {
-      targetIdx = currentIdx > 0 ? currentIdx - 1 : errorFields.length - 1;
+  // When errors appear from a submit, scroll to the first error in form order
+  const prevErrorCountRef = useRef(0);
+  useEffect(() => {
+    if (errorFields.length > 0 && prevErrorCountRef.current === 0) {
+      scrollToField(errorFields[0]);
     }
-
-    scrollToField(errorFields[targetIdx]);
+    prevErrorCountRef.current = errorFields.length;
   }, [errorFields, scrollToField]);
-
-  const handlePrevError = useCallback(() => navigateError('prev'), [navigateError]);
-  const handleNextError = useCallback(() => navigateError('next'), [navigateError]);
 
   const handleChange = useCallback((fieldName: string, value: unknown) => {
     setValues(prev => ({ ...prev, [fieldName]: value }));
@@ -168,8 +187,6 @@ export const RecordForm = ({
       }
       setErrors(errorMap);
       setSubmitError('validation');
-      // Scroll to and focus the first error so Next starts from there
-      setTimeout(() => scrollToField(failures[0].field), 100);
       return;
     }
 
@@ -277,15 +294,21 @@ export const RecordForm = ({
         </FieldGroupSection>
       )}
 
-      <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 pt-2 pb-2 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 -mx-4 px-4 sm:-mx-6 sm:px-6">
-        {submitError && errorFields.length > 0 ? (
+      <div className="sticky bottom-0 z-10 flex items-center gap-3 pt-2 pb-2 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 -mx-4 px-4 sm:-mx-6 sm:px-6">
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 shrink-0">
+          {isLoading ? 'Saving...' : isEdit ? 'Update' : 'Create'}
+        </button>
+        {submitError && errorFields.length > 0 && (
           <div className="flex items-center gap-3 text-sm text-red-600 dark:text-red-400">
             <span>
               {submitError === 'validation'
                 ? `${errorFields.length} ${errorFields.length === 1 ? 'error' : 'errors'} remaining`
                 : submitError}
             </span>
-            {errorFields.length > 1 && (
+            {(errorFields.length > 1 || (errorFields.length === 1 && focusedError !== errorFields[0])) && (
               <>
                 <button
                   type="button"
@@ -302,13 +325,7 @@ export const RecordForm = ({
               </>
             )}
           </div>
-        ) : <div />}
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 shrink-0">
-          {isLoading ? 'Saving...' : isEdit ? 'Update' : 'Create'}
-        </button>
+        )}
       </div>
     </form>
   );
