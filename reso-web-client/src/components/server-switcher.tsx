@@ -27,7 +27,12 @@ export const ServerSwitcher = () => {
       const id = addServer({
         name: data.name,
         baseUrl: data.baseUrl,
+        authMode: data.authMode,
         token: data.token || undefined,
+        clientId: data.clientId || undefined,
+        clientSecret: data.clientSecret || undefined,
+        tokenUrl: data.tokenUrl || undefined,
+        scope: data.scope || undefined,
         permissions: data.permissions
       });
       switchServer(id);
@@ -43,7 +48,12 @@ export const ServerSwitcher = () => {
       updateServer(editingServer.id, {
         name: data.name,
         baseUrl: data.baseUrl,
+        authMode: data.authMode,
         token: data.token || undefined,
+        clientId: data.clientId || undefined,
+        clientSecret: data.clientSecret || undefined,
+        tokenUrl: data.tokenUrl || undefined,
+        scope: data.scope || undefined,
         permissions: data.permissions
       });
       setEditingServer(null);
@@ -183,7 +193,7 @@ export const ServerSwitcher = () => {
           isOpen
           onClose={() => setEditingServer(null)}
           onSubmit={handleEditConnection}
-          initial={{ name: editingServer.name, baseUrl: editingServer.baseUrl, token: editingServer.token ?? '', permissions: editingServer.permissions ?? { canAdd: false, canEdit: false, canDelete: false } }}
+          initial={{ name: editingServer.name, baseUrl: editingServer.baseUrl, authMode: editingServer.authMode ?? 'token', token: editingServer.token ?? '', clientId: editingServer.clientId ?? '', clientSecret: editingServer.clientSecret ?? '', tokenUrl: editingServer.tokenUrl ?? '', scope: editingServer.scope ?? '', permissions: editingServer.permissions ?? { canAdd: false, canEdit: false, canDelete: false } }}
           title="Edit Connection"
         />
       )}

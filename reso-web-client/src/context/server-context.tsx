@@ -8,12 +8,19 @@ export interface ServerPermissions {
   readonly canDelete: boolean;
 }
 
+export type AuthMode = 'token' | 'client_credentials';
+
 /** Server connection configuration. */
 export interface ServerConfig {
   readonly id: string;
   readonly name: string;
   readonly baseUrl: string;
+  readonly authMode?: AuthMode;
   readonly token?: string;
+  readonly clientId?: string;
+  readonly clientSecret?: string;
+  readonly tokenUrl?: string;
+  readonly scope?: string;
   readonly type: 'local' | 'external';
   /** Per-operation permissions. Local server defaults to all true; external defaults to all false. */
   readonly permissions?: ServerPermissions;
@@ -28,7 +35,10 @@ const LOCAL_SERVER: ServerConfig = {
 };
 
 const STORAGE_KEY = 'reso-server-configs';
+const SECRETS_KEY = 'reso-server-secrets';
 const ACTIVE_KEY = 'reso-active-server';
+
+const SECRET_FIELDS = ['token', 'clientSecret'] as const;
 
 // ── Storage abstraction: Electron secure storage or browser localStorage ──
 
@@ -46,6 +56,12 @@ const isElectron = (): boolean => 'electronStorage' in window;
 const electronStorage = (): ElectronStorageApi =>
   (window as unknown as { electronStorage: ElectronStorageApi }).electronStorage;
 
+/** Strip secret fields from a config for non-secure storage. */
+const stripSecrets = (config: ServerConfig): ServerConfig => {
+  const { token: _t, clientSecret: _s, ...rest } = config;
+  return rest as ServerConfig;
+};
+
 /** Load saved external server configs (async — works with both Electron and localStorage). */
 const loadSavedConfigs = async (): Promise<ReadonlyArray<ServerConfig>> => {
   try {
@@ -55,7 +71,19 @@ const loadSavedConfigs = async (): Promise<ReadonlyArray<ServerConfig>> => {
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed as ReadonlyArray<ServerConfig>;
+    const configs = parsed as ReadonlyArray<ServerConfig>;
+
+    // In the browser, secrets are in sessionStorage; in Electron, they're in the full config
+    if (isElectron()) return configs;
+
+    // Merge secrets from sessionStorage
+    const secretsRaw = sessionStorage.getItem(SECRETS_KEY);
+    if (!secretsRaw) return configs;
+    const secrets = JSON.parse(secretsRaw) as Record<string, Record<string, string>>;
+    return configs.map(c => {
+      const s = secrets[c.id];
+      return s ? { ...c, ...s } : c;
+    });
   } catch {
     return [];
   }
@@ -73,13 +101,26 @@ const loadActiveServerId = async (): Promise<string> => {
   }
 };
 
-/** Save external server configs (async). */
+/** Save external server configs (async). Secrets go to sessionStorage in the browser. */
 const persistConfigs = async (configs: ReadonlyArray<ServerConfig>): Promise<void> => {
-  const json = JSON.stringify(configs);
   if (isElectron()) {
-    await electronStorage().set(STORAGE_KEY, json);
+    // Electron: store everything in secure storage
+    await electronStorage().set(STORAGE_KEY, JSON.stringify(configs));
   } else {
-    localStorage.setItem(STORAGE_KEY, json);
+    // Browser: non-sensitive config in localStorage, secrets in sessionStorage
+    const safeConfigs = configs.map(stripSecrets);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(safeConfigs));
+
+    const secrets: Record<string, Record<string, string>> = {};
+    for (const config of configs) {
+      const s: Record<string, string> = {};
+      for (const field of SECRET_FIELDS) {
+        const val = config[field];
+        if (val) s[field] = val;
+      }
+      if (Object.keys(s).length > 0) secrets[config.id] = s;
+    }
+    sessionStorage.setItem(SECRETS_KEY, JSON.stringify(secrets));
   }
 };
 
