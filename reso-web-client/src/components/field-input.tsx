@@ -20,13 +20,15 @@ export const FieldInput = ({ field, value, onChange, lookups, disabled = false, 
   // Multi-value enum (Collection type) with lookup values → toggle buttons
   if (lookups && lookups.length > 0 && field.isCollection) {
     const selected = new Set(
-      typeof value === 'string' ? value.split(',').map(s => s.trim()).filter(Boolean) : []
+      Array.isArray(value) ? value.map(String)
+        : typeof value === 'string' ? value.split(',').map(s => s.trim()).filter(Boolean)
+        : []
     );
     const handleToggle = (lookupValue: string) => {
       const next = new Set(selected);
       if (next.has(lookupValue)) next.delete(lookupValue);
       else next.add(lookupValue);
-      onChange(field.fieldName, next.size > 0 ? [...next].join(',') : null);
+      onChange(field.fieldName, next.size > 0 ? [...next] : null);
     };
     return (
       <div data-field={field.fieldName}>

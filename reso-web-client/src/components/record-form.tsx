@@ -77,8 +77,31 @@ export const RecordForm = ({
   const excludeFields = new Set(['ModificationTimestamp', ...(isEdit ? [] : [keyField])]);
   const { grouped, ungrouped } = groupFields(fields, resource, fieldGroups, excludeFields);
 
-  // Ordered list of field names with errors (stable across renders)
-  const errorFields = useMemo(() => [...errors.keys()], [errors]);
+  // Sort group keys alphabetically (needed here for error ordering)
+  const sortedGroups = useMemo(
+    () => [...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0])),
+    [grouped]
+  );
+
+  // Error fields in visual order: sorted groups first, then ungrouped
+  const errorFields = useMemo(() => {
+    const ordered: string[] = [];
+    for (const [, groupFields] of sortedGroups) {
+      for (const f of groupFields) {
+        if (errors.has(f.fieldName)) ordered.push(f.fieldName);
+      }
+    }
+    for (const f of ungrouped) {
+      if (errors.has(f.fieldName)) ordered.push(f.fieldName);
+    }
+    return ordered;
+  }, [errors, sortedGroups, ungrouped]);
+
+  // Clamp nav index when errors are fixed (list shrinks)
+  const clampedIndex = errorFields.length > 0
+    ? Math.min(errorNavIndex, errorFields.length - 1)
+    : 0;
+  if (clampedIndex !== errorNavIndex) setErrorNavIndex(clampedIndex);
 
   const scrollToError = useCallback((index: number) => {
     const fieldName = errorFields[index];
@@ -92,16 +115,16 @@ export const RecordForm = ({
   }, [errorFields]);
 
   const handlePrevError = useCallback(() => {
-    const next = errorNavIndex > 0 ? errorNavIndex - 1 : errorFields.length - 1;
+    const next = clampedIndex > 0 ? clampedIndex - 1 : errorFields.length - 1;
     setErrorNavIndex(next);
     scrollToError(next);
-  }, [errorNavIndex, errorFields.length, scrollToError]);
+  }, [clampedIndex, errorFields.length, scrollToError]);
 
   const handleNextError = useCallback(() => {
-    const next = errorNavIndex < errorFields.length - 1 ? errorNavIndex + 1 : 0;
+    const next = clampedIndex < errorFields.length - 1 ? clampedIndex + 1 : 0;
     setErrorNavIndex(next);
     scrollToError(next);
-  }, [errorNavIndex, errorFields.length, scrollToError]);
+  }, [clampedIndex, errorFields.length, scrollToError]);
 
   const handleChange = useCallback((fieldName: string, value: unknown) => {
     setValues(prev => ({ ...prev, [fieldName]: value }));
@@ -134,11 +157,7 @@ export const RecordForm = ({
       }
       setErrors(errorMap);
       setErrorNavIndex(0);
-      setSubmitError(
-        failures.length === 1
-          ? `Please fix the error in ${failures[0].field} before submitting.`
-          : `Please fix the ${failures.length} field errors highlighted below before submitting.`
-      );
+      setSubmitError('validation');
       // Scroll to the first error
       setTimeout(() => {
         const firstField = failures[0].field;
@@ -181,9 +200,6 @@ export const RecordForm = ({
       ))}
     </div>
   );
-
-  // Sort group keys alphabetically
-  const sortedGroups = [...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 
   // Compute error counts per group so sections with errors auto-expand
   const groupErrorCounts = useMemo(() => {
@@ -257,33 +273,26 @@ export const RecordForm = ({
       )}
 
       <div className="sticky bottom-0 z-10 pt-2 pb-2 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 -mx-4 px-4 sm:-mx-6 sm:px-6">
-        {submitError && (
+        {submitError && errorFields.length > 0 && (
           <div className="flex items-center justify-between gap-2 mb-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded px-3 py-1.5 text-sm">
-            <span>{submitError}</span>
+            <span>
+              {submitError === 'validation'
+                ? `${errorFields.length} ${errorFields.length === 1 ? 'error' : 'errors'} remaining`
+                : submitError}
+            </span>
             {errorFields.length > 1 && (
-              <div className="flex items-center gap-1 shrink-0">
-                <span className="text-xs text-red-500 dark:text-red-400">
-                  {errorNavIndex + 1} / {errorFields.length}
-                </span>
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={handlePrevError}
-                  className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/40"
-                  title="Previous error">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <title>Previous</title>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
+                  className="text-xs text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">
+                  Previous
                 </button>
                 <button
                   type="button"
                   onClick={handleNextError}
-                  className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/40"
-                  title="Next error">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <title>Next</title>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  className="text-xs text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">
+                  Next
                 </button>
               </div>
             )}
