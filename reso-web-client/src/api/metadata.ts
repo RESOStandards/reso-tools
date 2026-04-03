@@ -1,5 +1,6 @@
 import type { CsdlSchema, LookupResolver, LookupValue } from '@reso-standards/reso-client';
 import { entityTypeToFields } from './metadata-adapter';
+import { getCachedSchema, setCachedSchema, clearSchemaCache } from './schema-cache';
 import type { ResoField, ResoLookup } from '../types';
 
 /** Cache for the local server's custom metadata endpoints. */
@@ -13,7 +14,7 @@ const csdlFieldsCache = new Map<string, ReadonlyArray<ResoField>>();
 /** Cache for lookup resolvers, keyed by baseUrl. */
 const lookupResolverCache = new Map<string, LookupResolver>();
 
-/** Clear all metadata caches. Called when switching servers. */
+/** Clear in-memory metadata caches. Called when switching servers. */
 export const clearMetadataCache = (): void => {
   fieldsCache.clear();
   resourceLookupsCache.clear();
@@ -46,12 +47,22 @@ const createProxiedFetch = (): ((url: string, init?: RequestInit) => Promise<Res
     });
   };
 
-/** Fetch and cache the CSDL schema for a server. */
+/** Fetch and cache the CSDL schema for a server. Checks IndexedDB first, then network. */
 const fetchCsdlSchema = async (baseUrl: string, token?: string): Promise<CsdlSchema> => {
   const cacheKey = baseUrl || '__local__';
-  const cached = csdlSchemaCache.get(cacheKey);
-  if (cached) return cached;
 
+  // 1. In-memory cache (instant)
+  const memCached = csdlSchemaCache.get(cacheKey);
+  if (memCached) return memCached;
+
+  // 2. IndexedDB cache (fast, persists across sessions)
+  const dbCached = await getCachedSchema<CsdlSchema>(cacheKey);
+  if (dbCached) {
+    csdlSchemaCache.set(cacheKey, dbCached);
+    return dbCached;
+  }
+
+  // 3. Network fetch
   const { parseCsdlXml } = await import('@reso-standards/reso-client');
 
   const headers: Record<string, string> = { Accept: 'application/xml' };
@@ -70,7 +81,11 @@ const fetchCsdlSchema = async (baseUrl: string, token?: string): Promise<CsdlSch
 
   const xml = await res.text();
   const schema = parseCsdlXml(xml);
+
+  // Store in both caches
   csdlSchemaCache.set(cacheKey, schema);
+  setCachedSchema(cacheKey, schema).catch(() => {}); // Best-effort persist
+
   return schema;
 };
 

@@ -2,7 +2,7 @@ import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { ResoField } from '../types';
 import { isEnumType, isNumericEdmType } from '../types';
 import { getDisplayName } from '../utils/format';
-import { useLookups } from '../hooks/use-lookups';
+import { getLookupName, useLookups } from '../hooks/use-lookups';
 
 /** Definition of a single field in the basic search bar. */
 interface BasicSearchFieldDef {
@@ -15,85 +15,65 @@ interface BasicSearchFieldDef {
   /** OData operator to use when building the filter. */
   readonly operator: 'contains' | 'eq' | 'ge' | 'le' | 'gt' | 'lt';
   /** Input type hint. */
-  readonly inputType: 'text' | 'number' | 'enum';
+  readonly inputType: 'text' | 'number' | 'enum' | 'date';
   /** Placeholder text. */
   readonly placeholder?: string;
 }
 
-/** Per-resource basic search field definitions for well-known RESO resources. */
-const RESOURCE_SEARCH_FIELDS: Readonly<Record<string, ReadonlyArray<BasicSearchFieldDef>>> = {
-  Property: [
-    { id: 'City', fieldName: 'City', label: 'City', operator: 'contains', inputType: 'text', placeholder: 'e.g. Denver' },
-    { id: 'PostalCode', fieldName: 'PostalCode', label: 'Zip Code', operator: 'eq', inputType: 'text', placeholder: 'e.g. 80202' },
-    { id: 'ListPrice_ge', fieldName: 'ListPrice', label: 'Min Price', operator: 'ge', inputType: 'number', placeholder: '0' },
-    { id: 'ListPrice_le', fieldName: 'ListPrice', label: 'Max Price', operator: 'le', inputType: 'number', placeholder: 'Any' },
-    { id: 'StandardStatus', fieldName: 'StandardStatus', label: 'Status', operator: 'eq', inputType: 'enum' },
-    { id: 'PropertyType', fieldName: 'PropertyType', label: 'Type', operator: 'eq', inputType: 'enum' },
-    { id: 'BedroomsTotal_ge', fieldName: 'BedroomsTotal', label: 'Min Beds', operator: 'ge', inputType: 'number', placeholder: '0' }
-  ],
-  Member: [
-    { id: 'MemberFirstName', fieldName: 'MemberFirstName', label: 'First Name', operator: 'contains', inputType: 'text', placeholder: 'First name' },
-    { id: 'MemberLastName', fieldName: 'MemberLastName', label: 'Last Name', operator: 'contains', inputType: 'text', placeholder: 'Last name' },
-    { id: 'MemberEmail', fieldName: 'MemberEmail', label: 'Email', operator: 'contains', inputType: 'text', placeholder: 'Email' },
-    { id: 'MemberStatus', fieldName: 'MemberStatus', label: 'Status', operator: 'eq', inputType: 'enum' }
-  ],
-  Office: [
-    { id: 'OfficeName', fieldName: 'OfficeName', label: 'Office Name', operator: 'contains', inputType: 'text', placeholder: 'Office name' },
-    { id: 'OfficeCity', fieldName: 'OfficeCity', label: 'City', operator: 'contains', inputType: 'text', placeholder: 'City' },
-    { id: 'OfficeStatus', fieldName: 'OfficeStatus', label: 'Status', operator: 'eq', inputType: 'enum' }
-  ],
-  OpenHouse: [
-    { id: 'City', fieldName: 'City', label: 'City', operator: 'contains', inputType: 'text', placeholder: 'City' },
-    { id: 'OpenHouseDate_ge', fieldName: 'OpenHouseDate', label: 'From Date', operator: 'ge', inputType: 'text', placeholder: 'YYYY-MM-DD' },
-    { id: 'OpenHouseDate_le', fieldName: 'OpenHouseDate', label: 'To Date', operator: 'le', inputType: 'text', placeholder: 'YYYY-MM-DD' }
-  ],
-  Teams: [
-    { id: 'TeamName', fieldName: 'TeamName', label: 'Team Name', operator: 'contains', inputType: 'text', placeholder: 'Team name' },
-    { id: 'TeamStatus', fieldName: 'TeamStatus', label: 'Status', operator: 'eq', inputType: 'enum' }
-  ]
-};
+/** Fields to skip in basic search — keys and system tracking fields aren't useful for filtering. */
+const SKIP_PATTERNS = [/Key$/, /SystemID$/, /SystemName$/];
 
-/** Maximum number of auto-derived fields for unknown resources. */
-const MAX_AUTO_FIELDS = 5;
+/** Maximum number of fields to show in basic search. */
+const MAX_SEARCH_FIELDS = 7;
 
 /**
- * Auto-derive basic search fields from metadata for resources without
- * a hardcoded config. Picks the first few string, numeric, and enum fields.
+ * Build search field definitions from a ranked list of field names (from analytics data)
+ * matched against the server's actual metadata. Determines input type from field metadata.
+ *
+ * ModificationTimestamp is always included (if available) since it's the most common
+ * way to filter for recently changed records.
  */
-const deriveSearchFields = (fields: ReadonlyArray<ResoField>): ReadonlyArray<BasicSearchFieldDef> => {
+const buildSearchFields = (
+  rankedNames: ReadonlyArray<string>,
+  fields: ReadonlyArray<ResoField>
+): ReadonlyArray<BasicSearchFieldDef> => {
+  const fieldMap = new Map(fields.map(f => [f.fieldName, f]));
   const result: BasicSearchFieldDef[] = [];
-  const searchable = fields.filter(f => !f.isExpansion && !f.isCollection);
+  const added = new Set<string>();
 
-  for (const field of searchable) {
-    if (result.length >= MAX_AUTO_FIELDS) break;
+  const addField = (name: string): boolean => {
+    if (added.has(name)) return false;
+    if (SKIP_PATTERNS.some(p => p.test(name))) return false;
+
+    const field = fieldMap.get(name);
+    if (!field || field.isExpansion || field.isCollection) return false;
+
+    const label = getDisplayName(field);
+    added.add(name);
 
     if (field.lookupName || isEnumType(field.type)) {
-      result.push({
-        id: field.fieldName,
-        fieldName: field.fieldName,
-        label: getDisplayName(field),
-        operator: 'eq',
-        inputType: 'enum'
-      });
+      result.push({ id: name, fieldName: name, label, operator: 'eq', inputType: 'enum' });
     } else if (field.type === 'Edm.String') {
-      result.push({
-        id: field.fieldName,
-        fieldName: field.fieldName,
-        label: getDisplayName(field),
-        operator: 'contains',
-        inputType: 'text',
-        placeholder: getDisplayName(field)
-      });
+      result.push({ id: name, fieldName: name, label, operator: 'contains', inputType: 'text', placeholder: label });
+    } else if (field.type === 'Edm.DateTimeOffset' || field.type === 'Edm.Date') {
+      result.push({ id: `${name}_ge`, fieldName: name, label: `${label} (since)`, operator: 'ge', inputType: 'date' });
     } else if (isNumericEdmType(field.type)) {
-      result.push({
-        id: field.fieldName,
-        fieldName: field.fieldName,
-        label: getDisplayName(field),
-        operator: 'ge',
-        inputType: 'number',
-        placeholder: '0'
-      });
+      result.push({ id: name, fieldName: name, label, operator: 'ge', inputType: 'number', placeholder: '0' });
+    } else {
+      return false;
     }
+    return true;
+  };
+
+  // Add ranked fields from analytics data
+  for (const name of rankedNames) {
+    if (result.length >= MAX_SEARCH_FIELDS) break;
+    addField(name);
+  }
+
+  // Always include ModificationTimestamp if the server has it
+  if (!added.has('ModificationTimestamp') && fieldMap.has('ModificationTimestamp')) {
+    addField('ModificationTimestamp');
   }
 
   return result;
@@ -115,10 +95,15 @@ const buildBasicFilter = (
     const field = fieldMap.get(sf.fieldName);
     const isString = field ? (field.type === 'Edm.String' || isEnumType(field.type)) : true;
     const isNumeric = field ? isNumericEdmType(field.type) : false;
+    const isDate = field ? (field.type === 'Edm.DateTimeOffset' || field.type === 'Edm.Date') : false;
 
     if (sf.operator === 'contains') {
       const escaped = raw.replace(/'/g, "''");
       parts.push(`contains(${sf.fieldName},'${escaped}')`);
+    } else if (isDate) {
+      // Date picker gives YYYY-MM-DD; DateTimeOffset needs full timestamp
+      const timestamp = field?.type === 'Edm.DateTimeOffset' ? `${raw}T00:00:00Z` : raw;
+      parts.push(`${sf.fieldName} ${sf.operator} ${timestamp}`);
     } else if (sf.operator === 'eq') {
       if (isNumeric) {
         parts.push(`${sf.fieldName} eq ${raw}`);
@@ -131,7 +116,6 @@ const buildBasicFilter = (
       if (isNumeric) {
         parts.push(`${sf.fieldName} ${sf.operator} ${raw}`);
       } else {
-        // Date or other orderable string types
         const escaped = raw.replace(/'/g, "''");
         parts.push(`${sf.fieldName} ${sf.operator} '${escaped}'`);
       }
@@ -183,27 +167,30 @@ const parseBasicFilter = (
 interface BasicSearchProps {
   readonly resource: string;
   readonly fields: ReadonlyArray<ResoField>;
+  /** Ranked field names from analytics data (summary-fields.json). */
+  readonly rankedFieldNames?: ReadonlyArray<string>;
   readonly filterString: string;
   readonly onFilterChange: (filter: string) => void;
   readonly onSearch: () => void;
   readonly onShowOData: () => void;
 }
 
-/** Basic search bar with resource-specific fields for common search use cases. */
+/** Basic search bar with fields derived from analytics data and server metadata. */
 export const BasicSearch = ({
   resource,
   fields,
+  rankedFieldNames,
   filterString,
   onFilterChange,
   onSearch,
   onShowOData
 }: BasicSearchProps) => {
-  // Resolve and filter search fields for the active resource
+  // Build search fields from analytics-ranked names matched against server metadata.
+  // Falls back to server field order if no analytics data available.
   const activeFields = useMemo(() => {
-    const defs = RESOURCE_SEARCH_FIELDS[resource] ?? deriveSearchFields(fields);
-    const fieldNameSet = new Set(fields.map(f => f.fieldName));
-    return defs.filter(sf => fieldNameSet.has(sf.fieldName));
-  }, [resource, fields]);
+    const ranked = rankedFieldNames ?? fields.map(f => f.fieldName);
+    return buildSearchFields(ranked, fields);
+  }, [fields, rankedFieldNames]);
 
   // Lazy-fetch lookups for only the enum fields in the search bar
   const { lookups, fetchLookups } = useLookups();
@@ -212,7 +199,10 @@ export const BasicSearch = ({
   useEffect(() => {
     const enumLookupNames = activeFields
       .filter(sf => sf.inputType === 'enum')
-      .map(sf => fieldMap.get(sf.fieldName)?.lookupName)
+      .map(sf => {
+        const f = fieldMap.get(sf.fieldName);
+        return f ? getLookupName(f) : undefined;
+      })
       .filter((name): name is string => !!name);
     if (enumLookupNames.length > 0) fetchLookups(enumLookupNames);
   }, [activeFields]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -256,15 +246,12 @@ export const BasicSearch = ({
 
   if (activeFields.length === 0) {
     return (
-      <div className="flex gap-2 items-center">
-        <span className="text-sm text-gray-500 dark:text-gray-400">No searchable fields configured for this resource.</span>
-        <button
-          type="button"
-          onClick={onShowOData}
-          className="px-3 py-2 text-sm rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
-          Edit OData Filter
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={onShowOData}
+        className="px-3 py-2 text-sm rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
+        Edit OData Filter
+      </button>
     );
   }
 
@@ -273,8 +260,8 @@ export const BasicSearch = ({
       <div className="flex flex-wrap gap-2 items-end">
         {activeFields.map(sf => {
           const field = fieldMap.get(sf.fieldName);
-          const lookupName = field?.lookupName;
-          const fieldLookups = lookupName ? lookups[lookupName] : undefined;
+          const lkName = field ? getLookupName(field) : undefined;
+          const fieldLookups = lkName ? lookups[lkName] : undefined;
 
           return (
             <div key={sf.id} className="flex flex-col gap-0.5 min-w-0">
@@ -297,12 +284,12 @@ export const BasicSearch = ({
               ) : (
                 <input
                   id={`basic-${sf.id}`}
-                  type={sf.inputType === 'number' ? 'text' : 'text'}
-                  inputMode={sf.inputType === 'number' ? 'numeric' : 'text'}
+                  type={sf.inputType === 'date' ? 'date' : 'text'}
+                  inputMode={sf.inputType === 'number' ? 'numeric' : undefined}
                   value={values[sf.id] ?? ''}
                   onChange={e => handleFieldChange(sf.id, e.target.value)}
                   placeholder={sf.placeholder ?? ''}
-                  className="px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 w-28"
+                  className={`px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 ${sf.inputType === 'date' ? 'w-full dark:[color-scheme:dark]' : 'w-28'}`}
                 />
               )}
             </div>

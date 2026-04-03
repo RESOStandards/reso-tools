@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { getCachedSchema, setCachedSchema } from '../api/schema-cache';
 
 /** Per-operation permissions for a server connection. */
 export interface ServerPermissions {
@@ -354,7 +355,36 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     const loadMetadata = async () => {
       try {
         const { parseCsdlXml, discoverResources } = await import('@reso-standards/reso-client');
+        const cacheKey = activeServer.baseUrl || '__local__';
 
+        // Check IndexedDB cache first
+        const cachedSchema = await getCachedSchema<ReturnType<typeof parseCsdlXml>>(cacheKey);
+        if (cachedSchema && !controller.signal.aborted) {
+          setLoadingStatus('Loading cached metadata...');
+
+          // Still need to fetch token for data requests even when schema is cached
+          if (activeServer.authMode === 'client_credentials' && activeServer.clientId && activeServer.clientSecret && activeServer.tokenUrl) {
+            setLoadingStatus('Fetching access token...');
+            const accessToken = await fetchTokenViaProxy({
+              clientId: activeServer.clientId,
+              clientSecret: activeServer.clientSecret,
+              tokenUrl: activeServer.tokenUrl,
+              scope: activeServer.scope,
+            }, controller.signal);
+            if (!controller.signal.aborted) setCurrentToken(accessToken);
+          } else if (activeServer.token) {
+            if (!controller.signal.aborted) setCurrentToken(activeServer.token);
+          }
+
+          const discovered = discoverResources(cachedSchema);
+          if (!controller.signal.aborted) {
+            setResources(discovered);
+            setLoadingStatus(null);
+          }
+          return;
+        }
+
+        // No cache — fetch from network
         const headers: Record<string, string> = { Accept: 'application/xml' };
         if (activeServer.authMode === 'client_credentials' && activeServer.clientId && activeServer.clientSecret && activeServer.tokenUrl) {
           setLoadingStatus('Fetching access token...');
@@ -385,6 +415,9 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
         const xml = await res.text();
         const schema = parseCsdlXml(xml);
         const discovered = discoverResources(schema);
+
+        // Persist to IndexedDB for future sessions
+        setCachedSchema(cacheKey, schema).catch(() => {});
 
         if (!controller.signal.aborted) {
           setResources(discovered);

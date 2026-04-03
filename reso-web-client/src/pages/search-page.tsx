@@ -208,6 +208,7 @@ export const SearchPage = () => {
           <BasicSearch
             resource={resourceName}
             fields={fields}
+            rankedFieldNames={defaultSummaryFields}
             filterString={draftFilter}
             onFilterChange={setDraftFilter}
             onSearch={handleSubmit}
@@ -219,7 +220,7 @@ export const SearchPage = () => {
         {rows.length > 0 && (
           <div className="flex flex-wrap gap-1">
             <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Sort by:</span>
-            {summaryFields.slice(0, 6).map(f => (
+            {[...new Set([...summaryFields.slice(0, 6), ...(fields.some(f => f.fieldName === 'ModificationTimestamp') ? ['ModificationTimestamp'] : [])])].map(f => (
               <button
                 type="button"
                 key={f}

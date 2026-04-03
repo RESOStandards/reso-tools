@@ -1,7 +1,24 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { fetchLookupsByName } from '../api/metadata';
 import { useServer } from '../context/server-context';
 import type { ResoField, ResoLookup } from '../types';
+import { isEnumType } from '../types';
+
+/**
+ * Get the lookup/enum name for a field. Exported for use by pages that
+ * need to build a list of lookup names to fetch. Works for both:
+ * - Lookup Resource fields (have lookupName annotation)
+ * - CSDL EnumType fields (non-Edm type, e.g. "org.reso.metadata.StandardStatus" → "StandardStatus")
+ */
+export const getLookupName = (field: ResoField): string | undefined => {
+  if (field.lookupName) return field.lookupName;
+  if (field.isExpansion || field.isCollection) return undefined;
+  if (isEnumType(field.type)) {
+    const dotIndex = field.type.lastIndexOf('.');
+    return dotIndex >= 0 ? field.type.slice(dotIndex + 1) : field.type;
+  }
+  return undefined;
+};
 
 export interface UseLookupResult {
   /** Lookup values keyed by lookup name. Grows as more lookups are fetched. */
@@ -55,7 +72,7 @@ export const useLookups = (): UseLookupResult => {
     (fields: ReadonlyArray<ResoField>): Readonly<Record<string, ReadonlyArray<ResoLookup>>> => {
       const result: Record<string, ReadonlyArray<ResoLookup>> = {};
       for (const field of fields) {
-        const name = field.lookupName;
+        const name = getLookupName(field);
         if (name && lookups[name]) result[field.fieldName] = lookups[name];
       }
       return result;

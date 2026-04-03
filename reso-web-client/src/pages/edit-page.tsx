@@ -5,7 +5,7 @@ import { KeyPrompt } from '../components/key-prompt';
 import { LoadingSpinner } from '../components/loading-spinner';
 import { RecordForm } from '../components/record-form';
 import { useMetadata } from '../hooks/use-metadata';
-import { useLookups } from '../hooks/use-lookups';
+import { getLookupName, useLookups } from '../hooks/use-lookups';
 import { useUiConfig } from '../hooks/use-ui-config';
 import { useServer } from '../context/server-context';
 import { NotFoundPage } from './not-found-page';
@@ -29,8 +29,8 @@ export const EditPage = () => {
   // Fetch lookups for all enum fields on the form
   useEffect(() => {
     const enumNames = fields
-      .filter(f => f.lookupName && !f.isExpansion)
-      .map(f => f.lookupName as string);
+      .map(getLookupName)
+      .filter((name): name is string => !!name);
     if (enumNames.length > 0) fetchLookups(enumNames);
   }, [fields]); // eslint-disable-line react-hooks/exhaustive-deps
 
