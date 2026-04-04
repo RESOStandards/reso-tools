@@ -4,7 +4,7 @@
 
 ## v0.3 — 2026-04-03
 
-### OAuth2, Performance and Polish
+### The "Cache Me If You Can" Release
 
 **Connect to any RESO server with OAuth2.** The desktop client and web UI now support Client Credentials authentication alongside Bearer Token mode. Token management is automatic — tokens are fetched via the proxy, stored per server, and survive page reloads.
 

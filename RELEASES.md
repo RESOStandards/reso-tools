@@ -4,7 +4,7 @@
 
 ## v0.3 — 2026-04-03
 
-### OAuth2, Performance and UX Improvements
+### The "Cache Me If You Can" Release
 
 Third milestone release adding OAuth2 Client Credentials authentication, lazy lookup loading, IndexedDB metadata caching, a standalone CORS proxy package, and improved error handling across the application.
 
