@@ -54,6 +54,27 @@ const extractStatusCode = (message: string): number | undefined => {
   return match ? Number(match[1]) : undefined;
 };
 
+/**
+ * Extract the actual target URL from a request URL, unpacking the proxy wrapper if present.
+ * e.g., "/api/proxy?url=https%3A%2F%2Fapi.example.com%2FProperty" → "https://api.example.com/Property"
+ */
+export const unpackRequestUrl = (url: string): string => {
+  try {
+    const parsed = new URL(url, 'http://localhost');
+    if (parsed.pathname === '/api/proxy') {
+      const target = parsed.searchParams.get('url');
+      if (target) return target;
+    }
+  } catch {
+    // Try regex fallback for relative URLs
+    const match = url.match(/\/api\/proxy\?url=([^&]+)/);
+    if (match) {
+      try { return decodeURIComponent(match[1]); } catch { /* fall through */ }
+    }
+  }
+  return url;
+};
+
 /** Result of formatting an error for display. */
 export interface FriendlyErrorInfo {
   /** Short title for the error (e.g., "Too Many Requests"). */
@@ -64,13 +85,16 @@ export interface FriendlyErrorInfo {
   readonly serverMessage?: string;
   /** HTTP status code, if detected. */
   readonly statusCode?: number;
+  /** The request URL that caused the error (proxy unpacked). */
+  readonly requestUrl?: string;
 }
 
 /**
  * Format a raw error into a friendly, user-readable form.
  * Detects HTTP status codes and provides clear explanations.
  */
-export const formatError = (rawMessage: string, serverResponse?: string): FriendlyErrorInfo => {
+export const formatError = (rawMessage: string, serverResponse?: string, requestUrl?: string): FriendlyErrorInfo => {
+  const cleanUrl = requestUrl ? unpackRequestUrl(requestUrl) : undefined;
   const statusCode = extractStatusCode(rawMessage);
 
   if (statusCode) {
@@ -81,6 +105,7 @@ export const formatError = (rawMessage: string, serverResponse?: string): Friend
         description: info.description,
         serverMessage: serverResponse ?? (rawMessage.includes(':') ? rawMessage : undefined),
         statusCode,
+        requestUrl: cleanUrl,
       };
     }
 
@@ -93,6 +118,7 @@ export const formatError = (rawMessage: string, serverResponse?: string): Friend
         : `The server returned error ${statusCode}.`,
       serverMessage: serverResponse ?? rawMessage,
       statusCode,
+      requestUrl: cleanUrl,
     };
   }
 
@@ -102,6 +128,7 @@ export const formatError = (rawMessage: string, serverResponse?: string): Friend
       title: 'Connection Error',
       description: 'Could not connect to the server. Check that the server URL is correct and that you have an internet connection.',
       serverMessage: rawMessage,
+      requestUrl: cleanUrl,
     };
   }
 
@@ -110,11 +137,13 @@ export const formatError = (rawMessage: string, serverResponse?: string): Friend
       title: 'Request Timeout',
       description: 'The server took too long to respond. Try again in a moment.',
       serverMessage: rawMessage,
+      requestUrl: cleanUrl,
     };
   }
 
   return {
     title: 'Something Went Wrong',
     description: rawMessage,
+    requestUrl: cleanUrl,
   };
 };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatError } from '../src/utils/error-messages';
+import { formatError, unpackRequestUrl } from '../src/utils/error-messages';
 
 describe('formatError', () => {
   it('detects 429 status code and provides rate limit explanation', () => {
@@ -55,5 +55,35 @@ describe('formatError', () => {
     const result = formatError('The server returned status 503 for this request');
     expect(result.statusCode).toBe(503);
     expect(result.title).toBe('Service Unavailable');
+  });
+
+  it('includes request URL in result', () => {
+    const result = formatError('Failed: 500', undefined, 'https://api.example.com/Property');
+    expect(result.requestUrl).toBe('https://api.example.com/Property');
+  });
+
+  it('unpacks proxy URL in result', () => {
+    const result = formatError('Failed: 429', undefined, '/api/proxy?url=https%3A%2F%2Fapi.example.com%2FProperty');
+    expect(result.requestUrl).toBe('https://api.example.com/Property');
+  });
+});
+
+describe('unpackRequestUrl', () => {
+  it('returns the URL as-is when not proxied', () => {
+    expect(unpackRequestUrl('https://api.example.com/Property')).toBe('https://api.example.com/Property');
+  });
+
+  it('extracts target URL from proxy wrapper', () => {
+    expect(unpackRequestUrl('/api/proxy?url=https%3A%2F%2Fapi.example.com%2FProperty'))
+      .toBe('https://api.example.com/Property');
+  });
+
+  it('handles proxy URL with additional query params', () => {
+    const url = '/api/proxy?url=https%3A%2F%2Fapi.example.com%2FProperty%3F%24count%3Dtrue';
+    expect(unpackRequestUrl(url)).toBe('https://api.example.com/Property?$count=true');
+  });
+
+  it('returns relative URLs as-is', () => {
+    expect(unpackRequestUrl('/$metadata?$format=application/xml')).toBe('/$metadata?$format=application/xml');
   });
 });

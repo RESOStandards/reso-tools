@@ -20,7 +20,7 @@ export const SearchPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const { resources, isLoadingResources, loadingStatus, resourceError, permissions, activeServer, currentToken } = useServer();
+  const { resources, isLoadingResources, loadingStatus, resourceError, resourceErrorUrl, permissions, activeServer, currentToken } = useServer();
   const resourceName = resource ?? '';
 
   const filter = searchParams.get('$filter') ?? '';
@@ -150,7 +150,7 @@ export const SearchPage = () => {
   const isValidResource = resources?.some(r => r.name === resourceName) ?? null;
 
   if (resourceError) {
-    return <FriendlyError title="Failed to Load Metadata" message={resourceError} />;
+    return <FriendlyError message={resourceError} requestUrl={resourceErrorUrl ?? undefined} />;
   }
   if (isLoadingResources || isValidResource === null) {
     return <LoadingSpinner label={loadingStatus ?? 'Connecting...'} subtitle={activeServer.name} />;

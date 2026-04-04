@@ -186,6 +186,8 @@ export interface ServerContextValue {
   readonly loadingStatus: string | null;
   /** Error from metadata loading, if any. */
   readonly resourceError: string | null;
+  /** The request URL that caused the resource error (proxy unpacked for display). */
+  readonly resourceErrorUrl: string | null;
   /** Switch to a different server by ID. */
   readonly switchServer: (id: string) => void;
   /** Add a new external server configuration. Returns the generated ID. */
@@ -306,6 +308,7 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
   const [isLoadingResources, setIsLoadingResources] = useState(true);
   const [loadingStatus, setLoadingStatus] = useState<string | null>(null);
   const [resourceError, setResourceError] = useState<string | null>(null);
+  const [resourceErrorUrl, setResourceErrorUrl] = useState<string | null>(null);
   const [hasProxy, setHasProxy] = useState(false);
   const [serverTokens, setServerTokens] = useState<Readonly<Record<string, string>>>({});
 
@@ -397,10 +400,11 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
 
     setIsLoadingResources(true);
     setResourceError(null);
+    setResourceErrorUrl(null);
     setResources(null);
-    // Only clear token when switching to a different server, not on reload
     setLoadingStatus('Connecting...');
 
+    let lastRequestUrl: string | null = null;
     const loadMetadata = async () => {
       try {
         const { parseCsdlXml, discoverResources } = await import('@reso-standards/reso-client');
@@ -452,6 +456,7 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
 
         setLoadingStatus('Loading metadata...');
         const metadataUrl = resolveMetadataUrl(activeServer.baseUrl);
+        lastRequestUrl = metadataUrl;
         const needsCacheBust = metadataUrl.startsWith('/api/proxy');
         const res = await fetch(metadataUrl, {
           headers,
@@ -474,11 +479,8 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
         }
       } catch (err) {
         if (!controller.signal.aborted) {
-          const message = err instanceof Error ? err.message : 'Failed to load server metadata';
-          const is429 = message.includes('429');
-          setResourceError(is429
-            ? 'You have exceeded the maximum number of requests allowed by this provider. Please try again in a few minutes or contact the provider.'
-            : message);
+          setResourceError(err instanceof Error ? err.message : 'Failed to load server metadata');
+          setResourceErrorUrl(lastRequestUrl);
           setLoadingStatus(null);
         }
       } finally {
@@ -562,6 +564,7 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
       isLoadingResources,
       loadingStatus,
       resourceError,
+      resourceErrorUrl,
       switchServer,
       addServer,
       removeServer,
@@ -574,7 +577,7 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
       hasLookupResource,
       currentToken
     }),
-    [activeServer, servers, resources, isLoadingResources, loadingStatus, resourceError, switchServer, addServer, removeServer, updateServer, isLocal, hasProxy, permissions, getKeyField, getAlternateKeyField, hasLookupResource, currentToken]
+    [activeServer, servers, resources, isLoadingResources, loadingStatus, resourceError, resourceErrorUrl, switchServer, addServer, removeServer, updateServer, isLocal, hasProxy, permissions, getKeyField, getAlternateKeyField, hasLookupResource, currentToken]
   );
 
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;
