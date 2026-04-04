@@ -180,11 +180,8 @@ export const ServerSwitcher = () => {
               <button
                 type="button"
                 onClick={() => {
-                  clearAllCaches().then(() => {
-                    clearMetadataCache();
-                    // Reload to the current path
-                    window.location.replace(window.location.pathname + window.location.search);
-                  });
+                  clearAllCaches().then(() => clearMetadataCache());
+                  setIsOpen(false);
                 }}
                 title="Clearing the metadata cache will refresh all metadata on each server the next time you connect to it."
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200">

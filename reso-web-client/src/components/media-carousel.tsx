@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 interface MediaCarouselProps {
   /** Array of media records (expanded from $expand=Media). */
@@ -8,6 +8,7 @@ interface MediaCarouselProps {
 }
 
 const PLACEHOLDER_COUNT = 8;
+const LOADING_DELAY_MS = 50;
 
 /** Gets the image URL from a media record, falling back to a placeholder. */
 const getImageUrl = (record: Record<string, unknown>, index: number): string => {
@@ -20,6 +21,33 @@ const getImageUrl = (record: Record<string, unknown>, index: number): string => 
 /** Image carousel for Media records. Compact mode shows a single thumbnail with count. */
 export const MediaCarousel = ({ media, compact = false }: MediaCarouselProps) => {
   const [current, setCurrent] = useState(0);
+  const [showSpinner, setShowSpinner] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTimer = () => {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+  };
+
+  const handleImageLoad = useCallback(() => {
+    clearTimer();
+    setShowSpinner(false);
+  }, []);
+
+  const handleImageError = useCallback(() => {
+    clearTimer();
+    setShowSpinner(false);
+  }, []);
+
+  /** Ref callback for img elements — starts the loading timer and checks if already cached. */
+  const imgRef = useCallback((el: HTMLImageElement | null) => {
+    clearTimer();
+    if (!el) return;
+    if (el.complete) {
+      setShowSpinner(false);
+    } else {
+      timerRef.current = setTimeout(() => setShowSpinner(true), LOADING_DELAY_MS);
+    }
+  }, [current]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (media.length === 0) return null;
 
@@ -36,7 +64,16 @@ export const MediaCarousel = ({ media, compact = false }: MediaCarouselProps) =>
   if (compact) {
     return (
       <div className="group relative w-full h-32 sm:h-40 rounded overflow-hidden bg-gray-100">
-        <img src={getImageUrl(media[current], current)} alt={`Media ${current + 1} of ${media.length}`} className="w-full h-full object-cover" />
+        {showSpinner && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 z-10">
+            <svg className="w-5 h-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+              <title>Loading image</title>
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
+        )}
+        <img ref={imgRef} src={getImageUrl(media[current], current)} alt={`Media ${current + 1} of ${media.length}`} className="w-full h-full object-cover" onLoad={handleImageLoad} onError={handleImageError} />
         {media.length > 1 && (
           <>
             <button
@@ -65,10 +102,22 @@ export const MediaCarousel = ({ media, compact = false }: MediaCarouselProps) =>
   return (
     <div className="relative w-full">
       <div className="relative h-48 sm:h-64 md:h-80 rounded-lg overflow-hidden bg-gray-100">
+        {showSpinner && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 z-10">
+            <svg className="w-6 h-6 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+              <title>Loading image</title>
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
+        )}
         <img
+          ref={imgRef}
           src={getImageUrl(media[current], current)}
           alt={`Media ${current + 1} of ${media.length}`}
           className="w-full h-full object-cover"
+          onLoad={handleImageLoad}
+          onError={handleImageError}
         />
 
         {/* Previous button */}

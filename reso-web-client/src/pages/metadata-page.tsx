@@ -4,8 +4,21 @@ import { useNavigate, useParams } from 'react-router';
 import { FriendlyError } from '../components/friendly-error';
 import { LoadingSpinner } from '../components/loading-spinner';
 import { useServer } from '../context/server-context';
+import { getSchemaTimestamp } from '../api/schema-cache';
 import { getLookupName, useLookups } from '../hooks/use-lookups';
 import type { ResoLookup } from '../types';
+
+/** Format a timestamp as a relative time string. */
+const formatRelativeTime = (timestamp: number): string => {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
 
 /** Fetch CSDL schema, with caching handled by metadata.ts internals. */
 const fetchSchema = async (baseUrl?: string, token?: string): Promise<CsdlSchema> => {
@@ -309,6 +322,13 @@ export const MetadataPage = () => {
   const [search, setSearch] = useState('');
   const [expandedField, setExpandedField] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [schemaTimestamp, setSchemaTimestamp] = useState<number | null>(null);
+
+  // Load schema timestamp
+  useEffect(() => {
+    const cacheKey = isLocal ? '__local__' : activeServer.baseUrl;
+    getSchemaTimestamp(cacheKey).then(ts => setSchemaTimestamp(ts));
+  }, [activeServer.id, isLocal, schema]);
 
   // Load schema when server changes
   useEffect(() => {
@@ -483,11 +503,16 @@ export const MetadataPage = () => {
         </button>
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{resource}</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{resource} Resource</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {filteredFields.length === fields.length
                 ? `${fields.length} fields`
                 : `${filteredFields.length} of ${fields.length} fields`}
+              {schemaTimestamp && (
+                <span className="ml-2 text-xs text-gray-400 dark:text-gray-500" title={new Date(schemaTimestamp).toLocaleString()}>
+                  Metadata fetched {formatRelativeTime(schemaTimestamp)}
+                </span>
+              )}
             </p>
           </div>
         </div>

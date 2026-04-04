@@ -38,6 +38,7 @@ export const DetailPage = () => {
   const [record, setRecord] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorUrl, setErrorUrl] = useState<string | null>(null);
   const [showDelete, setShowDelete] = useState(false);
   const [keyCopied, setKeyCopied] = useState(false);
 
@@ -60,6 +61,7 @@ export const DetailPage = () => {
     let cancelled = false;
     setIsLoading(true);
     setError(null);
+    setErrorUrl(null);
 
     const load = async () => {
       try {
@@ -68,9 +70,13 @@ export const DetailPage = () => {
         if (!cancelled) setRecord(result);
       } catch (err) {
         if (!cancelled) {
-          const msg =
-            err instanceof Error ? err.message : ((err as { error?: { message?: string } })?.error?.message ?? 'Failed to load record');
+          const serverMsg = (err as { error?: { message?: string } })?.error?.message;
+          const httpStatus = (err as { httpStatus?: number })?.httpStatus;
+          const msg = serverMsg
+            ? (httpStatus ? `${serverMsg}: ${httpStatus}` : serverMsg)
+            : (err instanceof Error ? err.message : 'Failed to load record');
           setError(msg);
+          setErrorUrl((err as { requestUrl?: string })?.requestUrl ?? null);
         }
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -93,14 +99,7 @@ export const DetailPage = () => {
   if (!isValidResource || !key) {
     return <FriendlyError title="Invalid Resource" message={`Could not find resource "${resource}" with key "${key ?? 'none'}".`} />;
   }
-  if (error)
-    return (
-      <div className="p-4 sm:p-6">
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded px-3 py-2 text-sm">
-          {error}
-        </div>
-      </div>
-    );
+  if (error) return <FriendlyError message={error} requestUrl={errorUrl ?? undefined} />;
   if (!record) return <div className="p-4 sm:p-6 text-gray-500 dark:text-gray-400">Record not found</div>;
 
   // Extract media records

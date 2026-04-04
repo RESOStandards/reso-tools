@@ -64,14 +64,18 @@ export const useCollection = (
 
   // Reset when resource or params change
   useEffect(() => {
+    let cancelled = false;
     setRows([]);
     setCount(undefined);
     setHasMore(true);
     setError(null);
     setErrorUrl(null);
     nextLinkRef.current = null;
+    abortRef.current?.abort();
 
-    if (!enabled) return;
+    if (!enabled) {
+      return () => { cancelled = true; };
+    }
 
     const loadFirst = async () => {
       setIsLoading(true);
@@ -79,9 +83,6 @@ export const useCollection = (
         abortRef.current?.abort();
         abortRef.current = new AbortController();
 
-        // Use Prefer: odata.maxpagesize for server-driven pagination instead of $top.
-        // $top limits the total result set; maxpagesize tells the server the preferred page size
-        // while allowing it to return @odata.nextLink for subsequent pages.
         const result = await queryCollection(resource, {
           $filter: params.$filter || undefined,
           $orderby: params.$orderby || undefined,
@@ -90,27 +91,29 @@ export const useCollection = (
           $count: true
         }, PAGE_SIZE);
 
+        if (cancelled) return;
         setRows([...result.value]);
         if (result['@odata.count'] !== undefined) {
           setCount(result['@odata.count']);
         }
-        // Use server-provided nextLink for pagination
         nextLinkRef.current = result['@odata.nextLink'] ?? null;
         setHasMore(nextLinkRef.current !== null);
       } catch (err) {
+        if (cancelled) return;
         const statusCode = getHttpStatus(err);
         const msg =
           err instanceof Error ? err.message : ((err as { error?: { message?: string } })?.error?.message ?? 'Failed to load data');
         setError(humanizeError(msg, statusCode));
         setErrorUrl((err as { requestUrl?: string })?.requestUrl ?? null);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     loadFirst();
 
     return () => {
+      cancelled = true;
       abortRef.current?.abort();
     };
   }, [resource, params.$filter, params.$orderby, params.$select, params.$expand, enabled]);
@@ -119,7 +122,6 @@ export const useCollection = (
     if (isLoading || !hasMore || !nextLinkRef.current) return;
     setIsLoading(true);
     try {
-      // Follow the server-provided @odata.nextLink, preserving the page size preference
       const result = await fetchCollectionByUrl(nextLinkRef.current, PAGE_SIZE);
 
       setRows(prev => [...prev, ...result.value]);

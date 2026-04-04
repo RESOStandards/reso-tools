@@ -166,7 +166,7 @@ export const SearchPage = () => {
       <div className="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-3 space-y-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{resourceName}</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{resourceName} Resource</h2>
           {(permissions.canAdd || permissions.canEdit || permissions.canDelete) && (
             <div className="flex gap-2">
               {permissions.canAdd && (
@@ -197,29 +197,18 @@ export const SearchPage = () => {
           )}
         </div>
 
-        {/* Search — basic search by default, OData editor on toggle */}
-        {showODataEditor ? (
-          <SearchBar
-            value={draftFilter}
-            onChange={setDraftFilter}
-            onSearch={handleSubmit}
-            onClose={handleCloseOData}
-            onToggleAdvanced={handleToggleAdvanced}
-            isAdvancedMode={isAdvanced}
-            validationError={validationError}
-          />
-        ) : (
-          <BasicSearch
-            resource={resourceName}
-            fields={fields}
-            isLoadingFields={metaLoading || configLoading}
-            rankedFieldNames={defaultSummaryFields}
-            filterString={draftFilter}
-            onFilterChange={setDraftFilter}
-            onSearch={handleSubmit}
-            onShowOData={handleShowOData}
-          />
-        )}
+        {/* Search controls — basic search fields with Filters and OData edit */}
+        <BasicSearch
+          resource={resourceName}
+          fields={fields}
+          isLoadingFields={metaLoading || configLoading}
+          rankedFieldNames={defaultSummaryFields}
+          filterString={draftFilter}
+          onFilterChange={setDraftFilter}
+          onSearch={handleSubmit}
+          onShowOData={handleToggleAdvanced}
+        />
+
 
         {/* Sortable column headers */}
         {rows.length > 0 && (
@@ -259,7 +248,15 @@ export const SearchPage = () => {
               fieldGroups={fieldGroups}
               filterString={draftFilter}
               onFilterChange={setDraftFilter}
-              onSearch={() => { handleSubmit(); handleToggleAdvanced(); }}
+              onSearch={() => {
+                // Apply the filter and close advanced search in a single URL update
+                const params = new URLSearchParams(searchParams);
+                const trimmed = draftFilter.trim();
+                if (trimmed) params.set('$filter', trimmed);
+                else params.delete('$filter');
+                params.delete('mode');
+                setSearchParams(params);
+              }}
               onClose={handleToggleAdvanced}
             />
           </div>

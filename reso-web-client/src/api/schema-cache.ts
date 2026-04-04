@@ -140,6 +140,23 @@ export const setCachedSchema = async <T>(key: string, schema: T): Promise<void> 
 export const clearSchemaCache = async (): Promise<void> =>
   clearStore(SCHEMA_STORE);
 
+/** Get the timestamp of when a schema was cached. Returns null if not found. */
+export const getSchemaTimestamp = async (key: string): Promise<number | null> => {
+  try {
+    const db = await openDb();
+    const entry = await new Promise<CacheEntry | undefined>((resolve, reject) => {
+      const tx = db.transaction(SCHEMA_STORE, 'readonly');
+      const store = tx.objectStore(SCHEMA_STORE);
+      const request = store.get(key);
+      request.onsuccess = () => resolve(request.result as CacheEntry | undefined);
+      request.onerror = () => reject(request.error);
+    });
+    return entry?.timestamp ?? null;
+  } catch {
+    return null;
+  }
+};
+
 // ── Lookup cache (1-hour TTL, keyed by "serverBaseUrl:lookupName") ──
 
 /** Build a cache key for a lookup: "baseUrl:lookupName". */
