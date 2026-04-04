@@ -4,6 +4,17 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
+## v0.3 Security Notes — 2026-04-03
+
+- **OAuth2 token storage**: Per-server tokens stored in Electron secure storage (OS keychain encryption) or browser sessionStorage (cleared on tab close). Tokens are never written to localStorage.
+- **CORS proxy SSRF protection**: `/api/proxy` validates that target URLs use `http:` or `https:` protocols only.
+- **IndexedDB caches**: Schema and lookup caches use gzip compression. No sensitive data (tokens, credentials) is stored in IndexedDB.
+- **New package**: `@reso-standards/web-api-proxy` — standalone CORS proxy with same SSRF protections as the reference server.
+
+A full `npm audit` should be run before the v0.3 release.
+
+---
+
 ## Audit: 2026-03-17 — v0.2 Pre-Release npm Audit
 
 **Scope:** `npm audit` across all 9 packages

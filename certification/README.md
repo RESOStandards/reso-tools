@@ -332,7 +332,7 @@ The mock server:
 ```bash
 npm install
 npm run build
-npm test        # 60 tests
+npm test        # 102 tests
 ```
 
 ## License

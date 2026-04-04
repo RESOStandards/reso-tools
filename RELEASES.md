@@ -2,6 +2,70 @@
 
 ---
 
+## v0.3 — 2026-04-03
+
+### OAuth2, Performance and UX Improvements
+
+Third milestone release adding OAuth2 Client Credentials authentication, lazy lookup loading, IndexedDB metadata caching, a standalone CORS proxy package, and improved error handling across the application.
+
+#### OAuth2 Client Credentials
+
+- **Token fetch via proxy** — Client Credentials token requests route through `/api/proxy` to avoid CORS restrictions. Supports body, header (Basic), and query credential transport modes.
+- **Per-server token storage** — Access tokens stored per server ID in Electron secure storage (encrypted) or browser sessionStorage. Tokens survive page reloads.
+- **Proxy availability detection** — Client Credentials auth mode disabled in the connection modal when no proxy backend is detected.
+- **Token readiness gating** — Data and metadata requests wait for token availability on Client Credentials servers, preventing 401 race conditions.
+
+#### Performance
+
+- **Lazy lookup loading** — Lookups fetched on demand per field or group instead of loading all enum values upfront. BasicSearch fetches only its 2-3 enum fields; AdvancedSearch fetches per expanded group.
+- **Batch lookup fetch** — `LookupName in (...)` queries with `Prefer: odata.maxpagesize` replace individual per-field requests. Configurable via `maxPageSize` on `LookupResolverConfig`.
+- **IndexedDB schema cache** — Parsed CSDL schemas cached with gzip compression and 24-hour TTL. Eliminates repeated `$metadata` fetches that trigger rate limiting.
+- **IndexedDB lookup cache** — Lookup values cached with 1-hour TTL per server per lookup name.
+- **Analytics-driven search fields** — BasicSearch uses `summary-fields.json` (RESO adoption data) to pick the most relevant fields for each resource.
+- **Per-server metadata refresh** — Stale-while-revalidate: only replaces cached metadata if the fresh fetch succeeds and parses.
+
+#### Standalone CORS Proxy (New Package)
+
+- **`@reso-standards/web-api-proxy`** — Lightweight Express server with CORS proxy, health endpoint, static file serving, and SPA fallback.
+- **Three deployment modes** — Standalone CLI, Express middleware, or Docker container.
+- **Desktop client fallback** — Server entry tries the reference server first, falls back to proxy-only mode when unavailable.
+
+#### Error Handling
+
+- **Centralized `formatError`** — Maps HTTP status codes to human-readable titles and descriptions. Handles 429 rate limiting, 5xx server errors, auth failures, timeouts, and network errors.
+- **`FriendlyError` component** — Consistent error display across all pages with icon, quip, description, server response, request URL with copy button, and navigation buttons.
+- **Request URL display** — Shows the actual target URL (proxy unpacked) on error pages with copy-to-clipboard.
+
+#### Search and UI
+
+- **Filters button** — Direct access to Advanced Search from the search bar. Filter count badge using the OData expression parser.
+- **Apply Filters fix** — Combined URL param update prevents the filter from being lost when closing the advanced search panel.
+- **OData filter editor** — Inline toggle between basic search fields and raw OData filter input with copy button.
+- **Date picker** — Native `<input type="date">` for timestamp fields with dark mode support.
+- **ModificationTimestamp** — Always included in search fields and sort buttons when the server supports it.
+- **Error navigation** — Sticky footer on Add/Edit forms with Previous/Next to walk through validation errors. Scrolls to first error on submit using MutationObserver for collapsed panels.
+- **Collection enum toggle buttons** — Multi-value enum fields render as toggle buttons on Add/Edit forms, stored as arrays per OData standard.
+- **Media carousel** — Loading indicator with 50ms delay for slow images. Broken image placeholder with landscape icon.
+- **Metadata timestamp** — Shows when metadata was last fetched with per-server refresh button.
+- **Clear Metadata Cache** — Connection manager button to clear all cached metadata.
+- **Resource titles** — "Property Resource" instead of just "Property" on page headers.
+
+#### Testing
+
+- **928 unit/integration tests** across 7 packages (up from 856 in v0.2)
+- **72 web client tests** (new) — `getLookupName`, `buildSearchFields`, `humanizeError`, `formatError`, `unpackRequestUrl`, filter condition counting
+- **4 compliance suites** pass on PostgreSQL
+- **GitHub issue created** for E2E tests with Playwright (RESOStandards/reso-tools#75)
+
+#### Other
+
+- `odata-client` renamed to `reso-client` (`@reso-standards/reso-client`)
+- DD documentation migrated to standalone repo (RESOStandards/reso-data-dictionary-documentation)
+- Fixed DD docs 404s for lookup values with spaces in directory names
+- Added Usage column to DD docs Used By tables on LookupName pages
+
+---
+
 ## v0.2 — 2026-03-10
 
 ### RESO Desktop Client and Other Improvements
