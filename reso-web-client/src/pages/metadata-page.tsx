@@ -85,6 +85,7 @@ const FieldDetail = ({
   field,
   schema,
   lookups,
+  isLoadingLookups,
   isKeyField,
   navProp,
   onNavigate
@@ -92,6 +93,7 @@ const FieldDetail = ({
   readonly field: FieldInfo;
   readonly schema: CsdlSchema;
   readonly lookups: ReadonlyArray<ResoLookup>;
+  readonly isLoadingLookups?: boolean;
   readonly isKeyField: boolean;
   readonly navProp?: CsdlNavigationProperty;
   readonly onNavigate: (resource: string) => void;
@@ -235,6 +237,18 @@ const FieldDetail = ({
         </div>
       )}
 
+      {/* Loading indicator for lookup values */}
+      {isLoadingLookups && lookups.length === 0 && !enumType && (
+        <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+          <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+            <title>Loading</title>
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Loading lookup values...
+        </div>
+      )}
+
       {/* Lookup Resource values (fetched) */}
       {lookups.length > 0 && !enumType && (
         <div>
@@ -289,7 +303,7 @@ export const MetadataPage = () => {
 
   const [schema, setSchema] = useState<CsdlSchema | null>(null);
   const [fields, setFields] = useState<ReadonlyArray<FieldInfo>>([]);
-  const { lookups: lookupsByName, fetchLookups } = useLookups();
+  const { lookups: lookupsByName, fetchLookups, isLoading: isLoadingLookups } = useLookups();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -558,6 +572,7 @@ export const MetadataPage = () => {
                         field={field}
                         schema={schema}
                         lookups={lookupsByName[getLookupName(field as unknown as import('../types').ResoField) ?? ''] ?? []}
+                        isLoadingLookups={isLoadingLookups}
                         isKeyField={keyFields.has(field.fieldName)}
                         navProp={field.isExpansion ? entityType?.navigationProperties.find(np => np.name === field.fieldName) : undefined}
                         onNavigate={handleNavigateResource}

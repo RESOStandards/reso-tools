@@ -1,6 +1,6 @@
 import type { CsdlSchema, LookupResolver, LookupValue } from '@reso-standards/reso-client';
 import { entityTypeToFields } from './metadata-adapter';
-import { getCachedSchema, setCachedSchema, clearSchemaCache } from './schema-cache';
+import { getCachedSchema, setCachedSchema, getCachedLookup, setCachedLookup } from './schema-cache';
 import type { ResoField, ResoLookup } from '../types';
 
 /** Cache for the local server's custom metadata endpoints. */
@@ -156,7 +156,7 @@ export const fetchFieldsForResource = async (
 
 /**
  * Fetch lookup values for specific lookup names. Returns a map of lookupName → values.
- * Uses the resolver's per-name cache — previously fetched names return instantly.
+ * Checks IndexedDB cache first (1-hour TTL), then falls back to the resolver.
  * Deduplicates by lookupValue within each name.
  */
 export const fetchLookupsByName = async (
@@ -166,10 +166,15 @@ export const fetchLookupsByName = async (
   if (lookupNames.length === 0) return {};
 
   const baseUrl = options?.baseUrl || window.location.origin;
-  const resolver = await getResolver(baseUrl, options?.token);
 
   const entries = await Promise.all(
     lookupNames.map(async (name) => {
+      // Check IndexedDB cache first
+      const cached = await getCachedLookup<ReadonlyArray<ResoLookup>>(baseUrl, name);
+      if (cached) return [name, cached] as const;
+
+      // Cache miss — fetch from resolver
+      const resolver = await getResolver(baseUrl, options?.token);
       const values = await resolver.resolveLookups(name);
       // Deduplicate by lookupValue (some servers return duplicates)
       const seen = new Set<string>();
@@ -178,7 +183,10 @@ export const fetchLookupsByName = async (
         seen.add(v.lookupValue);
         return true;
       });
-      return [name, unique.map(toLookup)] as const;
+      const converted = unique.map(toLookup);
+      // Persist to IndexedDB for future sessions
+      setCachedLookup(baseUrl, name, converted).catch(() => {});
+      return [name, converted] as const;
     })
   );
 

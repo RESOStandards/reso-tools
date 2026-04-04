@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { useServer } from '../context/server-context';
+import { clearAllCaches } from '../api/schema-cache';
+import { clearMetadataCache } from '../api/metadata';
 import { ServerConnectionModal } from './server-connection-modal';
 import type { ServerFormData } from './server-connection-modal';
 import type { ServerConfig } from '../context/server-context';
@@ -121,7 +123,7 @@ export const ServerSwitcher = () => {
                 key={server.id}
                 type="button"
                 onClick={() => handleSelect(server.id)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 text-left cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 hover:brightness-125 ${
                   server.id === activeServer.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                 }`}>
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -169,11 +171,27 @@ export const ServerSwitcher = () => {
                   setShowModal(true);
                   setIsOpen(false);
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700">
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 hover:brightness-125">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
                   <path d="M8.75 3.75a.75.75 0 00-1.5 0v3.5h-3.5a.75.75 0 000 1.5h3.5v3.5a.75.75 0 001.5 0v-3.5h3.5a.75.75 0 000-1.5h-3.5v-3.5z" />
                 </svg>
                 Add Connection
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  clearAllCaches().then(() => {
+                    clearMetadataCache();
+                    // Reload to the current path
+                    window.location.replace(window.location.pathname + window.location.search);
+                  });
+                }}
+                title="Clearing the metadata cache will refresh all metadata on each server the next time you connect to it."
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
+                  <path fillRule="evenodd" d="M13.836 2.477a.75.75 0 01.75.75v3.182a.75.75 0 01-.75.75h-3.182a.75.75 0 010-1.5h1.37l-.84-.841a4.5 4.5 0 00-7.08.681.75.75 0 01-1.3-.75 6 6 0 019.44-.908l.987.987V3.227a.75.75 0 01.75-.75zm-12.672 8a.75.75 0 01.75-.75h3.182a.75.75 0 010 1.5H3.726l.84.841a4.5 4.5 0 007.08-.681.75.75 0 011.3.75 6 6 0 01-9.44.908l-.987-.987v1.37a.75.75 0 01-1.5 0v-3.182z" clipRule="evenodd" />
+                </svg>
+                Clear Metadata Cache
               </button>
             </div>
           </div>

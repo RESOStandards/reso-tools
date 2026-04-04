@@ -47,26 +47,29 @@ export const Layout = () => {
     clearConfigCache();
   }, [activeServer.id, currentToken]);
 
-  // Guard: when server changes and new resources load, validate the current route
+  // Guard: when server changes and new resources load, validate the current route.
+  // Only redirect on genuine server switches (not initial hydration or reload).
+  // Wait for two consecutive renders with the same server ID to confirm it's stable.
+  const serverStableRef = useRef(false);
   useEffect(() => {
     if (!resources || resources.length === 0) return;
 
-    // Only redirect on actual server switches, not initial load
-    if (prevServerIdRef.current === activeServer.id) {
+    if (prevServerIdRef.current !== activeServer.id) {
+      const wasStable = serverStableRef.current;
       prevServerIdRef.current = activeServer.id;
-      return;
-    }
-    prevServerIdRef.current = activeServer.id;
+      serverStableRef.current = false;
 
-    const resourceExists = resource && resources.some(r => r.name === resource);
+      // Only redirect if the previous server was stable (user switched, not hydration)
+      if (!wasStable) return;
 
-    if (resource && !resourceExists) {
-      // Current resource doesn't exist on the new server — go to first available
-      navigate(`/${resources[0].name}`, { replace: true });
-    } else if (resource && resourceExists && location.pathname !== `/${resource}`) {
-      // Resource exists but we're on a detail/add/edit/delete page — go to search
-      // (the specific record or context won't carry over between servers)
-      navigate(`/${resource}`, { replace: true });
+      const resourceExists = resource && resources.some(r => r.name === resource);
+      if (resource && !resourceExists) {
+        navigate(`/${resources[0].name}`, { replace: true });
+      } else if (resource && resourceExists && location.pathname !== `/${resource}`) {
+        navigate(`/${resource}`, { replace: true });
+      }
+    } else {
+      serverStableRef.current = true;
     }
   }, [resources, activeServer.id, resource, location.pathname, navigate]);
 

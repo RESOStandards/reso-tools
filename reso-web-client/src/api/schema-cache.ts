@@ -1,15 +1,21 @@
 /**
- * IndexedDB cache for parsed CSDL schemas. Stores compressed JSON to handle
- * large metadata documents (10-20 MB on some servers). Cache entries expire
- * after a configurable TTL (default 24 hours).
+ * IndexedDB cache for parsed CSDL schemas and lookup values.
+ *
+ * Schemas: compressed JSON, 24-hour TTL (large metadata documents).
+ * Lookups: compressed JSON, 1-hour TTL (per lookup name, keyed by server+name).
+ * Expired entries are flushed on access — no auto-refetch.
  */
 
-/** Default time-to-live for cached schemas (24 hours in milliseconds). */
-const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
+/** Default TTL for cached schemas (24 hours). */
+const SCHEMA_TTL_MS = 24 * 60 * 60 * 1000;
 
-const DB_NAME = 'reso-schema-cache';
-const DB_VERSION = 1;
-const STORE_NAME = 'schemas';
+/** Default TTL for cached lookups (1 hour). */
+const LOOKUP_TTL_MS = 60 * 60 * 1000;
+
+const DB_NAME = 'reso-cache';
+const DB_VERSION = 2;
+const SCHEMA_STORE = 'schemas';
+const LOOKUP_STORE = 'lookups';
 
 /** Shape of a cached entry in IndexedDB. */
 interface CacheEntry {
@@ -24,8 +30,11 @@ const openDb = (): Promise<IDBDatabase> =>
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'key' });
+      if (!db.objectStoreNames.contains(SCHEMA_STORE)) {
+        db.createObjectStore(SCHEMA_STORE, { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains(LOOKUP_STORE)) {
+        db.createObjectStore(LOOKUP_STORE, { keyPath: 'key' });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -44,15 +53,15 @@ const decompress = async (data: ArrayBuffer): Promise<string> => {
   return new Response(stream).text();
 };
 
-/**
- * Get a cached schema from IndexedDB. Returns null if not found or expired.
- */
-export const getCachedSchema = async <T>(key: string, ttlMs = DEFAULT_TTL_MS): Promise<T | null> => {
+// ── Generic IndexedDB operations ──
+
+/** Get a cached entry from a store. Returns null if not found or expired. */
+const getEntry = async <T>(storeName: string, key: string, ttlMs: number): Promise<T | null> => {
   try {
     const db = await openDb();
     const entry = await new Promise<CacheEntry | undefined>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
+      const tx = db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
       const request = store.get(key);
       request.onsuccess = () => resolve(request.result as CacheEntry | undefined);
       request.onerror = () => reject(request.error);
@@ -60,62 +69,57 @@ export const getCachedSchema = async <T>(key: string, ttlMs = DEFAULT_TTL_MS): P
 
     if (!entry) return null;
 
-    // Check TTL
     if (Date.now() - entry.timestamp > ttlMs) {
-      // Expired — delete in background
-      deleteEntry(key).catch(() => {});
+      deleteEntry(storeName, key).catch(() => {});
       return null;
     }
 
     const json = await decompress(entry.data);
     return JSON.parse(json) as T;
   } catch {
-    // IndexedDB unavailable or corrupt — fall through to network fetch
     return null;
   }
 };
 
-/**
- * Store a schema in IndexedDB with gzip compression.
- */
-export const setCachedSchema = async <T>(key: string, schema: T): Promise<void> => {
+/** Store a compressed entry in a store. */
+const setEntry = async <T>(storeName: string, key: string, value: T): Promise<void> => {
   try {
-    const json = JSON.stringify(schema);
+    const json = JSON.stringify(value);
     const compressed = await compress(json);
     const db = await openDb();
 
     await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
+      const tx = db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
       const entry: CacheEntry = { key, data: compressed, timestamp: Date.now() };
       const request = store.put(entry);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
   } catch {
-    // Silently fail — caching is best-effort
+    // Best-effort
   }
 };
 
-/** Delete a single cache entry. */
-const deleteEntry = async (key: string): Promise<void> => {
+/** Delete a single entry from a store. */
+const deleteEntry = async (storeName: string, key: string): Promise<void> => {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
     const request = store.delete(key);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });
 };
 
-/** Clear all cached schemas. */
-export const clearSchemaCache = async (): Promise<void> => {
+/** Clear all entries in a store. */
+const clearStore = async (storeName: string): Promise<void> => {
   try {
     const db = await openDb();
     await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
+      const tx = db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
       const request = store.clear();
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
@@ -123,4 +127,36 @@ export const clearSchemaCache = async (): Promise<void> => {
   } catch {
     // Silently fail
   }
+};
+
+// ── Schema cache (24-hour TTL) ──
+
+export const getCachedSchema = async <T>(key: string, ttlMs = SCHEMA_TTL_MS): Promise<T | null> =>
+  getEntry<T>(SCHEMA_STORE, key, ttlMs);
+
+export const setCachedSchema = async <T>(key: string, schema: T): Promise<void> =>
+  setEntry(SCHEMA_STORE, key, schema);
+
+export const clearSchemaCache = async (): Promise<void> =>
+  clearStore(SCHEMA_STORE);
+
+// ── Lookup cache (1-hour TTL, keyed by "serverBaseUrl:lookupName") ──
+
+/** Build a cache key for a lookup: "baseUrl:lookupName". */
+const lookupCacheKey = (baseUrl: string, lookupName: string): string =>
+  `${baseUrl}:${lookupName}`;
+
+export const getCachedLookup = async <T>(baseUrl: string, lookupName: string, ttlMs = LOOKUP_TTL_MS): Promise<T | null> =>
+  getEntry<T>(LOOKUP_STORE, lookupCacheKey(baseUrl, lookupName), ttlMs);
+
+export const setCachedLookup = async <T>(baseUrl: string, lookupName: string, values: T): Promise<void> =>
+  setEntry(LOOKUP_STORE, lookupCacheKey(baseUrl, lookupName), values);
+
+export const clearLookupCache = async (): Promise<void> =>
+  clearStore(LOOKUP_STORE);
+
+// ── Clear all caches ──
+
+export const clearAllCaches = async (): Promise<void> => {
+  await Promise.all([clearSchemaCache(), clearLookupCache()]);
 };
