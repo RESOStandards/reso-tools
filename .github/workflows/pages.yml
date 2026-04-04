@@ -25,11 +25,11 @@ jobs:
         run: |
           # Copy each package README as a Jekyll collection page
           packages=(
-            "validation:@reso-standards/validation:Isomorphic validation library"
+            "reso-validation:@reso-standards/reso-validation:Isomorphic validation library"
             "odata-expression-parser:@reso-standards/odata-expression-parser:OData filter parser"
             "reso-client:@reso-standards/reso-client:RESO Client SDK"
-            "data-generator:@reso-standards/data-generator:Test data generator"
-            "certification:@reso-standards/certification:Certification testing tools"
+            "reso-data-generator:@reso-standards/reso-data-generator:Test data generator"
+            "reso-certification:@reso-standards/reso-certification:Certification testing tools"
             "reso-reference-server:reso-reference-server:OData reference server"
             "reso-web-client:@reso/web-client:React browser UI"
             "reso-desktop-client:@reso/desktop-client:Electron desktop shell"

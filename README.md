@@ -11,13 +11,13 @@ Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compl
 |---------|-------------|-------|
 | [`reso-client/`](reso-client/) | OData 4.01 client SDK -- URI builder, CRUD helpers, CSDL metadata parsing, OAuth2 Client Credentials | 118 |
 | [`odata-expression-parser/`](odata-expression-parser/) | Zero-dependency `$filter` and `$expand` expression parser | 180 |
-| [`validation/`](validation/) | Isomorphic field and business-rule validation for RESO Data Dictionary records | 98 |
-| [`data-generator/`](data-generator/) | Realistic test data generator with FK dependency resolution | 104 |
+| [`reso-validation/`](reso-validation/) | Isomorphic field and business-rule validation for RESO Data Dictionary records | 98 |
+| [`reso-data-generator/`](reso-data-generator/) | Realistic test data generator with FK dependency resolution | 104 |
 | [`reso-reference-server/`](reso-reference-server/) | Metadata-driven OData reference server (PostgreSQL, MongoDB, SQLite) | 254 |
 | [`reso-web-client/`](reso-web-client/) | React + Vite browser UI for browsing and editing OData resources | 72 |
 | [`reso-web-api-proxy/`](reso-web-api-proxy/) | Lightweight CORS proxy and static file server for web client deployments | -- |
 | [`reso-desktop-client/`](reso-desktop-client/) | Electron desktop shell with native proxy, secure storage and optional reference server | -- |
-| [`certification/`](certification/) | RESO certification test runner (Add/Edit, Web API Core, DD, EntityEvent) | 102 |
+| [`reso-certification/`](reso-certification/) | RESO certification test runner (Add/Edit, Web API Core, DD, EntityEvent) | 102 |
 
 ## Quick Start
 

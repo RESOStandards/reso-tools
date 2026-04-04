@@ -56,7 +56,7 @@ export type {
   ODataResponse
 } from './test-runner/types.js';
 
-export type { ValidationFailure } from '@reso-standards/validation';
+export type { ValidationFailure } from '@reso-standards/reso-validation';
 
 // ── Add/Edit (RCP-010) ──
 

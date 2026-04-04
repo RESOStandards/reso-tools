@@ -4,38 +4,37 @@ WORKDIR /app
 
 # Copy workspace dependencies (same resolution chain as the server Dockerfile)
 COPY odata-expression-parser/ /deps/odata-expression-parser/
-COPY validation/ /deps/validation/
+COPY reso-validation/ /deps/reso-validation/
 COPY reso-client/ /deps/reso-client/
 
 # Build odata-expression-parser
 WORKDIR /deps/odata-expression-parser
 RUN npm install && npm run build
 
-# Build validation
-WORKDIR /deps/validation
+# Build reso-validation
+WORKDIR /deps/reso-validation
 RUN npm install && npm run build
 
-# Build reso-client (depends on filter-parser + validation)
+# Build reso-client (depends on filter-parser)
 WORKDIR /deps/reso-client
 RUN rm -f package-lock.json \
  && sed -i 's|file:../odata-expression-parser|file:/deps/odata-expression-parser|' package.json \
- && sed -i 's|file:../validation|file:/deps/validation|' package.json \
  && npm install && npm run build
 
-# Build certification (depends on reso-client + validation)
+# Build reso-certification (depends on reso-client + reso-validation)
 WORKDIR /app
-COPY certification/package.json ./
+COPY reso-certification/package.json ./
 RUN sed -i 's|file:../reso-client|file:/deps/reso-client|' package.json \
- && sed -i 's|file:../validation|file:/deps/validation|' package.json \
+ && sed -i 's|file:../reso-validation|file:/deps/reso-validation|' package.json \
  && npm install --ignore-scripts
 
-COPY certification/tsconfig.json ./
-COPY certification/src/ ./src/
+COPY reso-certification/tsconfig.json ./
+COPY reso-certification/src/ ./src/
 RUN npm run build
 
 # Copy sample payloads and metadata
-COPY certification/sample-payloads/ ./sample-payloads/
-COPY certification/sample-metadata.xml ./
+COPY reso-certification/sample-payloads/ ./sample-payloads/
+COPY reso-certification/sample-metadata.xml ./
 
 # --- Runtime stage ---
 FROM node:22-alpine
@@ -48,7 +47,7 @@ COPY --from=build /app/package.json ./
 COPY --from=build /app/sample-payloads ./sample-payloads
 COPY --from=build /app/sample-metadata.xml ./
 COPY --from=build /deps/odata-expression-parser /deps/odata-expression-parser
-COPY --from=build /deps/validation /deps/validation
+COPY --from=build /deps/reso-validation /deps/reso-validation
 COPY --from=build /deps/reso-client /deps/reso-client
 
 # Install wget for health checks in entrypoint

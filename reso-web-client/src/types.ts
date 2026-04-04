@@ -136,4 +136,4 @@ export interface OrganizationsResponse {
   readonly Organizations: ReadonlyArray<ResoOrganization>;
 }
 
-export { isEnumType, isNumericEdmType } from '@reso-standards/validation';
+export { isEnumType, isNumericEdmType } from '@reso-standards/reso-validation';

@@ -10,12 +10,12 @@ Open-source monorepo for building and testing RESO-compliant OData servers. Incl
 |---------|-------------|
 | `reso-client/` | OData 4.01 client SDK |
 | `odata-expression-parser/` | `$filter` and `$expand` expression parser |
-| `validation/` | Field and business-rule validation for RESO Data Dictionary |
-| `data-generator/` | Test data generator with FK dependency resolution |
+| `reso-validation/` | Field and business-rule validation for RESO Data Dictionary |
+| `reso-data-generator/` | Test data generator with FK dependency resolution |
 | `reso-reference-server/` | Metadata-driven OData reference server (PostgreSQL, MongoDB, SQLite) |
 | `reso-web-client/` | React + Vite browser UI (`@reso/web-client`) |
 | `reso-desktop-client/` | Electron desktop shell (`@reso/desktop-client`) |
-| `certification/` | RESO certification test runner (Add/Edit, Web API Core, DD) |
+| `reso-certification/` | RESO certification test runner (Add/Edit, Web API Core, DD) |
 | `.github/pages/` | GitHub Pages site including DD documentation generator |
 
 ## Common commands

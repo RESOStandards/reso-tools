@@ -6,7 +6,7 @@
 import { readFile } from 'node:fs/promises';
 import { fetchRawMetadata, parseCsdlXml } from '@reso-standards/reso-client';
 import type { CsdlEntityType, CsdlProperty, CsdlSchema } from '@reso-standards/reso-client';
-import { type ResoField, type ValidationFailure, validateRecord } from '@reso-standards/validation';
+import { type ResoField, type ValidationFailure, validateRecord } from '@reso-standards/reso-validation';
 import type { EntityProperty, EntityType, ParsedMetadata } from './types.js';
 
 // ── Type adapters (CsdlEntityType → EntityType) ──
