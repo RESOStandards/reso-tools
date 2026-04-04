@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router';
 import { FriendlyError } from '../components/friendly-error';
 import { LoadingSpinner } from '../components/loading-spinner';
 import { useServer } from '../context/server-context';
+import { getLookupName, useLookups } from '../hooks/use-lookups';
 import type { ResoLookup } from '../types';
 
 /** Fetch CSDL schema, with caching handled by metadata.ts internals. */
@@ -288,7 +289,7 @@ export const MetadataPage = () => {
 
   const [schema, setSchema] = useState<CsdlSchema | null>(null);
   const [fields, setFields] = useState<ReadonlyArray<FieldInfo>>([]);
-  const [lookups, setLookups] = useState<Readonly<Record<string, ReadonlyArray<ResoLookup>>>>({});
+  const { lookups: lookupsByName, fetchLookups } = useLookups();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -311,26 +312,22 @@ export const MetadataPage = () => {
     return () => { cancelled = true; };
   }, [activeServer.id, isLocal]);
 
-  // Load fields + lookups when resource changes
+  // Load fields from schema when resource changes (fast — no network request needed)
   useEffect(() => {
     if (!resource || !schema) return;
     let cancelled = false;
-    setIsLoading(true);
-    setError(null);
     setExpandedField(null);
     setSearch('');
     setTypeFilter('all');
+    setError(null);
+    setIsLoading(true);
 
     const load = async () => {
       try {
         const { getFieldsForResource } = await import('@reso-standards/reso-client');
-        const { fetchLookupsForResource } = await import('../api/metadata');
         const f = getFieldsForResource(schema, resource);
-        const metaOptions = isLocal ? undefined : { baseUrl: activeServer.baseUrl, token: currentToken ?? activeServer.token };
-        const l = await fetchLookupsForResource(resource, metaOptions);
         if (!cancelled) {
           setFields(f);
-          setLookups(l);
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load fields');
@@ -340,11 +337,20 @@ export const MetadataPage = () => {
     };
     load();
     return () => { cancelled = true; };
-  }, [resource, schema, activeServer.id, isLocal]);
+  }, [resource, schema]);
 
   const handleToggleField = useCallback((fieldName: string) => {
-    setExpandedField(prev => prev === fieldName ? null : fieldName);
-  }, []);
+    setExpandedField(prev => {
+      if (prev === fieldName) return null;
+      // Fetch lookups for this field when expanding
+      const field = fields.find(f => f.fieldName === fieldName);
+      if (field) {
+        const name = getLookupName(field as unknown as import('../types').ResoField);
+        if (name) fetchLookups([name]);
+      }
+      return fieldName;
+    });
+  }, [fields, fetchLookups]);
 
   const handleNavigateResource = useCallback((resourceName: string) => {
     navigate(`/metadata/${resourceName}`);
@@ -551,7 +557,7 @@ export const MetadataPage = () => {
                       <FieldDetail
                         field={field}
                         schema={schema}
-                        lookups={lookups[field.fieldName] ?? []}
+                        lookups={lookupsByName[getLookupName(field as unknown as import('../types').ResoField) ?? ''] ?? []}
                         isKeyField={keyFields.has(field.fieldName)}
                         navProp={field.isExpansion ? entityType?.navigationProperties.find(np => np.name === field.fieldName) : undefined}
                         onNavigate={handleNavigateResource}
