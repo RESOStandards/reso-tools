@@ -32,7 +32,7 @@ export const Layout = () => {
   const location = useLocation();
   const pageIndicator = getPageIndicator(location.pathname, resource);
   const navigate = useNavigate();
-  const { activeServer, resources } = useServer();
+  const { activeServer, resources, currentToken } = useServer();
   const prevServerIdRef = useRef(activeServer.id);
 
   // Close sidebar on navigation (mobile)
@@ -40,33 +40,36 @@ export const Layout = () => {
     setSidebarOpen(false);
   }, [location.pathname]);
 
-  // Sync API client config and clear caches when server changes
+  // Sync API client config and clear caches when server changes or token is fetched
   useEffect(() => {
-    setApiConfig(activeServer.baseUrl, activeServer.token);
+    setApiConfig(activeServer.baseUrl, currentToken ?? activeServer.token);
     clearMetadataCache();
     clearConfigCache();
-  }, [activeServer.id]);
+  }, [activeServer.id, currentToken]);
 
-  // Guard: when server changes and new resources load, validate the current route
+  // Guard: when server changes and new resources load, validate the current route.
+  // Only redirect on genuine server switches (not initial hydration or reload).
+  // Wait for two consecutive renders with the same server ID to confirm it's stable.
+  const serverStableRef = useRef(false);
   useEffect(() => {
     if (!resources || resources.length === 0) return;
 
-    // Only redirect on actual server switches, not initial load
-    if (prevServerIdRef.current === activeServer.id) {
+    if (prevServerIdRef.current !== activeServer.id) {
+      const wasStable = serverStableRef.current;
       prevServerIdRef.current = activeServer.id;
-      return;
-    }
-    prevServerIdRef.current = activeServer.id;
+      serverStableRef.current = false;
 
-    const resourceExists = resource && resources.some(r => r.name === resource);
+      // Only redirect if the previous server was stable (user switched, not hydration)
+      if (!wasStable) return;
 
-    if (resource && !resourceExists) {
-      // Current resource doesn't exist on the new server — go to first available
-      navigate(`/${resources[0].name}`, { replace: true });
-    } else if (resource && resourceExists && location.pathname !== `/${resource}`) {
-      // Resource exists but we're on a detail/add/edit/delete page — go to search
-      // (the specific record or context won't carry over between servers)
-      navigate(`/${resource}`, { replace: true });
+      const resourceExists = resource && resources.some(r => r.name === resource);
+      if (resource && !resourceExists) {
+        navigate(`/${resources[0].name}`, { replace: true });
+      } else if (resource && resourceExists && location.pathname !== `/${resource}`) {
+        navigate(`/${resource}`, { replace: true });
+      }
+    } else {
+      serverStableRef.current = true;
     }
   }, [resources, activeServer.id, resource, location.pathname, navigate]);
 
@@ -94,11 +97,14 @@ export const Layout = () => {
                 </svg>
               )}
             </button>
-            {/* RESO Logo — links to home */}
-            <NavLink to="/" className="shrink-0">
-              <img src={isDark ? LOGO_DARK : LOGO_LIGHT} alt="RESO" className="h-8 sm:h-10" />
+            {/* RESO Logo — fixed width matches sidebar so switcher aligns with content */}
+            <NavLink to="/" className="shrink-0 hidden sm:flex sm:w-44 sm:items-center">
+              <img src={isDark ? LOGO_DARK : LOGO_LIGHT} alt="RESO" className="h-10" />
             </NavLink>
-            {/* Server switcher replaces static title */}
+            <NavLink to="/" className="shrink-0 sm:hidden">
+              <img src={isDark ? LOGO_DARK : LOGO_LIGHT} alt="RESO" className="h-8" />
+            </NavLink>
+            {/* Server switcher — aligns with main content area */}
             <ServerSwitcher />
             {pageIndicator && <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">/ {pageIndicator}</span>}
           </div>

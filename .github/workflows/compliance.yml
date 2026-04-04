@@ -1,15 +1,7 @@
-name: Compliance Tests
+name: CI & Compliance
 
 on:
   pull_request:
-    paths:
-      - reso-reference-server/**
-      - certification/**
-      - odata-client/**
-      - odata-expression-parser/**
-      - validation/**
-      - data-generator/**
-  push:
     branches: [main]
   workflow_dispatch:
 
@@ -17,8 +9,53 @@ env:
   SEED_COUNTS: Property=1000,Media=5,OpenHouse=2,Showing=2,PropertyRooms=3,PropertyGreenVerification=1,PropertyPowerProduction=1,PropertyUnitTypes=2
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Biome lint
+        run: npm run lint
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install all package dependencies
+        run: |
+          npm install
+          for dir in validation odata-expression-parser reso-client data-generator reso-reference-server reso-web-client reso-web-api-proxy certification; do
+            (cd "$dir" && npm install)
+          done
+
+      - name: Build shared libraries
+        run: |
+          cd validation && npx tsc && cd ..
+          cd odata-expression-parser && npx tsc && cd ..
+          cd reso-client && npx tsc && cd ..
+          cd data-generator && npx tsc && cd ..
+          cd reso-reference-server && npx tsc && cd ..
+
+      - name: Run all tests
+        run: npm test
+
   compliance-postgres:
     name: Compliance (PostgreSQL)
+    needs: [lint, test]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -63,6 +100,7 @@ jobs:
 
   compliance-mongodb:
     name: Compliance (MongoDB)
+    needs: [lint, test]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -107,6 +145,7 @@ jobs:
 
   compliance-sqlite:
     name: Compliance (SQLite)
+    needs: [lint, test]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

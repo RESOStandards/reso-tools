@@ -4,11 +4,11 @@ import { isEnumType, isNumericEdmType } from '../types';
 import { type FilterEntry, buildFilterString, parseFilterToEntries } from '../utils/filter-sync.js';
 import { getDisplayName } from '../utils/format';
 import { FieldGroupSection } from './field-group-section';
+import { getLookupName, useLookups } from '../hooks/use-lookups';
 
 interface AdvancedSearchProps {
   readonly resource: string;
   readonly fields: ReadonlyArray<ResoField>;
-  readonly lookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>>;
   readonly fieldGroups: FieldGroups | null;
   readonly filterString: string;
   readonly onFilterChange: (filter: string) => void;
@@ -88,11 +88,12 @@ interface FieldRowProps {
   readonly index: number;
   readonly entry: FilterEntry | undefined;
   readonly fieldLookups: ReadonlyArray<ResoLookup> | undefined;
+  readonly isLoadingLookups?: boolean;
   readonly onChange: (fieldName: string, operator: string, value: string) => void;
 }
 
 /** Single field row — memoized to avoid re-rendering unchanged rows. */
-const FieldRow = memo(({ field, index, entry, fieldLookups, onChange }: FieldRowProps) => {
+const FieldRow = memo(({ field, index, entry, fieldLookups, isLoadingLookups, onChange }: FieldRowProps) => {
   const operators = getOperatorsForField(field);
   const defaultOp = operators[0].value;
   const stripe = index % 2 === 1 ? 'bg-gray-100 dark:bg-gray-700/40' : '';
@@ -158,6 +159,15 @@ const FieldRow = memo(({ field, index, entry, fieldLookups, onChange }: FieldRow
             </option>
           ))}
         </select>
+      ) : isLoadingLookups && getLookupName(field) ? (
+        <div className="flex-1 flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 py-1">
+          <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+            <title>Loading</title>
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Loading values...
+        </div>
       ) : (
         <input
           type="text"
@@ -172,11 +182,27 @@ const FieldRow = memo(({ field, index, entry, fieldLookups, onChange }: FieldRow
 });
 
 /** Advanced search form with fields organized by RESO Data Dictionary groups. */
-export const AdvancedSearch = ({ resource, fields, lookups, fieldGroups, filterString, onFilterChange, onSearch, onClose }: AdvancedSearchProps) => {
+export const AdvancedSearch = ({ resource, fields, fieldGroups, filterString, onFilterChange, onSearch, onClose }: AdvancedSearchProps) => {
   const [filters, setFilters] = useState<Map<string, FilterEntry>>(new Map());
   const [hasUnrepresentable, setHasUnrepresentable] = useState(false);
   const lastEmittedRef = useRef('');
   const { grouped, ungrouped } = groupFields(fields, resource, fieldGroups);
+
+  // Lazy-fetch lookups per group when expanded
+  const { fetchLookups, lookupsByField, isLoading: isLoadingLookups } = useLookups();
+  const lookups = lookupsByField(fields);
+
+  const fetchLookupsForFields = useCallback((groupFields: ReadonlyArray<ResoField>) => {
+    const names = groupFields.map(getLookupName).filter((n): n is string => !!n);
+    if (names.length > 0) fetchLookups(names);
+  }, [fetchLookups]);
+
+  // When there are no groups, all fields are visible — fetch lookups immediately
+  useEffect(() => {
+    if (grouped.size === 0 && ungrouped.length > 0) {
+      fetchLookupsForFields(ungrouped);
+    }
+  }, [grouped.size, ungrouped.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Derive form state from incoming filter string (e.g. typed in search bar)
   useEffect(() => {
@@ -227,6 +253,7 @@ export const AdvancedSearch = ({ resource, fields, lookups, fieldGroups, filterS
       index={index}
       entry={filters.get(field.fieldName)}
       fieldLookups={lookups[field.fieldName]}
+      isLoadingLookups={isLoadingLookups}
       onChange={handleChange}
     />
   );
@@ -271,7 +298,7 @@ export const AdvancedSearch = ({ resource, fields, lookups, fieldGroups, filterS
       {/* Scrollable field groups */}
       <div className="flex-1 overflow-y-auto min-h-0 space-y-3">
         {sortedGroups.map(([group, groupFields]) => (
-          <FieldGroupSection key={group} title={group}>
+          <FieldGroupSection key={group} title={group} onExpand={() => fetchLookupsForFields(groupFields)}>
             {groupFields.map(renderFieldRow)}
           </FieldGroupSection>
         ))}
@@ -279,7 +306,9 @@ export const AdvancedSearch = ({ resource, fields, lookups, fieldGroups, filterS
         {/* Ungrouped fields — flat list when no groupings exist, "Other" section otherwise */}
         {ungrouped.length > 0 && sortedGroups.length === 0 && <div>{ungrouped.map(renderFieldRow)}</div>}
         {ungrouped.length > 0 && sortedGroups.length > 0 && (
-          <FieldGroupSection title="Other">{ungrouped.map(renderFieldRow)}</FieldGroupSection>
+          <FieldGroupSection title="Other" onExpand={() => fetchLookupsForFields(ungrouped)}>
+            {ungrouped.map(renderFieldRow)}
+          </FieldGroupSection>
         )}
       </div>
 

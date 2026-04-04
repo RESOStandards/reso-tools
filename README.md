@@ -1,38 +1,58 @@
 # RESO Tools
 
-![Tests](https://img.shields.io/badge/tests-856%20passed-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-97%25-brightgreen)
+![Tests](https://img.shields.io/badge/tests-928%20passed-brightgreen)
 ![Compliance](https://img.shields.io/badge/RESO%20compliance-4%2F4%20suites-blue)
 
-Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compliant OData servers. Includes a reference server, desktop client, web UI, certification test runner and shared libraries for OData parsing, validation and data generation.
+Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compliant OData servers. Includes a reference server, desktop client, web UI, CORS proxy, certification test runner and shared libraries for OData parsing, validation and data generation.
 
 ## Packages
 
-| Package | Description |
-|---------|-------------|
-| [`odata-client/`](odata-client/) | OData 4.01 client SDK -- URI builder, CRUD helpers, CSDL metadata parsing |
-| [`odata-expression-parser/`](odata-expression-parser/) | Zero-dependency `$filter` and `$expand` expression parser |
-| [`validation/`](validation/) | Isomorphic field and business-rule validation for RESO Data Dictionary records |
-| [`data-generator/`](data-generator/) | Realistic test data generator with FK dependency resolution |
-| [`reso-reference-server/`](reso-reference-server/) | Metadata-driven OData reference server (PostgreSQL, MongoDB, SQLite) |
-| [`reso-web-client/`](reso-web-client/) | React + Vite browser UI for browsing and editing OData resources |
-| [`reso-desktop-client/`](reso-desktop-client/) | Electron desktop shell wrapping the server and web UI |
-| [`certification/`](certification/) | RESO certification test runner (Add/Edit, Web API Core, Data Dictionary) |
+| Package | Description | Tests |
+|---------|-------------|-------|
+| [`reso-client/`](reso-client/) | OData 4.01 client SDK -- URI builder, CRUD helpers, CSDL metadata parsing, OAuth2 Client Credentials | 118 |
+| [`odata-expression-parser/`](odata-expression-parser/) | Zero-dependency `$filter` and `$expand` expression parser | 180 |
+| [`validation/`](validation/) | Isomorphic field and business-rule validation for RESO Data Dictionary records | 98 |
+| [`data-generator/`](data-generator/) | Realistic test data generator with FK dependency resolution | 104 |
+| [`reso-reference-server/`](reso-reference-server/) | Metadata-driven OData reference server (PostgreSQL, MongoDB, SQLite) | 254 |
+| [`reso-web-client/`](reso-web-client/) | React + Vite browser UI for browsing and editing OData resources | 72 |
+| [`reso-web-api-proxy/`](reso-web-api-proxy/) | Lightweight CORS proxy and static file server for web client deployments | -- |
+| [`reso-desktop-client/`](reso-desktop-client/) | Electron desktop shell with native proxy, secure storage and optional reference server | -- |
+| [`certification/`](certification/) | RESO certification test runner (Add/Edit, Web API Core, DD, EntityEvent) | 102 |
 
 ## Quick Start
 
-```bash
-# Prerequisites: Node.js >= 22, Docker (for the reference server database)
+### Reference Server (Docker)
 
-# Start the reference server with Docker
+```bash
 cd reso-reference-server
 docker compose up -d
 docker compose --profile seed up seed
 # Server: http://localhost:8080  UI: http://localhost:5173
+```
 
-# Or run the desktop client (SQLite, no Docker required)
-cd ../reso-reference-server && npm install && npm run build
+### Desktop Client (SQLite, No Docker)
+
+```bash
+cd reso-reference-server && npm install && npm run build
+cd ../reso-web-client && npm install && npm run build
 cd ../reso-desktop-client && npm install && npm run dev
+```
+
+The desktop client connects to external OData servers out of the box. The reference server starts in the background for local test data.
+
+### Web Client with Proxy (No Reference Server)
+
+```bash
+cd reso-web-api-proxy && npm install && npm run build
+npm start -- --port 8888 --ui ../reso-web-client/dist
+```
+
+Or with Docker:
+
+```bash
+cd reso-web-client
+docker compose --profile proxy up -d
+# UI + Proxy: http://localhost:8888
 ```
 
 ## Development
@@ -62,6 +82,28 @@ The root `package.json` provides convenience scripts for linting and testing. Ea
 ```bash
 npm install           # installs Biome + Lefthook
 npx lefthook install  # activates git hooks
+```
+
+### Compliance Testing
+
+Four compliance suites run against the reference server via Docker:
+
+```bash
+cd reso-reference-server
+docker compose up -d --build --wait db server
+docker compose --profile seed up seed
+
+# Data Dictionary 2.0
+docker compose --profile compliance-dd up --build --exit-code-from compliance-dd compliance-dd
+
+# Web API Core 2.0.0
+docker compose --profile compliance-core up --build --exit-code-from compliance-core compliance-core
+
+# Add/Edit RCP-010
+docker compose --profile compliance-addedit up --build --exit-code-from compliance-addedit db-addedit server-addedit compliance-addedit
+
+# EntityEvent RCP-027
+docker compose --profile compliance-entity-event up --build --exit-code-from compliance-entity-event db-entity-event server-entity-event compliance-entity-event
 ```
 
 ## License

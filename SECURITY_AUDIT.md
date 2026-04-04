@@ -4,6 +4,17 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
+## v0.3 Security Notes — 2026-04-03
+
+- **OAuth2 token storage**: Per-server tokens stored in Electron secure storage (OS keychain encryption) or browser sessionStorage (cleared on tab close). Tokens are never written to localStorage.
+- **CORS proxy SSRF protection**: `/api/proxy` validates that target URLs use `http:` or `https:` protocols only.
+- **IndexedDB caches**: Schema and lookup caches use gzip compression. No sensitive data (tokens, credentials) is stored in IndexedDB.
+- **New package**: `@reso-standards/web-api-proxy` — standalone CORS proxy with same SSRF protections as the reference server.
+
+A full `npm audit` should be run before the v0.3 release.
+
+---
+
 ## Audit: 2026-03-17 — v0.2 Pre-Release npm Audit
 
 **Scope:** `npm audit` across all 9 packages
@@ -17,7 +28,7 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 | reso-reference-server | 6 | 5 moderate, 1 high |
 | reso-web-client | 0 | Clean |
 | reso-desktop-client | 0 | Clean |
-| odata-client | 1 | 1 high |
+| reso-client | 1 | 1 high |
 | odata-expression-parser | 0 | Clean |
 | validation | 0 | Clean |
 | data-generator | 0 | Clean |
@@ -25,7 +36,7 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ### HIGH: fast-xml-parser (CVE-2026-26278) — FIXED
 
-- **Affected packages**: reso-reference-server, odata-client
+- **Affected packages**: reso-reference-server, reso-client
 - **Versions**: 4.0.0-beta.3 – 5.5.5
 - **Advisory**: [GHSA-8gc5-j5rx-235r](https://github.com/advisories/GHSA-8gc5-j5rx-235r)
 - **Description**: Numeric entity expansion bypasses all entity expansion limits
@@ -43,7 +54,7 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ### Recommended Actions
 
-1. Run `npm audit fix` in `reso-reference-server/` and `odata-client/` to patch fast-xml-parser
+1. Run `npm audit fix` in `reso-reference-server/` and `reso-client/` to patch fast-xml-parser
 2. esbuild/vite/vitest findings are dev-only — track for next major dependency update
 
 ---

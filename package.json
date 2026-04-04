@@ -8,12 +8,13 @@
   "scripts": {
     "lint": "biome check .",
     "lint:fix": "biome check --fix .",
-    "test": "npm run test:validation && npm run test:filter-parser && npm run test:client && npm run test:data-generator && npm run test:server && npm run test:certification",
+    "test": "npm run test:validation && npm run test:filter-parser && npm run test:client && npm run test:data-generator && npm run test:server && npm run test:web-client && npm run test:certification",
     "test:validation": "cd validation && npx vitest run",
     "test:filter-parser": "cd odata-expression-parser && npx vitest run",
-    "test:client": "cd odata-client && npx vitest run",
+    "test:client": "cd reso-client && npx vitest run",
     "test:data-generator": "cd data-generator && npx vitest run",
     "test:server": "cd reso-reference-server && npx vitest run",
+    "test:web-client": "cd reso-web-client && npx vitest run",
     "test:certification": "cd certification && npx vitest run"
   },
   "devDependencies": {

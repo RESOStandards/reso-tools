@@ -17,7 +17,46 @@ export const FieldInput = ({ field, value, onChange, lookups, disabled = false, 
     error ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-gray-300 dark:border-gray-600'
   }`;
 
-  // Enum or Lookup Resource field with lookup values → select dropdown
+  // Multi-value enum (Collection type) with lookup values → toggle buttons
+  if (lookups && lookups.length > 0 && field.isCollection) {
+    const selected = new Set(
+      Array.isArray(value) ? value.map(String)
+        : typeof value === 'string' ? value.split(',').map(s => s.trim()).filter(Boolean)
+        : []
+    );
+    const handleToggle = (lookupValue: string) => {
+      const next = new Set(selected);
+      if (next.has(lookupValue)) next.delete(lookupValue);
+      else next.add(lookupValue);
+      onChange(field.fieldName, next.size > 0 ? [...next] : null);
+    };
+    return (
+      <div data-field={field.fieldName}>
+        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1" title={getDisplayName(field)}>
+          {getDisplayName(field)}
+        </label>
+        <div className="flex flex-wrap gap-1 p-1.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800">
+          {lookups.map(l => (
+            <button
+              key={l.lookupValue}
+              type="button"
+              disabled={disabled}
+              onClick={() => handleToggle(l.lookupValue)}
+              className={`px-2 py-0.5 text-xs rounded border transition-colors ${
+                selected.has(l.lookupValue)
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-gray-400'
+              }`}>
+              {l.lookupValue}
+            </button>
+          ))}
+        </div>
+        {error && <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{error}</p>}
+      </div>
+    );
+  }
+
+  // Single-value enum or Lookup Resource field with lookup values → select dropdown
   if (lookups && lookups.length > 0) {
     return (
       <div>

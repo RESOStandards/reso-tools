@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { createEntity } from '../api/client';
 import { LoadingSpinner } from '../components/loading-spinner';
 import { RecordForm } from '../components/record-form';
 import { useMetadata } from '../hooks/use-metadata';
+import { getLookupName, useLookups } from '../hooks/use-lookups';
 import { useUiConfig } from '../hooks/use-ui-config';
 import { useServer } from '../context/server-context';
 import { NotFoundPage } from './not-found-page';
@@ -16,8 +17,17 @@ export const AddPage = () => {
   const resourceName = resource ?? '';
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { fields, lookups, isLoading: metaLoading } = useMetadata(resourceName);
+  const { fields, isLoading: metaLoading } = useMetadata(resourceName);
+  const { fetchLookups, lookupsByField } = useLookups();
   const { fieldGroups } = useUiConfig();
+
+  // Fetch lookups for all enum fields on the form
+  useEffect(() => {
+    const enumNames = fields
+      .map(getLookupName)
+      .filter((name): name is string => !!name);
+    if (enumNames.length > 0) fetchLookups(enumNames);
+  }, [fields]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = useCallback(
     async (values: Record<string, unknown>) => {
@@ -69,7 +79,7 @@ export const AddPage = () => {
         <RecordForm
           resource={resourceName}
           fields={fields}
-          lookups={lookups}
+          lookups={lookupsByField(fields)}
           fieldGroups={fieldGroups}
           onSubmit={handleSubmit}
           isLoading={isSubmitting}

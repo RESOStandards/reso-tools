@@ -33,6 +33,7 @@ const formatRangeMessage = (rule: FieldRule, value: number): string => {
   if (rule.max !== undefined && value > rule.max) {
     return `Must be at most ${rule.max.toLocaleString('en-US')}.`;
   }
+  /* v8 ignore next 2 */
   return 'Value is out of range.';
 };
 

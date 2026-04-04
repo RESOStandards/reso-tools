@@ -1,6 +1,10 @@
 /**
  * Server entry point — runs in a plain Node.js child process (ESM).
  *
+ * Tries to load the full reference server (OData + proxy + UI). If the
+ * reference server package is not available, falls back to the lightweight
+ * web-api-proxy (CORS proxy + health + UI only).
+ *
  * Receives configuration via argv:
  *   [0] sqliteDbPath
  *   [1] metadataPath
@@ -14,7 +18,8 @@
 
 const [sqliteDbPath, metadataPath, serverRoot, uiDistPath] = process.argv.slice(2);
 
-const start = async () => {
+/** Start the full reference server (OData routes + proxy + UI). */
+const startReferenceServer = async () => {
   const { createApp, loadConfig } = await import('@reso-standards/reference-server');
 
   const config = loadConfig({
@@ -39,11 +44,40 @@ const start = async () => {
     process.send?.({ type: 'ready', port: addr.port });
   });
 
+  return () => {
+    server.close();
+    instance.cleanup?.();
+  };
+};
+
+/** Start the lightweight proxy server (proxy + health + UI only, no OData). */
+const startProxyOnly = async () => {
+  const { createProxyServer } = await import('@reso-standards/web-api-proxy');
+
+  console.log('Starting RESO Web API Proxy (child process)...');
+  console.log(`  UI: ${uiDistPath}`);
+
+  const instance = await createProxyServer({ port: 0, uiDistPath });
+
+  console.log(`RESO Web API Proxy running at ${instance.url}`);
+  process.send?.({ type: 'ready', port: instance.port });
+
+  return () => instance.close();
+};
+
+const start = async () => {
+  let cleanup;
+  try {
+    cleanup = await startReferenceServer();
+  } catch (err) {
+    console.log(`Reference server not available (${err instanceof Error ? err.message : String(err)}), falling back to proxy-only mode`);
+    cleanup = await startProxyOnly();
+  }
+
   // Graceful shutdown on parent disconnect or signal
   const shutdown = () => {
     console.log('Server child process shutting down...');
-    server.close();
-    instance.cleanup?.();
+    cleanup();
     process.exit(0);
   };
 

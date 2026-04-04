@@ -1,4 +1,6 @@
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { formatError } from '../utils/error-messages';
 
 const QUIPS = [
   'Well, that listing fell through.',
@@ -11,13 +13,21 @@ const QUIPS = [
 /**
  * Reusable friendly error display with an icon, quip, server message block,
  * and navigation buttons. Drop this in anywhere you'd show a raw error string.
+ *
+ * Automatically detects HTTP status codes in the message and shows
+ * human-readable explanations.
  */
-export const FriendlyError = ({ title = 'Something went wrong', message }: {
+export const FriendlyError = ({ title, message, requestUrl }: {
   readonly title?: string;
   readonly message: string;
+  readonly requestUrl?: string;
 }) => {
   const navigate = useNavigate();
-  const quip = QUIPS[Math.floor(Math.random() * QUIPS.length)];
+  const [urlCopied, setUrlCopied] = useState(false);
+  const quip = useMemo(() => QUIPS[Math.floor(Math.random() * QUIPS.length)], []);
+  const errorInfo = formatError(message, undefined, requestUrl);
+  const displayTitle = title ?? errorInfo.title;
+  const displayUrl = errorInfo.requestUrl;
 
   return (
     <div className="h-full flex items-center justify-center pt-12">
@@ -28,31 +38,59 @@ export const FriendlyError = ({ title = 'Something went wrong', message }: {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
           </svg>
         </div>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-1">{title}</h1>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-1">{displayTitle}</h1>
         <p className="text-sm italic text-gray-500 dark:text-gray-400 mb-3">{quip}</p>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-8 font-mono bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">{message}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">{errorInfo.description}</p>
+        {errorInfo.serverMessage && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 font-mono bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 whitespace-pre-line">
+            {errorInfo.serverMessage}
+          </p>
+        )}
+        {displayUrl && (
+          <div className="mb-8">
+            <div className="flex items-center justify-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+              <span className="font-mono truncate max-w-xs" title={displayUrl}>{displayUrl}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(displayUrl).then(() => {
+                    setUrlCopied(true);
+                    setTimeout(() => setUrlCopied(false), 1500);
+                  });
+                }}
+                className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
+                title="Copy request URL">
+                {urlCopied ? (
+                  <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <title>Copied</title>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <title>Copy URL</title>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
         <div className="flex items-center justify-center gap-3 mb-6">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
           >
             Go Back
           </button>
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors cursor-pointer"
           >
             Dashboard
           </button>
         </div>
-        <a
-          href="mailto:support@reso.org"
-          className="text-sm text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-        >
-          Contact Support
-        </a>
       </div>
     </div>
   );

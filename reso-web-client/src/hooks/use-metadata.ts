@@ -1,42 +1,41 @@
 import { useEffect, useState } from 'react';
-import { fetchFieldsForResource, fetchLookupsForResource } from '../api/metadata';
+import { fetchFieldsForResource } from '../api/metadata';
 import { useServer } from '../context/server-context';
-import type { ResoField, ResoLookup } from '../types';
+import type { ResoField } from '../types';
 
 export interface UseMetadataResult {
   readonly fields: ReadonlyArray<ResoField>;
-  readonly lookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>>;
   readonly isLoading: boolean;
   readonly error: string | null;
 }
 
-/** Fetches and caches field definitions and lookups for a resource. */
+/** Fetches and caches field definitions for a resource from $metadata. */
 export const useMetadata = (resource: string): UseMetadataResult => {
-  const { activeServer, isLocal } = useServer();
+  const { activeServer, isLocal, currentToken } = useServer();
   const [fields, setFields] = useState<ReadonlyArray<ResoField>>([]);
-  const [lookups, setLookups] = useState<Readonly<Record<string, ReadonlyArray<ResoLookup>>>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // For Client Credentials servers, wait until the token is available before fetching.
+  // Otherwise we'd make an unauthenticated request that returns 401.
+  const needsToken = activeServer.authMode === 'client_credentials';
+  const token = currentToken ?? activeServer.token;
+  const ready = isLocal || !needsToken || !!token;
+
   useEffect(() => {
+    if (!ready) return;
     let cancelled = false;
     setIsLoading(true);
     setError(null);
 
     const metaOptions = isLocal
       ? undefined
-      : { baseUrl: activeServer.baseUrl, token: activeServer.token };
+      : { baseUrl: activeServer.baseUrl, token };
 
     const load = async () => {
       try {
-        const [fieldsResult, lookupsResult] = await Promise.all([
-          fetchFieldsForResource(resource, metaOptions),
-          fetchLookupsForResource(resource, metaOptions)
-        ]);
-        if (!cancelled) {
-          setFields(fieldsResult);
-          setLookups(lookupsResult);
-        }
+        const fieldsResult = await fetchFieldsForResource(resource, metaOptions);
+        if (!cancelled) setFields(fieldsResult);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load metadata');
@@ -47,10 +46,8 @@ export const useMetadata = (resource: string): UseMetadataResult => {
     };
 
     load();
-    return () => {
-      cancelled = true;
-    };
-  }, [resource, activeServer.id, isLocal]);
+    return () => { cancelled = true; };
+  }, [resource, activeServer.id, isLocal, token, ready]);
 
-  return { fields, lookups, isLoading, error };
+  return { fields, isLoading, error };
 };

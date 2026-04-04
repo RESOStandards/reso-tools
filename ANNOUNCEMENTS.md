@@ -2,6 +2,22 @@
 
 ---
 
+## v0.3 — 2026-04-03
+
+### OAuth2, Performance and Polish
+
+**Connect to any RESO server with OAuth2.** The desktop client and web UI now support Client Credentials authentication alongside Bearer Token mode. Token management is automatic — tokens are fetched via the proxy, stored per server, and survive page reloads.
+
+**Faster metadata loading.** CSDL schemas are cached in IndexedDB with gzip compression (24-hour TTL). Lookup values are fetched lazily per field or group instead of loading everything upfront. Batch `LookupName in (...)` queries with server-driven paging replace individual per-field requests.
+
+**New standalone proxy package.** `@reso-standards/web-api-proxy` lets you deploy the web client without the reference server — just a lightweight CORS proxy for connecting to external OData servers from the browser.
+
+**Better error handling.** HTTP errors are translated into human-readable explanations with the request URL, copy button, and navigation. Rate limiting (429) gets a clear message telling users to wait.
+
+**928 tests.** Up from 856 in v0.2, with 72 new web client component tests and all 4 compliance suites passing.
+
+---
+
 ## v0.2 — 2026-03-10
 
 ### The "There's an App for That" Release

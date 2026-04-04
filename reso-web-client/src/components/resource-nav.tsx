@@ -9,7 +9,7 @@ type Section = 'home' | 'organizations' | 'resources' | 'metadata';
 export const ResourceNav = () => {
   const { resource: activeResource } = useParams<{ resource: string }>();
   const location = useLocation();
-  const { resources, isLocal, isLoadingResources, permissions } = useServer();
+  const { resources, isLocal, isLoadingResources, loadingStatus, permissions } = useServer();
 
   const resourceNames = useMemo(
     () => resources?.map(r => r.name) ?? [],
@@ -31,7 +31,7 @@ export const ResourceNav = () => {
     }`;
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       {/* Dashboard link */}
       <NavLink to="/" className={sectionHeaderClass('home')}>
         <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -52,7 +52,7 @@ export const ResourceNav = () => {
 
       {/* Resources section */}
       <div>
-        <NavLink to={activeSection === 'resources' ? '/metadata' : `/${resourceNames[0] ?? 'Property'}`} className={sectionHeaderClass('resources', 'mb-2')}>
+      <NavLink to={activeSection === 'resources' ? '/metadata' : `/${resourceNames[0] ?? 'Property'}`} className={sectionHeaderClass('resources')}>
           <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
             <title>Resources</title>
             <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
@@ -69,11 +69,11 @@ export const ResourceNav = () => {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              Loading...
+              {loadingStatus ?? 'Loading...'}
             </div>
           )}
 
-          <ul className="flex flex-wrap sm:flex-col gap-1.5 sm:gap-1">
+          <ul className="flex flex-wrap sm:flex-col gap-1.5 sm:gap-0.5 mt-1">
             {resourceNames.map(resource => {
               const isActive = activeResource === resource;
               const isReadOnly = READ_ONLY_RESOURCES.has(resource);
@@ -119,11 +119,12 @@ export const ResourceNav = () => {
           </ul>
         </>
       )}
+
       </div>
 
       {/* Metadata section */}
       <div>
-        <NavLink to={activeSection === 'metadata' ? `/${resourceNames[0] ?? 'Property'}` : '/metadata'} className={sectionHeaderClass('metadata', 'mb-2')}>
+      <NavLink to={activeSection === 'metadata' ? `/${resourceNames[0] ?? 'Property'}` : '/metadata'} className={sectionHeaderClass('metadata')}>
           <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
             <title>Metadata</title>
             <path fillRule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -140,11 +141,11 @@ export const ResourceNav = () => {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                Loading...
+                {loadingStatus ?? 'Loading...'}
               </div>
             )}
 
-            <ul className="flex flex-wrap sm:flex-col gap-1.5 sm:gap-1">
+            <ul className="flex flex-wrap sm:flex-col gap-1.5 sm:gap-0.5 mt-1">
               {resourceNames.map(resource => {
                 const isActive = location.pathname === `/metadata/${resource}`;
                 return (

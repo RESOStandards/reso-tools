@@ -8,7 +8,7 @@ Open-source monorepo for building and testing RESO-compliant OData servers. Incl
 
 | Package | What it does |
 |---------|-------------|
-| `odata-client/` | OData 4.01 client SDK |
+| `reso-client/` | OData 4.01 client SDK |
 | `odata-expression-parser/` | `$filter` and `$expand` expression parser |
 | `validation/` | Field and business-rule validation for RESO Data Dictionary |
 | `data-generator/` | Test data generator with FK dependency resolution |

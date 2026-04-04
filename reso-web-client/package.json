@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@reso-standards/odata-client": "file:../odata-client",
     "@reso-standards/odata-expression-parser": "file:../odata-expression-parser",
+    "@reso-standards/reso-client": "file:../reso-client",
     "@reso-standards/validation": "file:../validation",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -18,11 +19,15 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
+    "jsdom": "^29.0.1",
     "tailwindcss": "^4.0.0",
     "typescript": "~5.6.0",
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "vitest": "^4.1.2"
   }
 }

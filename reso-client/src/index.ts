@@ -1,0 +1,134 @@
+/**
+ * @reso-standards/reso-client
+ *
+ * OData 4.01 client SDK for TypeScript. Provides URI building, CRUD helpers,
+ * CSDL metadata parsing/validation, query option validation, and response
+ * parsing.
+ *
+ * Inspired by Apache Olingo's Java Client SDK.
+ *
+ * @see https://olingo.apache.org/doc/odata4/index.html
+ *
+ * @example
+ * ```ts
+ * import { createClient, createEntity, readEntity, buildUri } from "@reso-standards/reso-client";
+ *
+ * const client = await createClient({
+ *   baseUrl: "http://localhost:8080",
+ *   auth: { mode: "token", authToken: "test" },
+ * });
+ *
+ * const created = await createEntity(client, "Property", {
+ *   ListPrice: 250000,
+ *   City: "Austin",
+ * }, { prefer: "representation" });
+ * ```
+ */
+
+// Types
+export type {
+  ODataQueryOptions,
+  ODataResponse,
+  ODataEntity,
+  ODataCollection,
+  ODataAnnotations,
+  ODataErrorBody,
+  ODataErrorDetail,
+  AuthConfig,
+  TokenAuth,
+  ClientCredentialsAuth,
+  CredentialTransport,
+  TokenResponse,
+  TokenState,
+  TokenProvider,
+  ClientConfig,
+  PreferReturn,
+  WriteOptions,
+  ODataClient
+} from './types.js';
+
+// URI builder
+export { buildUri } from './uri/builder.js';
+export type { UriBuilder } from './uri/builder.js';
+export { parseQueryString } from './uri/parser.js';
+
+// CSDL parser & validator
+export { parseCsdlXml, discoverResources, getEntityType, getEnumType, getComplexType, getFieldsForResource, getFieldsForEntityType, getAllFields } from './csdl/parser.js';
+export { validateCsdl } from './csdl/validator.js';
+export type {
+  CsdlSchema,
+  CsdlEntityType,
+  CsdlProperty,
+  CsdlNavigationProperty,
+  CsdlReferentialConstraint,
+  CsdlComplexType,
+  CsdlEnumType,
+  CsdlEnumMember,
+  CsdlEntityContainer,
+  CsdlEntitySet,
+  CsdlNavigationPropertyBinding,
+  CsdlSingleton,
+  CsdlActionImport,
+  CsdlFunctionImport,
+  CsdlParameter,
+  CsdlReturnType,
+  CsdlAction,
+  CsdlFunction,
+  CsdlValidationError,
+  CsdlResourceInfo,
+  CsdlValidationResult,
+  FieldAnnotation,
+  FieldInfo
+} from './csdl/types.js';
+
+// Query validator
+export { validateQueryOptions } from './query/validator.js';
+export type {
+  QueryValidationError,
+  QueryValidationResult
+} from './query/validator.js';
+
+// HTTP client & auth
+export { createClient } from './http/client.js';
+export { createTokenProvider, resolveToken, fetchAccessToken } from './http/auth.js';
+
+// CRUD helpers
+export { createEntity } from './crud/create.js';
+export { readEntity } from './crud/read.js';
+export { updateEntity } from './crud/update.js';
+export { replaceEntity } from './crud/replace.js';
+export { deleteEntity } from './crud/delete.js';
+export type { DeleteOptions } from './crud/delete.js';
+export { queryEntities } from './crud/query.js';
+
+// Response parsing
+export { extractAnnotations, isODataCollection, extractEntityData, getNextLink, followAllPages } from './response/parser.js';
+export { isODataError, parseODataError, getErrorTargets } from './response/error.js';
+
+// Environment config
+export { authConfigFromEnv, configFromEnv } from './env.js';
+export type { EnvConfig } from './env.js';
+
+// Metadata fetcher
+export { fetchRawMetadata, fetchAndParseMetadata } from './metadata/fetcher.js';
+
+// Lookup resolver
+export { createLookupResolver } from './lookup/resolver.js';
+export type { LookupValue, LookupResolverConfig, LookupResolver } from './lookup/types.js';
+
+// Re-export expression parser types for convenience
+export type {
+  FilterExpression,
+  ComparisonExpr,
+  LogicalExpr,
+  NotExpr,
+  ArithmeticExpr,
+  FunctionCallExpr,
+  LambdaExpr,
+  CollectionExpr,
+  LiteralExpr,
+  PropertyExpr,
+  ExpandExpression,
+  ExpandQueryOptions
+} from '@reso-standards/odata-expression-parser';
+export { parseFilter, parseExpand } from '@reso-standards/odata-expression-parser';

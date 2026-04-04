@@ -1,0 +1,23 @@
+{
+  "name": "@reso-standards/web-api-proxy",
+  "version": "0.1.0",
+  "description": "Lightweight CORS proxy and static file server for RESO web clients",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "typescript": "^5.7.0"
+  }
+}

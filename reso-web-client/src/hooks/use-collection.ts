@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchCollectionByUrl, queryCollection } from '../api/client.js';
+import { formatError } from '../utils/error-messages.js';
 
 const PAGE_SIZE = 25;
 
@@ -13,12 +14,26 @@ const UNSUPPORTED_QUERY_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
   [/syntax error/i, 'The server could not parse this query. Check the filter syntax and try again.'],
 ];
 
+/** Extract the HTTP status code from a thrown error. */
+const getHttpStatus = (err: unknown): number | undefined => {
+  const status = (err as { httpStatus?: number })?.httpStatus;
+  if (typeof status === 'number') return status;
+  const code = (err as { error?: { code?: string } })?.error?.code;
+  return code ? Number(code) || undefined : undefined;
+};
+
 /** Transforms raw server error messages into user-friendly descriptions. */
-const humanizeError = (raw: string): string => {
+export const humanizeError = (raw: string, statusCode?: number): string => {
+  // Check for query-specific patterns first
   for (const [pattern, friendly] of UNSUPPORTED_QUERY_PATTERNS) {
     if (pattern.test(raw)) return `${friendly}\n\nServer response: ${raw}`;
   }
-  return raw;
+
+  // Use centralized error formatting for HTTP status codes
+  const info = formatError(statusCode ? `${raw}: ${statusCode}` : raw, raw);
+  return info.serverMessage && info.serverMessage !== info.description
+    ? `${info.description}\n\nServer response: ${info.serverMessage}`
+    : info.description;
 };
 
 export interface UseCollectionResult {
@@ -27,6 +42,7 @@ export interface UseCollectionResult {
   readonly isLoading: boolean;
   readonly hasMore: boolean;
   readonly error: string | null;
+  readonly errorUrl: string | null;
   readonly loadMore: () => void;
 }
 
@@ -42,18 +58,24 @@ export const useCollection = (
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorUrl, setErrorUrl] = useState<string | null>(null);
   const nextLinkRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   // Reset when resource or params change
   useEffect(() => {
+    let cancelled = false;
     setRows([]);
     setCount(undefined);
     setHasMore(true);
     setError(null);
+    setErrorUrl(null);
     nextLinkRef.current = null;
+    abortRef.current?.abort();
 
-    if (!enabled) return;
+    if (!enabled) {
+      return () => { cancelled = true; };
+    }
 
     const loadFirst = async () => {
       setIsLoading(true);
@@ -61,9 +83,6 @@ export const useCollection = (
         abortRef.current?.abort();
         abortRef.current = new AbortController();
 
-        // Use Prefer: odata.maxpagesize for server-driven pagination instead of $top.
-        // $top limits the total result set; maxpagesize tells the server the preferred page size
-        // while allowing it to return @odata.nextLink for subsequent pages.
         const result = await queryCollection(resource, {
           $filter: params.$filter || undefined,
           $orderby: params.$orderby || undefined,
@@ -72,25 +91,29 @@ export const useCollection = (
           $count: true
         }, PAGE_SIZE);
 
+        if (cancelled) return;
         setRows([...result.value]);
         if (result['@odata.count'] !== undefined) {
           setCount(result['@odata.count']);
         }
-        // Use server-provided nextLink for pagination
         nextLinkRef.current = result['@odata.nextLink'] ?? null;
         setHasMore(nextLinkRef.current !== null);
       } catch (err) {
+        if (cancelled) return;
+        const statusCode = getHttpStatus(err);
         const msg =
           err instanceof Error ? err.message : ((err as { error?: { message?: string } })?.error?.message ?? 'Failed to load data');
-        setError(humanizeError(msg));
+        setError(humanizeError(msg, statusCode));
+        setErrorUrl((err as { requestUrl?: string })?.requestUrl ?? null);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     loadFirst();
 
     return () => {
+      cancelled = true;
       abortRef.current?.abort();
     };
   }, [resource, params.$filter, params.$orderby, params.$select, params.$expand, enabled]);
@@ -99,20 +122,21 @@ export const useCollection = (
     if (isLoading || !hasMore || !nextLinkRef.current) return;
     setIsLoading(true);
     try {
-      // Follow the server-provided @odata.nextLink, preserving the page size preference
       const result = await fetchCollectionByUrl(nextLinkRef.current, PAGE_SIZE);
 
       setRows(prev => [...prev, ...result.value]);
       nextLinkRef.current = result['@odata.nextLink'] ?? null;
       setHasMore(nextLinkRef.current !== null);
     } catch (err) {
+      const statusCode = getHttpStatus(err);
       const msg =
         err instanceof Error ? err.message : ((err as { error?: { message?: string } })?.error?.message ?? 'Failed to load more data');
-      setError(humanizeError(msg));
+      setError(humanizeError(msg, statusCode));
+      setErrorUrl((err as { requestUrl?: string })?.requestUrl ?? null);
     } finally {
       setIsLoading(false);
     }
   }, [isLoading, hasMore]);
 
-  return { rows, count, isLoading, hasMore, error, loadMore };
+  return { rows, count, isLoading, hasMore, error, errorUrl, loadMore };
 };

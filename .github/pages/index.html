@@ -8,16 +8,16 @@ title: RESO Tools
   <p>Open-source testing, client SDK, and reference implementation tools for the RESO Web API specification.</p>
   <div class="hero-stats">
     <div class="hero-stat">
-      <div class="number">7</div>
+      <div class="number">9</div>
       <div class="label">Packages</div>
     </div>
     <div class="hero-stat">
-      <div class="number">433+</div>
+      <div class="number">928+</div>
       <div class="label">Tests</div>
     </div>
     <div class="hero-stat">
-      <div class="number">3</div>
-      <div class="label">DB Backends</div>
+      <div class="number">4</div>
+      <div class="label">Compliance Suites</div>
     </div>
   </div>
 </div>
@@ -63,7 +63,7 @@ title: RESO Tools
   </div>
   <div class="arch-arrow">&darr;</div>
   <div class="arch-row">
-    <div class="arch-box arch-box-blue">odata-client</div>
+    <div class="arch-box arch-box-blue">reso-client</div>
     <div class="arch-box arch-box-green">validation</div>
     <div class="arch-box arch-box-green">odata-expression-parser</div>
   </div>
@@ -96,7 +96,7 @@ title: RESO Tools
         <div class="package-name">@reso-standards/validation</div>
         <div class="package-desc">Validate real estate data against RESO metadata rules. Works in any JS runtime &mdash; Node.js, browsers, or edge functions. Use it to check field types, enumerations, and required fields before sending or accepting data.</div>
         <div class="package-meta">
-          <span>41 tests</span>
+          <span>98 tests</span>
           <span>&middot;</span>
           <span>Zero dependencies</span>
         </div>
@@ -109,7 +109,7 @@ title: RESO Tools
         <div class="package-name">@reso-standards/odata-expression-parser</div>
         <div class="package-desc">Parse OData <code>$filter</code> expressions like <code>ListPrice ge 200000 and City eq 'Austin'</code> into a structured syntax tree. Useful for building query UIs, validating filters, or translating queries between systems.</div>
         <div class="package-meta">
-          <span>97 tests</span>
+          <span>180 tests</span>
           <span>&middot;</span>
           <span>Zero dependencies</span>
         </div>
@@ -119,15 +119,15 @@ title: RESO Tools
 
     <div class="package-item">
       <div>
-        <div class="package-name">@reso-standards/odata-client</div>
+        <div class="package-name">@reso-standards/reso-client</div>
         <div class="package-desc">Query RESO servers from TypeScript or JavaScript. Build OData URLs, fetch listings, parse metadata, and validate responses &mdash; without hand-crafting HTTP requests or dealing with protocol details.</div>
         <div class="package-meta">
-          <span>101 tests</span>
+          <span>118 tests</span>
           <span>&middot;</span>
-          <span>Depends on odata-expression-parser</span>
+          <span>OAuth2 Client Credentials</span>
         </div>
       </div>
-      <a href="{{ '/packages/odata-client' | relative_url }}" class="view-link">View &rarr;</a>
+      <a href="{{ '/packages/reso-client' | relative_url }}" class="view-link">View &rarr;</a>
     </div>
   </div>
 </div>
@@ -149,7 +149,7 @@ title: RESO Tools
         <div class="package-name">@reso-standards/data-generator</div>
         <div class="package-desc">Generate realistic sample real estate data for testing. Creates properties, agents, offices, media, and more that conform to the RESO Data Dictionary. Use the CLI or import as a library.</div>
         <div class="package-meta">
-          <span>69 tests</span>
+          <span>104 tests</span>
           <span>&middot;</span>
           <span>CLI + Library</span>
         </div>
@@ -162,9 +162,9 @@ title: RESO Tools
         <div class="package-name">@reso-standards/certification</div>
         <div class="package-desc">Run the same compliance tests used in RESO certification. Covers Web API Core, Data Dictionary, Add/Edit (RCP-010), and EntityEvent (RCP-027) endorsements. Test your server before submitting for certification.</div>
         <div class="package-meta">
-          <span>49 tests</span>
+          <span>102 tests</span>
           <span>&middot;</span>
-          <span>Certification</span>
+          <span>4 Compliance Suites</span>
         </div>
       </div>
       <a href="{{ '/packages/certification' | relative_url }}" class="view-link">View &rarr;</a>
@@ -194,7 +194,7 @@ title: RESO Tools
           Use it as a reference for building your own server, or as a test target for compliance tools.
         </div>
         <div class="package-meta">
-          <span>76 tests</span>
+          <span>254 tests</span>
           <span>&middot;</span>
           <span>PostgreSQL</span>
           <span>&middot;</span>
@@ -206,6 +206,63 @@ title: RESO Tools
         </div>
       </div>
       <a href="{{ '/packages/reso-reference-server' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+  </div>
+</div>
+
+<!-- Desktop & Web Client -->
+<div id="clients" class="section-group section-tools">
+  <div class="section-title">
+    <svg viewBox="0 0 24 24"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+    Desktop &amp; Web Client
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <h3>RESO Desktop Client</h3>
+      <span class="badge badge-blue">Preview</span>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">reso-desktop-client</div>
+        <div class="package-desc">Electron desktop application for browsing any RESO-compliant OData server. Includes OAuth2 Client Credentials and Bearer Token authentication, metadata caching, and an optional built-in reference server for local test data. No Docker required.</div>
+        <div class="package-meta">
+          <span>SQLite</span>
+          <span>&middot;</span>
+          <span>Electron</span>
+          <span>&middot;</span>
+          <span>macOS / Windows / Linux</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/reso-desktop-client' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso-standards/web-client</div>
+        <div class="package-desc">React-based OData browser UI with server connection manager, analytics-driven search fields, advanced search with field groups, metadata explorer, and CRUD operations. Connects to any OData server via the CORS proxy.</div>
+        <div class="package-meta">
+          <span>72 tests</span>
+          <span>&middot;</span>
+          <span>React 19 + Vite 6</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/reso-web-client' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso-standards/web-api-proxy</div>
+        <div class="package-desc">Lightweight CORS proxy and static file server for deploying the web client without the reference server. Enables browser-based OData clients to connect to servers that don&rsquo;t set CORS headers.</div>
+        <div class="package-meta">
+          <span>Express middleware</span>
+          <span>&middot;</span>
+          <span>CLI</span>
+          <span>&middot;</span>
+          <span>Docker</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/reso-web-api-proxy' | relative_url }}" class="view-link">View &rarr;</a>
     </div>
   </div>
 </div>
@@ -301,6 +358,26 @@ npx reso-cert-add-edit \
         <div class="learn-text">
           <h4>RESO Certification Portal</h4>
           <p>View certification results and analytics</p>
+        </div>
+      </a>
+    </div>
+    <div class="learn-grid" style="margin-top: 1rem; border-top: 1px solid #e5e7eb; padding-top: 1rem;">
+      <a href="{{ '/releases' | relative_url }}" class="learn-item">
+        <div class="learn-text">
+          <h4>Releases</h4>
+          <p>Version history and changelog</p>
+        </div>
+      </a>
+      <a href="{{ '/announcements' | relative_url }}" class="learn-item">
+        <div class="learn-text">
+          <h4>Announcements</h4>
+          <p>Project news and updates</p>
+        </div>
+      </a>
+      <a href="{{ '/security' | relative_url }}" class="learn-item">
+        <div class="learn-text">
+          <h4>Security</h4>
+          <p>Security audit and disclosure policy</p>
         </div>
       </a>
     </div>

@@ -1,4 +1,5 @@
 import type { ResoField } from '../types';
+import { FriendlyError } from './friendly-error';
 import { InfiniteScroll } from './infinite-scroll';
 import { ResultsCard } from './results-card';
 
@@ -11,6 +12,7 @@ interface ResultsListProps {
   readonly isLoading: boolean;
   readonly hasMore: boolean;
   readonly error: string | null;
+  readonly errorUrl: string | null;
   readonly onLoadMore: () => void;
   readonly onRowClick: (key: string) => void;
   /** Whether this resource has a Media navigation property (show placeholder when no media). */
@@ -27,6 +29,7 @@ export const ResultsList = ({
   isLoading,
   hasMore,
   error,
+  errorUrl,
   onLoadMore,
   onRowClick,
   hasMediaExpansion = false
@@ -36,11 +39,7 @@ export const ResultsList = ({
   return (
     <div>
       {/* Error */}
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded px-3 py-2 text-sm mb-3">
-          {error}
-        </div>
-      )}
+      {error && <FriendlyError message={error} requestUrl={errorUrl ?? undefined} />}
 
       {/* Empty state */}
       {!isLoading && rows.length === 0 && !error && (

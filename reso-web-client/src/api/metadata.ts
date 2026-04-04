@@ -1,5 +1,6 @@
-import type { CsdlSchema, LookupResolver, LookupValue } from '@reso-standards/odata-client';
+import type { CsdlSchema, LookupResolver, LookupValue } from '@reso-standards/reso-client';
 import { entityTypeToFields } from './metadata-adapter';
+import { getCachedSchema, setCachedSchema, getCachedLookup, setCachedLookup } from './schema-cache';
 import type { ResoField, ResoLookup } from '../types';
 
 /** Cache for the local server's custom metadata endpoints. */
@@ -13,7 +14,7 @@ const csdlFieldsCache = new Map<string, ReadonlyArray<ResoField>>();
 /** Cache for lookup resolvers, keyed by baseUrl. */
 const lookupResolverCache = new Map<string, LookupResolver>();
 
-/** Clear all metadata caches. Called when switching servers. */
+/** Clear in-memory metadata caches. Called when switching servers. */
 export const clearMetadataCache = (): void => {
   fieldsCache.clear();
   resourceLookupsCache.clear();
@@ -46,13 +47,23 @@ const createProxiedFetch = (): ((url: string, init?: RequestInit) => Promise<Res
     });
   };
 
-/** Fetch and cache the CSDL schema for a server. */
+/** Fetch and cache the CSDL schema for a server. Checks IndexedDB first, then network. */
 const fetchCsdlSchema = async (baseUrl: string, token?: string): Promise<CsdlSchema> => {
   const cacheKey = baseUrl || '__local__';
-  const cached = csdlSchemaCache.get(cacheKey);
-  if (cached) return cached;
 
-  const { parseCsdlXml } = await import('@reso-standards/odata-client');
+  // 1. In-memory cache (instant)
+  const memCached = csdlSchemaCache.get(cacheKey);
+  if (memCached) return memCached;
+
+  // 2. IndexedDB cache (fast, persists across sessions)
+  const dbCached = await getCachedSchema<CsdlSchema>(cacheKey);
+  if (dbCached) {
+    csdlSchemaCache.set(cacheKey, dbCached);
+    return dbCached;
+  }
+
+  // 3. Network fetch
+  const { parseCsdlXml } = await import('@reso-standards/reso-client');
 
   const headers: Record<string, string> = { Accept: 'application/xml' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -70,7 +81,42 @@ const fetchCsdlSchema = async (baseUrl: string, token?: string): Promise<CsdlSch
 
   const xml = await res.text();
   const schema = parseCsdlXml(xml);
+
+  // Store in both caches
   csdlSchemaCache.set(cacheKey, schema);
+  setCachedSchema(cacheKey, schema).catch(() => {}); // Best-effort persist
+
+  return schema;
+};
+
+/**
+ * Force-refresh the CSDL schema from the network, bypassing all caches.
+ * Only replaces the cached schema if the fetch succeeds and parses (stale-while-revalidate).
+ * Returns the fresh schema on success, or throws on failure (existing cache is preserved).
+ */
+export const refreshSchema = async (baseUrl: string, token?: string): Promise<CsdlSchema> => {
+  const { parseCsdlXml } = await import('@reso-standards/reso-client');
+  const cacheKey = baseUrl || '__local__';
+
+  const headers: Record<string, string> = { Accept: 'application/xml' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const rawUrl = baseUrl
+    ? `${baseUrl}/$metadata?$format=application/xml`
+    : '/$metadata?$format=application/xml';
+  const fetchUrl = baseUrl ? resolveUrl(rawUrl) : rawUrl;
+  const res = await fetch(fetchUrl, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error(`Failed to fetch $metadata: ${res.status} ${res.statusText}`);
+
+  const xml = await res.text();
+  const schema = parseCsdlXml(xml);
+
+  // Success — replace both caches
+  csdlSchemaCache.set(cacheKey, schema);
+  csdlFieldsCache.clear(); // Clear derived field caches so they rebuild from new schema
+  lookupResolverCache.delete(baseUrl); // Resolver may reference old schema
+  setCachedSchema(cacheKey, schema).catch(() => {});
+
   return schema;
 };
 
@@ -79,7 +125,7 @@ const getResolver = async (baseUrl: string, token?: string): Promise<LookupResol
   const cached = lookupResolverCache.get(baseUrl);
   if (cached) return cached;
 
-  const { createLookupResolver } = await import('@reso-standards/odata-client');
+  const { createLookupResolver } = await import('@reso-standards/reso-client');
   const schema = await fetchCsdlSchema(baseUrl, token);
   const resolver = createLookupResolver({
     schema,
@@ -91,7 +137,7 @@ const getResolver = async (baseUrl: string, token?: string): Promise<LookupResol
   return resolver;
 };
 
-/** Convert LookupValue (odata-client) to ResoLookup (UI type). */
+/** Convert LookupValue (reso-client) to ResoLookup (UI type). */
 const toLookup = (lv: LookupValue): ResoLookup => ({
   lookupName: lv.lookupName,
   lookupValue: lv.lookupValue,
@@ -139,6 +185,59 @@ export const fetchFieldsForResource = async (
   return fields;
 };
 
+/** Deduplicate lookup values by lookupValue. */
+const deduplicateLookups = (values: ReadonlyArray<LookupValue>): ReadonlyArray<LookupValue> => {
+  const seen = new Set<string>();
+  return values.filter(v => {
+    if (seen.has(v.lookupValue)) return false;
+    seen.add(v.lookupValue);
+    return true;
+  });
+};
+
+/**
+ * Fetch lookup values for specific lookup names. Returns a map of lookupName → values.
+ * Checks IndexedDB cache first (1-hour TTL), then batch-fetches uncached names
+ * using a single `$filter=LookupName in (...)` request.
+ */
+export const fetchLookupsByName = async (
+  lookupNames: ReadonlyArray<string>,
+  options?: { baseUrl?: string; token?: string }
+): Promise<Readonly<Record<string, ReadonlyArray<ResoLookup>>>> => {
+  if (lookupNames.length === 0) return {};
+
+  const baseUrl = options?.baseUrl || window.location.origin;
+  const result: Record<string, ReadonlyArray<ResoLookup>> = {};
+
+  // Check IndexedDB cache for each name
+  const uncached: string[] = [];
+  await Promise.all(
+    lookupNames.map(async (name) => {
+      const cached = await getCachedLookup<ReadonlyArray<ResoLookup>>(baseUrl, name);
+      if (cached) {
+        result[name] = cached;
+      } else {
+        uncached.push(name);
+      }
+    })
+  );
+
+  // Batch-fetch all uncached names in one request
+  if (uncached.length > 0) {
+    const resolver = await getResolver(baseUrl, options?.token);
+    const batchResult = await resolver.resolveLookupsBatch(uncached);
+    for (const [name, values] of Object.entries(batchResult)) {
+      const unique = deduplicateLookups(values);
+      const converted = unique.map(toLookup);
+      // Persist to IndexedDB for future sessions
+      setCachedLookup(baseUrl, name, converted).catch(() => {});
+      if (converted.length > 0) result[name] = converted;
+    }
+  }
+
+  return result;
+};
+
 /**
  * Fetches all lookup values for all enum/lookup fields in a resource.
  * Always returns lookups keyed by **field name**.
@@ -147,7 +246,7 @@ export const fetchLookupsForResource = async (
   resource: string,
   options?: { baseUrl?: string; token?: string }
 ): Promise<Readonly<Record<string, ReadonlyArray<ResoLookup>>>> => {
-  // External server path — use the odata-client lookup resolver
+  // External server path — use the reso-client lookup resolver
   if (options?.baseUrl) {
     const resolver = await getResolver(options.baseUrl, options.token);
     const result = await resolver.resolveLookupsForResource(resource);

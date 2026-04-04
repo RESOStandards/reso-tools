@@ -1,14 +1,29 @@
-import type { CsdlComplexType, CsdlEnumType, CsdlNavigationProperty, CsdlSchema, FieldInfo } from '@reso-standards/odata-client';
+import type { CsdlComplexType, CsdlEnumType, CsdlNavigationProperty, CsdlSchema, FieldInfo } from '@reso-standards/reso-client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { FriendlyError } from '../components/friendly-error';
 import { LoadingSpinner } from '../components/loading-spinner';
 import { useServer } from '../context/server-context';
+import { getSchemaTimestamp } from '../api/schema-cache';
+import { refreshSchema } from '../api/metadata';
+import { getLookupName, useLookups } from '../hooks/use-lookups';
 import type { ResoLookup } from '../types';
+
+/** Format a timestamp as a relative time string. */
+const formatRelativeTime = (timestamp: number): string => {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
 
 /** Fetch CSDL schema, with caching handled by metadata.ts internals. */
 const fetchSchema = async (baseUrl?: string, token?: string): Promise<CsdlSchema> => {
-  const { parseCsdlXml } = await import('@reso-standards/odata-client');
+  const { parseCsdlXml } = await import('@reso-standards/reso-client');
 
   const isLocalhost = (url: string): boolean => {
     try { return ['localhost', '127.0.0.1', '::1'].includes(new URL(url).hostname); }
@@ -84,6 +99,7 @@ const FieldDetail = ({
   field,
   schema,
   lookups,
+  isLoadingLookups,
   isKeyField,
   navProp,
   onNavigate
@@ -91,6 +107,7 @@ const FieldDetail = ({
   readonly field: FieldInfo;
   readonly schema: CsdlSchema;
   readonly lookups: ReadonlyArray<ResoLookup>;
+  readonly isLoadingLookups?: boolean;
   readonly isKeyField: boolean;
   readonly navProp?: CsdlNavigationProperty;
   readonly onNavigate: (resource: string) => void;
@@ -234,6 +251,18 @@ const FieldDetail = ({
         </div>
       )}
 
+      {/* Loading indicator for lookup values */}
+      {isLoadingLookups && lookups.length === 0 && !enumType && (
+        <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+          <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+            <title>Loading</title>
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Loading lookup values...
+        </div>
+      )}
+
       {/* Lookup Resource values (fetched) */}
       {lookups.length > 0 && !enumType && (
         <div>
@@ -284,24 +313,36 @@ const ResourceCard = ({
 export const MetadataPage = () => {
   const { resource } = useParams<{ resource?: string }>();
   const navigate = useNavigate();
-  const { resources, isLoadingResources, activeServer, isLocal } = useServer();
+  const { resources, isLoadingResources, loadingStatus, activeServer, isLocal, currentToken } = useServer();
 
   const [schema, setSchema] = useState<CsdlSchema | null>(null);
   const [fields, setFields] = useState<ReadonlyArray<FieldInfo>>([]);
-  const [lookups, setLookups] = useState<Readonly<Record<string, ReadonlyArray<ResoLookup>>>>({});
+  const { lookups: lookupsByName, fetchLookups, isLoading: isLoadingLookups } = useLookups();
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [expandedField, setExpandedField] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [schemaTimestamp, setSchemaTimestamp] = useState<number | null>(null);
 
-  // Load schema on mount
+  // Load schema timestamp
+  useEffect(() => {
+    const cacheKey = isLocal ? '__local__' : activeServer.baseUrl;
+    getSchemaTimestamp(cacheKey).then(ts => setSchemaTimestamp(ts));
+  }, [activeServer.id, isLocal, schema]);
+
+  // Load schema when server changes
   useEffect(() => {
     let cancelled = false;
+    setError(null);
+    setSchema(null);
+    setFields([]);
     const load = async () => {
       try {
         const baseUrl = isLocal ? undefined : activeServer.baseUrl;
-        const s = await fetchSchema(baseUrl, activeServer.token);
+        const s = await fetchSchema(baseUrl, currentToken ?? activeServer.token);
         if (!cancelled) setSchema(s);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load metadata');
@@ -311,26 +352,22 @@ export const MetadataPage = () => {
     return () => { cancelled = true; };
   }, [activeServer.id, isLocal]);
 
-  // Load fields + lookups when resource changes
+  // Load fields from schema when resource changes (fast — no network request needed)
   useEffect(() => {
     if (!resource || !schema) return;
     let cancelled = false;
-    setIsLoading(true);
-    setError(null);
     setExpandedField(null);
     setSearch('');
     setTypeFilter('all');
+    setError(null);
+    setIsLoading(true);
 
     const load = async () => {
       try {
-        const { getFieldsForResource } = await import('@reso-standards/odata-client');
-        const { fetchLookupsForResource } = await import('../api/metadata');
+        const { getFieldsForResource } = await import('@reso-standards/reso-client');
         const f = getFieldsForResource(schema, resource);
-        const metaOptions = isLocal ? undefined : { baseUrl: activeServer.baseUrl, token: activeServer.token };
-        const l = await fetchLookupsForResource(resource, metaOptions);
         if (!cancelled) {
           setFields(f);
-          setLookups(l);
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load fields');
@@ -340,11 +377,44 @@ export const MetadataPage = () => {
     };
     load();
     return () => { cancelled = true; };
-  }, [resource, schema, activeServer.id, isLocal]);
+  }, [resource, schema]);
+
+  /** Refresh metadata from the server. Only replaces cache on success. */
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    setRefreshError(null);
+    try {
+      const baseUrl = isLocal ? undefined : activeServer.baseUrl;
+      const token = currentToken ?? activeServer.token;
+      const freshSchema = await refreshSchema(baseUrl ?? '', token);
+      setSchema(freshSchema);
+      // Re-derive fields from the fresh schema
+      if (resource) {
+        const { getFieldsForResource } = await import('@reso-standards/reso-client');
+        setFields(getFieldsForResource(freshSchema, resource));
+      }
+      // Update the timestamp
+      const cacheKey = baseUrl || '__local__';
+      getSchemaTimestamp(cacheKey).then(ts => setSchemaTimestamp(ts));
+    } catch (err) {
+      setRefreshError(err instanceof Error ? err.message : 'Failed to refresh metadata');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [activeServer.baseUrl, activeServer.token, currentToken, isLocal, resource]);
 
   const handleToggleField = useCallback((fieldName: string) => {
-    setExpandedField(prev => prev === fieldName ? null : fieldName);
-  }, []);
+    setExpandedField(prev => {
+      if (prev === fieldName) return null;
+      // Fetch lookups for this field when expanding
+      const field = fields.find(f => f.fieldName === fieldName);
+      if (field) {
+        const name = getLookupName(field as unknown as import('../types').ResoField);
+        if (name) fetchLookups([name]);
+      }
+      return fieldName;
+    });
+  }, [fields, fetchLookups]);
 
   const handleNavigateResource = useCallback((resourceName: string) => {
     navigate(`/metadata/${resourceName}`);
@@ -357,7 +427,7 @@ export const MetadataPage = () => {
       if (lowerSearch && !f.fieldName.toLowerCase().includes(lowerSearch)) return false;
       if (typeFilter === 'properties' && f.isExpansion) return false;
       if (typeFilter === 'expansions' && !f.isExpansion) return false;
-      if (typeFilter === 'enums' && !f.lookupName && !f.typeName) return false;
+      if (typeFilter === 'enums' && (f.isExpansion || (!f.lookupName && !f.typeName))) return false;
       return true;
     });
   }, [fields, search, typeFilter]);
@@ -378,11 +448,11 @@ export const MetadataPage = () => {
     all: fields.length,
     properties: fields.filter(f => !f.isExpansion).length,
     expansions: fields.filter(f => f.isExpansion).length,
-    enums: fields.filter(f => f.lookupName || (!f.isExpansion && f.typeName)).length
+    enums: fields.filter(f => !f.isExpansion && (f.lookupName || f.typeName)).length
   }), [fields]);
 
-  if (isLoadingResources) return <LoadingSpinner />;
-  if (error && !resource) return <FriendlyError title="Metadata Error" message={error} />;
+  if (isLoadingResources) return <LoadingSpinner label={loadingStatus ?? 'Connecting...'} subtitle={activeServer.name} />;
+  if (error && !resource) return <FriendlyError message={error} />;
 
   // Resource grid view
   if (!resource) {
@@ -460,12 +530,38 @@ export const MetadataPage = () => {
         </button>
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{resource}</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{resource} Resource</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {filteredFields.length === fields.length
                 ? `${fields.length} fields`
                 : `${filteredFields.length} of ${fields.length} fields`}
+              {schemaTimestamp && (
+                <span className="ml-2 text-xs text-gray-400 dark:text-gray-500" title={new Date(schemaTimestamp).toLocaleString()}>
+                  Metadata fetched {formatRelativeTime(schemaTimestamp)}
+                </span>
+              )}
             </p>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            {refreshError && (
+              <span className="text-amber-500 dark:text-amber-400 cursor-help" title={`Server metadata could not be refreshed, using existing cache.\n\n${refreshError}`}>
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <title>Refresh failed</title>
+                  <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.168 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                </svg>
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="p-1.5 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer disabled:opacity-50"
+              title="Refresh metadata from server">
+              <svg className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
+                <title>Refresh</title>
+                <path fillRule="evenodd" d="M13.836 2.477a.75.75 0 01.75.75v3.182a.75.75 0 01-.75.75h-3.182a.75.75 0 010-1.5h1.37l-.84-.841a4.5 4.5 0 00-7.08.681.75.75 0 01-1.3-.75 6 6 0 019.44-.908l.987.987V3.227a.75.75 0 01.75-.75zm-12.672 8a.75.75 0 01.75-.75h3.182a.75.75 0 010 1.5H3.726l.84.841a4.5 4.5 0 007.08-.681.75.75 0 011.3.75 6 6 0 01-9.44.908l-.987-.987v1.37a.75.75 0 01-1.5 0v-3.182z" clipRule="evenodd" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -502,7 +598,7 @@ export const MetadataPage = () => {
       {/* Scrollable field list */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {isLoading && <LoadingSpinner />}
-        {error && <div className="p-4 text-red-600 dark:text-red-400 text-sm">{error}</div>}
+        {error && <FriendlyError message={error} />}
         {!isLoading && !error && (
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {filteredFields.map((field, idx) => {
@@ -551,7 +647,8 @@ export const MetadataPage = () => {
                       <FieldDetail
                         field={field}
                         schema={schema}
-                        lookups={lookups[field.fieldName] ?? []}
+                        lookups={lookupsByName[getLookupName(field as unknown as import('../types').ResoField) ?? ''] ?? []}
+                        isLoadingLookups={isLoadingLookups}
                         isKeyField={keyFields.has(field.fieldName)}
                         navProp={field.isExpansion ? entityType?.navigationProperties.find(np => np.name === field.fieldName) : undefined}
                         onNavigate={handleNavigateResource}

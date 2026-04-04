@@ -5,7 +5,7 @@ WORKDIR /app
 # Copy workspace dependencies (same resolution chain as the server Dockerfile)
 COPY odata-expression-parser/ /deps/odata-expression-parser/
 COPY validation/ /deps/validation/
-COPY odata-client/ /deps/odata-client/
+COPY reso-client/ /deps/reso-client/
 
 # Build odata-expression-parser
 WORKDIR /deps/odata-expression-parser
@@ -15,17 +15,17 @@ RUN npm install && npm run build
 WORKDIR /deps/validation
 RUN npm install && npm run build
 
-# Build odata-client (depends on filter-parser + validation)
-WORKDIR /deps/odata-client
+# Build reso-client (depends on filter-parser + validation)
+WORKDIR /deps/reso-client
 RUN rm -f package-lock.json \
  && sed -i 's|file:../odata-expression-parser|file:/deps/odata-expression-parser|' package.json \
  && sed -i 's|file:../validation|file:/deps/validation|' package.json \
  && npm install && npm run build
 
-# Build certification (depends on odata-client + validation)
+# Build certification (depends on reso-client + validation)
 WORKDIR /app
 COPY certification/package.json ./
-RUN sed -i 's|file:../odata-client|file:/deps/odata-client|' package.json \
+RUN sed -i 's|file:../reso-client|file:/deps/reso-client|' package.json \
  && sed -i 's|file:../validation|file:/deps/validation|' package.json \
  && npm install --ignore-scripts
 
@@ -49,7 +49,7 @@ COPY --from=build /app/sample-payloads ./sample-payloads
 COPY --from=build /app/sample-metadata.xml ./
 COPY --from=build /deps/odata-expression-parser /deps/odata-expression-parser
 COPY --from=build /deps/validation /deps/validation
-COPY --from=build /deps/odata-client /deps/odata-client
+COPY --from=build /deps/reso-client /deps/reso-client
 
 # Install wget for health checks in entrypoint
 RUN apk add --no-cache wget

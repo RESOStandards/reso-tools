@@ -1,11 +1,11 @@
 /**
  * Metadata loading, parsing, and validation — delegates XML parsing to
- * @reso-standards/odata-client's CSDL parser and type validation to @reso-standards/validation.
+ * @reso-standards/reso-client's CSDL parser and type validation to @reso-standards/validation.
  */
 
 import { readFile } from 'node:fs/promises';
-import { fetchRawMetadata, parseCsdlXml } from '@reso-standards/odata-client';
-import type { CsdlEntityType, CsdlProperty, CsdlSchema } from '@reso-standards/odata-client';
+import { fetchRawMetadata, parseCsdlXml } from '@reso-standards/reso-client';
+import type { CsdlEntityType, CsdlProperty, CsdlSchema } from '@reso-standards/reso-client';
 import { type ResoField, type ValidationFailure, validateRecord } from '@reso-standards/validation';
 import type { EntityProperty, EntityType, ParsedMetadata } from './types.js';
 
@@ -75,7 +75,7 @@ export const loadMetadataFromFile = async (filePath: string): Promise<string> =>
 
 /**
  * Parses an OData EDMX XML metadata document into a structured representation.
- * Delegates to @reso-standards/odata-client's parseCsdlXml and adapts the types.
+ * Delegates to @reso-standards/reso-client's parseCsdlXml and adapts the types.
  */
 export const parseMetadataXml = (xml: string): ParsedMetadata => {
   const schema = parseCsdlXml(xml);

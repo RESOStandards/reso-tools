@@ -98,15 +98,43 @@ All view state is stored in URL query parameters for shareable links and browser
 
 ## Docker
 
-Build and run with Docker Compose (from the `reso-reference-server/` directory):
+Two deployment modes are available via Docker Compose profiles.
+
+### Proxy Only (External Servers)
+
+Serves the web UI with a lightweight CORS proxy. No local database — connect to external OData servers using Bearer Token or Client Credentials auth.
 
 ```bash
-docker compose up -d
-# UI: http://localhost:5173
-# API: http://localhost:8080
+docker compose --profile proxy up -d
+# UI + Proxy: http://localhost:8888
 ```
 
-The UI container uses nginx to serve the built React app and proxy API requests to the server container.
+### Full Stack (Reference Server + UI)
+
+Includes the reference server with PostgreSQL for local test data, plus the web UI served via nginx.
+
+```bash
+docker compose --profile full up -d
+# UI: http://localhost:5173
+# API: http://localhost:8080
+
+# Seed with test data
+docker compose --profile full,seed up seed
+```
+
+### Without Docker
+
+Run the proxy standalone with Node.js:
+
+```bash
+# Build the web client
+npm run build
+
+# Start the proxy with the built UI
+cd ../reso-web-api-proxy
+npm install && npm run build
+npm start -- --port 8888 --ui ../reso-web-client/dist
+```
 
 ## License
 

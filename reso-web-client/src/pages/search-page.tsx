@@ -20,7 +20,7 @@ export const SearchPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const { resources, isLoadingResources, resourceError, permissions } = useServer();
+  const { resources, isLoadingResources, loadingStatus, resourceError, resourceErrorUrl, permissions, activeServer, currentToken } = useServer();
   const resourceName = resource ?? '';
 
   const filter = searchParams.get('$filter') ?? '';
@@ -41,8 +41,8 @@ export const SearchPage = () => {
     setValidationError(null);
   }, [filter]);
 
-  const { config, fieldGroups, summaryFieldsConfig } = useUiConfig();
-  const { fields, lookups, isLoading: metaLoading } = useMetadata(resourceName);
+  const { config, fieldGroups, summaryFieldsConfig, isLoading: configLoading } = useUiConfig();
+  const { fields, isLoading: metaLoading, error: metaError } = useMetadata(resourceName);
 
   // Resolve summary fields from config
   // Priority: server-specific config > bundled summary-fields.json > all fields
@@ -62,12 +62,16 @@ export const SearchPage = () => {
   const hasMediaExpansion = resourceInfo?.navigationProperties.includes('Media') ?? false;
   const selectFields = isAllFields ? undefined : summaryFields.join(',');
 
-  const { rows, count, isLoading, hasMore, error, loadMore } = useCollection(resourceName, {
+  // Don't fetch data until resources are discovered and token is ready for Client Credentials servers
+  const needsToken = activeServer.authMode === 'client_credentials';
+  const collectionReady = !isLoadingResources && (!needsToken || !!currentToken);
+
+  const { rows, count, isLoading, hasMore, error, errorUrl, loadMore } = useCollection(resourceName, {
     $filter: filter || undefined,
     $orderby: orderby || undefined,
     $select: selectFields,
     $expand: hasMediaExpansion ? 'Media' : undefined
-  }, !isLoadingResources);
+  }, collectionReady);
   const handleSearch = useCallback(
     (newFilter: string) => {
       const params = new URLSearchParams(searchParams);
@@ -145,11 +149,11 @@ export const SearchPage = () => {
   // Validate resource exists in discovered metadata
   const isValidResource = resources?.some(r => r.name === resourceName) ?? null;
 
-  if (isLoadingResources || isValidResource === null || metaLoading) {
-    return <LoadingSpinner />;
-  }
   if (resourceError) {
-    return <FriendlyError title="Failed to Load Metadata" message={resourceError} />;
+    return <FriendlyError message={resourceError} requestUrl={resourceErrorUrl ?? undefined} />;
+  }
+  if (isLoadingResources || isValidResource === null) {
+    return <LoadingSpinner label={loadingStatus ?? 'Connecting...'} subtitle={activeServer.name} />;
   }
 
   if (!isValidResource) {
@@ -162,7 +166,7 @@ export const SearchPage = () => {
       <div className="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-3 space-y-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{resourceName}</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{resourceName} Resource</h2>
           {(permissions.canAdd || permissions.canEdit || permissions.canDelete) && (
             <div className="flex gap-2">
               {permissions.canAdd && (
@@ -193,34 +197,24 @@ export const SearchPage = () => {
           )}
         </div>
 
-        {/* Search — basic search by default, OData editor on toggle */}
-        {showODataEditor ? (
-          <SearchBar
-            value={draftFilter}
-            onChange={setDraftFilter}
-            onSearch={handleSubmit}
-            onClose={handleCloseOData}
-            onToggleAdvanced={handleToggleAdvanced}
-            isAdvancedMode={isAdvanced}
-            validationError={validationError}
-          />
-        ) : (
-          <BasicSearch
-            resource={resourceName}
-            fields={fields}
-            lookups={lookups}
-            filterString={draftFilter}
-            onFilterChange={setDraftFilter}
-            onSearch={handleSubmit}
-            onShowOData={handleShowOData}
-          />
-        )}
+        {/* Search controls — basic search fields with Filters and OData edit */}
+        <BasicSearch
+          resource={resourceName}
+          fields={fields}
+          isLoadingFields={metaLoading || configLoading}
+          rankedFieldNames={defaultSummaryFields}
+          filterString={draftFilter}
+          onFilterChange={setDraftFilter}
+          onSearch={handleSubmit}
+          onShowOData={handleToggleAdvanced}
+        />
+
 
         {/* Sortable column headers */}
         {rows.length > 0 && (
           <div className="flex flex-wrap gap-1">
             <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Sort by:</span>
-            {summaryFields.slice(0, 6).map(f => (
+            {[...new Set([...summaryFields.slice(0, 6), ...(fields.some(f => f.fieldName === 'ModificationTimestamp') ? ['ModificationTimestamp'] : [])])].map(f => (
               <button
                 type="button"
                 key={f}
@@ -251,11 +245,18 @@ export const SearchPage = () => {
             <AdvancedSearch
               resource={resourceName}
               fields={fields}
-              lookups={lookups}
               fieldGroups={fieldGroups}
               filterString={draftFilter}
               onFilterChange={setDraftFilter}
-              onSearch={() => { handleSubmit(); handleToggleAdvanced(); }}
+              onSearch={() => {
+                // Apply the filter and close advanced search in a single URL update
+                const params = new URLSearchParams(searchParams);
+                const trimmed = draftFilter.trim();
+                if (trimmed) params.set('$filter', trimmed);
+                else params.delete('$filter');
+                params.delete('mode');
+                setSearchParams(params);
+              }}
               onClose={handleToggleAdvanced}
             />
           </div>
@@ -271,6 +272,7 @@ export const SearchPage = () => {
           isLoading={isLoading}
           hasMore={hasMore}
           error={error}
+          errorUrl={errorUrl}
           onLoadMore={loadMore}
           onRowClick={handleRowClick}
           hasMediaExpansion={hasMediaExpansion}

@@ -27,7 +27,7 @@ jobs:
           packages=(
             "validation:@reso-standards/validation:Isomorphic validation library"
             "odata-expression-parser:@reso-standards/odata-expression-parser:OData filter parser"
-            "odata-client:@reso-standards/odata-client:OData client SDK"
+            "reso-client:@reso-standards/reso-client:RESO Client SDK"
             "data-generator:@reso-standards/data-generator:Test data generator"
             "certification:@reso-standards/certification:Certification testing tools"
             "reso-reference-server:reso-reference-server:OData reference server"
@@ -61,18 +61,27 @@ jobs:
             cat "$readme" >> ".github/pages/_packages/$dir.md"
           done
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
+      - name: Sync project docs into site
+        run: |
+          docs=(
+            "RELEASES.md:Release Notes:releases"
+            "ANNOUNCEMENTS.md:Announcements:announcements"
+            "SECURITY_AUDIT.md:Security Audit:security"
+          )
+          for entry in "${docs[@]}"; do
+            IFS=':' read -r file title slug <<< "$entry"
+            if [ -f "$file" ]; then
+              cat > ".github/pages/${slug}.md" <<FRONT
+          ---
+          title: "${title}"
+          layout: default
+          permalink: /${slug}/
+          ---
 
-      - name: Generate DD documentation
-        run: node .github/pages/dd-generator/generate.mjs
-        env:
-          TOKEN_URI: ${{ secrets.TOKEN_URI }}
-          CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-          RESO_AGGS_URL: ${{ secrets.RESO_AGGS_URL }}
+          FRONT
+              cat "$file" >> ".github/pages/${slug}.md"
+            fi
+          done
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -83,17 +92,10 @@ jobs:
           source: ./.github/pages
           destination: ./_site
 
-      - name: Build search index with Pagefind
-        run: |
-          cp -r ./_site ./_site_searchable
-          mkdir -p ./_site_searchable/dd
-          cp -r .github/pages/dd-output/* ./_site_searchable/dd/
-          npx pagefind --site ./_site_searchable
-
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./_site_searchable
+          path: ./_site
 
   deploy:
     environment:
