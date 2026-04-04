@@ -33,7 +33,7 @@ const MAX_SEARCH_FIELDS = 7;
  * ModificationTimestamp is always included (if available) since it's the most common
  * way to filter for recently changed records.
  */
-const buildSearchFields = (
+export const buildSearchFields = (
   rankedNames: ReadonlyArray<string>,
   fields: ReadonlyArray<ResoField>
 ): ReadonlyArray<BasicSearchFieldDef> => {
