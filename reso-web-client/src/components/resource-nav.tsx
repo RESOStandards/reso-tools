@@ -73,7 +73,7 @@ export const ResourceNav = () => {
             </div>
           )}
 
-          <ul className="flex flex-wrap sm:flex-col gap-1.5 sm:gap-1">
+          <ul className="flex flex-wrap sm:flex-col gap-1.5 sm:gap-0.5 mt-1">
             {resourceNames.map(resource => {
               const isActive = activeResource === resource;
               const isReadOnly = READ_ONLY_RESOURCES.has(resource);
@@ -145,7 +145,7 @@ export const ResourceNav = () => {
               </div>
             )}
 
-            <ul className="flex flex-wrap sm:flex-col gap-1.5 sm:gap-1">
+            <ul className="flex flex-wrap sm:flex-col gap-1.5 sm:gap-0.5 mt-1">
               {resourceNames.map(resource => {
                 const isActive = location.pathname === `/metadata/${resource}`;
                 return (

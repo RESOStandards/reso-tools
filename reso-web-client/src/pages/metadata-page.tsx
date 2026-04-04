@@ -5,6 +5,7 @@ import { FriendlyError } from '../components/friendly-error';
 import { LoadingSpinner } from '../components/loading-spinner';
 import { useServer } from '../context/server-context';
 import { getSchemaTimestamp } from '../api/schema-cache';
+import { refreshSchema } from '../api/metadata';
 import { getLookupName, useLookups } from '../hooks/use-lookups';
 import type { ResoLookup } from '../types';
 
@@ -318,6 +319,8 @@ export const MetadataPage = () => {
   const [fields, setFields] = useState<ReadonlyArray<FieldInfo>>([]);
   const { lookups: lookupsByName, fetchLookups, isLoading: isLoadingLookups } = useLookups();
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [expandedField, setExpandedField] = useState<string | null>(null);
@@ -375,6 +378,30 @@ export const MetadataPage = () => {
     load();
     return () => { cancelled = true; };
   }, [resource, schema]);
+
+  /** Refresh metadata from the server. Only replaces cache on success. */
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    setRefreshError(null);
+    try {
+      const baseUrl = isLocal ? undefined : activeServer.baseUrl;
+      const token = currentToken ?? activeServer.token;
+      const freshSchema = await refreshSchema(baseUrl ?? '', token);
+      setSchema(freshSchema);
+      // Re-derive fields from the fresh schema
+      if (resource) {
+        const { getFieldsForResource } = await import('@reso-standards/reso-client');
+        setFields(getFieldsForResource(freshSchema, resource));
+      }
+      // Update the timestamp
+      const cacheKey = baseUrl || '__local__';
+      getSchemaTimestamp(cacheKey).then(ts => setSchemaTimestamp(ts));
+    } catch (err) {
+      setRefreshError(err instanceof Error ? err.message : 'Failed to refresh metadata');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [activeServer.baseUrl, activeServer.token, currentToken, isLocal, resource]);
 
   const handleToggleField = useCallback((fieldName: string) => {
     setExpandedField(prev => {
@@ -514,6 +541,27 @@ export const MetadataPage = () => {
                 </span>
               )}
             </p>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            {refreshError && (
+              <span className="text-amber-500 dark:text-amber-400 cursor-help" title={`Server metadata could not be refreshed, using existing cache.\n\n${refreshError}`}>
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <title>Refresh failed</title>
+                  <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.168 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                </svg>
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="p-1.5 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer disabled:opacity-50"
+              title="Refresh metadata from server">
+              <svg className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
+                <title>Refresh</title>
+                <path fillRule="evenodd" d="M13.836 2.477a.75.75 0 01.75.75v3.182a.75.75 0 01-.75.75h-3.182a.75.75 0 010-1.5h1.37l-.84-.841a4.5 4.5 0 00-7.08.681.75.75 0 01-1.3-.75 6 6 0 019.44-.908l.987.987V3.227a.75.75 0 01.75-.75zm-12.672 8a.75.75 0 01.75-.75h3.182a.75.75 0 010 1.5H3.726l.84.841a4.5 4.5 0 007.08-.681.75.75 0 011.3.75 6 6 0 01-9.44.908l-.987-.987v1.37a.75.75 0 01-1.5 0v-3.182z" clipRule="evenodd" />
+              </svg>
+            </button>
           </div>
         </div>
 

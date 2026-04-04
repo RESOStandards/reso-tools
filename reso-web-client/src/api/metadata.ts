@@ -89,6 +89,37 @@ const fetchCsdlSchema = async (baseUrl: string, token?: string): Promise<CsdlSch
   return schema;
 };
 
+/**
+ * Force-refresh the CSDL schema from the network, bypassing all caches.
+ * Only replaces the cached schema if the fetch succeeds and parses (stale-while-revalidate).
+ * Returns the fresh schema on success, or throws on failure (existing cache is preserved).
+ */
+export const refreshSchema = async (baseUrl: string, token?: string): Promise<CsdlSchema> => {
+  const { parseCsdlXml } = await import('@reso-standards/reso-client');
+  const cacheKey = baseUrl || '__local__';
+
+  const headers: Record<string, string> = { Accept: 'application/xml' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const rawUrl = baseUrl
+    ? `${baseUrl}/$metadata?$format=application/xml`
+    : '/$metadata?$format=application/xml';
+  const fetchUrl = baseUrl ? resolveUrl(rawUrl) : rawUrl;
+  const res = await fetch(fetchUrl, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error(`Failed to fetch $metadata: ${res.status} ${res.statusText}`);
+
+  const xml = await res.text();
+  const schema = parseCsdlXml(xml);
+
+  // Success — replace both caches
+  csdlSchemaCache.set(cacheKey, schema);
+  csdlFieldsCache.clear(); // Clear derived field caches so they rebuild from new schema
+  lookupResolverCache.delete(baseUrl); // Resolver may reference old schema
+  setCachedSchema(cacheKey, schema).catch(() => {});
+
+  return schema;
+};
+
 /** Get or create a LookupResolver for an external server. */
 const getResolver = async (baseUrl: string, token?: string): Promise<LookupResolver> => {
   const cached = lookupResolverCache.get(baseUrl);
