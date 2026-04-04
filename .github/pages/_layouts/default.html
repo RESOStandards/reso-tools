@@ -837,13 +837,6 @@
   <script src="/pagefind/pagefind-ui.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
-      new PagefindUI({
-        element: '#search',
-        showSubResults: true,
-        showImages: false,
-        resetStyles: false
-      });
-
       // Hamburger menu toggle
       var menuToggle = document.getElementById('menuToggle');
       var headerNav = document.getElementById('headerNav');
@@ -871,6 +864,16 @@
         var isDark = document.documentElement.classList.toggle('dark');
         localStorage.setItem('dd-theme', isDark ? 'dark' : 'light');
       });
+
+      // Search (may fail if pagefind not built yet)
+      try {
+        new PagefindUI({
+          element: '#search',
+          showSubResults: true,
+          showImages: false,
+          resetStyles: false
+        });
+      } catch (e) { /* pagefind not available */ }
 
       var overlay = document.getElementById('searchOverlay');
       var trigger = document.getElementById('searchTrigger');
