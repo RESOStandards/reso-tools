@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { formatError } from '../utils/error-messages';
 
@@ -24,7 +24,7 @@ export const FriendlyError = ({ title, message, requestUrl }: {
 }) => {
   const navigate = useNavigate();
   const [urlCopied, setUrlCopied] = useState(false);
-  const quip = QUIPS[Math.floor(Math.random() * QUIPS.length)];
+  const quip = useMemo(() => QUIPS[Math.floor(Math.random() * QUIPS.length)], []);
   const errorInfo = formatError(message, undefined, requestUrl);
   const displayTitle = title ?? errorInfo.title;
   const displayUrl = errorInfo.requestUrl;

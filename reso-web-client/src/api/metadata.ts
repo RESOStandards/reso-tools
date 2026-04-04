@@ -154,10 +154,20 @@ export const fetchFieldsForResource = async (
   return fields;
 };
 
+/** Deduplicate lookup values by lookupValue. */
+const deduplicateLookups = (values: ReadonlyArray<LookupValue>): ReadonlyArray<LookupValue> => {
+  const seen = new Set<string>();
+  return values.filter(v => {
+    if (seen.has(v.lookupValue)) return false;
+    seen.add(v.lookupValue);
+    return true;
+  });
+};
+
 /**
  * Fetch lookup values for specific lookup names. Returns a map of lookupName → values.
- * Checks IndexedDB cache first (1-hour TTL), then falls back to the resolver.
- * Deduplicates by lookupValue within each name.
+ * Checks IndexedDB cache first (1-hour TTL), then batch-fetches uncached names
+ * using a single `$filter=LookupName in (...)` request.
  */
 export const fetchLookupsByName = async (
   lookupNames: ReadonlyArray<string>,
@@ -166,31 +176,35 @@ export const fetchLookupsByName = async (
   if (lookupNames.length === 0) return {};
 
   const baseUrl = options?.baseUrl || window.location.origin;
+  const result: Record<string, ReadonlyArray<ResoLookup>> = {};
 
-  const entries = await Promise.all(
+  // Check IndexedDB cache for each name
+  const uncached: string[] = [];
+  await Promise.all(
     lookupNames.map(async (name) => {
-      // Check IndexedDB cache first
       const cached = await getCachedLookup<ReadonlyArray<ResoLookup>>(baseUrl, name);
-      if (cached) return [name, cached] as const;
-
-      // Cache miss — fetch from resolver
-      const resolver = await getResolver(baseUrl, options?.token);
-      const values = await resolver.resolveLookups(name);
-      // Deduplicate by lookupValue (some servers return duplicates)
-      const seen = new Set<string>();
-      const unique = values.filter(v => {
-        if (seen.has(v.lookupValue)) return false;
-        seen.add(v.lookupValue);
-        return true;
-      });
-      const converted = unique.map(toLookup);
-      // Persist to IndexedDB for future sessions
-      setCachedLookup(baseUrl, name, converted).catch(() => {});
-      return [name, converted] as const;
+      if (cached) {
+        result[name] = cached;
+      } else {
+        uncached.push(name);
+      }
     })
   );
 
-  return Object.fromEntries(entries.filter(([, values]) => values.length > 0));
+  // Batch-fetch all uncached names in one request
+  if (uncached.length > 0) {
+    const resolver = await getResolver(baseUrl, options?.token);
+    const batchResult = await resolver.resolveLookupsBatch(uncached);
+    for (const [name, values] of Object.entries(batchResult)) {
+      const unique = deduplicateLookups(values);
+      const converted = unique.map(toLookup);
+      // Persist to IndexedDB for future sessions
+      setCachedLookup(baseUrl, name, converted).catch(() => {});
+      if (converted.length > 0) result[name] = converted;
+    }
+  }
+
+  return result;
 };
 
 /**

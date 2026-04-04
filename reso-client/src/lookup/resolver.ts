@@ -72,11 +72,15 @@ const fetchBatchFromLookupResource = async (
   lookupNames: ReadonlyArray<string>,
   baseUrl: string,
   token: string | undefined,
-  fetchFn: (url: string, init?: RequestInit) => Promise<Response>
+  fetchFn: (url: string, init?: RequestInit) => Promise<Response>,
+  maxPageSize = 1000
 ): Promise<ReadonlyMap<string, ReadonlyArray<LookupValue>>> => {
   if (lookupNames.length === 0) return new Map();
 
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    Prefer: `odata.maxpagesize=${maxPageSize}`,
+  };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const nameList = lookupNames.map(n => `'${n}'`).join(',');
@@ -157,7 +161,7 @@ const resolveLookupFields = (
  * members otherwise.
  */
 export const createLookupResolver = (config: LookupResolverConfig): LookupResolver => {
-  const { schema, baseUrl, token } = config;
+  const { schema, baseUrl, token, maxPageSize = 1000 } = config;
   const fetchFn = config.fetchFn ?? globalThis.fetch.bind(globalThis);
 
   // Pre-index CSDL enum types by name
@@ -197,6 +201,36 @@ export const createLookupResolver = (config: LookupResolverConfig): LookupResolv
     return values;
   };
 
+  const resolveLookupsBatch = async (
+    lookupNames: ReadonlyArray<string>
+  ): Promise<Readonly<Record<string, ReadonlyArray<LookupValue>>>> => {
+    if (lookupNames.length === 0) return {};
+
+    const uncachedNames = lookupNames.filter(name => !cache.has(name));
+
+    // Batch-fetch uncached names from the Lookup Resource
+    if (uncachedNames.length > 0 && hasLookupResource && baseUrl) {
+      try {
+        const batchResults = await fetchBatchFromLookupResource(uncachedNames, baseUrl, token, fetchFn, maxPageSize);
+        for (const [name, values] of batchResults) {
+          if (values.length > 0) cache.set(name, values);
+        }
+      } catch {
+        // Fall through to per-name CSDL enum fallback below
+      }
+    }
+
+    // Resolve each name — cache hits for batch-fetched, CSDL enum fallback for the rest
+    const entries = await Promise.all(
+      lookupNames.map(async (name) => {
+        const values = await resolveLookups(name);
+        return [name, values] as const;
+      })
+    );
+
+    return Object.fromEntries(entries.filter(([, values]) => values.length > 0));
+  };
+
   const resolveLookupsForResource = async (
     resourceName: string
   ): Promise<Readonly<Record<string, ReadonlyArray<LookupValue>>>> => {
@@ -213,7 +247,7 @@ export const createLookupResolver = (config: LookupResolverConfig): LookupResolv
     // Batch-fetch all uncached lookups from the Lookup Resource in one request
     if (uncachedNames.length > 0 && hasLookupResource && baseUrl) {
       try {
-        const batchResults = await fetchBatchFromLookupResource(uncachedNames, baseUrl, token, fetchFn);
+        const batchResults = await fetchBatchFromLookupResource(uncachedNames, baseUrl, token, fetchFn, maxPageSize);
         for (const [name, values] of batchResults) {
           if (values.length > 0) cache.set(name, values);
         }
@@ -233,5 +267,5 @@ export const createLookupResolver = (config: LookupResolverConfig): LookupResolv
     return Object.fromEntries(entries.filter(([, values]) => values.length > 0));
   };
 
-  return { hasLookupResource, resolveLookups, resolveLookupsForResource };
+  return { hasLookupResource, resolveLookups, resolveLookupsBatch, resolveLookupsForResource };
 };

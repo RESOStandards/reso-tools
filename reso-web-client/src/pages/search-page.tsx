@@ -66,7 +66,7 @@ export const SearchPage = () => {
   const needsToken = activeServer.authMode === 'client_credentials';
   const collectionReady = !isLoadingResources && (!needsToken || !!currentToken);
 
-  const { rows, count, isLoading, hasMore, error, loadMore } = useCollection(resourceName, {
+  const { rows, count, isLoading, hasMore, error, errorUrl, loadMore } = useCollection(resourceName, {
     $filter: filter || undefined,
     $orderby: orderby || undefined,
     $select: selectFields,
@@ -275,6 +275,7 @@ export const SearchPage = () => {
           isLoading={isLoading}
           hasMore={hasMore}
           error={error}
+          errorUrl={errorUrl}
           onLoadMore={loadMore}
           onRowClick={handleRowClick}
           hasMediaExpansion={hasMediaExpansion}

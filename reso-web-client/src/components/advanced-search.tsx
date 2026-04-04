@@ -88,11 +88,12 @@ interface FieldRowProps {
   readonly index: number;
   readonly entry: FilterEntry | undefined;
   readonly fieldLookups: ReadonlyArray<ResoLookup> | undefined;
+  readonly isLoadingLookups?: boolean;
   readonly onChange: (fieldName: string, operator: string, value: string) => void;
 }
 
 /** Single field row — memoized to avoid re-rendering unchanged rows. */
-const FieldRow = memo(({ field, index, entry, fieldLookups, onChange }: FieldRowProps) => {
+const FieldRow = memo(({ field, index, entry, fieldLookups, isLoadingLookups, onChange }: FieldRowProps) => {
   const operators = getOperatorsForField(field);
   const defaultOp = operators[0].value;
   const stripe = index % 2 === 1 ? 'bg-gray-100 dark:bg-gray-700/40' : '';
@@ -158,6 +159,15 @@ const FieldRow = memo(({ field, index, entry, fieldLookups, onChange }: FieldRow
             </option>
           ))}
         </select>
+      ) : isLoadingLookups && getLookupName(field) ? (
+        <div className="flex-1 flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 py-1">
+          <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+            <title>Loading</title>
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Loading values...
+        </div>
       ) : (
         <input
           type="text"
@@ -179,7 +189,7 @@ export const AdvancedSearch = ({ resource, fields, fieldGroups, filterString, on
   const { grouped, ungrouped } = groupFields(fields, resource, fieldGroups);
 
   // Lazy-fetch lookups per group when expanded
-  const { fetchLookups, lookupsByField } = useLookups();
+  const { fetchLookups, lookupsByField, isLoading: isLoadingLookups } = useLookups();
   const lookups = lookupsByField(fields);
 
   const fetchLookupsForFields = useCallback((groupFields: ReadonlyArray<ResoField>) => {
@@ -243,6 +253,7 @@ export const AdvancedSearch = ({ resource, fields, fieldGroups, filterString, on
       index={index}
       entry={filters.get(field.fieldName)}
       fieldLookups={lookups[field.fieldName]}
+      isLoadingLookups={isLoadingLookups}
       onChange={handleChange}
     />
   );

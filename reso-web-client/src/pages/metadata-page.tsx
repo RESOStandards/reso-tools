@@ -310,9 +310,12 @@ export const MetadataPage = () => {
   const [expandedField, setExpandedField] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
-  // Load schema on mount
+  // Load schema when server changes
   useEffect(() => {
     let cancelled = false;
+    setError(null);
+    setSchema(null);
+    setFields([]);
     const load = async () => {
       try {
         const baseUrl = isLocal ? undefined : activeServer.baseUrl;
@@ -402,7 +405,7 @@ export const MetadataPage = () => {
   }), [fields]);
 
   if (isLoadingResources) return <LoadingSpinner label={loadingStatus ?? 'Connecting...'} subtitle={activeServer.name} />;
-  if (error && !resource) return <FriendlyError title="Metadata Error" message={error} />;
+  if (error && !resource) return <FriendlyError message={error} />;
 
   // Resource grid view
   if (!resource) {
@@ -522,7 +525,7 @@ export const MetadataPage = () => {
       {/* Scrollable field list */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {isLoading && <LoadingSpinner />}
-        {error && <div className="p-4 text-red-600 dark:text-red-400 text-sm">{error}</div>}
+        {error && <FriendlyError message={error} />}
         {!isLoading && !error && (
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {filteredFields.map((field, idx) => {

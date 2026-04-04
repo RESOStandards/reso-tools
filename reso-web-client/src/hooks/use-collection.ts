@@ -42,6 +42,7 @@ export interface UseCollectionResult {
   readonly isLoading: boolean;
   readonly hasMore: boolean;
   readonly error: string | null;
+  readonly errorUrl: string | null;
   readonly loadMore: () => void;
 }
 
@@ -57,6 +58,7 @@ export const useCollection = (
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorUrl, setErrorUrl] = useState<string | null>(null);
   const nextLinkRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -66,6 +68,7 @@ export const useCollection = (
     setCount(undefined);
     setHasMore(true);
     setError(null);
+    setErrorUrl(null);
     nextLinkRef.current = null;
 
     if (!enabled) return;
@@ -99,6 +102,7 @@ export const useCollection = (
         const msg =
           err instanceof Error ? err.message : ((err as { error?: { message?: string } })?.error?.message ?? 'Failed to load data');
         setError(humanizeError(msg, statusCode));
+        setErrorUrl((err as { requestUrl?: string })?.requestUrl ?? null);
       } finally {
         setIsLoading(false);
       }
@@ -126,10 +130,11 @@ export const useCollection = (
       const msg =
         err instanceof Error ? err.message : ((err as { error?: { message?: string } })?.error?.message ?? 'Failed to load more data');
       setError(humanizeError(msg, statusCode));
+      setErrorUrl((err as { requestUrl?: string })?.requestUrl ?? null);
     } finally {
       setIsLoading(false);
     }
   }, [isLoading, hasMore]);
 
-  return { rows, count, isLoading, hasMore, error, loadMore };
+  return { rows, count, isLoading, hasMore, error, errorUrl, loadMore };
 };

@@ -26,6 +26,8 @@ export interface LookupResolverConfig {
    * Useful for proxying requests in browser environments.
    */
   readonly fetchFn?: (url: string, init?: RequestInit) => Promise<Response>;
+  /** Maximum page size for Lookup Resource queries. Sent via Prefer: odata.maxpagesize=N. Default: 1000. */
+  readonly maxPageSize?: number;
 }
 
 /** A resolver that provides lookup values from CSDL enums or the Lookup Resource. */
@@ -38,6 +40,11 @@ export interface LookupResolver {
    * CSDL EnumType members.
    */
   readonly resolveLookups: (lookupName: string) => Promise<ReadonlyArray<LookupValue>>;
+  /**
+   * Batch-resolve lookup values for multiple lookup names in a single request.
+   * Uses `$filter=LookupName in (...)` for efficiency. Returns a map of lookupName → values.
+   */
+  readonly resolveLookupsBatch: (lookupNames: ReadonlyArray<string>) => Promise<Readonly<Record<string, ReadonlyArray<LookupValue>>>>;
   /**
    * Resolve all lookup values for every enum/lookup field in a resource.
    * Returns a record keyed by field name.
