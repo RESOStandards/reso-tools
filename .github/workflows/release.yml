@@ -1,0 +1,74 @@
+name: Build & Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install and build shared libraries
+        run: |
+          npm install
+          cd validation && npm install && npx tsc && cd ..
+          cd odata-expression-parser && npm install && npx tsc && cd ..
+          cd reso-client && npm install && npx tsc && cd ..
+          cd data-generator && npm install && npx tsc && cd ..
+          cd reso-reference-server && npm install && npm run build && cd ..
+          cd reso-web-api-proxy && npm install && npm run build && cd ..
+          cd reso-web-client && npm install && npm run build && cd ..
+
+      - name: Install desktop client dependencies
+        run: cd reso-desktop-client && npm install
+
+      - name: Build desktop client
+        run: cd reso-desktop-client && npm run build && npm run build:server-bundle
+
+      - name: Package Electron app
+        run: cd reso-desktop-client && npx electron-builder --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: |
+            reso-desktop-client/dist/*.dmg
+            reso-desktop-client/dist/*.zip
+            reso-desktop-client/dist/*.AppImage
+            reso-desktop-client/dist/*.deb
+            reso-desktop-client/dist/*.exe
+          if-no-files-found: ignore
+
+  release:
+    name: Attach to Release
+    needs: build
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
