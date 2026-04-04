@@ -53,16 +53,31 @@ afterAll(async () => {
 
 describe('fetchAccessToken', () => {
   it('returns an access token for valid credentials', async () => {
-    const token = await fetchAccessToken('my-client', 'my-secret', tokenUrl);
-    expect(token).toBe('token-for-my-client');
+    const result = await fetchAccessToken({
+      mode: 'client_credentials',
+      clientId: 'my-client',
+      clientSecret: 'my-secret',
+      tokenUrl,
+    });
+    expect(result.access_token).toBe('token-for-my-client');
   });
 
   it('throws on invalid client', async () => {
-    await expect(fetchAccessToken('bad-client', 'secret', tokenUrl)).rejects.toThrow('OAuth2 token request failed: 401');
+    await expect(fetchAccessToken({
+      mode: 'client_credentials',
+      clientId: 'bad-client',
+      clientSecret: 'secret',
+      tokenUrl,
+    })).rejects.toThrow('OAuth2 token request failed: 401');
   });
 
   it('throws on unreachable URL', async () => {
-    await expect(fetchAccessToken('id', 'secret', 'http://localhost:1/oauth/token')).rejects.toThrow();
+    await expect(fetchAccessToken({
+      mode: 'client_credentials',
+      clientId: 'id',
+      clientSecret: 'secret',
+      tokenUrl: 'http://localhost:1/oauth/token',
+    })).rejects.toThrow();
   });
 });
 

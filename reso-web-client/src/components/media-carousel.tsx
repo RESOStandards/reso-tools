@@ -40,15 +40,20 @@ export const MediaCarousel = ({ media, compact = false }: MediaCarouselProps) =>
     setImageBroken(true);
   }, []);
 
+  // Reset broken state when navigating to a different image
+  const prevCurrentRef = useRef(current);
+  if (prevCurrentRef.current !== current) {
+    prevCurrentRef.current = current;
+    if (imageBroken) setImageBroken(false);
+  }
+
   /** Ref callback for img elements — starts the loading timer and checks if already cached. */
   const imgRef = useCallback((el: HTMLImageElement | null) => {
     clearTimer();
-    setImageBroken(false);
     if (!el) return;
     if (el.complete && el.naturalWidth > 0) {
       setShowSpinner(false);
     } else if (el.complete) {
-      // complete but no dimensions = broken
       setShowSpinner(false);
       setImageBroken(true);
     } else {
