@@ -31,6 +31,7 @@
   "build": {
     "appId": "org.reso.desktop",
     "productName": "RESO Desktop Client",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "files": [
       "dist/main.js",
       "dist/preload.js",
