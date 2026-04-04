@@ -2,6 +2,11 @@
   "name": "@reso-standards/desktop-client",
   "version": "0.3.0",
   "description": "RESO Reference Server — Desktop Client",
+  "author": {
+    "name": "Real Estate Standards Organization",
+    "email": "dev@reso.org"
+  },
+  "homepage": "https://tools.reso.org",
   "private": true,
   "main": "dist/main.js",
   "scripts": {
@@ -9,7 +14,7 @@
     "build:server-bundle": "node scripts/bundle-server.mjs",
     "start": "env -u ELECTRON_RUN_AS_NODE electron dist/main.js",
     "dev": "tsc && cp src/server-entry.mjs dist/ && env -u ELECTRON_RUN_AS_NODE electron dist/main.js",
-    "postinstall": "electron-rebuild 2>/dev/null; /usr/libexec/PlistBuddy -c \"Set CFBundleDisplayName 'RESO Desktop Client'\" node_modules/electron/dist/Electron.app/Contents/Info.plist 2>/dev/null; /usr/libexec/PlistBuddy -c \"Set CFBundleName 'RESO Desktop Client'\" node_modules/electron/dist/Electron.app/Contents/Info.plist 2>/dev/null; true",
+    "postinstall": "electron-rebuild || true",
     "package": "npm run build && npm run build:server-bundle && electron-builder"
   },
   "dependencies": {
