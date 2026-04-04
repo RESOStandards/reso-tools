@@ -47,6 +47,7 @@ jobs:
           cd validation && npx tsc && cd ..
           cd odata-expression-parser && npx tsc && cd ..
           cd reso-client && npx tsc && cd ..
+          cd data-generator && npx tsc && cd ..
           cd reso-reference-server && npx tsc && cd ..
 
       - name: Run all tests
