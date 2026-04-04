@@ -1,6 +1,6 @@
 {
   "name": "@reso-standards/desktop-client",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "RESO Reference Server — Desktop Client",
   "private": true,
   "main": "dist/main.js",
