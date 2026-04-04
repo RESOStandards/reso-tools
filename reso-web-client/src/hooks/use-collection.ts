@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchCollectionByUrl, queryCollection } from '../api/client.js';
+import { formatError } from '../utils/error-messages.js';
 
 const PAGE_SIZE = 25;
 
@@ -23,19 +24,16 @@ const getHttpStatus = (err: unknown): number | undefined => {
 
 /** Transforms raw server error messages into user-friendly descriptions. */
 export const humanizeError = (raw: string, statusCode?: number): string => {
-  if (statusCode === 429) {
-    return `You have exceeded the maximum number of requests allowed by this provider. Please try again in a few minutes or contact the provider.\n\nServer response: ${raw}`;
-  }
-  if (statusCode && statusCode >= 500) {
-    return `The remote server returned an error (${statusCode}). This is a problem with the server, not the client.\n\nServer response: ${raw}`;
-  }
+  // Check for query-specific patterns first
   for (const [pattern, friendly] of UNSUPPORTED_QUERY_PATTERNS) {
     if (pattern.test(raw)) return `${friendly}\n\nServer response: ${raw}`;
   }
-  if (statusCode) {
-    return `The remote server returned an error (${statusCode}).\n\nServer response: ${raw}`;
-  }
-  return `Server response: ${raw}`;
+
+  // Use centralized error formatting for HTTP status codes
+  const info = formatError(statusCode ? `${raw}: ${statusCode}` : raw, raw);
+  return info.serverMessage && info.serverMessage !== info.description
+    ? `${info.description}\n\nServer response: ${info.serverMessage}`
+    : info.description;
 };
 
 export interface UseCollectionResult {
