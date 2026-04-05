@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, safeStorage, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, shell } from 'electron';
 import { resolve } from 'node:path';
 import { fork, type ChildProcess } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -343,9 +343,34 @@ const startReferenceServer = (): Promise<string> => {
   });
 };
 
-/** Create the main application window. */
-const createWindow = (url: string): BrowserWindow => {
-  const paths = resolvePaths();
+/** Check the persisted theme preference, falling back to system setting. */
+const isDarkMode = (): boolean => {
+  const store = readStore();
+  const saved = store['reso-theme'];
+  if (saved === 'dark') return true;
+  if (saved === 'light') return false;
+  return nativeTheme.shouldUseDarkColors;
+};
+
+/** Build an inline HTML splash screen with the RESO logo. */
+const buildSplashHtml = (logoPath: string): string => {
+  const isDark = isDarkMode();
+  const bg = isDark ? '#1a202c' : '#f9fafb';
+  const spinnerColor = isDark ? '#63b3ed' : '#007e9e';
+  const logoSrc = `file://${logoPath}`;
+
+  return `data:text/html;charset=utf-8,${encodeURIComponent(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  body { margin:0; height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; background:${bg}; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+  img { width:200px; margin-bottom:24px; }
+  .spinner { width:24px; height:24px; border:3px solid transparent; border-top-color:${spinnerColor}; border-radius:50%; animation:spin 0.8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style></head><body><img src="${logoSrc}" alt="RESO" /><div class="spinner"></div></body></html>`)}`;
+};
+
+/** Create the main application window. Shows a splash screen, then navigates to the server URL. */
+const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => {
+  const isDark = isDarkMode();
   const icon = nativeImage.createFromPath(paths.iconPath);
 
   const win = new BrowserWindow({
@@ -354,6 +379,7 @@ const createWindow = (url: string): BrowserWindow => {
     minWidth: 800,
     minHeight: 600,
     show: false,
+    backgroundColor: isDark ? '#1a202c' : '#f9fafb',
     title: 'RESO Desktop Client',
     icon,
     webPreferences: {
@@ -367,6 +393,10 @@ const createWindow = (url: string): BrowserWindow => {
   if (process.platform === 'darwin' && !icon.isEmpty() && app.dock) {
     app.dock.setIcon(icon);
   }
+
+  // Show the splash screen immediately
+  win.once('ready-to-show', () => win.show());
+  win.loadURL(buildSplashHtml(paths.logoPath));
 
   // Open external links in the system browser
   win.webContents.setWindowOpenHandler(({ url: linkUrl }) => {
@@ -429,9 +459,6 @@ const createWindow = (url: string): BrowserWindow => {
       })();
     `).catch(() => {});
   });
-
-  win.once('ready-to-show', () => win.show());
-  win.loadURL(url);
 
   state.mainWindow = win;
 
@@ -545,9 +572,13 @@ app.whenReady().then(async () => {
   registerStorageHandlers();
   buildMenu();
 
+  // Show splash screen immediately while server starts
+  const win = createWindow(paths);
+
   try {
     const url = await startReferenceServer();
-    createWindow(url);
+    // Navigate from splash to the real server UI
+    win.loadURL(url);
     checkForUpdatesSilent();
   } catch (err) {
     log(`Failed to start server: ${err instanceof Error ? err.message : String(err)}`);
@@ -565,6 +596,7 @@ app.on('before-quit', shutdown);
 // macOS: re-create window when dock icon is clicked
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0 && state.serverUrl) {
-    createWindow(state.serverUrl);
+    const win = createWindow(resolvePaths());
+    win.loadURL(state.serverUrl);
   }
 });
