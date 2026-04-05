@@ -3,12 +3,19 @@ import { resolve } from 'node:path';
 import { fork, type ChildProcess } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
+// Suppress EPIPE errors from broken pipes (e.g., child process stdout closed on shutdown).
+// These are harmless but surface as uncaught exceptions that crash the app.
+process.on('uncaughtException', (err) => {
+  if ('code' in err && err.code === 'EPIPE') return;
+  throw err;
+});
+
 /** Write diagnostic messages to a log file in the user data directory. */
 const logFile = (): string => resolve(app.getPath('userData'), 'reso-desktop.log');
 const log = (msg: string): void => {
   const line = `[${new Date().toISOString()}] ${msg}\n`;
   try { appendFileSync(logFile(), line); } catch { /* ignore */ }
-  console.log(msg);
+  try { console.log(msg); } catch { /* EPIPE if child process pipe is closed */ }
 };
 
 // Override default "Electron" name shown in macOS menu bar and dock
@@ -295,14 +302,19 @@ const startReferenceServer = (): Promise<string> => {
     // Fork Electron as a plain Node.js process via ELECTRON_RUN_AS_NODE.
     // This uses Electron's bundled Node (same ABI as the compiled native
     // addons), so it works in packaged apps without requiring system Node.
+    log(`  execPath: ${process.execPath}`);
     const child = fork(
       paths.serverEntry,
       [paths.sqliteDbPath, paths.metadataPath, paths.serverRoot, paths.uiDistPath],
       {
-        stdio: ['pipe', 'inherit', 'inherit', 'ipc'],
+        stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
         env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
       }
     );
+
+    // Capture child stdout/stderr for diagnostics
+    child.stdout?.on('data', (data: Buffer) => log(`[server] ${data.toString().trimEnd()}`));
+    child.stderr?.on('data', (data: Buffer) => log(`[server:err] ${data.toString().trimEnd()}`));
 
     state.serverProcess = child;
 
@@ -341,6 +353,7 @@ const createWindow = (url: string): BrowserWindow => {
     height: 900,
     minWidth: 800,
     minHeight: 600,
+    show: false,
     title: 'RESO Desktop Client',
     icon,
     webPreferences: {
@@ -417,10 +430,12 @@ const createWindow = (url: string): BrowserWindow => {
     `).catch(() => {});
   });
 
+  win.once('ready-to-show', () => win.show());
   win.loadURL(url);
 
   state.mainWindow = win;
 
+  win.on('close', () => win.hide());
   win.on('closed', () => {
     state.mainWindow = null;
   });
@@ -430,7 +445,7 @@ const createWindow = (url: string): BrowserWindow => {
 
 /** Graceful shutdown — kill server child process. */
 const shutdown = (): void => {
-  console.log('Shutting down...');
+  log('Shutting down...');
   if (state.serverProcess) {
     state.serverProcess.kill('SIGTERM');
     state.serverProcess = null;
