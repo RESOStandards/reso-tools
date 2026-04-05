@@ -33,6 +33,7 @@ jobs:
             "reso-reference-server:reso-reference-server:OData reference server"
             "reso-web-client:@reso/web-client:React browser UI"
             "reso-desktop-client:@reso/desktop-client:Electron desktop shell"
+            "reso-web-api-proxy:@reso-standards/web-api-proxy:CORS proxy server"
           )
 
           mkdir -p .github/pages/_packages
