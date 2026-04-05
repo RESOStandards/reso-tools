@@ -38,9 +38,10 @@ jobs:
       - name: Install all package dependencies
         run: |
           npm install
-          for dir in reso-validation odata-expression-parser reso-client reso-data-generator reso-reference-server reso-web-client reso-web-api-proxy reso-certification; do
+          for dir in reso-validation odata-expression-parser reso-client reso-data-generator reso-reference-server reso-web-client reso-web-api-proxy; do
             (cd "$dir" && npm install)
           done
+          cd reso-certification && npm install --ignore-scripts && cd ..
 
       - name: Build shared libraries
         run: |
