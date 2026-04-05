@@ -61,7 +61,7 @@ Third milestone release adding OAuth2 Client Credentials authentication, lazy lo
 
 Pre-built binaries are available on the [GitHub Releases page](https://github.com/RESOStandards/reso-tools/releases). These binaries are **unsigned** and your operating system may warn you before running them.
 
-- **macOS** (.dmg) — macOS will show "app is from an unidentified developer." Open System Settings > Privacy & Security, scroll to the Security section, and click "Open Anyway." Alternatively, right-click the app and select Open, then click Open in the dialog.
+- **macOS** (.dmg) — On macOS Sequoia and earlier, right-click the app and select Open, then click Open in the confirmation dialog. On macOS Tahoe (26+), unsigned apps are blocked by Gatekeeper. After mounting the DMG and copying the app to Applications, run: `xattr -cr "/Applications/RESO Desktop Client.app"` to remove the quarantine attribute.
 - **Windows** (.exe) — Windows Defender SmartScreen may show "Windows protected your PC." Click "More info" then "Run anyway."
 - **Linux** (.AppImage, .deb) — AppImage: `chmod +x` the file and run it. Deb: install with `sudo dpkg -i`.
 
