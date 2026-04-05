@@ -1,8 +1,8 @@
 name: Build & Release
 
 on:
-  release:
-    types: [created]
+  push:
+    tags: ['v*']
   workflow_dispatch:
 
 jobs:
@@ -55,9 +55,9 @@ jobs:
           if-no-files-found: ignore
 
   release:
-    name: Attach to Release
+    name: Create Release
     needs: build
-    if: github.event_name == 'release'
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -68,12 +68,12 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Upload assets and publish release
+      - name: Create GitHub release with assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for file in artifacts/*; do
-            echo "Uploading $file..."
-            gh release upload "${{ github.event.release.tag_name }}" "$file" --repo "${{ github.repository }}" --clobber
-          done
-          gh release edit "${{ github.event.release.tag_name }}" --repo "${{ github.repository }}" --draft=false
+          tag="${GITHUB_REF#refs/tags/}"
+          gh release create "$tag" artifacts/* \
+            --repo "${{ github.repository }}" \
+            --title "$tag" \
+            --generate-notes
