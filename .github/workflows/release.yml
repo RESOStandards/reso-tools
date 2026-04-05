@@ -2,7 +2,7 @@ name: Build & Release
 
 on:
   release:
-    types: [published]
+    types: [created]
   workflow_dispatch:
 
 jobs:
@@ -68,7 +68,12 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v2
-        with:
-          files: artifacts/*
+      - name: Upload assets and publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for file in artifacts/*; do
+            echo "Uploading $file..."
+            gh release upload "${{ github.event.release.tag_name }}" "$file" --repo "${{ github.repository }}" --clobber
+          done
+          gh release edit "${{ github.event.release.tag_name }}" --repo "${{ github.repository }}" --draft=false
