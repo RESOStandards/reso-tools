@@ -9,7 +9,7 @@
  */
 
 import { build } from 'esbuild';
-import { cpSync, mkdirSync, existsSync } from 'node:fs';
+import { cpSync, mkdirSync, existsSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -54,16 +54,24 @@ await build({
 const bundleNodeModules = resolve(outDir, 'node_modules');
 mkdirSync(bundleNodeModules, { recursive: true });
 
-/** Copy a package from the monorepo node_modules to the bundle's node_modules. */
+/** Candidate locations where runtime dependencies may be installed. */
+const nodeModulesDirs = [
+  resolve(monoRoot, 'reso-reference-server', 'node_modules'),
+  resolve(monoRoot, 'node_modules'),
+];
+
+/** Copy a package from the first location where it exists to the bundle's node_modules. */
 const copyPackage = (name) => {
-  const src = resolve(monoRoot, 'node_modules', name);
   const dest = resolve(bundleNodeModules, name);
-  if (existsSync(src)) {
-    console.log(`  Copying ${name}...`);
-    cpSync(src, dest, { recursive: true });
-  } else {
-    console.warn(`  WARNING: ${name} not found at ${src}`);
+  for (const dir of nodeModulesDirs) {
+    const src = resolve(dir, name);
+    if (existsSync(src)) {
+      console.log(`  Copying ${name} from ${dir}...`);
+      cpSync(src, dest, { recursive: true });
+      return;
+    }
   }
+  console.warn(`  WARNING: ${name} not found in any node_modules`);
 };
 
 // better-sqlite3 + its native dependencies
@@ -75,5 +83,17 @@ copyPackage('prebuild-install');
 
 // swagger-ui-dist (static assets served at runtime by swagger-ui-express, which is bundled)
 copyPackage('swagger-ui-dist');
+
+// Stub packages for DB drivers not used in desktop/SQLite mode.
+// ESM resolution requires these to exist even if the code path is never reached.
+const createStub = (name) => {
+  const dir = resolve(bundleNodeModules, name);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(resolve(dir, 'package.json'), JSON.stringify({ name, version: '0.0.0', main: 'index.js', type: 'commonjs' }));
+  writeFileSync(resolve(dir, 'index.js'), 'module.exports = {};');
+  console.log(`  Stubbed ${name} (not used in SQLite mode)`);
+};
+createStub('pg');
+createStub('mongodb');
 
 console.log('Server bundle complete.');
