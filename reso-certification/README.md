@@ -2,7 +2,7 @@
 
 RESO certification testing toolkit for validating OData 4.01 server compliance against RESO Web API endorsement specifications. Ships as a single package with spec-specific modules for Add/Edit (RCP-010), Web API Core, and Data Dictionary.
 
-Uses shared test infrastructure (`src/test-runner/`) providing OData protocol validators, metadata parsing (via [`@reso-standards/reso-client`](../reso-client/)), field validation (via [`@reso-standards/validation`](../validation/)), reporting, and HTTP client helpers.
+Uses shared test infrastructure (`src/test-runner/`) providing OData protocol validators, metadata parsing (via [`@reso-standards/reso-client`](../reso-client/)), field validation (via [`@reso-standards/reso-validation`](../reso-validation/)), reporting, and HTTP client helpers.
 
 ## Install
 

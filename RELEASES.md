@@ -2,6 +2,53 @@
 
 ---
 
+## v0.4 — 2026-04-05
+
+### Package Restructuring and Desktop Client Improvements
+
+Fourth milestone release restructuring packages for the upcoming RESO compliance testing integration, fixing desktop client startup issues, and adding update checking and theme persistence.
+
+#### Package Restructuring
+
+- **Renamed packages** — `validation/` → `reso-validation/`, `data-generator/` → `reso-data-generator/`, `certification/` → `reso-certification/` with updated package names (`@reso-standards/reso-validation`, `@reso-standards/reso-data-generator`, `@reso-standards/reso-certification`).
+- **Added `reso-certification-utils@3.0.0`** — RESO certification SDK added as a dependency of `reso-certification`, installed from GitHub. Provides DD testing, replication, schema validation, variations detection, and UPI validation.
+- **Updated all cross-references** — Imports, `file:` dependencies, Dockerfiles, CI workflows, docker-compose, lefthook, and documentation.
+
+#### Desktop Client
+
+- **Splash screen** — RESO logo with spinner shown while the server initializes. Adapts to dark/light mode. No more white flash on startup.
+- **Dark mode persistence** — Theme preference saved to Electron secure storage. Survives app restarts (previously lost because `localStorage` is per-origin and the server uses random ports).
+- **Update checker** — Checks GitHub releases on launch (silent notification badge) and from Help > Check for Updates (interactive dialog). Release URL validated against expected GitHub domain.
+- **Server bundle fix** — Native dependencies (`better-sqlite3`) now resolved from the correct `node_modules`. Stub packages for `pg` and `mongodb` prevent ESM resolution failures in SQLite-only desktop mode.
+- **EPIPE fix** — Broken pipe errors on shutdown no longer crash the app.
+- **Window lifecycle** — Window hidden before close to prevent flash. `show: false` until content is ready.
+- **Help menu** — Added links to Releases, Announcements, and Security Audit on tools.reso.org.
+
+#### Security
+
+- **`navigateTo` injection fix** — Menu navigation paths are now JSON-serialized instead of string-interpolated into `executeJavaScript` calls, preventing potential script injection.
+- **Release URL validation** — Update checker validates that release URLs point to `https://github.com/RESOStandards/reso-tools/releases/` before opening in the browser.
+
+#### Release Workflow
+
+- **Tag-triggered builds** — Release workflow now triggers on `v*` tag push instead of release events. Builds all three platforms (macOS, Windows, Linux) and creates the GitHub release with binaries attached automatically.
+- **Cross-platform postinstall** — Removed macOS-only `PlistBuddy` commands from `postinstall`.
+- **Linux .deb fix** — Added `artifactName` to electron-builder config to avoid invalid paths from scoped package names.
+
+#### Site
+
+- **About dropdown** — Consolidated Releases, Announcements, and Security Audit into a dropdown menu in the header navigation.
+- **Dark mode icons** — Added CSS overrides for audience and learn-more icon classes.
+- **Doc page styling** — New `doc` layout wraps markdown content pages in styled cards with proper typography.
+- **Proxy package link** — Added `reso-web-api-proxy` to the Pages workflow (was missing, causing a broken link).
+
+#### Testing
+
+- **928 tests** across 7 packages, all passing
+- **All 3 compliance suites** pass (PostgreSQL, MongoDB, SQLite)
+
+---
+
 ## v0.3 — 2026-04-03
 
 ### The "Cache Me If You Can" Release

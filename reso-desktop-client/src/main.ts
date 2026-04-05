@@ -137,7 +137,7 @@ const navigateTo = (path: string): void => {
   const win = BrowserWindow.getFocusedWindow();
   if (win) {
     win.webContents.executeJavaScript(
-      `window.history.pushState({}, '', '${path}'); window.dispatchEvent(new PopStateEvent('popstate'));`
+      `(function() { const p = ${JSON.stringify(path)}; window.history.pushState({}, '', p); window.dispatchEvent(new PopStateEvent('popstate')); })()`
     ).catch(() => {});
   }
 };
@@ -266,6 +266,19 @@ const buildMenu = (): void => {
         {
           label: 'Check for Updates...',
           click: () => checkForUpdatesInteractive()
+        },
+        { type: 'separator' },
+        {
+          label: 'Releases',
+          click: () => shell.openExternal('https://tools.reso.org/releases/')
+        },
+        {
+          label: 'Announcements',
+          click: () => shell.openExternal('https://tools.reso.org/announcements/')
+        },
+        {
+          label: 'Security Audit',
+          click: () => shell.openExternal('https://tools.reso.org/security/')
         },
         { type: 'separator' },
         {
@@ -499,6 +512,18 @@ interface ReleaseInfo {
   readonly name: string;
 }
 
+/** Validate that a release URL points to the expected GitHub repository. */
+const isValidReleaseUrl = (url: string): boolean => {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' &&
+      parsed.hostname === 'github.com' &&
+      parsed.pathname.startsWith('/RESOStandards/reso-tools/releases/');
+  } catch {
+    return false;
+  }
+};
+
 /** Fetch the latest release info from GitHub. Returns null if up to date or on error. */
 const fetchLatestRelease = async (): Promise<ReleaseInfo | null> => {
   try {
@@ -508,6 +533,10 @@ const fetchLatestRelease = async (): Promise<ReleaseInfo | null> => {
     if (!response.ok) return null;
 
     const release = await response.json() as { tag_name: string; html_url: string; name: string };
+    if (!isValidReleaseUrl(release.html_url)) {
+      log(`Update check: unexpected release URL ${release.html_url}`);
+      return null;
+    }
     const currentVersion = app.getVersion();
 
     if (isNewerVersion(currentVersion, release.tag_name)) {

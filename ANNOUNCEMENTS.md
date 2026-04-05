@@ -2,6 +2,20 @@
 
 ---
 
+## v0.4 — 2026-04-05
+
+### Getting Ready for Certification
+
+**Packages restructured for compliance testing.** The `validation`, `data-generator`, and `certification` packages have been renamed to `reso-validation`, `reso-data-generator`, and `reso-certification` for consistency. The RESO certification SDK (`reso-certification-utils@3.0.0`) has been integrated as a dependency, laying the groundwork for DD testing, replication, schema validation, and more.
+
+**Desktop client polished.** The app now shows a RESO-branded splash screen while the server starts, remembers your dark/light mode preference across sessions, checks for updates on launch, and no longer flashes white on startup or crashes on shutdown. The Help menu links to release notes, announcements, and the security audit on tools.reso.org.
+
+**Release workflow automated.** Push a version tag and the CI builds macOS, Windows, and Linux binaries and creates a GitHub release with them attached. No more manual uploads.
+
+**Security hardened.** Menu navigation paths are now safely serialized. Release URLs are validated before opening in the browser. See the [security audit](SECURITY_AUDIT.md) for details.
+
+---
+
 ## v0.3 — 2026-04-03
 
 ### The "Cache Me If You Can" Release

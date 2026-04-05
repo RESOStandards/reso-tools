@@ -4,6 +4,29 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
+## v0.4 Security Notes — 2026-04-05
+
+### Findings Addressed
+
+- **`navigateTo` script injection** (Critical → Fixed): The `navigateTo()` function in the Electron main process constructed JavaScript strings with unescaped path parameters via template literals. Paths are now JSON-serialized before interpolation, preventing script injection through the path argument.
+- **Release URL validation** (Critical → Fixed): The update checker fetches release info from the GitHub API. The `html_url` field is now validated to match `https://github.com/RESOStandards/reso-tools/releases/` before being passed to `shell.openExternal()`, preventing SSRF or malicious URL injection if the API response is compromised.
+
+### Noted Risks (Accepted)
+
+- **`reso-certification-utils@3.0.0` supply chain**: Installed from GitHub (not npm). Git tags are not cryptographically signed. Transitive dependency on `@reso/reso-certification-etl` also from GitHub. Risk accepted because both repos are under RESOStandards org control. Will migrate to npm publishing in a future release.
+- **IPC storage API**: The `storage:get`/`storage:set` handlers accept any key/value string from the renderer. Currently only the renderer (same-origin, sandboxed) can access these. No rate limiting. Acceptable for a desktop app with trusted renderer content.
+- **EPIPE exception handler**: `process.on('uncaughtException')` suppresses EPIPE errors (broken stdout pipe on shutdown). Non-EPIPE errors are re-thrown. Could theoretically mask an error with a `code` property of `'EPIPE'` from a different source, but this is unlikely in practice.
+- **Stub packages**: `pg` and `mongodb` are replaced with empty stubs in the desktop server bundle (SQLite-only mode). If the server code ever conditionally requires these at runtime, the stubs would silently return empty objects instead of throwing.
+- **Unsigned binaries**: macOS, Windows, and Linux binaries are not code-signed. macOS Tahoe requires `xattr -cr` to run. Windows shows SmartScreen warnings. Signing planned for a future release.
+
+### Architecture Notes
+
+- **Electron preload API surface**: `contextBridge` exposes three APIs — `electronStorage` (get/set/remove), `electronUpdates` (onUpdateAvailable listener). All are read-only or write-only with no ability to execute arbitrary code. `contextIsolation: true` and `nodeIntegration: false` are set.
+- **Dark mode preference**: Stored in Electron secure storage (encrypted via OS keychain when available, plain JSON fallback). Non-sensitive data.
+- **Splash screen**: Generated as a `data:` URI with inline CSS. No external resources loaded. Images use `file:` protocol for the local logo.
+
+---
+
 ## v0.3 Security Notes — 2026-04-03
 
 - **OAuth2 token storage**: Per-server tokens stored in Electron secure storage (OS keychain encryption) or browser sessionStorage (cleared on tab close). Tokens are never written to localStorage.
