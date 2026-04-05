@@ -16,6 +16,8 @@
 
 **928 tests.** Up from 856 in v0.2, with 72 new web client component tests and all 4 compliance suites passing.
 
+**Desktop binaries available.** Pre-built installers for macOS, Windows, and Linux are attached to each [GitHub release](https://github.com/RESOStandards/reso-tools/releases). Binaries are currently unsigned — see the [release notes](RELEASES.md) for platform-specific instructions. The app now checks for updates automatically on launch.
+
 ---
 
 ## v0.2 — 2026-03-10

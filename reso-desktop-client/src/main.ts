@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, safeStorage, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, safeStorage, shell } from 'electron';
 import { resolve } from 'node:path';
 import { fork, type ChildProcess } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -257,6 +257,11 @@ const buildMenu = (): void => {
       label: 'Help',
       submenu: [
         {
+          label: 'Check for Updates...',
+          click: () => checkForUpdatesInteractive()
+        },
+        { type: 'separator' },
+        {
           label: 'RESO Website',
           click: () => shell.openExternal('https://www.reso.org')
         },
@@ -432,6 +437,83 @@ const shutdown = (): void => {
   }
 };
 
+// ── Update checker ──
+
+const GITHUB_RELEASES_URL = 'https://api.github.com/repos/RESOStandards/reso-tools/releases/latest';
+
+/** Compare two semver strings. Returns true if remote is newer than local. */
+const isNewerVersion = (local: string, remote: string): boolean => {
+  const parse = (v: string): readonly number[] => v.replace(/^v/, '').split('.').map(Number);
+  const [lMajor = 0, lMinor = 0, lPatch = 0] = parse(local);
+  const [rMajor = 0, rMinor = 0, rPatch = 0] = parse(remote);
+  if (rMajor !== lMajor) return rMajor > lMajor;
+  if (rMinor !== lMinor) return rMinor > lMinor;
+  return rPatch > lPatch;
+};
+
+interface ReleaseInfo {
+  readonly tagName: string;
+  readonly url: string;
+  readonly name: string;
+}
+
+/** Fetch the latest release info from GitHub. Returns null if up to date or on error. */
+const fetchLatestRelease = async (): Promise<ReleaseInfo | null> => {
+  try {
+    const response = await fetch(GITHUB_RELEASES_URL, {
+      headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'RESO-Desktop-Client' }
+    });
+    if (!response.ok) return null;
+
+    const release = await response.json() as { tag_name: string; html_url: string; name: string };
+    const currentVersion = app.getVersion();
+
+    if (isNewerVersion(currentVersion, release.tag_name)) {
+      log(`Update available: ${release.tag_name} (current: v${currentVersion})`);
+      return { tagName: release.tag_name, url: release.html_url, name: release.name };
+    }
+    log(`Up to date (v${currentVersion})`);
+    return null;
+  } catch (err) {
+    log(`Update check failed: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
+};
+
+/** Silent check — notifies the renderer to show an update badge. */
+const checkForUpdatesSilent = async (): Promise<void> => {
+  const release = await fetchLatestRelease();
+  if (release && state.mainWindow) {
+    state.mainWindow.webContents.send('update:available', release);
+  }
+};
+
+/** Interactive check — shows a native dialog (from Help menu). */
+const checkForUpdatesInteractive = async (): Promise<void> => {
+  const release = await fetchLatestRelease();
+  if (release) {
+    const { response: button } = await dialog.showMessageBox({
+      type: 'info',
+      title: 'Update Available',
+      message: 'A new version of RESO Desktop Client is available.',
+      detail: `${release.name}\n\nYou are running v${app.getVersion()}. Would you like to download the latest version?`,
+      buttons: ['Download', 'Later'],
+      defaultId: 0,
+      cancelId: 1
+    });
+    if (button === 0) {
+      shell.openExternal(release.url);
+    }
+  } else {
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'No Updates',
+      message: 'You are running the latest version.',
+      detail: `RESO Desktop Client v${app.getVersion()}`
+    });
+  }
+};
+
 // App lifecycle
 app.whenReady().then(async () => {
   const paths = resolvePaths();
@@ -451,6 +533,7 @@ app.whenReady().then(async () => {
   try {
     const url = await startReferenceServer();
     createWindow(url);
+    checkForUpdatesSilent();
   } catch (err) {
     log(`Failed to start server: ${err instanceof Error ? err.message : String(err)}`);
     app.quit();
