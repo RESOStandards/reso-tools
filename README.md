@@ -1,6 +1,6 @@
 # RESO Tools
 
-![Tests](https://img.shields.io/badge/tests-988%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1146%20passed-brightgreen)
 ![Compliance](https://img.shields.io/badge/RESO%20compliance-4%2F4%20suites-blue)
 
 Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compliant OData servers. Includes a reference server, desktop client, web UI, CORS proxy, certification test runner and shared libraries for OData parsing, validation and data generation.

@@ -60,7 +60,7 @@ const tools = toolsForScope(scope);
 
 const server = new McpServer({
   name: 'reso-tools',
-  version: '0.1.0',
+  version: '0.5.0',
 });
 
 // Register each tool with its Zod schema

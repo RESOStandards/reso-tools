@@ -158,7 +158,7 @@ docker compose --profile compliance-core up --build \
 ```bash
 npm install
 npm run build
-npm test        # 224 tests
+npm test        # 250 tests
 npm run dev     # Watch mode
 ```
 
