@@ -163,6 +163,7 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
   limit: config.limit ?? DEFAULT_LIMIT,
   jsonSchemaValidation: config.strictMode ?? true,
   batchExpand: config.batchExpand ?? false,
+  outputPath: config.options?.outputDir ?? join(process.cwd(), '.reso-cert', 'dd'),
 });
 
 const initReplicationState: PipelineStep<DDContext> = {

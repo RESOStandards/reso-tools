@@ -63,6 +63,25 @@ const ODATA_VALUE_PROPERTY_NAME = 'value',
   ODATA_NEXT_LINK_PROPERTY_NAME = '@odata.nextLink';
 
 /**
+ * Rebases a URL's host to match the initial request URI.
+ * Fixes Docker-internal hostnames (e.g., http://server:8080) in @odata.nextLink
+ * when the client connects via a different hostname (e.g., http://localhost:8080).
+ */
+const rebaseNextLink = (nextLinkUrl, initialRequestUri) => {
+  try {
+    const next = new URL(nextLinkUrl);
+    const initial = new URL(initialRequestUri);
+    if (next.host !== initial.host) {
+      next.protocol = initial.protocol;
+      next.host = initial.host;
+    }
+    return next.toString();
+  } catch {
+    return nextLinkUrl;
+  }
+};
+
+/**
  * OData Prefer header name and max page size parameter.
  * @see https://docs.oasis-open.org/odata/odata/v4.01/odata-v4.01-part1-protocol.html#sec_HeaderPrefer
  */
@@ -186,7 +205,8 @@ async function* replicationIterator({
         responseBytes = calculateJsonSize(responseJson);
 
         pageSize = responseJson[ODATA_VALUE_PROPERTY_NAME]?.length ?? 0;
-        nextLink = responseJson[ODATA_NEXT_LINK_PROPERTY_NAME] ?? null;
+        const rawNextLink = responseJson[ODATA_NEXT_LINK_PROPERTY_NAME] ?? null;
+        nextLink = rawNextLink ? rebaseNextLink(rawNextLink, initialRequestUri) : null;
         totalRecordsFetched += pageSize;
 
         if (pageSize) {
