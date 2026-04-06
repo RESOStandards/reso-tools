@@ -106,7 +106,7 @@ export const ServerSwitcher = () => {
                   : 'bg-blue-400'
             }`}
           />
-          <span className="truncate max-w-[200px] font-semibold">{activeServer.name}</span>
+          <span className="truncate max-w-[300px] font-semibold">{activeServer.name}</span>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 shrink-0">
             <path
               fillRule="evenodd"
