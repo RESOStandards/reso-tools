@@ -17,3 +17,4 @@ compliance-results.zip
 .env
 .env.*
 *.env
+.reso-cert/

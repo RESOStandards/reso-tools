@@ -121,11 +121,11 @@ const sampleRecords = (config: AddEditConfig): PipelineStep<AddEditContext> => (
   },
 });
 
-/** Generate payload files for all 6 Add/Edit scenarios. */
+/** Generate payload files from inline config, sampled keys, or a provided directory. */
 const generatePayloads = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
   name: 'Generate payloads',
   run: async (ctx) => {
-    // If user provided payloads dir, use those instead
+    // Option 1: User provided a directory of payload files
     if (config.payloadsDir) {
       return {
         context: { ...ctx, payloadsDir: config.payloadsDir },
@@ -133,42 +133,68 @@ const generatePayloads = (config: AddEditConfig): PipelineStep<AddEditContext> =
       };
     }
 
-    const keys = ctx.sampleKeys!;
     const outputDir = config.options?.outputDir
       ? join(config.options.outputDir, 'payloads')
       : join(process.cwd(), '.reso-cert', 'payloads');
 
     await mkdir(outputDir, { recursive: true });
 
-    const payloads = {
-      'create-succeeds.json': {
-        ListPrice: 350000.00,
-        BedroomsTotal: 4,
-        BathroomsTotalInteger: 3,
-        City: 'Test City',
-        StateOrProvince: 'CA',
-        PostalCode: '90210',
-        Country: 'US',
-      },
-      'create-fails.json': {
-        ListPrice: -99999.00,
-        BedroomsTotal: 3,
-        BathroomsTotalInteger: 2,
-      },
-      'update-succeeds.json': {
-        ListingKey: keys[0],
-        ListPrice: 375000.00,
-      },
-      'update-fails.json': {
-        ListingKey: keys[0],
-        ListPrice: -1.00,
-      },
-      'delete-succeeds.json': {
-        id: keys[1],
-      },
-      'delete-fails.json': {
-        id: '00000000-0000-0000-0000-000000000000',
-      },
+    // Option 2: Inline payloads from config file
+    if (config.payloads) {
+      const inline = config.payloads;
+      const keys = ctx.sampleKeys ?? [];
+      const keyField = 'ListingKey';
+      const hasCreate = !!inline.createSucceeds && Object.keys(inline.createSucceeds).length > 0;
+
+      // Key chaining: if update/delete missing keys, they'll be resolved after create runs
+      const needsKeyChaining =
+        (inline.updateSucceeds && !(keyField in inline.updateSucceeds)) ||
+        (inline.deleteSucceeds && !('id' in inline.deleteSucceeds));
+
+      if (needsKeyChaining && !hasCreate && keys.length === 0) {
+        return {
+          context: ctx,
+          status: 'failed',
+          errors: ['Update/delete payloads missing keys and no Create payload to chain from. Provide keys or add Create payloads.'],
+        };
+      }
+
+      // Use sampled keys if available, otherwise mark for runtime chaining
+      const updateKey = keys[0] ?? null;
+      const deleteKey = keys[1] ?? keys[0] ?? null;
+
+      const payloads: Record<string, Record<string, unknown>> = {
+        'create-succeeds.json': inline.createSucceeds ?? { ListPrice: 350000, BedroomsTotal: 4, City: 'Test City', StateOrProvince: 'CA', PostalCode: '90210', Country: 'US' },
+        'create-fails.json': inline.createFails ?? { ListPrice: -99999, BedroomsTotal: 3 },
+        'update-succeeds.json': { ...inline.updateSucceeds, ...(updateKey && !(keyField in (inline.updateSucceeds ?? {})) ? { [keyField]: updateKey } : {}) },
+        'update-fails.json': { ...inline.updateFails, ...(updateKey && !(keyField in (inline.updateFails ?? {})) ? { [keyField]: updateKey } : {}) },
+        'delete-succeeds.json': inline.deleteSucceeds && 'id' in inline.deleteSucceeds ? inline.deleteSucceeds : { id: deleteKey ?? '00000000-0000-0000-0000-000000000000' },
+        'delete-fails.json': inline.deleteFails ?? { id: '00000000-0000-0000-0000-000000000000' },
+      };
+
+      const writes = Object.entries(payloads).map(([filename, data]) =>
+        writeFile(join(outputDir, filename), JSON.stringify(data, null, 2))
+      );
+      await Promise.all(writes);
+
+      const chainedMsg = needsKeyChaining && keys.length > 0 ? ' (keys resolved from sampled records)' : '';
+      return {
+        context: { ...ctx, payloadsDir: outputDir },
+        summary: `Generated 6 payload files from config${chainedMsg}`,
+        artifacts: [{ label: 'Payloads', path: outputDir }],
+        counts: { payloads: 6 },
+      };
+    }
+
+    // Option 3: Auto-generate from sampled records (default)
+    const keys = ctx.sampleKeys!;
+    const payloads: Record<string, Record<string, unknown>> = {
+      'create-succeeds.json': { ListPrice: 350000.00, BedroomsTotal: 4, BathroomsTotalInteger: 3, City: 'Test City', StateOrProvince: 'CA', PostalCode: '90210', Country: 'US' },
+      'create-fails.json': { ListPrice: -99999.00, BedroomsTotal: 3, BathroomsTotalInteger: 2 },
+      'update-succeeds.json': { ListingKey: keys[0], ListPrice: 375000.00 },
+      'update-fails.json': { ListingKey: keys[0], ListPrice: -1.00 },
+      'delete-succeeds.json': { id: keys[1] },
+      'delete-fails.json': { id: '00000000-0000-0000-0000-000000000000' },
     };
 
     const writes = Object.entries(payloads).map(([filename, data]) =>
@@ -237,17 +263,29 @@ const writeComplianceReports = (config: AddEditConfig): PipelineStep<AddEditCont
 
 // ── Pipeline Assembly ──
 
+/** Check if inline payloads need keys resolved from the server. */
+const inlinePayloadsNeedSampling = (payloads?: import('./types.js').InlinePayloads): boolean => {
+  if (!payloads) return false;
+  const keyField = 'ListingKey';
+  const updateMissing = payloads.updateSucceeds && !(keyField in payloads.updateSucceeds);
+  const deleteMissing = payloads.deleteSucceeds && !('id' in payloads.deleteSucceeds);
+  const deleteEmpty = payloads.deleteSucceeds && Object.keys(payloads.deleteSucceeds).length === 0;
+  return !!(updateMissing || deleteMissing || deleteEmpty);
+};
+
 /** Create the Add/Edit compliance test pipeline. */
-export const createAddEditPipeline = (config: AddEditConfig) =>
-  createPipeline<AddEditContext>('add-edit', [
+export const createAddEditPipeline = (config: AddEditConfig) => {
+  const needsSampling = !config.payloadsDir && (!config.payloads || inlinePayloadsNeedSampling(config.payloads));
+  return createPipeline<AddEditContext>('add-edit', [
     healthCheck,
     resolveAuth(config),
     fetchAndParseMetadata(config),
-    ...(config.payloadsDir ? [] : [sampleRecords(config)]),
+    ...(needsSampling ? [sampleRecords(config)] : []),
     generatePayloads(config),
     runTests(config),
     writeComplianceReports(config),
   ]);
+};
 
 /** Run Add/Edit compliance tests with a single function call. */
 export const runAddEditCompliance = async (
@@ -265,4 +303,29 @@ export const runAddEditCompliance = async (
     onProgress,
     { failFast: config.options?.failFast ?? true },
   );
+};
+
+/** Run Add/Edit compliance from a config file. Runs each config entry sequentially. */
+export const runAddEditFromConfigFile = async (
+  configPath: string,
+  onProgress?: (progress: import('./types.js').StepProgress) => void,
+) => {
+  const { loadConfigFile, configEntryToAddEdit } = await import('./config.js');
+  const configFile = await loadConfigFile(configPath);
+
+  const results: Array<import('./types.js').PipelineResult> = [];
+
+  for (const entry of configFile.configs) {
+    const config = configEntryToAddEdit(entry, configFile.providerUoi);
+
+    // If config entry has inline payloads, pass them through
+    if (entry.payloads) {
+      (config as unknown as Record<string, unknown>).payloads = entry.payloads;
+    }
+
+    const result = await runAddEditCompliance(config, onProgress);
+    results.push(result);
+  }
+
+  return results;
 };

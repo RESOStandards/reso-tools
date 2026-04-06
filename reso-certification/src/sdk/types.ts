@@ -98,11 +98,22 @@ export interface DDConfig extends BaseComplianceConfig {
   readonly strictMode?: boolean;
 }
 
+/** Inline payloads for Add/Edit config. */
+export interface InlinePayloads {
+  readonly createSucceeds?: Record<string, unknown>;
+  readonly createFails?: Record<string, unknown>;
+  readonly updateSucceeds?: Record<string, unknown>;
+  readonly updateFails?: Record<string, unknown>;
+  readonly deleteSucceeds?: Record<string, unknown>;
+  readonly deleteFails?: Record<string, unknown>;
+}
+
 /** Add/Edit (RCP-010) endorsement config. */
 export interface AddEditConfig extends BaseComplianceConfig {
   readonly endorsement: 'add-edit';
   readonly resource: string;
   readonly payloadsDir?: string;
+  readonly payloads?: InlinePayloads;
   readonly metadataPath?: string;
   readonly specVersion?: string;
 }
