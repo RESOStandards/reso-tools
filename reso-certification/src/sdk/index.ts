@@ -20,6 +20,7 @@ export { createPipeline } from './pipeline.js';
 export { runAddEditCompliance, createAddEditPipeline } from './add-edit.js';
 export { runEntityEventCompliance, createEntityEventPipeline } from './entity-event.js';
 export { runCoreCompliance, createCorePipeline } from './core.js';
+export { runDDCompliance, createDDPipeline } from './dd.js';
 export {
   writeReports,
   addEditReportGenerators,
@@ -33,6 +34,7 @@ import type { ComplianceConfig, PipelineResult, ProgressCallback } from './types
 import { runAddEditCompliance } from './add-edit.js';
 import { runEntityEventCompliance } from './entity-event.js';
 import { runCoreCompliance } from './core.js';
+import { runDDCompliance } from './dd.js';
 
 /** Run compliance tests for any endorsement. Dispatches to the appropriate pipeline. */
 export const runComplianceTests = async (
@@ -47,6 +49,6 @@ export const runComplianceTests = async (
     case 'core':
       return runCoreCompliance(config, onProgress);
     case 'dd':
-      throw new Error('DD compliance testing not yet implemented in the SDK pipeline');
+      return runDDCompliance(config, onProgress);
   }
 };

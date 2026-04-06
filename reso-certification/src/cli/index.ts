@@ -17,7 +17,7 @@ import { Command } from 'commander';
 import { startMockServer, stopMockServer } from '../add-edit/mock/server.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
 import { loadConfigFile, configEntryToAddEdit, configEntryToEntityEvent, configEntryToCore } from '../sdk/config.js';
-import type { AddEditConfig, EntityEventConfig, CoreConfig, PipelineResult } from '../sdk/types.js';
+import type { AddEditConfig, EntityEventConfig, CoreConfig, DDConfig, PipelineResult } from '../sdk/types.js';
 import { loadDotEnv, resolveCliAuth } from './auth.js';
 import { resolveRenderMode, runWithProgress, runConfigEntries } from './render.js';
 
@@ -398,6 +398,72 @@ coreCmd.action(
       };
 
       const result = await runWithProgress(config, `Web API Core ${specVersion}`, renderMode);
+
+      if (opts.output === 'json') {
+        console.log(formatResultJson([result]));
+      }
+
+      process.exitCode = resolveExitCode([result]);
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exitCode = 2;
+    }
+  },
+);
+
+// ── Data Dictionary Subcommand ──
+
+const ddCmd = program
+  .command('dd')
+  .description('Data Dictionary 1.7/2.0 compliance testing')
+  .requiredOption('--url <url>', 'Server base URL')
+  .option('--version <version>', 'DD version: 1.7 or 2.0', '2.0')
+  .option('--limit <n>', 'Max records to replicate per resource', '100000')
+  .option('--strict', 'Strict mode: fail on variations and enforce JSON schema validation');
+
+addAuthOptions(ddCmd);
+addOutputOptions(ddCmd);
+
+ddCmd.action(
+  async (opts: {
+    url: string;
+    version: string;
+    limit: string;
+    strict?: boolean;
+    authToken?: string;
+    clientId?: string;
+    clientSecret?: string;
+    tokenUrl?: string;
+    verbose?: boolean;
+    output: string;
+    outputDir?: string;
+  }) => {
+    try {
+      const ddVersion = opts.version as '1.7' | '2.0';
+      if (ddVersion !== '1.7' && ddVersion !== '2.0') {
+        throw new Error(`Invalid version "${opts.version}". Must be "1.7" or "2.0".`);
+      }
+
+      const renderMode = resolveRenderMode(opts);
+      const auth = resolveCliAuth({
+        authToken: opts.authToken,
+        clientId: opts.clientId,
+        clientSecret: opts.clientSecret,
+        tokenUrl: opts.tokenUrl,
+      });
+
+      const config: DDConfig = {
+        endorsement: 'dd',
+        server: { url: opts.url, auth },
+        version: ddVersion,
+        limit: Number(opts.limit),
+        strictMode: opts.strict,
+        options: {
+          ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {}),
+        },
+      };
+
+      const result = await runWithProgress(config, `Data Dictionary ${ddVersion}`, renderMode);
 
       if (opts.output === 'json') {
         console.log(formatResultJson([result]));
