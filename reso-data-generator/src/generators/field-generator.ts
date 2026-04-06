@@ -88,9 +88,9 @@ export const transformLookupsForHumanFriendly = (
   return result;
 };
 
-/** Generates a random lookup value from available lookups for a given type. */
+/** Generates a random lookup value from available lookups for a given type, skipping placeholder values. */
 const randomLookupValue = (type: string, lookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>>): string | undefined => {
-  const values = lookups[type];
+  const values = lookups[type]?.filter(v => !v.lookupValue.startsWith('Sample') || !v.lookupValue.endsWith('EnumValue'));
   if (!values || values.length === 0) return undefined;
   return randomChoice(values).lookupValue;
 };
