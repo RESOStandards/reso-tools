@@ -9,6 +9,8 @@
  *   reso-cert mcp                # alias for --scope cert
  */
 
+/// <reference types="node" />
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -65,10 +67,12 @@ const server = new McpServer({
 for (const tool of tools) {
   const zodShape = jsonSchemaToZodShape(tool.inputSchema);
 
-  server.tool(
+  server.registerTool(
     tool.name,
-    tool.description,
-    zodShape,
+    {
+      description: tool.description,
+      inputSchema: zodShape,
+    },
     async (args) => {
       const handler = handlers[tool.name];
       if (!handler) {
