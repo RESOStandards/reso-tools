@@ -34,11 +34,12 @@ COPY reso-certification/package.json ./
 RUN sed -i 's|file:../reso-client|file:/deps/reso-client|' package.json \
  && sed -i 's|file:../reso-validation|file:/deps/reso-validation|' package.json \
  && sed -i 's|git+https://github.com/RESOStandards/reso-certification-utils.git#v3.0.0|file:/tmp/cert-utils|' package.json \
- && npm install --omit=dev
+ && npm install
 
 COPY reso-certification/tsconfig.json ./
 COPY reso-certification/src/ ./src/
 RUN npm run build
+RUN npm prune --omit=dev
 
 # Copy sample payloads and metadata
 COPY reso-certification/sample-payloads/ ./sample-payloads/
