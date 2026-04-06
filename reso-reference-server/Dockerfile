@@ -48,8 +48,8 @@ WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /deps/odata-expression-parser /deps/odata-expression-parser
-COPY --from=build /deps/validation /deps/validation
-COPY --from=build /deps/data-generator /deps/data-generator
+COPY --from=build /deps/reso-validation /deps/reso-validation
+COPY --from=build /deps/reso-data-generator /deps/reso-data-generator
 COPY reso-reference-server/package.json ./
 COPY reso-reference-server/server-metadata.json ./
 COPY reso-reference-server/public ./public
