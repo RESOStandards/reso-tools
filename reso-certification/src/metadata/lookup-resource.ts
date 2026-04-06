@@ -176,6 +176,7 @@ export const fetchAndMergeLookupResource = async (
   readonly report: MetadataReport;
   readonly lookupResourceAvailable: boolean;
   readonly lookupRecordCount: number;
+  readonly rawRecords?: ReadonlyArray<RawLookupRecord>;
 }> => {
   const lookupRecords = await fetchLookupResource(serverUrl, authToken);
 
@@ -187,5 +188,6 @@ export const fetchAndMergeLookupResource = async (
     report: mergeWithLookupResource(baseReport, lookupRecords),
     lookupResourceAvailable: true,
     lookupRecordCount: lookupRecords.length,
+    rawRecords: lookupRecords,
   };
 };

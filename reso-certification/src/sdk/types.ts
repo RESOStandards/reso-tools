@@ -99,6 +99,12 @@ export interface DDConfig extends BaseComplianceConfig {
   readonly strictMode?: boolean;
   /** Batch all expansions for a resource into a single $expand request (default: false). */
   readonly batchExpand?: boolean;
+  /** Provider Unique Organization Identifier. */
+  readonly providerUoi?: string;
+  /** Provider Unique System Identifier. */
+  readonly providerUsi?: string;
+  /** Recipient Unique Organization Identifier. */
+  readonly recipientUoi?: string;
 }
 
 /** Inline payloads for Add/Edit config. */
