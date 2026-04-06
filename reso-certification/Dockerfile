@@ -23,12 +23,18 @@ RUN rm -f package-lock.json \
  && sed -i 's|file:../odata-expression-parser|file:/deps/odata-expression-parser|' package.json \
  && npm install && npm run build
 
+# Pre-clone reso-certification-utils and strip lefthook prepare script.
+# npm always runs prepare for git deps regardless of --ignore-scripts or --omit=dev.
+RUN git clone --depth 1 --branch v3.0.0 https://github.com/RESOStandards/reso-certification-utils.git /tmp/cert-utils \
+ && cd /tmp/cert-utils && npm pkg delete scripts.prepare
+
 # Build reso-certification (depends on reso-client + reso-validation)
 WORKDIR /app
 COPY reso-certification/package.json ./
 RUN sed -i 's|file:../reso-client|file:/deps/reso-client|' package.json \
  && sed -i 's|file:../reso-validation|file:/deps/reso-validation|' package.json \
- && npm install --ignore-scripts
+ && sed -i 's|git+https://github.com/RESOStandards/reso-certification-utils.git#v3.0.0|file:/tmp/cert-utils|' package.json \
+ && npm install --omit=dev
 
 COPY reso-certification/tsconfig.json ./
 COPY reso-certification/src/ ./src/
