@@ -9,7 +9,6 @@
 import { writeFile, mkdir, copyFile, rename } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { createRequire } from 'node:module';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata } from '../test-runner/metadata.js';
 import { generateMetadataReport } from '../metadata/serializer.js';
@@ -211,9 +210,9 @@ const initReplicationState: PipelineStep<DDContext> = {
     // cert-utils reads schema-validation-settings.json from cwd — ensure it's there
     const settingsFile = 'schema-validation-settings.json';
     if (!existsSync(settingsFile)) {
-      const require = createRequire(import.meta.url);
-      const certUtilsPath = dirname(require.resolve('@reso/reso-certification-utils/common.js'));
-      const sourcePath = join(certUtilsPath, settingsFile);
+      // Resolve from the legacy-cert-utils local copy
+      const legacyDir = join(dirname(new URL(import.meta.url).pathname), '..', '..', 'legacy-cert-utils');
+      const sourcePath = join(legacyDir, settingsFile);
       if (existsSync(sourcePath)) {
         await copyFile(sourcePath, settingsFile);
       }

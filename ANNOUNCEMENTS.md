@@ -2,6 +2,22 @@
 
 ---
 
+## v0.5 — 2026-04-06
+
+### Sayonara, Commander!
+
+**All four RESO certification endorsements now run natively in TypeScript.** Add/Edit, EntityEvent, Web API Core, and Data Dictionary testing no longer requires Java, Gradle, or the Commander. Just `npm install` and `reso-cert <endorsement>`. Test parameters are auto-configured from live server data.
+
+**Data Dictionary 2.1 support is here.** The new DD version brings 3 new resources (Building, Model, RelatedLookup), 425 new fields, and 566 new lookups. [DD 2.1 documentation](https://dd.reso.org/DD2.1/) is live on dd.reso.org. The desktop client lets you switch between DD 2.0 and 2.1 from the Server menu.
+
+**AI agents can now use RESO tools.** The new MCP server exposes OData query, metadata, validation, and compliance testing tools to any MCP-compatible client — Claude, Cursor, VS Code, Windsurf, and more. See the [MCP server docs](reso-mcp-server/README.md).
+
+**Metadata generation from DD sheets.** Give the tool a DD XLSX file and it produces the reference metadata report used by the server and certification tools. No more Commander codegen. DD sheets have moved from the Commander repo to [transport.reso.org](https://github.com/RESOStandards/transport).
+
+**Migrating from reso-certification-utils?** See the [migration guide](reso-certification/MIGRATION.md) for command mapping, config compatibility, and new features.
+
+---
+
 ## v0.4 — 2026-04-05
 
 ### Getting Ready for Certification
