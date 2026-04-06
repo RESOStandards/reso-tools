@@ -37,8 +37,6 @@ export const createPipeline = <TContext extends PipelineContext>(
         const duration = Date.now() - stepStart;
         const status = output.status ?? 'passed';
 
-        context = { ...output.context };
-
         const result: StepResult = {
           name: step.name,
           endorsement,
@@ -52,6 +50,7 @@ export const createPipeline = <TContext extends PipelineContext>(
         };
 
         stepResults.push(result);
+        context = { ...output.context, pipelineSteps: [...stepResults] };
 
         onProgress({
           step: step.name,

@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { StepResult } from './types.js';
 import {
   buildResourceUrl,
   fetchMetadata,
@@ -10,9 +11,9 @@ import {
   resolveAuthToken,
 } from '../test-runner/index.js';
 import { runAllScenarios } from '../add-edit/index.js';
-import { generateComplianceReport } from '../add-edit/compliance-report.js';
 import type { AddEditConfig, PipelineStep, StepOutput } from './types.js';
 import { createPipeline } from './pipeline.js';
+import { addEditReportGenerators, writeReports } from './reports.js';
 
 // ── Pipeline Context ──
 
@@ -208,29 +209,28 @@ const runTests = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
   },
 });
 
-/** Generate the compliance report JSON. */
-const generateReport = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
-  name: 'Generate compliance report',
-  run: async (ctx) => {
-    const report = generateComplianceReport(
-      ctx.testReport as Parameters<typeof generateComplianceReport>[0],
-      {
-        version: config.specVersion ?? '2.0.0',
-        payloads: {},
-        entityType: ctx.entityType as Parameters<typeof generateComplianceReport>[1]['entityType'],
-      },
-    );
-
+/** Write generic and detailed compliance reports. */
+const writeComplianceReports = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
+  name: 'Write compliance reports',
+  run: async (ctx, onProgress) => {
     const outputDir = config.options?.outputDir ?? join(process.cwd(), '.reso-cert');
-    await mkdir(outputDir, { recursive: true });
+    const generators = addEditReportGenerators(config.specVersion ?? '2.0.0');
 
-    const reportPath = join(outputDir, 'add-edit-compliance-report.json');
-    await writeFile(reportPath, JSON.stringify(report, null, 2));
+    // Build a temporary pipeline result for the report generators
+    const pipelineResult = {
+      status: (ctx.testReport as { summary: { failed: number } }).summary.failed > 0 ? 'failed' as const : 'passed' as const,
+      endorsement: 'add-edit',
+      steps: ctx.pipelineSteps as ReadonlyArray<import('./types.js').StepResult> ?? [],
+      context: ctx,
+      duration: 0,
+    };
+
+    const written = await writeReports(pipelineResult, generators, outputDir, onProgress);
 
     return {
-      context: { ...ctx, complianceReport: report },
-      summary: `Compliance report: ${report.outcome}`,
-      artifacts: [{ label: 'Compliance Report', path: reportPath }],
+      context: { ...ctx, reports: written },
+      summary: `${written.length} reports written`,
+      artifacts: written.map(r => ({ label: r.name, path: r.path })),
     };
   },
 });
@@ -246,7 +246,7 @@ export const createAddEditPipeline = (config: AddEditConfig) =>
     ...(config.payloadsDir ? [] : [sampleRecords(config)]),
     generatePayloads(config),
     runTests(config),
-    generateReport(config),
+    writeComplianceReports(config),
   ]);
 
 /** Run Add/Edit compliance tests with a single function call. */
