@@ -19,9 +19,9 @@
     "node": ">=22.0.0"
   },
   "dependencies": {
-    "@reso-standards/data-generator": "file:../data-generator",
+    "@reso-standards/reso-data-generator": "file:../reso-data-generator",
     "@reso-standards/odata-expression-parser": "file:../odata-expression-parser",
-    "@reso-standards/validation": "file:../validation",
+    "@reso-standards/reso-validation": "file:../reso-validation",
     "better-sqlite3": "^11.0.0",
     "express": "^4.21.0",
     "mongodb": "^6.12.0",

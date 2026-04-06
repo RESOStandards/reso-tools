@@ -11,3 +11,9 @@ contextBridge.exposeInMainWorld('electronStorage', {
   set: (key: string, value: string): Promise<void> => ipcRenderer.invoke('storage:set', key, value),
   remove: (key: string): Promise<void> => ipcRenderer.invoke('storage:remove', key)
 });
+
+contextBridge.exposeInMainWorld('electronUpdates', {
+  onUpdateAvailable: (callback: (release: { tagName: string; url: string; name: string }) => void): void => {
+    ipcRenderer.on('update:available', (_event, release) => callback(release));
+  }
+});

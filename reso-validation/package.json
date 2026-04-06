@@ -1,17 +1,18 @@
 {
-  "name": "@reso-standards/data-generator",
+  "name": "@reso-standards/reso-validation",
   "version": "0.1.0",
-  "description": "RESO Data Dictionary test data generator — creates realistic OData records via the Add/Edit API",
+  "description": "RESO validation library — isomorphic, no Node/browser APIs.",
   "type": "module",
-  "bin": {
-    "reso-data-generator": "./dist/cli.js"
-  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./metadata": {
+      "types": "./dist/metadata/index.d.ts",
+      "import": "./dist/metadata/index.js"
     }
   },
   "files": [
@@ -27,12 +28,9 @@
   "engines": {
     "node": ">=22"
   },
-  "dependencies": {
-    "@inquirer/prompts": "^7.0.0"
-  },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "typescript": "~5.6.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   }
 }

@@ -64,7 +64,7 @@ title: RESO Tools
   <div class="arch-arrow">&darr;</div>
   <div class="arch-row">
     <div class="arch-box arch-box-blue">reso-client</div>
-    <div class="arch-box arch-box-green">validation</div>
+    <div class="arch-box arch-box-green">reso-validation</div>
     <div class="arch-box arch-box-green">odata-expression-parser</div>
   </div>
   <div class="arch-arrow">&darr;</div>
@@ -74,8 +74,8 @@ title: RESO Tools
   </div>
   <div class="arch-arrow">&darr;</div>
   <div class="arch-row">
-    <div class="arch-box arch-box-orange">certification</div>
-    <div class="arch-box arch-box-orange">data-generator</div>
+    <div class="arch-box arch-box-orange">reso-certification</div>
+    <div class="arch-box arch-box-orange">reso-data-generator</div>
   </div>
 </div>
 
@@ -93,7 +93,7 @@ title: RESO Tools
 
     <div class="package-item">
       <div>
-        <div class="package-name">@reso-standards/validation</div>
+        <div class="package-name">@reso-standards/reso-validation</div>
         <div class="package-desc">Validate real estate data against RESO metadata rules. Works in any JS runtime &mdash; Node.js, browsers, or edge functions. Use it to check field types, enumerations, and required fields before sending or accepting data.</div>
         <div class="package-meta">
           <span>98 tests</span>
@@ -101,7 +101,7 @@ title: RESO Tools
           <span>Zero dependencies</span>
         </div>
       </div>
-      <a href="{{ '/packages/validation' | relative_url }}" class="view-link">View &rarr;</a>
+      <a href="{{ '/packages/reso-validation' | relative_url }}" class="view-link">View &rarr;</a>
     </div>
 
     <div class="package-item">
@@ -146,7 +146,7 @@ title: RESO Tools
 
     <div class="package-item">
       <div>
-        <div class="package-name">@reso-standards/data-generator</div>
+        <div class="package-name">@reso-standards/reso-data-generator</div>
         <div class="package-desc">Generate realistic sample real estate data for testing. Creates properties, agents, offices, media, and more that conform to the RESO Data Dictionary. Use the CLI or import as a library.</div>
         <div class="package-meta">
           <span>104 tests</span>
@@ -154,12 +154,12 @@ title: RESO Tools
           <span>CLI + Library</span>
         </div>
       </div>
-      <a href="{{ '/packages/data-generator' | relative_url }}" class="view-link">View &rarr;</a>
+      <a href="{{ '/packages/reso-data-generator' | relative_url }}" class="view-link">View &rarr;</a>
     </div>
 
     <div class="package-item">
       <div>
-        <div class="package-name">@reso-standards/certification</div>
+        <div class="package-name">@reso-standards/reso-certification</div>
         <div class="package-desc">Run the same compliance tests used in RESO certification. Covers Web API Core, Data Dictionary, Add/Edit (RCP-010), and EntityEvent (RCP-027) endorsements. Test your server before submitting for certification.</div>
         <div class="package-meta">
           <span>102 tests</span>
@@ -167,7 +167,7 @@ title: RESO Tools
           <span>4 Compliance Suites</span>
         </div>
       </div>
-      <a href="{{ '/packages/certification' | relative_url }}" class="view-link">View &rarr;</a>
+      <a href="{{ '/packages/reso-certification' | relative_url }}" class="view-link">View &rarr;</a>
     </div>
   </div>
 </div>
@@ -306,7 +306,7 @@ docker compose --profile seed up          # Seed with test data
 
       <h3>Run Compliance Tests</h3>
       <p>Verify your server passes RESO certification requirements. This example runs the Add/Edit endorsement tests against the local reference server.</p>
-<pre><code>cd certification
+<pre><code>cd reso-certification
 npx reso-cert-add-edit \
   --url http://localhost:8080 \
   --resource Property \

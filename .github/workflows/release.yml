@@ -23,10 +23,10 @@ jobs:
       - name: Install and build shared libraries
         run: |
           npm install
-          cd validation && npm install && npx tsc && cd ..
+          cd reso-validation && npm install && npx tsc && cd ..
           cd odata-expression-parser && npm install && npx tsc && cd ..
           cd reso-client && npm install && npx tsc && cd ..
-          cd data-generator && npm install && npx tsc && cd ..
+          cd reso-data-generator && npm install && npx tsc && cd ..
           cd reso-reference-server && npm install && npm run build && cd ..
           cd reso-web-api-proxy && npm install && npm run build && cd ..
           cd reso-web-client && npm install && npm run build && cd ..

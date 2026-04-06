@@ -416,7 +416,7 @@ services:
   compliance-entity-event:
     build:
       context: ..
-      dockerfile: certification/Dockerfile
+      dockerfile: reso-certification/Dockerfile
     entrypoint: ["/bin/sh", "/config/entrypoint-entity-event.sh"]
     environment:
       SERVER_URL: http://server-entity-event:8080
@@ -473,7 +473,7 @@ services:
   compliance-entity-event-mongo:
     build:
       context: ..
-      dockerfile: certification/Dockerfile
+      dockerfile: reso-certification/Dockerfile
     entrypoint: ["/bin/sh", "/config/entrypoint-entity-event.sh"]
     environment:
       SERVER_URL: http://server-entity-event-mongo:8080
@@ -519,7 +519,7 @@ services:
   compliance-entity-event-sqlite:
     build:
       context: ..
-      dockerfile: certification/Dockerfile
+      dockerfile: reso-certification/Dockerfile
     entrypoint: ["/bin/sh", "/config/entrypoint-entity-event.sh"]
     environment:
       SERVER_URL: http://server-entity-event-sqlite:8080
@@ -579,7 +579,7 @@ services:
   compliance-addedit:
     build:
       context: ..
-      dockerfile: certification/Dockerfile
+      dockerfile: reso-certification/Dockerfile
     entrypoint: ["/bin/sh", "/config/entrypoint-addedit.sh"]
     environment:
       SERVER_URL: http://server-addedit:8080
@@ -635,7 +635,7 @@ services:
   compliance-addedit-mongo:
     build:
       context: ..
-      dockerfile: certification/Dockerfile
+      dockerfile: reso-certification/Dockerfile
     entrypoint: ["/bin/sh", "/config/entrypoint-addedit.sh"]
     environment:
       SERVER_URL: http://server-addedit-mongo:8080
@@ -680,7 +680,7 @@ services:
   compliance-addedit-sqlite:
     build:
       context: ..
-      dockerfile: certification/Dockerfile
+      dockerfile: reso-certification/Dockerfile
     entrypoint: ["/bin/sh", "/config/entrypoint-addedit.sh"]
     environment:
       SERVER_URL: http://server-addedit-sqlite:8080

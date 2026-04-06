@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { isEnumType } from '@reso-standards/validation';
+import { isEnumType } from '@reso-standards/reso-validation';
 import type { ResoField, ResoLookup, ResoMetadata } from './types.js';
 import { KEY_FIELD_MAP } from './types.js';
 

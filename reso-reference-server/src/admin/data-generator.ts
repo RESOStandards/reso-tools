@@ -6,8 +6,8 @@ import {
   getGenerator,
   getRelatedResources,
   transformLookupsForHumanFriendly
-} from '@reso-standards/data-generator';
-import type { ResoField, ResoLookup } from '@reso-standards/data-generator';
+} from '@reso-standards/reso-data-generator';
+import type { ResoField, ResoLookup } from '@reso-standards/reso-data-generator';
 import type { RequestHandler } from 'express';
 import type { EnumMode } from '../config.js';
 import type { DataAccessLayer, ResourceContext } from '../db/data-access.js';

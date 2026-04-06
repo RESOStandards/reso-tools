@@ -247,7 +247,7 @@ docker compose --profile sqlite --profile compliance-dd-sqlite up --build --exit
 
 ### Web API Add/Edit (RCP-010)
 
-Validates Create, Update, and Delete operations with representation and minimal response modes. Uses the custom [`@reso-standards/certification`](../certification/) test runner.
+Validates Create, Update, and Delete operations with representation and minimal response modes. Uses the custom [`@reso-standards/reso-certification`](../reso-certification/) test runner.
 
 **Current status: 8 passed, 0 failed**
 

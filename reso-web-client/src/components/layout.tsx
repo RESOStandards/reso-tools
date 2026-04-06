@@ -5,6 +5,7 @@ import { setApiConfig } from '../api/client';
 import { clearMetadataCache } from '../api/metadata';
 import { useServer } from '../context/server-context';
 import { useDarkMode } from '../hooks/use-dark-mode';
+import { useUpdateCheck } from '../hooks/use-update-check';
 import { ResourceNav } from './resource-nav';
 import { ServerSwitcher } from './server-switcher';
 
@@ -27,6 +28,7 @@ const getPageIndicator = (pathname: string, resource?: string): string | null =>
 /** App shell with responsive sidebar nav, RESO branding, dark mode toggle, and main content. */
 export const Layout = () => {
   const { isDark, toggle } = useDarkMode();
+  const availableUpdate = useUpdateCheck();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { resource } = useParams<{ resource: string }>();
   const location = useLocation();
@@ -110,6 +112,20 @@ export const Layout = () => {
           </div>
 
           <div className="flex items-center gap-3">
+          {/* Update badge */}
+          {availableUpdate && (
+            <a
+              href={availableUpdate.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 transition-colors"
+              title={availableUpdate.name}>
+              <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 17a.75.75 0 01-.75-.75V5.612L5.29 9.77a.75.75 0 01-1.08-1.04l5.25-5.5a.75.75 0 011.08 0l5.25 5.5a.75.75 0 11-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0110 17z" clipRule="evenodd" />
+              </svg>
+              Update
+            </a>
+          )}
           {/* Dark mode toggle */}
           <button
             type="button"

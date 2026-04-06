@@ -6,7 +6,7 @@ pre-commit:
       stage_fixed: true
 
     typecheck-validation:
-      root: "tools/validation/"
+      root: "tools/reso-validation/"
       run: npx tsc --noEmit
       priority: 1
 
@@ -21,7 +21,7 @@ pre-commit:
       priority: 2
 
     typecheck-data-generator:
-      root: "tools/data-generator/"
+      root: "tools/reso-data-generator/"
       run: npx tsc --noEmit
       priority: 2
 
@@ -31,7 +31,7 @@ pre-commit:
       priority: 2
 
     typecheck-certification:
-      root: "tools/certification/"
+      root: "tools/reso-certification/"
       run: npx tsc --noEmit
       priority: 3
 
@@ -41,7 +41,7 @@ pre-commit:
       priority: 2
 
     test-validation:
-      root: "tools/validation/"
+      root: "tools/reso-validation/"
       run: npx vitest run
       priority: 3
 
@@ -56,7 +56,7 @@ pre-commit:
       priority: 4
 
     test-data-generator:
-      root: "tools/data-generator/"
+      root: "tools/reso-data-generator/"
       run: npx vitest run
       priority: 4
 
@@ -66,6 +66,6 @@ pre-commit:
       priority: 4
 
     test-certification:
-      root: "tools/certification/"
+      root: "tools/reso-certification/"
       run: npx vitest run
       priority: 5
