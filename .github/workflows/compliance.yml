@@ -41,8 +41,9 @@ jobs:
           for dir in reso-validation odata-expression-parser reso-client reso-data-generator reso-reference-server reso-web-client reso-web-api-proxy; do
             (cd "$dir" && npm install)
           done
-          printf '#!/bin/sh\nexit 0' | sudo tee /usr/local/bin/lefthook > /dev/null && sudo chmod +x /usr/local/bin/lefthook
-          cd reso-certification && npm install && cd ..
+          git clone --depth 1 --branch v3.0.0 https://github.com/RESOStandards/reso-certification-utils.git /tmp/cert-utils
+          cd /tmp/cert-utils && npm pkg delete scripts.prepare && cd -
+          cd reso-certification && npm install /tmp/cert-utils && cd ..
 
       - name: Build shared libraries
         run: |
