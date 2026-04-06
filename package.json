@@ -16,7 +16,10 @@
     "test:server": "cd reso-reference-server && npx vitest run",
     "test:web-client": "cd reso-web-client && npx vitest run",
     "test:certification": "cd reso-certification && npx vitest run",
-    "test:mcp": "cd reso-mcp-server && npx vitest run"
+    "test:mcp": "cd reso-mcp-server && npx vitest run",
+    "bench": "npm run bench:filter-parser && npm run bench:certification",
+    "bench:filter-parser": "cd odata-expression-parser && npx vitest bench",
+    "bench:certification": "cd reso-certification && npx vitest bench"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
