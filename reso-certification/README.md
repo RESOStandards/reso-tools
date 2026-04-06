@@ -1,109 +1,220 @@
-# @reso-standards/certification
+# @reso-standards/reso-certification
 
-RESO certification testing toolkit for validating OData 4.01 server compliance against RESO Web API endorsement specifications. Ships as a single package with spec-specific modules for Add/Edit (RCP-010), Web API Core, and Data Dictionary.
+RESO certification compliance testing toolkit. Tests OData 4.01 servers against RESO Web API endorsement specifications via a CLI, SDK, or MCP server.
 
-Uses shared test infrastructure (`src/test-runner/`) providing OData protocol validators, metadata parsing (via [`@reso-standards/reso-client`](../reso-client/)), field validation (via [`@reso-standards/reso-validation`](../reso-validation/)), reporting, and HTTP client helpers.
+Built on [`@reso-standards/reso-client`](../reso-client/) for OData operations and [`@reso-standards/reso-validation`](../reso-validation/) for field validation.
 
 ## Install
 
 ```bash
-npm install @reso-standards/certification
+npm install @reso-standards/reso-certification
 ```
 
-## Project Structure
+## Quick Start
 
-```
-certification/
-├── src/
-│   ├── index.ts              # Public SDK exports
-│   ├── cli/index.ts          # Unified CLI entry point (bin: reso-cert)
-│   ├── test-runner/          # Shared infrastructure (validators, client, auth, metadata, reporter)
-│   ├── add-edit/             # RCP-010 Add/Edit scenarios + mock server
-│   ├── web-api-core/         # Web API Core 2.0.0 (stub)
-│   └── data-dictionary/      # Data Dictionary 2.0 (stub)
-├── tests/                    # 102 Vitest tests
-├── sample-payloads/          # JSON payload files for Add/Edit testing
-├── sample-metadata.xml       # Sample EDMX metadata for mock server
-└── Dockerfile                # Multi-stage Docker build for CI
+```bash
+# Add/Edit (RCP-010)
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN
+
+# EntityEvent (RCP-027)
+reso-cert entity-event --url https://api.example.com --auth-token TOKEN
+
+# Web API Core 2.0.0
+reso-cert core --url https://api.example.com --auth-token TOKEN
+
+# Web API Core 2.1.0
+reso-cert core --url https://api.example.com --auth-token TOKEN --version 2.1.0
 ```
 
-## Certification Modules
+## Authentication
+
+Auth is resolved from the first available source:
+
+1. CLI flags: `--auth-token` or `--client-id`/`--client-secret`/`--token-url`
+2. Config file: `--config` with per-entry auth
+3. `.env` file in the current directory
+4. Environment variables: `RESO_AUTH_TOKEN` or `RESO_CLIENT_ID`/`RESO_CLIENT_SECRET`/`RESO_TOKEN_URI`
+
+```bash
+# Bearer token
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN
+
+# OAuth2 Client Credentials
+reso-cert add-edit --url https://api.example.com \
+  --client-id ID --client-secret SECRET --token-url https://auth.example.com/token
+
+# Environment variables (no flags needed)
+RESO_AUTH_TOKEN=TOKEN reso-cert add-edit --url https://api.example.com
+```
+
+## Endorsements
 
 ### Add/Edit (RCP-010)
 
-Validates OData CRUD operations against 8 Gherkin BDD certification scenarios:
-
-1. **Create with `Prefer: return=representation`** — POST returns 201 with entity, OData annotations, and follow-up GET
-2. **Create with `Prefer: return=minimal`** — POST returns 204 with headers only, and follow-up GET
-3. **Create with invalid payload** — POST returns 400 with OData error format and field-level details
-4. **Update with `Prefer: return=representation`** — PATCH returns 200 with entity and `@odata.etag`
-5. **Update with `Prefer: return=minimal`** — PATCH returns 204 with headers only
-6. **Update with invalid payload** — PATCH returns 400 with OData error format
-7. **Delete succeeds** — DELETE returns 204, follow-up GET returns 404
-8. **Delete fails** — DELETE to non-existent resource returns 4xx
-
-**Current status: 8 passed, 0 failed**
-
-### Web API Core 2.0.0 (stub)
-
-Future home of programmatic Web API Core certification. Currently tested via the RESO [web-api-commander](https://github.com/RESOStandards/web-api-commander) Docker workflow.
-
-**Current status: 42 passed, 0 failed, 3 skipped** (via Docker)
-
-### Data Dictionary 2.0 (stub)
-
-Future home of programmatic Data Dictionary certification. Currently tested via [reso-certification-utils](https://github.com/RESOStandards/reso-certification-utils) Docker workflow.
-
-**Current status: 1,034 passed, 570 skipped, 0 failed** (via Docker)
-
-## CLI Usage
+Validates OData CRUD operations against 8 certification scenarios: create with representation/minimal, create fails, update with representation/minimal, update fails, delete succeeds, delete fails.
 
 ```bash
-npm run build
+# Auto-generate payloads from sampled server data
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN
 
-# Run Add/Edit against a live server
-npx reso-cert \
-  --url https://api.example.com \
-  --resource Property \
-  --payloads ./sample-payloads \
-  --auth-token <token>
+# Use a payload directory
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads
 
-# Run against the built-in mock server (offline testing / CI)
-npx reso-cert \
-  --url http://localhost:8800 \
-  --resource Property \
-  --payloads ./sample-payloads \
-  --auth-token test \
-  --mock
+# Use a config file with inline payloads
+reso-cert add-edit --config sample-configs/add-edit-config.json
 
-# Generate a compliance report
-npx reso-cert \
-  --url http://localhost:8080 \
-  --resource Property \
-  --payloads ./sample-payloads \
-  --auth-token test \
-  --compliance-report ./report.json \
-  --spec-version 2.0.0
+# Mock server (offline testing)
+reso-cert add-edit --mock --payloads sample-payloads
 ```
 
-### CLI Options
+### EntityEvent (RCP-027)
 
-| Option | Description |
-|--------|-------------|
-| `--url <url>` | OData server base URL |
-| `--resource <name>` | OData resource name (e.g., `Property`) |
-| `--payloads <dir>` | Directory containing payload JSON files |
-| `--auth-token <token>` | Pre-fetched bearer token |
-| `--client-id <id>` | OAuth2 client ID (alternative to `--auth-token`) |
-| `--client-secret <secret>` | OAuth2 client secret |
-| `--token-url <url>` | OAuth2 token endpoint URL |
-| `--metadata <path>` | Path to local XML metadata file |
-| `--mock` | Start a built-in mock OData server on port 8800 |
-| `--output <format>` | Output format: `console` (default) or `json` |
-| `--compliance-report <path>` | Write structured JSON compliance report to file |
-| `--spec-version <version>` | Spec version for the report (default: `2.0.0`) |
+Validates EntityEvent change tracking with observe mode (read-only) and full mode (create/update/delete canary writes).
 
-### Exit Codes
+```bash
+# Observe mode (read-only, default)
+reso-cert entity-event --url https://api.example.com --auth-token TOKEN
+
+# Full mode (canary writes to verify event generation)
+reso-cert entity-event --url https://api.example.com --auth-token TOKEN --mode full
+```
+
+### Web API Core 2.0.0 / 2.1.0
+
+Validates OData query capabilities: $filter (integer, decimal, date, datetime, enum comparisons), $select, $top, $skip, $count, $orderby, error codes. v2.1.0 adds $expand, server-driven paging, and string-based enum comparisons.
+
+45 scenarios defined as data and run through 5 assertion primitives — no Java, Gradle, or RESOScript XML required.
+
+```bash
+# Test all well-known resources (Property, Member, Office, Media, etc.)
+reso-cert core --url https://api.example.com --auth-token TOKEN
+
+# Test specific resources
+reso-cert core --url https://api.example.com --auth-token TOKEN --resources Property,Member
+
+# Version 2.1.0 (adds $expand, nextLink, string enum tests)
+reso-cert core --url https://api.example.com --auth-token TOKEN --version 2.1.0
+
+# Require full data type coverage (fail if any type has no test data)
+reso-cert core --url https://api.example.com --auth-token TOKEN --full-coverage
+```
+
+#### Test Matrix
+
+The Web API Core test runner validates the following OData operations per resource:
+
+| Category | Scenarios | What's Tested |
+|----------|-----------|---------------|
+| Structural | 7 | Metadata validation, service document, fetch-by-key, $select, $top, $skip, $count |
+| Integer filters | 9 | eq, ne, gt, ge, lt, le, and, or, not() on integer fields |
+| Decimal filters | 5 | ne, gt, ge, lt, le on decimal fields |
+| Date filters | 6 | eq, ne, gt, ge, lt, le on ISO 8601 date fields |
+| Timestamp filters | 5 | gt, ge, lt/le/ne with `now()` on DateTimeOffset fields |
+| OrderBy | 4 | Ascending, descending, combined with integer filter |
+| Enum (single) | 3 | has, eq, ne on single-value enumerations |
+| Enum (multi) | 2 | has, has+and on multi-value enumerations |
+| Collection | 2 | any(), all() lambda operators |
+| Error codes | 2 | HTTP 400 (bad request), HTTP 404 (not found) |
+| **v2.0.0 total** | **45** | |
+| String enums (v2.1.0) | 4 | eq, ne on string enums; any(), all() on string collections |
+| Paging (v2.1.0) | 1 | Server-driven paging via @odata.nextLink |
+| $expand (v2.1.0) | 1 | Navigation property expansion |
+| **v2.1.0 total** | **51** | |
+
+Each scenario samples live data from the server to find appropriate test values (median selection for numeric/temporal types ensures filter tests work bidirectionally). Scenarios are skipped when the required data type doesn't exist in the resource's metadata or no data is available to validate.
+
+#### Enum Mode
+
+The server's enumeration representation is auto-detected from metadata. Override with `--enum-mode` if needed:
+
+| Mode | Single Enum | Multi Enum | Detection |
+|------|-------------|------------|-----------|
+| `string` | `Edm.String` + LookupName | `Collection(Edm.String)` | LookupName annotations |
+| `collections` | `Edm.EnumType` | `Collection(Edm.EnumType)` | Collection enum types |
+| `isflags` | `Edm.EnumType` | `Edm.EnumType` with `IsFlags=true` | IsFlags attribute |
+
+```bash
+# Override auto-detection
+reso-cert core --url https://api.example.com --auth-token TOKEN --enum-mode collections
+```
+
+#### Coverage Matrix
+
+The Core report includes a coverage matrix showing which data types were tested per resource. In default mode, the test passes as long as no scenarios fail — missing types are skipped and noted. With `--full-coverage`, the test fails if any type category has zero coverage across all tested resources.
+
+## Output Modes
+
+```bash
+# Default: listr2 progress with spinners
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN
+
+# Verbose: line-by-line output (good for CI)
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --verbose
+
+# JSON: pipeline result as JSON (for piping)
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --output json
+
+# Write compliance reports to a directory
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --output-dir ./results
+```
+
+## Config Files
+
+Use `--config` to run tests from a JSON config file. Each entry in the `configs` array is tested sequentially.
+
+```bash
+reso-cert add-edit --config sample-configs/add-edit-config.json
+reso-cert entity-event --config sample-configs/entity-event-config.json
+```
+
+See [`sample-configs/`](sample-configs/) for examples.
+
+## SDK Usage
+
+All CLI commands wrap SDK functions. Use the same functions programmatically:
+
+```typescript
+import { runComplianceTests } from '@reso-standards/reso-certification';
+
+// Run any endorsement
+const result = await runComplianceTests({
+  endorsement: 'add-edit',
+  server: {
+    url: 'https://api.example.com',
+    auth: { mode: 'token', authToken: 'TOKEN' },
+  },
+  resource: 'Property',
+}, (progress) => {
+  console.log(`${progress.step}: ${progress.status}`);
+});
+
+console.log(`${result.status}: ${result.steps.length} steps`);
+```
+
+Available SDK functions:
+
+```typescript
+import {
+  // Unified dispatcher
+  runComplianceTests,
+
+  // Per-endorsement pipelines
+  runAddEditCompliance,
+  runEntityEventCompliance,
+  runCoreCompliance,
+
+  // Pipeline builder
+  createPipeline,
+
+  // Report generators
+  writeReports,
+  addEditReportGenerators,
+  entityEventReportGenerators,
+  coreReportGenerators,
+} from '@reso-standards/reso-certification';
+```
+
+## Exit Codes
 
 | Code | Meaning |
 |------|---------|
@@ -111,228 +222,36 @@ npx reso-cert \
 | 1 | One or more scenarios failed |
 | 2 | Runtime error |
 
-## Programmatic API
-
-```typescript
-import {
-  runAllScenarios,
-  generateComplianceReport,
-  startMockServer,
-  stopMockServer
-} from '@reso-standards/certification';
-
-// Run all 8 Add/Edit scenarios
-const report = await runAllScenarios({
-  serverUrl: 'http://localhost:8080',
-  resource: 'Property',
-  payloadsDir: './sample-payloads',
-  auth: { mode: 'token', authToken: 'test' }
-});
-
-console.log(`${report.summary.passed} passed, ${report.summary.failed} failed`);
-```
-
-### Shared Test Infrastructure
-
-The test-runner module is also exported for building custom certification scenarios:
-
-```typescript
-import {
-  // Validators
-  validateODataVersionHeader,
-  validateStatusCode,
-  validateLocationHeader,
-  validateODataAnnotation,
-  validateODataError,
-  validateResponseContainsPayload,
-
-  // Client
-  odataRequest,
-  buildResourceUrl,
-
-  // Metadata
-  fetchMetadata,
-  parseMetadataXml,
-  getEntityType,
-  validatePayloadAgainstMetadata,
-
-  // Auth
-  resolveAuthToken,
-
-  // Reporter
-  formatConsoleReport,
-  formatJsonReport,
-
-  // Helpers
-  extractPrimaryKey,
-  buildScenarioResult
-} from '@reso-standards/certification';
-```
-
 ## Docker Compliance Testing
 
-Run compliance tests against the [RESO Reference Server](../reso-reference-server/) using Docker Compose.
-
-### Setup
+Run compliance tests against the [RESO Reference Server](../reso-reference-server/) using Docker Compose:
 
 ```bash
 cd ../reso-reference-server
 
-# Start server and seed data
-docker compose up -d --build --wait
-docker compose --profile seed up --exit-code-from seed seed
+# Start server
+docker compose up -d --build --wait db server
+
+# Add/Edit
+docker compose --profile compliance-addedit up --build \
+  --exit-code-from compliance-addedit db-addedit server-addedit compliance-addedit
+
+# EntityEvent
+docker compose --profile compliance-entity-event up --build \
+  --exit-code-from compliance-entity-event db-entity-event server-entity-event compliance-entity-event
+
+# Web API Core
+docker compose --profile compliance-core up --build \
+  --exit-code-from compliance-core compliance-core
 ```
-
-### Web API Core 2.0.0
-
-```bash
-docker compose --profile compliance-core up --build --exit-code-from compliance-core
-```
-
-### Add/Edit (RCP-010)
-
-```bash
-docker compose --profile compliance-addedit up --build --exit-code-from compliance-addedit
-```
-
-### Data Dictionary 2.0
-
-```bash
-docker compose --profile compliance-dd up --build --exit-code-from compliance-dd
-```
-
-### Local CLI (without Docker)
-
-```bash
-# Against a running reference server
-npx reso-cert \
-  --url http://localhost:8080 \
-  --resource Property \
-  --payloads ./sample-payloads \
-  --auth-token test \
-  --compliance-report ./compliance-report.json \
-  --spec-version 2.0.0
-```
-
-## Compliance Report Format
-
-The `--compliance-report` flag generates a structured JSON file suitable for API submission. The report captures the outcome of each certification scenario along with the fields, enumerations, and expansions tested.
-
-### Top-Level Structure
-
-```json
-{
-  "description": "Web API Add/Edit",
-  "version": "2.0.0",
-  "generatedOn": "2026-03-06T09:00:00.000Z",
-  "outcome": "passed",
-  "remarks": "Tested Create (representation, minimal), Update (representation, minimal), and Delete operations on Property with 5 of 652 fields.",
-  "scenarios": [...]
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `description` | `string` | Endorsement name (`"Web API Add/Edit"`) |
-| `version` | `string` | Spec version (from `--spec-version`) |
-| `generatedOn` | `string` | ISO 8601 timestamp |
-| `outcome` | `"passed" \| "failed"` | Overall result |
-| `remarks` | `string` | Human-readable summary of operations, fields, and any failures |
-| `scenarios` | `ScenarioDetail[]` | Per-scenario results |
-
-### Scenario Detail
-
-Each scenario includes the operation type, response preference, tested fields, enumerations, and any failures:
-
-```json
-{
-  "name": "create-succeeds-representation",
-  "operation": "Create",
-  "preference": "return=representation",
-  "resource": "Property",
-  "status": "passed",
-  "durationMs": 42,
-  "fields": {
-    "count": 5,
-    "names": ["ListPrice", "City", "StateOrProvince", "PostalCode", "Country"]
-  },
-  "enumerations": {
-    "count": 1,
-    "values": [{ "fieldName": "StandardStatus", "value": "Active" }]
-  },
-  "expansions": [],
-  "failures": []
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | `string` | Scenario identifier (e.g., `create-succeeds-representation`) |
-| `operation` | `"Create" \| "Update" \| "Delete"` | CRUD operation type |
-| `preference` | `string?` | `return=representation` or `return=minimal` (omitted for Delete) |
-| `resource` | `string` | OData resource tested |
-| `status` | `"passed" \| "failed"` | Scenario result |
-| `durationMs` | `number` | Execution time in milliseconds |
-| `fields.count` | `number` | Number of non-key fields in the payload |
-| `fields.names` | `string[]` | Field names tested |
-| `enumerations.count` | `number` | Number of enum fields with values |
-| `enumerations.values` | `{fieldName, value}[]` | Enum field names and their test values |
-| `expansions` | `string[]` | Navigation properties included in the payload |
-| `failures` | `FailureDetail[]` | Assertion failures (empty when passed) |
-
-### Failure Detail
-
-When a scenario fails, each failing assertion is captured:
-
-```json
-{
-  "assertion": "OData-Version header is 4.0 or 4.01",
-  "expected": "4.0 or 4.01",
-  "actual": "(missing)"
-}
-```
-
-## Payload Format
-
-Place JSON files in the payloads directory. The tool expects 6 files:
-
-| File | Purpose |
-|------|---------|
-| `create-succeeds.json` | Known-good payload for POST |
-| `create-fails.json` | Known-bad payload for POST (e.g., negative ListPrice) |
-| `update-succeeds.json` | Known-good payload for PATCH (includes primary key) |
-| `update-fails.json` | Known-bad payload for PATCH |
-| `delete-succeeds.json` | `{ "id": "<key>" }` — existing record to delete |
-| `delete-fails.json` | `{ "id": "<key>" }` — non-existent record |
-
-Known-bad payloads use negative numeric values to trigger server-side validation errors (e.g., `"ListPrice": -1`).
-
-## Authentication
-
-| Method | Options |
-|--------|---------|
-| Bearer token | `--auth-token <token>` |
-| OAuth2 Client Credentials | `--client-id <id> --client-secret <secret> --token-url <url>` |
-
-When using `--mock`, the mock server provides its own OAuth2 token endpoint automatically.
-
-## Mock Server
-
-The `--mock` flag starts a built-in Express-based OData mock server on port 8800 that implements enough of the OData protocol to exercise all 8 scenarios. Useful for offline testing and CI.
-
-The mock server:
-- Serves EDMX metadata at `/$metadata`
-- Implements CRUD at `/{Resource}` and `/{Resource}('{key}')`
-- Returns OData-compliant headers, annotations, and error responses
-- Triggers 400 validation errors for negative numeric field values
-- Provides a mock OAuth2 token endpoint at `/oauth/token`
 
 ## Development
 
 ```bash
 npm install
 npm run build
-npm test        # 102 tests
+npm test        # 219 tests
+npm run dev     # Watch mode
 ```
 
 ## License
