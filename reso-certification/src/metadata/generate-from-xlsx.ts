@@ -147,10 +147,13 @@ const processField = (row: SheetRow, version: string): MetadataReportField | nul
 
   if (!resourceName || !fieldName) return null;
 
-  // Skip expansion references (SourceResource indicates a navigation property)
+  // SourceResource indicates a navigation property (expansion)
   const isExpansion = !!sourceResource;
 
-  const { type, nullable, maxLength, scale, precision, isCollection } = mapFieldType(row);
+  // For expansions, the type is a collection reference to the target entity type
+  const { type: mappedType, nullable, maxLength, scale, precision, isCollection: mappedIsCollection } = mapFieldType(row);
+  const type = isExpansion ? `Collection(${ENUM_NAMESPACE.replace('.enums', '')}.${sourceResource})` : mappedType;
+  const isCollection = isExpansion ? true : mappedIsCollection;
 
   const annotations: Array<{ readonly term: string; readonly value: string }> = [];
 

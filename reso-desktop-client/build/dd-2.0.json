@@ -1,7 +1,7 @@
 {
   "description": "RESO Data Dictionary Metadata Report",
   "version": "2.0",
-  "generatedOn": "2026-04-06T11:01:45.888Z",
+  "generatedOn": "2026-04-06T11:38:35.271Z",
   "resources": [
     {
       "resourceName": "Property",
@@ -1426,8 +1426,9 @@
     {
       "resourceName": "Property",
       "fieldName": "BuyerAgent",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -2075,8 +2076,9 @@
     {
       "resourceName": "Property",
       "fieldName": "BuyerOffice",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Office)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -2315,8 +2317,9 @@
     {
       "resourceName": "Property",
       "fieldName": "BuyerTeam",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Teams)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Teams",
       "annotations": [
@@ -2606,8 +2609,9 @@
     {
       "resourceName": "Property",
       "fieldName": "CoBuyerAgent",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -3191,8 +3195,9 @@
     {
       "resourceName": "Property",
       "fieldName": "CoBuyerOffice",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Office)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -3431,8 +3436,9 @@
     {
       "resourceName": "Property",
       "fieldName": "CoListAgent",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -4016,8 +4022,9 @@
     {
       "resourceName": "Property",
       "fieldName": "CoListOffice",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Office)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -6742,8 +6749,9 @@
     {
       "resourceName": "Property",
       "fieldName": "GreenBuildingVerification",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.PropertyGreenVerification)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "PropertyGreenVerification",
       "annotations": [
@@ -7128,8 +7136,9 @@
     {
       "resourceName": "Property",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -7979,8 +7988,9 @@
     {
       "resourceName": "Property",
       "fieldName": "ListAgent",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -8765,8 +8775,9 @@
     {
       "resourceName": "Property",
       "fieldName": "ListOffice",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Office)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -9053,8 +9064,9 @@
     {
       "resourceName": "Property",
       "fieldName": "ListTeam",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Teams)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Teams",
       "annotations": [
@@ -9684,8 +9696,9 @@
     {
       "resourceName": "Property",
       "fieldName": "Media",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Media)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Media",
       "annotations": [
@@ -10440,8 +10453,9 @@
     {
       "resourceName": "Property",
       "fieldName": "OpenHouse",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OpenHouse)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OpenHouse",
       "annotations": [
@@ -10610,8 +10624,9 @@
     {
       "resourceName": "Property",
       "fieldName": "OriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -11387,8 +11402,9 @@
     {
       "resourceName": "Property",
       "fieldName": "PowerProduction",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.PropertyPowerProduction)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "PropertyPowerProduction",
       "annotations": [
@@ -11986,8 +12002,9 @@
     {
       "resourceName": "Property",
       "fieldName": "Rooms",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.PropertyRooms)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "PropertyRooms",
       "annotations": [
@@ -12573,8 +12590,9 @@
     {
       "resourceName": "Property",
       "fieldName": "SocialMedia",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.SocialMedia)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "SocialMedia",
       "annotations": [
@@ -12595,8 +12613,9 @@
     {
       "resourceName": "Property",
       "fieldName": "SourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -13787,8 +13806,9 @@
     {
       "resourceName": "Property",
       "fieldName": "UnitTypes",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.PropertyUnitTypes)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "PropertyUnitTypes",
       "annotations": [
@@ -14906,8 +14926,9 @@
     {
       "resourceName": "Association",
       "fieldName": "AssociationMember",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -15054,8 +15075,9 @@
     {
       "resourceName": "Association",
       "fieldName": "AssociationSocialMedia",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.SocialMedia)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "SocialMedia",
       "annotations": [
@@ -15181,8 +15203,9 @@
     {
       "resourceName": "Association",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -15264,8 +15287,9 @@
     {
       "resourceName": "Association",
       "fieldName": "OriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -15391,8 +15415,9 @@
     {
       "resourceName": "Association",
       "fieldName": "SourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -16684,8 +16709,9 @@
     {
       "resourceName": "ContactListingNotes",
       "fieldName": "Contact",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Contacts)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Contacts",
       "annotations": [
@@ -16748,8 +16774,9 @@
     {
       "resourceName": "ContactListingNotes",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -16770,8 +16797,9 @@
     {
       "resourceName": "ContactListingNotes",
       "fieldName": "Listing",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Property)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Property",
       "annotations": [
@@ -16937,8 +16965,9 @@
     {
       "resourceName": "ContactListings",
       "fieldName": "Contact",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Contacts)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Contacts",
       "annotations": [
@@ -17083,8 +17112,9 @@
     {
       "resourceName": "ContactListings",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -17145,8 +17175,9 @@
     {
       "resourceName": "ContactListings",
       "fieldName": "Listing",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Property)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Property",
       "annotations": [
@@ -17229,8 +17260,9 @@
     {
       "resourceName": "ContactListings",
       "fieldName": "ListingNotes",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.ContactListingNotes)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "ContactListingNotes",
       "annotations": [
@@ -17602,8 +17634,9 @@
     {
       "resourceName": "Contacts",
       "fieldName": "ContactsOtherPhone",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OtherPhone)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OtherPhone",
       "annotations": [
@@ -17624,8 +17657,9 @@
     {
       "resourceName": "Contacts",
       "fieldName": "ContactsSocialMedia",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.SocialMedia)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "SocialMedia",
       "annotations": [
@@ -17836,8 +17870,9 @@
     {
       "resourceName": "Contacts",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -18174,8 +18209,9 @@
     {
       "resourceName": "Contacts",
       "fieldName": "Media",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Media)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Media",
       "annotations": [
@@ -18404,8 +18440,9 @@
     {
       "resourceName": "Contacts",
       "fieldName": "OriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -18700,8 +18737,9 @@
     {
       "resourceName": "Contacts",
       "fieldName": "OwnerMember",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -18911,8 +18949,9 @@
     {
       "resourceName": "Contacts",
       "fieldName": "SourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -20059,8 +20098,9 @@
     {
       "resourceName": "InternetTracking",
       "fieldName": "ActorOriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -20228,8 +20268,9 @@
     {
       "resourceName": "InternetTracking",
       "fieldName": "ActorSourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -20438,8 +20479,9 @@
     {
       "resourceName": "InternetTracking",
       "fieldName": "EventOriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -20543,8 +20585,9 @@
     {
       "resourceName": "InternetTracking",
       "fieldName": "EventSourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -20732,8 +20775,9 @@
     {
       "resourceName": "InternetTracking",
       "fieldName": "ObjectOriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -20796,8 +20840,9 @@
     {
       "resourceName": "InternetTracking",
       "fieldName": "ObjectSourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -21697,8 +21742,9 @@
     {
       "resourceName": "LockOrBox",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -22286,8 +22332,9 @@
     {
       "resourceName": "LockOrBox",
       "fieldName": "OriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -22308,8 +22355,9 @@
     {
       "resourceName": "LockOrBox",
       "fieldName": "ShowingAgent",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -22519,8 +22567,9 @@
     {
       "resourceName": "LockOrBox",
       "fieldName": "ShowingOffice",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Office)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -22604,8 +22653,9 @@
     {
       "resourceName": "LockOrBox",
       "fieldName": "SourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -22746,8 +22796,9 @@
     {
       "resourceName": "Media",
       "fieldName": "ChangedByMember",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -22831,8 +22882,9 @@
     {
       "resourceName": "Media",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -23233,8 +23285,9 @@
     {
       "resourceName": "Media",
       "fieldName": "OriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -23531,8 +23584,9 @@
     {
       "resourceName": "Media",
       "fieldName": "SourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -23687,8 +23741,9 @@
     {
       "resourceName": "Member",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -23750,8 +23805,9 @@
     {
       "resourceName": "Member",
       "fieldName": "Media",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Media)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Media",
       "annotations": [
@@ -24629,8 +24685,9 @@
     {
       "resourceName": "Member",
       "fieldName": "MemberOtherPhone",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OtherPhone)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OtherPhone",
       "annotations": [
@@ -24912,8 +24969,9 @@
     {
       "resourceName": "Member",
       "fieldName": "MemberSocialMedia",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.SocialMedia)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "SocialMedia",
       "annotations": [
@@ -25220,8 +25278,9 @@
     {
       "resourceName": "Member",
       "fieldName": "Office",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Office)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -25358,8 +25417,9 @@
     {
       "resourceName": "Member",
       "fieldName": "OriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -25473,8 +25533,9 @@
     {
       "resourceName": "Member",
       "fieldName": "SourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -25605,8 +25666,9 @@
     {
       "resourceName": "MemberAssociation",
       "fieldName": "Association",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Association)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Association",
       "annotations": [
@@ -25710,8 +25772,9 @@
     {
       "resourceName": "MemberAssociation",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -25732,8 +25795,9 @@
     {
       "resourceName": "MemberAssociation",
       "fieldName": "Member",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -26080,8 +26144,9 @@
     {
       "resourceName": "MemberAssociation",
       "fieldName": "OriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -26165,8 +26230,9 @@
     {
       "resourceName": "MemberAssociation",
       "fieldName": "SourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -26250,8 +26316,9 @@
     {
       "resourceName": "MemberStateLicense",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -26272,8 +26339,9 @@
     {
       "resourceName": "MemberStateLicense",
       "fieldName": "Member",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -26523,8 +26591,9 @@
     {
       "resourceName": "Office",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -26569,8 +26638,9 @@
     {
       "resourceName": "Office",
       "fieldName": "MainOffice",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Office)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -26641,8 +26711,9 @@
     {
       "resourceName": "Office",
       "fieldName": "Media",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Media)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Media",
       "annotations": [
@@ -26924,8 +26995,9 @@
     {
       "resourceName": "Office",
       "fieldName": "OfficeBroker",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -27357,8 +27429,9 @@
     {
       "resourceName": "Office",
       "fieldName": "OfficeManager",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -27671,8 +27744,9 @@
     {
       "resourceName": "Office",
       "fieldName": "OfficeSocialMedia",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.SocialMedia)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "SocialMedia",
       "annotations": [
@@ -27784,8 +27858,9 @@
     {
       "resourceName": "Office",
       "fieldName": "OriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -27924,8 +27999,9 @@
     {
       "resourceName": "Office",
       "fieldName": "SourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -28084,8 +28160,9 @@
     {
       "resourceName": "OfficeAssociation",
       "fieldName": "Association",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Association)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Association",
       "annotations": [
@@ -28190,8 +28267,9 @@
     {
       "resourceName": "OfficeAssociation",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -28252,8 +28330,9 @@
     {
       "resourceName": "OfficeAssociation",
       "fieldName": "Office",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Office)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -28398,8 +28477,9 @@
     {
       "resourceName": "OfficeAssociation",
       "fieldName": "OriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -28483,8 +28563,9 @@
     {
       "resourceName": "OfficeAssociation",
       "fieldName": "SourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -28568,8 +28649,9 @@
     {
       "resourceName": "OfficeCorporateLicense",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -28610,8 +28692,9 @@
     {
       "resourceName": "OfficeCorporateLicense",
       "fieldName": "Office",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Office)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -29547,8 +29630,9 @@
     {
       "resourceName": "OtherPhone",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -29736,8 +29820,9 @@
     {
       "resourceName": "OUID",
       "fieldName": "ChangedByMember",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -29800,8 +29885,9 @@
     {
       "resourceName": "OUID",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -29822,8 +29908,9 @@
     {
       "resourceName": "OUID",
       "fieldName": "Media",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Media)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Media",
       "annotations": [
@@ -30472,8 +30559,9 @@
     {
       "resourceName": "OUID",
       "fieldName": "OrganizationSocialMedia",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.SocialMedia)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "SocialMedia",
       "annotations": [
@@ -31075,8 +31163,9 @@
     {
       "resourceName": "PropertyGreenVerification",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -31097,8 +31186,9 @@
     {
       "resourceName": "PropertyGreenVerification",
       "fieldName": "Listing",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Property)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Property",
       "annotations": [
@@ -31193,8 +31283,9 @@
     {
       "resourceName": "PropertyPowerProduction",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -31215,8 +31306,9 @@
     {
       "resourceName": "PropertyPowerProduction",
       "fieldName": "Listing",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Property)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Property",
       "annotations": [
@@ -31468,8 +31560,9 @@
     {
       "resourceName": "PropertyRooms",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -31490,8 +31583,9 @@
     {
       "resourceName": "PropertyRooms",
       "fieldName": "Listing",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Property)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Property",
       "annotations": [
@@ -31851,8 +31945,9 @@
     {
       "resourceName": "PropertyUnitTypes",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -31873,8 +31968,9 @@
     {
       "resourceName": "PropertyUnitTypes",
       "fieldName": "Listing",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Property)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Property",
       "annotations": [
@@ -33242,8 +33338,9 @@
     {
       "resourceName": "Rules",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -33304,8 +33401,9 @@
     {
       "resourceName": "Rules",
       "fieldName": "OriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -33681,8 +33779,9 @@
     {
       "resourceName": "Rules",
       "fieldName": "SourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -33787,8 +33886,9 @@
     {
       "resourceName": "SavedSearch",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -33809,8 +33909,9 @@
     {
       "resourceName": "SavedSearch",
       "fieldName": "Member",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -33913,8 +34014,9 @@
     {
       "resourceName": "SavedSearch",
       "fieldName": "OriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -34250,8 +34352,9 @@
     {
       "resourceName": "SavedSearch",
       "fieldName": "SourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -34335,8 +34438,9 @@
     {
       "resourceName": "Showing",
       "fieldName": "AgentOriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -34399,8 +34503,9 @@
     {
       "resourceName": "Showing",
       "fieldName": "AgentSourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -34463,8 +34568,9 @@
     {
       "resourceName": "Showing",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -34485,8 +34591,9 @@
     {
       "resourceName": "Showing",
       "fieldName": "Listing",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Property)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Property",
       "annotations": [
@@ -34549,8 +34656,9 @@
     {
       "resourceName": "Showing",
       "fieldName": "ListingOriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -34613,8 +34721,9 @@
     {
       "resourceName": "Showing",
       "fieldName": "ListingSourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -34677,8 +34786,9 @@
     {
       "resourceName": "Showing",
       "fieldName": "Media",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Media)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Media",
       "annotations": [
@@ -34802,8 +34912,9 @@
     {
       "resourceName": "Showing",
       "fieldName": "ShowingAgent",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -34948,8 +35059,9 @@
     {
       "resourceName": "Showing",
       "fieldName": "ShowingOriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -35032,8 +35144,9 @@
     {
       "resourceName": "Showing",
       "fieldName": "ShowingSourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -35179,8 +35292,9 @@
     {
       "resourceName": "Showing",
       "fieldName": "SocialMedia",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.SocialMedia)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "SocialMedia",
       "annotations": [
@@ -36157,8 +36271,9 @@
     {
       "resourceName": "SocialMedia",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -36325,8 +36440,9 @@
     {
       "resourceName": "TeamMembers",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -36347,8 +36463,9 @@
     {
       "resourceName": "TeamMembers",
       "fieldName": "Member",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -36472,8 +36589,9 @@
     {
       "resourceName": "TeamMembers",
       "fieldName": "OriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -36557,8 +36675,9 @@
     {
       "resourceName": "TeamMembers",
       "fieldName": "SourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -36768,8 +36887,9 @@
     {
       "resourceName": "Teams",
       "fieldName": "HistoryTransactional",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.HistoryTransactional)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "HistoryTransactional",
       "annotations": [
@@ -36790,8 +36910,9 @@
     {
       "resourceName": "Teams",
       "fieldName": "Media",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Media)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Media",
       "annotations": [
@@ -36852,8 +36973,9 @@
     {
       "resourceName": "Teams",
       "fieldName": "OriginatingSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -36959,8 +37081,9 @@
     {
       "resourceName": "Teams",
       "fieldName": "SourceSystem",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.OUID)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -37275,8 +37398,9 @@
     {
       "resourceName": "Teams",
       "fieldName": "TeamLead",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.Member)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -37591,8 +37715,9 @@
     {
       "resourceName": "Teams",
       "fieldName": "TeamsSocialMedia",
-      "type": "Edm.String",
+      "type": "Collection(org.reso.metadata.SocialMedia)",
       "nullable": true,
+      "isCollection": true,
       "isExpansion": true,
       "typeName": "SocialMedia",
       "annotations": [
