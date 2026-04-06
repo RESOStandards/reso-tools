@@ -1,5 +1,7 @@
 FROM node:22-alpine AS build
 
+RUN apk add --no-cache git
+
 WORKDIR /app
 
 # Copy workspace dependencies (same resolution chain as the server Dockerfile)
