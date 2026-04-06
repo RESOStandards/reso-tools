@@ -10,9 +10,9 @@ import {
   parseMetadataXml,
   getEntityType,
   runComplianceTests,
+  generateMetadataReport,
 } from '@reso-standards/reso-certification';
-import type { ComplianceConfig, AddEditConfig, CoreConfig } from '@reso-standards/reso-certification';
-import type { EntityEventConfig } from '@reso-standards/reso-certification';
+import type { ComplianceConfig } from '@reso-standards/reso-certification';
 
 /** Auth args common to most tools. */
 interface AuthArgs {
@@ -218,25 +218,10 @@ export const handleRunCompliance = async (args: Record<string, unknown>): Promis
 
 export const handleMetadataReport = async (args: Record<string, unknown>): Promise<HandlerResult> => {
   const authToken = await resolveAuthToken(args as AuthArgs);
-  const { url } = args as { url: string };
+  const { url, version } = args as { url: string; version?: string };
 
   const metadataXml = await fetchMetadata(url, authToken);
-  const metadata = parseMetadataXml(metadataXml);
-
-  const report = {
-    serverUrl: url,
-    entityTypes: metadata.entityTypes.length,
-    resources: metadata.entityTypes.map(et => ({
-      name: et.name,
-      keyProperties: et.keyProperties,
-      fieldCount: et.properties.length,
-      fields: et.properties.map(p => ({
-        name: p.name,
-        type: p.type,
-        nullable: p.nullable,
-      })),
-    })),
-  };
+  const report = generateMetadataReport(metadataXml, version ?? '2.0');
 
   return textResult(report);
 };

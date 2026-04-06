@@ -118,6 +118,20 @@ export type {
   ProgressCallback,
 } from './sdk/types.js';
 
+// ── Metadata Report ──
+
+export {
+  serializeMetadataReport,
+  generateMetadataReport,
+} from './metadata/index.js';
+
+export type {
+  MetadataReport,
+  MetadataReportField,
+  MetadataReportLookup,
+  MetadataReportResource,
+} from './metadata/index.js';
+
 // ── Data Dictionary (stub) ──
 
 export { DATA_DICTIONARY_VERSION } from './data-dictionary/index.js';
