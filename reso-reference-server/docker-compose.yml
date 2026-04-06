@@ -233,16 +233,16 @@ services:
   # ---------------------------------------------------------------------------
   compliance-dd:
     build:
-      context: compliance
-      dockerfile: Dockerfile.dd
+      context: ..
+      dockerfile: reso-certification/Dockerfile
     entrypoint: ["/bin/sh", "/config/entrypoint-dd.sh"]
     environment:
       SERVER_URL: http://server:8080
+      AUTH_TOKEN: admin-token
       SEED_COUNTS: ${SEED_COUNTS:-}
       SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
-      - compliance-dd-results:/reso-certification-utils/results
     depends_on:
       server:
         condition: service_healthy
@@ -279,16 +279,16 @@ services:
   # ---------------------------------------------------------------------------
   compliance-dd-mongo:
     build:
-      context: compliance
-      dockerfile: Dockerfile.dd
+      context: ..
+      dockerfile: reso-certification/Dockerfile
     entrypoint: ["/bin/sh", "/config/entrypoint-dd.sh"]
     environment:
       SERVER_URL: http://server-mongo:8080
+      AUTH_TOKEN: admin-token
       SEED_COUNTS: ${SEED_COUNTS:-}
       SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
-      - compliance-dd-mongo-results:/reso-certification-utils/results
     depends_on:
       server-mongo:
         condition: service_healthy
@@ -325,16 +325,16 @@ services:
   # ---------------------------------------------------------------------------
   compliance-dd-sqlite:
     build:
-      context: compliance
-      dockerfile: Dockerfile.dd
+      context: ..
+      dockerfile: reso-certification/Dockerfile
     entrypoint: ["/bin/sh", "/config/entrypoint-dd.sh"]
     environment:
       SERVER_URL: http://server-sqlite:8080
+      AUTH_TOKEN: admin-token
       SEED_COUNTS: ${SEED_COUNTS:-}
       SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
-      - compliance-dd-sqlite-results:/reso-certification-utils/results
     depends_on:
       server-sqlite:
         condition: service_healthy
@@ -696,6 +696,3 @@ volumes:
   sqlitedata:
   sqlitedata-addedit:
   sqlitedata-entity-event:
-  compliance-dd-results:
-  compliance-dd-mongo-results:
-  compliance-dd-sqlite-results:

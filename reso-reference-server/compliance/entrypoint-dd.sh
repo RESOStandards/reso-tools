@@ -1,34 +1,50 @@
 #!/bin/sh
-# ---------------------------------------------------------------------------
-# entrypoint-dd.sh — Wait for server, run Data Dictionary 2.0 compliance tests
-# ---------------------------------------------------------------------------
 set -e
+
+# ---------------------------------------------------------------------------
+# Data Dictionary compliance entrypoint
+#
+# 1. Seed test data via the data generator
+# 2. Run the reso-cert dd pipeline (handles health check, metadata
+#    serialization, Lookup Resource merge, variations, and replication)
+# ---------------------------------------------------------------------------
 
 SERVER_URL="${SERVER_URL:-http://server:8080}"
 AUTH_TOKEN="${AUTH_TOKEN:-admin-token}"
+DD_VERSION="${DD_VERSION:-2.0}"
 
 # Load shared seed helpers (seed_count function)
 . "$(dirname "$0")/seed-helpers.sh" 2>/dev/null || . /config/seed-helpers.sh
 
-echo "Waiting for server at $SERVER_URL..."
-until wget -qO- "$SERVER_URL/health" > /dev/null 2>&1; do sleep 2; done
-echo "Server ready."
+echo "============================================"
+echo " RESO Data Dictionary ${DD_VERSION} Compliance Test"
+echo "============================================"
+echo "Server: $SERVER_URL"
+echo ""
 
-# Seed test data so there are records for compliance queries
+# --- 1. Seed test data ---
+echo "Waiting for server..."
+until wget -qO- "$SERVER_URL/health" > /dev/null 2>&1; do sleep 2; done
+
 PROP_COUNT=$(seed_count Property)
 echo "Seeding $PROP_COUNT Property records..."
 wget -qO- --post-data="{\"resource\":\"Property\",\"count\":$PROP_COUNT,\"resolveDependencies\":true,\"relatedRecords\":{\"Media\":$(seed_count Media),\"OpenHouse\":$(seed_count OpenHouse),\"Showing\":$(seed_count Showing),\"PropertyRooms\":$(seed_count PropertyRooms),\"PropertyGreenVerification\":$(seed_count PropertyGreenVerification),\"PropertyPowerProduction\":$(seed_count PropertyPowerProduction),\"PropertyUnitTypes\":$(seed_count PropertyUnitTypes)}}" \
-  --header='Content-Type: application/json' --header="Authorization: Bearer $AUTH_TOKEN" \
-  "$SERVER_URL/admin/data-generator" || echo "WARNING: Seed failed, continuing anyway"
+  --header='Content-Type: application/json' \
+  --header="Authorization: Bearer $AUTH_TOKEN" \
+  "$SERVER_URL/admin/data-generator" || true
 echo "Seed complete."
+echo ""
 
-# Substitute server URL into config template
-sed "s|SERVER_URL_PLACEHOLDER|$SERVER_URL|g" /config/dd-config.json > /tmp/dd-config.json
-
-echo "Running Data Dictionary 2.0 compliance tests..."
+# --- 2. Run compliance pipeline ---
 LIMIT_FLAG=""
 if [ -n "$RECORD_LIMIT" ]; then
-  LIMIT_FLAG="-l $RECORD_LIMIT"
-  echo "Record limit: $RECORD_LIMIT"
+  LIMIT_FLAG="--limit $RECORD_LIMIT"
 fi
-exec reso-certification-utils runDDTests -v 2.0 -p /tmp/dd-config.json -a $LIMIT_FLAG
+
+exec node /app/dist/cli/index.js dd \
+  --url "$SERVER_URL" \
+  --auth-token "$AUTH_TOKEN" \
+  --dd-version "$DD_VERSION" \
+  --verbose \
+  --output-dir /tmp/compliance-results \
+  $LIMIT_FLAG
