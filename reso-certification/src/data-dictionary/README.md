@@ -1,17 +1,15 @@
 # Data Dictionary Compliance Testing
 
-Validates OData servers against the RESO Data Dictionary specification. Supports DD 1.7 and DD 2.0, with DD 2.1 coming soon.
+Validates OData servers against the RESO Data Dictionary 2.0 specification. DD 2.1 coming soon.
 
 Replaces the Commander-based DD workflow entirely — metadata serialization, Lookup Resource fetching, and replication all happen natively in TypeScript, calling cert-utils inner functions directly for the replication strategies and variations checking.
+
+> **Note:** RESO no longer certifies providers on DD 1.7. The CLI enforces DD 2.0. DD 1.7 is available via the SDK for historical compatibility only.
 
 ## Usage
 
 ```bash
-# DD 2.0 (default)
 reso-cert dd --url https://api.example.com --auth-token TOKEN
-
-# DD 1.7
-reso-cert dd --url https://api.example.com --auth-token TOKEN --dd-version 1.7
 
 # Strict mode (fail on variations and schema validation errors)
 reso-cert dd --url https://api.example.com --auth-token TOKEN --strict
@@ -38,14 +36,14 @@ The DD pipeline executes these steps:
 | Replicate: NEXT_LINK (DD 2.0) | Fetch all records using server-driven paging |
 | Replicate: NEXT_LINK + filter (DD 2.0) | Fetch recent records with ModificationTimestamp filter |
 
-### DD 1.7 vs DD 2.0
+### DD 2.0 Testing
 
-| | DD 1.7 | DD 2.0 |
-|---|--------|--------|
-| Replication strategies | TIMESTAMP_DESC only | TIMESTAMP_DESC + NEXT_LINK + NEXT_LINK with filter |
-| Variations check | No | Yes |
-| JSON schema validation | No | Yes (in strict mode) |
-| Page size | 100 | 1000 |
+| Capability | Details |
+|------------|---------|
+| Replication strategies | TIMESTAMP_DESC + NEXT_LINK + NEXT_LINK with filter |
+| Variations check | Yes |
+| JSON schema validation | Yes (in strict mode) |
+| Page size | 1000 |
 
 ## Expansion Strategies
 
@@ -98,7 +96,7 @@ Tested against the RESO reference server (Docker, PostgreSQL, 153 Property recor
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--dd-version` | 2.0 | DD version: 1.7 or 2.0 |
+| `--dd-version` | 2.0 | DD version (2.0) |
 | `--limit` | 100000 | Max records to replicate per resource |
 | `--strict` | false | Fail on variations, enforce JSON schema validation |
 | `--batch-expand` | false | Batch all expansions per resource into a single `$expand` request |

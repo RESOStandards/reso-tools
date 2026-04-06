@@ -32,7 +32,7 @@ reso-cert dd --config config.json --dd-version 2.0
 
 | reso-certification-utils | reso-cert |
 |-------------------------|-----------|
-| `-v 2.0` | `--dd-version 2.0` |
+| `-v 2.0` | `--dd-version 2.0` (DD 1.7 no longer certified, SDK only) |
 | `-p config.json` | `--config config.json` or `--url` + `--auth-token` |
 | `-a` (run all tests) | Always runs all tests |
 | `-l 100000` | `--limit 100000` |

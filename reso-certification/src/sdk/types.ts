@@ -91,7 +91,16 @@ export interface BaseComplianceConfig {
   };
 }
 
-/** Data Dictionary endorsement config. */
+/**
+ * Data Dictionary endorsement config.
+ *
+ * @note RESO no longer certifies providers on DD 1.7. Version '1.7' is
+ * deprecated and retained only for historical compatibility. Use '2.0'.
+ * The CLI enforces DD 2.0 only. To run DD 1.7 via the SDK:
+ * ```typescript
+ * await runDDCompliance({ endorsement: 'dd', version: '1.7', server: { ... } });
+ * ```
+ */
 export interface DDConfig extends BaseComplianceConfig {
   readonly endorsement: 'dd';
   readonly version: '1.7' | '2.0';

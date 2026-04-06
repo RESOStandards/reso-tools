@@ -68,15 +68,12 @@ reso-cert core --url https://api.example.com --auth-token TOKEN
 
 [**More info**](src/web-api-core/README.md)
 
-### Data Dictionary 1.7 / 2.0
+### Data Dictionary 2.0
 
 Validates server metadata and data availability against the RESO Data Dictionary. Fetches metadata, merges Lookup Resource data, checks for variations, and replicates data using multiple strategies.
 
 ```bash
 reso-cert dd --url https://api.example.com --auth-token TOKEN
-
-# DD 1.7
-reso-cert dd --url https://api.example.com --auth-token TOKEN --dd-version 1.7
 
 # Strict mode
 reso-cert dd --url https://api.example.com --auth-token TOKEN --strict
