@@ -161,7 +161,7 @@ export const createProxyServer = (options: ProxyServerOptions = {}): Promise<Pro
     app.use(express.static(resolvedUiPath));
 
     // SPA catch-all: unknown routes serve index.html
-    app.get('*', (_req: Request, res: Response) => {
+    app.get('/{*path}', (_req: Request, res: Response) => {
       res.sendFile(resolve(resolvedUiPath, 'index.html'));
     });
   }

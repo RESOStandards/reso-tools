@@ -388,7 +388,7 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
   if (options.uiDistPath) {
     app.use(express.static(options.uiDistPath));
     const uiIndexPath = resolve(options.uiDistPath, 'index.html');
-    app.get('*', async (_req, res) => {
+    app.get('/{*path}', async (_req, res) => {
       res.sendFile(uiIndexPath);
     });
   }

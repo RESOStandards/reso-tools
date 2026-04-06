@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, shell } from 'electron';
 import { resolve } from 'node:path';
 import { fork, type ChildProcess } from 'node:child_process';
-import { appendFileSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
 
 // Suppress EPIPE errors from broken pipes (e.g., child process stdout closed on shutdown).
 // These are harmless but surface as uncaught exceptions that crash the app.
@@ -140,9 +140,9 @@ const resolvePaths = (): {
   readonly iconPath: string;
   readonly logoPath: string;
 } => {
-  const sqliteDbPath = resolve(app.getPath('userData'), 'reso_reference.db');
-
   const ddVersion = getDDVersion();
+  const sqliteDbPath = resolve(app.getPath('userData'), `reso_reference_${ddVersion}.db`);
+
   const metadataPath = resolveMetadataForVersion(ddVersion);
 
   if (app.isPackaged) {
