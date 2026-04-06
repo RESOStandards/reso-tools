@@ -1,0 +1,39 @@
+{
+  "providerUoi": "LOCAL-PROVIDER",
+  "configs": [
+    {
+      "description": "Add/Edit Testing — Bearer Token",
+      "serviceRootUri": "http://localhost:8080",
+      "recipientUoi": "LOCAL-RECIPIENT",
+      "providerUsi": "LOCAL-SYSTEM",
+      "token": "admin-token",
+      "resource": "Property",
+      "payloads": {
+        "createSucceeds": {
+          "ListPrice": 350000.00,
+          "BedroomsTotal": 4,
+          "BathroomsTotalInteger": 3,
+          "City": "Test City",
+          "StateOrProvince": "CA",
+          "PostalCode": "90210",
+          "Country": "US"
+        },
+        "createFails": {
+          "ListPrice": -99999.00,
+          "BedroomsTotal": 3,
+          "BathroomsTotalInteger": 2
+        },
+        "updateSucceeds": {
+          "ListPrice": 375000.00
+        },
+        "updateFails": {
+          "ListPrice": -1.00
+        },
+        "deleteSucceeds": {},
+        "deleteFails": {
+          "id": "00000000-0000-0000-0000-000000000000"
+        }
+      }
+    }
+  ]
+}
