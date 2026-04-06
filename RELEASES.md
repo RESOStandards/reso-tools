@@ -2,6 +2,71 @@
 
 ---
 
+## v0.5 — 2026-04-06
+
+### Sayonara, Commander!
+
+The Java-based web-api-commander has been retired. All certification testing now runs natively in TypeScript on Node.js 22+.
+
+#### Certification CLI (`reso-cert`)
+
+- **Add/Edit (RCP-010)** — 8 scenarios with auto-generated payloads, listr2 progress, config file support
+- **EntityEvent (RCP-027)** — observe + full mode, 9-12 scenarios
+- **Web API Core 2.0.0/2.1.0** — 45+ data-driven scenarios, auto-detects enum mode (isflags/collections/string), coverage matrix, per-request latency tracking, `--full-coverage` flag
+- **Data Dictionary 2.0/2.1** — full pipeline: metadata serialization, Lookup Resource merge, variations checking, 3 replication strategies (TIMESTAMP_DESC, NEXT_LINK, NEXT_LINK+filter)
+- **Auth chain** — resolves from CLI flags > config file > `.env` > `RESO_*` env vars
+- **Output** — listr2 spinners (default), `--verbose` for CI, `--output json` for piping
+
+#### MCP Server (`reso-mcp-server`)
+
+New package — 7 tools: authenticate, query, metadata, validate, parse-filter, run-compliance, metadata-report. Works with Claude, Cursor, VS Code, Windsurf, JetBrains, Zed, and any MCP client.
+
+#### Metadata Tooling
+
+- **EDMX → JSON serializer** — replaces Commander's MetadataReport + FieldJson + LookupJson Java serializers
+- **XLSX → JSON generator** — replaces Commander's codegen. Reads DD sheets, produces reference metadata
+- **Lookup Resource fetcher** — `@odata.nextLink` pagination with `$top/$skip` fallback
+- **DD 2.0 and 2.1 reference metadata** generated and validated (41→44 resources, 1745→2170 fields, 3611→4177 lookups)
+
+#### Desktop Client
+
+- **DD version chooser** — Server menu with DD 2.0 / DD 2.1 (Draft) selection
+- **Per-version SQLite databases** — switching versions doesn't destroy data
+- **Version display** — window title and server switcher show active DD version
+
+#### Data Generator
+
+- **Lookup resolution fix** — uses LookupName annotations for string-based enum lookup
+- **Human-friendly values** — StandardName annotations produce DD-compliant values
+- **Placeholder filtering** — skips SampleXxxEnumValue placeholders for open enums
+
+#### Docker and CI
+
+- **Simplified entrypoints** — all compliance containers use one Dockerfile (no more Dockerfile.core, Dockerfile.dd)
+- **Express wildcard fix** — updated `*` routes to `/{*path}` for newer path-to-regexp
+- **CI workflow** — added reso-certification and reso-mcp-server to build and test pipeline
+
+#### Documentation
+
+- **Per-endorsement READMEs** — test matrices, enum modes, coverage, pipeline steps
+- **Migration guide** — command mapping from cert-utils/Commander to reso-cert
+- **Release workflow** added to CLAUDE.md
+- **DD 2.1 documentation** live at dd.reso.org
+
+#### Performance
+
+- **Vitest benchmarks** — parser (1.1M ops/sec), assertions (18M ops/sec), query building (3.6M ops/sec)
+- **`--batch-expand`** option for DD testing (batches $expand per resource)
+- **Coverage reporting** via @vitest/coverage-v8
+
+#### Numbers
+
+- 1,146 tests across 8 packages
+- 50 commits on the v0.5 branch
+- Commander retirement: [web-api-commander#215](https://github.com/RESOStandards/web-api-commander/issues/215)
+
+---
+
 ## v0.4 — 2026-04-05
 
 ### Package Restructuring and Desktop Client Improvements

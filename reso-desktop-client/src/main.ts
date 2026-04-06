@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, shell } from 'electron';
 import { resolve } from 'node:path';
 import { fork, type ChildProcess } from 'node:child_process';
-import { appendFileSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
 
 // Suppress EPIPE errors from broken pipes (e.g., child process stdout closed on shutdown).
 // These are harmless but surface as uncaught exceptions that crash the app.
@@ -84,6 +84,37 @@ const registerStorageHandlers = (): void => {
   });
 };
 
+// ── DD version management ──
+
+const DD_VERSIONS = ['2.0', '2.1'] as const;
+type DDVersion = typeof DD_VERSIONS[number];
+const DD_VERSION_KEY = 'ddVersion';
+const DEFAULT_DD_VERSION: DDVersion = '2.0';
+
+/** Get the currently selected DD version. */
+const getDDVersion = (): DDVersion => {
+  const store = readStore();
+  const version = store[DD_VERSION_KEY];
+  return DD_VERSIONS.includes(version as DDVersion) ? (version as DDVersion) : DEFAULT_DD_VERSION;
+};
+
+/** Set the DD version and return it. */
+const setDDVersion = (version: DDVersion): DDVersion => {
+  const store = readStore();
+  store[DD_VERSION_KEY] = version;
+  writeStore(store);
+  return version;
+};
+
+/** Resolve the metadata file path for a DD version. */
+const resolveMetadataForVersion = (version: DDVersion): string => {
+  if (app.isPackaged) {
+    return resolve(process.resourcesPath, `dd-${version}.json`);
+  }
+  // Dev mode: reference metadata from reso-certification package
+  return resolve(__dirname, '..', '..', 'reso-certification', 'reference-metadata', `dd-${version}.json`);
+};
+
 /** State for the running server instance. */
 interface AppState {
   serverProcess: ChildProcess | null;
@@ -107,13 +138,16 @@ const resolvePaths = (): {
   readonly iconPath: string;
   readonly logoPath: string;
 } => {
-  const sqliteDbPath = resolve(app.getPath('userData'), 'reso_reference.db');
+  const ddVersion = getDDVersion();
+  const sqliteDbPath = resolve(app.getPath('userData'), `reso_reference_${ddVersion}.db`);
+
+  const metadataPath = resolveMetadataForVersion(ddVersion);
 
   if (app.isPackaged) {
     return {
       serverEntry: resolve(process.resourcesPath, 'server-bundle', 'server-entry.mjs'),
       sqliteDbPath,
-      metadataPath: resolve(process.resourcesPath, 'server-metadata.json'),
+      metadataPath,
       serverRoot: process.resourcesPath,
       uiDistPath: resolve(process.resourcesPath, 'ui'),
       iconPath: resolve(process.resourcesPath, '..', 'Resources', 'icon.icns'),
@@ -124,7 +158,7 @@ const resolvePaths = (): {
   return {
     serverEntry: resolve(__dirname, 'server-entry.mjs'),
     sqliteDbPath,
-    metadataPath: resolve(__dirname, '..', '..', 'reso-reference-server', 'server-metadata.json'),
+    metadataPath,
     serverRoot: resolve(__dirname, '..', '..', 'reso-reference-server', 'src'),
     uiDistPath: resolve(__dirname, '..', '..', 'reso-web-client', 'dist'),
     iconPath: resolve(__dirname, '..', 'build', 'icon.png'),
@@ -246,6 +280,44 @@ const buildMenu = (): void => {
           label: 'Data Generator',
           click: () => navigateTo('/admin/data-generator')
         }
+      ]
+    },
+    // Server
+    {
+      label: 'Server',
+      submenu: [
+        {
+          label: 'Data Dictionary Version',
+          submenu: DD_VERSIONS.map(version => ({
+            label: `DD ${version}${version === '2.1' ? ' (Draft)' : ''}`,
+            type: 'radio' as const,
+            checked: getDDVersion() === version,
+            click: async () => {
+              const current = getDDVersion();
+              if (current === version) return;
+              setDDVersion(version);
+              const result = await dialog.showMessageBox({
+                type: 'question',
+                buttons: ['Restart Now', 'Later'],
+                defaultId: 0,
+                title: 'Restart Required',
+                message: `Switched to DD ${version}. The reference server needs to restart to use the new metadata.`,
+              });
+              if (result.response === 0) {
+                app.relaunch();
+                app.exit(0);
+              }
+            },
+          })),
+        },
+        { type: 'separator' },
+        {
+          label: 'Restart Server',
+          click: () => {
+            app.relaunch();
+            app.exit(0);
+          },
+        },
       ]
     },
     // Window
@@ -393,7 +465,7 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
     minHeight: 600,
     show: false,
     backgroundColor: isDark ? '#1a202c' : '#f9fafb',
-    title: 'RESO Desktop Client',
+    title: `RESO Desktop Client — DD ${getDDVersion()}`,
     icon,
     webPreferences: {
       nodeIntegration: false,

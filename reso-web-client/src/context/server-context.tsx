@@ -35,6 +35,19 @@ const LOCAL_SERVER: ServerConfig = {
   type: 'local'
 };
 
+/** Fetch DD version from the server's /health endpoint. */
+const fetchServerVersion = async (baseUrl: string): Promise<string | null> => {
+  try {
+    const url = baseUrl ? `${baseUrl}/health` : '/health';
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json() as { version?: string };
+    return data.version ?? null;
+  } catch {
+    return null;
+  }
+};
+
 const STORAGE_KEY = 'reso-server-configs';
 const SECRETS_KEY = 'reso-server-secrets';
 const ACTIVE_KEY = 'reso-active-server';
@@ -310,6 +323,7 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
   const [resourceError, setResourceError] = useState<string | null>(null);
   const [resourceErrorUrl, setResourceErrorUrl] = useState<string | null>(null);
   const [hasProxy, setHasProxy] = useState(false);
+  const [localServerVersion, setLocalServerVersion] = useState<string | null>(null);
   const [serverTokens, setServerTokens] = useState<Readonly<Record<string, string>>>({});
 
   /** Set the token for a specific server and persist the map. */
@@ -381,11 +395,16 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     } catch { /* ignore */ }
   }, []);
 
-  const servers = useMemo(() => [LOCAL_SERVER, ...externalConfigs], [externalConfigs]);
+  const localServerWithVersion = useMemo<ServerConfig>(() => ({
+    ...LOCAL_SERVER,
+    name: localServerVersion ? `RESO Reference Server (DD ${localServerVersion})` : LOCAL_SERVER.name,
+  }), [localServerVersion]);
+
+  const servers = useMemo(() => [localServerWithVersion, ...externalConfigs], [localServerWithVersion, externalConfigs]);
 
   const activeServer = useMemo(
-    () => servers.find(s => s.id === activeServerId) ?? LOCAL_SERVER,
-    [servers, activeServerId]
+    () => servers.find(s => s.id === activeServerId) ?? localServerWithVersion,
+    [servers, activeServerId, localServerWithVersion]
   );
 
   const isLocal = activeServer.type === 'local';
@@ -403,6 +422,13 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     setResourceErrorUrl(null);
     setResources(null);
     setLoadingStatus('Connecting...');
+
+    // Fetch server version for display
+    if (activeServer.type === 'local') {
+      fetchServerVersion(activeServer.baseUrl).then(v => {
+        if (v && !controller.signal.aborted) setLocalServerVersion(v);
+      });
+    }
 
     let lastRequestUrl: string | null = null;
     const loadMetadata = async () => {

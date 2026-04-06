@@ -17,3 +17,14 @@ compliance-results.zip
 .env
 .env.*
 *.env
+.reso-cert/
+
+# RESO certification test artifacts
+data-availability*.json
+metadata-report*.json
+data-dictionary*.json
+reso-replication-output/
+schema-validation-report.json
+reso-variations.json
+upi-validation-report.json
+*.resoscript

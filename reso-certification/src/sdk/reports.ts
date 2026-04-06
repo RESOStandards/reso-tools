@@ -1,0 +1,165 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import type { PipelineResult, PipelineContext, ProgressCallback } from './types.js';
+
+// ── Report Types ──
+
+/** Base fields shared by all report formats (required by the Cert API). */
+export interface BaseReport {
+  readonly description: string;
+  readonly version: string;
+  readonly generatedOn: string;
+  readonly remarks: string;
+}
+
+/** A report generator produces a report object from pipeline results. */
+export interface ReportGenerator<TContext extends PipelineContext = PipelineContext> {
+  readonly name: string;
+  readonly filename: string;
+  readonly generate: (result: PipelineResult<TContext>) => Record<string, unknown>;
+}
+
+// ── Remarks Serializers ──
+
+/** Serialize Add/Edit pipeline results into a human-readable remarks string. */
+export const serializeAddEditRemarks = (result: PipelineResult): string => {
+  const testStep = result.steps.find(s => s.name === 'Run Add/Edit scenarios');
+  if (!testStep?.counts) return `Add/Edit compliance test ${result.status}.`;
+
+  const { total = 0, passed = 0, failed = 0 } = testStep.counts;
+  const scenarioDetails = result.steps
+    .filter(s => s.name === 'Run Add/Edit scenarios')
+    .map(s => s.summary)
+    .filter(Boolean)
+    .join('. ');
+
+  const metadataStep = result.steps.find(s => s.name === 'Fetch metadata');
+  const fieldCount = metadataStep?.counts?.fields ?? 0;
+  const resource = (result.context as Record<string, unknown>).resource ?? 'Property';
+
+  const parts = [`${passed} of ${total} scenarios ${result.status}`];
+  if (fieldCount > 0) parts.push(`${fieldCount} fields validated against ${resource} metadata`);
+  if (failed > 0) {
+    const errors = testStep.errors ?? [];
+    if (errors.length > 0) parts.push(`Failures: ${errors.join(', ')}`);
+  }
+
+  return `${parts.join('. ')}.`;
+};
+
+/** Serialize EntityEvent pipeline results into a human-readable remarks string. */
+export const serializeEntityEventRemarks = (result: PipelineResult): string => {
+  const testStep = result.steps.find(s => s.name === 'Run EntityEvent scenarios');
+  if (!testStep?.counts) return `EntityEvent compliance test ${result.status}.`;
+
+  const { total = 0, passed = 0 } = testStep.counts;
+  const mode = (result.context as Record<string, unknown>).mode ?? 'observe';
+
+  return `${passed} of ${total} scenarios ${result.status} in ${mode} mode.`;
+};
+
+/** Serialize Web API Core pipeline results into a human-readable remarks string. */
+export const serializeCoreRemarks = (result: PipelineResult): string => {
+  const testStep = result.steps.find(s => s.counts);
+  if (!testStep?.counts) return `Web API Core compliance test ${result.status}.`;
+
+  const { total = 0, passed = 0, failed = 0, skipped = 0 } = testStep.counts;
+  return `${passed} passed, ${failed} failed, ${skipped} skipped out of ${total} tests.`;
+};
+
+// ── Generic Report Generator ──
+
+/** Create a generic report generator for any endorsement (Cert API compatible). */
+export const createGenericReportGenerator = (
+  description: string,
+  version: string,
+  serializeRemarks: (result: PipelineResult) => string,
+): ReportGenerator => ({
+  name: 'Generic',
+  filename: 'report.json',
+  generate: (result) => ({
+    description,
+    version,
+    generatedOn: new Date().toISOString(),
+    remarks: serializeRemarks(result),
+  }),
+});
+
+// ── Detailed Report Generator ──
+
+/** Create a detailed report generator that extends the generic format with step results. */
+export const createDetailedReportGenerator = (
+  description: string,
+  version: string,
+  serializeRemarks: (result: PipelineResult) => string,
+): ReportGenerator => ({
+  name: 'Detailed',
+  filename: 'report-detailed.json',
+  generate: (result) => ({
+    description,
+    version,
+    generatedOn: new Date().toISOString(),
+    remarks: serializeRemarks(result),
+    outcome: result.status,
+    endorsement: result.endorsement,
+    duration: result.duration,
+    steps: result.steps.map(({ name, status, duration, summary, params, counts, artifacts, errors }) => ({
+      name,
+      status,
+      duration,
+      ...(summary ? { summary } : {}),
+      ...(params ? { params } : {}),
+      ...(counts ? { counts } : {}),
+      ...(artifacts ? { artifacts } : {}),
+      ...(errors && errors.length > 0 ? { errors } : {}),
+    })),
+  }),
+});
+
+// ── Report Writer ──
+
+/** Write all reports from the given generators to the output directory. */
+export const writeReports = async (
+  result: PipelineResult,
+  generators: ReadonlyArray<ReportGenerator>,
+  outputDir: string,
+  onProgress?: ProgressCallback,
+): Promise<ReadonlyArray<{ readonly name: string; readonly path: string }>> => {
+  await mkdir(outputDir, { recursive: true });
+
+  const written: Array<{ name: string; path: string }> = [];
+
+  for (const generator of generators) {
+    const report = generator.generate(result);
+    const reportPath = join(outputDir, generator.filename);
+    await writeFile(reportPath, JSON.stringify(report, null, 2));
+    written.push({ name: generator.name, path: reportPath });
+    onProgress?.({
+      step: `Write ${generator.name} report`,
+      status: 'passed',
+      artifacts: [{ label: generator.name, path: reportPath }],
+    });
+  }
+
+  return written;
+};
+
+// ── Pre-built Report Generator Sets ──
+
+/** Report generators for Add/Edit endorsement. */
+export const addEditReportGenerators = (version: string): ReadonlyArray<ReportGenerator> => [
+  createGenericReportGenerator('Web API Add/Edit', version, serializeAddEditRemarks),
+  createDetailedReportGenerator('Web API Add/Edit', version, serializeAddEditRemarks),
+];
+
+/** Report generators for EntityEvent endorsement. */
+export const entityEventReportGenerators = (version: string): ReadonlyArray<ReportGenerator> => [
+  createGenericReportGenerator('EntityEvent (RCP-027)', version, serializeEntityEventRemarks),
+  createDetailedReportGenerator('EntityEvent (RCP-027)', version, serializeEntityEventRemarks),
+];
+
+/** Report generators for Web API Core endorsement. */
+export const coreReportGenerators = (version: string): ReadonlyArray<ReportGenerator> => [
+  createGenericReportGenerator('Web API Server Core', version, serializeCoreRemarks),
+  createDetailedReportGenerator('Web API Server Core', version, serializeCoreRemarks),
+];

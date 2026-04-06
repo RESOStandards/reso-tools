@@ -1,6 +1,6 @@
 {
   "name": "@reso-standards/desktop-client",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "description": "RESO Reference Server — Desktop Client",
   "author": {
     "name": "Real Estate Standards Organization",
@@ -50,8 +50,12 @@
         ]
       },
       {
-        "from": "../reso-reference-server/server-metadata.json",
-        "to": "server-metadata.json"
+        "from": "../reso-certification/reference-metadata/dd-2.0.json",
+        "to": "dd-2.0.json"
+      },
+      {
+        "from": "../reso-certification/reference-metadata/dd-2.1.json",
+        "to": "dd-2.1.json"
       },
       {
         "from": "../reso-reference-server/src/ui-config.json",

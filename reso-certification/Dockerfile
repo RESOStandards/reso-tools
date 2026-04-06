@@ -38,6 +38,7 @@ RUN sed -i 's|file:../reso-client|file:/deps/reso-client|' package.json \
 
 COPY reso-certification/tsconfig.json ./
 COPY reso-certification/src/ ./src/
+COPY reso-certification/legacy-cert-utils/ ./legacy-cert-utils/
 RUN npm run build
 RUN npm prune --omit=dev
 
@@ -53,6 +54,7 @@ WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./
+COPY --from=build /app/legacy-cert-utils ./legacy-cert-utils
 COPY --from=build /app/sample-payloads ./sample-payloads
 COPY --from=build /app/sample-metadata.xml ./
 COPY --from=build /deps/odata-expression-parser /deps/odata-expression-parser
@@ -63,7 +65,8 @@ COPY --from=build /deps/reso-client /deps/reso-client
 RUN apk add --no-cache wget
 
 # Run as non-root user
-RUN addgroup -S reso && adduser -S reso -G reso
+RUN addgroup -S reso && adduser -S reso -G reso \
+ && chown -R reso:reso /app
 USER reso
 
 ENTRYPOINT ["node", "dist/cli/index.js"]

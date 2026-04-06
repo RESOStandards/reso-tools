@@ -46,14 +46,14 @@ export const generateOpenHouseRecords = (
     record.OpenHouseEndTime = endDate.toISOString();
 
     // Status
-    const statusValues = lookups['org.reso.metadata.enums.OpenHouseStatus'];
+    const statusValues = lookups['OpenHouseStatus'];
     if (statusValues && statusValues.length > 0) {
       const active = statusValues.find(s => s.lookupValue === 'Active');
       record.OpenHouseStatus = active ? 'Active' : randomChoice(statusValues).lookupValue;
     }
 
     // Type
-    const typeValues = lookups['org.reso.metadata.enums.OpenHouseType'];
+    const typeValues = lookups['OpenHouseType'];
     if (typeValues && typeValues.length > 0) {
       record.OpenHouseType = randomChoice(typeValues).lookupValue;
     }

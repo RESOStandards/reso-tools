@@ -1,6 +1,6 @@
 # RESO Tools
 
-![Tests](https://img.shields.io/badge/tests-928%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1146%20passed-brightgreen)
 ![Compliance](https://img.shields.io/badge/RESO%20compliance-4%2F4%20suites-blue)
 
 Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compliant OData servers. Includes a reference server, desktop client, web UI, CORS proxy, certification test runner and shared libraries for OData parsing, validation and data generation.
@@ -17,7 +17,8 @@ Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compl
 | [`reso-web-client/`](reso-web-client/) | React + Vite browser UI for browsing and editing OData resources | 72 |
 | [`reso-web-api-proxy/`](reso-web-api-proxy/) | Lightweight CORS proxy and static file server for web client deployments | -- |
 | [`reso-desktop-client/`](reso-desktop-client/) | Electron desktop shell with native proxy, secure storage and optional reference server | -- |
-| [`reso-certification/`](reso-certification/) | RESO certification test runner (Add/Edit, Web API Core, DD, EntityEvent) | 102 |
+| [`reso-certification/`](reso-certification/) | RESO certification CLI + SDK — Add/Edit, EntityEvent, Web API Core, DD ([docs](reso-certification/README.md)) | 224 |
+| [`reso-mcp-server/`](reso-mcp-server/) | MCP server — exposes OData query, validation, certification tools for AI agents ([docs](reso-mcp-server/README.md)) | -- |
 
 ## Quick Start
 
@@ -84,17 +85,26 @@ npm install           # installs Biome + Lefthook
 npx lefthook install  # activates git hooks
 ```
 
-### Compliance Testing
+### Certification Testing
 
-Four compliance suites run against the reference server via Docker:
+Test any RESO OData server from the command line:
+
+```bash
+# Add/Edit
+reso-cert add-edit --url http://localhost:8080 --auth-token TOKEN
+
+# EntityEvent
+reso-cert entity-event --url http://localhost:8080 --auth-token TOKEN
+
+# Web API Core
+reso-cert core --url http://localhost:8080 --auth-token TOKEN
+```
+
+Or run compliance suites against the reference server via Docker:
 
 ```bash
 cd reso-reference-server
 docker compose up -d --build --wait db server
-docker compose --profile seed up seed
-
-# Data Dictionary 2.0
-docker compose --profile compliance-dd up --build --exit-code-from compliance-dd compliance-dd
 
 # Web API Core 2.0.0
 docker compose --profile compliance-core up --build --exit-code-from compliance-core compliance-core
@@ -105,6 +115,8 @@ docker compose --profile compliance-addedit up --build --exit-code-from complian
 # EntityEvent RCP-027
 docker compose --profile compliance-entity-event up --build --exit-code-from compliance-entity-event db-entity-event server-entity-event compliance-entity-event
 ```
+
+See [`reso-certification/`](reso-certification/) for full documentation.
 
 ## License
 

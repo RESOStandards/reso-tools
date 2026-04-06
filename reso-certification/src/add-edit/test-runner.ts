@@ -26,6 +26,22 @@ import {
 import type { EntityType, ScenarioResult, TestAssertion, TestConfig, TestReport } from '../test-runner/types.js';
 import type { DeletePayload, PayloadSet, ScenarioName } from './types.js';
 
+/**
+ * Rewrites a server-returned URL to use the configured service root.
+ * Handles cases where the server returns internal hostnames (e.g., Docker service names).
+ */
+const rebaseUrl = (returnedUrl: string, configuredServerUrl: string): string => {
+  try {
+    const returned = new URL(returnedUrl);
+    const configured = new URL(configuredServerUrl);
+    returned.protocol = configured.protocol;
+    returned.host = configured.host;
+    return returned.toString();
+  } catch {
+    return returnedUrl;
+  }
+};
+
 // ── Public API ──
 
 /**
@@ -149,7 +165,7 @@ const runCreateSucceedsRepresentation = async (
   if (locationUrl) {
     const getResponse = await odataRequest({
       method: 'GET',
-      url: locationUrl,
+      url: rebaseUrl(locationUrl, config.serverUrl),
       authToken
     });
     assertions.push(validateStatusCode(getResponse, [200]));
@@ -197,7 +213,7 @@ const runCreateSucceedsMinimal = async (
   if (locationUrl) {
     const getResponse = await odataRequest({
       method: 'GET',
-      url: locationUrl,
+      url: rebaseUrl(locationUrl, config.serverUrl),
       authToken
     });
     assertions.push(validateStatusCode(getResponse, [200]));
@@ -291,7 +307,7 @@ const runUpdateSucceedsRepresentation = async (
   if (locationUrl) {
     const getResponse = await odataRequest({
       method: 'GET',
-      url: locationUrl,
+      url: rebaseUrl(locationUrl, config.serverUrl),
       authToken
     });
     assertions.push(validateStatusCode(getResponse, [200]));
@@ -340,7 +356,7 @@ const runUpdateSucceedsMinimal = async (
   if (locationUrl) {
     const getResponse = await odataRequest({
       method: 'GET',
-      url: locationUrl,
+      url: rebaseUrl(locationUrl, config.serverUrl),
       authToken
     });
     assertions.push(validateStatusCode(getResponse, [200]));

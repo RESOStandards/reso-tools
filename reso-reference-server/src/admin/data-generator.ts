@@ -8,6 +8,8 @@ import {
   transformLookupsForHumanFriendly
 } from '@reso-standards/reso-data-generator';
 import type { ResoField, ResoLookup } from '@reso-standards/reso-data-generator';
+
+const LOOKUP_NAME_ANNOTATION_TERM = 'RESO.OData.Metadata.LookupName';
 import type { RequestHandler } from 'express';
 import type { EnumMode } from '../config.js';
 import type { DataAccessLayer, ResourceContext } from '../db/data-access.js';
@@ -64,10 +66,19 @@ const buildLookupMap = (
 ): Record<string, ReadonlyArray<ResoLookup>> => {
   const lookupMap: Record<string, ResoLookup[]> = {};
   for (const field of fields) {
-    if (isEnumType(field.type) && !lookupMap[field.type]) {
-      const lookups = getLookupsForType(metadata, field.type);
+    // For string-based enums, use the LookupName annotation as the key
+    const lookupNameAnnotation = field.annotations?.find(a => a.term === LOOKUP_NAME_ANNOTATION_TERM);
+    const lookupKey = lookupNameAnnotation?.value ?? (isEnumType(field.type) ? field.type : null);
+
+    if (lookupKey && !lookupMap[lookupKey]) {
+      const lookups = getLookupsForType(metadata, lookupKey);
       if (lookups.length > 0) {
-        lookupMap[field.type] = [...lookups];
+        lookupMap[lookupKey] = [...lookups];
+        // Also key by short name (without namespace) for generator convenience
+        const shortName = lookupKey.includes('.') ? lookupKey.slice(lookupKey.lastIndexOf('.') + 1) : null;
+        if (shortName && !lookupMap[shortName]) {
+          lookupMap[shortName] = lookupMap[lookupKey];
+        }
       }
     }
   }

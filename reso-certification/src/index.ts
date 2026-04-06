@@ -85,9 +85,52 @@ export type {
   EntityEventTestReport
 } from './entity-event/types.js';
 
-// ── Web API Core (stub) ──
+// ── Web API Core ──
 
-export { WEB_API_CORE_VERSION } from './web-api-core/index.js';
+export {
+  allScenarios,
+  scenariosForVersion,
+  runCoreResourceScenarios,
+  resolveTestParams,
+  WELL_KNOWN_RESOURCES,
+} from './web-api-core/index.js';
+
+// ── SDK ──
+
+export {
+  runComplianceTests,
+  runAddEditCompliance,
+  runEntityEventCompliance,
+  runCoreCompliance,
+  createPipeline,
+  writeReports,
+} from './sdk/index.js';
+
+export type {
+  ComplianceConfig,
+  AddEditConfig,
+  CoreConfig,
+  DDConfig,
+  BaseComplianceConfig,
+  PipelineResult,
+  StepResult,
+  StepProgress,
+  ProgressCallback,
+} from './sdk/types.js';
+
+// ── Metadata Report ──
+
+export {
+  serializeMetadataReport,
+  generateMetadataReport,
+} from './metadata/index.js';
+
+export type {
+  MetadataReport,
+  MetadataReportField,
+  MetadataReportLookup,
+  MetadataReportResource,
+} from './metadata/index.js';
 
 // ── Data Dictionary (stub) ──
 

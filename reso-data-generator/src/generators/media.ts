@@ -93,7 +93,7 @@ export const generateMediaRecords = (
     record.MediaObjectID = `IMG-${String(randomInt(100000, 999999))}`;
 
     // Media category — prefer Photo
-    const categoryValues = lookups['org.reso.metadata.enums.MediaCategory'];
+    const categoryValues = lookups['MediaCategory'];
     if (categoryValues && categoryValues.length > 0) {
       const photo = categoryValues.find(c => c.lookupValue === 'Photo');
       // First image is always a Photo, rest can be mixed

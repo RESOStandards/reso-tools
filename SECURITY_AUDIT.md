@@ -4,6 +4,22 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
+## v0.5 Security Notes — 2026-04-06
+
+### Findings
+
+- **Docker base image vulnerability** (High → Open, #98): `node:22-alpine` has 1 high, 4 medium, and 1 low vulnerability. Used in `reso-certification/Dockerfile` and `reso-reference-server/Dockerfile`. Important for deployments behind corporate firewalls. Pin to specific patched version and add image scanning to CI.
+- **Legacy cert-utils local copy**: The `legacy-cert-utils/` directory contains a full copy of `reso-certification-utils@3.0.0` (CJS). This is temporary for the DD pipeline until the rewrite. The code is from a known source (RESOStandards org) but has its own transitive dependencies (`ajv`, `fast-xml-parser`, `fs-extra`, etc.) that increase the attack surface.
+
+### Noted Risks (Accepted)
+
+- **MCP server auth**: The MCP server accepts bearer tokens and Client Credentials via tool parameters. Tokens are passed through stdio (not network). In hosted deployments, the server should be behind an auth proxy.
+- **`schema-validation-settings.json` copied to cwd**: The DD pipeline copies this file from the legacy-cert-utils package to the working directory at runtime. The file is committee-approved and read-only but the copy location is user-writable.
+- **`@odata.nextLink` rebase**: The replication iterator rewrites `@odata.nextLink` hostnames to match the client's initial request URL. This is safe (only hostname/port are changed, not path/query) but could theoretically redirect to an unintended host if `initialRequestUri` is compromised.
+- **DD XLSX processing**: The `xlsx` library parses untrusted XLSX files. The library is widely used but XLSX files can contain macros and embedded content. Our generator only reads cell values, not macros.
+
+---
+
 ## v0.4 Security Notes — 2026-04-05
 
 ### Findings Addressed
