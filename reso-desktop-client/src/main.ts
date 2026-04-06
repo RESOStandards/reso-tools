@@ -467,7 +467,7 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
     minHeight: 600,
     show: false,
     backgroundColor: isDark ? '#1a202c' : '#f9fafb',
-    title: 'RESO Desktop Client',
+    title: `RESO Desktop Client — DD ${getDDVersion()}`,
     icon,
     webPreferences: {
       nodeIntegration: false,
