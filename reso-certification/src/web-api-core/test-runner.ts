@@ -31,6 +31,10 @@ export interface ScenarioResult {
   readonly skipped: boolean;
   readonly assertions: ReadonlyArray<AssertionResult>;
   readonly duration: number;
+  /** OData request latency in ms (excludes assertion/processing time). */
+  readonly requestLatency?: number;
+  /** URL that was requested (for diagnostics). */
+  readonly requestUrl?: string;
 }
 
 /** Coverage of a data type category for a resource. */
@@ -122,7 +126,9 @@ const runScenario = async (
 
     // Special handling for error scenarios
     if (scenario.category === 'error') {
+      const reqStart = Date.now();
       const response = await odataRequest({ method: 'GET', url: query.url, authToken });
+      const requestLatency = Date.now() - reqStart;
       const responseCheck = assertODataResponse(response, scenario.expectedStatus);
       return {
         tag: scenario.tag,
@@ -131,16 +137,20 @@ const runScenario = async (
         skipped: false,
         assertions: [responseCheck],
         duration: Date.now() - start,
+        requestLatency,
+        requestUrl: query.url,
       };
     }
 
     // Standard flow: request → validate response → validate data
+    const reqStart = Date.now();
     const response = await odataRequest({ method: 'GET', url: query.url, authToken });
+    const requestLatency = Date.now() - reqStart;
 
     const responseCheck = assertODataResponse(response, 200);
     assertions.push(responseCheck);
     if (!responseCheck.passed) {
-      return { tag: scenario.tag, name: scenario.name, passed: false, skipped: false, assertions, duration: Date.now() - start };
+      return { tag: scenario.tag, name: scenario.name, passed: false, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url };
     }
 
     const records = extractRecords(response.body);
@@ -148,7 +158,7 @@ const runScenario = async (
     // No results: filter worked (200 OK) but no data to validate — skip with diagnostic
     if (records.length === 0) {
       assertions.push({ passed: true, message: 'No records returned — filter executed but no matching data to validate' });
-      return { tag: scenario.tag, name: scenario.name, passed: true, skipped: true, assertions, duration: Date.now() - start };
+      return { tag: scenario.tag, name: scenario.name, passed: true, skipped: true, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url };
     }
 
     // Data assertion based on scenario category
@@ -156,7 +166,7 @@ const runScenario = async (
     if (dataAssertion) assertions.push(dataAssertion);
 
     const allPassed = assertions.every(a => a.passed);
-    return { tag: scenario.tag, name: scenario.name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start };
+    return { tag: scenario.tag, name: scenario.name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url };
   } catch (err) {
     assertions.push({ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` });
     return { tag: scenario.tag, name: scenario.name, passed: false, skipped: false, assertions, duration: Date.now() - start };
