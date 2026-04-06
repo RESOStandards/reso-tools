@@ -50,8 +50,12 @@
         ]
       },
       {
-        "from": "../reso-reference-server/server-metadata.json",
-        "to": "server-metadata.json"
+        "from": "../reso-certification/reference-metadata/dd-2.0.json",
+        "to": "dd-2.0.json"
+      },
+      {
+        "from": "../reso-certification/reference-metadata/dd-2.1.json",
+        "to": "dd-2.1.json"
       },
       {
         "from": "../reso-reference-server/src/ui-config.json",

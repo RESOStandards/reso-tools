@@ -84,6 +84,39 @@ const registerStorageHandlers = (): void => {
   });
 };
 
+// ── DD version management ──
+
+const DD_VERSIONS = ['2.0', '2.1'] as const;
+type DDVersion = typeof DD_VERSIONS[number];
+const DD_VERSION_KEY = 'ddVersion';
+const DEFAULT_DD_VERSION: DDVersion = '2.0';
+
+/** Get the currently selected DD version. */
+const getDDVersion = (): DDVersion => {
+  const store = readStore();
+  const version = store[DD_VERSION_KEY];
+  return DD_VERSIONS.includes(version as DDVersion) ? (version as DDVersion) : DEFAULT_DD_VERSION;
+};
+
+/** Set the DD version and return it. */
+const setDDVersion = (version: DDVersion): DDVersion => {
+  const store = readStore();
+  store[DD_VERSION_KEY] = version;
+  writeStore(store);
+  return version;
+};
+
+/** Resolve the metadata file path for a DD version. */
+const resolveMetadataForVersion = (version: DDVersion): string => {
+  if (app.isPackaged) {
+    return resolve(process.resourcesPath, `dd-${version}.json`);
+  }
+  // Dev mode: try reference-metadata first, fall back to build dir
+  const refPath = resolve(__dirname, '..', '..', 'reso-certification', 'reference-metadata', `dd-${version}.json`);
+  const buildPath = resolve(__dirname, '..', 'build', `dd-${version}.json`);
+  try { readFileSync(refPath, 'utf-8'); return refPath; } catch { return buildPath; }
+};
+
 /** State for the running server instance. */
 interface AppState {
   serverProcess: ChildProcess | null;
@@ -109,11 +142,14 @@ const resolvePaths = (): {
 } => {
   const sqliteDbPath = resolve(app.getPath('userData'), 'reso_reference.db');
 
+  const ddVersion = getDDVersion();
+  const metadataPath = resolveMetadataForVersion(ddVersion);
+
   if (app.isPackaged) {
     return {
       serverEntry: resolve(process.resourcesPath, 'server-bundle', 'server-entry.mjs'),
       sqliteDbPath,
-      metadataPath: resolve(process.resourcesPath, 'server-metadata.json'),
+      metadataPath,
       serverRoot: process.resourcesPath,
       uiDistPath: resolve(process.resourcesPath, 'ui'),
       iconPath: resolve(process.resourcesPath, '..', 'Resources', 'icon.icns'),
@@ -124,7 +160,7 @@ const resolvePaths = (): {
   return {
     serverEntry: resolve(__dirname, 'server-entry.mjs'),
     sqliteDbPath,
-    metadataPath: resolve(__dirname, '..', '..', 'reso-reference-server', 'server-metadata.json'),
+    metadataPath,
     serverRoot: resolve(__dirname, '..', '..', 'reso-reference-server', 'src'),
     uiDistPath: resolve(__dirname, '..', '..', 'reso-web-client', 'dist'),
     iconPath: resolve(__dirname, '..', 'build', 'icon.png'),
@@ -246,6 +282,44 @@ const buildMenu = (): void => {
           label: 'Data Generator',
           click: () => navigateTo('/admin/data-generator')
         }
+      ]
+    },
+    // Server
+    {
+      label: 'Server',
+      submenu: [
+        {
+          label: 'Data Dictionary Version',
+          submenu: DD_VERSIONS.map(version => ({
+            label: `DD ${version}${version === '2.1' ? ' (Draft)' : ''}`,
+            type: 'radio' as const,
+            checked: getDDVersion() === version,
+            click: async () => {
+              const current = getDDVersion();
+              if (current === version) return;
+              setDDVersion(version);
+              const result = await dialog.showMessageBox({
+                type: 'question',
+                buttons: ['Restart Now', 'Later'],
+                defaultId: 0,
+                title: 'Restart Required',
+                message: `Switched to DD ${version}. The reference server needs to restart to use the new metadata.`,
+              });
+              if (result.response === 0) {
+                app.relaunch();
+                app.exit(0);
+              }
+            },
+          })),
+        },
+        { type: 'separator' },
+        {
+          label: 'Restart Server',
+          click: () => {
+            app.relaunch();
+            app.exit(0);
+          },
+        },
       ]
     },
     // Window
