@@ -1,5 +1,5 @@
 {
-  "name": "@reso-standards/desktop-client",
+  "name": "@reso-standards/reso-desktop-client",
   "version": "0.5.0",
   "description": "RESO Reference Server — Desktop Client",
   "author": {
@@ -18,8 +18,8 @@
     "package": "npm run build && npm run build:server-bundle && electron-builder"
   },
   "dependencies": {
-    "@reso-standards/web-api-proxy": "file:../reso-web-api-proxy",
-    "@reso-standards/reference-server": "file:../reso-reference-server"
+    "@reso-standards/reso-web-api-proxy": "file:../reso-web-api-proxy",
+    "@reso-standards/reso-reference-server": "file:../reso-reference-server"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",

@@ -30,10 +30,11 @@ jobs:
             "reso-client:@reso-standards/reso-client:RESO Client SDK"
             "reso-data-generator:@reso-standards/reso-data-generator:Test data generator"
             "reso-certification:@reso-standards/reso-certification:Certification testing tools"
-            "reso-reference-server:reso-reference-server:OData reference server"
-            "reso-web-client:@reso/web-client:React browser UI"
-            "reso-desktop-client:@reso/desktop-client:Electron desktop shell"
-            "reso-web-api-proxy:@reso-standards/web-api-proxy:CORS proxy server"
+            "reso-reference-server:@reso-standards/reso-reference-server:OData reference server"
+            "reso-web-client:@reso-standards/reso-web-client:React browser UI"
+            "reso-desktop-client:@reso-standards/reso-desktop-client:Electron desktop shell"
+            "reso-web-api-proxy:@reso-standards/reso-web-api-proxy:CORS proxy server"
+            "reso-mcp-server:@reso-standards/reso-mcp-server:MCP server for AI agents"
           )
 
           mkdir -p .github/pages/_packages

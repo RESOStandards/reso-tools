@@ -37,14 +37,21 @@ New package — 7 tools: authenticate, query, metadata, validate, parse-filter, 
 #### Data Generator
 
 - **Lookup resolution fix** — uses LookupName annotations for string-based enum lookup
+- **Collection() type unwrapping** — `buildLookupMap` now unwraps `Collection(org.reso.metadata.enums.X)` so multi-value enum fields resolve their lookups correctly
 - **Human-friendly values** — StandardName annotations produce DD-compliant values
 - **Placeholder filtering** — skips SampleXxxEnumValue placeholders for open enums
+- **Realistic open enum values** — 34 open enum types (City, CountyOrParish, schools, districts, MLS areas, etc.) now have realistic PascalCased lookup values instead of SampleXxxEnumValue placeholders
 
 #### Docker and CI
 
 - **Simplified entrypoints** — all compliance containers use one Dockerfile (no more Dockerfile.core, Dockerfile.dd)
+- **DD strict mode** — `entrypoint-dd.sh` now passes `--strict`, failing on variations and schema validation errors instead of silently logging them
 - **Express wildcard fix** — updated `*` routes to `/{*path}` for newer path-to-regexp
 - **CI workflow** — added reso-certification and reso-mcp-server to build and test pipeline
+
+#### Package Naming
+
+- **Consistent `@reso-standards/reso-*` convention** — renamed `@reso-standards/reference-server`, `@reso-standards/web-client`, `@reso-standards/desktop-client`, and `@reso-standards/web-api-proxy` to include the `reso-` prefix, matching the folder names and other packages
 
 #### Documentation
 
@@ -52,6 +59,13 @@ New package — 7 tools: authenticate, query, metadata, validate, parse-filter, 
 - **Migration guide** — command mapping from cert-utils/Commander to reso-cert
 - **Release workflow** added to CLAUDE.md
 - **DD 2.1 documentation** live at dd.reso.org
+- **LICENSE links** — all package READMEs now link to the GitHub LICENSE URL (fixes 404s on GH Pages and npm)
+- **GH Pages** — updated hero stats, test counts, CLI examples, added MCP server to package listing and architecture diagram, fixed mobile nav layout
+
+#### Data Quality
+
+- **Unicode BOM fix** — removed invisible U+FEFF (byte order mark) from "Full Exposure" lookup value in DD 2.1 reference metadata and server metadata. Fixed XLSX source sheets for DD 2.0 and 2.1 (21 NBSP and 1 BOM cleaned)
+- **DD strict compliance** — 8/8 DD steps pass with `--strict` flag: health check, auth, metadata report, replication state, variations (0 found), and all 3 replication strategies (TIMESTAMP_DESC, NEXT_LINK, NEXT_LINK+filter)
 
 #### Performance
 
@@ -61,8 +75,7 @@ New package — 7 tools: authenticate, query, metadata, validate, parse-filter, 
 
 #### Numbers
 
-- 1,146 tests across 8 packages
-- 50 commits on the v0.5 branch
+- 1,096 tests across 8 packages
 - Commander retirement: [web-api-commander#215](https://github.com/RESOStandards/web-api-commander/issues/215)
 
 ---

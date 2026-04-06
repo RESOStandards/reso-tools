@@ -1,5 +1,5 @@
 {
-  "name": "@reso-standards/reference-server",
+  "name": "@reso-standards/reso-reference-server",
   "version": "0.5.0",
   "description": "RESO Reference OData Server — metadata-driven CRUD server for RESO Data Dictionary resources",
   "type": "module",

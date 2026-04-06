@@ -8,11 +8,11 @@ title: RESO Tools
   <p>Open-source testing, client SDK, and reference implementation tools for the RESO Web API specification.</p>
   <div class="hero-stats">
     <div class="hero-stat">
-      <div class="number">9</div>
+      <div class="number">10</div>
       <div class="label">Packages</div>
     </div>
     <div class="hero-stat">
-      <div class="number">928+</div>
+      <div class="number">1,096</div>
       <div class="label">Tests</div>
     </div>
     <div class="hero-stat">
@@ -76,6 +76,7 @@ title: RESO Tools
   <div class="arch-row">
     <div class="arch-box arch-box-orange">reso-certification</div>
     <div class="arch-box arch-box-orange">reso-data-generator</div>
+    <div class="arch-box arch-box-orange">reso-mcp-server</div>
   </div>
 </div>
 
@@ -162,12 +163,25 @@ title: RESO Tools
         <div class="package-name">@reso-standards/reso-certification</div>
         <div class="package-desc">Run the same compliance tests used in RESO certification. Covers Web API Core, Data Dictionary, Add/Edit (RCP-010), and EntityEvent (RCP-027) endorsements. Test your server before submitting for certification.</div>
         <div class="package-meta">
-          <span>102 tests</span>
+          <span>250 tests</span>
           <span>&middot;</span>
           <span>4 Compliance Suites</span>
         </div>
       </div>
       <a href="{{ '/packages/reso-certification' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso-standards/reso-mcp-server</div>
+        <div class="package-desc">MCP server that exposes RESO tools for AI agents. Query OData servers, parse metadata, validate records, and run compliance tests &mdash; all through the Model Context Protocol.</div>
+        <div class="package-meta">
+          <span>20 tests</span>
+          <span>&middot;</span>
+          <span>7 Tools</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/reso-mcp-server' | relative_url }}" class="view-link">View &rarr;</a>
     </div>
   </div>
 </div>
@@ -186,7 +200,7 @@ title: RESO Tools
 
     <div class="package-item">
       <div>
-        <div class="package-name">reso-reference-server</div>
+        <div class="package-name">@reso-standards/reso-reference-server</div>
         <div class="package-desc">
           A fully working RESO Web API server you can run locally with Docker.
           Point it at the RESO Data Dictionary metadata and it automatically creates database tables,
@@ -224,7 +238,7 @@ title: RESO Tools
 
     <div class="package-item">
       <div>
-        <div class="package-name">reso-desktop-client</div>
+        <div class="package-name">@reso-standards/reso-desktop-client</div>
         <div class="package-desc">Electron desktop application for browsing any RESO-compliant OData server. Includes OAuth2 Client Credentials and Bearer Token authentication, metadata caching, and an optional built-in reference server for local test data. No Docker required.</div>
         <div class="package-meta">
           <span>SQLite</span>
@@ -239,7 +253,7 @@ title: RESO Tools
 
     <div class="package-item">
       <div>
-        <div class="package-name">@reso-standards/web-client</div>
+        <div class="package-name">@reso-standards/reso-web-client</div>
         <div class="package-desc">React-based OData browser UI with server connection manager, analytics-driven search fields, advanced search with field groups, metadata explorer, and CRUD operations. Connects to any OData server via the CORS proxy.</div>
         <div class="package-meta">
           <span>72 tests</span>
@@ -252,7 +266,7 @@ title: RESO Tools
 
     <div class="package-item">
       <div>
-        <div class="package-name">@reso-standards/web-api-proxy</div>
+        <div class="package-name">@reso-standards/reso-web-api-proxy</div>
         <div class="package-desc">Lightweight CORS proxy and static file server for deploying the web client without the reference server. Enables browser-based OData clients to connect to servers that don&rsquo;t set CORS headers.</div>
         <div class="package-meta">
           <span>Express middleware</span>
@@ -307,10 +321,8 @@ docker compose --profile seed up          # Seed with test data
       <h3>Run Compliance Tests</h3>
       <p>Verify your server passes RESO certification requirements. This example runs the Add/Edit endorsement tests against the local reference server.</p>
 <pre><code>cd reso-certification
-npx reso-cert-add-edit \
+npx reso-cert add-edit \
   --url http://localhost:8080 \
-  --resource Property \
-  --payloads ./add-edit/sample-payloads \
   --auth-token admin-token</code></pre>
     </div>
   </div>

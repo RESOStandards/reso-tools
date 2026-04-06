@@ -20,7 +20,7 @@ const [sqliteDbPath, metadataPath, serverRoot, uiDistPath] = process.argv.slice(
 
 /** Start the full reference server (OData routes + proxy + UI). */
 const startReferenceServer = async () => {
-  const { createApp, loadConfig } = await import('@reso-standards/reference-server');
+  const { createApp, loadConfig } = await import('@reso-standards/reso-reference-server');
 
   const config = loadConfig({
     port: 0,
@@ -52,7 +52,7 @@ const startReferenceServer = async () => {
 
 /** Start the lightweight proxy server (proxy + health + UI only, no OData). */
 const startProxyOnly = async () => {
-  const { createProxyServer } = await import('@reso-standards/web-api-proxy');
+  const { createProxyServer } = await import('@reso-standards/reso-web-api-proxy');
 
   console.log('Starting RESO Web API Proxy (child process)...');
   console.log(`  UI: ${uiDistPath}`);

@@ -59,6 +59,10 @@ const buildResourceContext = (metadata: ResoMetadata, resource: string): Resourc
 const pickRandom = <T>(arr: ReadonlyArray<T>): T => arr[Math.floor(Math.random() * arr.length)];
 
 /** Collects all lookup values for fields of a resource into a lookup map. */
+/** Unwraps Collection() wrapper from OData type names. */
+const unwrapCollectionType = (type: string): string =>
+  type.startsWith('Collection(') && type.endsWith(')') ? type.slice(11, -1) : type;
+
 const buildLookupMap = (
   metadata: ResoMetadata,
   fields: ReadonlyArray<ResoField>,
@@ -68,7 +72,8 @@ const buildLookupMap = (
   for (const field of fields) {
     // For string-based enums, use the LookupName annotation as the key
     const lookupNameAnnotation = field.annotations?.find(a => a.term === LOOKUP_NAME_ANNOTATION_TERM);
-    const lookupKey = lookupNameAnnotation?.value ?? (isEnumType(field.type) ? field.type : null);
+    const rawType = isEnumType(field.type) ? unwrapCollectionType(field.type) : null;
+    const lookupKey = lookupNameAnnotation?.value ?? rawType;
 
     if (lookupKey && !lookupMap[lookupKey]) {
       const lookups = getLookupsForType(metadata, lookupKey);

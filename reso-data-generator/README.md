@@ -125,4 +125,4 @@ The CLI fetches field metadata and lookup values from the server's metadata API 
 
 ## License
 
-See [LICENSE](../LICENSE) in the repository root.
+See [LICENSE](https://github.com/RESOStandards/reso-tools/blob/main/LICENSE) in the repository root.

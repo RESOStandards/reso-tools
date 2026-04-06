@@ -121,6 +121,13 @@
     html.dark .nav-dropdown-menu a { color: #e2e8f0 !important; border-color: #4a5568; }
     html.dark .nav-dropdown-menu a:hover { background: #1a202c; color: #63b3ed !important; }
 
+    /* Header actions (search, theme, hamburger) */
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
     /* Hamburger menu button */
     .menu-toggle {
       display: none;
@@ -135,6 +142,7 @@
     @media (max-width: 768px) {
       .site-header { flex-wrap: wrap; height: auto; min-height: 64px; }
       .menu-toggle { display: block; }
+      .search-trigger kbd { display: none; }
       .header-nav {
         display: none;
         flex-direction: column;
@@ -147,12 +155,14 @@
       .header-nav a {
         padding: 0.625rem 0;
         opacity: 1;
+        text-align: center;
         border-bottom: 1px solid rgba(255,255,255,0.08);
       }
       .header-nav a:last-of-type { border-bottom: none; }
-      .nav-dropdown { width: 100%; }
+      .nav-dropdown { width: 100%; text-align: center; }
       .nav-dropdown-trigger {
         width: 100%;
+        justify-content: center;
         padding: 0.625rem 0;
         opacity: 1;
         border-bottom: 1px solid rgba(255,255,255,0.08);
@@ -166,14 +176,13 @@
       }
       .nav-dropdown-menu a {
         color: white !important;
-        padding-left: 1.5rem;
+        text-align: center;
+        padding-left: 0;
         border-color: rgba(255,255,255,0.05);
       }
       .nav-dropdown-menu a:hover { background: rgba(255,255,255,0.1); color: var(--reso-orange) !important; }
       html.dark .nav-dropdown-menu { background: rgba(255,255,255,0.08); }
       html.dark .nav-dropdown-menu a { color: white !important; border-color: rgba(255,255,255,0.05); }
-      .search-trigger { margin-top: 0.5rem; justify-content: center; }
-      .search-trigger kbd { display: none; }
     }
 
     /* Main */
@@ -791,9 +800,19 @@
     <a href="{{ '/' | relative_url }}" class="header-logo">
       <img src="{{ '/assets/reso-logo-white.png' | relative_url }}" alt="RESO" />
     </a>
-    <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle menu">
-      <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
-    </button>
+    <div class="header-actions">
+      <button class="search-trigger" id="searchTrigger" type="button">
+        <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        Search<kbd>/</kbd>
+      </button>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
+        <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      </button>
+      <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle menu">
+        <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+      </button>
+    </div>
     <nav class="header-nav" id="headerNav">
       <a href="{{ '/' | relative_url }}">Home</a>
       <a href="https://dd.reso.org">Data Dictionary</a>
@@ -809,15 +828,6 @@
       </div>
       <a href="https://github.com/RESOStandards/reso-tools">GitHub</a>
       <a href="https://reso.org">RESO.org</a>
-      <button class="search-trigger" id="searchTrigger" type="button">
-        <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-        Search<kbd>/</kbd>
-      </button>
-      <!-- TODO: When DD site is split out, unify theme toggle into shared component -->
-      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
-        <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
-        <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-      </button>
     </nav>
   </header>
 
