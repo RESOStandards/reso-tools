@@ -1,0 +1,34 @@
+{
+  "name": "@reso-standards/reso-mcp-server",
+  "version": "0.1.0",
+  "description": "RESO MCP server — exposes OData query, validation, certification, and metadata tools for AI agents",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "reso-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.23.0",
+    "@reso-standards/reso-client": "file:../reso-client",
+    "@reso-standards/reso-validation": "file:../reso-validation",
+    "@reso-standards/reso-certification": "file:../reso-certification",
+    "@reso-standards/odata-expression-parser": "file:../odata-expression-parser"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.0.0"
+  }
+}

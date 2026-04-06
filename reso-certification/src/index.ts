@@ -95,6 +95,29 @@ export {
   WELL_KNOWN_RESOURCES,
 } from './web-api-core/index.js';
 
+// ── SDK ──
+
+export {
+  runComplianceTests,
+  runAddEditCompliance,
+  runEntityEventCompliance,
+  runCoreCompliance,
+  createPipeline,
+  writeReports,
+} from './sdk/index.js';
+
+export type {
+  ComplianceConfig,
+  AddEditConfig,
+  CoreConfig,
+  DDConfig,
+  BaseComplianceConfig,
+  PipelineResult,
+  StepResult,
+  StepProgress,
+  ProgressCallback,
+} from './sdk/types.js';
+
 // ── Data Dictionary (stub) ──
 
 export { DATA_DICTIONARY_VERSION } from './data-dictionary/index.js';
