@@ -41,7 +41,8 @@ jobs:
           for dir in reso-validation odata-expression-parser reso-client reso-data-generator reso-reference-server reso-web-client reso-web-api-proxy; do
             (cd "$dir" && npm install)
           done
-          cd reso-certification && NPM_CONFIG_IGNORE_SCRIPTS=true npm install && cd ..
+          printf '#!/bin/sh\nexit 0' | sudo tee /usr/local/bin/lefthook > /dev/null && sudo chmod +x /usr/local/bin/lefthook
+          cd reso-certification && npm install && cd ..
 
       - name: Build shared libraries
         run: |
