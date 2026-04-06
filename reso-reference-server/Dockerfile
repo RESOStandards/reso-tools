@@ -35,7 +35,7 @@ RUN sed -i 's|file:../odata-expression-parser|file:/deps/odata-expression-parser
  && sed -i 's|file:../reso-validation|file:/deps/reso-validation|' package.json \
  && sed -i 's|file:../reso-data-generator|file:/deps/reso-data-generator|' package.json
 
-RUN npm ci --ignore-scripts || npm install
+RUN npm install
 COPY reso-reference-server/tsconfig.json ./
 COPY reso-reference-server/src/ ./src/
 RUN npm run build
