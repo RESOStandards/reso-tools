@@ -144,10 +144,10 @@ export const generatePropertyRecords = (
     // Address overrides
     record.StreetNumber = String(randomInt(100, 9999));
     record.StreetName = randomChoice(STREET_NAMES);
-    const streetSuffixValues = lookups['org.reso.metadata.enums.StreetSuffix'];
+    const streetSuffixValues = lookups['StreetSuffix'];
     record.StreetSuffix = streetSuffixValues?.length ? randomChoice(streetSuffixValues).lookupValue : randomChoice(STREET_SUFFIXES);
     record.UnparsedAddress = `${record.StreetNumber} ${record.StreetName} ${record.StreetSuffix}`;
-    const cityValues = lookups['org.reso.metadata.enums.City'];
+    const cityValues = lookups['City'];
     record.City = cityValues?.length ? randomChoice(cityValues).lookupValue : randomChoice(CITY_NAMES);
     record.StateOrProvince = randomChoice(US_STATES);
     record.PostalCode = String(randomInt(10000, 99999));
@@ -182,15 +182,15 @@ export const generatePropertyRecords = (
     record.Longitude = randomDecimal(-124.0, -71.0, 6);
 
     // Property type — prefer lookup values, fall back to hardcoded
-    const propertyTypeValues = lookups['org.reso.metadata.enums.PropertyType'];
+    const propertyTypeValues = lookups['PropertyType'];
     record.PropertyType = propertyTypeValues?.length ? randomChoice(propertyTypeValues).lookupValue : randomChoice(PROPERTY_TYPES);
-    const propertySubTypeValues = lookups['org.reso.metadata.enums.PropertySubType'];
+    const propertySubTypeValues = lookups['PropertySubType'];
     record.PropertySubType = propertySubTypeValues?.length
       ? randomChoice(propertySubTypeValues).lookupValue
       : randomChoice(PROPERTY_SUBTYPES);
 
     // Status — prefer Active for most generated listings
-    const statusValues = lookups['org.reso.metadata.enums.StandardStatus'];
+    const statusValues = lookups['StandardStatus'];
     if (statusValues && statusValues.length > 0) {
       const activeStatus = statusValues.find(s => s.lookupValue === 'Active');
       record.StandardStatus = activeStatus

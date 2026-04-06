@@ -154,7 +154,7 @@ export const generateMemberRecords = (
     record.MemberCountry = 'US';
 
     // Designations — prefer lookup values, fall back to hardcoded
-    const designationValues = lookups['org.reso.metadata.enums.MemberDesignation'];
+    const designationValues = lookups['MemberDesignation'];
     const numDesignations = randomInt(0, 3);
     if (numDesignations > 0) {
       const source = designationValues?.length ? designationValues.map(v => v.lookupValue) : DESIGNATIONS;
@@ -163,7 +163,7 @@ export const generateMemberRecords = (
     }
 
     // Status — prefer Active
-    const statusValues = lookups['org.reso.metadata.enums.MemberStatus'];
+    const statusValues = lookups['MemberStatus'];
     if (statusValues && statusValues.length > 0) {
       const active = statusValues.find(s => s.lookupValue === 'Active');
       record.MemberStatus = active ? 'Active' : randomChoice(statusValues).lookupValue;

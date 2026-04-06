@@ -31,7 +31,7 @@ export const generateShowingRecords = (
     record.ShowingEndTimestamp = endDate.toISOString();
 
     // Status
-    const statusValues = lookups['org.reso.metadata.enums.ShowingStatus'];
+    const statusValues = lookups['ShowingStatus'];
     if (statusValues && statusValues.length > 0) {
       const active = statusValues.find(s => s.lookupValue === 'Active' || s.lookupValue === 'Confirmed');
       record.ShowingStatus = active ? active.lookupValue : randomChoice(statusValues).lookupValue;

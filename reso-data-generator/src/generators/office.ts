@@ -100,7 +100,7 @@ export const generateOfficeRecords = (
     record.OfficeCountry = 'US';
 
     // Status — prefer Active
-    const statusValues = lookups['org.reso.metadata.enums.OfficeStatus'];
+    const statusValues = lookups['OfficeStatus'];
     if (statusValues && statusValues.length > 0) {
       const active = statusValues.find(s => s.lookupValue === 'Active');
       record.OfficeStatus = active ? 'Active' : randomChoice(statusValues).lookupValue;
