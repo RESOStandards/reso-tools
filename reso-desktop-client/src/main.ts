@@ -111,10 +111,8 @@ const resolveMetadataForVersion = (version: DDVersion): string => {
   if (app.isPackaged) {
     return resolve(process.resourcesPath, `dd-${version}.json`);
   }
-  // Dev mode: try reference-metadata first, fall back to build dir
-  const refPath = resolve(__dirname, '..', '..', 'reso-certification', 'reference-metadata', `dd-${version}.json`);
-  const buildPath = resolve(__dirname, '..', 'build', `dd-${version}.json`);
-  try { readFileSync(refPath, 'utf-8'); return refPath; } catch { return buildPath; }
+  // Dev mode: reference metadata from reso-certification package
+  return resolve(__dirname, '..', '..', 'reso-certification', 'reference-metadata', `dd-${version}.json`);
 };
 
 /** State for the running server instance. */
