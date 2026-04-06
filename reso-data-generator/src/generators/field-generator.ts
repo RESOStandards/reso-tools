@@ -88,9 +88,13 @@ export const transformLookupsForHumanFriendly = (
   return result;
 };
 
+/** Check if a lookup value is a placeholder (SampleXxxEnumValue or Sample Xxx Enum Value). */
+export const isPlaceholderValue = (value: string): boolean =>
+  value.startsWith('Sample') && (value.endsWith('EnumValue') || value.endsWith('Enum Value'));
+
 /** Generates a random lookup value from available lookups for a given type, skipping placeholder values. */
 const randomLookupValue = (type: string, lookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>>): string | undefined => {
-  const values = lookups[type]?.filter(v => !v.lookupValue.startsWith('Sample') || !v.lookupValue.endsWith('EnumValue'));
+  const values = lookups[type]?.filter(v => !isPlaceholderValue(v.lookupValue));
   if (!values || values.length === 0) return undefined;
   return randomChoice(values).lookupValue;
 };

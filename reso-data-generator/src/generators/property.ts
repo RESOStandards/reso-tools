@@ -1,4 +1,4 @@
-import { generateRecord, randomChoice, randomDecimal, randomInt } from './field-generator.js';
+import { generateRecord, randomChoice, randomDecimal, randomInt, isPlaceholderValue } from './field-generator.js';
 import type { ResoField, ResoLookup } from './types.js';
 
 /**
@@ -147,7 +147,7 @@ export const generatePropertyRecords = (
     const streetSuffixValues = lookups['StreetSuffix'];
     record.StreetSuffix = streetSuffixValues?.length ? randomChoice(streetSuffixValues).lookupValue : randomChoice(STREET_SUFFIXES);
     record.UnparsedAddress = `${record.StreetNumber} ${record.StreetName} ${record.StreetSuffix}`;
-    const cityValues = lookups['City'];
+    const cityValues = lookups['City']?.filter(v => !isPlaceholderValue(v.lookupValue));
     record.City = cityValues?.length ? randomChoice(cityValues).lookupValue : randomChoice(CITY_NAMES);
     record.StateOrProvince = randomChoice(US_STATES);
     record.PostalCode = String(randomInt(10000, 99999));
