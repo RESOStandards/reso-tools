@@ -1,0 +1,28 @@
+{
+  "providerUoi": "REQUIRED: <providerUoi>",
+  "configs": [
+    {
+      "description": "Sample Bearer Token Config",
+      "serviceRootUri": "REQUIRED: OData Service Root",
+      "recipientUoi": "REQUIRED: Recipient UOI",
+      "providerUsi": "REQUIRED: USI of System",
+      "token": "REQUIRED: auth token",
+      "originatingSystemName": "OPTIONAL",
+      "originatingSystemId": "OPTIONAL"
+    },
+    {
+      "description": "Sample Client Credentials Config",
+      "serviceRootUri": "REQUIRED: OData Service Root",
+      "recipientUoi": "REQUIRED: Recipient UOI",
+      "providerUsi": "REQUIRED: USI of System",
+      "clientCredentials": {
+        "clientId": "REQUIRED: clientId",
+        "clientSecret": "REQUIRED: clientSecret",
+        "tokenUri": "REQUIRED: tokenUri",
+        "scope": "OPTIONAL"
+      },
+      "originatingSystemName": "OPTIONAL",
+      "originatingSystemId": "OPTIONAL"
+    }
+  ]
+}

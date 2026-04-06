@@ -419,7 +419,8 @@ const ddCmd = program
   .requiredOption('--url <url>', 'Server base URL')
   .option('--dd-version <version>', 'DD version: 1.7 or 2.0', '2.0')
   .option('--limit <n>', 'Max records to replicate per resource', '100000')
-  .option('--strict', 'Strict mode: fail on variations and enforce JSON schema validation');
+  .option('--strict', 'Strict mode: fail on variations and enforce JSON schema validation')
+  .option('--batch-expand', 'Batch all expansions per resource into a single $expand request');
 
 addAuthOptions(ddCmd);
 addOutputOptions(ddCmd);
@@ -430,6 +431,7 @@ ddCmd.action(
     ddVersion: string;
     limit: string;
     strict?: boolean;
+    batchExpand?: boolean;
     authToken?: string;
     clientId?: string;
     clientSecret?: string;
@@ -458,6 +460,7 @@ ddCmd.action(
         version: ddVersion,
         limit: Number(opts.limit),
         strictMode: opts.strict,
+        batchExpand: opts.batchExpand,
         options: {
           ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {}),
         },

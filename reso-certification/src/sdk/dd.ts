@@ -18,19 +18,17 @@ import type { DDConfig, PipelineStep, StepResult } from './types.js';
 import { createPipeline } from './pipeline.js';
 import { coreReportGenerators, writeReports } from './reports.js';
 
-// ── Cert-utils imports ──
+// ── Cert-utils imports (local copy for modification) ──
 
-// @ts-expect-error — cert-utils is CJS, no type declarations
-import certUtils from '@reso/reso-certification-utils';
-// @ts-expect-error — cert-utils is CJS
-import certUtilsCommon from '@reso/reso-certification-utils/common.js';
+// @ts-expect-error — legacy CJS, no type declarations
+import certUtils from '../../legacy-cert-utils/index.js';
+// @ts-expect-error — legacy CJS
+import certUtilsCommon from '../../legacy-cert-utils/common.js';
+// @ts-expect-error — legacy CJS
+import certUtilsReplicationUtils from '../../legacy-cert-utils/lib/replication/utils.js';
 
 const { replicate, findVariations } = certUtils;
 const { createReplicationStateServiceInstance } = certUtilsCommon;
-
-// Replication strategies are used by the inner replication function
-// @ts-expect-error — cert-utils is CJS
-import certUtilsReplicationUtils from '@reso/reso-certification-utils/lib/replication/utils.js';
 const { REPLICATION_STRATEGIES } = certUtilsReplicationUtils;
 
 // ── Constants ──
@@ -164,6 +162,7 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
   fromCli: true,
   limit: config.limit ?? DEFAULT_LIMIT,
   jsonSchemaValidation: config.strictMode ?? true,
+  batchExpand: config.batchExpand ?? false,
 });
 
 const initReplicationState: PipelineStep<DDContext> = {

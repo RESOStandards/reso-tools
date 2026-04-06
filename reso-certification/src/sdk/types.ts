@@ -97,6 +97,8 @@ export interface DDConfig extends BaseComplianceConfig {
   readonly version: '1.7' | '2.0';
   readonly limit?: number;
   readonly strictMode?: boolean;
+  /** Batch all expansions for a resource into a single $expand request (default: false). */
+  readonly batchExpand?: boolean;
 }
 
 /** Inline payloads for Add/Edit config. */
