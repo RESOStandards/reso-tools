@@ -8,7 +8,7 @@ Works with any MCP client: Claude, Cursor, Windsurf, VS Code, or your own applic
 
 ### Claude Code / Claude Desktop
 
-Add to your MCP settings:
+Add to your MCP settings (`~/.claude/claude_desktop_config.json` or via `/mcp add`):
 
 ```json
 {
@@ -33,6 +33,17 @@ Certification tools only:
   }
 }
 ```
+
+### Other MCP Clients
+
+The server uses stdio transport, so the configuration is the same `command` + `args` across all clients:
+
+- [Cursor](https://docs.cursor.com/context/model-context-protocol) — Settings > MCP Servers
+- [VS Code](https://code.visualstudio.com/docs/copilot/chat/mcp-servers) — `.vscode/mcp.json`
+- [Windsurf](https://docs.windsurf.com/windsurf/mcp) — MCP settings
+- [JetBrains](https://www.jetbrains.com/help/idea/mcp-servers.html) — Settings > AI Assistant > MCP
+- [Zed](https://zed.dev/docs/assistant/model-context-protocol) — Settings
+- [Continue](https://docs.continue.dev/customize/model-providers/mcp), [Cline](https://github.com/cline/cline), [Amazon Q](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/mcp.html), [Sourcegraph Cody](https://sourcegraph.com/docs/cody/clients/mcp)
 
 ### Docker
 
