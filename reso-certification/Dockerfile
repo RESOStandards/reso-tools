@@ -65,7 +65,8 @@ COPY --from=build /deps/reso-client /deps/reso-client
 RUN apk add --no-cache wget
 
 # Run as non-root user
-RUN addgroup -S reso && adduser -S reso -G reso
+RUN addgroup -S reso && adduser -S reso -G reso \
+ && chown -R reso:reso /app
 USER reso
 
 ENTRYPOINT ["node", "dist/cli/index.js"]

@@ -210,7 +210,6 @@ const initReplicationState: PipelineStep<DDContext> = {
     // cert-utils reads schema-validation-settings.json from cwd — ensure it's there
     const settingsFile = 'schema-validation-settings.json';
     if (!existsSync(settingsFile)) {
-      // Resolve from the legacy-cert-utils local copy
       const legacyDir = join(dirname(new URL(import.meta.url).pathname), '..', '..', 'legacy-cert-utils');
       const sourcePath = join(legacyDir, settingsFile);
       if (existsSync(sourcePath)) {
