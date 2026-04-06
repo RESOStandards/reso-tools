@@ -20,6 +20,7 @@ export interface ResoField {
   readonly nullable?: boolean;
   readonly isCollection?: boolean;
   readonly isExpansion?: boolean;
+  readonly isEnumeration?: boolean;
   readonly maxLength?: number;
   readonly scale?: number;
   readonly precision?: number;

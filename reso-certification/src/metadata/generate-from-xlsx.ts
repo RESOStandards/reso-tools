@@ -149,11 +149,18 @@ const processField = (row: SheetRow, version: string): MetadataReportField | nul
 
   // SourceResource indicates a navigation property (expansion)
   const isExpansion = !!sourceResource;
+  const simpleType = String(row.SimpleDataType ?? '').trim();
 
-  // For expansions, the type is a collection reference to the target entity type
+  // For expansions, the type is a reference to the target entity type
   const { type: mappedType, nullable, maxLength, scale, precision, isCollection: mappedIsCollection } = mapFieldType(row);
-  const type = isExpansion ? `Collection(${ENUM_NAMESPACE.replace('.enums', '')}.${sourceResource})` : mappedType;
-  const isCollection = isExpansion ? true : mappedIsCollection;
+  const entityNamespace = ENUM_NAMESPACE.replace('.enums', '');
+  const expansionType = isExpansion
+    ? (simpleType === 'Collection'
+      ? `Collection(${entityNamespace}.${sourceResource})`
+      : `${entityNamespace}.${sourceResource}`)
+    : mappedType;
+  const type = isExpansion ? expansionType : mappedType;
+  const isCollection = isExpansion ? simpleType === 'Collection' : mappedIsCollection;
 
   const annotations: Array<{ readonly term: string; readonly value: string }> = [];
 

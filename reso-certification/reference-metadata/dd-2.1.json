@@ -1,7 +1,7 @@
 {
   "description": "RESO Data Dictionary Metadata Report",
   "version": "2.1",
-  "generatedOn": "2026-04-06T11:38:34.692Z",
+  "generatedOn": "2026-04-06T11:49:41.344Z",
   "resources": [
     {
       "resourceName": "Property",
@@ -1454,9 +1454,8 @@
     {
       "resourceName": "Property",
       "fieldName": "BuyerAgent",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -2196,9 +2195,8 @@
     {
       "resourceName": "Property",
       "fieldName": "BuyerOffice",
-      "type": "Collection(org.reso.metadata.Office)",
+      "type": "org.reso.metadata.Office",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -2473,9 +2471,8 @@
     {
       "resourceName": "Property",
       "fieldName": "BuyerTeam",
-      "type": "Collection(org.reso.metadata.Teams)",
+      "type": "org.reso.metadata.Teams",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Teams",
       "annotations": [
@@ -2785,9 +2782,8 @@
     {
       "resourceName": "Property",
       "fieldName": "CoBuyerAgent",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -3455,9 +3451,8 @@
     {
       "resourceName": "Property",
       "fieldName": "CoBuyerOffice",
-      "type": "Collection(org.reso.metadata.Office)",
+      "type": "org.reso.metadata.Office",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -3728,9 +3723,8 @@
     {
       "resourceName": "Property",
       "fieldName": "CoListAgent",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -4398,9 +4392,8 @@
     {
       "resourceName": "Property",
       "fieldName": "CoListOffice",
-      "type": "Collection(org.reso.metadata.Office)",
+      "type": "org.reso.metadata.Office",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -8552,9 +8545,8 @@
     {
       "resourceName": "Property",
       "fieldName": "ListAgent",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -9431,9 +9423,8 @@
     {
       "resourceName": "Property",
       "fieldName": "ListOffice",
-      "type": "Collection(org.reso.metadata.Office)",
+      "type": "org.reso.metadata.Office",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -9752,9 +9743,8 @@
     {
       "resourceName": "Property",
       "fieldName": "ListTeam",
-      "type": "Collection(org.reso.metadata.Teams)",
+      "type": "org.reso.metadata.Teams",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Teams",
       "annotations": [
@@ -11372,9 +11362,8 @@
     {
       "resourceName": "Property",
       "fieldName": "OriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -13453,9 +13442,8 @@
     {
       "resourceName": "Property",
       "fieldName": "SourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -15950,9 +15938,8 @@
     {
       "resourceName": "Association",
       "fieldName": "AssociationMember",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -16379,9 +16366,8 @@
     {
       "resourceName": "Association",
       "fieldName": "OriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -16531,9 +16517,8 @@
     {
       "resourceName": "Association",
       "fieldName": "SourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -17841,9 +17826,8 @@
     {
       "resourceName": "ContactListingNotes",
       "fieldName": "Contact",
-      "type": "Collection(org.reso.metadata.Contacts)",
+      "type": "org.reso.metadata.Contacts",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Contacts",
       "annotations": [
@@ -17929,9 +17913,8 @@
     {
       "resourceName": "ContactListingNotes",
       "fieldName": "Listing",
-      "type": "Collection(org.reso.metadata.Property)",
+      "type": "org.reso.metadata.Property",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Property",
       "annotations": [
@@ -18097,9 +18080,8 @@
     {
       "resourceName": "ContactListings",
       "fieldName": "Contact",
-      "type": "Collection(org.reso.metadata.Contacts)",
+      "type": "org.reso.metadata.Contacts",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Contacts",
       "annotations": [
@@ -18307,9 +18289,8 @@
     {
       "resourceName": "ContactListings",
       "fieldName": "Listing",
-      "type": "Collection(org.reso.metadata.Property)",
+      "type": "org.reso.metadata.Property",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Property",
       "annotations": [
@@ -19728,9 +19709,8 @@
     {
       "resourceName": "Contacts",
       "fieldName": "OriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -20080,9 +20060,8 @@
     {
       "resourceName": "Contacts",
       "fieldName": "OwnerMember",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -20319,9 +20298,8 @@
     {
       "resourceName": "Contacts",
       "fieldName": "SourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -21583,9 +21561,8 @@
     {
       "resourceName": "InternetTracking",
       "fieldName": "ActorOriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -21785,9 +21762,8 @@
     {
       "resourceName": "InternetTracking",
       "fieldName": "ActorSourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -22036,9 +22012,8 @@
     {
       "resourceName": "InternetTracking",
       "fieldName": "EventOriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -22162,9 +22137,8 @@
     {
       "resourceName": "InternetTracking",
       "fieldName": "EventSourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -22388,9 +22362,8 @@
     {
       "resourceName": "InternetTracking",
       "fieldName": "ObjectOriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -22465,9 +22438,8 @@
     {
       "resourceName": "InternetTracking",
       "fieldName": "ObjectSourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -24137,9 +24109,8 @@
     {
       "resourceName": "LockOrBox",
       "fieldName": "OriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -24160,9 +24131,8 @@
     {
       "resourceName": "LockOrBox",
       "fieldName": "ShowingAgent",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -24372,9 +24342,8 @@
     {
       "resourceName": "LockOrBox",
       "fieldName": "ShowingOffice",
-      "type": "Collection(org.reso.metadata.Office)",
+      "type": "org.reso.metadata.Office",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -24458,9 +24427,8 @@
     {
       "resourceName": "LockOrBox",
       "fieldName": "SourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -24606,9 +24574,8 @@
     {
       "resourceName": "Media",
       "fieldName": "ChangedByMember",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -25095,9 +25062,8 @@
     {
       "resourceName": "Media",
       "fieldName": "OriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -25394,9 +25360,8 @@
     {
       "resourceName": "Media",
       "fieldName": "SourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -27303,9 +27268,8 @@
     {
       "resourceName": "Member",
       "fieldName": "Office",
-      "type": "Collection(org.reso.metadata.Office)",
+      "type": "org.reso.metadata.Office",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -27454,9 +27418,8 @@
     {
       "resourceName": "Member",
       "fieldName": "OriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -27581,9 +27544,8 @@
     {
       "resourceName": "Member",
       "fieldName": "SourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -27734,9 +27696,8 @@
     {
       "resourceName": "MemberAssociation",
       "fieldName": "Association",
-      "type": "Collection(org.reso.metadata.Association)",
+      "type": "org.reso.metadata.Association",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Association",
       "annotations": [
@@ -27863,9 +27824,8 @@
     {
       "resourceName": "MemberAssociation",
       "fieldName": "Member",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -28212,9 +28172,8 @@
     {
       "resourceName": "MemberAssociation",
       "fieldName": "OriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -28298,9 +28257,8 @@
     {
       "resourceName": "MemberAssociation",
       "fieldName": "SourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -28407,9 +28365,8 @@
     {
       "resourceName": "MemberStateLicense",
       "fieldName": "Member",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -28722,9 +28679,8 @@
     {
       "resourceName": "Office",
       "fieldName": "MainOffice",
-      "type": "Collection(org.reso.metadata.Office)",
+      "type": "org.reso.metadata.Office",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -29123,9 +29079,8 @@
     {
       "resourceName": "Office",
       "fieldName": "OfficeBroker",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -29625,9 +29580,8 @@
     {
       "resourceName": "Office",
       "fieldName": "OfficeManager",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -30102,9 +30056,8 @@
     {
       "resourceName": "Office",
       "fieldName": "OriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -30254,9 +30207,8 @@
     {
       "resourceName": "Office",
       "fieldName": "SourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -30431,9 +30383,8 @@
     {
       "resourceName": "OfficeAssociation",
       "fieldName": "Association",
-      "type": "Collection(org.reso.metadata.Association)",
+      "type": "org.reso.metadata.Association",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Association",
       "annotations": [
@@ -30633,9 +30584,8 @@
     {
       "resourceName": "OfficeAssociation",
       "fieldName": "Office",
-      "type": "Collection(org.reso.metadata.Office)",
+      "type": "org.reso.metadata.Office",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -30808,9 +30758,8 @@
     {
       "resourceName": "OfficeAssociation",
       "fieldName": "OriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -30910,9 +30859,8 @@
     {
       "resourceName": "OfficeAssociation",
       "fieldName": "SourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -31063,9 +31011,8 @@
     {
       "resourceName": "OfficeCorporateLicense",
       "fieldName": "Office",
-      "type": "Collection(org.reso.metadata.Office)",
+      "type": "org.reso.metadata.Office",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Office",
       "annotations": [
@@ -32223,9 +32170,8 @@
     {
       "resourceName": "OUID",
       "fieldName": "ChangedByMember",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -33600,9 +33546,8 @@
     {
       "resourceName": "PropertyGreenVerification",
       "fieldName": "Listing",
-      "type": "Collection(org.reso.metadata.Property)",
+      "type": "org.reso.metadata.Property",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Property",
       "annotations": [
@@ -33708,9 +33653,8 @@
     {
       "resourceName": "PropertyPowerProduction",
       "fieldName": "Listing",
-      "type": "Collection(org.reso.metadata.Property)",
+      "type": "org.reso.metadata.Property",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Property",
       "annotations": [
@@ -33983,9 +33927,8 @@
     {
       "resourceName": "PropertyRooms",
       "fieldName": "Listing",
-      "type": "Collection(org.reso.metadata.Property)",
+      "type": "org.reso.metadata.Property",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Property",
       "annotations": [
@@ -34368,9 +34311,8 @@
     {
       "resourceName": "PropertyUnitTypes",
       "fieldName": "Listing",
-      "type": "Collection(org.reso.metadata.Property)",
+      "type": "org.reso.metadata.Property",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Property",
       "annotations": [
@@ -35799,9 +35741,8 @@
     {
       "resourceName": "Rules",
       "fieldName": "OriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -36177,9 +36118,8 @@
     {
       "resourceName": "Rules",
       "fieldName": "SourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -36307,9 +36247,8 @@
     {
       "resourceName": "SavedSearch",
       "fieldName": "Member",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -36412,9 +36351,8 @@
     {
       "resourceName": "SavedSearch",
       "fieldName": "OriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -36750,9 +36688,8 @@
     {
       "resourceName": "SavedSearch",
       "fieldName": "SourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -36836,9 +36773,8 @@
     {
       "resourceName": "Showing",
       "fieldName": "AgentOriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -36901,9 +36837,8 @@
     {
       "resourceName": "Showing",
       "fieldName": "AgentSourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -36989,9 +36924,8 @@
     {
       "resourceName": "Showing",
       "fieldName": "Listing",
-      "type": "Collection(org.reso.metadata.Property)",
+      "type": "org.reso.metadata.Property",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Property",
       "annotations": [
@@ -37054,9 +36988,8 @@
     {
       "resourceName": "Showing",
       "fieldName": "ListingOriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -37119,9 +37052,8 @@
     {
       "resourceName": "Showing",
       "fieldName": "ListingSourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -37310,9 +37242,8 @@
     {
       "resourceName": "Showing",
       "fieldName": "ShowingAgent",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -37457,9 +37388,8 @@
     {
       "resourceName": "Showing",
       "fieldName": "ShowingOriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -37542,9 +37472,8 @@
     {
       "resourceName": "Showing",
       "fieldName": "ShowingSourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -38905,9 +38834,8 @@
     {
       "resourceName": "TeamMembers",
       "fieldName": "Member",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [
@@ -39055,9 +38983,8 @@
     {
       "resourceName": "TeamMembers",
       "fieldName": "OriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -39157,9 +39084,8 @@
     {
       "resourceName": "TeamMembers",
       "fieldName": "SourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -39511,9 +39437,8 @@
     {
       "resourceName": "Teams",
       "fieldName": "OriginatingSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -39638,9 +39563,8 @@
     {
       "resourceName": "Teams",
       "fieldName": "SourceSystem",
-      "type": "Collection(org.reso.metadata.OUID)",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "OUID",
       "annotations": [
@@ -40015,9 +39939,8 @@
     {
       "resourceName": "Teams",
       "fieldName": "TeamLead",
-      "type": "Collection(org.reso.metadata.Member)",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
-      "isCollection": true,
       "isExpansion": true,
       "typeName": "Member",
       "annotations": [

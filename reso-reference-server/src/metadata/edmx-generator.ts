@@ -11,17 +11,24 @@ const SIMPLE_IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 /** Checks whether a string is a valid OData SimpleIdentifier. */
 const isValidSimpleIdentifier = (name: string): boolean => SIMPLE_IDENTIFIER_RE.test(name);
 
+/** Unwrap Collection(X) → X */
+const unwrapCollection = (type: string): string =>
+  type.startsWith('Collection(') && type.endsWith(')') ? type.slice('Collection('.length, -1) : type;
+
 /** Maps a RESO field type to an EDMX Property type string. */
 const toEdmxType = (field: ResoField, enumMode: EnumMode): string => {
-  if (field.isCollection) {
-    if (enumMode === 'enum-type' && isEnumType(field.type)) {
-      return `Collection(${field.type})`;
+  const rawType = unwrapCollection(field.type);
+  const isEnum = isEnumType(rawType) || field.isEnumeration;
+  const isCol = field.isCollection || field.type.startsWith('Collection(');
+
+  if (isEnum) {
+    if (enumMode === 'enum-type') {
+      return isCol ? `Collection(${rawType})` : rawType;
     }
-    return 'Collection(Edm.String)';
+    // String mode: enums become Edm.String or Collection(Edm.String)
+    return isCol ? 'Collection(Edm.String)' : 'Edm.String';
   }
-  if (isEnumType(field.type)) {
-    return enumMode === 'enum-type' ? field.type : 'Edm.String';
-  }
+
   return field.type;
 };
 
@@ -47,10 +54,13 @@ const generateProperty = (field: ResoField, enumMode: EnumMode): string => {
     attrs.push(`Scale="${field.scale}"`);
   }
 
-  // LookupName annotation: only in string mode for actual enum fields
+  // LookupName annotation: only in string mode for enum fields
+  const rawType = unwrapCollection(field.type);
+  const isEnum = isEnumType(rawType) || field.isEnumeration;
+  const lookupShortName = field.typeName ?? (rawType.includes('.') ? rawType.slice(rawType.lastIndexOf('.') + 1) : null);
   const lookupAnnotation =
-    enumMode === 'string' && isEnumType(field.type) && field.typeName
-      ? `\n          <Annotation Term="RESO.OData.Metadata.LookupName" String="${escapeXml(field.typeName)}"/>`
+    enumMode === 'string' && isEnum && lookupShortName
+      ? `\n          <Annotation Term="RESO.OData.Metadata.LookupName" String="${escapeXml(lookupShortName)}"/>`
       : '';
 
   if (lookupAnnotation) {
@@ -62,7 +72,8 @@ const generateProperty = (field: ResoField, enumMode: EnumMode): string => {
 
 /** Generates an EDMX NavigationProperty element for an expansion field. */
 const generateNavigationProperty = (field: ResoField): string => {
-  const type = field.isCollection ? `Collection(${field.type})` : field.type;
+  // Don't double-wrap Collection() — the type may already include it from the metadata report
+  const type = field.type.startsWith('Collection(') ? field.type : (field.isCollection ? `Collection(${field.type})` : field.type);
   return `        <NavigationProperty Name="${escapeXml(field.fieldName)}" Type="${escapeXml(type)}"/>`;
 };
 
