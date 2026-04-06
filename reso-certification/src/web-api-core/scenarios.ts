@@ -89,6 +89,13 @@ export interface StringEnumScenario extends BaseScenario {
   readonly valueParam2?: string;
 }
 
+export interface StringFunctionScenario extends BaseScenario {
+  readonly category: 'string-function';
+  readonly func: 'contains' | 'startswith' | 'endswith';
+  readonly fieldParam: string;
+  readonly valueParam: string;
+}
+
 export interface PagingScenario extends BaseScenario {
   readonly category: 'paging';
   readonly assertion: 'nextLink';
@@ -107,6 +114,7 @@ export type CoreScenario =
   | CollectionScenario
   | ErrorScenario
   | StringEnumScenario
+  | StringFunctionScenario
   | PagingScenario
   | ExpandScenario;
 
@@ -193,6 +201,12 @@ const stringEnumScenarios: ReadonlyArray<StringEnumScenario> = [
   { tag: 'filter-string-enum-multi-all', name: 'String enum collection: all()', category: 'string-enum', enumType: 'multi', op: 'all', fieldParam: 'multiLookupField', valueParam: 'multiLookupValue1', valueParam2: 'multiLookupValue2', minVersion: '2.1.0' },
 ];
 
+const stringFunctionScenarios: ReadonlyArray<StringFunctionScenario> = [
+  { tag: 'filter-string-contains', name: 'String: contains()', category: 'string-function', func: 'contains', fieldParam: 'stringField', valueParam: 'stringValue', minVersion: '2.1.0' },
+  { tag: 'filter-string-startswith', name: 'String: startswith()', category: 'string-function', func: 'startswith', fieldParam: 'stringField', valueParam: 'stringValue', minVersion: '2.1.0' },
+  { tag: 'filter-string-endswith', name: 'String: endswith()', category: 'string-function', func: 'endswith', fieldParam: 'stringField', valueParam: 'stringValue', minVersion: '2.1.0' },
+];
+
 const pagingScenarios: ReadonlyArray<PagingScenario> = [
   { tag: 'server-driven-paging', name: 'Server-driven paging (nextLink)', category: 'paging', assertion: 'nextLink', minVersion: '2.1.0' },
 ];
@@ -214,6 +228,7 @@ export const allScenarios: ReadonlyArray<CoreScenario> = [
   ...collectionScenarios,
   ...errorScenarios,
   ...stringEnumScenarios,
+  ...stringFunctionScenarios,
   ...pagingScenarios,
   ...expandScenarios,
 ];

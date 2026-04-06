@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { allScenarios, scenariosForVersion } from '../../src/web-api-core/scenarios.js';
 
 describe('scenario definitions', () => {
-  it('has at least 45 total scenarios', () => {
-    expect(allScenarios.length).toBeGreaterThanOrEqual(45);
+  it('has at least 51 total scenarios', () => {
+    expect(allScenarios.length).toBeGreaterThanOrEqual(51);
   });
 
   it('all scenarios have unique tags', () => {
@@ -29,10 +29,11 @@ describe('scenario definitions', () => {
     expect(v210.length).toBeGreaterThan(45);
   });
 
-  it('v2.1.0 includes string-enum, paging, and expand scenarios', () => {
+  it('v2.1.0 includes string-enum, string-function, paging, and expand scenarios', () => {
     const v210 = scenariosForVersion('2.1.0');
     const categories = new Set(v210.map(s => s.category));
     expect(categories.has('string-enum')).toBe(true);
+    expect(categories.has('string-function')).toBe(true);
     expect(categories.has('paging')).toBe(true);
     expect(categories.has('expand')).toBe(true);
   });

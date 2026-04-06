@@ -13,6 +13,7 @@ import type {
   CollectionScenario,
   ErrorScenario,
   StringEnumScenario,
+  StringFunctionScenario,
   ExpandScenario,
   ComparisonOp,
 } from './scenarios.js';
@@ -170,6 +171,22 @@ const buildStringEnumUrl = (
   return { url, selectFields };
 };
 
+const buildStringFunctionUrl = (
+  serverUrl: string,
+  resource: string,
+  params: TestParams,
+  scenario: StringFunctionScenario,
+): QuerySpec | undefined => {
+  const field = resolveField(params, scenario.fieldParam);
+  const value = resolveParam(params, scenario.valueParam);
+  if (!field || value == null) return undefined;
+
+  const selectFields = [params.keyField, field];
+  const filterExpr = `${scenario.func}(${field},'${value}')`;
+  const url = `${serverUrl}/${resource}?$filter=${encodeURIComponent(filterExpr)}&$select=${selectFields.join(',')}`;
+  return { url, selectFields };
+};
+
 const buildExpandUrl = (
   serverUrl: string,
   resource: string,
@@ -262,6 +279,8 @@ export const buildScenarioQuery = (
       return buildErrorUrl(serverUrl, resource, scenario);
     case 'string-enum':
       return buildStringEnumUrl(serverUrl, resource, params, scenario);
+    case 'string-function':
+      return buildStringFunctionUrl(serverUrl, resource, params, scenario);
     case 'expand':
       return buildExpandUrl(serverUrl, resource, params, scenario);
     case 'paging':

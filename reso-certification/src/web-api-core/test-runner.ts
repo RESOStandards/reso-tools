@@ -237,6 +237,27 @@ const assertData = (
           : [String(resolve(scenario.valueParam))],
       );
 
+    case 'string-function': {
+      const strField = resolveField(scenario.fieldParam);
+      const strValue = String(resolve(scenario.valueParam) ?? '');
+      const func = scenario.func;
+      const failures: string[] = [];
+      for (const [i, record] of records.entries()) {
+        const actual = record[strField];
+        if (actual == null) continue;
+        const actualStr = String(actual);
+        const matches = func === 'contains' ? actualStr.includes(strValue)
+          : func === 'startswith' ? actualStr.startsWith(strValue)
+          : actualStr.endsWith(strValue);
+        if (!matches) {
+          failures.push(`Record ${i}: ${strField}=${JSON.stringify(actualStr)} does not satisfy ${func}('${strValue}')`);
+        }
+      }
+      return failures.length === 0
+        ? { passed: true, message: `All ${records.length} records satisfy ${func}()` }
+        : { passed: false, message: `${failures.length} records failed: ${failures[0]}` };
+    }
+
     case 'expand':
       return { passed: true, message: 'Expand response received' };
 

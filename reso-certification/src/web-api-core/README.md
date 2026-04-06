@@ -30,99 +30,90 @@ Test values are selected using median sampling so filter tests work bidirectiona
 
 ## Test Matrix
 
-The following scenarios are defined. The actual number executed depends on the server's enum mode and data availability — scenarios are skipped (not failed) when their required data type or test data is unavailable.
+The actual number of scenarios executed depends on the server's enum mode, spec version, and data availability. Scenarios are skipped (not failed) when their required data type or test data is unavailable.
 
-### Structural Tests (always run)
+### Summary
+
+| Category | Count | String | Collections | IsFlags | Version |
+|----------|-------|--------|-------------|---------|---------|
+| Structural | 7 | all | all | all | 2.0.0 |
+| Integer filters | 9 | all | all | all | 2.0.0 |
+| Decimal filters | 5 | all | all | all | 2.0.0 |
+| Date filters | 6 | all | all | all | 2.0.0 |
+| Timestamp filters | 5 | all | all | all | 2.0.0 |
+| OrderBy | 4 | all | all | all | 2.0.0 |
+| Enum single (eq, ne) | 2 | skip | run | run | 2.0.0 |
+| Enum single (has) | 1 | skip | skip | run | 2.0.0 |
+| Enum multi (has) | 2 | skip | skip | run | 2.0.0 |
+| Collection (any, all) | 2 | skip | run | skip | 2.0.0 |
+| Error codes | 2 | all | all | all | 2.0.0 |
+| String enum (eq, ne) | 2 | run | skip | skip | 2.1.0 |
+| String enum (any, all) | 2 | run | skip | skip | 2.1.0 |
+| String functions | 3 | all | all | all | 2.1.0 |
+| Server-driven paging | 1 | all | all | all | 2.1.0 |
+| $expand | 1 | all | all | all | 2.1.0 |
+
+**v2.0.0 totals**: 38-45 scenarios depending on enum mode
+**v2.1.0 totals**: 44-54 scenarios depending on enum mode
+
+### Structural Tests
 
 | Scenario | What's Tested |
 |----------|---------------|
-| metadata-validation | Valid EDMX XML, OData-Version header, required resources present |
-| service-document | Service root returns 200, valid JSON, OData-Version header |
+| metadata-validation | Valid EDMX XML, OData-Version header, required resources |
+| service-document | Service root returns 200, valid JSON |
 | fetch-by-key | Single entity retrieval by key field |
 | select | `$select` restricts returned fields |
 | top | `$top` limits result count |
 | skip | `$skip` returns different records than first page |
 | count | `$count=true` returns `@odata.count` >= result count |
 
-### Filter Tests (require matching data type in resource)
+### Filter Tests
 
-**Integer** (9 scenarios) — requires at least one Edm.Int16/Int32/Int64 field with data:
+Require a field of the matching data type with sampled data. Test values use **median selection** so records exist both above and below the test value.
 
-| Scenario | Filter |
-|----------|--------|
-| filter-int-eq | `IntegerField eq value` |
-| filter-int-ne | `IntegerField ne value` |
-| filter-int-gt | `IntegerField gt value` |
-| filter-int-ge | `IntegerField ge value` |
-| filter-int-lt | `IntegerField lt value` |
-| filter-int-le | `IntegerField le value` |
-| filter-int-and | `IntegerField gt low and IntegerField lt high` |
-| filter-int-or | `IntegerField gt low or IntegerField lt high` |
-| filter-int-not | `not(IntegerField eq value)` |
+**Integer** (9) — Edm.Int16, Int32, Int64: `eq`, `ne`, `gt`, `ge`, `lt`, `le`, `and`, `or`, `not()`
 
-**Decimal** (5 scenarios) — requires at least one Edm.Decimal/Double field:
+**Decimal** (5) — Edm.Decimal, Double: `ne`, `gt`, `ge`, `lt`, `le`
 
-| Scenario | Filter |
-|----------|--------|
-| filter-decimal-ne | `DecimalField ne value` |
-| filter-decimal-gt | `DecimalField gt value` |
-| filter-decimal-ge | `DecimalField ge value` |
-| filter-decimal-lt | `DecimalField lt value` |
-| filter-decimal-le | `DecimalField le value` |
+**Date** (6) — Edm.Date (ISO 8601 `yyyy-mm-dd`): `eq`, `ne`, `gt`, `ge`, `lt`, `le`
 
-**Date** (6 scenarios) — requires at least one Edm.Date field:
+**Timestamp** (5) — Edm.DateTimeOffset: `gt`, `ge`, plus `lt`/`le`/`ne` with `now()`
 
-| Scenario | Filter |
-|----------|--------|
-| filter-date-eq | `DateField eq 'yyyy-mm-dd'` |
-| filter-date-ne | `DateField ne 'yyyy-mm-dd'` |
-| filter-date-gt | `DateField gt 'yyyy-mm-dd'` |
-| filter-date-ge | `DateField ge 'yyyy-mm-dd'` |
-| filter-date-lt | `DateField lt 'yyyy-mm-dd'` |
-| filter-date-le | `DateField le 'yyyy-mm-dd'` |
+### OrderBy Tests
 
-**Timestamp** (5 scenarios) — requires at least one Edm.DateTimeOffset field:
+4 scenarios: ascending, descending, and combined with integer filter. Requires Edm.DateTimeOffset field (prefers a fully-populated field for stable sort results).
+
+### Enumeration Tests
+
+Three enum modes exist. The mode is **auto-detected from metadata** or set with `--enum-mode`:
+
+| Mode | Single Lookups | Multi Lookups | Detection |
+|------|---------------|--------------|-----------|
+| **string** | `Edm.String` + LookupName | `Collection(Edm.String)` | LookupName annotations |
+| **collections** | `Edm.EnumType` | `Collection(Edm.EnumType)` | Collection enum types |
+| **isflags** | `Edm.EnumType` | `Edm.EnumType` + `IsFlags=true` | IsFlags attribute |
+
+**IsFlags mode** (5 scenarios):
 
 | Scenario | Filter |
 |----------|--------|
-| filter-datetime-gt | `TimestampField gt DateTimeOffset` |
-| filter-datetime-ge | `TimestampField ge DateTimeOffset` |
-| filter-datetime-lt-now | `TimestampField lt now()` |
-| filter-datetime-le-now | `TimestampField le now()` |
-| filter-datetime-ne-now | `TimestampField ne now()` |
+| filter-enum-single-has | `Field has Namespace'Value'` |
+| filter-enum-single-eq | `Field eq Namespace'Value'` |
+| filter-enum-ne | `Field ne Namespace'Value'` |
+| filter-enum-multi-has | `Field has Namespace'Value'` |
+| filter-enum-multi-has-and | `Field has Value1 and Field has Value2` |
 
-### OrderBy Tests (require Edm.DateTimeOffset field)
+**Collections mode** (4 scenarios):
 
-| Scenario | Query |
-|----------|-------|
-| orderby-timestamp-asc | `$orderby=TimestampField asc` |
-| orderby-timestamp-desc | `$orderby=TimestampField desc` |
-| orderby-timestamp-asc-filter-int-gt | `$orderby=TimestampField asc&$filter=IntegerField gt value` |
-| orderby-timestamp-desc-filter-int-gt | `$orderby=TimestampField desc&$filter=IntegerField gt value` |
+| Scenario | Filter |
+|----------|--------|
+| filter-enum-single-eq | `Field eq Namespace'Value'` |
+| filter-enum-ne | `Field ne Namespace'Value'` |
+| filter-coll-enum-any | `Field/any(x:x eq Value)` |
+| filter-coll-enum-all | `Field/all(x:x eq Value)` |
 
-### Enumeration Tests (depend on enum mode)
-
-Three enum modes exist. The mode is auto-detected from metadata or set with `--enum-mode`:
-
-| Mode | How Single Lookups Work | How Multi Lookups Work | Detection |
-|------|------------------------|----------------------|-----------|
-| **string** | `Edm.String` + LookupName annotation | `Collection(Edm.String)` | LookupName annotations present |
-| **collections** | `Edm.EnumType` | `Collection(Edm.EnumType)` | Collection enum types present |
-| **isflags** | `Edm.EnumType` | `Edm.EnumType` with `IsFlags=true` | IsFlags attribute on enum definitions |
-
-**OData enum type scenarios** (run in `collections` and `isflags` modes):
-
-| Scenario | Filter | Modes |
-|----------|--------|-------|
-| filter-enum-single-has | `SingleLookupField has Namespace'Value'` | isflags |
-| filter-enum-single-eq | `SingleLookupField eq Namespace'Value'` | collections, isflags |
-| filter-enum-ne | `SingleLookupField ne Namespace'Value'` | collections, isflags |
-| filter-enum-multi-has | `MultiLookupField has Namespace'Value'` | isflags |
-| filter-enum-multi-has-and | `MultiLookupField has Value1 and has Value2` | isflags |
-| filter-coll-enum-any | `MultiLookupField/any(x:x eq Value)` | collections |
-| filter-coll-enum-all | `MultiLookupField/all(x:x eq Value)` | collections |
-
-**String enum scenarios** (v2.1.0, run in `string` mode):
+**String mode** (v2.1.0, 4 scenarios):
 
 | Scenario | Filter |
 |----------|--------|
@@ -131,19 +122,28 @@ Three enum modes exist. The mode is auto-detected from metadata or set with `--e
 | filter-string-enum-multi-any | `Features/any(x:x eq 'Value1' or x eq 'Value2')` |
 | filter-string-enum-multi-all | `Features/all(x:x eq 'Value1' or x eq 'Value2')` |
 
-### Error Code Tests (always run)
+### String Function Tests (v2.1.0)
+
+| Scenario | Filter |
+|----------|--------|
+| filter-string-contains | `contains(Field,'value')` |
+| filter-string-startswith | `startswith(Field,'value')` |
+| filter-string-endswith | `endswith(Field,'value')` |
+
+### Error Code Tests
 
 | Scenario | Expected |
 |----------|----------|
 | response-code-400 | HTTP 400 for invalid query syntax |
 | response-code-404 | HTTP 404 for non-existent resource |
 
-### v2.1.0 Additional Tests
+### Server-Driven Paging (v2.1.0)
 
-| Scenario | What's Tested |
-|----------|---------------|
-| server-driven-paging | `@odata.nextLink` pagination — multiple pages, final page has no nextLink |
-| expand | `$expand` navigation property — expanded data present in response |
+Validates `@odata.nextLink` pagination: multiple pages fetched, each page returns new records, final page has no nextLink.
+
+### $expand (v2.1.0)
+
+Validates `$expand` on a navigation property. Expanded data must be present in the response.
 
 ## Coverage Matrix
 

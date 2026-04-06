@@ -31,6 +31,8 @@ export interface TestParams {
   readonly multiLookupField?: string;
   readonly multiLookupValue1?: string;
   readonly multiLookupValue2?: string;
+  readonly stringField?: string;
+  readonly stringValue?: string;
   readonly expandField?: string;
   readonly skippedTypes: ReadonlyArray<string>;
 }
@@ -264,6 +266,25 @@ export const resolveTestParams = async (
   const multiResult = findMultiLookupValues(multiLookupFields, records);
   if (!multiResult) skippedTypes.push('multiLookup');
 
+  // Resolve string field for contains/startswith/endswith (v2.1.0)
+  const plainStringFields = entityType.properties
+    .filter(p => p.type === 'Edm.String' && !p.annotations?.['RESO.OData.Metadata.LookupName'])
+    .map(p => p.name);
+  let stringField: string | undefined;
+  let stringValue: string | undefined;
+  for (const field of plainStringFields) {
+    const vals = collectValues(records, field);
+    if (vals.length > 0) {
+      const val = String(vals[0]);
+      if (val.length >= 3) {
+        stringField = field;
+        // Use a substring from the middle for contains/startswith/endswith
+        stringValue = val.slice(0, Math.min(5, val.length));
+        break;
+      }
+    }
+  }
+
   return {
     resource,
     keyField,
@@ -284,6 +305,8 @@ export const resolveTestParams = async (
     multiLookupField: multiResult?.field,
     multiLookupValue1: multiResult?.value1,
     multiLookupValue2: multiResult?.value2,
+    stringField,
+    stringValue,
     skippedTypes,
   };
 };
