@@ -6,8 +6,10 @@
  * our own metadata serializer and Lookup Resource fetcher.
  */
 
-import { writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { writeFile, mkdir, copyFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { createRequire } from 'node:module';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata } from '../test-runner/metadata.js';
 import { generateMetadataReport } from '../metadata/serializer.js';
@@ -128,7 +130,7 @@ const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
     const { variations } = await findVariations({
       pathToMetadataReportJson: ctx.metadataReportPath,
       fromCli: true,
-      strictMode: config.strictMode ?? true,
+      strictMode: config.strictMode ?? false,
     });
 
     const hasVariations = Object.values(variations as Record<string, unknown[]>).some(
@@ -156,7 +158,7 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
   serviceRootUri: ctx.serverUrl,
   shouldGenerateReports: true,
   version: ctx.version,
-  strictMode: config.strictMode ?? true,
+  strictMode: config.strictMode ?? false,
   pathToMetadataReportJson: ctx.metadataReportPath,
   REPLICATION_STATE_SERVICE: ctx.replicationStateService,
   fromCli: true,
@@ -166,10 +168,23 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
 
 const initReplicationState: PipelineStep<DDContext> = {
   name: 'Initialize replication state',
-  run: async (ctx) => ({
-    context: { ...ctx, replicationStateService: createReplicationStateServiceInstance() },
-    summary: 'Replication state service initialized',
-  }),
+  run: async (ctx) => {
+    // cert-utils reads schema-validation-settings.json from cwd — ensure it's there
+    const settingsFile = 'schema-validation-settings.json';
+    if (!existsSync(settingsFile)) {
+      const require = createRequire(import.meta.url);
+      const certUtilsPath = dirname(require.resolve('@reso/reso-certification-utils/common.js'));
+      const sourcePath = join(certUtilsPath, settingsFile);
+      if (existsSync(sourcePath)) {
+        await copyFile(sourcePath, settingsFile);
+      }
+    }
+
+    return {
+      context: { ...ctx, replicationStateService: createReplicationStateServiceInstance() },
+      summary: 'Replication state service initialized',
+    };
+  },
 };
 
 const replicateTimestampDesc = (config: DDConfig): PipelineStep<DDContext> => ({

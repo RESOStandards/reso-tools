@@ -417,7 +417,7 @@ const ddCmd = program
   .command('dd')
   .description('Data Dictionary 1.7/2.0 compliance testing')
   .requiredOption('--url <url>', 'Server base URL')
-  .option('--version <version>', 'DD version: 1.7 or 2.0', '2.0')
+  .option('--dd-version <version>', 'DD version: 1.7 or 2.0', '2.0')
   .option('--limit <n>', 'Max records to replicate per resource', '100000')
   .option('--strict', 'Strict mode: fail on variations and enforce JSON schema validation');
 
@@ -427,7 +427,7 @@ addOutputOptions(ddCmd);
 ddCmd.action(
   async (opts: {
     url: string;
-    version: string;
+    ddVersion: string;
     limit: string;
     strict?: boolean;
     authToken?: string;
@@ -439,9 +439,9 @@ ddCmd.action(
     outputDir?: string;
   }) => {
     try {
-      const ddVersion = opts.version as '1.7' | '2.0';
+      const ddVersion = opts.ddVersion as '1.7' | '2.0';
       if (ddVersion !== '1.7' && ddVersion !== '2.0') {
-        throw new Error(`Invalid version "${opts.version}". Must be "1.7" or "2.0".`);
+        throw new Error(`Invalid version "${opts.ddVersion}". Must be "1.7" or "2.0".`);
       }
 
       const renderMode = resolveRenderMode(opts);
