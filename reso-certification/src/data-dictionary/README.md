@@ -138,6 +138,63 @@ The pipeline generates a metadata report (`metadata-report.json` or `metadata-re
 
 When the Lookup Resource is available, it's fetched (using `@odata.nextLink` pagination with `$top`/`$skip` fallback) and merged with the EDMX-based report. Fields with `LookupName` annotations get their type replaced with the lookup name.
 
+## Output Directory Structure
+
+Results are written to a directory structure compatible with `reso-certification-utils`:
+
+```
+.reso-cert/
+  data-dictionary-<version>/
+    <providerUoi>-<providerUsi>/
+      <recipientUoi>/
+        current/
+          metadata.xml                           # Raw EDMX XML from /$metadata
+          metadata-report.json                   # Serialized metadata report (from EDMX)
+          metadata-report.processed.json         # Merged report (if Lookup Resource available)
+          lookup-resource-lookup-metadata.json    # Raw Lookup Resource data dump
+          data-availability-report.json          # Replication results and field coverage
+          data-availability-responses.json       # Raw OData response data
+          data-dictionary-variations.json        # Variations report (DD 2.0)
+        archived/
+          20260406T033000000Z/                   # Previous run (auto-archived)
+            ...
+```
+
+### Path construction
+
+When using a config file (`--config`), the path components come from the config:
+- `providerUoi` and `providerUsi` from the top-level config
+- `recipientUoi` from each config entry
+
+When running from CLI flags (no config), local placeholders are generated:
+- `LOCAL-<timestamp>` for providerUoi
+- `LOCAL-SYSTEM` for providerUsi
+- `LOCAL-RECIPIENT` for recipientUoi
+
+### Archiving
+
+Each run automatically archives the previous `current/` directory to `archived/<timestamp>/` before writing new results. This preserves a full history of all runs for a given provider/recipient combination.
+
+### Migration from reso-certification-utils
+
+For providers currently using `reso-certification-utils`, the output structure is identical. The `results/` directory becomes `.reso-cert/` — you can symlink for backward compatibility:
+
+```bash
+ln -s .reso-cert results
+```
+
+### Report Files
+
+| File | Description |
+|------|-------------|
+| `metadata.xml` | Raw EDMX XML downloaded from `/$metadata` |
+| `metadata-report.json` | Metadata serialized from EDMX (resources, fields, enum lookups) |
+| `metadata-report.processed.json` | Metadata merged with Lookup Resource data (if available) |
+| `lookup-resource-lookup-metadata.json` | Raw Lookup Resource records (LookupName, LookupValue, StandardLookupValue, LegacyODataValue) |
+| `data-availability-report.json` | Field coverage, record counts, and data availability statistics per resource |
+| `data-availability-responses.json` | Raw OData response payloads from replication |
+| `data-dictionary-variations.json` | Non-standard fields and lookups found during variations checking (DD 2.0) |
+
 ## Future Optimizations
 
 - **Parallel execution**: Split the precomputed query list across N workers, each replicating a subset of resources concurrently. The replication state service is shared across workers for consistent tallying. Combined with batch expand, this could reduce DD testing time by an order of magnitude for servers with many resources.
