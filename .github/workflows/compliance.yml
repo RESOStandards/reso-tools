@@ -44,6 +44,7 @@ jobs:
           git clone --depth 1 --branch v3.0.0 https://github.com/RESOStandards/reso-certification-utils.git /tmp/cert-utils
           cd /tmp/cert-utils && npm pkg delete scripts.prepare && cd -
           cd reso-certification && npm install /tmp/cert-utils && cd ..
+          cd reso-mcp-server && npm install && cd ..
 
       - name: Build shared libraries
         run: |
@@ -52,6 +53,8 @@ jobs:
           cd reso-client && npx tsc && cd ..
           cd reso-data-generator && npx tsc && cd ..
           cd reso-reference-server && npx tsc && cd ..
+          cd reso-certification && npx tsc && cd ..
+          cd reso-mcp-server && npx tsc && cd ..
 
       - name: Run all tests
         run: npm test
