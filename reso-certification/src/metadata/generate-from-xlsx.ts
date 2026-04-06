@@ -40,7 +40,33 @@ const readSheet = async (xlsxPath: string, sheetName: string): Promise<ReadonlyA
 // ── Constants ──
 
 const ENUM_NAMESPACE = 'org.reso.metadata.enums';
-const DD_WIKI_BASE_URL = 'https://ddwiki.reso.org/display/DDW';
+
+/** Build the correct wiki base URL for a DD version. */
+const getWikiBaseUrl = (version: string): string => {
+  // DD 2.1+ uses dd.reso.org
+  if (version !== '1.7' && version !== '2.0') {
+    return `https://dd.reso.org/DD${version}`;
+  }
+  // DD 2.0 and 1.7 use the legacy ddwiki
+  const wikiVersion = version === '1.7' ? 'DDW17' : 'DDW20';
+  return `https://ddwiki.reso.org/display/${wikiVersion}`;
+};
+
+/** Rewrite a wiki URL from the sheet to match the target version. */
+const rewriteWikiUrl = (sheetUrl: string, version: string): string => {
+  if (!sheetUrl) return '';
+  // If version is 2.1+, rewrite ddwiki URLs to dd.reso.org
+  if (version !== '1.7' && version !== '2.0' && sheetUrl.includes('ddwiki.reso.org')) {
+    const baseUrl = getWikiBaseUrl(version);
+    // Extract the page name from the ddwiki URL: /display/DDW20/PageName → PageName
+    const match = sheetUrl.match(/\/display\/DDW\d+\/(.+)/);
+    if (match) {
+      const pageName = match[1].replace(/\+/g, '/');
+      return `${baseUrl}/${pageName}`;
+    }
+  }
+  return sheetUrl;
+};
 
 // ── Type mapping ──
 
@@ -113,7 +139,8 @@ const processField = (row: SheetRow, version: string): MetadataReportField | nul
   const fieldName = String(row.StandardName ?? '').trim();
   const displayName = String(row.DisplayName ?? '').trim();
   const definition = String(row.Definition ?? '').trim();
-  const wikiPageUrl = String(row.WikiPageUrl ?? '').trim();
+  const rawWikiUrl = String(row.WikiPageUrl ?? '').trim();
+  const wikiPageUrl = rewriteWikiUrl(rawWikiUrl, version);
   const lookupName = String(row.LookupName ?? '').trim();
   const payloads = String(row.Payloads ?? '').trim();
   const sourceResource = String(row.SourceResource ?? '').trim();
@@ -157,7 +184,7 @@ const processField = (row: SheetRow, version: string): MetadataReportField | nul
 
 // ── Lookup processing ──
 
-const processLookup = (row: SheetRow): MetadataReportLookup | null => {
+const processLookup = (row: SheetRow, version: string): MetadataReportLookup | null => {
   const lookupName = String(row.LookupName ?? '').trim();
   const lookupValue = String(row.LegacyODataValue ?? row.StandardLookupValue ?? '').trim();
   const standardValue = String(row.StandardLookupValue ?? '').trim();
@@ -172,7 +199,11 @@ const processLookup = (row: SheetRow): MetadataReportLookup | null => {
   }
 
   // Build wiki URL for lookup value
-  const wikiUrl = `${DD_WIKI_BASE_URL}/${encodeURIComponent(standardValue || lookupValue)}`;
+  const baseUrl = getWikiBaseUrl(version);
+  const lookupPageName = standardValue || lookupValue;
+  const wikiUrl = version !== '1.7' && version !== '2.0'
+    ? `${baseUrl}/lookups/${encodeURIComponent(lookupName)}/${encodeURIComponent(lookupPageName)}`
+    : `${baseUrl}/${encodeURIComponent(lookupPageName)}`;
   annotations.push({ term: 'RESO.DDWikiUrl', value: wikiUrl });
 
   if (definition) {
@@ -199,11 +230,14 @@ const extractResources = (
   for (const field of fields) {
     if (!seen.has(field.resourceName)) {
       seen.add(field.resourceName);
-      const wikiVersion = version === '1.7' ? 'DDW17' : 'DDW20';
+      const baseUrl = getWikiBaseUrl(version);
+      const resourceUrl = version !== '1.7' && version !== '2.0'
+        ? `${baseUrl}/${field.resourceName}`
+        : `${baseUrl}/${field.resourceName}+Resource`;
       resources.push({
         resourceName: field.resourceName,
         // @ts-expect-error — wikiPageURL is in the reference format but not in our strict type
-        wikiPageURL: `https://ddwiki.reso.org/display/${wikiVersion}/${field.resourceName}+Resource`,
+        wikiPageURL: resourceUrl,
       });
     }
   }
@@ -232,7 +266,7 @@ export const generateMetadataReportFromXlsx = async (
     .filter((f): f is MetadataReportField => f !== null);
 
   const lookups = lookupRows
-    .map(row => processLookup(row))
+    .map(row => processLookup(row, version))
     .filter((l): l is MetadataReportLookup => l !== null);
 
   // Add placeholder values for open enumerations (enum types with no values in the sheet).

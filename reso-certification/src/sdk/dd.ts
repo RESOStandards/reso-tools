@@ -60,7 +60,7 @@ const archiveCurrentResults = async (currentPath: string): Promise<void> => {
 
 interface DDContext {
   readonly serverUrl: string;
-  readonly version: '1.7' | '2.0';
+  readonly version: '1.7' | '2.0' | '2.1';
   readonly outputPath: string;
   readonly authToken?: string;
   readonly metadataReportPath?: string;
@@ -160,7 +160,7 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
 const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Check variations',
   run: async (ctx) => {
-    if (ctx.version !== '2.0') {
+    if (ctx.version !== '2.0' && ctx.version !== '2.1') {
       return { context: ctx, status: 'skipped', summary: 'Variations only checked for DD 2.0' };
     }
 
@@ -276,9 +276,9 @@ export const createDDPipeline = (config: DDConfig) =>
     resolveAuth(config),
     generateMetadata(config),
     initReplicationState,
-    ...(config.version === '2.0' ? [runVariations(config)] : []),
+    ...(config.version !== '1.7' ? [runVariations(config)] : []),
     replicateTimestampDesc(config),
-    ...(config.version === '2.0' ? [
+    ...(config.version !== '1.7' ? [
       replicateNextLink(config),
       replicateNextLinkFiltered(config),
     ] : []),

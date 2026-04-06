@@ -417,7 +417,7 @@ const ddCmd = program
   .command('dd')
   .description('Data Dictionary 1.7/2.0 compliance testing')
   .requiredOption('--url <url>', 'Server base URL')
-  .option('--dd-version <version>', 'DD version (2.0)', '2.0')
+  .option('--dd-version <version>', 'DD version: 2.0 or 2.1', '2.0')
   .option('--limit <n>', 'Max records to replicate per resource', '100000')
   .option('--strict', 'Strict mode: fail on variations and enforce JSON schema validation')
   .option('--batch-expand', 'Batch all expansions per resource into a single $expand request');
@@ -441,9 +441,9 @@ ddCmd.action(
     outputDir?: string;
   }) => {
     try {
-      const ddVersion = opts.ddVersion as '1.7' | '2.0';
-      if (ddVersion !== '2.0') {
-        throw new Error(`Invalid version "${opts.ddVersion}". RESO certification requires DD 2.0.`);
+      const ddVersion = opts.ddVersion as '1.7' | '2.0' | '2.1';
+      if (ddVersion !== '2.0' && ddVersion !== '2.1') {
+        throw new Error(`Invalid version "${opts.ddVersion}". RESO certification requires DD 2.0 or 2.1.`);
       }
 
       const renderMode = resolveRenderMode(opts);
