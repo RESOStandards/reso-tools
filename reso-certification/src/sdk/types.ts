@@ -135,6 +135,10 @@ export interface EntityEventConfig extends BaseComplianceConfig {
 export interface CoreConfig extends BaseComplianceConfig {
   readonly endorsement: 'core';
   readonly version?: '2.0.0' | '2.1.0';
+  readonly resources?: ReadonlyArray<string>;
+  readonly enumMode?: 'auto' | 'isflags' | 'collections' | 'string';
+  readonly metadataPath?: string;
+  readonly fullCoverage?: boolean;
 }
 
 /** Discriminated union of all endorsement configs. */

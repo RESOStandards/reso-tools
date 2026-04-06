@@ -6,6 +6,7 @@
  * Subcommands:
  *   add-edit       — RCP-010 Add/Edit endorsement testing
  *   entity-event   — RCP-027 EntityEvent change tracking testing
+ *   core           — Web API Core 2.0.0/2.1.0 compliance testing
  *
  * Exit codes: 0 = all scenarios passed, 1 = one or more failed, 2 = runtime error.
  */
@@ -15,8 +16,8 @@ import { resolve } from 'node:path';
 import { Command } from 'commander';
 import { startMockServer, stopMockServer } from '../add-edit/mock/server.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
-import { loadConfigFile, configEntryToAddEdit, configEntryToEntityEvent } from '../sdk/config.js';
-import type { AddEditConfig, EntityEventConfig, PipelineResult } from '../sdk/types.js';
+import { loadConfigFile, configEntryToAddEdit, configEntryToEntityEvent, configEntryToCore } from '../sdk/config.js';
+import type { AddEditConfig, EntityEventConfig, CoreConfig, PipelineResult } from '../sdk/types.js';
 import { loadDotEnv, resolveCliAuth } from './auth.js';
 import { resolveRenderMode, runWithProgress, runConfigEntries } from './render.js';
 
@@ -330,6 +331,82 @@ entityEventCmd.action(
       if (mockServer) {
         await stopMockEntityEventServer(mockServer.server);
       }
+    }
+  },
+);
+
+// ── Web API Core Subcommand ──
+
+const coreCmd = program
+  .command('core')
+  .description('Web API Core 2.0.0/2.1.0 compliance testing')
+  .requiredOption('--url <url>', 'Server base URL')
+  .option('--resources <list>', 'Comma-separated resource names (default: well-known list)')
+  .option('--version <version>', 'Spec version: 2.0.0 or 2.1.0', '2.0.0')
+  .option('--enum-mode <mode>', 'Enum mode: auto, string, collections, or isflags (default: auto-detect)', 'auto')
+  .option('--full-coverage', 'Fail if any data type category has no coverage across all resources');
+
+addAuthOptions(coreCmd);
+addOutputOptions(coreCmd);
+
+coreCmd.action(
+  async (opts: {
+    url: string;
+    resources?: string;
+    version: string;
+    enumMode: string;
+    fullCoverage?: boolean;
+    authToken?: string;
+    clientId?: string;
+    clientSecret?: string;
+    tokenUrl?: string;
+    verbose?: boolean;
+    output: string;
+    outputDir?: string;
+  }) => {
+    try {
+      const specVersion = opts.version as '2.0.0' | '2.1.0';
+      if (specVersion !== '2.0.0' && specVersion !== '2.1.0') {
+        throw new Error(`Invalid version "${opts.version}". Must be "2.0.0" or "2.1.0".`);
+      }
+
+      const enumMode = opts.enumMode as 'auto' | 'isflags' | 'collections' | 'string';
+      if (!['auto', 'isflags', 'collections', 'string'].includes(enumMode)) {
+        throw new Error(`Invalid enum mode "${opts.enumMode}". Must be "auto", "string", "collections", or "isflags".`);
+      }
+
+      const renderMode = resolveRenderMode(opts);
+      const auth = resolveCliAuth({
+        authToken: opts.authToken,
+        clientId: opts.clientId,
+        clientSecret: opts.clientSecret,
+        tokenUrl: opts.tokenUrl,
+      });
+
+      const resources = opts.resources?.split(',').map(r => r.trim());
+
+      const config: CoreConfig = {
+        endorsement: 'core',
+        server: { url: opts.url, auth },
+        version: specVersion,
+        enumMode,
+        fullCoverage: opts.fullCoverage,
+        resources,
+        options: {
+          ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {}),
+        },
+      };
+
+      const result = await runWithProgress(config, `Web API Core ${specVersion}`, renderMode);
+
+      if (opts.output === 'json') {
+        console.log(formatResultJson([result]));
+      }
+
+      process.exitCode = resolveExitCode([result]);
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exitCode = 2;
     }
   },
 );

@@ -85,9 +85,15 @@ export type {
   EntityEventTestReport
 } from './entity-event/types.js';
 
-// ── Web API Core (stub) ──
+// ── Web API Core ──
 
-export { WEB_API_CORE_VERSION } from './web-api-core/index.js';
+export {
+  allScenarios,
+  scenariosForVersion,
+  runCoreResourceScenarios,
+  resolveTestParams,
+  WELL_KNOWN_RESOURCES,
+} from './web-api-core/index.js';
 
 // ── Data Dictionary (stub) ──
 

@@ -1,0 +1,230 @@
+/**
+ * Web API Core SDK pipeline.
+ *
+ * Runs all Core compliance scenarios per resource using the same
+ * pipeline pattern as Add/Edit and EntityEvent.
+ */
+
+import { resolveAuthToken } from '../test-runner/auth.js';
+import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, getEntityType } from '../test-runner/metadata.js';
+import { resolveTestParams, WELL_KNOWN_RESOURCES } from '../web-api-core/index.js';
+import { runCoreResourceScenarios, type ResourceTestReport } from '../web-api-core/test-runner.js';
+import type { CoreConfig, PipelineStep, StepResult } from './types.js';
+import { createPipeline } from './pipeline.js';
+import { coreReportGenerators, writeReports } from './reports.js';
+
+// ── Pipeline Context ──
+
+interface CoreContext {
+  readonly serverUrl: string;
+  readonly version: '2.0.0' | '2.1.0';
+  readonly enumMode: 'auto' | 'isflags' | 'collections' | 'string';
+  readonly resources: ReadonlyArray<string>;
+  readonly authToken?: string;
+  readonly metadataXml?: string;
+  readonly resourceReports?: ReadonlyArray<ResourceTestReport>;
+  readonly [key: string]: unknown;
+}
+
+// ── Pipeline Steps ──
+
+const healthCheck: PipelineStep<CoreContext> = {
+  name: 'Health check',
+  run: async (ctx, onProgress) => {
+    const url = `${ctx.serverUrl}/health`;
+    const maxAttempts = 30;
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const response = await fetch(url);
+        if (response.ok) {
+          return { context: ctx, summary: `Server is ready at ${ctx.serverUrl}` };
+        }
+      } catch { /* retry */ }
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      onProgress({ step: 'Health check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
+    }
+    return { context: ctx, status: 'failed', errors: [`Server at ${ctx.serverUrl} did not respond after ${maxAttempts} attempts`] };
+  },
+};
+
+const resolveAuth = (config: CoreConfig): PipelineStep<CoreContext> => ({
+  name: 'Resolve authentication',
+  run: async (ctx) => {
+    const authToken = await resolveAuthToken(config.server.auth);
+    return { context: { ...ctx, authToken }, summary: `Authenticated via ${config.server.auth.mode}` };
+  },
+});
+
+const fetchAndParseMetadata = (config: CoreConfig): PipelineStep<CoreContext> => ({
+  name: 'Fetch metadata',
+  run: async (ctx) => {
+    const metadataXml = config.metadataPath
+      ? await loadMetadataFromFile(config.metadataPath)
+      : await fetchMetadata(ctx.serverUrl, ctx.authToken!);
+
+    const metadata = parseMetadataXml(metadataXml);
+
+    // Check which requested resources exist in metadata
+    const availableResources = ctx.resources.filter(r => getEntityType(metadata, r));
+    const missingResources = ctx.resources.filter(r => !getEntityType(metadata, r));
+
+    return {
+      context: { ...ctx, metadataXml, resources: availableResources, metadata },
+      summary: `Parsed metadata: ${metadata.entityTypes.length} entity types, ${availableResources.length}/${ctx.resources.length} resources available`,
+      counts: { entityTypes: metadata.entityTypes.length, resources: availableResources.length },
+      ...(missingResources.length > 0 ? { errors: [`Resources not found in metadata: ${missingResources.join(', ')}`] } : {}),
+    };
+  },
+});
+
+const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
+  name: 'Run Core scenarios',
+  run: async (ctx, onProgress) => {
+    const metadata = parseMetadataXml(ctx.metadataXml!);
+    const version = ctx.version;
+    const resourceReports: ResourceTestReport[] = [];
+
+    for (const resource of ctx.resources) {
+      const entityType = getEntityType(metadata, resource)!;
+
+      onProgress({
+        step: 'Run Core scenarios',
+        status: 'running',
+        message: `Sampling ${resource}...`,
+      });
+
+      const enumModeOverride = ctx.enumMode !== 'auto' ? ctx.enumMode as import('../web-api-core/sampling.js').EnumMode : undefined;
+      const params = await resolveTestParams(
+        ctx.serverUrl,
+        resource,
+        entityType,
+        ctx.authToken!,
+        enumModeOverride,
+      );
+
+      if (params.skippedTypes.length > 0) {
+        onProgress({
+          step: 'Run Core scenarios',
+          status: 'running',
+          message: `${resource}: missing types: ${params.skippedTypes.join(', ')} — some scenarios will be skipped`,
+        });
+      }
+
+      onProgress({
+        step: 'Run Core scenarios',
+        status: 'running',
+        message: `Testing ${resource}...`,
+      });
+
+      const report = await runCoreResourceScenarios(
+        ctx.serverUrl,
+        resource,
+        params,
+        ctx.authToken!,
+        version,
+      );
+
+      resourceReports.push(report);
+
+      onProgress({
+        step: 'Run Core scenarios',
+        status: 'running',
+        message: `${resource}: ${report.summary.passed} passed, ${report.summary.failed} failed, ${report.summary.skipped} skipped`,
+      });
+    }
+
+    const totalPassed = resourceReports.reduce((sum, r) => sum + r.summary.passed, 0);
+    const totalFailed = resourceReports.reduce((sum, r) => sum + r.summary.failed, 0);
+    const totalSkipped = resourceReports.reduce((sum, r) => sum + r.summary.skipped, 0);
+    const totalScenarios = resourceReports.reduce((sum, r) => sum + r.summary.total, 0);
+
+    // Compute union coverage across all resources
+    const allTypes = ['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup'];
+    const coveredTypes = allTypes.filter(type =>
+      resourceReports.some(r => r.coverage.some(c => c.type === type && c.hasData))
+    );
+    const missingTypes = allTypes.filter(t => !coveredTypes.includes(t));
+    const fullCoverage = missingTypes.length === 0;
+
+    // In --full-coverage mode, fail if any types are missing
+    const requireFullCoverage = config.fullCoverage ?? false;
+    const coverageFailed = requireFullCoverage && !fullCoverage;
+    const status = (totalFailed > 0 || coverageFailed) ? 'failed' as const : 'passed' as const;
+
+    const coverageMsg = fullCoverage
+      ? 'Full type coverage achieved'
+      : `Missing coverage: ${missingTypes.join(', ')}`;
+    const modeMsg = requireFullCoverage ? ' (--full-coverage enabled)' : '';
+
+    return {
+      context: { ...ctx, resourceReports, coverageMatrix: { coveredTypes, missingTypes, fullCoverage } },
+      status,
+      summary: `${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped (${totalScenarios} scenarios across ${resourceReports.length} resources). ${coverageMsg}${modeMsg}`,
+      counts: { total: totalScenarios, passed: totalPassed, failed: totalFailed, skipped: totalSkipped, resources: resourceReports.length },
+      ...(coverageFailed ? { errors: [`Full coverage required but missing types: ${missingTypes.join(', ')}`] } : {}),
+    };
+  },
+});
+
+const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> => ({
+  name: 'Write compliance reports',
+  run: async (ctx, onProgress) => {
+    const outputDir = config.options?.outputDir ?? `${process.cwd()}/.reso-cert`;
+    const generators = coreReportGenerators(config.version ?? '2.0.0');
+
+    const resourceReports = ctx.resourceReports as ReadonlyArray<ResourceTestReport> ?? [];
+    const totalFailed = resourceReports.reduce((sum, r) => sum + r.summary.failed, 0);
+
+    const pipelineResult = {
+      status: totalFailed > 0 ? 'failed' as const : 'passed' as const,
+      endorsement: 'core',
+      steps: ctx.pipelineSteps as ReadonlyArray<StepResult> ?? [],
+      context: ctx,
+      duration: 0,
+    };
+
+    const written = await writeReports(pipelineResult, generators, outputDir, onProgress);
+
+    return {
+      context: { ...ctx, reports: written },
+      summary: `${written.length} reports written`,
+      artifacts: written.map(r => ({ label: r.name, path: r.path })),
+    };
+  },
+});
+
+// ── Pipeline Assembly ──
+
+/** Create the Web API Core compliance test pipeline. */
+export const createCorePipeline = (config: CoreConfig) => {
+  const resources = config.resources ?? WELL_KNOWN_RESOURCES.map(r => r.resource);
+
+  return createPipeline<CoreContext>('core', [
+    ...(config.options?.skipHealthCheck ? [] : [healthCheck]),
+    resolveAuth(config),
+    fetchAndParseMetadata(config),
+    sampleAndTest(config),
+    writeComplianceReports(config),
+  ]);
+};
+
+/** Run Web API Core compliance tests with a single function call. */
+export const runCoreCompliance = async (
+  config: CoreConfig,
+  onProgress?: (progress: import('./types.js').StepProgress) => void,
+) => {
+  const pipeline = createCorePipeline(config);
+  const resources = config.resources ?? WELL_KNOWN_RESOURCES.map(r => r.resource);
+  const initialContext: CoreContext = {
+    serverUrl: config.server.url,
+    version: config.version ?? '2.0.0',
+    enumMode: config.enumMode ?? 'auto',
+    resources,
+  };
+
+  return pipeline.run(
+    initialContext,
+    onProgress,
+    { failFast: config.options?.failFast ?? true },
+  );
+};

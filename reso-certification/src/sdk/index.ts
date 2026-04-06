@@ -19,6 +19,7 @@ export type {
 export { createPipeline } from './pipeline.js';
 export { runAddEditCompliance, createAddEditPipeline } from './add-edit.js';
 export { runEntityEventCompliance, createEntityEventPipeline } from './entity-event.js';
+export { runCoreCompliance, createCorePipeline } from './core.js';
 export {
   writeReports,
   addEditReportGenerators,
@@ -31,6 +32,7 @@ export {
 import type { ComplianceConfig, PipelineResult, ProgressCallback } from './types.js';
 import { runAddEditCompliance } from './add-edit.js';
 import { runEntityEventCompliance } from './entity-event.js';
+import { runCoreCompliance } from './core.js';
 
 /** Run compliance tests for any endorsement. Dispatches to the appropriate pipeline. */
 export const runComplianceTests = async (
@@ -42,9 +44,9 @@ export const runComplianceTests = async (
       return runAddEditCompliance(config, onProgress);
     case 'entity-event':
       return runEntityEventCompliance(config, onProgress);
+    case 'core':
+      return runCoreCompliance(config, onProgress);
     case 'dd':
       throw new Error('DD compliance testing not yet implemented in the SDK pipeline');
-    case 'core':
-      throw new Error('Web API Core compliance testing not yet implemented in the SDK pipeline');
   }
 };
