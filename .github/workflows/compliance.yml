@@ -87,6 +87,10 @@ jobs:
         working-directory: reso-reference-server
         run: docker compose --profile compliance-entity-event up --build --exit-code-from compliance-entity-event db-entity-event server-entity-event compliance-entity-event
 
+      - name: MCP server smoke test
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-mcp up --build --exit-code-from compliance-mcp compliance-mcp
+
       - name: Collect results
         if: always()
         working-directory: reso-reference-server

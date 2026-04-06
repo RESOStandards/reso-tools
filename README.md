@@ -121,6 +121,9 @@ docker compose --profile compliance-addedit up --build --exit-code-from complian
 
 # EntityEvent RCP-027
 docker compose --profile compliance-entity-event up --build --exit-code-from compliance-entity-event
+
+# MCP server smoke test
+docker compose --profile compliance-mcp up --build --exit-code-from compliance-mcp
 ```
 
 See [`reso-certification/`](reso-certification/) for full documentation.

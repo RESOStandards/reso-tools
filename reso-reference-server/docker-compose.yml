@@ -690,6 +690,30 @@ services:
     profiles:
       - compliance-addedit-sqlite
 
+  # ---------------------------------------------------------------------------
+  # MCP server smoke test
+  # Verifies the reso-mcp-server Docker image starts and successfully calls
+  # tools (initialize, tools/list, metadata, query, parse-filter) against
+  # the reference server.
+  # Usage: docker compose --profile compliance-mcp up --build --exit-code-from compliance-mcp
+  # ---------------------------------------------------------------------------
+  compliance-mcp:
+    build:
+      context: ..
+      dockerfile: reso-mcp-server/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-mcp-smoke.sh"]
+    environment:
+      SERVER_URL: http://server:8080
+      AUTH_TOKEN: admin-token
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server:
+        condition: service_healthy
+    profiles:
+      - compliance
+      - compliance-mcp
+
 volumes:
   pgdata:
   mongodata:

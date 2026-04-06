@@ -59,7 +59,7 @@ const scope = parseScope();
 const tools = toolsForScope(scope);
 
 const server = new McpServer({
-  name: 'reso-tools',
+  name: 'reso-mcp-server',
   version: '0.5.0',
 });
 
