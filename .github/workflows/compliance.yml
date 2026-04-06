@@ -41,7 +41,9 @@ jobs:
           for dir in reso-validation odata-expression-parser reso-client reso-data-generator reso-reference-server reso-web-client reso-web-api-proxy; do
             (cd "$dir" && npm install)
           done
-          cd reso-certification && npm install --ignore-scripts && cd ..
+          npm config set ignore-scripts true
+          cd reso-certification && npm install && cd ..
+          npm config set ignore-scripts false
 
       - name: Build shared libraries
         run: |
