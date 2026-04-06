@@ -13135,7 +13135,7 @@
         },
         {
           "term": "Core.Description",
-          "value": "A pick list of conditions that may require caution or further consideration, such as bringing someone with you, when showing the property (i.e., Electricity Not On, Inconsistent Cell Service, No Exterior Lighting)."
+          "value": "A pick list of conditions that may require caution or further consideration, such as bringing someone with you, when showing the property (i.e., Electricity Not On, Inconsistent Cell Service, No Exterior Lighting)."
         }
       ]
     },
@@ -53191,11 +53191,11 @@
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Full ﻿Exposure"
+          "value": "Full Exposure"
         },
         {
           "term": "RESO.DDWikiUrl",
-          "value": "https://dd.reso.org/DD2.1/lookups/Basement/Full%20%EF%BB%BFExposure"
+          "value": "https://dd.reso.org/DD2.1/lookups/Basement/Full%20Exposure"
         },
         {
           "term": "Core.Description",
@@ -126525,409 +126525,2147 @@
       ]
     },
     {
-      "lookupName": "org.reso.metadata.enums.BuildingFeatures",
-      "lookupValue": "SampleBuildingFeaturesEnumValue",
-      "type": "Edm.Int32",
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample BuildingFeatures Enum Value"
-        }
-      ]
-    },
-    {
-      "lookupName": "org.reso.metadata.enums.AOR",
-      "lookupValue": "SampleAOREnumValue",
-      "type": "Edm.Int32",
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample AOR Enum Value"
-        }
-      ]
-    },
-    {
       "lookupName": "org.reso.metadata.enums.City",
-      "lookupValue": "SampleCityEnumValue",
+      "lookupValue": "Springfield",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample City Enum Value"
-        }
-      ]
-    },
-    {
-      "lookupName": "org.reso.metadata.enums.CountyOrParish",
-      "lookupValue": "SampleCountyOrParishEnumValue",
-      "type": "Edm.Int32",
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample CountyOrParish Enum Value"
-        }
-      ]
-    },
-    {
-      "lookupName": "org.reso.metadata.enums.Disclosures",
-      "lookupValue": "SampleDisclosuresEnumValue",
-      "type": "Edm.Int32",
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample Disclosures Enum Value"
-        }
-      ]
-    },
-    {
-      "lookupName": "org.reso.metadata.enums.DocumentsAvailable",
-      "lookupValue": "SampleDocumentsAvailableEnumValue",
-      "type": "Edm.Int32",
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample DocumentsAvailable Enum Value"
-        }
-      ]
-    },
-    {
-      "lookupName": "org.reso.metadata.enums.ElementarySchool",
-      "lookupValue": "SampleElementarySchoolEnumValue",
-      "type": "Edm.Int32",
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample ElementarySchool Enum Value"
-        }
-      ]
-    },
-    {
-      "lookupName": "org.reso.metadata.enums.ElementarySchoolDistrict",
-      "lookupValue": "SampleElementarySchoolDistrictEnumValue",
-      "type": "Edm.Int32",
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample ElementarySchoolDistrict Enum Value"
-        }
-      ]
-    },
-    {
-      "lookupName": "org.reso.metadata.enums.GreenLocation",
-      "lookupValue": "SampleGreenLocationEnumValue",
-      "type": "Edm.Int32",
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample GreenLocation Enum Value"
-        }
-      ]
-    },
-    {
-      "lookupName": "org.reso.metadata.enums.HighSchool",
-      "lookupValue": "SampleHighSchoolEnumValue",
-      "type": "Edm.Int32",
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample HighSchool Enum Value"
-        }
-      ]
-    },
-    {
-      "lookupName": "org.reso.metadata.enums.HighSchoolDistrict",
-      "lookupValue": "SampleHighSchoolDistrictEnumValue",
-      "type": "Edm.Int32",
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample HighSchoolDistrict Enum Value"
-        }
-      ]
-    },
-    {
-      "lookupName": "org.reso.metadata.enums.IrrigationSource",
-      "lookupValue": "SampleIrrigationSourceEnumValue",
-      "type": "Edm.Int32",
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample IrrigationSource Enum Value"
-        }
-      ]
-    },
-    {
-      "lookupName": "org.reso.metadata.enums.MiddleOrJuniorSchool",
-      "lookupValue": "SampleMiddleOrJuniorSchoolEnumValue",
-      "type": "Edm.Int32",
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample MiddleOrJuniorSchool Enum Value"
-        }
-      ]
-    },
-    {
-      "lookupName": "org.reso.metadata.enums.MiddleOrJuniorSchoolDistrict",
-      "lookupValue": "SampleMiddleOrJuniorSchoolDistrictEnumValue",
-      "type": "Edm.Int32",
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample MiddleOrJuniorSchoolDistrict Enum Value"
-        }
-      ]
-    },
-    {
-      "lookupName": "org.reso.metadata.enums.MLSAreaMajor",
-      "lookupValue": "SampleMLSAreaMajorEnumValue",
-      "type": "Edm.Int32",
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample MLSAreaMajor Enum Value"
-        }
-      ]
-    },
-    {
-      "lookupName": "org.reso.metadata.enums.MLSAreaMinor",
-      "lookupValue": "SampleMLSAreaMinorEnumValue",
-      "type": "Edm.Int32",
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample MLSAreaMinor Enum Value"
-        }
-      ]
-    },
-    {
-      "lookupName": "org.reso.metadata.enums.MlsStatus",
-      "lookupValue": "SampleMlsStatusEnumValue",
-      "type": "Edm.Int32",
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample MlsStatus Enum Value"
+          "value": "Springfield"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.PostalCity",
-      "lookupValue": "SamplePostalCityEnumValue",
+      "lookupValue": "Springfield",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample PostalCity Enum Value"
+          "value": "Springfield"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.City",
+      "lookupValue": "Fairview",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Fairview"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PostalCity",
+      "lookupValue": "Fairview",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Fairview"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.City",
+      "lookupValue": "Madison",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Madison"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PostalCity",
+      "lookupValue": "Madison",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Madison"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.City",
+      "lookupValue": "Georgetown",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Georgetown"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PostalCity",
+      "lookupValue": "Georgetown",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Georgetown"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.City",
+      "lookupValue": "Arlington",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Arlington"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PostalCity",
+      "lookupValue": "Arlington",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Arlington"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.City",
+      "lookupValue": "Salem",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Salem"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PostalCity",
+      "lookupValue": "Salem",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Salem"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.City",
+      "lookupValue": "Franklin",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Franklin"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PostalCity",
+      "lookupValue": "Franklin",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Franklin"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.City",
+      "lookupValue": "Clinton",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Clinton"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PostalCity",
+      "lookupValue": "Clinton",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Clinton"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.City",
+      "lookupValue": "Greenville",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Greenville"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PostalCity",
+      "lookupValue": "Greenville",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Greenville"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.City",
+      "lookupValue": "Bristol",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Bristol"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PostalCity",
+      "lookupValue": "Bristol",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Bristol"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.City",
+      "lookupValue": "Manchester",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Manchester"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PostalCity",
+      "lookupValue": "Manchester",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Manchester"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.City",
+      "lookupValue": "Oxford",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Oxford"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PostalCity",
+      "lookupValue": "Oxford",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Oxford"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.City",
+      "lookupValue": "Burlington",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Burlington"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PostalCity",
+      "lookupValue": "Burlington",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Burlington"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.City",
+      "lookupValue": "Ashland",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Ashland"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PostalCity",
+      "lookupValue": "Ashland",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Ashland"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.City",
+      "lookupValue": "Centerville",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Centerville"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PostalCity",
+      "lookupValue": "Centerville",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Centerville"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.CountyOrParish",
+      "lookupValue": "WashingtonCounty",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Washington County"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.CountyOrParish",
+      "lookupValue": "JeffersonCounty",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Jefferson County"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.CountyOrParish",
+      "lookupValue": "FranklinCounty",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Franklin County"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.CountyOrParish",
+      "lookupValue": "LincolnCounty",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Lincoln County"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.CountyOrParish",
+      "lookupValue": "MadisonCounty",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Madison County"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.CountyOrParish",
+      "lookupValue": "JacksonCounty",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Jackson County"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.CountyOrParish",
+      "lookupValue": "HamiltonCounty",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Hamilton County"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.CountyOrParish",
+      "lookupValue": "MarionCounty",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Marion County"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.CountyOrParish",
+      "lookupValue": "WarrenCounty",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Warren County"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.CountyOrParish",
+      "lookupValue": "MontgomeryCounty",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Montgomery County"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.BuildingFeatures",
+      "lookupValue": "Elevator",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Elevator"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.BuildingFeatures",
+      "lookupValue": "Lobby",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Lobby"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.BuildingFeatures",
+      "lookupValue": "StorageArea",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Storage Area"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.BuildingFeatures",
+      "lookupValue": "RecreationRoom",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Recreation Room"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.BuildingFeatures",
+      "lookupValue": "LaundryFacility",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Laundry Facility"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.AOR",
+      "lookupValue": "GreaterMetroAssociationOfRealtors",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Greater Metro Association of Realtors"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.AOR",
+      "lookupValue": "CoastalBoardOfRealtors",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Coastal Board of Realtors"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.AOR",
+      "lookupValue": "HeartlandAssociationOfRealtors",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Heartland Association of Realtors"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.Disclosures",
+      "lookupValue": "LeadPaint",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Lead Paint"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.Disclosures",
+      "lookupValue": "SellerPropertyDisclosure",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Seller Property Disclosure"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.Disclosures",
+      "lookupValue": "FloodZone",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Flood Zone"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.Disclosures",
+      "lookupValue": "Asbestos",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Asbestos"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.Disclosures",
+      "lookupValue": "HOADisclosure",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "H O A Disclosure"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.DocumentsAvailable",
+      "lookupValue": "Appraisal",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Appraisal"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.DocumentsAvailable",
+      "lookupValue": "FloorPlan",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Floor Plan"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.DocumentsAvailable",
+      "lookupValue": "SurveyMap",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Survey Map"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.DocumentsAvailable",
+      "lookupValue": "TitleInsurance",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Title Insurance"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.DocumentsAvailable",
+      "lookupValue": "PropertyDisclosure",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Property Disclosure"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ElementarySchool",
+      "lookupValue": "LincolnElementary",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Lincoln Elementary"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ElementarySchool",
+      "lookupValue": "WashingtonElementary",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Washington Elementary"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ElementarySchool",
+      "lookupValue": "JeffersonElementary",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Jefferson Elementary"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ElementarySchool",
+      "lookupValue": "FranklinElementary",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Franklin Elementary"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ElementarySchool",
+      "lookupValue": "RooseveltElementary",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Roosevelt Elementary"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ElementarySchoolDistrict",
+      "lookupValue": "District1",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "District 1"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ElementarySchoolDistrict",
+      "lookupValue": "District2",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "District 2"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ElementarySchoolDistrict",
+      "lookupValue": "District3",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "District 3"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ElementarySchoolDistrict",
+      "lookupValue": "District4",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "District 4"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ElementarySchoolDistrict",
+      "lookupValue": "District5",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "District 5"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.GreenLocation",
+      "lookupValue": "TransitAccessible",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Transit Accessible"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.GreenLocation",
+      "lookupValue": "BikeScore",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Bike Score"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.GreenLocation",
+      "lookupValue": "WalkScore",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Walk Score"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.HighSchool",
+      "lookupValue": "CentralHighSchool",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Central High School"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.HighSchool",
+      "lookupValue": "WestviewHighSchool",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Westview High School"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.HighSchool",
+      "lookupValue": "EastsideHighSchool",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Eastside High School"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.HighSchool",
+      "lookupValue": "NorthpointHighSchool",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Northpoint High School"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.HighSchool",
+      "lookupValue": "LakewoodHighSchool",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Lakewood High School"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.HighSchoolDistrict",
+      "lookupValue": "District1",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "District 1"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.HighSchoolDistrict",
+      "lookupValue": "District2",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "District 2"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.HighSchoolDistrict",
+      "lookupValue": "District3",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "District 3"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.HighSchoolDistrict",
+      "lookupValue": "District4",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "District 4"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.HighSchoolDistrict",
+      "lookupValue": "District5",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "District 5"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.IrrigationSource",
+      "lookupValue": "Well",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Well"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.IrrigationSource",
+      "lookupValue": "Pond",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Pond"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.IrrigationSource",
+      "lookupValue": "CanalDitch",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Canal Ditch"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.IrrigationSource",
+      "lookupValue": "Municipal",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Municipal"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.IrrigationSource",
+      "lookupValue": "None",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "None"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MiddleOrJuniorSchool",
+      "lookupValue": "LincolnMiddleSchool",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Lincoln Middle School"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MiddleOrJuniorSchool",
+      "lookupValue": "WashingtonMiddleSchool",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Washington Middle School"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MiddleOrJuniorSchool",
+      "lookupValue": "JeffersonMiddleSchool",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Jefferson Middle School"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MiddleOrJuniorSchool",
+      "lookupValue": "FranklinMiddleSchool",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Franklin Middle School"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MiddleOrJuniorSchoolDistrict",
+      "lookupValue": "District1",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "District 1"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MiddleOrJuniorSchoolDistrict",
+      "lookupValue": "District2",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "District 2"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MiddleOrJuniorSchoolDistrict",
+      "lookupValue": "District3",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "District 3"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MiddleOrJuniorSchoolDistrict",
+      "lookupValue": "District4",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "District 4"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MiddleOrJuniorSchoolDistrict",
+      "lookupValue": "District5",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "District 5"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MLSAreaMajor",
+      "lookupValue": "Metro",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Metro"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MLSAreaMajor",
+      "lookupValue": "Suburban",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Suburban"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MLSAreaMajor",
+      "lookupValue": "Rural",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Rural"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MLSAreaMajor",
+      "lookupValue": "Coastal",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Coastal"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MLSAreaMajor",
+      "lookupValue": "Mountain",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Mountain"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MLSAreaMinor",
+      "lookupValue": "North",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "North"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MLSAreaMinor",
+      "lookupValue": "South",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "South"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MLSAreaMinor",
+      "lookupValue": "East",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "East"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MLSAreaMinor",
+      "lookupValue": "West",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "West"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MLSAreaMinor",
+      "lookupValue": "Central",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Central"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MlsStatus",
+      "lookupValue": "Active",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Active"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MlsStatus",
+      "lookupValue": "Pending",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Pending"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MlsStatus",
+      "lookupValue": "Closed",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Closed"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MlsStatus",
+      "lookupValue": "Withdrawn",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Withdrawn"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MlsStatus",
+      "lookupValue": "Expired",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Expired"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MlsStatus",
+      "lookupValue": "Canceled",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Canceled"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MlsStatus",
+      "lookupValue": "Hold",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Hold"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MlsStatus",
+      "lookupValue": "ComingSoon",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Coming Soon"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.ShowingDays",
-      "lookupValue": "SampleShowingDaysEnumValue",
+      "lookupValue": "Monday",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample ShowingDays Enum Value"
+          "value": "Monday"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ShowingDays",
+      "lookupValue": "Tuesday",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Tuesday"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ShowingDays",
+      "lookupValue": "Wednesday",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Wednesday"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ShowingDays",
+      "lookupValue": "Thursday",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Thursday"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ShowingDays",
+      "lookupValue": "Friday",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Friday"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ShowingDays",
+      "lookupValue": "Saturday",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Saturday"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ShowingDays",
+      "lookupValue": "Sunday",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Sunday"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.ImageSizeDescription",
-      "lookupValue": "SampleImageSizeDescriptionEnumValue",
+      "lookupValue": "Small",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample ImageSizeDescription Enum Value"
+          "value": "Small"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ImageSizeDescription",
+      "lookupValue": "Medium",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Medium"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ImageSizeDescription",
+      "lookupValue": "Large",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Large"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ImageSizeDescription",
+      "lookupValue": "Thumbnail",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Thumbnail"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ImageSizeDescription",
+      "lookupValue": "Original",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Original"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.MemberMlsSecurityClass",
-      "lookupValue": "SampleMemberMlsSecurityClassEnumValue",
+      "lookupValue": "Agent",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample MemberMlsSecurityClass Enum Value"
+          "value": "Agent"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MemberMlsSecurityClass",
+      "lookupValue": "Broker",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Broker"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MemberMlsSecurityClass",
+      "lookupValue": "Admin",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Admin"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MemberMlsSecurityClass",
+      "lookupValue": "Appraiser",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Appraiser"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.MemberMlsSecurityClass",
+      "lookupValue": "Assistant",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Assistant"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.SyndicateAgentOption",
-      "lookupValue": "SampleSyndicateAgentOptionEnumValue",
+      "lookupValue": "Include",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample SyndicateAgentOption Enum Value"
+          "value": "Include"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.SyndicateAgentOption",
+      "lookupValue": "Exclude",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Exclude"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.SyndicateAgentOption",
+      "lookupValue": "ContactOnly",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Contact Only"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.OrganizationType",
-      "lookupValue": "SampleOrganizationTypeEnumValue",
+      "lookupValue": "MLS",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample OrganizationType Enum Value"
+          "value": "M L S"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.OrganizationType",
+      "lookupValue": "Association",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Association"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.OrganizationType",
+      "lookupValue": "Board",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Board"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.OrganizationType",
+      "lookupValue": "Franchise",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Franchise"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.OrganizationType",
+      "lookupValue": "Brokerage",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Brokerage"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.RuleType",
-      "lookupValue": "SampleRuleTypeEnumValue",
+      "lookupValue": "Accept",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample RuleType Enum Value"
+          "value": "Accept"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.RuleType",
+      "lookupValue": "Reject",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Reject"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.RuleType",
+      "lookupValue": "ConditionalAccept",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Conditional Accept"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.SavedSearchType",
-      "lookupValue": "SampleSavedSearchTypeEnumValue",
+      "lookupValue": "Email",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample SavedSearchType Enum Value"
+          "value": "Email"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.SavedSearchType",
+      "lookupValue": "Alert",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Alert"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.SavedSearchType",
+      "lookupValue": "Auto",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Auto"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.SearchQueryExceptions",
-      "lookupValue": "SampleSearchQueryExceptionsEnumValue",
+      "lookupValue": "NoResults",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample SearchQueryExceptions Enum Value"
+          "value": "No Results"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.SearchQueryExceptions",
+      "lookupValue": "Timeout",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Timeout"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.SearchQueryExceptions",
+      "lookupValue": "InvalidQuery",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Invalid Query"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.TeamImpersonationLevel",
-      "lookupValue": "SampleTeamImpersonationLevelEnumValue",
+      "lookupValue": "Full",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample TeamImpersonationLevel Enum Value"
+          "value": "Full"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.TeamImpersonationLevel",
+      "lookupValue": "Limited",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Limited"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.TeamImpersonationLevel",
+      "lookupValue": "None",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "None"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.AttendantType",
-      "lookupValue": "SampleAttendantTypeEnumValue",
+      "lookupValue": "Doorman",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample AttendantType Enum Value"
+          "value": "Doorman"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.AttendantType",
+      "lookupValue": "Concierge",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Concierge"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.AttendantType",
+      "lookupValue": "SecurityGuard",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Security Guard"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.AttendantType",
+      "lookupValue": "None",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "None"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.BuildingContactType",
-      "lookupValue": "SampleBuildingContactTypeEnumValue",
+      "lookupValue": "Manager",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample BuildingContactType Enum Value"
+          "value": "Manager"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.BuildingContactType",
+      "lookupValue": "Superintendent",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Superintendent"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.BuildingContactType",
+      "lookupValue": "Board",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Board"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.BuildingContactType",
+      "lookupValue": "Owner",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Owner"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.BuildingRules",
-      "lookupValue": "SampleBuildingRulesEnumValue",
+      "lookupValue": "PetsAllowed",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample BuildingRules Enum Value"
+          "value": "Pets Allowed"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.BuildingRules",
+      "lookupValue": "NoPets",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "No Pets"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.BuildingRules",
+      "lookupValue": "SmallPetsOnly",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Small Pets Only"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.BuildingRules",
+      "lookupValue": "NoSmoking",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "No Smoking"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.BuildingRules",
+      "lookupValue": "QuietHours",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Quiet Hours"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.BuildingType",
-      "lookupValue": "SampleBuildingTypeEnumValue",
+      "lookupValue": "HighRise",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample BuildingType Enum Value"
+          "value": "High Rise"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.BuildingType",
+      "lookupValue": "LowRise",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Low Rise"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.BuildingType",
+      "lookupValue": "MidRise",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Mid Rise"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.BuildingType",
+      "lookupValue": "Garden",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Garden"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.BuildingType",
+      "lookupValue": "Townhome",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Townhome"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.ConciergeServiceType",
-      "lookupValue": "SampleConciergeServiceTypeEnumValue",
+      "lookupValue": "FullTime",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample ConciergeServiceType Enum Value"
+          "value": "Full Time"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ConciergeServiceType",
+      "lookupValue": "PartTime",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Part Time"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ConciergeServiceType",
+      "lookupValue": "Virtual",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Virtual"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ConciergeServiceType",
+      "lookupValue": "None",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "None"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.DoormanType",
-      "lookupValue": "SampleDoormanTypeEnumValue",
+      "lookupValue": "FullTime",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample DoormanType Enum Value"
+          "value": "Full Time"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.DoormanType",
+      "lookupValue": "PartTime",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Part Time"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.DoormanType",
+      "lookupValue": "Virtual",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Virtual"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.DoormanType",
+      "lookupValue": "None",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "None"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.GeneralCondition",
-      "lookupValue": "SampleGeneralConditionEnumValue",
+      "lookupValue": "Excellent",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample GeneralCondition Enum Value"
+          "value": "Excellent"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.GeneralCondition",
+      "lookupValue": "Good",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Good"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.GeneralCondition",
+      "lookupValue": "Fair",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Fair"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.GeneralCondition",
+      "lookupValue": "Poor",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Poor"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.GeneralCondition",
+      "lookupValue": "NeedsRenovation",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Needs Renovation"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.ParkingRestrictions",
-      "lookupValue": "SampleParkingRestrictionsEnumValue",
+      "lookupValue": "NoOvernightParking",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample ParkingRestrictions Enum Value"
+          "value": "No Overnight Parking"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ParkingRestrictions",
+      "lookupValue": "PermitRequired",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Permit Required"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ParkingRestrictions",
+      "lookupValue": "NoCommercialVehicles",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "No Commercial Vehicles"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.ParkingRestrictions",
+      "lookupValue": "NoTrailers",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "No Trailers"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.PetRestrictionsSource",
-      "lookupValue": "SamplePetRestrictionsSourceEnumValue",
+      "lookupValue": "HOA",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample PetRestrictionsSource Enum Value"
+          "value": "H O A"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PetRestrictionsSource",
+      "lookupValue": "Building",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Building"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PetRestrictionsSource",
+      "lookupValue": "City",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "City"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PetRestrictionsSource",
+      "lookupValue": "County",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "County"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.PetRestrictionsSource",
+      "lookupValue": "Lease",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Lease"
         }
       ]
     },
     {
       "lookupName": "org.reso.metadata.enums.Restrictions",
-      "lookupValue": "SampleRestrictionsEnumValue",
+      "lookupValue": "DeedRestrictions",
       "type": "Edm.Int32",
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Sample Restrictions Enum Value"
+          "value": "Deed Restrictions"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.Restrictions",
+      "lookupValue": "HOARestrictions",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "H O A Restrictions"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.Restrictions",
+      "lookupValue": "AgeRestrictions",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Age Restrictions"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.Restrictions",
+      "lookupValue": "RentalRestrictions",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "Rental Restrictions"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.Restrictions",
+      "lookupValue": "NoRestrictions",
+      "type": "Edm.Int32",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.StandardName",
+          "value": "No Restrictions"
         }
       ]
     }

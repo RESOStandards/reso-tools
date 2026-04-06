@@ -164,4 +164,4 @@ npm run dev     # Watch mode
 
 ## License
 
-See [LICENSE](../LICENSE) in the repository root.
+See [LICENSE](https://github.com/RESOStandards/reso-tools/blob/main/LICENSE) in the repository root.

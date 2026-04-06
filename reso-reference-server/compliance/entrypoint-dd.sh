@@ -45,6 +45,7 @@ exec node /app/dist/cli/index.js dd \
   --url "$SERVER_URL" \
   --auth-token "$AUTH_TOKEN" \
   --dd-version "$DD_VERSION" \
+  --strict \
   --verbose \
   --output-dir /tmp/compliance-results \
   $LIMIT_FLAG

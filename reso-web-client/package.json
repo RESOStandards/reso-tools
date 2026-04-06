@@ -1,5 +1,5 @@
 {
-  "name": "@reso-standards/web-client",
+  "name": "@reso-standards/reso-web-client",
   "version": "0.2.0",
   "private": true,
   "type": "module",

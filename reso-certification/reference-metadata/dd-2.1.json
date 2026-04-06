@@ -13135,7 +13135,7 @@
         },
         {
           "term": "Core.Description",
-          "value": "A pick list of conditions that may require caution or further consideration, such as bringing someone with you, when showing the property (i.e., Electricity Not On, Inconsistent Cell Service, No Exterior Lighting)."
+          "value": "A pick list of conditions that may require caution or further consideration, such as bringing someone with you, when showing the property (i.e., Electricity Not On, Inconsistent Cell Service, No Exterior Lighting)."
         }
       ]
     },
@@ -53191,11 +53191,11 @@
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Full ﻿Exposure"
+          "value": "Full Exposure"
         },
         {
           "term": "RESO.DDWikiUrl",
-          "value": "https://dd.reso.org/DD2.1/lookups/Basement/Full%20%EF%BB%BFExposure"
+          "value": "https://dd.reso.org/DD2.1/lookups/Basement/Full%20Exposure"
         },
         {
           "term": "Core.Description",

@@ -1,4 +1,4 @@
-# @reso-standards/web-api-proxy
+# @reso-standards/reso-web-api-proxy
 
 Lightweight CORS proxy and static file server for RESO web clients. Enables browser-based OData clients to connect to external servers that don't set CORS headers.
 
@@ -29,7 +29,7 @@ npm start -- --port 8888
 ### As a Library
 
 ```typescript
-import { createProxyServer } from '@reso-standards/web-api-proxy';
+import { createProxyServer } from '@reso-standards/reso-web-api-proxy';
 
 const instance = await createProxyServer({
   port: 8888,
@@ -46,7 +46,7 @@ Mount the proxy on an existing Express app:
 
 ```typescript
 import express from 'express';
-import { createProxyMiddleware, createCorsMiddleware } from '@reso-standards/web-api-proxy';
+import { createProxyMiddleware, createCorsMiddleware } from '@reso-standards/reso-web-api-proxy';
 
 const app = express();
 app.use(createCorsMiddleware());
@@ -103,4 +103,4 @@ ALL /api/proxy?url=<encoded-target-url>
 
 ## License
 
-See [LICENSE](../LICENSE) in the repository root.
+See [LICENSE](https://github.com/RESOStandards/reso-tools/blob/main/LICENSE) in the repository root.

@@ -164,4 +164,4 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 
 ## License
 
-See [LICENSE](../LICENSE) in the repository root.
+See [LICENSE](https://github.com/RESOStandards/reso-tools/blob/main/LICENSE) in the repository root.

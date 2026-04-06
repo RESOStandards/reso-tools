@@ -70,4 +70,4 @@ In a signed/packaged build, connection data (including tokens) is encrypted at r
 
 ## License
 
-See [LICENSE](../LICENSE) in the repository root.
+See [LICENSE](https://github.com/RESOStandards/reso-tools/blob/main/LICENSE) in the repository root.

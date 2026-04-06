@@ -1,6 +1,6 @@
 # @reso-standards/odata-expression-parser
 
-Standalone, zero-dependency library for parsing OData 4.01 `$filter` and `$expand` expressions into typed ASTs (abstract syntax trees). Used by both [`@reso-standards/reso-client`](../reso-client/) for query validation and [`@reso-standards/reference-server`](../reso-reference-server/) for SQL WHERE clause generation and multi-level navigation property expansion.
+Standalone, zero-dependency library for parsing OData 4.01 `$filter` and `$expand` expressions into typed ASTs (abstract syntax trees). Used by both [`@reso-standards/reso-client`](../reso-client/) for query validation and [`@reso-standards/reso-reference-server`](../reso-reference-server/) for SQL WHERE clause generation and multi-level navigation property expansion.
 
 ## Install
 
@@ -229,4 +229,4 @@ npm test        # 180 tests
 
 ## License
 
-See [LICENSE](../LICENSE) in the repository root.
+See [LICENSE](https://github.com/RESOStandards/reso-tools/blob/main/LICENSE) in the repository root.

@@ -12,6 +12,8 @@
 
 **AI agents can now use RESO tools.** The new MCP server exposes OData query, metadata, validation, and compliance testing tools to any MCP-compatible client — Claude, Cursor, VS Code, Windsurf, and more. See the [MCP server docs](reso-mcp-server/README.md).
 
+**Strict mode compliance verified.** The DD compliance pipeline now runs in strict mode by default in Docker, enforcing zero variations and full JSON schema validation. All 8 pipeline steps pass cleanly against the reference server with seeded data.
+
 **Metadata generation from DD sheets.** Give the tool a DD XLSX file and it produces the reference metadata report used by the server and certification tools. No more Commander codegen. DD sheets have moved from the Commander repo to [transport.reso.org](https://github.com/RESOStandards/transport).
 
 **Migrating from reso-certification-utils?** See the [migration guide](reso-certification/MIGRATION.md) for command mapping, config compatibility, and new features.

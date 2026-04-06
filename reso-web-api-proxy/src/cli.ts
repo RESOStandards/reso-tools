@@ -4,7 +4,7 @@
  * CLI entry point for the standalone proxy server.
  *
  * Usage:
- *   npx @reso-standards/web-api-proxy [--port 8080] [--ui ../reso-web-client/dist]
+ *   npx @reso-standards/reso-web-api-proxy [--port 8080] [--ui ../reso-web-client/dist]
  */
 
 import { createProxyServer } from './index.js';
