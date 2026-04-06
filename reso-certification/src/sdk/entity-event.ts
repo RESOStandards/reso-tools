@@ -181,7 +181,7 @@ const writeComplianceReports = (config: EntityEventConfig): PipelineStep<EntityE
 /** Create the EntityEvent compliance test pipeline. */
 export const createEntityEventPipeline = (config: EntityEventConfig) =>
   createPipeline<EntityEventContext>('entity-event', [
-    healthCheck,
+    ...(config.options?.skipHealthCheck ? [] : [healthCheck]),
     resolveAuth(config),
     fetchAndParseMetadata(config),
     ...(config.mode === 'full' ? [generatePayloads(config)] : []),

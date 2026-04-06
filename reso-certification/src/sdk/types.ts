@@ -87,6 +87,7 @@ export interface BaseComplianceConfig {
     readonly failFast?: boolean;
     readonly outputDir?: string;
     readonly verbose?: boolean;
+    readonly skipHealthCheck?: boolean;
   };
 }
 

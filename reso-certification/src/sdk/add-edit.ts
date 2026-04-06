@@ -277,7 +277,7 @@ const inlinePayloadsNeedSampling = (payloads?: import('./types.js').InlinePayloa
 export const createAddEditPipeline = (config: AddEditConfig) => {
   const needsSampling = !config.payloadsDir && (!config.payloads || inlinePayloadsNeedSampling(config.payloads));
   return createPipeline<AddEditContext>('add-edit', [
-    healthCheck,
+    ...(config.options?.skipHealthCheck ? [] : [healthCheck]),
     resolveAuth(config),
     fetchAndParseMetadata(config),
     ...(needsSampling ? [sampleRecords(config)] : []),
