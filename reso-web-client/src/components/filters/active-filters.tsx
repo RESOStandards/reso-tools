@@ -10,6 +10,7 @@
 export interface ActiveFilterPillSpec {
   readonly key: string;
   readonly label: string;
+  readonly count?: number;
   readonly onRemove: () => void;
 }
 
@@ -20,13 +21,20 @@ interface ActiveFiltersProps {
 
 export const ActiveFilterPill = ({
   label,
+  count,
   onRemove
 }: {
   readonly label: string;
+  readonly count?: number;
   readonly onRemove: () => void;
 }) => (
-  <span className="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 ring-1 ring-blue-200/70 dark:ring-blue-900/40">
+  <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 ring-1 ring-blue-200/70 dark:ring-blue-900/40">
     {label}
+    {typeof count === 'number' && (
+      <span className="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 rounded text-[11px] font-semibold tabular-nums bg-blue-100 text-blue-800 dark:bg-blue-800/50 dark:text-blue-100">
+        {count.toLocaleString()}
+      </span>
+    )}
     <button
       type="button"
       onClick={onRemove}
@@ -45,7 +53,12 @@ export const ActiveFilters = ({ pills, onClearAll }: ActiveFiltersProps) => {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {pills.map((p) => (
-        <ActiveFilterPill key={p.key} label={p.label} onRemove={p.onRemove} />
+        <ActiveFilterPill
+          key={p.key}
+          label={p.label}
+          count={p.count}
+          onRemove={p.onRemove}
+        />
       ))}
       <button
         type="button"

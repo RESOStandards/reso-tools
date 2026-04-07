@@ -318,12 +318,14 @@ export const EndorsementList = ({
     ...Array.from(activeEndorsements).map((key) => ({
       key: `e-${key}`,
       label: endorsementKeyLabel(key),
+      count: countOf(key),
       onRemove: () => toggleEndorsement(key)
     })),
     ...(isSignedIn
       ? Array.from(activeStatuses).map((s) => ({
           key: `s-${s}`,
           label: statusLabel(s),
+          count: countOf(s),
           onRemove: () => toggleStatus(s)
         }))
       : []),
@@ -352,7 +354,27 @@ export const EndorsementList = ({
 
   const activeFilterCount = activePills.length;
 
-  // ── Stats strip ────────────────────────────────────────────────────
+  // ── Counts derived from active filter ──────────────────────────────
+  //
+  // Public users only see certified endorsements on the wire (the API
+  // doesn't expose status filtering anonymously), so the headline count
+  // should reflect whatever endorsement filter they currently have set.
+  // Sum the per-endorsement counts when one or more is selected;
+  // otherwise fall back to the certified total (or `all` as a last
+  // resort, in case the API ever exposes a non-certified-restricted
+  // anonymous count).
+  const headlineCount = useMemo<number | undefined>(() => {
+    if (!counts) return undefined;
+    if (activeEndorsements.size > 0) {
+      let sum = 0;
+      for (const key of activeEndorsements) sum += counts[key] ?? 0;
+      return sum;
+    }
+    return counts.certified ?? counts.all;
+  }, [counts, searchParams.get('endorsement')]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Signed-in users get the stats strip — hide zero values so we don't
+  // surface empty rails for endpoints that the API didn't return.
   const totalCount = counts?.all;
   const certifiedCount = counts?.certified;
   const notifiedCount = counts?.recipient_notified;
@@ -363,33 +385,68 @@ export const EndorsementList = ({
       {/* Sticky sub-chrome — title + search/sort/filters + active pills */}
       <div className="sticky top-[52px] z-20 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur border-b border-gray-200/60 dark:border-gray-700/60">
         <div className={`${containerClassName} pt-6 pb-4 space-y-4`}>
-          {/* Title row — title left, summary stats inline, action slot right */}
+          {/* Title row — title left, action slot right */}
           <div className="flex items-end justify-between gap-6 flex-wrap">
             <div className="min-w-0 flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
-                Endorsements
-              </h1>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Browse RESO certification endorsements across all participating organizations.
-              </p>
+              <div className="flex items-baseline gap-x-4 gap-y-1 flex-wrap">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
+                  Endorsements
+                </h1>
+                {!isSignedIn && typeof headlineCount === 'number' && (
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-semibold tabular-nums text-green-700 dark:text-green-400">
+                      {headlineCount.toLocaleString()}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-sm font-medium text-green-700 dark:text-green-400">
+                      <svg
+                        className="w-4 h-4"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 011.42-1.42L8.5 12.08l6.79-6.79a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Certified
+                      {activeEndorsements.size > 0 && (
+                        <span className="text-gray-500 dark:text-gray-400 font-normal">
+                          {' '}· matching filters
+                        </span>
+                      )}
+                    </span>
+                    <span className="ml-1 self-center">
+                      <SourceBadge source={source} title={fallbackError ?? undefined} />
+                    </span>
+                  </div>
+                )}
+              </div>
+              {isSignedIn && (
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                  Browse RESO certification endorsements across all participating organizations.
+                </p>
+              )}
             </div>
             {/* Action slot — reserved for export, provider/admin actions, etc. */}
             <div className="flex items-center gap-2" aria-label="Page actions" />
           </div>
 
-          {/* Stats strip — prominent counts */}
-          {counts && (
+          {/* Stats strip — signed-in only. Reserved for the eventual
+              role-aware mini dashboard for providers and admins. */}
+          {isSignedIn && counts && (
             <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-              {typeof totalCount === 'number' && (
+              {typeof totalCount === 'number' && totalCount > 0 && (
                 <Stat label="Total" value={totalCount} accent />
               )}
-              {typeof certifiedCount === 'number' && (
+              {typeof certifiedCount === 'number' && certifiedCount > 0 && (
                 <Stat label="Certified" value={certifiedCount} tone="green" />
               )}
-              {typeof notifiedCount === 'number' && (
+              {typeof notifiedCount === 'number' && notifiedCount > 0 && (
                 <Stat label="Notified" value={notifiedCount} tone="sky" />
               )}
-              {typeof passedCount === 'number' && (
+              {typeof passedCount === 'number' && passedCount > 0 && (
                 <Stat label="Passed" value={passedCount} tone="emerald" />
               )}
               <SourceBadge source={source} title={fallbackError ?? undefined} />
