@@ -2,6 +2,26 @@
 
 ---
 
+## v0.7 — 2026-04-06
+
+### Return of the MCP
+
+**AI agents can now write RESO records, not just read them.** The MCP server picks up the three operations that real Add/Edit work needs — `create`, `update`, `delete` — wrapped with the standard MCP destructive-hint annotations so compliant clients (Claude Code, Claude Desktop, IDE extensions) prompt the user before invoking destructive operations. The reference server's full RESO Add/Edit certification surface is now reachable from any MCP-aware assistant.
+
+**The MCP server has a real user guide.** [`reso-mcp-server/doc/GUIDE.md`](https://github.com/RESOStandards/reso-tools/blob/main/reso-mcp-server/doc/GUIDE.md) is a dialogue-format walkthrough — every section is a real question to an AI assistant, the actual MCP tool call, and the verbatim response from a seeded reference server. It covers authentication (bearer and Client Credentials), metadata exploration, OData querying and searching, and a full Add/Edit + EntityEvent narrative. The EntityEvent section walks through the polling-replication consumer pattern that every RESO sync client is, at heart, some variation on — including a dedicated section on how an assistant should walk a user through structured server errors.
+
+**EntityEvent works end to end through MCP.** With the reference server's `ENTITY_EVENT=true` mode enabled, the MCP server's generic OData passthrough surfaces the `EntityEvent` resource automatically — no MCP-side changes needed. Section 5 of the user guide demonstrates the full pull-based replication loop with a live consumer that distinguishes creates, updates, and deletes using the canonical "404 on follow-up fetch means delete; otherwise compare or hash" rules.
+
+**Search now works on tools.reso.org.** The Pagefind index is now built and deployed via the GitHub Pages workflow, matching what dd.reso.org and transport.reso.org already do. Both desktop and mobile.
+
+**The desktop client About panel can never go stale again.** Version is read automatically from `package.json` via `app.getVersion()`, and the release name is a single named constant. The release checklist in `CLAUDE.md` calls out the pattern explicitly.
+
+**1,097 tests passing across 8 packages.** The MCP server's test suite now asserts the destructive-hint annotations on the new write tools so the safety contract is enforced in CI.
+
+**What's next.** v0.8 — "License to Cert" — focuses on the desktop client Cert UI: Endorsements, Certification dashboard, and the role-based access work that has been waiting since v0.5.
+
+---
+
 ## v0.6 — 2026-04-06
 
 ### The MCP Strikes Back

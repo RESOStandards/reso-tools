@@ -22,7 +22,7 @@ Open-source monorepo for building and testing RESO-compliant OData servers. Incl
 ## Common commands
 
 ```bash
-npm test                    # Run all tests (1,096 across 8 packages)
+npm test                    # Run all tests (1,097 across 8 packages)
 npm run test:server         # Run server tests only
 npm run test:validation     # Run validation tests only
 npm run lint                # Biome lint check

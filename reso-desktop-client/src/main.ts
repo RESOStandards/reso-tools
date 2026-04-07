@@ -663,7 +663,7 @@ app.whenReady().then(async () => {
   // Release name displayed in the About panel. Update this each release —
   // the version itself is read automatically from package.json via
   // app.getVersion() so it can never drift. See CLAUDE.md release checklist.
-  const RELEASE_NAME = 'License to Test';
+  const RELEASE_NAME = 'Return of the MCP';
   const appVersion = app.getVersion();
   app.setAboutPanelOptions({
     applicationName: 'RESO Desktop Client',

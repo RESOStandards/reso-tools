@@ -2,6 +2,53 @@
 
 ---
 
+## v0.7 — 2026-04-06
+
+### Return of the MCP
+
+The MCP server picks up where v0.6 left off. v0.6 shipped seven read tools and proved AI agents could drive RESO end to end; v0.7 fills in the gaps that real-world Add/Edit work needs and gives AI integrators a real walkthrough to learn from.
+
+#### Write tools — `create`, `update`, `delete`
+
+Three new tools wrap the OData POST / PATCH / DELETE paths against any RESO resource. Each carries the standard MCP `ToolAnnotations` (`destructiveHint`, `idempotentHint`, `openWorldHint`), so compliant hosts like Claude Code, Claude Desktop, and IDE extensions can prompt the user before invoking destructive operations. `delete` is the only one tagged `destructiveHint: true`; `create` and `update` rely on the assistant-side confirmation dance instead.
+
+The handlers reuse the same `odataRequest` + `buildResourceUrl(serverUrl, resource, key)` plumbing the certification runner uses, so behavior is consistent with the rest of the toolchain.
+
+#### MCP Server User Guide
+
+[`reso-mcp-server/doc/GUIDE.md`](reso-mcp-server/doc/GUIDE.md) is a dialogue-format walkthrough of working with a RESO OData server through an AI assistant. Every tool call and every response in the guide was captured live against the seeded reference server with `ENTITY_EVENT=true`. Sections cover:
+
+- **Authentication** — both bearer-token and Client Credentials, framed as a real first-contact conversation
+- **Metadata exploration** — what 14 resources look like on the wire, the field-type breakdown of `Property`, the lookup reverse index that powers dd.reso.org
+- **Querying the Lookup resource** to resolve allowed values for any lookup-backed string
+- **Searching** — range filters, string matching, multi-value lookup lambdas (`Appliances/any(...)`), date windows for incremental sync, and `parse-filter` for sanity-checking complex expressions before sending
+- **Add/Edit and EntityEvent** — the complete write loop, including the polling-replication consumer pattern (404 or empty result on follow-up fetch means delete; otherwise compare or hash to detect change), the canonical 30-line sync loop, and a dedicated section on error handling that walks through structured 400s, structured 404s, and the silent-200 trap when servers don't enforce lookup membership on PATCH
+
+The guide is intentionally written as user-and-assistant dialogue rather than API reference — every section starts with a real question and ends with the assistant's interpretation of the live response.
+
+#### EntityEvent end-to-end through MCP
+
+The reference server's `ENTITY_EVENT=true` mode is now confirmed working through the MCP layer with no additional code in the MCP server itself. The generic OData passthrough in the `query` and `metadata` tools surfaces the `EntityEvent` resource (DD 2.1 schema: `EntityEventSequence`, `ResourceName`, `ResourceRecordKey`, `ResourceRecordUrl`, `FeedTypes`) automatically once the flag is enabled. Section 5 of the user guide demonstrates the full pull-based replication loop end to end.
+
+#### Harness coercion fix
+
+The MCP server's JSON-Schema-to-Zod converter now uses `z.coerce.number()`, `z.coerce.boolean()`, and `z.preprocess(JSON.parse, ...)` for objects and arrays. This means MCP harnesses that serialize all tool arguments as strings (e.g. XML-text parameter forms) no longer trip strict validation on `top`, `skip`, `count`, or structured `record` payloads. Single-point fix in `jsonPropToZod`, applies to all 10 tools.
+
+#### Desktop About panel
+
+The release name in the About panel is now read from a single `RELEASE_NAME` constant in `reso-desktop-client/src/main.ts`, and the version is read automatically via `app.getVersion()` so it can never drift from `package.json` again. The release checklist in `CLAUDE.md` documents the new pattern.
+
+#### tools.reso.org search
+
+The Pagefind search index is now built and deployed for tools.reso.org via the GitHub Pages workflow. The site layout already had the search modal wired up; the workflow was missing the `npx pagefind --site` step that DD and Transport already have. Search now works on both desktop and mobile.
+
+#### Tests and quality
+
+- **1,097 tests passing** across 8 packages (was 1,096 in v0.6)
+- New `tools.test.ts` cases assert the destructive-hint annotations on `create`/`update`/`delete` so the safety contract is enforced in CI
+
+---
+
 ## v0.6 — 2026-04-06
 
 ### The MCP Strikes Back

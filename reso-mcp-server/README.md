@@ -4,6 +4,8 @@ MCP server that exposes RESO tools for AI agents. Query OData servers, parse met
 
 Works with any MCP client: Claude, Cursor, Windsurf, VS Code, or your own application.
 
+> **New here?** The [User Guide](doc/GUIDE.md) is a dialogue-format walkthrough — every example is a real question to an AI assistant, the actual MCP tool call, and the live response from a seeded reference server. It covers auth, metadata exploration, querying, searching, and the full Add/Edit + EntityEvent loop including error handling.
+
 ## Quick Start
 
 ### Claude Code / Claude Desktop
@@ -158,6 +160,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 
 ## Related
 
+- [User Guide](doc/GUIDE.md) — dialogue-format walkthrough with live examples
 - [`reso-certification/`](../reso-certification/) — CLI and SDK for compliance testing
 - [`reso-client/`](../reso-client/) — OData client SDK
 - [RESO Tools MCP Server ticket](https://github.com/RESOStandards/reso-tools/issues/91)
