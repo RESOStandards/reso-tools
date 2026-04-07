@@ -1,6 +1,6 @@
 # RESO MCP Server — User Guide
 
-A walkthrough of using the RESO MCP server through an AI assistant. Each section is a real conversation: the user asks a question, the assistant calls the appropriate MCP tool, and the answer comes back grounded in live data from the [reso-reference-server](../../reso-reference-server/) seeded with the bundled fixtures.
+A walkthrough of using the RESO MCP server through an AI assistant. Each section is a real conversation: the user asks a question, the assistant calls the appropriate MCP tool, and the answer comes back grounded in live data from the [reso-reference-server](https://tools.reso.org/packages/reso-reference-server/) seeded with the bundled fixtures.
 
 The format is intentional — this is what working with a RESO OData server *should* feel like once you have an MCP-aware assistant in the loop. The boxed JSON tool calls are collapsed by default so the dialogue stays readable; click them open when you want to see the exact arguments.
 
