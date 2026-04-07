@@ -8,32 +8,37 @@ const LOGO_LIGHT =
 const LOGO_DARK =
   'https://www.reso.org/wp-content/uploads/2020/06/RESO-Logo_Horizontal_White.png';
 
+const PAGE_CONTAINER = 'max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8';
+
 /**
  * Public Cert workspace landing page.
  *
- * Always renders, regardless of auth state. Anyone can browse
- * endorsements, filter, search, and (eventually) drill into summary
- * and detail reports without signing in. Sign-in is opt-in via the
- * auth pill in the upper right and unlocks additional capabilities
- * (status mutation, My Results filter, variations review with edit).
+ * The page chrome is intentionally split:
+ *
+ * - The top section header (logo, theme, auth pill) sits at the top
+ *   and stays put.
+ * - The Endorsements list owns its own sticky sub-chrome (title row,
+ *   search/sort/filters, drawer, active pills) so the controls stay
+ *   visible while the list scrolls underneath.
+ *
+ * Public-by-default — every Cert section page renders for everyone.
+ * Sign-in is opt-in via the auth pill in the upper right and unlocks
+ * additional capabilities (status mutation, My Results filter,
+ * variations review with edit).
  */
 export const CertHomePage = () => {
   const { isDark, toggle } = useDarkMode();
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
-      {/* Cert section header — distinct from the global Layout header.
-          The OData browser layout sits at the / route; the Cert
-          section has its own chrome so cert-specific concerns
-          (auth pill, future cert nav) stay scoped here. */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-white/95 dark:bg-gray-800/95 backdrop-blur border-b border-gray-200 dark:border-gray-700">
+        <div className={`${PAGE_CONTAINER} py-3 flex items-center justify-between`}>
           <div className="flex items-center gap-4">
             <NavLink to="/" className="shrink-0" aria-label="Back to RESO Tools">
               <img
                 src={isDark ? LOGO_DARK : LOGO_LIGHT}
                 alt="RESO"
-                className="h-9"
+                className="h-8"
               />
             </NavLink>
             <div className="hidden sm:block w-px h-7 bg-gray-200 dark:bg-gray-700" />
@@ -69,20 +74,8 @@ export const CertHomePage = () => {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-10">
-        {/* Hero */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
-            Endorsements
-          </h1>
-          <p className="mt-2 text-base text-gray-600 dark:text-gray-400 max-w-2xl">
-            Browse RESO certification endorsements across all participating
-            organizations. Filter by status or type, search by provider, and
-            click any endorsement to see its summary and detail reports.
-          </p>
-        </div>
-
-        <EndorsementList />
+      <main>
+        <EndorsementList containerClassName={PAGE_CONTAINER} />
       </main>
     </div>
   );

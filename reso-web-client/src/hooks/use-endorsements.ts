@@ -36,6 +36,10 @@ export interface UseEndorsementsInput {
   readonly endorsementFilter?: ReadonlyArray<string>;
   readonly searchKey?: string;
   readonly showMyResults?: boolean;
+  /** Sort direction. Defaults to "desc" (most recent / Z→A first). */
+  readonly sortBy?: 'asc' | 'desc';
+  /** When true, sort by timestamp; when false, sort by name. */
+  readonly sortByTimestamp?: boolean;
 }
 
 export interface UseEndorsementsResult {
@@ -77,6 +81,8 @@ export const useEndorsements = (
   const endorsementFilter = input.endorsementFilter ?? EMPTY_ARRAY;
   const searchKey = input.searchKey ?? '';
   const showMyResults = input.showMyResults ?? false;
+  const sortBy = input.sortBy ?? 'desc';
+  const sortByTimestamp = input.sortByTimestamp ?? true;
 
   // Stable per-value keys so effect deps fire only when content changes,
   // not when caller passes a new array reference for the same values.
@@ -101,6 +107,8 @@ export const useEndorsements = (
   // Recreated only when one of the filters actually changes.
   const baseOptions = useMemo<FetchReportsOptions>(
     () => ({
+      sortBy,
+      sortByTimestamp,
       ...(statusFilter.length > 0 ? { statusFilter } : {}),
       ...(endorsementFilter.length > 0 ? { endorsementFilter } : {}),
       ...(searchKey ? { searchKey } : {}),
@@ -110,7 +118,7 @@ export const useEndorsements = (
     // on the value-based string instead so reference-only changes don't
     // refire.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [statusKey, endorsementKey, searchKey, showMyResults]
+    [statusKey, endorsementKey, searchKey, showMyResults, sortBy, sortByTimestamp]
   );
 
   /** Internal: perform a single fetch at the given `from` cursor. */

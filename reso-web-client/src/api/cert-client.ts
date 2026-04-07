@@ -171,8 +171,10 @@ export interface FetchReportsOptions {
   readonly showMyResults?: boolean;
   readonly providerUoi?: string | null;
   readonly searchKey?: string;
-  readonly sortBy?: string;
-  readonly sortByTimestamp?: string;
+  /** Sort direction: "asc" or "desc". Not a field name. */
+  readonly sortBy?: 'asc' | 'desc';
+  /** When true, sort by timestamp; when false, sort by name. */
+  readonly sortByTimestamp?: boolean;
   readonly fromProvider?: number;
   // TODO(range): the existing app passes a getCalenderDateRange() result
   // here; shape unconfirmed. Leaving as unknown until we capture one.
@@ -236,10 +238,18 @@ export const fetchEndorsements = async (
   };
   if (apiKey) headers.Authorization = `ApiKey ${apiKey}`;
 
+  // The Cert API requires `options.sortBy` (direction) and
+  // `options.sortByTimestamp` (boolean toggle). Default to most-recent-first.
+  const optionsWithDefaults: FetchReportsOptions = {
+    sortBy: 'desc',
+    sortByTimestamp: true,
+    ...options
+  };
+
   const res = await fetch(proxiedCertUrl('/certification_reports/filter'), {
     method: 'POST',
     headers,
-    body: JSON.stringify({ options })
+    body: JSON.stringify({ options: optionsWithDefaults })
   });
 
   if (!res.ok) {
@@ -250,4 +260,37 @@ export const fetchEndorsements = async (
   }
 
   return (await res.json()) as FetchReportsResponse;
+};
+
+// ── Certification counts ───────────────────────────────────────────────────
+//
+// GET /api/v1/certification_reports/certification-count returns a flat
+// dictionary keyed by either an endorsement slug (`{type}_{version}`),
+// a status name, `all`, or `legacy`. The response shape is open-ended —
+// new types/statuses can appear without a schema bump — so we model it
+// as a `Record<string, number>` and read by lookup.
+
+export type CertificationCounts = Readonly<Record<string, number>>;
+
+export const fetchCertificationCounts = async (
+  apiKey: string | null
+): Promise<CertificationCounts> => {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (apiKey) headers.Authorization = `ApiKey ${apiKey}`;
+
+  // The endpoint takes `showMyResults` and `endorsements` as query params.
+  // For the public list we want global counts (showMyResults=false) with
+  // no endorsement narrowing.
+  const path = '/certification_reports/certification-count?showMyResults=false&endorsements=';
+
+  const res = await fetch(proxiedCertUrl(path), { headers });
+
+  if (!res.ok) {
+    throw new CertApiAuthError(
+      `Failed to fetch certification counts (HTTP ${res.status})`,
+      res.status
+    );
+  }
+
+  return (await res.json()) as CertificationCounts;
 };

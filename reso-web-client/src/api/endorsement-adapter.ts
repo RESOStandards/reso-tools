@@ -34,13 +34,16 @@ const KNOWN_TYPES = new Set<EndorsementType>([
 ]);
 
 const KNOWN_STATUSES = new Set<EndorsementStatus>([
-  'active',
-  'pending',
+  'certified',
+  'recipient_notified',
+  'passed',
   'in_progress',
   'in_review',
   'failed',
-  'closed',
-  'expired'
+  'canceled',
+  'withdrawn',
+  'revoked',
+  'legacy'
 ]);
 
 /** Coerce an arbitrary type string to our `EndorsementType` union; defaults
@@ -59,7 +62,7 @@ const coerceStatus = (raw: string): EndorsementStatus => {
   const slug = raw?.toLowerCase().replace(/[-\s]/g, '_');
   return KNOWN_STATUSES.has(slug as EndorsementStatus)
     ? (slug as EndorsementStatus)
-    : 'active';
+    : 'certified';
 };
 
 /**

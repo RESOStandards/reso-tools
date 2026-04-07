@@ -112,21 +112,21 @@ export const EndorsementRow = ({ endorsement }: EndorsementRowProps) => {
         </p>
 
         {ddStatsAvailable && !showFailedStep && (
-          <div className="mt-2 flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-gray-500 dark:text-gray-400">
+          <div className="mt-2 flex items-center gap-x-5 gap-y-1 flex-wrap text-xs text-gray-500 dark:text-gray-400">
             <span>
-              <span className="font-medium text-gray-700 dark:text-gray-300">
+              <span className="text-base font-semibold tabular-nums text-gray-900 dark:text-gray-100">
                 {formatNumber((standardResourcesCount ?? 0) + (localResourcesCount ?? 0))}
               </span>{' '}
               resources
             </span>
             <span>
-              <span className="font-medium text-gray-700 dark:text-gray-300">
+              <span className="text-base font-semibold tabular-nums text-gray-900 dark:text-gray-100">
                 {formatNumber((standardFieldsCount ?? 0) + (localFieldsCount ?? 0))}
               </span>{' '}
               fields
             </span>
             <span>
-              <span className="font-medium text-gray-700 dark:text-gray-300">
+              <span className="text-base font-semibold tabular-nums text-gray-900 dark:text-gray-100">
                 {formatNumber((standardLookupsCount ?? 0) + (localLookupsCount ?? 0))}
               </span>{' '}
               lookups
@@ -134,7 +134,7 @@ export const EndorsementRow = ({ endorsement }: EndorsementRowProps) => {
             {idxPercent !== null && (
               <span>
                 IDX{' '}
-                <span className="font-medium text-gray-700 dark:text-gray-300">
+                <span className="text-base font-semibold tabular-nums text-gray-900 dark:text-gray-100">
                   {idxPercent}%
                 </span>
               </span>

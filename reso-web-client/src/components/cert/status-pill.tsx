@@ -24,25 +24,40 @@ const STATUS_STYLES: Record<EndorsementStatus, StatusStyle> = {
     className:
       'bg-blue-50 text-blue-700 ring-1 ring-blue-200/70 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-900/40'
   },
-  pending: {
-    label: 'Pending',
+  passed: {
+    label: 'Passed',
     className:
-      'bg-purple-50 text-purple-700 ring-1 ring-purple-200/70 dark:bg-purple-900/30 dark:text-purple-300 dark:ring-purple-900/40'
+      'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70 dark:bg-emerald-900/30 dark:text-emerald-300 dark:ring-emerald-900/40'
   },
-  active: {
-    label: 'Active',
+  recipient_notified: {
+    label: 'Notified',
+    className:
+      'bg-sky-50 text-sky-700 ring-1 ring-sky-200/70 dark:bg-sky-900/30 dark:text-sky-300 dark:ring-sky-900/40'
+  },
+  certified: {
+    label: 'Certified',
     className:
       'bg-green-50 text-green-700 ring-1 ring-green-200/70 dark:bg-green-900/30 dark:text-green-300 dark:ring-green-900/40'
   },
-  closed: {
-    label: 'Closed',
+  canceled: {
+    label: 'Canceled',
     className:
       'bg-gray-100 text-gray-700 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700'
   },
-  expired: {
-    label: 'Expired',
+  withdrawn: {
+    label: 'Withdrawn',
     className:
       'bg-gray-100 text-gray-500 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:ring-gray-700'
+  },
+  revoked: {
+    label: 'Revoked',
+    className:
+      'bg-rose-50 text-rose-700 ring-1 ring-rose-200/70 dark:bg-rose-900/30 dark:text-rose-300 dark:ring-rose-900/40'
+  },
+  legacy: {
+    label: 'Legacy',
+    className:
+      'bg-slate-100 text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700'
   }
 };
 
@@ -69,11 +84,14 @@ export const STATUS_SORT_ORDER: ReadonlyArray<EndorsementStatus> = [
   'failed',
   'in_review',
   'in_progress',
-  'pending',
-  'active',
-  'closed',
-  'expired'
+  'passed',
+  'recipient_notified',
+  'certified',
+  'canceled',
+  'withdrawn',
+  'revoked',
+  'legacy'
 ];
 
 export const statusLabel = (status: EndorsementStatus): string =>
-  STATUS_STYLES[status].label;
+  STATUS_STYLES[status]?.label ?? status;

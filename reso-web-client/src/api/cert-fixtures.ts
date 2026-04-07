@@ -18,15 +18,19 @@ export type EndorsementType =
   | 'reso_common_format'
   | 'webhooks';
 
-/** Endorsement status — semantic, drives the status pill color. */
+/** Endorsement status — matches the values returned by the Cert API
+ *  certification-count endpoint and the report status field. */
 export type EndorsementStatus =
-  | 'active'
-  | 'pending'
+  | 'certified'
+  | 'recipient_notified'
+  | 'passed'
   | 'in_progress'
   | 'in_review'
   | 'failed'
-  | 'closed'
-  | 'expired';
+  | 'canceled'
+  | 'withdrawn'
+  | 'revoked'
+  | 'legacy';
 
 /** A single endorsement / cert report row. */
 export interface Endorsement {
@@ -128,13 +132,13 @@ const TYPE_CATALOG: ReadonlyArray<TypeEntry> = [
  * most things are active, fewer are in progress, very few are failed.
  */
 const STATUS_DISTRIBUTION: ReadonlyArray<EndorsementStatus> = [
-  'active', 'active', 'active', 'active', 'active',
+  'certified', 'certified', 'certified', 'certified', 'certified',
   'in_progress', 'in_progress',
-  'pending', 'pending',
+  'recipient_notified', 'recipient_notified',
   'in_review',
   'failed',
-  'closed', 'closed',
-  'expired'
+  'canceled', 'canceled',
+  'withdrawn'
 ];
 
 /** Days-ago offsets, deterministic, spread across the last ~14 months. */
@@ -224,7 +228,7 @@ export const ENDORSEMENT_FIXTURES: ReadonlyArray<Endorsement> = [
     type: 'data_dictionary',
     typeLabel: 'Data Dictionary',
     version: '2.0',
-    status: 'active',
+    status: 'certified',
     providerUoi: 'P00000123',
     providerName: 'Bright MLS',
     systemName: 'Matrix',
@@ -270,7 +274,7 @@ export const ENDORSEMENT_FIXTURES: ReadonlyArray<Endorsement> = [
     type: 'web_api_server_core',
     typeLabel: 'Web API Server Core',
     version: '2.1.0',
-    status: 'active',
+    status: 'certified',
     providerUoi: 'P00000123',
     providerName: 'Bright MLS',
     systemName: 'Matrix',
@@ -284,7 +288,7 @@ export const ENDORSEMENT_FIXTURES: ReadonlyArray<Endorsement> = [
     type: 'add_edit',
     typeLabel: 'Add/Edit',
     version: '1.0',
-    status: 'pending',
+    status: 'recipient_notified',
     providerUoi: 'P00000789',
     providerName: 'Stellar MLS',
     systemName: 'Flexmls',
@@ -336,7 +340,7 @@ export const ENDORSEMENT_FIXTURES: ReadonlyArray<Endorsement> = [
     type: 'web_api_server_core',
     typeLabel: 'Web API Server Core',
     version: '2.0.0',
-    status: 'closed',
+    status: 'canceled',
     providerUoi: 'P00000222',
     providerName: 'REcolorado',
     systemName: 'Matrix',
@@ -350,7 +354,7 @@ export const ENDORSEMENT_FIXTURES: ReadonlyArray<Endorsement> = [
     type: 'data_dictionary',
     typeLabel: 'Data Dictionary',
     version: '2.1',
-    status: 'expired',
+    status: 'withdrawn',
     providerUoi: 'P00000999',
     providerName: 'Heartland MLS',
     systemName: 'Rapattoni',
