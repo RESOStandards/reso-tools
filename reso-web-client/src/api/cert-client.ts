@@ -151,38 +151,94 @@ export const requestProviderToken = async (
   };
 };
 
-// ── Endorsements (Cert reports) ────────────────────────────────────────────
+// ── Endorsements (cert reports filter) ─────────────────────────────────────
 //
-// The endpoint exists in the existing cert app as
-// POST /api/v1/certification_reports/filter with a {options} body. The exact
-// shape of `options` and the report row schema haven't been confirmed yet —
-// see TODO below.
+// POST /api/v1/certification_reports/filter takes a JSON body shaped like
+// `{ options: FetchReportsOptions }` and returns a `FetchReportsResponse`
+// envelope. The response is keyed by recipient UOI — each value is an
+// array of report objects for that org. Pagination is server-side via
+// `from` (the next call passes the previous response's `lastUoiIndex`).
+//
+// Field shapes here mirror the existing reso-certification web app's
+// usage on branch 2532-variations-uix-improvements (apis/reports/index.js
+// + components/Reports/index.js). Anything still uncertain is marked
+// TODO and tightened as we see real data come back.
 
-/** Stub options shape — refine once we have a real response sample. */
-export interface FetchEndorsementsOptions {
+export interface FetchReportsOptions {
+  readonly from?: number;
+  readonly endorsementFilter?: ReadonlyArray<string>;
+  readonly statusFilter?: ReadonlyArray<string>;
   readonly showMyResults?: boolean;
-  readonly providerUoi?: string;
-  // TODO(filter-shape): mirror the real options shape once captured live.
+  readonly providerUoi?: string | null;
+  readonly searchKey?: string;
+  readonly sortBy?: string;
+  readonly sortByTimestamp?: string;
+  readonly fromProvider?: number;
+  // TODO(range): the existing app passes a getCalenderDateRange() result
+  // here; shape unconfirmed. Leaving as unknown until we capture one.
+  readonly range?: unknown;
+}
+
+/** A single report row from the Cert API. */
+export interface CertReport {
+  readonly id: string;
+  readonly type: string;
+  readonly version: string;
+  readonly status: string;
+  readonly recipientUoi: string;
+  readonly providerUoi: string;
+  readonly providerUsi?: string;
+  readonly description?: string;
+  /** True for jobs run from a local CLI runner; false for cloud. */
+  readonly local?: boolean;
+  /** Step that failed, if status is failed/in_review. */
+  readonly failedStep?: string;
+  /** ISO timestamp; the existing app reads several timestamp fields and
+   *  picks the most relevant one for display — we capture the common ones. */
+  readonly statusTimestamp?: string;
+  readonly modificationTimestamp?: string;
+  // DD-specific aggregates
+  readonly standardResourcesCount?: number;
+  readonly localResourcesCount?: number;
+  readonly standardFieldsCount?: number;
+  readonly localFieldsCount?: number;
+  readonly standardLookupsCount?: number;
+  readonly localLookupsCount?: number;
+  readonly iDXFieldsCount?: number;
+  readonly totalStandardIdxFieldsCount?: number;
+  // TODO(report-shape): there are more fields on the wire; this is the
+  // subset the Endorsement UI cares about today. Extend as we surface
+  // more screens (Summary, Detail).
   readonly [key: string]: unknown;
 }
 
+export interface FetchReportsResponse {
+  readonly reportsByOrgs: Record<string, ReadonlyArray<CertReport>>;
+  readonly lastUoiIndex?: number;
+  readonly fromProvider?: number;
+}
+
 /**
- * Fetch the endorsements list (a.k.a. cert reports filter).
+ * Fetch the endorsements list.
  *
- * Requires the Cert API key as `Authorization: ApiKey <token>`. The auth
- * context wraps this in a higher-level call that injects the header.
+ * The Cert API key is optional — pass null/undefined to attempt an
+ * anonymous call (which may succeed for public-readable endpoints or
+ * fail with 401 for auth-required ones; the caller decides what to do
+ * with the failure).
  */
 export const fetchEndorsements = async (
-  apiKey: string,
-  options: FetchEndorsementsOptions = {}
-): Promise<unknown> => {
+  apiKey: string | null,
+  options: FetchReportsOptions = {}
+): Promise<FetchReportsResponse> => {
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json'
+  };
+  if (apiKey) headers.Authorization = `ApiKey ${apiKey}`;
+
   const res = await fetch(proxiedCertUrl('/certification_reports/filter'), {
     method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      Authorization: `ApiKey ${apiKey}`
-    },
+    headers,
     body: JSON.stringify({ options })
   });
 
@@ -193,8 +249,5 @@ export const fetchEndorsements = async (
     );
   }
 
-  // TODO(report-shape): type the response once we have a sample. The
-  // existing cert app uses a `report` shape with type, version, status,
-  // recipientUoi, providerUoi, providerUsi, plus DD-specific counts.
-  return res.json();
+  return (await res.json()) as FetchReportsResponse;
 };

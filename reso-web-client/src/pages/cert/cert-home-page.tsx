@@ -1,57 +1,89 @@
-import { Navigate } from 'react-router';
-import { useAuth } from '../../hooks/use-auth';
+import { NavLink } from 'react-router';
+import { AuthPill } from '../../components/cert/auth-pill';
+import { EndorsementList } from '../../components/cert/endorsement-list';
+import { useDarkMode } from '../../hooks/use-dark-mode';
+
+const LOGO_LIGHT =
+  'https://www.reso.org/wp-content/uploads/2020/06/RESO-Logo_Horizontal_Blue.png';
+const LOGO_DARK =
+  'https://www.reso.org/wp-content/uploads/2020/06/RESO-Logo_Horizontal_White.png';
 
 /**
- * Minimal landing page for the Cert workspace. Used during Phase A as the
- * destination after a successful sign-in until the proper Cert layout
- * (sidebar nav, Endorsements list, etc.) lands in the next slice.
+ * Public Cert workspace landing page.
+ *
+ * Always renders, regardless of auth state. Anyone can browse
+ * endorsements, filter, search, and (eventually) drill into summary
+ * and detail reports without signing in. Sign-in is opt-in via the
+ * auth pill in the upper right and unlocks additional capabilities
+ * (status mutation, My Results filter, variations review with edit).
  */
 export const CertHomePage = () => {
-  const { user, isAuthenticated, signOut } = useAuth();
-
-  if (!isAuthenticated || !user) {
-    return <Navigate to="/cert/login" replace />;
-  }
+  const { isDark, toggle } = useDarkMode();
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-4 py-12 transition-colors">
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                Welcome, {user.fullName}
-              </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                {user.email}
-                {user.isAdmin && (
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                    Admin
-                  </span>
-                )}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={signOut}
-              className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-            >
-              Sign out
-            </button>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
+      {/* Cert section header — distinct from the global Layout header.
+          The OData browser layout sits at the / route; the Cert
+          section has its own chrome so cert-specific concerns
+          (auth pill, future cert nav) stay scoped here. */}
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <NavLink to="/" className="shrink-0" aria-label="Back to RESO Tools">
+              <img
+                src={isDark ? LOGO_DARK : LOGO_LIGHT}
+                alt="RESO"
+                className="h-9"
+              />
+            </NavLink>
+            <div className="hidden sm:block w-px h-7 bg-gray-200 dark:bg-gray-700" />
+            <span className="hidden sm:block text-sm font-medium text-gray-700 dark:text-gray-200">
+              Certification
+            </span>
           </div>
 
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              You&apos;re signed in to the Cert workspace. The Endorsements
-              list, Dashboard, and Variations Review screens land in the next
-              slice of v0.8 work.
-            </p>
-            <p className="mt-4 text-xs text-gray-400 dark:text-gray-500">
-              Cert API key: <span className="font-mono">{user.token.slice(0, 8)}…</span>
-            </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggle}
+              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors"
+            >
+              {isDark ? (
+                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM10 7a3 3 0 100 6 3 3 0 000-6zM15.657 5.404a.75.75 0 10-1.06-1.06l-1.061 1.06a.75.75 0 001.06 1.06l1.06-1.06zM6.464 14.596a.75.75 0 10-1.06-1.06l-1.06 1.06a.75.75 0 001.06 1.06l1.06-1.06zM18 10a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0118 10zM5 10a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 015 10zM14.596 15.657a.75.75 0 001.06-1.06l-1.06-1.061a.75.75 0 10-1.06 1.06l1.06 1.06zM5.404 6.464a.75.75 0 001.06-1.06l-1.06-1.06a.75.75 0 10-1.06 1.06l1.06 1.06z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path
+                    fillRule="evenodd"
+                    d="M7.455 2.004a.75.75 0 01.26.77 7 7 0 009.958 7.967.75.75 0 011.067.853A8.5 8.5 0 116.647 1.921a.75.75 0 01.808.083z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              )}
+            </button>
+            <AuthPill />
           </div>
         </div>
-      </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-6 py-10">
+        {/* Hero */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
+            Endorsements
+          </h1>
+          <p className="mt-2 text-base text-gray-600 dark:text-gray-400 max-w-2xl">
+            Browse RESO certification endorsements across all participating
+            organizations. Filter by status or type, search by provider, and
+            click any endorsement to see its summary and detail reports.
+          </p>
+        </div>
+
+        <EndorsementList />
+      </main>
     </div>
   );
 };
