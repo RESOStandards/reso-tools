@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "reso": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--add-host=host.docker.internal:host-gateway",
+        "reso-mcp-server"
+      ]
+    }
+  }
+}

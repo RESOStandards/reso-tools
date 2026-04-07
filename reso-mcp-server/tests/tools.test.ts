@@ -2,8 +2,23 @@ import { describe, it, expect } from 'vitest';
 import { allTools, toolsForScope } from '../src/tools.js';
 
 describe('tool definitions', () => {
-  it('has 7 tools total', () => {
-    expect(allTools).toHaveLength(7);
+  it('has 10 tools total', () => {
+    expect(allTools).toHaveLength(10);
+  });
+
+  it('write tools (create/update/delete) have correct destructive hints', () => {
+    const create = allTools.find(t => t.name === 'create');
+    const update = allTools.find(t => t.name === 'update');
+    const del = allTools.find(t => t.name === 'delete');
+
+    expect(create?.annotations?.destructiveHint).toBe(false);
+    expect(create?.annotations?.idempotentHint).toBe(false);
+
+    expect(update?.annotations?.destructiveHint).toBe(false);
+    expect(update?.annotations?.idempotentHint).toBe(true);
+
+    expect(del?.annotations?.destructiveHint).toBe(true);
+    expect(del?.annotations?.idempotentHint).toBe(true);
   });
 
   it('all tools have unique names', () => {

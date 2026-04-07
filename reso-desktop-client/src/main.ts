@@ -660,10 +660,15 @@ const checkForUpdatesInteractive = async (): Promise<void> => {
 // App lifecycle
 app.whenReady().then(async () => {
   const paths = resolvePaths();
+  // Release name displayed in the About panel. Update this each release —
+  // the version itself is read automatically from package.json via
+  // app.getVersion() so it can never drift. See CLAUDE.md release checklist.
+  const RELEASE_NAME = 'Return of the MCP';
+  const appVersion = app.getVersion();
   app.setAboutPanelOptions({
     applicationName: 'RESO Desktop Client',
-    applicationVersion: '0.6.0',
-    version: 'v0.6 — The MCP Strikes Back',
+    applicationVersion: appVersion,
+    version: `v${appVersion} — ${RELEASE_NAME}`,
     copyright: '© 2026 Real Estate Standards Organization',
     credits: 'Browse, query, and manage real estate data using RESO standards.',
     website: 'https://reso.org',

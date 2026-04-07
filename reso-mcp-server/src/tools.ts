@@ -8,12 +8,26 @@
 /** Tool scope for filtering. */
 export type ToolScope = 'all' | 'cert';
 
+/**
+ * MCP ToolAnnotations — behavioral hints that compliant MCP hosts use to decide
+ * how to present a tool to the user (e.g. show a confirmation prompt before
+ * invoking destructive tools). Mirrors the shape from the MCP SDK.
+ */
+export interface ToolAnnotations {
+  readonly title?: string;
+  readonly readOnlyHint?: boolean;
+  readonly destructiveHint?: boolean;
+  readonly idempotentHint?: boolean;
+  readonly openWorldHint?: boolean;
+}
+
 /** Tool definition with metadata for registration. */
 export interface ToolDef {
   readonly name: string;
   readonly description: string;
   readonly scope: ToolScope;
   readonly inputSchema: Record<string, unknown>;
+  readonly annotations?: ToolAnnotations;
 }
 
 // ── Auth Tools ──
@@ -78,6 +92,78 @@ export const metadataTool: ToolDef = {
       resource: { type: 'string', description: 'Optional: return only this resource\'s entity type' },
     },
     required: ['url'],
+  },
+};
+
+// ── Write Tools ──
+
+export const createTool: ToolDef = {
+  name: 'create',
+  description: 'Create a new record on a RESO OData resource via POST. Returns the server response (typically the created record or its location).',
+  scope: 'all',
+  annotations: {
+    title: 'Create record',
+    readOnlyHint: false,
+    destructiveHint: false,  // POST adds, doesn't destroy
+    idempotentHint: false,   // re-running creates duplicates
+    openWorldHint: true,     // touches an external system
+  },
+  inputSchema: {
+    type: 'object',
+    properties: {
+      url: { type: 'string', description: 'OData service root URL' },
+      resource: { type: 'string', description: 'Resource name to create a record in (e.g., Property)' },
+      ...authProperties,
+      record: { type: 'object', description: 'Field/value pairs for the new record' },
+    },
+    required: ['url', 'resource', 'record'],
+  },
+};
+
+export const updateTool: ToolDef = {
+  name: 'update',
+  description: 'Update fields on an existing RESO OData record via PATCH. Returns the server response.',
+  scope: 'all',
+  annotations: {
+    title: 'Update record',
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,    // same PATCH twice yields the same result
+    openWorldHint: true,
+  },
+  inputSchema: {
+    type: 'object',
+    properties: {
+      url: { type: 'string', description: 'OData service root URL' },
+      resource: { type: 'string', description: 'Resource name (e.g., Property)' },
+      key: { type: 'string', description: 'Key value of the record to update (e.g., the ListingKey)' },
+      ...authProperties,
+      record: { type: 'object', description: 'Field/value pairs to PATCH onto the record' },
+    },
+    required: ['url', 'resource', 'key', 'record'],
+  },
+};
+
+export const deleteTool: ToolDef = {
+  name: 'delete',
+  description: 'Delete a RESO OData record via DELETE. Returns the server response (typically 204 No Content on success).',
+  scope: 'all',
+  annotations: {
+    title: 'Delete record',
+    readOnlyHint: false,
+    destructiveHint: true,   // ← the big one — hosts should require confirmation
+    idempotentHint: true,
+    openWorldHint: true,
+  },
+  inputSchema: {
+    type: 'object',
+    properties: {
+      url: { type: 'string', description: 'OData service root URL' },
+      resource: { type: 'string', description: 'Resource name (e.g., Property)' },
+      key: { type: 'string', description: 'Key value of the record to delete' },
+      ...authProperties,
+    },
+    required: ['url', 'resource', 'key'],
   },
 };
 
@@ -162,6 +248,9 @@ export const allTools: ReadonlyArray<ToolDef> = [
   authenticateTool,
   queryTool,
   metadataTool,
+  createTool,
+  updateTool,
+  deleteTool,
   validateTool,
   parseFilterTool,
   runComplianceTool,

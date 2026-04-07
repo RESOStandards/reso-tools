@@ -1,6 +1,6 @@
 # RESO Tools
 
-![Tests](https://img.shields.io/badge/tests-1096%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1097%20passed-brightgreen)
 ![Compliance](https://img.shields.io/badge/RESO%20compliance-4%2F4%20suites-blue)
 
 Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compliant OData servers. Includes a reference server, desktop client, web UI, certification test runner, MCP server for AI agents and shared libraries for OData parsing, validation and data generation.
@@ -18,7 +18,7 @@ Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compl
 | [`reso-web-api-proxy/`](reso-web-api-proxy/) | Lightweight CORS proxy and static file server for web client deployments | -- |
 | [`reso-desktop-client/`](reso-desktop-client/) | Electron desktop shell with native proxy, secure storage and optional reference server | -- |
 | [`reso-certification/`](reso-certification/) | RESO certification CLI + SDK — Add/Edit, EntityEvent, Web API Core, DD ([docs](reso-certification/README.md)) | 250 |
-| [`reso-mcp-server/`](reso-mcp-server/) | MCP server — exposes OData query, validation, certification tools for AI agents ([docs](reso-mcp-server/README.md)) | 20 |
+| [`reso-mcp-server/`](reso-mcp-server/) | MCP server — exposes OData query, write, validation, certification tools for AI agents ([guide](reso-mcp-server/doc/GUIDE.md)) | 21 |
 
 ## Quick Start
 

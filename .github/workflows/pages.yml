@@ -94,10 +94,15 @@ jobs:
           source: ./.github/pages
           destination: ./_site
 
+      - name: Build search index with Pagefind
+        run: |
+          cp -r ./_site ./_site_searchable
+          npx pagefind --site ./_site_searchable
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./_site
+          path: ./_site_searchable
 
   deploy:
     environment:
