@@ -69,6 +69,7 @@ jobs:
             "RELEASES.md:Release Notes:releases"
             "ANNOUNCEMENTS.md:Announcements:announcements"
             "SECURITY_AUDIT.md:Security Audit:security"
+            "reso-mcp-server/doc/GUIDE.md:MCP Server User Guide:mcp-guide"
           )
           for entry in "${docs[@]}"; do
             IFS=':' read -r file title slug <<< "$entry"
