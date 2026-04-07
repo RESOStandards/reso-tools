@@ -154,14 +154,32 @@ export const useEndorsements = (
           !response.reportsByOrgs ||
           Object.keys(response.reportsByOrgs).length === 0;
 
-        // Cursor: server returns lastUoiIndex; if absent or empty page,
-        // we're done paginating.
-        const newCursor: number | null = reportsByOrgsEmpty
-          ? null
-          : (response.lastUoiIndex ?? null);
+        // Cursor: server returns lastUoiIndex; if absent, empty, or
+        // hasn't advanced past where we just fetched from, we're done
+        // paginating. The cursor-stuck check matters when a narrow
+        // search collapses results to a single org — without it,
+        // infinite scroll re-loads the same page indefinitely.
+        const rawCursor = response.lastUoiIndex ?? null;
+        const newCursor: number | null =
+          reportsByOrgsEmpty || rawCursor === null || rawCursor <= from
+            ? null
+            : rawCursor;
 
         setNextFrom(newCursor);
-        setEndorsements((prev) => (append ? [...prev, ...adapted] : adapted));
+        // Dedupe by id so any server-side overlap (or pagination edge
+        // cases) doesn't surface as visible duplicates.
+        setEndorsements((prev) => {
+          if (!append) return adapted;
+          const seen = new Set(prev.map((e) => e.id));
+          const merged = [...prev];
+          for (const e of adapted) {
+            if (!seen.has(e.id)) {
+              seen.add(e.id);
+              merged.push(e);
+            }
+          }
+          return merged;
+        });
         setSource(adapted.length > 0 ? 'live' : append ? 'live' : 'fixtures');
         if (!append && adapted.length === 0) {
           // First page came back empty — fall back to fixtures so the

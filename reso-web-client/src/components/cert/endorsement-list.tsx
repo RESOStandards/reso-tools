@@ -229,38 +229,134 @@ export const EndorsementList = ({
     ]);
   };
 
-  const applySearch = () => {
+  // Debounced search-as-you-type. The local input updates instantly;
+  // the URL (and therefore the API call) only updates after the user
+  // stops typing for 300ms — matches the existing reso-certification
+  // client's pattern of pushing the searchKey straight to the
+  // server-side filter.
+  useEffect(() => {
     const trimmed = searchInput.trim();
     if (trimmed === query) return;
-    updateParam('q', trimmed || null);
-  };
+    const timer = setTimeout(() => {
+      updateParam('q', trimmed || null);
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
 
   const clearAll = () => {
     setSearchInput('');
     setSearchParams(new URLSearchParams());
   };
 
+  // ── Data ───────────────────────────────────────────────────────────
+  //
+  // When a text search is active, we deliberately drop the endorsement
+  // and status filters from the API call and apply them client-side
+  // instead. The reason: facet count badges should reflect what's
+  // available *for the searched org* — not what's left after the
+  // user's chip selection. By fetching the full search-scoped set we
+  // can compute accurate per-endorsement / per-status counts and
+  // still narrow the displayed list to what the chips select.
+  const endorsementFilter = useMemo(
+    () => (query ? [] : Array.from(activeEndorsements)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [query, searchParams.get('endorsement')]
+  );
+
+  const apiStatusFilter = useMemo(
+    () => (query ? [] : isSignedIn ? Array.from(activeStatuses) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [query, isSignedIn, searchParams.get('status')]
+  );
+
+  const {
+    endorsements: rawEndorsements,
+    isLoadingInitial,
+    isLoadingMore,
+    hasMore,
+    source,
+    fallbackError,
+    loadMore
+  } = useEndorsements({
+    statusFilter: apiStatusFilter,
+    endorsementFilter,
+    searchKey: query,
+    sortBy: sortOption.sortBy,
+    sortByTimestamp: sortOption.sortByTimestamp
+  });
+
+  // Apply endorsement + status filters client-side when search is
+  // active. Otherwise the API has already done it and we pass through.
+  const endorsements = useMemo(() => {
+    if (!query) return rawEndorsements;
+    return rawEndorsements.filter((e) => {
+      const endorsementKey = `${e.type}_${e.version}`;
+      if (
+        activeEndorsements.size > 0 &&
+        !activeEndorsements.has(endorsementKey)
+      ) {
+        return false;
+      }
+      if (
+        isSignedIn &&
+        activeStatuses.size > 0 &&
+        !(activeStatuses as Set<string>).has(e.status)
+      ) {
+        return false;
+      }
+      return true;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    query,
+    rawEndorsements,
+    isSignedIn,
+    searchParams.get('endorsement'),
+    searchParams.get('status')
+  ]);
+
   // ── Counts ─────────────────────────────────────────────────────────
-  const { counts } = useCertificationCounts();
+  const { counts: globalCounts } = useCertificationCounts();
+
+  // When a text search is active, the global counts no longer reflect
+  // the visible set (the count endpoint ignores `searchKey`). Compute
+  // counts client-side from the loaded results so the facet badges
+  // and headline reflect what the user is actually seeing. This is
+  // best-effort against the loaded page — accurate when the search
+  // narrows enough that everything fits in one page.
+  const localCounts = useMemo<Record<string, number> | null>(() => {
+    if (!query) return null;
+    // Counts come from the *unfiltered* (search-only) set so chips
+    // represent what's available for the searched org regardless of
+    // the user's current chip selection.
+    const c: Record<string, number> = { all: rawEndorsements.length };
+    for (const e of rawEndorsements) {
+      const key = `${e.type}_${e.version}`;
+      c[key] = (c[key] ?? 0) + 1;
+      c[e.status] = (c[e.status] ?? 0) + 1;
+    }
+    return c;
+  }, [query, rawEndorsements]);
+
+  const counts = localCounts ?? globalCounts;
 
   const countOf = (key: string): number | undefined =>
     counts ? counts[key] ?? 0 : undefined;
 
+  // Always show every chip, even when its count is zero. Zero counts
+  // are meaningful — "this org doesn't have Web API" is information.
   const endorsementGroupOptions = useMemo<
     ReadonlyArray<{ readonly group: EndorsementGroup; readonly options: ReadonlyArray<FacetOption<string>> }>
   >(
     () =>
       ENDORSEMENT_GROUPS.map((group) => ({
         group,
-        options: group.items.map((item) => {
-          const c = countOf(item.key);
-          return {
-            value: item.key,
-            label: item.label,
-            count: c,
-            hidden: counts !== null && c === 0
-          };
-        })
+        options: group.items.map((item) => ({
+          value: item.key,
+          label: item.label,
+          count: countOf(item.key)
+        }))
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [counts]
@@ -271,42 +367,15 @@ export const EndorsementList = ({
       const visible: ReadonlyArray<EndorsementStatus> = showAllStatuses
         ? [...PUBLIC_DEFAULT_STATUSES, ...ADVANCED_STATUSES]
         : PUBLIC_DEFAULT_STATUSES;
-      return visible.map((s) => {
-        const c = countOf(s);
-        return {
-          value: s,
-          label: statusLabel(s),
-          count: c,
-          hidden: counts !== null && c === 0 && !activeStatuses.has(s)
-        };
-      });
+      return visible.map((s) => ({
+        value: s,
+        label: statusLabel(s),
+        count: countOf(s)
+      }));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [counts, showAllStatuses, searchParams.get('status')]
+    [counts, showAllStatuses]
   );
-
-  // ── Data ───────────────────────────────────────────────────────────
-  const endorsementFilter = useMemo(
-    () => Array.from(activeEndorsements),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [searchParams.get('endorsement')]
-  );
-
-  const {
-    endorsements,
-    isLoadingInitial,
-    isLoadingMore,
-    hasMore,
-    source,
-    fallbackError,
-    loadMore
-  } = useEndorsements({
-    statusFilter: isSignedIn ? Array.from(activeStatuses) : [],
-    endorsementFilter,
-    searchKey: query,
-    sortBy: sortOption.sortBy,
-    sortByTimestamp: sortOption.sortByTimestamp
-  });
 
   // Decorate endorsements with resolved org names + system product
   // names so the row can lead with human-readable identity rather
@@ -566,7 +635,9 @@ export const EndorsementList = ({
               value={searchInput}
               placeholder={searchPlaceholder}
               onChange={setSearchInput}
-              onApply={applySearch}
+              onApply={() => {
+                /* debounced; explicit apply is a no-op */
+              }}
             />
             <FilterToggleButton
               open={drawerOpen}
@@ -666,7 +737,16 @@ export const EndorsementList = ({
                 </>
               )}
               {hasMore && (
-                <span className="text-gray-400 dark:text-gray-500"> · more available</span>
+                <span className="inline-flex items-center gap-0.5 text-gray-400 dark:text-gray-500">
+                  {' · scroll to view more'}
+                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path
+                      fillRule="evenodd"
+                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </span>
               )}
             </div>
             {isGroupedMode ? (
