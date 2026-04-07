@@ -1,6 +1,6 @@
 {
   "name": "@reso-standards/reso-certification",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "RESO certification testing toolkit — Add/Edit (RCP-010), Web API Core, Data Dictionary",
   "type": "module",
   "engines": {

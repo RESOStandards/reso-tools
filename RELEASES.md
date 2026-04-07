@@ -2,11 +2,13 @@
 
 ---
 
-## v0.5 — 2026-04-06
+## v0.6 — 2026-04-06
 
-### Sayonara, Commander!
+### The MCP Strikes Back
 
-The Java-based web-api-commander has been retired. All certification testing now runs natively in TypeScript on Node.js 22+.
+The Java-based web-api-commander has been retired. All certification testing now runs natively in TypeScript on Node.js 22+. The MCP server is now built and smoke-tested in CI against the reference server, so AI agents can drive RESO end to end with confidence.
+
+> **Note on versioning:** v0.5 was published briefly with a tag protection issue that prevented re-releasing it after a workflow fix. Rather than fight the protection, we skipped to v0.6 with the same scope plus the release-workflow improvement. v0.5 should be considered superseded.
 
 #### Certification CLI (`reso-cert`)
 
@@ -46,6 +48,8 @@ New package — 7 tools: authenticate, query, metadata, validate, parse-filter, 
 
 - **Simplified entrypoints** — all compliance containers use one Dockerfile (no more Dockerfile.core, Dockerfile.dd)
 - **DD strict mode** — `entrypoint-dd.sh` now passes `--strict`, failing on variations and schema validation errors instead of silently logging them
+- **MCP smoke test in CI** — new `compliance-mcp` Docker service builds the MCP server image and runs JSON-RPC requests against the reference server (5/5 tools verified: initialize, tools/list, metadata, query, parse-filter)
+- **Release workflow fix** — `gh release create` would fail when a draft release was published manually before the workflow ran. The workflow now checks if a release already exists and uploads to it instead of trying to create a duplicate.
 - **Express wildcard fix** — updated `*` routes to `/{*path}` for newer path-to-regexp
 - **CI workflow** — added reso-certification and reso-mcp-server to build and test pipeline
 

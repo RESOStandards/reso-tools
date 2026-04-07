@@ -662,8 +662,8 @@ app.whenReady().then(async () => {
   const paths = resolvePaths();
   app.setAboutPanelOptions({
     applicationName: 'RESO Desktop Client',
-    applicationVersion: '0.3.0',
-    version: 'v0.3 — The "Cache Me If You Can" Release',
+    applicationVersion: '0.6.0',
+    version: 'v0.6 — The MCP Strikes Back',
     copyright: '© 2026 Real Estate Standards Organization',
     credits: 'Browse, query, and manage real estate data using RESO standards.',
     website: 'https://reso.org',

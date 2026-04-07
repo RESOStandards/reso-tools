@@ -2,21 +2,23 @@
 
 ---
 
-## v0.5 — 2026-04-06
+## v0.6 — 2026-04-06
 
-### Sayonara, Commander!
+### The MCP Strikes Back
 
 **All four RESO certification endorsements now run natively in TypeScript.** Add/Edit, EntityEvent, Web API Core, and Data Dictionary testing no longer requires Java, Gradle, or the Commander. Just `npm install` and `reso-cert <endorsement>`. Test parameters are auto-configured from live server data.
 
 **Data Dictionary 2.1 support is here.** The new DD version brings 3 new resources (Building, Model, RelatedLookup), 425 new fields, and 566 new lookups. [DD 2.1 documentation](https://dd.reso.org/DD2.1/) is live on dd.reso.org. The desktop client lets you switch between DD 2.0 and 2.1 from the Server menu.
 
-**AI agents can now use RESO tools.** The new MCP server exposes OData query, metadata, validation, and compliance testing tools to any MCP-compatible client — Claude, Cursor, VS Code, Windsurf, and more. See the [MCP server docs](https://tools.reso.org/packages/reso-mcp-server/).
+**AI agents can drive RESO end to end.** The new MCP server exposes OData query, metadata, validation, and compliance testing tools to any MCP-compatible client — Claude, Cursor, VS Code, Windsurf, and more. As of v0.6 the MCP server is built and smoke-tested in CI against the reference server, so the dependency chain is verified on every PR. See the [MCP server docs](https://tools.reso.org/packages/reso-mcp-server/).
 
 **Strict mode compliance verified.** The DD compliance pipeline now runs in strict mode by default in Docker, enforcing zero variations and full JSON schema validation. All 8 pipeline steps pass cleanly against the reference server with seeded data.
 
 **Metadata generation from DD sheets.** Give the tool a DD XLSX file and it produces the reference metadata report used by the server and certification tools. No more Commander codegen. DD sheets have moved from the Commander repo to [transport.reso.org](https://github.com/RESOStandards/transport).
 
 **Migrating from reso-certification-utils?** See the [migration guide](https://tools.reso.org/packages/reso-certification/) for command mapping, config compatibility, and new features.
+
+> v0.5 was published briefly but had a release-workflow issue we couldn't resolve without bumping the version. v0.6 is the same scope plus the workflow fix. Treat v0.5 as superseded.
 
 ---
 
