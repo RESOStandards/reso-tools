@@ -2,11 +2,14 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router';
 import { Layout } from './components/layout';
+import { AuthProvider } from './context/auth-context';
 import { ServerProvider } from './context/server-context';
 import './index.css';
 import { AddPage } from './pages/add-page';
 import { AdminLayout } from './pages/admin/admin-layout';
 import { DataGeneratorPage } from './pages/admin/data-generator-page';
+import { CertHomePage } from './pages/cert/cert-home-page';
+import { LoginPage } from './pages/cert/login-page';
 import { DeletePage } from './pages/delete-page';
 import { ErrorPage } from './pages/error-page';
 import { DetailPage } from './pages/detail-page';
@@ -18,6 +21,14 @@ import { OrganizationsPage } from './pages/organizations-page';
 import { SearchPage } from './pages/search-page';
 
 const router = createBrowserRouter([
+  // Cert workspace — its own top-level branch with no shared chrome.
+  // The Cert UI has its own visual baseline (clean centered card for login,
+  // Cert-specific layout shell to land in the next slice) and its own auth
+  // context, so it intentionally sits outside the OData browser Layout.
+  { path: '/cert/login', element: <LoginPage /> },
+  { path: '/cert', element: <CertHomePage /> },
+
+  // OData server browser — the existing app, untouched.
   {
     path: '/',
     element: <Layout />,
@@ -48,8 +59,10 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ServerProvider>
-      <RouterProvider router={router} />
-    </ServerProvider>
+    <AuthProvider>
+      <ServerProvider>
+        <RouterProvider router={router} />
+      </ServerProvider>
+    </AuthProvider>
   </StrictMode>
 );
