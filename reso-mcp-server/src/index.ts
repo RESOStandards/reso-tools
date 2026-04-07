@@ -33,10 +33,23 @@ const jsonPropToZod = (prop: Record<string, unknown>): z.ZodTypeAny => {
     case 'string': return prop.enum
       ? z.enum(prop.enum as [string, ...string[]])
       : z.string().describe(String(prop.description ?? ''));
-    case 'number': return z.number().describe(String(prop.description ?? ''));
-    case 'boolean': return z.boolean().describe(String(prop.description ?? ''));
-    case 'object': return z.record(z.unknown()).describe(String(prop.description ?? ''));
-    case 'array': return z.array(z.string()).describe(String(prop.description ?? ''));
+    // TODO(v0.8): revisit string-coerced numbers/booleans. Using z.coerce here so that
+    // MCP harnesses that send all tool args as strings (e.g. XML-text parameter forms)
+    // don't trip strict number/boolean validation. Strict validation would be cleaner
+    // but requires the harness side to honor JSON Schema types.
+    case 'number': return z.coerce.number().describe(String(prop.description ?? ''));
+    case 'boolean': return z.coerce.boolean().describe(String(prop.description ?? ''));
+    // TODO(v0.8): see number/boolean note above. Same harness-coercion situation
+    // applies to object/array — XML-text harnesses serialize structured args as
+    // JSON strings. We accept either form and parse on the way in.
+    case 'object': return z.preprocess(
+      v => (typeof v === 'string' ? JSON.parse(v) : v),
+      z.record(z.unknown()),
+    ).describe(String(prop.description ?? ''));
+    case 'array': return z.preprocess(
+      v => (typeof v === 'string' ? JSON.parse(v) : v),
+      z.array(z.string()),
+    ).describe(String(prop.description ?? ''));
     default: return z.unknown();
   }
 };
@@ -72,6 +85,7 @@ for (const tool of tools) {
     {
       description: tool.description,
       inputSchema: zodShape,
+      ...(tool.annotations ? { annotations: tool.annotations } : {}),
     },
     async (args) => {
       const handler = handlers[tool.name];

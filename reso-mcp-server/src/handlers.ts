@@ -112,6 +112,62 @@ export const handleQuery = async (args: Record<string, unknown>): Promise<Handle
   return textResult(response.body);
 };
 
+// ── Write helpers ──
+
+const writeOk = (status: number): boolean => status >= 200 && status < 300;
+
+// ── Create ──
+
+export const handleCreate = async (args: Record<string, unknown>): Promise<HandlerResult> => {
+  const authToken = await resolveAuthToken(args as AuthArgs);
+  const { url, resource, record } = args as {
+    url: string; resource: string; record: Record<string, unknown>;
+  };
+
+  const requestUrl = buildResourceUrl(url, resource);
+  const response = await odataRequest({ method: 'POST', url: requestUrl, body: record, authToken });
+
+  if (!writeOk(response.status)) {
+    return errorResult(`Server returned HTTP ${response.status}: ${response.rawBody}`);
+  }
+
+  return textResult({ status: response.status, body: response.body });
+};
+
+// ── Update ──
+
+export const handleUpdate = async (args: Record<string, unknown>): Promise<HandlerResult> => {
+  const authToken = await resolveAuthToken(args as AuthArgs);
+  const { url, resource, key, record } = args as {
+    url: string; resource: string; key: string; record: Record<string, unknown>;
+  };
+
+  const requestUrl = buildResourceUrl(url, resource, key);
+  const response = await odataRequest({ method: 'PATCH', url: requestUrl, body: record, authToken });
+
+  if (!writeOk(response.status)) {
+    return errorResult(`Server returned HTTP ${response.status}: ${response.rawBody}`);
+  }
+
+  return textResult({ status: response.status, body: response.body });
+};
+
+// ── Delete ──
+
+export const handleDelete = async (args: Record<string, unknown>): Promise<HandlerResult> => {
+  const authToken = await resolveAuthToken(args as AuthArgs);
+  const { url, resource, key } = args as { url: string; resource: string; key: string };
+
+  const requestUrl = buildResourceUrl(url, resource, key);
+  const response = await odataRequest({ method: 'DELETE', url: requestUrl, authToken });
+
+  if (!writeOk(response.status)) {
+    return errorResult(`Server returned HTTP ${response.status}: ${response.rawBody}`);
+  }
+
+  return textResult({ status: response.status, body: response.body });
+};
+
 // ── Metadata ──
 
 export const handleMetadata = async (args: Record<string, unknown>): Promise<HandlerResult> => {
@@ -232,6 +288,9 @@ export const handlers: Readonly<Record<string, (args: Record<string, unknown>) =
   authenticate: handleAuthenticate,
   query: handleQuery,
   metadata: handleMetadata,
+  create: handleCreate,
+  update: handleUpdate,
+  delete: handleDelete,
   validate: handleValidate,
   'parse-filter': handleParseFilter,
   'run-compliance': handleRunCompliance,
