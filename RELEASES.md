@@ -1659,7 +1659,7 @@ from this single source of truth.
   integer-only enforcement for Int types, collection and enum validation
 - **Subpath exports** — `@reso-standards/validation` (top-level barrel) and
   `@reso-standards/validation/metadata` (direct subpath) for future extensibility
-- **41 tests** — [tests/validate.test.ts](validation/tests/validate.test.ts)
+- **41 tests** — `tests/validate.test.ts`
 - `// TODO: Add executable business rules validation` placeholder for future
   grammar-based rules engine
 
@@ -1709,11 +1709,11 @@ Added pre-commit hooks and a shared linter/formatter to enforce code quality acr
   [RESO certification-utils](https://github.com/RESOStandards/reso-certification-utils)
   style (single quotes, semicolons, no trailing commas, 140 char line width, LF line
   endings, arrow parens avoided)
-  — [biome.json](../biome.json)
+  — [biome.json](https://github.com/RESOStandards/reso-tools/blob/main/biome.json)
 - **[Lefthook](https://github.com/evilmartians/lefthook)** for git pre-commit hooks
-  — [lefthook.yml](../lefthook.yml)
+  — [lefthook.yml](https://github.com/RESOStandards/reso-tools/blob/main/lefthook.yml)
 - **Root `package.json`** with `lint`, `lint:fix`, and `test` convenience scripts
-  — [package.json](../package.json)
+  — [package.json](https://github.com/RESOStandards/reso-tools/blob/main/package.json)
 
 #### Pre-commit Hook Flow
 
@@ -1745,7 +1745,7 @@ the RESO Data Dictionary and Web API specifications.
 
 ### New Packages
 
-#### `@reso-standards/odata-expression-parser` — [odata-expression-parser/](odata-expression-parser/)
+#### `@reso-standards/odata-expression-parser` — [odata-expression-parser/](https://github.com/RESOStandards/reso-tools/blob/main/odata-expression-parser/)
 
 Standalone, zero-dependency library for parsing OData `$filter` expressions into a
 typed AST. Shared by both the client SDK (query validation) and the reference server
@@ -1761,9 +1761,9 @@ typed AST. Shared by both the client SDK (query validation) and the reference se
 - **Lambda operators**: `any` and `all` with variable binding
 - **Literal types**: string, number, boolean, null, date, datetimeoffset, timeofday,
   duration, guid, enum
-- **97 tests** — [tests/filter-parser.test.ts](odata-expression-parser/tests/filter-parser.test.ts)
+- **97 tests** — [tests/filter-parser.test.ts](https://github.com/RESOStandards/reso-tools/blob/main/odata-expression-parser/tests/filter-parser.test.ts)
 
-#### `@reso-standards/reso-client` — [reso-client/](reso-client/)
+#### `@reso-standards/reso-client` — [reso-client/](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/)
 
 OData 4.01 client SDK for TypeScript, inspired by
 [Apache Olingo](https://olingo.apache.org/doc/odata4/index.html). Provides URI
@@ -1772,60 +1772,60 @@ and response parsing.
 
 - **URI Builder** with compound keys, `$filter`, `$select`, `$orderby`, `$top`,
   `$skip`, `$count`, `$expand`, `$search`, `$compute`, `$format`
-  — [src/uri/builder.ts](reso-client/src/uri/builder.ts)
+  — [src/uri/builder.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/uri/builder.ts)
 - **CSDL/EDMX Parser** supporting EntityType, ComplexType, EnumType,
   NavigationProperty (with ReferentialConstraint, Partner, ContainsTarget),
   Action, Function, Singleton, EntityContainer, inheritance (BaseType/Abstract),
   OpenType, HasStream, IsFlags
-  — [src/csdl/parser.ts](reso-client/src/csdl/parser.ts)
+  — [src/csdl/parser.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/csdl/parser.ts)
 - **CSDL Validator** for structural correctness
-  — [src/csdl/validator.ts](reso-client/src/csdl/validator.ts)
+  — [src/csdl/validator.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/csdl/validator.ts)
 - **HTTP Client** with OAuth2 Client Credentials and bearer token auth
-  — [src/http/client.ts](reso-client/src/http/client.ts)
+  — [src/http/client.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/http/client.ts)
 - **CRUD Helpers**: `createEntity`, `readEntity`, `updateEntity` (PATCH),
   `replaceEntity` (PUT), `deleteEntity` with If-Match/If-None-Match ETag support
-  — [src/crud/](reso-client/src/crud/)
+  — [src/crud/](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/crud/)
 - **Query Validator** checking `$filter`, `$select`, `$orderby`, `$expand` against
-  CSDL metadata — [src/query/validator.ts](reso-client/src/query/validator.ts)
+  CSDL metadata — [src/query/validator.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/query/validator.ts)
 - **Response Parser** with `@odata.nextLink` auto-paging (`followAllPages`),
   annotation extraction, and OData error parsing
-  — [src/response/parser.ts](reso-client/src/response/parser.ts)
+  — [src/response/parser.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/response/parser.ts)
 - **Metadata Fetcher** (`fetchRawMetadata`, `fetchAndParseMetadata`)
-  — [src/metadata/fetcher.ts](reso-client/src/metadata/fetcher.ts)
+  — [src/metadata/fetcher.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/metadata/fetcher.ts)
 - **101 tests** across 5 test files
 - **5 runnable examples**:
-  - [Fetch a Property by key](reso-client/examples/fetch-property.ts)
-  - [Query with $filter, $select, $orderby](reso-client/examples/query-with-filter.ts)
-  - [Create and update a record](reso-client/examples/create-and-update.ts)
-  - [Validate CSDL metadata](reso-client/examples/validate-metadata.ts)
-  - [OAuth2 Client Credentials flow](reso-client/examples/oauth-flow.ts)
+  - [Fetch a Property by key](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/examples/fetch-property.ts)
+  - [Query with $filter, $select, $orderby](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/examples/query-with-filter.ts)
+  - [Create and update a record](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/examples/create-and-update.ts)
+  - [Validate CSDL metadata](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/examples/validate-metadata.ts)
+  - [OAuth2 Client Credentials flow](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/examples/oauth-flow.ts)
 
-#### `@reso-standards/reference-server` — [reso-reference-server/](reso-reference-server/)
+#### `@reso-standards/reference-server` — [reso-reference-server/](https://github.com/RESOStandards/reso-tools/blob/main/reso-reference-server/)
 
 Metadata-driven OData 4.01 reference server for the RESO Data Dictionary. Reads
 RESO JSON metadata and dynamically generates PostgreSQL tables, OData CRUD endpoints,
 EDMX metadata, and OpenAPI documentation.
 
 - **Data Access Layer** interface abstracting persistence from query handling
-  — [server/src/db/data-access.ts](reso-reference-server/server/src/db/data-access.ts)
+  — `server/src/db/data-access.ts`
 - **PostgreSQL implementation** using LEFT JOIN + app-side grouping for `$expand`
-  — [server/src/db/postgres-dal.ts](reso-reference-server/server/src/db/postgres-dal.ts)
+  — `server/src/db/postgres-dal.ts`
 - **MongoDB example** demonstrating batch-query pattern for document stores
-  — [server/src/db/mongo-dal.example.ts](reso-reference-server/server/src/db/mongo-dal.example.ts)
+  — `server/src/db/mongo-dal.example.ts`
 - **`$filter` → SQL translation** using `@reso-standards/odata-expression-parser` AST with
   parameterized queries (SQL injection safe)
-  — [server/src/db/filter-to-sql.ts](reso-reference-server/server/src/db/filter-to-sql.ts)
+  — `server/src/db/filter-to-sql.ts`
 - **Collection GET handler** with `$filter`, `$select`, `$orderby`, `$top`, `$skip`,
   `$count`, `$expand` support
-  — [server/src/odata/handlers.ts](reso-reference-server/server/src/odata/handlers.ts)
+  — `server/src/odata/handlers.ts`
 - **Navigation property auto-detection** via RESO `ResourceName`/`ResourceRecordKey`
   FK convention
-  — [server/src/odata/router.ts](reso-reference-server/server/src/odata/router.ts)
+  — `server/src/odata/router.ts`
 - **6 target resources**: Property, Member, Office, Media, OpenHouse, Showing
   (1,316 fields, 2,951 lookup values)
 - **67 tests** across 5 test files
 
-#### `@reso-standards/certification-add-edit` — [certification/add-edit/](certification/add-edit/)
+#### `@reso-standards/certification-add-edit` — `certification/add-edit/`
 
 RESO Web API Add/Edit Endorsement (RCP-010) compliance testing tool. Sends
 known-good and known-bad JSON payloads to OData servers and validates responses
@@ -1864,7 +1864,7 @@ Implementation was audited against three OData 4.01 specification documents:
 - [OData CSDL XML](https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html)
 
 All high and medium priority gaps were addressed. Remaining lower-priority items are
-tracked in [TODO.md](TODO.md).
+tracked in [TODO.md](https://github.com/RESOStandards/reso-tools/blob/main/TODO.md).
 
 ### Test Summary
 

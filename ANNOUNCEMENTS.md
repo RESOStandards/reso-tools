@@ -10,13 +10,13 @@
 
 **Data Dictionary 2.1 support is here.** The new DD version brings 3 new resources (Building, Model, RelatedLookup), 425 new fields, and 566 new lookups. [DD 2.1 documentation](https://dd.reso.org/DD2.1/) is live on dd.reso.org. The desktop client lets you switch between DD 2.0 and 2.1 from the Server menu.
 
-**AI agents can now use RESO tools.** The new MCP server exposes OData query, metadata, validation, and compliance testing tools to any MCP-compatible client — Claude, Cursor, VS Code, Windsurf, and more. See the [MCP server docs](reso-mcp-server/README.md).
+**AI agents can now use RESO tools.** The new MCP server exposes OData query, metadata, validation, and compliance testing tools to any MCP-compatible client — Claude, Cursor, VS Code, Windsurf, and more. See the [MCP server docs](https://tools.reso.org/packages/reso-mcp-server/).
 
 **Strict mode compliance verified.** The DD compliance pipeline now runs in strict mode by default in Docker, enforcing zero variations and full JSON schema validation. All 8 pipeline steps pass cleanly against the reference server with seeded data.
 
 **Metadata generation from DD sheets.** Give the tool a DD XLSX file and it produces the reference metadata report used by the server and certification tools. No more Commander codegen. DD sheets have moved from the Commander repo to [transport.reso.org](https://github.com/RESOStandards/transport).
 
-**Migrating from reso-certification-utils?** See the [migration guide](reso-certification/MIGRATION.md) for command mapping, config compatibility, and new features.
+**Migrating from reso-certification-utils?** See the [migration guide](https://tools.reso.org/packages/reso-certification/) for command mapping, config compatibility, and new features.
 
 ---
 
@@ -30,7 +30,7 @@
 
 **Release workflow automated.** Push a version tag and the CI builds macOS, Windows, and Linux binaries and creates a GitHub release with them attached. No more manual uploads.
 
-**Security hardened.** Menu navigation paths are now safely serialized. Release URLs are validated before opening in the browser. See the [security audit](SECURITY_AUDIT.md) for details.
+**Security hardened.** Menu navigation paths are now safely serialized. Release URLs are validated before opening in the browser. See the [security audit](https://tools.reso.org/security/) for details.
 
 ---
 
@@ -48,7 +48,7 @@
 
 **928 tests.** Up from 856 in v0.2, with 72 new web client component tests and all 4 compliance suites passing.
 
-**Desktop binaries available.** Pre-built installers for macOS, Windows, and Linux are attached to each [GitHub release](https://github.com/RESOStandards/reso-tools/releases). Binaries are currently unsigned — see the [release notes](RELEASES.md) for platform-specific instructions. The app now checks for updates automatically on launch.
+**Desktop binaries available.** Pre-built installers for macOS, Windows, and Linux are attached to each [GitHub release](https://github.com/RESOStandards/reso-tools/releases). Binaries are currently unsigned — see the [release notes](https://tools.reso.org/releases/) for platform-specific instructions. The app now checks for updates automatically on launch.
 
 ---
 
@@ -62,7 +62,7 @@
 
 **Explore your metadata.** A new Metadata Explorer lets you browse entity types, fields, navigation properties, and enumerations straight from `$metadata`. Searchable, filterable, and a lot easier than reading raw XML.
 
-**Four-for-four on compliance.** Data Dictionary 2.0, Web API Core 2.0, Add/Edit (RCP-010), and EntityEvent (RCP-027) all pass with zero failures against PostgreSQL with human-friendly enumerations. See the [technical release notes](RELEASES.md) for the full scorecard.
+**Four-for-four on compliance.** Data Dictionary 2.0, Web API Core 2.0, Add/Edit (RCP-010), and EntityEvent (RCP-027) all pass with zero failures against PostgreSQL with human-friendly enumerations. See the [technical release notes](https://tools.reso.org/releases/) for the full scorecard.
 
 **Browse RESO organizations.** A new Organizations page lets you browse and search the full RESO member directory — filterable by type, location, and certification status, with sortable columns, expandable detail rows showing endorsements, addresses, and certification summaries alongside an embedded map.
 
@@ -84,4 +84,4 @@ We consolidated RESO's testing and validation tools into a single open-source mo
 
 **EntityEvent compliance testing is live.** If your server implements RCP-027 change tracking, there's now a tool to verify it works correctly — two testing modes, eleven scenarios, and a detailed compliance report at the end. See [PR #25](https://github.com/RESOStandards/reso-tools/pull/25) for the full rundown.
 
-**Three backends, zero schema errors.** PostgreSQL, MongoDB, and SQLite all pass DD 2.0 compliance cleanly. Details in the [technical release notes](RELEASES.md).
+**Three backends, zero schema errors.** PostgreSQL, MongoDB, and SQLite all pass DD 2.0 compliance cleanly. Details in the [technical release notes](https://tools.reso.org/releases/).
