@@ -101,8 +101,8 @@ cd .github/pages/dd-generator && node generate.mjs
 4. **Update READMEs**: Test counts, new features, CLI examples, package table in root README
 5. **Update test badge**: `![Tests](https://img.shields.io/badge/tests-XXXX%20passed-brightgreen)` in root README
 6. **Desktop client**:
-   - Update version in `package.json`
-   - Pick a release name and update the About dialog
+   - Update `version` in `reso-desktop-client/package.json` (the About dialog reads it via `app.getVersion()` automatically — don't hardcode)
+   - Pick a release name and update the `RELEASE_NAME` constant in `reso-desktop-client/src/main.ts` (search for the comment block above `setAboutPanelOptions`)
    - Rebuild web client: `cd reso-web-client && npm run build`
 7. **Create PR**: `gh pr create --base main --head vX.Y --title "vX.Y — Release Name"`
 8. **Create draft release**: `gh release create vX.Y --draft --target vX.Y --title "vX.Y — Release Name"`
