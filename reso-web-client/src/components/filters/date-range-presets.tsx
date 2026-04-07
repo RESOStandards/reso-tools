@@ -72,36 +72,34 @@ export const DateRangePresets = ({
   onChange,
   onCustomChange
 }: DateRangePresetsProps) => (
-  <div className="space-y-2">
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 min-w-16">
-        Date
-      </span>
-      {PRESETS.map((p) => (
-        <FacetButton
-          key={p.value}
-          label={p.label}
-          active={value === p.value}
-          onClick={() => onChange(p.value)}
-        />
-      ))}
-    </div>
+  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+    <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 min-w-16">
+      Date
+    </span>
+    {PRESETS.map((p) => (
+      <FacetButton
+        key={p.value}
+        label={p.label}
+        active={value === p.value}
+        onClick={() => onChange(p.value)}
+      />
+    ))}
     {value === 'custom' && (
-      <div className="flex flex-wrap items-center gap-2 pl-16">
+      <>
         <input
           type="date"
           value={customFrom}
           onChange={(e) => onCustomChange?.(e.target.value, customTo)}
-          className="text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md px-2 py-1.5 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <span className="text-[11px] text-gray-400 dark:text-gray-500">to</span>
         <input
           type="date"
           value={customTo}
           onChange={(e) => onCustomChange?.(customFrom, e.target.value)}
-          className="text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md px-2 py-1.5 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-      </div>
+      </>
     )}
   </div>
 );

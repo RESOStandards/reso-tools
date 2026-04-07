@@ -195,10 +195,14 @@ export interface CertReport {
   readonly local?: boolean;
   /** Step that failed, if status is failed/in_review. */
   readonly failedStep?: string;
-  /** ISO timestamp; the existing app reads several timestamp fields and
-   *  picks the most relevant one for display — we capture the common ones. */
+  /** ISO timestamps. The wire field for status changes is
+   *  `statusUpdatedAt`; the older `statusTimestamp` is kept for fixture
+   *  compatibility. The adapter prefers them in this order. */
+  readonly statusUpdatedAt?: string;
   readonly statusTimestamp?: string;
   readonly modificationTimestamp?: string;
+  readonly createdTimestamp?: string;
+  readonly generatedOn?: string;
   // DD-specific aggregates
   readonly standardResourcesCount?: number;
   readonly localResourcesCount?: number;
@@ -238,9 +242,18 @@ export const fetchEndorsements = async (
   };
   if (apiKey) headers.Authorization = `ApiKey ${apiKey}`;
 
-  // The Cert API requires `options.sortBy` (direction) and
-  // `options.sortByTimestamp` (boolean toggle). Default to most-recent-first.
+  // The Cert API's Joi schema requires every key present (not just
+  // present-or-omitted). Build a full default shape and overlay the
+  // caller's overrides — anything they don't pass falls through to
+  // the empty/null/false defaults. Verified against certqa: omitting
+  // any of these triggers a wrapped axios 400 from a downstream call.
   const optionsWithDefaults: FetchReportsOptions = {
+    from: 0,
+    endorsementFilter: [],
+    statusFilter: [],
+    showMyResults: false,
+    providerUoi: null,
+    searchKey: '',
     sortBy: 'desc',
     sortByTimestamp: true,
     ...options
@@ -271,6 +284,45 @@ export const fetchEndorsements = async (
 // as a `Record<string, number>` and read by lookup.
 
 export type CertificationCounts = Readonly<Record<string, number>>;
+
+// ── Organizations ──────────────────────────────────────────────────────────
+
+export interface CertOrganizationSystem {
+  readonly systemName: string;
+  readonly usi: string;
+  readonly isActive?: boolean;
+  readonly providerUoi?: string;
+}
+
+export interface CertOrganization {
+  readonly id: string;
+  readonly name: string;
+  readonly systems?: ReadonlyArray<CertOrganizationSystem>;
+  readonly organizationDdVersion?: string;
+  readonly organizationDdStatus?: string;
+  readonly organizationWebApiVersion?: string;
+  readonly organizationWebApiStatus?: string;
+  readonly lastSyncedAt?: string;
+}
+
+/** Fetch the full organization directory in one call. The endpoint
+ *  is small (~few hundred KB) so we cache the result for the page
+ *  lifetime instead of paginating. */
+export const fetchOrganizations = async (
+  apiKey: string | null
+): Promise<ReadonlyArray<CertOrganization>> => {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (apiKey) headers.Authorization = `ApiKey ${apiKey}`;
+
+  const res = await fetch(proxiedCertUrl('/organization/all'), { headers });
+  if (!res.ok) {
+    throw new CertApiAuthError(
+      `Failed to fetch organizations (HTTP ${res.status})`,
+      res.status
+    );
+  }
+  return (await res.json()) as ReadonlyArray<CertOrganization>;
+};
 
 export const fetchCertificationCounts = async (
   apiKey: string | null

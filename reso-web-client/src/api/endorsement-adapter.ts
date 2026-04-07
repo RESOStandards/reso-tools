@@ -46,6 +46,18 @@ const KNOWN_STATUSES = new Set<EndorsementStatus>([
   'legacy'
 ]);
 
+/** Standard IDX field counts per DD version. The wire response only
+ *  carries the *present* count (`iDXFieldsCount`); the denominator
+ *  comes from the published RESO IDX standard for each DD version.
+ *  Used to compute "X / Y (Z%)" coverage. TODO(idx-totals): confirm
+ *  exact spec denominators with the certification team — values below
+ *  are best-effort from observed prod displays. */
+const STANDARD_IDX_FIELD_COUNT_BY_DD_VERSION: Readonly<Record<string, number>> = {
+  '1.7': 251,
+  '2.0': 251,
+  '2.1': 251
+};
+
 /** Coerce an arbitrary type string to our `EndorsementType` union; defaults
  *  to `data_dictionary` for unknown values so the UI never crashes on a
  *  surprise from the wire. */
@@ -96,8 +108,11 @@ export const reportToEndorsement = (
     recipientUoi: report.recipientUoi,
     recipientName: context.recipientName,
     statusTimestamp:
+      report.statusUpdatedAt ??
       report.statusTimestamp ??
       report.modificationTimestamp ??
+      report.createdTimestamp ??
+      report.generatedOn ??
       new Date(0).toISOString(),
     local: Boolean(report.local),
     ...(report.failedStep ? { failedStep: report.failedStep } : {}),
@@ -109,8 +124,16 @@ export const reportToEndorsement = (
           localFieldsCount: report.localFieldsCount,
           standardLookupsCount: report.standardLookupsCount,
           localLookupsCount: report.localLookupsCount,
-          idxFieldsCount: report.iDXFieldsCount,
-          totalStandardIdxFieldsCount: report.totalStandardIdxFieldsCount
+          // Wire field is `iDXFieldsCount` (capital X). Both the cert
+          // API and the variants on the wire use this casing — keep
+          // the lookup explicit so a future rename doesn't silently
+          // drop the IDX coverage display.
+          idxFieldsCount:
+            (report.iDXFieldsCount as number | undefined) ??
+            (report['idxFieldsCount'] as number | undefined),
+          totalStandardIdxFieldsCount:
+            report.totalStandardIdxFieldsCount ??
+            STANDARD_IDX_FIELD_COUNT_BY_DD_VERSION[report.version]
         }
       : {})
   };

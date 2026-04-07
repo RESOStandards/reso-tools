@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/use-auth';
 import { useCertificationCounts } from '../../hooks/use-certification-counts';
 import { useEndorsements } from '../../hooks/use-endorsements';
 import { useInfiniteScroll } from '../../hooks/use-infinite-scroll';
+import { useOrganizationNames } from '../../hooks/use-organization-names';
 import { ActiveFilters, type ActiveFilterPillSpec } from '../filters/active-filters';
 import {
   DateRangePresets,
@@ -18,7 +19,7 @@ import {
 } from '../filters/filter-disclosure';
 import { SearchInput } from '../filters/search-input';
 import { SortDropdown, type SortOption } from '../filters/sort-dropdown';
-import { EndorsementRow } from './endorsement-row';
+import { EndorsementGroupCard } from './endorsement-group-card';
 import { SourceBadge } from './source-badge';
 import { statusLabel } from './status-pill';
 
@@ -307,6 +308,111 @@ export const EndorsementList = ({
     sortByTimestamp: sortOption.sortByTimestamp
   });
 
+  // Decorate endorsements with resolved org names + system product
+  // names so the row can lead with human-readable identity rather
+  // than raw UOIs and USIs.
+  const { lookup: lookupOrgName, lookupSystem } = useOrganizationNames();
+  const decoratedEndorsements = useMemo(
+    () =>
+      endorsements.map((e) => ({
+        ...e,
+        recipientName: lookupOrgName(e.recipientUoi) ?? e.recipientName ?? e.recipientUoi,
+        providerName: lookupOrgName(e.providerUoi) ?? e.providerName ?? e.providerUoi,
+        systemName: lookupSystem(e.providerUoi, e.providerUsi) ?? e.systemName
+      })),
+    [endorsements, lookupOrgName, lookupSystem]
+  );
+
+  // Group by recipient organization. Group order follows the chosen
+  // sort: alpha sorts arrange groups A→Z; time sorts arrange groups
+  // by their most-recent endorsement. Within each group, sub-rows
+  // follow the same sort.
+  interface RecipientGroup {
+    readonly recipientUoi: string;
+    readonly recipientName: string;
+    readonly endorsements: ReadonlyArray<typeof decoratedEndorsements[number]>;
+    readonly mostRecentMs: number;
+  }
+
+  const groupedEndorsements = useMemo<ReadonlyArray<RecipientGroup>>(() => {
+    const groups = new Map<string, RecipientGroup & { endorsements: Array<typeof decoratedEndorsements[number]> }>();
+
+    for (const e of decoratedEndorsements) {
+      const key = e.recipientUoi;
+      const existing = groups.get(key);
+      const ts = new Date(e.statusTimestamp).getTime();
+      if (existing) {
+        existing.endorsements.push(e);
+        if (!Number.isNaN(ts) && ts > existing.mostRecentMs) {
+          (existing as { mostRecentMs: number }).mostRecentMs = ts;
+        }
+      } else {
+        groups.set(key, {
+          recipientUoi: key,
+          recipientName: e.recipientName ?? e.recipientUoi,
+          endorsements: [e],
+          mostRecentMs: Number.isNaN(ts) ? 0 : ts
+        });
+      }
+    }
+
+    const list = Array.from(groups.values());
+
+    const dir = sortOption.sortBy === 'asc' ? 1 : -1;
+    const byTime = sortOption.sortByTimestamp;
+
+    // Sort sub-rows within each group
+    for (const g of list) {
+      g.endorsements.sort((a, b) => {
+        if (byTime) {
+          return (
+            (new Date(a.statusTimestamp).getTime() -
+              new Date(b.statusTimestamp).getTime()) *
+            dir
+          );
+        }
+        return (
+          (`${a.typeLabel} ${a.version}`.localeCompare(
+            `${b.typeLabel} ${b.version}`
+          )) * dir
+        );
+      });
+    }
+
+    // Sort groups themselves
+    list.sort((a, b) => {
+      if (byTime) {
+        return (a.mostRecentMs - b.mostRecentMs) * dir;
+      }
+      return a.recipientName.localeCompare(b.recipientName) * dir;
+    });
+
+    return list;
+  }, [decoratedEndorsements, sortOption.sortBy, sortOption.sortByTimestamp]);
+
+  const totalShown = groupedEndorsements.reduce(
+    (n, g) => n + g.endorsements.length,
+    0
+  );
+
+  // Sort mode determines layout:
+  //   - Name (alpha):  grouped showcase — one card per recipient with
+  //     all their matching endorsements stacked inside.
+  //   - Time:          flat activity feed — one row per endorsement
+  //     with the org name inline, ordered by date.
+  const isGroupedMode = !sortOption.sortByTimestamp;
+
+  // Flat-mode sorted list (used when isGroupedMode === false).
+  const flatSortedEndorsements = useMemo(() => {
+    const dir = sortOption.sortBy === 'asc' ? 1 : -1;
+    return [...decoratedEndorsements].sort(
+      (a, b) =>
+        (new Date(a.statusTimestamp).getTime() -
+          new Date(b.statusTimestamp).getTime()) *
+        dir
+    );
+  }, [decoratedEndorsements, sortOption.sortBy]);
+
   const sentinelRef = useInfiniteScroll({
     hasMore,
     isLoading: isLoadingMore || isLoadingInitial,
@@ -453,7 +559,8 @@ export const EndorsementList = ({
             </div>
           )}
 
-          {/* Search + Sort + Filters toggle — single row */}
+          {/* Search + Filters + Sort — single row. Sort sits trailing
+              by convention: filters narrow the set, sort orders it. */}
           <div className="flex items-center gap-2">
             <SearchInput
               value={searchInput}
@@ -461,15 +568,15 @@ export const EndorsementList = ({
               onChange={setSearchInput}
               onApply={applySearch}
             />
-            <SortDropdown
-              value={sortValue}
-              options={SORT_OPTIONS}
-              onChange={setSort}
-            />
             <FilterToggleButton
               open={drawerOpen}
               onToggle={() => setDrawerOpen((o) => !o)}
               activeCount={activeFilterCount}
+            />
+            <SortDropdown
+              value={sortValue}
+              options={SORT_OPTIONS}
+              onChange={setSort}
             />
           </div>
 
@@ -542,24 +649,51 @@ export const EndorsementList = ({
           <div className="py-16 text-center text-sm text-gray-400 dark:text-gray-500">
             Loading endorsements…
           </div>
-        ) : endorsements.length > 0 ? (
+        ) : totalShown > 0 ? (
           <>
             <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
               <span className="font-medium text-gray-700 dark:text-gray-300">
-                {endorsements.length}
+                {totalShown}
               </span>{' '}
-              endorsement{endorsements.length === 1 ? '' : 's'} shown
+              endorsement{totalShown === 1 ? '' : 's'}
+              {isGroupedMode && (
+                <>
+                  {' '}across{' '}
+                  <span className="font-medium text-gray-700 dark:text-gray-300">
+                    {groupedEndorsements.length}
+                  </span>{' '}
+                  organization{groupedEndorsements.length === 1 ? '' : 's'}
+                </>
+              )}
               {hasMore && (
                 <span className="text-gray-400 dark:text-gray-500"> · more available</span>
               )}
             </div>
-            <ul className="space-y-2.5">
-              {endorsements.map((e) => (
-                <li key={e.id}>
-                  <EndorsementRow endorsement={e} />
-                </li>
-              ))}
-            </ul>
+            {isGroupedMode ? (
+              <ul className="space-y-3">
+                {groupedEndorsements.map((g) => (
+                  <li key={g.recipientUoi}>
+                    <EndorsementGroupCard
+                      recipientUoi={g.recipientUoi}
+                      recipientName={g.recipientName}
+                      endorsements={g.endorsements}
+                    />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ul className="space-y-3">
+                {flatSortedEndorsements.map((e) => (
+                  <li key={e.id}>
+                    <EndorsementGroupCard
+                      recipientUoi={e.recipientUoi}
+                      recipientName={e.recipientName ?? e.recipientUoi}
+                      endorsements={[e]}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
             <div
               ref={sentinelRef}
               className="py-6 text-center text-xs text-gray-400 dark:text-gray-500"
