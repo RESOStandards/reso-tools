@@ -1,0 +1,22 @@
+---
+layout: default
+---
+<div style="margin-bottom: 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; font-size: 0.875rem;">
+  <a href="{{ '/guides/' | relative_url }}" class="view-link">&larr; All guides</a>
+  <span style="color: var(--reso-gray-300);">/</span>
+  <span style="color: var(--reso-gray-500);">{{ page.title }}</span>
+  {% if page.package_url %}
+    <span style="color: var(--reso-gray-300);">·</span>
+    <a href="{{ page.package_url | relative_url }}" class="view-link" style="font-size: 0.8125rem;">View package &rarr;</a>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3>{{ page.title }}</h3>
+    {% if page.audience %}<span class="badge badge-blue">{{ page.audience }}</span>{% endif %}
+  </div>
+  <div class="card-body content">
+    {{ content }}
+  </div>
+</div>

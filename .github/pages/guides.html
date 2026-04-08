@@ -1,0 +1,339 @@
+---
+layout: default
+title: User Guides
+description: Task-oriented guides for every package in the RESO Tools monorepo.
+permalink: /guides/
+---
+
+<style>
+  /* Guide tile grid — local to this page only. Mirrors the audience-card
+     visuals used elsewhere on tools.reso.org so it reads as part of the
+     same family. */
+  .guides-hero {
+    margin-bottom: 2.5rem;
+  }
+  .guides-hero h1 {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--reso-navy);
+    letter-spacing: -0.025em;
+    margin-bottom: 0.75rem;
+  }
+  .guides-hero p {
+    color: var(--reso-gray-600);
+    max-width: 56rem;
+    font-size: 1.0625rem;
+    line-height: 1.6;
+  }
+  body.dark .guides-hero h1 { color: #e2e8f0; }
+  body.dark .guides-hero p { color: #94a3b8; }
+
+  .guides-section-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.075em;
+    color: var(--reso-gray-500);
+    margin: 2.5rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--reso-gray-200);
+  }
+  body.dark .guides-section-title {
+    color: #64748b;
+    border-bottom-color: #334155;
+  }
+
+  .guides-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 640px)  { .guides-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 960px)  { .guides-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 1280px) { .guides-grid { grid-template-columns: repeat(4, 1fr); } }
+
+  .guide-tile {
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border: 1px solid var(--reso-gray-200);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    position: relative;
+    min-height: 180px;
+  }
+  .guide-tile:hover {
+    border-color: var(--reso-blue);
+    box-shadow: 0 4px 12px rgba(0, 126, 158, 0.08);
+    transform: translateY(-1px);
+  }
+  body.dark .guide-tile {
+    background: #1e293b;
+    border-color: #334155;
+  }
+  body.dark .guide-tile:hover {
+    border-color: var(--reso-blue);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .guide-tile-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .guide-tile-mark {
+    width: 36px;
+    height: 36px;
+    border-radius: 0.5rem;
+    background: var(--reso-blue-light);
+    color: var(--reso-blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+  }
+  body.dark .guide-tile-mark {
+    background: rgba(0, 126, 158, 0.15);
+    color: #5eead4;
+  }
+  .guide-tile-mark.mark-library  { background: #e6f7ed; color: var(--reso-green); }
+  .guide-tile-mark.mark-server   { background: #fff3e0; color: var(--reso-orange); }
+  .guide-tile-mark.mark-cli      { background: #e0f4f8; color: var(--reso-blue); }
+  .guide-tile-mark.mark-app      { background: #ede9fe; color: #7c3aed; }
+  .guide-tile-mark.mark-mcp      { background: #fef3c7; color: #b45309; }
+  body.dark .guide-tile-mark.mark-library { background: rgba(56, 161, 105, 0.15); color: #6ee7b7; }
+  body.dark .guide-tile-mark.mark-server  { background: rgba(255, 153, 0, 0.15); color: #fbbf24; }
+  body.dark .guide-tile-mark.mark-cli     { background: rgba(0, 126, 158, 0.15); color: #67e8f9; }
+  body.dark .guide-tile-mark.mark-app     { background: rgba(124, 58, 237, 0.2); color: #c4b5fd; }
+  body.dark .guide-tile-mark.mark-mcp     { background: rgba(180, 83, 9, 0.2); color: #fcd34d; }
+
+  .guide-tile-tag {
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.075em;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    background: var(--reso-gray-100);
+    color: var(--reso-gray-600);
+  }
+  body.dark .guide-tile-tag {
+    background: #334155;
+    color: #94a3b8;
+  }
+
+  .guide-tile-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--reso-navy);
+    margin-bottom: 0.375rem;
+    letter-spacing: -0.01em;
+  }
+  body.dark .guide-tile-title { color: #e2e8f0; }
+
+  .guide-tile-summary {
+    font-size: 0.875rem;
+    color: var(--reso-gray-600);
+    line-height: 1.5;
+    flex: 1;
+  }
+  body.dark .guide-tile-summary { color: #94a3b8; }
+
+  .guide-tile-arrow {
+    margin-top: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--reso-blue);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  /* "Coming soon" tile — visually muted, not clickable. */
+  .guide-tile.coming-soon {
+    opacity: 0.65;
+    cursor: default;
+  }
+  .guide-tile.coming-soon:hover {
+    border-color: var(--reso-gray-200);
+    box-shadow: none;
+    transform: none;
+  }
+  body.dark .guide-tile.coming-soon:hover {
+    border-color: #334155;
+  }
+  .guide-tile.coming-soon .guide-tile-arrow {
+    color: var(--reso-gray-500);
+  }
+</style>
+
+<div class="guides-hero">
+  <h1>User Guides</h1>
+  <p>
+    Task-oriented walkthroughs for every package in the RESO Tools monorepo.
+    Each guide is built around the things you'd actually want to do &mdash;
+    fetch a listing, validate a record, run a compliance test, browse a
+    server &mdash; with realistic examples you can copy and run.
+  </p>
+</div>
+
+<!-- Libraries — call this out first because it's where most app developers start -->
+<h2 class="guides-section-title">Libraries</h2>
+<div class="guides-grid">
+
+  <a href="{{ '/guides/reso-client/' | relative_url }}" class="guide-tile">
+    <div class="guide-tile-header">
+      <div class="guide-tile-mark mark-library">RC</div>
+      <span class="guide-tile-tag">Library</span>
+    </div>
+    <div class="guide-tile-title">RESO Client SDK</div>
+    <div class="guide-tile-summary">
+      Connect to any RESO or OData Web API from TypeScript or JavaScript.
+      Fetch listings, validate query options, page through results, and
+      handle OData errors &mdash; without hand-rolling HTTP requests.
+    </div>
+    <div class="guide-tile-arrow">Read guide &rarr;</div>
+  </a>
+
+  <div class="guide-tile coming-soon">
+    <div class="guide-tile-header">
+      <div class="guide-tile-mark mark-library">OEP</div>
+      <span class="guide-tile-tag">Library</span>
+    </div>
+    <div class="guide-tile-title">OData Expression Parser</div>
+    <div class="guide-tile-summary">
+      Parse OData <code>$filter</code> and <code>$expand</code> expressions
+      into typed ASTs. Build query UIs, validate filters, or translate
+      queries between systems.
+    </div>
+    <div class="guide-tile-arrow">Coming soon</div>
+  </div>
+
+  <div class="guide-tile coming-soon">
+    <div class="guide-tile-header">
+      <div class="guide-tile-mark mark-library">RV</div>
+      <span class="guide-tile-tag">Library</span>
+    </div>
+    <div class="guide-tile-title">RESO Validation</div>
+    <div class="guide-tile-summary">
+      Validate real estate records against the RESO Data Dictionary in any
+      JS runtime. Check field types, enumerations, and business rules
+      before sending or accepting data.
+    </div>
+    <div class="guide-tile-arrow">Coming soon</div>
+  </div>
+
+  <div class="guide-tile coming-soon">
+    <div class="guide-tile-header">
+      <div class="guide-tile-mark mark-library">RDG</div>
+      <span class="guide-tile-tag">Library</span>
+    </div>
+    <div class="guide-tile-title">RESO Data Generator</div>
+    <div class="guide-tile-summary">
+      Generate realistic sample real estate data for testing. Properties,
+      members, offices, media, open houses &mdash; all conforming to the
+      RESO Data Dictionary, with foreign keys resolved.
+    </div>
+    <div class="guide-tile-arrow">Coming soon</div>
+  </div>
+
+</div>
+
+<!-- Server + CLI -->
+<h2 class="guides-section-title">Servers &amp; CLI</h2>
+<div class="guides-grid">
+
+  <div class="guide-tile coming-soon">
+    <div class="guide-tile-header">
+      <div class="guide-tile-mark mark-server">RRS</div>
+      <span class="guide-tile-tag">Server</span>
+    </div>
+    <div class="guide-tile-title">RESO Reference Server</div>
+    <div class="guide-tile-summary">
+      A complete RESO-compliant OData server you can run locally with
+      Docker or SQLite. Use it as a test target, a starting point for
+      your own server, or a teaching tool.
+    </div>
+    <div class="guide-tile-arrow">Coming soon</div>
+  </div>
+
+  <div class="guide-tile coming-soon">
+    <div class="guide-tile-header">
+      <div class="guide-tile-mark mark-cli">RC</div>
+      <span class="guide-tile-tag">CLI</span>
+    </div>
+    <div class="guide-tile-title">RESO Certification</div>
+    <div class="guide-tile-summary">
+      Run the same compliance tests RESO uses for official certification.
+      Covers Data Dictionary, Web API Core, Add/Edit, and EntityEvent
+      endorsements. Use the CLI or call the SDK directly.
+    </div>
+    <div class="guide-tile-arrow">Coming soon</div>
+  </div>
+
+</div>
+
+<!-- Apps -->
+<h2 class="guides-section-title">Apps &amp; UI</h2>
+<div class="guides-grid">
+
+  <div class="guide-tile coming-soon">
+    <div class="guide-tile-header">
+      <div class="guide-tile-mark mark-app">RDC</div>
+      <span class="guide-tile-tag">App</span>
+    </div>
+    <div class="guide-tile-title">RESO Desktop Client</div>
+    <div class="guide-tile-summary">
+      Browse any RESO-compliant OData server from a native desktop app.
+      OAuth2 authentication, metadata caching, and an optional built-in
+      reference server &mdash; no Docker required.
+    </div>
+    <div class="guide-tile-arrow">Coming soon</div>
+  </div>
+
+  <div class="guide-tile coming-soon">
+    <div class="guide-tile-header">
+      <div class="guide-tile-mark mark-app">RWC</div>
+      <span class="guide-tile-tag">App</span>
+    </div>
+    <div class="guide-tile-title">RESO Web Client</div>
+    <div class="guide-tile-summary">
+      Browser-based OData explorer with server connection management,
+      analytics-driven search, advanced filters, metadata browsing, and
+      CRUD operations.
+    </div>
+    <div class="guide-tile-arrow">Coming soon</div>
+  </div>
+
+</div>
+
+<!-- AI / MCP — separate section because it's a different audience -->
+<h2 class="guides-section-title">AI &amp; Agents</h2>
+<div class="guides-grid">
+
+  <a href="{{ '/guides/reso-mcp-server/' | relative_url }}" class="guide-tile">
+    <div class="guide-tile-header">
+      <div class="guide-tile-mark mark-mcp">MCP</div>
+      <span class="guide-tile-tag">MCP</span>
+    </div>
+    <div class="guide-tile-title">RESO MCP Server</div>
+    <div class="guide-tile-summary">
+      Model Context Protocol server that exposes RESO tools to AI
+      assistants. Query OData servers, parse metadata, validate records,
+      and run compliance tests &mdash; all through MCP.
+    </div>
+    <div class="guide-tile-arrow">Read guide &rarr;</div>
+  </a>
+
+</div>
+
+<p style="margin-top: 3rem; padding: 1rem 1.25rem; background: var(--reso-gray-100); border-radius: 0.5rem; font-size: 0.875rem; color: var(--reso-gray-600);">
+  <strong>Note:</strong> Guides marked &ldquo;Coming soon&rdquo; will be published over the next several rounds. Each one mirrors the structure of the RESO Client guide &mdash; task-oriented sections, realistic examples, and links into the source code where deeper detail lives.
+</p>
