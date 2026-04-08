@@ -23,7 +23,48 @@ jobs:
 
       - name: Sync package READMEs into site
         run: |
-          # Copy each package README as a Jekyll collection page
+          # Copy each package README as a Jekyll collection page.
+          #
+          # The set of pages is *discovered*, not enumerated. For each
+          # known package we walk its directory tree, find every
+          # README.md that isn't excluded by the skip patterns below,
+          # and render it as a page under tools.reso.org.
+          #
+          # URL scheme:
+          #   <pkg>/README.md                  → /packages/<pkg>/
+          #   <pkg>/<a>/README.md              → /packages/<pkg>/<a>/
+          #   <pkg>/src/<a>/README.md          → /packages/<pkg>/<a>/
+          #     (the literal "src/" segment is stripped — it's a build
+          #      convention, not a meaningful URL component)
+          #   <pkg>/<a>/<b>/README.md          → /packages/<pkg>/<a>/<b>/
+          #
+          # Title for each page is the first H1 (`# Title`) in the
+          # README. If no H1 is found we fall back to a title-cased
+          # version of the leaf directory name.
+          #
+          # Skip patterns (any of these in the path → skip):
+          #   legacy-cert-utils/, node_modules/, dist/, build/, .next/,
+          #   _site/, tests/, test/, __tests__/, .github/, .vscode/,
+          #   coverage/, sample-payloads/, sample-configs/, examples/
+          #
+          # During the copy we sed-rewrite README links so they resolve
+          # correctly under tools.reso.org without requiring authors to
+          # use a special URL convention. The rewrites:
+          #
+          #   - src/<sub>/README.md → <sub>/        (relative to package
+          #                                          page; resolves to the
+          #                                          discovered sub-page)
+          #   - <sub>/README.md     → <sub>/        (same, no src/ prefix)
+          #   - examples/<path>     → absolute GitHub URL (code files;
+          #                                          GitHub renders them
+          #                                          better than we can)
+          #   - doc/<file>.md       → absolute GitHub URL (revisited when
+          #                                          the User Guides
+          #                                          project lands)
+          #
+          # Source READMEs are never modified — the rewrite happens on
+          # the copy in .github/pages/_packages/.
+
           packages=(
             "reso-validation:@reso-standards/reso-validation:Isomorphic validation library"
             "odata-expression-parser:@reso-standards/odata-expression-parser:OData filter parser"
@@ -37,31 +78,156 @@ jobs:
             "reso-mcp-server:@reso-standards/reso-mcp-server:MCP server for AI agents"
           )
 
-          mkdir -p .github/pages/_packages
-          for entry in "${packages[@]}"; do
-            IFS=':' read -r dir name desc <<< "$entry"
+          GH_BLOB="https://github.com/RESOStandards/reso-tools/blob/main"
+          GH_TREE="https://github.com/RESOStandards/reso-tools/tree/main"
 
-            # Find the README — handle nested structures
-            if [ -f "$dir/README.md" ]; then
-              readme="$dir/README.md"
-            elif [ -f "$dir/server/README.md" ]; then
-              readme="$dir/server/README.md"
+          # Path-segment patterns to exclude. A README is skipped if
+          # *any* segment in its path matches one of these.
+          SKIP_SEGMENTS="legacy-cert-utils node_modules dist build .next _site tests test __tests__ .github .vscode coverage sample-payloads sample-configs examples"
+
+          # Returns 0 if any segment of the given path matches a skip
+          # pattern, 1 otherwise.
+          should_skip() {
+            local path="$1"
+            local seg
+            for seg in $SKIP_SEGMENTS; do
+              case "/$path/" in
+                */$seg/*) return 0 ;;
+              esac
+            done
+            return 1
+          }
+
+          # Extract the first H1 from a README; print to stdout. Falls
+          # back to a title-cased version of the directory name.
+          extract_title() {
+            local readme="$1"
+            local fallback="$2"
+            local h1
+            h1=$(grep -m 1 -E '^#[[:space:]]+' "$readme" | sed -E 's/^#[[:space:]]+//' | sed -E 's/[[:space:]]+$//')
+            if [ -n "$h1" ]; then
+              printf '%s\n' "$h1"
             else
-              continue
+              printf '%s\n' "$fallback"
             fi
+          }
 
-            # Create Jekyll front matter + README content
-            cat > ".github/pages/_packages/$dir.md" <<FRONT
-          ---
-          title: "$name"
-          package_name: "$name"
-          description: "$desc"
-          layout: package
-          ---
+          # Title-case a kebab-case directory name as a fallback title:
+          # "add-edit" → "Add Edit"
+          titlecase() {
+            printf '%s\n' "$1" | sed -E 's/[-_]/ /g' | awk '{
+              for (i=1; i<=NF; i++) $i = toupper(substr($i,1,1)) substr($i,2);
+              print
+            }'
+          }
 
-          FRONT
-            cat "$readme" >> ".github/pages/_packages/$dir.md"
+          # Apply the README link rewrites for a given package directory.
+          # Reads stdin, writes stdout.
+          rewrite_links() {
+            local pkg_dir="$1"
+            sed -E \
+              -e "s|\]\(src/([a-z0-9_/-]+)/README\.md\)|\](\1/)|g" \
+              -e "s|\]\(([a-z0-9][a-z0-9_/-]*)/README\.md\)|\](\1/)|g" \
+              -e "s|\]\(examples/([^)]+)\)|\](${GH_BLOB}/${pkg_dir}/examples/\1)|g" \
+              -e "s|\]\(examples/\)|\](${GH_TREE}/${pkg_dir}/examples)|g" \
+              -e "s|\]\(doc/([^)]+)\)|\](${GH_BLOB}/${pkg_dir}/doc/\1)|g"
+          }
+
+          # Translate a path-relative-to-package into the URL segment
+          # under /packages/<pkg>/. Strips a leading "src/" if present.
+          # Returns the empty string for the package root.
+          to_url_segment() {
+            local rel="$1"          # e.g. "src/add-edit" or "lib/oauth" or ""
+            [ -z "$rel" ] && { printf '\n'; return; }
+            case "$rel" in
+              src) printf '\n'; return ;;
+              src/*) printf '%s\n' "${rel#src/}"; return ;;
+            esac
+            printf '%s\n' "$rel"
+          }
+
+          mkdir -p .github/pages/_packages
+
+          discovered_count=0
+          skipped_count=0
+
+          for entry in "${packages[@]}"; do
+            IFS=':' read -r pkg_dir pkg_name pkg_desc <<< "$entry"
+            [ -d "$pkg_dir" ] || { echo "skip missing package: $pkg_dir" >&2; continue; }
+
+            # Find every README.md in the package, prune skip dirs.
+            #
+            # We use `find -prune` to avoid descending into excluded
+            # directories at all (faster, and avoids edge cases where a
+            # nested allowed dir lives under an excluded parent).
+            prune_args=()
+            for seg in $SKIP_SEGMENTS; do
+              prune_args+=( -name "$seg" -prune -o )
+            done
+
+            while IFS= read -r readme; do
+              # Path relative to the package dir. For the package
+              # README this is empty.
+              rel_dir=$(dirname "${readme#$pkg_dir/}")
+              [ "$rel_dir" = "." ] && rel_dir=""
+
+              # Extra defense — should_skip catches anything find missed
+              if [ -n "$rel_dir" ] && should_skip "$rel_dir"; then
+                skipped_count=$((skipped_count + 1))
+                continue
+              fi
+
+              url_seg=$(to_url_segment "$rel_dir")
+
+              if [ -z "$url_seg" ]; then
+                # Top-level package README → /packages/<pkg>/
+                out_file=".github/pages/_packages/${pkg_dir}.md"
+                permalink="/packages/${pkg_dir}/"
+                title="$pkg_name"
+                description="$pkg_desc"
+                parent_front=""
+              else
+                # Nested README → /packages/<pkg>/<url_seg>/
+                # File on disk uses double-dash as path separator so
+                # the collection stays flat.
+                flat_seg=$(printf '%s\n' "$url_seg" | tr '/' '-')
+                out_file=".github/pages/_packages/${pkg_dir}--${flat_seg}.md"
+                permalink="/packages/${pkg_dir}/${url_seg}/"
+
+                # Title from H1, fallback to title-cased leaf dir.
+                leaf=$(basename "$rel_dir")
+                fallback_title=$(titlecase "$leaf")
+                title=$(extract_title "$readme" "$fallback_title")
+
+                description="Part of ${pkg_name}"
+                parent_front="parent_package: \"${pkg_dir}\"
+          parent_package_name: \"${pkg_name}\"
+          parent_package_url: \"/packages/${pkg_dir}/\""
+              fi
+
+              {
+                echo "---"
+                echo "title: \"${title}\""
+                echo "package_name: \"${title}\""
+                echo "description: \"${description}\""
+                echo "layout: package"
+                echo "permalink: \"${permalink}\""
+                if [ -n "$parent_front" ]; then
+                  echo "$parent_front"
+                fi
+                echo "---"
+                echo
+              } > "$out_file"
+
+              rewrite_links "$pkg_dir" < "$readme" >> "$out_file"
+
+              echo "  → ${permalink}  (from ${readme})"
+              discovered_count=$((discovered_count + 1))
+            done < <(find "$pkg_dir" "${prune_args[@]}" -name 'README.md' -print)
           done
+
+          echo
+          echo "Discovered ${discovered_count} README pages (${skipped_count} extra skips)."
 
       - name: Sync project docs into site
         run: |

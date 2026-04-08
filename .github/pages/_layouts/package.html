@@ -1,8 +1,14 @@
 ---
 layout: default
 ---
-<div style="margin-bottom: 1rem;">
-  <a href="{{ '/' | relative_url }}" class="view-link">&larr; Back to all packages</a>
+<div style="margin-bottom: 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; font-size: 0.875rem;">
+  <a href="{{ '/' | relative_url }}" class="view-link">&larr; All packages</a>
+  {% if page.parent_package_url %}
+    <span style="color: var(--reso-gray-300);">/</span>
+    <a href="{{ page.parent_package_url | relative_url }}" class="view-link">{{ page.parent_package_name }}</a>
+    <span style="color: var(--reso-gray-300);">/</span>
+    <span style="color: var(--reso-gray-500);">{{ page.title }}</span>
+  {% endif %}
 </div>
 
 <div class="card">
