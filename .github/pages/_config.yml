@@ -20,6 +20,9 @@ collections:
   packages:
     output: true
     permalink: /packages/:name/
+  guides:
+    output: true
+    permalink: /guides/:name/
 
 defaults:
   - scope:
@@ -27,3 +30,8 @@ defaults:
       type: "packages"
     values:
       layout: "package"
+  - scope:
+      path: ""
+      type: "guides"
+    values:
+      layout: "guide"

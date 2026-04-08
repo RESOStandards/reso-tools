@@ -229,6 +229,92 @@ jobs:
           echo
           echo "Discovered ${discovered_count} README pages (${skipped_count} extra skips)."
 
+      - name: Sync user guides into site
+        run: |
+          # Discover and publish user guides. Each package may have a
+          # doc/GUIDE.md (matching the existing reso-mcp-server pattern).
+          # Discovery is data-driven so new guides appear on the site
+          # automatically when their GUIDE.md is committed — no workflow
+          # changes needed.
+          #
+          # URL: /guides/<package>/
+          # Layout: guide (cousin of package, with breadcrumb back to /guides/)
+          # Title: extracted from the first H1 in the guide
+          #
+          # Link rewrites are the same family as the package README pass:
+          # examples/* and src/* references go to GitHub blob/tree URLs;
+          # sibling-package references like ../reso-validation/ continue to
+          # work because tools.reso.org already has /packages/<name>/.
+
+          packages=(
+            "reso-validation:@reso-standards/reso-validation"
+            "odata-expression-parser:@reso-standards/odata-expression-parser"
+            "reso-client:@reso-standards/reso-client"
+            "reso-data-generator:@reso-standards/reso-data-generator"
+            "reso-certification:@reso-standards/reso-certification"
+            "reso-reference-server:@reso-standards/reso-reference-server"
+            "reso-web-client:@reso-standards/reso-web-client"
+            "reso-desktop-client:@reso-standards/reso-desktop-client"
+            "reso-web-api-proxy:@reso-standards/reso-web-api-proxy"
+            "reso-mcp-server:@reso-standards/reso-mcp-server"
+          )
+
+          GH_BLOB="https://github.com/RESOStandards/reso-tools/blob/main"
+          GH_TREE="https://github.com/RESOStandards/reso-tools/tree/main"
+
+          extract_title() {
+            local f="$1"
+            local fallback="$2"
+            local h1
+            h1=$(grep -m 1 -E '^#[[:space:]]+' "$f" | sed -E 's/^#[[:space:]]+//' | sed -E 's/[[:space:]]+$//')
+            if [ -n "$h1" ]; then
+              printf '%s\n' "$h1"
+            else
+              printf '%s\n' "$fallback"
+            fi
+          }
+
+          rewrite_guide_links() {
+            local pkg_dir="$1"
+            sed -E \
+              -e "s|\]\(\.\./reso-([a-z0-9-]+)/\)|\](/packages/reso-\1/)|g" \
+              -e "s|\]\(\.\./odata-expression-parser/\)|\](/packages/odata-expression-parser/)|g" \
+              -e "s|\]\(\.\./\)|\](${GH_TREE}/${pkg_dir})|g" \
+              -e "s|\]\(examples/([^)]+)\)|\](${GH_BLOB}/${pkg_dir}/examples/\1)|g" \
+              -e "s|\]\(examples/\)|\](${GH_TREE}/${pkg_dir}/examples)|g" \
+              -e "s|\]\(src/([^)]+)\)|\](${GH_BLOB}/${pkg_dir}/src/\1)|g"
+          }
+
+          mkdir -p .github/pages/_guides
+          guide_count=0
+
+          for entry in "${packages[@]}"; do
+            IFS=':' read -r pkg_dir pkg_name <<< "$entry"
+            guide="${pkg_dir}/doc/GUIDE.md"
+            [ -f "$guide" ] || continue
+
+            title=$(extract_title "$guide" "$pkg_name")
+            out_file=".github/pages/_guides/${pkg_dir}.md"
+
+            cat > "$out_file" <<FRONT
+          ---
+          title: "${title}"
+          package: "${pkg_name}"
+          package_url: "/packages/${pkg_dir}/"
+          layout: guide
+          permalink: "/guides/${pkg_dir}/"
+          ---
+
+          FRONT
+            rewrite_guide_links "$pkg_dir" < "$guide" >> "$out_file"
+
+            echo "  → /guides/${pkg_dir}/  (from ${guide})"
+            guide_count=$((guide_count + 1))
+          done
+
+          echo
+          echo "Discovered ${guide_count} user guides."
+
       - name: Sync project docs into site
         run: |
           docs=(
