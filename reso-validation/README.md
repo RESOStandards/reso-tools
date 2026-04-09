@@ -24,14 +24,14 @@ const rules = getBusinessRules('Property');
 
 Validates a record payload against RESO field metadata. Checks:
 
-- **Unknown fields** — fields not in metadata
-- **Type mismatches** — Edm.String, Edm.Boolean, Edm.Int32, Edm.Decimal, Edm.Date, Edm.DateTimeOffset, etc.
-- **Negative numerics** — rejects negative values for numeric types
-- **MaxLength** — strings exceeding `field.maxLength`
-- **Integer enforcement** — Int types must be whole numbers
-- **Collection fields** — must be arrays
-- **Enum fields** — must be string or number
-- **Business rules** — delegates to `validateBusinessRules()` for range/relationship checks
+- **Unknown fields** – fields not in metadata
+- **Type mismatches** – Edm.String, Edm.Boolean, Edm.Int32, Edm.Decimal, Edm.Date, Edm.DateTimeOffset, etc.
+- **Negative numerics** – rejects negative values for numeric types
+- **MaxLength** – strings exceeding `field.maxLength`
+- **Integer enforcement** – Int types must be whole numbers
+- **Collection fields** – must be arrays
+- **Enum fields** – must be string or number
+- **Business rules** – delegates to `validateBusinessRules()` for range/relationship checks
 
 Null, undefined, and empty string values are silently skipped unless the field is required. Fields starting with `@` (OData annotations) are ignored.
 
@@ -57,9 +57,9 @@ Returns the per-field constraint definitions for a resource.
 
 ### Type Helpers
 
-- `isEnumType(type)` — true if type is an enum reference (not a primitive Edm type)
-- `isNumericEdmType(type)` — true for Edm.Decimal, Edm.Int32, Edm.Double, etc.
-- `isIntegerEdmType(type)` — true for Edm.Int16, Edm.Int32, Edm.Int64, Edm.Byte
+- `isEnumType(type)` – true if type is an enum reference (not a primitive Edm type)
+- `isNumericEdmType(type)` – true for Edm.Decimal, Edm.Int32, Edm.Double, etc.
+- `isIntegerEdmType(type)` – true for Edm.Int16, Edm.Int32, Edm.Int64, Edm.Byte
 
 ## Types
 

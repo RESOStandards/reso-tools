@@ -1,10 +1,10 @@
 # RESO MCP Server
 
-MCP server that exposes RESO tools for AI agents. Query OData servers, parse metadata, validate records, run compliance tests — all through the [Model Context Protocol](https://modelcontextprotocol.io/).
+MCP server that exposes RESO tools for AI agents. Query OData servers, parse metadata, validate records, run compliance tests – all through the [Model Context Protocol](https://modelcontextprotocol.io/).
 
 Works with any MCP client: Claude, Cursor, Windsurf, VS Code, or your own application.
 
-> **New here?** The [User Guide](doc/GUIDE.md) is a dialogue-format walkthrough — every example is a real question to an AI assistant, the actual MCP tool call, and the live response from a seeded reference server. It covers auth, metadata exploration, querying, searching, and the full Add/Edit + EntityEvent loop including error handling.
+> **New here?** The [User Guide](doc/GUIDE.md) is a dialogue-format walkthrough – every example is a real question to an AI assistant, the actual MCP tool call, and the live response from a seeded reference server. It covers auth, metadata exploration, querying, searching, and the full Add/Edit + EntityEvent loop including error handling.
 
 ## Quick Start
 
@@ -40,11 +40,11 @@ Certification tools only:
 
 The server uses stdio transport, so the configuration is the same `command` + `args` across all clients:
 
-- [Cursor](https://docs.cursor.com/context/model-context-protocol) — Settings > MCP Servers
-- [VS Code](https://code.visualstudio.com/docs/copilot/chat/mcp-servers) — `.vscode/mcp.json`
-- [Windsurf](https://docs.windsurf.com/windsurf/mcp) — MCP settings
-- [JetBrains](https://www.jetbrains.com/help/idea/mcp-servers.html) — Settings > AI Assistant > MCP
-- [Zed](https://zed.dev/docs/assistant/model-context-protocol) — Settings
+- [Cursor](https://docs.cursor.com/context/model-context-protocol) – Settings > MCP Servers
+- [VS Code](https://code.visualstudio.com/docs/copilot/chat/mcp-servers) – `.vscode/mcp.json`
+- [Windsurf](https://docs.windsurf.com/windsurf/mcp) – MCP settings
+- [JetBrains](https://www.jetbrains.com/help/idea/mcp-servers.html) – Settings > AI Assistant > MCP
+- [Zed](https://zed.dev/docs/assistant/model-context-protocol) – Settings
 - [Continue](https://docs.continue.dev/customize/model-providers/mcp), [Cline](https://github.com/cline/cline), [Amazon Q](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/mcp.html), [Sourcegraph Cody](https://sourcegraph.com/docs/cody/clients/mcp)
 
 ### Docker
@@ -135,7 +135,7 @@ The `--scope` flag limits which tools are available:
 Tools accept authentication in two ways:
 
 1. **Bearer token**: Pass `authToken` directly
-2. **Client Credentials**: Pass `clientId`, `clientSecret`, `tokenUrl` — the tool exchanges them for a token automatically
+2. **Client Credentials**: Pass `clientId`, `clientSecret`, `tokenUrl` – the tool exchanges them for a token automatically
 
 Or use the `authenticate` tool first to get a token, then pass it to subsequent calls.
 
@@ -160,9 +160,9 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 
 ## Related
 
-- [User Guide](doc/GUIDE.md) — dialogue-format walkthrough with live examples
-- [`reso-certification/`](../reso-certification/) — CLI and SDK for compliance testing
-- [`reso-client/`](../reso-client/) — OData client SDK
+- [User Guide](doc/GUIDE.md) – dialogue-format walkthrough with live examples
+- [`reso-certification/`](../reso-certification/) – CLI and SDK for compliance testing
+- [`reso-client/`](../reso-client/) – OData client SDK
 - [RESO Tools MCP Server ticket](https://github.com/RESOStandards/reso-tools/issues/91)
 
 ## License

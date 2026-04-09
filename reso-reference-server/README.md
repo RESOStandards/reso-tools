@@ -52,7 +52,7 @@ docker compose --profile sqlite up -d server-sqlite ui-sqlite
 This starts:
 - **UI** at `http://localhost:5173`
 - **Server** at `http://localhost:8080` (OData API, `DB_BACKEND=sqlite`)
-- No external database — SQLite file stored in a Docker volume
+- No external database – SQLite file stored in a Docker volume
 
 Seed with test data:
 
@@ -72,11 +72,11 @@ docker compose --profile mongodb --profile sqlite down -v
 docker compose up -d
 docker compose --profile seed up seed
 
-# — or start with MongoDB —
+# – or start with MongoDB – 
 docker compose --profile mongodb up -d mongodb server-mongo ui-mongo
 docker compose --profile mongodb --profile seed-mongo up seed-mongo
 
-# — or start with SQLite —
+# – or start with SQLite – 
 docker compose --profile sqlite up -d server-sqlite ui-sqlite
 docker compose --profile sqlite --profile seed-sqlite up seed-sqlite
 ```
@@ -104,7 +104,7 @@ curl -X POST http://localhost:8080/Property \
   -d '{"ListPrice": 250000, "City": "Austin", "StateOrProvince": "TX", "PostalCode": "78701", "Country": "US", "BedroomsTotal": 3}'
 ```
 
-Seeding uses the data generator with automatic dependency resolution (`resolveDependencies: true`). A single seed call creates all resources in topological order with valid FK linkages: Office (10), Member (25), OUID (2), Teams (5), Property (50), plus child collections (Media, OpenHouse, Showing, Rooms, etc.) — 892 records total.
+Seeding uses the data generator with automatic dependency resolution (`resolveDependencies: true`). A single seed call creates all resources in topological order with valid FK linkages: Office (10), Member (25), OUID (2), Teams (5), Property (50), plus child collections (Media, OpenHouse, Showing, Rooms, etc.) – 892 records total.
 
 ### Reseed (drop existing data)
 
@@ -186,8 +186,8 @@ The server implements OData 4.01 features required by the RESO Web API Add/Edit 
 
 The server supports two enumeration representations via `ENUM_MODE` environment variable:
 
-- **`string` (default)** — Enum fields use `Edm.String` with `LookupName` annotations. A Lookup Resource at `/Lookup` exposes all 3,634 valid values. Human-readable display names (e.g., "Active Under Contract").
-- **`enum-type`** — Enum fields reference `Edm.EnumType` definitions in EDMX metadata. PascalCase member names (e.g., `ActiveUnderContract`). No Lookup Resource.
+- **`string` (default)** – Enum fields use `Edm.String` with `LookupName` annotations. A Lookup Resource at `/Lookup` exposes all 3,634 valid values. Human-readable display names (e.g., "Active Under Contract").
+- **`enum-type`** – Enum fields reference `Edm.EnumType` definitions in EDMX metadata. PascalCase member names (e.g., `ActiveUnderContract`). No Lookup Resource.
 
 ```bash
 # Start in enum-type mode

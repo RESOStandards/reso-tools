@@ -2,7 +2,7 @@
 
 Validates OData servers against the RESO Data Dictionary 2.0 specification. DD 2.1 coming soon.
 
-Replaces the Commander-based DD workflow entirely — metadata serialization, Lookup Resource fetching, and replication all happen natively in TypeScript, calling cert-utils inner functions directly for the replication strategies and variations checking.
+Replaces the Commander-based DD workflow entirely – metadata serialization, Lookup Resource fetching, and replication all happen natively in TypeScript, calling cert-utils inner functions directly for the replication strategies and variations checking.
 
 > **Note:** RESO no longer certifies providers on DD 1.7. The CLI enforces DD 2.0. DD 1.7 is available via the SDK for historical compatibility only.
 
@@ -60,7 +60,7 @@ GET /Property?$expand=PropertyRooms
 ...
 ```
 
-This is the safer approach — each response is manageable in size, and a failure on one expansion doesn't affect others.
+This is the safer approach – each response is manageable in size, and a failure on one expansion does not affect others.
 
 ### `--batch-expand`: All expansions in a single request
 
@@ -134,7 +134,7 @@ The pipeline generates a metadata report (`metadata-report.json` or `metadata-re
 }
 ```
 
-When the Lookup Resource is available, it's fetched (using `@odata.nextLink` pagination with `$top`/`$skip` fallback) and merged with the EDMX-based report. Fields with `LookupName` annotations get their type replaced with the lookup name.
+When the Lookup Resource is available, it is fetched (using `@odata.nextLink` pagination with `$top`/`$skip` fallback) and merged with the EDMX-based report. Fields with `LookupName` annotations get their type replaced with the lookup name.
 
 ## Output Directory Structure
 
@@ -175,7 +175,7 @@ Each run automatically archives the previous `current/` directory to `archived/<
 
 ### Migration from reso-certification-utils
 
-For providers currently using `reso-certification-utils`, the output structure is identical. The `results/` directory becomes `.reso-cert/` — you can symlink for backward compatibility:
+For providers currently using `reso-certification-utils`, the output structure is identical. The `results/` directory becomes `.reso-cert/` – you can symlink for backward compatibility:
 
 ```bash
 ln -s .reso-cert results

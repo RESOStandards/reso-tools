@@ -22,7 +22,7 @@ If you are *just* querying a server, the **[RESO Client SDK](../reso-client/)** 
 npm install @reso-standards/reso-validation
 ```
 
-Zero runtime dependencies. Isomorphic — runs identically in Node.js 22 or later, in any modern browser bundle and in any edge runtime that supports ESM.
+Zero runtime dependencies. Isomorphic – runs identically in Node.js 22 or later, in any modern browser bundle and in any edge runtime that supports ESM.
 
 ---
 
@@ -86,7 +86,7 @@ const failures = validateBusinessRules('Property', {
 // ]
 ```
 
-The two layers compose naturally. Most consumers call both — `validateRecord` for the structural checks the metadata describes, then `validateBusinessRules` for the resource-specific constraints the metadata cannot express.
+The two layers compose naturally. Most consumers call both – `validateRecord` for the structural checks the metadata describes, then `validateBusinessRules` for the resource-specific constraints the metadata cannot express.
 
 ---
 

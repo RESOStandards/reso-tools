@@ -35,16 +35,16 @@ The desktop client starts immediately and connects to external servers via the b
 
 The desktop client uses a dual-process architecture:
 
-- **Main process** (CJS) — Electron window management, native menus, navigation gestures, secure storage
-- **Server child process** (ESM) — Tries the full reference server first, falls back to the lightweight web-api-proxy when unavailable
+- **Main process** (CJS) – Electron window management, native menus, navigation gestures, secure storage
+- **Server child process** (ESM) – Tries the full reference server first, falls back to the lightweight web-api-proxy when unavailable
 
 The server starts on a random available port and communicates readiness back to the main process via IPC.
 
 ## Features
 
 - **OAuth2 Client Credentials and Bearer Token** authentication with per-server token storage
-- **Metadata caching** — CSDL schemas cached in IndexedDB with gzip compression (24-hour TTL)
-- **Lazy lookup loading** — Enum values fetched on demand, not upfront
+- **Metadata caching** – CSDL schemas cached in IndexedDB with gzip compression (24-hour TTL)
+- **Lazy lookup loading** – Enum values fetched on demand, not upfront
 - Native macOS/Windows/Linux menus (File, Edit, View, Navigate, Window, Help)
 - Keyboard navigation: Cmd/Ctrl+[/] and Cmd/Ctrl+Arrow for back/forward
 - Trackpad gestures: two-finger scroll and three-finger swipe navigation
@@ -66,7 +66,7 @@ In a signed/packaged build, connection data (including tokens) is encrypted at r
 ## Prerequisites
 
 - Node.js >= 22
-- No Docker required — the desktop client uses an embedded SQLite database
+- No Docker required – the desktop client uses an embedded SQLite database
 
 ## License
 

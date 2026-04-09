@@ -5,10 +5,10 @@ Validates EntityEvent change tracking against the RESO EntityEvent specification
 ## Usage
 
 ```bash
-# Observe mode — read-only, validates existing EntityEvent records
+# Observe mode – read-only, validates existing EntityEvent records
 reso-cert entity-event --url https://api.example.com --auth-token TOKEN
 
-# Full mode — creates, updates, and deletes a canary record, then verifies events
+# Full mode – creates, updates, and deletes a canary record, then verifies events
 reso-cert entity-event --url https://api.example.com --auth-token TOKEN --mode full
 
 # Use a config file
@@ -19,14 +19,14 @@ reso-cert entity-event --config sample-configs/entity-event-config.json
 
 | Mode | What It Does | Scenarios |
 |------|-------------|-----------|
-| **observe** (default) | Read-only — queries existing EntityEvent records and validates structure | 9 |
+| **observe** (default) | Read-only – queries existing EntityEvent records and validates structure | 9 |
 | **full** | Writes a canary record (create, update, delete) and verifies EntityEvent entries are generated | 12 |
 
 ## Scenarios
 
 ### Both Modes (9 scenarios)
 
-| Scenario | What's Tested |
+| Scenario | What is Tested |
 |----------|---------------|
 | metadata-valid | EntityEvent entity type exists in `/$metadata` |
 | read-only-enforced | POST, PATCH, DELETE to EntityEvent return 4xx (read-only) |
@@ -40,7 +40,7 @@ reso-cert entity-event --config sample-configs/entity-event-config.json
 
 ### Full Mode Only (3 additional scenarios)
 
-| Scenario | What's Tested |
+| Scenario | What is Tested |
 |----------|---------------|
 | create-triggers-event | POST to writable resource creates an EntityEvent entry |
 | update-triggers-event | PATCH to writable resource creates an EntityEvent with higher sequence |
@@ -48,12 +48,12 @@ reso-cert entity-event --config sample-configs/entity-event-config.json
 
 ## Pipeline
 
-1. **Health check** — wait for server
-2. **Resolve auth** — token or OAuth2
-3. **Fetch metadata** — verify EntityEvent entity type exists
-4. **Generate payloads** — canary write payload (full mode only)
-5. **Run scenarios** — all applicable scenarios
-6. **Write reports** — generic + detailed JSON reports
+1. **Health check** – wait for server
+2. **Resolve auth** – token or OAuth2
+3. **Fetch metadata** – verify EntityEvent entity type exists
+4. **Generate payloads** – canary write payload (full mode only)
+5. **Run scenarios** – all applicable scenarios
+6. **Write reports** – generic + detailed JSON reports
 
 ## Options
 

@@ -26,12 +26,12 @@ reso-cert add-edit --mock --payloads sample-payloads
 |---|----------|-----------|------------|----------|
 | 1 | create-succeeds-representation | POST | return=representation | 201 with entity body |
 | 2 | create-succeeds-minimal | POST | return=minimal | 204 with Location header |
-| 3 | create-fails | POST | — | 400 with OData error |
+| 3 | create-fails | POST | – | 400 with OData error |
 | 4 | update-succeeds-representation | PATCH | return=representation | 200 with updated entity |
 | 5 | update-succeeds-minimal | PATCH | return=minimal | 204 with headers |
-| 6 | update-fails | PATCH | — | 400 with OData error |
-| 7 | delete-succeeds | DELETE | — | 204, follow-up GET returns 404 |
-| 8 | delete-fails | DELETE | — | 4xx for non-existent key |
+| 6 | update-fails | PATCH | – | 400 with OData error |
+| 7 | delete-succeeds | DELETE | – | 204, follow-up GET returns 404 |
+| 8 | delete-fails | DELETE | – | 4xx for non-existent key |
 
 Each scenario validates:
 - HTTP status code
@@ -43,13 +43,13 @@ Each scenario validates:
 
 When you run `reso-cert add-edit`, the SDK pipeline executes these steps:
 
-1. **Health check** — wait for the server to respond
-2. **Resolve auth** — token or OAuth2 Client Credentials
-3. **Fetch metadata** — download and parse `/$metadata`
-4. **Sample records** — fetch 2 existing records for update/delete keys
-5. **Generate payloads** — create 6 JSON payload files (or use provided ones)
-6. **Run scenarios** — execute all 8 scenarios sequentially
-7. **Write reports** — generic + detailed JSON reports
+1. **Health check** – wait for the server to respond
+2. **Resolve auth** – token or OAuth2 Client Credentials
+3. **Fetch metadata** – download and parse `/$metadata`
+4. **Sample records** – fetch 2 existing records for update/delete keys
+5. **Generate payloads** – create 6 JSON payload files (or use provided ones)
+6. **Run scenarios** – execute all 8 scenarios sequentially
+7. **Write reports** – generic + detailed JSON reports
 
 ## Payloads
 

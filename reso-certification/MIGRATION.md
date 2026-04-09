@@ -57,7 +57,7 @@ reso-cert core --url https://api.example.com --auth-token TOKEN \
 
 **Key differences:**
 - No Java or Gradle required
-- No RESOScript XML files — test parameters auto-sampled from live server data
+- No RESOScript XML files – test parameters auto-sampled from live server data
 - Enum mode auto-detected from metadata (override with `--enum-mode`)
 - Coverage matrix built automatically
 
@@ -177,13 +177,13 @@ docker compose --profile compliance-dd up --build      # reso-certification/Dock
 docker compose --profile compliance-core up --build    # reso-certification/Dockerfile (Node.js)
 ```
 
-## What's Not Changed
+## What is Not Changed
 
-- Config file format (providerUoi, configs array, auth) — same as before
-- Output file names and content format — same as before
-- Directory structure convention — same as before (.reso-cert instead of results)
-- Lookup Resource handling — same merge behavior
-- Schema validation settings — same file, never modified
+- Config file format (providerUoi, configs array, auth) – same as before
+- Output file names and content format – same as before
+- Directory structure convention – same as before (.reso-cert instead of results)
+- Lookup Resource handling – same merge behavior
+- Schema validation settings – same file, never modified
 
 ## New Features
 

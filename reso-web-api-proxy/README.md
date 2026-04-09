@@ -1,12 +1,12 @@
 # @reso-standards/reso-web-api-proxy
 
-Lightweight CORS proxy and static file server for RESO web clients. Enables browser-based OData clients to connect to external servers that don't set CORS headers.
+Lightweight CORS proxy and static file server for RESO web clients. Enables browser-based OData clients to connect to external servers that do not set CORS headers.
 
 ## What It Does
 
-- **CORS Proxy** (`/api/proxy?url=<encoded>`) — Forwards requests to external OData servers, bypassing browser CORS restrictions. Supports all HTTP methods, forwards auth and content-type headers.
-- **Health Check** (`/health`) — Returns `{ "status": "ok" }` so the web client can detect proxy availability.
-- **Static File Serving** — Serves a built web UI with SPA fallback (all unknown routes serve `index.html`).
+- **CORS Proxy** (`/api/proxy?url=<encoded>`) – Forwards requests to external OData servers, bypassing browser CORS restrictions. Supports all HTTP methods, forwards auth and content-type headers.
+- **Health Check** (`/health`) – Returns `{ "status": "ok" }` so the web client can detect proxy availability.
+- **Static File Serving** – Serves a built web UI with SPA fallback (all unknown routes serve `index.html`).
 
 ## Usage
 
@@ -56,7 +56,7 @@ app.use(createProxyMiddleware());
 app.listen(8080);
 ```
 
-This is how the RESO Reference Server and Desktop Client use it — the proxy middleware is mounted alongside OData routes on the same Express app.
+This is how the RESO Reference Server and Desktop Client use it – the proxy middleware is mounted alongside OData routes on the same Express app.
 
 ## API
 
@@ -67,7 +67,7 @@ Creates and starts a standalone HTTP server.
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `port` | `number` | `0` (random) | Port to listen on |
-| `uiDistPath` | `string` | — | Path to built web UI files for static serving |
+| `uiDistPath` | `string` | – | Path to built web UI files for static serving |
 | `resources` | `string[]` | `[]` | OData resource names for SPA routing (e.g., `['Property', 'Member']`) |
 
 Returns `Promise<ProxyServerInstance>` with `{ app, url, port, close }`.
@@ -93,8 +93,8 @@ ALL /api/proxy?url=<encoded-target-url>
 **Response**: Upstream status code, `Content-Type`, and `OData-Version` headers are forwarded. `Cache-Control: no-store` is added to prevent stale browser caching.
 
 **Error responses**:
-- `400` — Missing or invalid `url` parameter, non-http(s) protocol
-- `502` — Network error reaching the target server
+- `400` – Missing or invalid `url` parameter, non-http(s) protocol
+- `502` – Network error reaching the target server
 
 ## Security
 

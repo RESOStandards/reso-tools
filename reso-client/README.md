@@ -63,7 +63,7 @@ The client supports two authentication modes.
 
 #### OAuth2 Client Credentials
 
-Tokens are managed automatically — fetched on first use, refreshed proactively at 90% of TTL, and retried once on 401 responses.
+Tokens are managed automatically – fetched on first use, refreshed proactively at 90% of TTL, and retried once on 401 responses.
 
 ```typescript
 const client = await createClient({
@@ -98,7 +98,7 @@ const client = await createClient({
 
 #### Environment Variables
 
-Build auth configuration from environment variables — no code changes needed to switch between token and client credentials.
+Build auth configuration from environment variables – no code changes needed to switch between token and client credentials.
 
 ```typescript
 import { authConfigFromEnv, configFromEnv } from "@reso-standards/reso-client";
