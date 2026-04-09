@@ -177,7 +177,7 @@ docker compose --profile compliance-dd up --build      # reso-certification/Dock
 docker compose --profile compliance-core up --build    # reso-certification/Dockerfile (Node.js)
 ```
 
-## What is Not Changed
+## What Is Not Changed
 
 - Config file format (providerUoi, configs array, auth) – same as before
 - Output file names and content format – same as before

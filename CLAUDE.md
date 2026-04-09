@@ -1,6 +1,6 @@
 # CLAUDE.md – RESO Tools
 
-## Project overview
+## Project Overview
 
 Open-source monorepo for building and testing RESO-compliant OData servers. Includes a reference server, desktop client, web UI, certification test runner and shared libraries.
 
@@ -19,7 +19,7 @@ Open-source monorepo for building and testing RESO-compliant OData servers. Incl
 | `reso-mcp-server/` | MCP server for AI agents (query, metadata, validate, compliance) |
 | `.github/pages/` | GitHub Pages site including DD documentation generator |
 
-## Common commands
+## Common Commands
 
 ```bash
 npm test                    # Run all tests (1,097 across 8 packages)
@@ -39,7 +39,7 @@ cd reso-desktop-client && npm run dev
 cd .github/pages/dd-generator && node generate.mjs
 ```
 
-## Tech stack
+## Tech Stack
 
 - **Runtime**: Node.js >= 22, ESM throughout
 - **Test framework**: Vitest (all packages)
@@ -50,7 +50,7 @@ cd .github/pages/dd-generator && node generate.mjs
 - **Server**: Express + OData 4.01, supports PostgreSQL, MongoDB, SQLite
 - **DD docs site**: Static HTML generator (Node.js), Jekyll for GitHub Pages, Pagefind for search
 
-## Coding standards
+## Coding Standards
 
 - **Paradigm**: Functional and declarative. Use `map`, `filter`, `reduce`, `flatMap`.
 - **Immutability**: Use `const` always. Avoid `let` and `var`. Do not mutate objects/arrays. Prefer `Readonly<T>` and `ReadonlyArray<T>`.
@@ -71,14 +71,14 @@ cd .github/pages/dd-generator && node generate.mjs
 - DO NOT use classes or `this`.
 - DO NOT use `any`. Use `unknown` and narrow with type guards.
 
-## Style conventions
+## Style Conventions
 
 - Chicago Manual of Style for prose, no serial comma
 - Biome handles code formatting and linting
 - Commit messages: imperative mood, concise first line, body for context
 - No parenthetical terms in DD documentation (e.g., show "Property Resource" not "Property Resource (Res)")
 
-## Architecture notes
+## Architecture Notes
 
 - Each package manages its own `package.json` and dependencies
 - Root `package.json` has convenience scripts for cross-package lint and test
@@ -87,13 +87,13 @@ cd .github/pages/dd-generator && node generate.mjs
 - DD documentation generator reads CSV data from `.github/pages/dd-data/` and outputs static HTML to `.github/pages/dd-output/` (symlinked from `.github/pages/dd/`)
 - Compliance testing requires a running server (Docker or desktop) with seeded data
 
-## Release workflow
+## Release Workflow
 
-### Version branches
+### Version Branches
 - All work done in version branches named `vX.Y` (e.g., `v0.5`)
 - GitHub milestones match the branch version
 
-### Release checklist
+### Release Checklist
 
 1. **Run full test suite**: `npm test` from root – all packages must pass
 2. **Security audit**: Review changes for injection, auth bypass, data leakage
@@ -112,12 +112,12 @@ cd .github/pages/dd-generator && node generate.mjs
 10. **Tag**: The release workflow triggers on tag push, builds desktop binaries, and attaches them
 11. **Publish release**: Remove draft status after binaries are attached
 
-### File naming
+### File Naming
 - `schema-validation-settings.json` – committee-approved, NEVER modify
 - `server-metadata.json` – generated from DD XLSX, do not hand-edit
 - Reference metadata in `reso-certification/reference-metadata/dd-{version}.json`
 
-## Important patterns
+## Important Patterns
 
 - The reference server uses a metadata-driven architecture: CSDL metadata defines the schema, and routes/queries are generated dynamically
 - The OData client handles URI building, CRUD, pagination, and metadata parsing – it is used by both the web UI and the certification runner

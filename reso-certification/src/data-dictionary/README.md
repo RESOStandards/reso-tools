@@ -49,7 +49,7 @@ The DD pipeline executes these steps:
 
 During replication, the DD pipeline fetches both top-level resources and their expanded navigation properties (e.g., `Property?$expand=Media`). Two strategies are available:
 
-### Default: One expansion per request
+### Default: One Expansion per Request
 
 Each navigation property gets its own request:
 ```
@@ -158,7 +158,7 @@ Results are written to a directory structure compatible with `reso-certification
             ...
 ```
 
-### Path construction
+### Path Construction
 
 When using a config file (`--config`), the path components come from the config:
 - `providerUoi` and `providerUsi` from the top-level config
