@@ -10,6 +10,7 @@ import { AdminLayout } from './pages/admin/admin-layout';
 import { DataGeneratorPage } from './pages/admin/data-generator-page';
 import { CertHomePage } from './pages/cert/cert-home-page';
 import { LoginPage } from './pages/cert/login-page';
+import { OrgSummaryPage } from './pages/cert/org-summary-page';
 import { DeletePage } from './pages/delete-page';
 import { ErrorPage } from './pages/error-page';
 import { DetailPage } from './pages/detail-page';
@@ -27,6 +28,7 @@ const router = createBrowserRouter([
   // context, so it intentionally sits outside the OData browser Layout.
   { path: '/cert/login', element: <LoginPage /> },
   { path: '/cert', element: <CertHomePage /> },
+  { path: '/cert/orgs/:uoi', element: <OrgSummaryPage /> },
 
   // OData server browser — the existing app, untouched.
   {

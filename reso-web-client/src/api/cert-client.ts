@@ -324,6 +324,135 @@ export const fetchOrganizations = async (
   return (await res.json()) as ReadonlyArray<CertOrganization>;
 };
 
+// ── Organization Detail ───────────────────────────────────────────────────
+//
+// The /organization?uoi=X endpoint returns the full org record with
+// address, geo, member count, cert status, and systems. The field names
+// use the cert API's shortened convention; the adapter below maps them
+// to the canonical RESO OUID Resource shape (ResoOrganization) so the
+// rest of the app never knows which source the data came from.
+
+/** Raw shape returned by GET /organization?uoi=X on the cert API. */
+export interface CertOrganizationDetail {
+  readonly uoi: string;
+  readonly type: string;
+  readonly assnToMls: string | null;
+  readonly name: string;
+  readonly address: string;
+  readonly city: string;
+  readonly state: string;
+  readonly zip: string;
+  readonly url: string | null;
+  readonly country: string;
+  readonly active: boolean;
+  readonly updated: string;
+  readonly statusUpdated: string;
+  readonly comments: string;
+  readonly latitude: string;
+  readonly longitude: string;
+  readonly organizationCertName: string | null;
+  readonly organizationDdVersion: string;
+  readonly organizationDdStatus: string;
+  readonly organizationWebApiVersion: string;
+  readonly organizationWebApiStatus: string;
+  readonly memberCount: number | null;
+  readonly lastSyncedAt: string;
+  readonly systems: ReadonlyArray<CertOrganizationSystem>;
+}
+
+/** Fetch the full org detail from the cert API by UOI. */
+export const fetchOrganizationDetail = async (
+  apiKey: string | null,
+  uoi: string
+): Promise<CertOrganizationDetail> => {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (apiKey) headers.Authorization = `ApiKey ${apiKey}`;
+
+  const res = await fetch(
+    proxiedCertUrl(`/organization?uoi=${encodeURIComponent(uoi)}`),
+    { headers }
+  );
+
+  if (!res.ok) {
+    throw new CertApiAuthError(
+      `Failed to fetch organization detail for ${uoi} (HTTP ${res.status})`,
+      res.status
+    );
+  }
+
+  return (await res.json()) as CertOrganizationDetail;
+};
+
+// ── Certification Report Summary ──────────────────────────────────────────
+//
+// GET /certification_reports/summary/:uoi returns an array of all cert
+// reports for an org. DD reports carry an `advertised` object with
+// per-resource field/lookup counts broken down by total/reso/idx/local.
+
+/** Per-resource advertised stats from a DD cert report. */
+export interface CertAdvertisedResource {
+  readonly lookups: {
+    readonly total: number;
+    readonly reso: number;
+    readonly idx: number;
+    readonly local: number;
+  };
+  readonly fields: {
+    readonly total: number;
+    readonly reso: number;
+    readonly idx: number;
+    readonly local: number;
+  };
+  readonly expansions?: Readonly<Record<string, CertAdvertisedResource>>;
+}
+
+/** A single cert report from the summary endpoint. */
+export interface CertReportSummary {
+  readonly id: string;
+  readonly type: string;
+  readonly version: string;
+  readonly status: string;
+  readonly description: string;
+  readonly providerUoi: string;
+  readonly providerUsi: string;
+  readonly recipientUoi: string;
+  readonly generatedOn: string;
+  readonly statusUpdatedAt: string;
+  // DD-specific
+  readonly totalResourcesCount?: number;
+  readonly localResourcesCount?: number;
+  readonly localLookupsCount?: number;
+  readonly advertised?: Readonly<Record<string, CertAdvertisedResource>>;
+  // Core-specific
+  readonly odataVersion?: string;
+  readonly authentication?: ReadonlyArray<string>;
+  // Notification count
+  readonly notificationCount?: number;
+}
+
+/** Fetch all cert report summaries for an org by recipient UOI. */
+export const fetchCertReportSummary = async (
+  apiKey: string | null,
+  uoi: string
+): Promise<ReadonlyArray<CertReportSummary>> => {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (apiKey) headers.Authorization = `ApiKey ${apiKey}`;
+
+  const res = await fetch(
+    proxiedCertUrl(`/certification_reports/summary/${encodeURIComponent(uoi)}`),
+    { headers }
+  );
+
+  if (!res.ok) {
+    throw new CertApiAuthError(
+      `Failed to fetch cert report summary for ${uoi} (HTTP ${res.status})`,
+      res.status
+    );
+  }
+
+  return (await res.json()) as ReadonlyArray<CertReportSummary>;
+};
+
 export const fetchCertificationCounts = async (
   apiKey: string | null
 ): Promise<CertificationCounts> => {

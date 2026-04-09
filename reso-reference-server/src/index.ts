@@ -384,11 +384,15 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
     res.json({ status: 'ok', version: metadata.version });
   });
 
-  // Serve built UI as SPA (must come after all API routes)
+  // Serve built UI as SPA (must come after all API routes).
+  // The catch-all uses express 4's `*` wildcard — earlier code used
+  // express 5 syntax (`/{*path}`) which silently never matched, so
+  // SPA routes outside the resource-aware middleware above (like
+  // /cert/orgs/:uoi) returned the express default 404.
   if (options.uiDistPath) {
     app.use(express.static(options.uiDistPath));
     const uiIndexPath = resolve(options.uiDistPath, 'index.html');
-    app.get('/{*path}', async (_req, res) => {
+    app.get('*', async (_req, res) => {
       res.sendFile(uiIndexPath);
     });
   }

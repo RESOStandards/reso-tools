@@ -44,9 +44,19 @@ export interface MetadataReportLookup {
   readonly annotations?: ReadonlyArray<{ readonly term: string; readonly value: string }>;
 }
 
-/** A resource entry in the metadata report. */
+/**
+ * A resource entry in the metadata report.
+ *
+ * Only `resourceName` is mandatory today. The shape is intentionally
+ * extensible via an index signature so DD 2.2's forthcoming Model
+ * resource (which will carry per-resource definitions, complex type
+ * info, and other descriptors) can be added without a breaking
+ * change. Consumers should narrow `unknown` extras before using
+ * them.
+ */
 export interface MetadataReportResource {
   readonly resourceName: string;
+  readonly [extra: string]: unknown;
 }
 
 /** The complete metadata report. */

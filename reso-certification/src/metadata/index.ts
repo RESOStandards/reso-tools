@@ -15,6 +15,8 @@ export type {
   MetadataReportResource,
 } from './serializer.js';
 
+export { synthesizeResourcesFromFields } from './synthesize-resources.js';
+
 export {
   fetchLookupResource,
   mergeWithLookupResource,
