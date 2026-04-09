@@ -1,8 +1,10 @@
-# RESO MCP Server — User Guide
+# RESO MCP Server – User Guide
 
-A walkthrough of using the RESO MCP server through an AI assistant. Each section is a real conversation: the user asks a question, the assistant calls the appropriate MCP tool, and the answer comes back grounded in live data from the [reso-reference-server](../../reso-reference-server/) seeded with the bundled fixtures.
+A walkthrough of using the RESO MCP server through an AI assistant. Each section is a real conversation: the user asks a question, the assistant calls the appropriate MCP tool, and the answer comes back grounded in live data from the **[reso-reference-server](../../reso-reference-server/)** seeded with the bundled fixtures.
 
-The format is intentional — this is what working with a RESO OData server *should* feel like once you have an MCP-aware assistant in the loop. The boxed JSON tool calls are collapsed by default so the dialogue stays readable; click them open when you want to see the exact arguments.
+The format is intentional – this is what working with a RESO OData server *should* feel like once you have an MCP-aware assistant in the loop. The boxed JSON tool calls are collapsed by default so the dialogue stays readable; click them open when you want to see the exact arguments.
+
+> **A note on tone.** The dialogues below are real captures from working sessions, and the conversational voice in the assistant's replies is deliberate. Do not normalize them to a more formal register – the whole point of the guide is to show what working with the MCP server actually feels like, not to read as polished marketing copy. Style-guide rules (Title Case headings, spaced en-dashes, no contractions) apply to the narration prose around the dialogue blocks; everything inside a blockquoted dialogue stays exactly as it was captured.
 
 ## Setup
 
@@ -23,7 +25,7 @@ Because the MCP server runs inside a container, use `http://host.docker.internal
 
 ---
 
-## Section 0 — Getting authenticated
+## Section 0 – Getting Authenticated
 
 > **User:** I want to start exploring my RESO server through you. How do I authenticate?
 >
@@ -61,9 +63,9 @@ For the rest of the guide, assume the Client Credentials shape above is implicit
 
 ---
 
-## Section 1 — Exploring metadata
+## Section 1 – Exploring Metadata
 
-### 1.1 What's on this server?
+### 1.1 What Is on This Server?
 
 > **User:** What resources does this server actually expose?
 >
@@ -105,7 +107,7 @@ For the rest of the guide, assume the Client Credentials shape above is implicit
 > - **Every resource has a single-field key** named `<Resource>Key`. This is the convention the rest of the DD relies on for joins and filters.
 > - The **`Lookup`** resource sitting alongside the others is the v2.0+ "Lookup Resource" enum mode at work — enumerated values are queryable rows instead of CSDL `EnumType` members.
 
-### 1.2 What does a `Property` field look like?
+### 1.2 What Does a `Property` Field Look Like?
 
 > **User:** Show me what a typical field on `Property` looks like in the metadata.
 >
@@ -136,7 +138,7 @@ For the rest of the guide, assume the Client Credentials shape above is implicit
 >
 > No annotation, just the OData primitive type and numeric precision.
 
-### 1.3 How is `Property` shaped overall?
+### 1.3 How Is `Property` Shaped Overall?
 
 > **User:** Of those 722 fields, what's the type breakdown?
 >
@@ -159,7 +161,7 @@ For the rest of the guide, assume the Client Credentials shape above is implicit
 > - **Numeric fields cluster around `Decimal` and `Int64`** — `Decimal` for money and measurements (with explicit `precision`/`scale`), `Int64` for counts and identifiers.
 > - **Dates split into `Edm.Date` and `Edm.DateTimeOffset`** — `Date` for things like `ListingContractDate`, `DateTimeOffset` for timestamps like `ModificationTimestamp`.
 
-### 1.4 Which lookups are reused most?
+### 1.4 Which Lookups Are Reused Most?
 
 > **User:** Which `LookupName`s get reused across the most fields?
 >
@@ -182,9 +184,9 @@ For the rest of the guide, assume the Client Credentials shape above is implicit
 
 ---
 
-## Section 2 — Querying data
+## Section 2 – Querying Data
 
-### 2.1 What values are actually allowed for a lookup field?
+### 2.1 What Values Are Actually Allowed for a Lookup Field?
 
 > **User:** OK so `AboveGradeFinishedAreaSource` uses the `AreaSource` lookup. What values can it take?
 >
@@ -230,7 +232,7 @@ For the rest of the guide, assume the Client Credentials shape above is implicit
 > - **`LookupValue`** is what shows up in the actual data — the string a server returns when you `$select=AboveGradeFinishedAreaSource`.
 > - **`StandardLookupValue`** is the DD-standard label. On the seeded reference server they match, but on a real MLS feed they often don't — `LookupValue` may be `"Appr"` or `"PUB REC"` while `StandardLookupValue` stays canonical. That's the column to join on when normalizing across multiple feeds.
 
-### 2.2 Just give me the first few
+### 2.2 Just Give Me the First Few
 
 > **User:** I just want a quick peek — first three values.
 >
@@ -266,7 +268,7 @@ For the rest of the guide, assume the Client Credentials shape above is implicit
 >
 > `top` pairs naturally with `skip` for paging and `orderby` for stable ordering — all three are thin pass-throughs to their OData equivalents.
 
-### 2.3 Pull some real listings
+### 2.3 Pull Some Real Listings
 
 > **User:** Show me a handful of listings over $500k with just the headline columns.
 >
@@ -306,11 +308,11 @@ For the rest of the guide, assume the Client Credentials shape above is implicit
 
 ---
 
-## Section 4 — Searching
+## Section 3 – Searching
 
-Section 2 used `$filter` for the simplest possible cases — equality and a single comparison. Real searches lean on the full OData `$filter` toolkit: range expressions, string functions, collection lambdas, and date windows. The MCP `query` tool is a thin pass-through, so anything OData supports is available here. This section walks through the patterns most teams reach for first.
+Section 2 used `$filter` for the simplest possible cases – equality and a single comparison. Real searches lean on the full OData `$filter` toolkit: range expressions, string functions, collection lambdas and date windows. The MCP `query` tool is a thin pass-through, so anything OData supports is available here. This section walks through the patterns most teams reach for first.
 
-### 4.1 Range + status: "active listings between $300k and $600k"
+### 3.1 Range and Status – Active Listings Between $300k and $600k
 
 > **User:** Show me a few active listings priced between $300k and $600k, cheapest first, with bed/bath counts.
 >
@@ -351,7 +353,7 @@ Section 2 used `$filter` for the simplest possible cases — equality and a sing
 > - **`StandardStatus eq 'Active'`** is the canonical "is this listing on the market?" filter. It's the lookup-backed string we resolved in §2.1, used here directly as a literal.
 > - **`orderby` is a thin pass-through to `$orderby`** — `asc`/`desc` modifiers work, multi-column ordering works (`ListPrice asc, ModificationTimestamp desc`), and ordering on lookup-backed strings sorts alphabetically by `LookupValue`.
 
-### 4.2 String matching: "anything in a Springfield"
+### 3.2 String Matching – Anything in a Springfield
 
 > **User:** Find me active listings whose city contains "spring" — case-insensitive if possible.
 >
@@ -387,7 +389,7 @@ Section 2 used `$filter` for the simplest possible cases — equality and a sing
 >
 > The same family includes `startswith(City, 'spring')` for prefix matches and `endswith(StreetName, 'Avenue')` for suffix matches. They all work on any `Edm.String` field. For exact matching against an enumerated set of values use `in` instead — `City in ('Austin', 'Dallas', 'Houston')` is much cheaper than three `contains()` calls OR'd together.
 
-### 4.3 Multi-value lookup fields: "homes with an ENERGY STAR fridge"
+### 3.3 Multi-Value Lookup Fields – Homes With an ENERGY STAR Fridge
 
 > **User:** Find listings whose `Appliances` includes an ENERGY STAR refrigerator.
 >
@@ -433,7 +435,7 @@ Section 2 used `$filter` for the simplest possible cases — equality and a sing
 > - **The variable name (`a`) is arbitrary** — use whatever reads well. `Appliances/any(appliance: appliance eq '…')` is identical.
 > - **`all(...)` is the dual of `any(...)`** when you want every element to satisfy the predicate. Less common in real searches, but it shows up in negative filters: `not Appliances/any(a: a eq 'Trash Compactor')` is the way to ask for "no trash compactor."
 
-### 4.4 Sanity-checking a complex filter with `parse-filter`
+### 3.4 Sanity-Checking a Complex Filter With `parse-filter`
 
 > **User:** Before I run this, can you confirm I built the filter correctly? `StandardStatus eq 'Active' and ListPrice ge 300000 and ListPrice le 600000 and contains(City, 'spring')`
 >
@@ -476,7 +478,7 @@ Section 2 used `$filter` for the simplest possible cases — equality and a sing
 >
 > Use `parse-filter` whenever you're hand-building a filter from string concatenation, especially when user input is involved — it catches quoting errors and operator typos before they reach the network.
 
-### 4.5 Date windows: the foundation of incremental sync
+### 3.5 Date Windows – The Foundation of Incremental Sync
 
 > **User:** Show me listings modified since the start of 2025, newest first.
 >
@@ -511,30 +513,30 @@ Section 2 used `$filter` for the simplest possible cases — equality and a sing
 > }
 > ```
 >
-> Notice that all three results have nearly identical timestamps in early April 2026 — that's the moment the seed step ran, not the moment the listings were "actually" modified. This is what you'd expect from a freshly bulk-loaded database: every record's `ModificationTimestamp` reflects the load, and the *real* incremental-sync story starts when the next mutation happens. Which is exactly what Section 5 is about.
+> Notice that all three results have nearly identical timestamps in early April 2026 — that's the moment the seed step ran, not the moment the listings were "actually" modified. This is what you'd expect from a freshly bulk-loaded database: every record's `ModificationTimestamp` reflects the load, and the *real* incremental-sync story starts when the next mutation happens. Which is exactly what Section 4 is about.
 >
 > Two things worth knowing about timestamp filters:
 >
 > - **`Edm.DateTimeOffset` literals don't take quotes.** It's `ge 2025-01-01T00:00:00Z`, not `ge '2025-01-01T00:00:00Z'`. This is one of the most common mistakes when hand-building filters; `parse-filter` will catch it for you.
 > - **The DD also defines `ModificationTimestamp`'s Date sibling, `ListingContractDate`**, which is `Edm.Date` (no time component). For Date fields the literal is `2025-01-01` with no `T...Z` suffix.
 
-### 4.6 What's *not* covered here
+### 3.6 What Is *Not* Covered Here
 
-`$filter` has a few more corners worth knowing about, even if we won't demo each one in detail:
+`$filter` has a few more corners worth knowing about, even if we will not demo each one in detail:
 
-- **Geospatial functions** (`geo.distance`, `geo.intersects`) — for radius and polygon search. RESO defines them in the spec, but support varies by server. Worth checking your `$metadata` capabilities annotations before relying on them.
-- **`$count=true`** — returns `@odata.count` alongside the page so you know the total result-set size, not just the current page. The MCP `query` tool exposes it as the `count` boolean parameter.
-- **`$expand`** — pulls related records inline (e.g. `$expand=Media`). The MCP `query` tool exposes it as the `expand` parameter. Whether it works depends on the server's navigation properties, which is server-specific.
+- **Geospatial functions** (`geo.distance`, `geo.intersects`) – for radius and polygon search. RESO defines them in the spec, but support varies by server. Worth checking your `$metadata` capabilities annotations before relying on them.
+- **`$count=true`** – returns `@odata.count` alongside the page so you know the total result-set size, not just the current page. The MCP `query` tool exposes it as the `count` boolean parameter.
+- **`$expand`** – pulls related records inline (e.g. `$expand=Media`). The MCP `query` tool exposes it as the `expand` parameter. Whether it works depends on the server's navigation properties, which is server-specific.
 
-These are best learned the same way Sections 4.1–4.5 demonstrated: form a question, send it, and read the AST or the response. The MCP server doesn't care which OData feature you reach for — it just forwards the call.
+These are best learned the same way Sections 3.1–3.5 demonstrated: form a question, send it, and read the AST or the response. The MCP server does not care which OData feature you reach for – it just forwards the call.
 
 ---
 
-## Section 5 — Add/Edit and EntityEvent
+## Section 4 – Add/Edit and EntityEvent
 
-Reading data is half the story. The other half — making changes and *knowing* a change happened — is what `create`, `update`, `delete`, and the `EntityEvent` resource are for. This section walks through the full write loop: enabling the change feed, editing a record, watching the event land, and reasoning about how a real client would consume it.
+Reading data is half the story. The other half – making changes and *knowing* a change happened – is what `create`, `update`, `delete` and the `EntityEvent` resource are for. This section walks through the full write loop: enabling the change feed, editing a record, watching the event land and reasoning about how a real client would consume it.
 
-### 5.1 Why EntityEvent matters
+### 4.1 Why EntityEvent Matters
 
 > **User:** Before we touch anything, what *is* EntityEvent and why should I care?
 >
@@ -560,7 +562,7 @@ Reading data is half the story. The other half — making changes and *knowing* 
 >    A future optional `EventTypes` extension is on the roadmap to make this distinction explicit on the server side, but the polling rules above work against every compliant server today.
 > 3. **Today's model is pull, not push.** You poll `EntityEvent` on whatever interval suits you — every few seconds for near-real-time sync, every few minutes for slower feeds. Subscription/push semantics are on the RESO roadmap (server-sent events, webhooks, filterable subscriptions) but not in the current spec. Build your client around polling for now and the migration to push will be a layer on top, not a rewrite.
 
-### 5.2 Enabling EntityEvent on the reference server
+### 4.2 Enabling EntityEvent on the Reference Server
 
 > **User:** OK, I want to try it. How do I turn it on?
 >
@@ -581,7 +583,7 @@ Reading data is half the story. The other half — making changes and *knowing* 
 >
 > "Read-only" is important: clients can `GET` from `EntityEvent` but can't `POST`/`PATCH`/`DELETE` against it directly. Rows appear there *only* as a side effect of writes against other resources.
 
-### 5.3 The empty feed
+### 4.3 The Empty Feed
 
 > **User:** Cool. Show me what's changed in my feed lately.
 >
@@ -614,7 +616,7 @@ Reading data is half the story. The other half — making changes and *knowing* 
 >
 > Let's generate one. I'll edit a listing and we'll watch it appear in the feed.
 
-### 5.4 Editing a listing — the confirm-then-PATCH dance
+### 4.4 Editing a Listing – The Confirm-Then-PATCH Dance
 
 > **User:** Mark listing `50ddad45-e172-448d-8e9e-9aa5e2746873` as Pending.
 >
@@ -665,7 +667,7 @@ Reading data is half the story. The other half — making changes and *knowing* 
 >
 > The PATCH landed. Notice the server bumped `ModificationTimestamp` automatically and returned a fresh `@odata.etag` — those are both standard OData behaviors and useful if you're holding a local cache.
 
-### 5.5 The first event appears
+### 4.5 The First Event Appears
 
 > **User:** Did it land in the feed?
 >
@@ -709,7 +711,7 @@ Reading data is half the story. The other half — making changes and *knowing* 
 > - **`FeedTypes` is empty** for the same reason — single-feed server, no need to tag events.
 > - **There's no `EventType: 'Update'` here.** A consumer that wants "what kind of change was this?" has to derive it: keep a known-keys set, and treat events for unknown keys as creates, events for known keys as updates, and events whose follow-up GET returns 404 as deletes.
 
-### 5.6 Adding a brand new listing
+### 4.6 Adding a Brand New Listing
 
 > **User:** OK now add a brand new listing — minimal fields, just enough to pass validation.
 >
@@ -799,7 +801,7 @@ Reading data is half the story. The other half — making changes and *knowing* 
 >
 > One thing worth flagging: **the server assigned its own `ListingKey`** (`1bd91490-…`). On the ref server, `ListingKey` is server-generated regardless of what you supply. Different servers have different policies — some accept client-supplied keys, some require them, some always overwrite. Always read the response body to learn the canonical key, don't assume your input survived.
 
-### 5.7 Deleting a record — the destructive path
+### 4.7 Deleting a Record – The Destructive Path
 
 > **User:** OK that was a throwaway, delete it.
 >
@@ -828,9 +830,9 @@ Reading data is half the story. The other half — making changes and *knowing* 
 >
 > HTTP **204 No Content** — the OData convention for a successful DELETE. There's no body, just the status code. The record is gone from `Property` and a new EntityEvent row has been appended.
 
-### 5.8 Wearing the consumer's hat — verifying a delete from the feed
+### 4.8 Wearing the Consumer's Hat – Verifying a Delete From the Feed
 
-Sections 5.4–5.7 were about *making* writes. Now let's flip the perspective: you're a polling replication client, you've just pulled a new batch of EntityEvent rows, and you need to figure out what each one means. The cleanest way to teach this is to do a clean add → observe → delete → re-observe cycle on a fresh record.
+Sections 4.4–4.7 were about *making* writes. Now let us flip the perspective: you are a polling replication client, you have just pulled a new batch of EntityEvent rows and you need to figure out what each one means. The cleanest way to teach this is to do a clean add → observe → delete → re-observe cycle on a fresh record.
 
 > **User:** Add another listing — minimal fields, somewhere in Oregon — and then walk me through how a polling client would actually consume the events.
 >
@@ -894,7 +896,7 @@ Sections 5.4–5.7 were about *making* writes. Now let's flip the perspective: y
 > }
 > ```
 >
-> One new event, sequence 6, for a key I've never seen before. Per the rules in §5.1: **unknown key + record exists on follow-up fetch = create**. Let me verify by fetching the record:
+> One new event, sequence 6, for a key I've never seen before. Per the rules in §4.1: **unknown key + record exists on follow-up fetch = create**. Let me verify by fetching the record:
 >
 > <details><summary>Tool call — <code>mcp__reso__query</code></summary>
 >
@@ -1024,7 +1026,7 @@ Sections 5.4–5.7 were about *making* writes. Now let's flip the perspective: y
 >
 > Every consumer in the RESO ecosystem is, at heart, some variation on that loop. The forthcoming optional `EventTypes` extension will let servers advertise the change type up front so consumers can skip the disambiguation fetch when they care, but the loop above works against every compliant server today.
 
-### 5.9 Summarizing recent changes from the feed
+### 4.9 Summarizing Recent Changes From the Feed
 
 > **User:** Show me everything that's happened in my feed today, oldest first, and summarize.
 >
@@ -1061,27 +1063,27 @@ Sections 5.4–5.7 were about *making* writes. Now let's flip the perspective: y
 > }
 > ```
 >
-> Seven events on `Property`, in the order they happened. Notice what the rows *don't* tell you on their own — there's nothing here that distinguishes a create from an update from a delete. Applying the polling rules from §5.1 and §5.8, here's what a fresh consumer would reconstruct:
+> Seven events on `Property`, in the order they happened. Notice what the rows *don't* tell you on their own — there's nothing here that distinguishes a create from an update from a delete. Applying the polling rules from §4.1 and §4.8, here's what a fresh consumer would reconstruct:
 >
 > | Seq | Key | Known before? | Follow-up fetch | Verdict |
 > |---|---|---|---|---|
-> | 1 | `50ddad45-…` | Yes (seed) | Returns record | **Update** — compare to cached copy; `StandardStatus` and `PurchaseContractDate` differ → apply (§5.4 PATCH to Pending) |
-> | 2 | `1bd91490-…` | No | Returns record | **Create** — add to cache (§5.6 Demo City throwaway) |
-> | 3 | `1bd91490-…` | Yes (just learned at seq 2) | Returns empty | **Delete** — drop from cache (§5.7) |
-> | 4 | `50ddad45-…` | Yes | Returns record | **Update** — compare; `StandardStatus` differs → apply (foreshadowing §5.10) |
+> | 1 | `50ddad45-…` | Yes (seed) | Returns record | **Update** — compare to cached copy; `StandardStatus` and `PurchaseContractDate` differ → apply (§4.4 PATCH to Pending) |
+> | 2 | `1bd91490-…` | No | Returns record | **Create** — add to cache (§4.6 Demo City throwaway) |
+> | 3 | `1bd91490-…` | Yes (just learned at seq 2) | Returns empty | **Delete** — drop from cache (§4.7) |
+> | 4 | `50ddad45-…` | Yes | Returns record | **Update** — compare; `StandardStatus` differs → apply (foreshadowing §4.10) |
 > | 5 | `50ddad45-…` | Yes | Returns record | **Update** — compare; `StandardStatus` differs again → apply |
-> | 6 | `bc4fb5d7-…` | No | Returns record | **Create** — add to cache (§5.8 Faraway, OR) |
-> | 7 | `bc4fb5d7-…` | Yes (just learned at seq 6) | Returns empty | **Delete** — drop from cache (§5.8) |
+> | 6 | `bc4fb5d7-…` | No | Returns record | **Create** — add to cache (§4.8 Faraway, OR) |
+> | 7 | `bc4fb5d7-…` | Yes (just learned at seq 6) | Returns empty | **Delete** — drop from cache (§4.8) |
 >
-> A real incremental-sync client doesn't need to do any of this reasoning by hand — it just runs the loop from §5.8 and the `if record is empty / elif key not in cache / elif hash differs` branches do the work mechanically. But it's worth seeing the *shape* of the reasoning at least once: the feed gives you the sequence and the pointer; you decide what kind of change it represents by comparing what you knew to what you can fetch now.
+> A real incremental-sync client doesn't need to do any of this reasoning by hand — it just runs the loop from §4.8 and the `if record is empty / elif key not in cache / elif hash differs` branches do the work mechanically. But it's worth seeing the *shape* of the reasoning at least once: the feed gives you the sequence and the pointer; you decide what kind of change it represents by comparing what you knew to what you can fetch now.
 
-### 5.10 When things go wrong — error handling
+### 4.10 When Things Go Wrong – Error Handling
 
-The happy path is the easy part. What separates a usable AI integration from a frustrating one is how it walks the user through *errors* — and RESO Add/Edit servers return them in a structured way that the assistant can translate into plain language. This section walks through the three error shapes you'll see most often.
+The happy path is the easy part. What separates a usable AI integration from a frustrating one is how it walks the user through *errors* – and RESO Add/Edit servers return them in a structured way that the assistant can translate into plain language. This section walks through the three error shapes you will see most often.
 
 #### Missing required fields (HTTP 400 with field-level details)
 
-This is the one we already hit in §5.6 when the first `create` attempt left out `PostalCode` and `Country`. Worth seeing the full shape:
+This is the one we already hit in §4.6 when the first `create` attempt left out `PostalCode` and `Country`. Worth seeing the full shape:
 
 ```json
 {
@@ -1099,17 +1101,17 @@ This is the one we already hit in §5.6 when the first `create` attempt left out
 
 Three things make this useful for AI-assisted Add/Edit:
 
-- **The outer `error` envelope follows the OData JSON error format** — every compliant Add/Edit server returns this shape, so the assistant can parse it the same way no matter whose server is on the other end.
-- **`details[]` is the field-level breakdown.** Each entry has `target` (the field name) and `message` (a human-readable description). The assistant doesn't have to guess which fields the user needs to add — the server tells it explicitly.
-- **`code: 30212` is a stable RESO error code** for "required field missing." A more sophisticated client could map error codes to localized messages or trigger automatic remediation (e.g. "looks like you forgot Country — should I default it to `US`?"). The assistant can pattern-match on the code rather than the English text.
+- **The outer `error` envelope follows the OData JSON error format** – every compliant Add/Edit server returns this shape, so the assistant can parse it the same way no matter whose server is on the other end.
+- **`details[]` is the field-level breakdown.** Each entry has `target` (the field name) and `message` (a human-readable description). The assistant does not have to guess which fields the user needs to add – the server tells it explicitly.
+- **`code: 30212` is a stable RESO error code** for "required field missing." A more sophisticated client could map error codes to localized messages or trigger automatic remediation (e.g. "looks like you forgot Country – should I default it to `US`?"). The assistant can pattern-match on the code rather than the English text.
 
-The recovery dialogue in §5.6 is the natural shape for handling this:
+The recovery dialogue in §4.6 is the natural shape for handling this:
 
 > **Assistant:** The server rejected the create with two validation errors — `PostalCode` and `Country` are both required and we didn't include them. Want me to add `PostalCode: "94000"` and `Country: "US"` and retry?
 
 That's the pattern: parse the structured error, summarize it in plain language, propose a concrete fix, retry with consent. No raw JSON in the user-facing dialogue unless the user asks for it.
 
-#### Acting on a record that doesn't exist (HTTP 404 with structured body)
+#### Acting on a Record That Does Not Exist (HTTP 404 With Structured Body)
 
 > **User:** Delete listing `does-not-exist-12345`.
 >
@@ -1143,12 +1145,12 @@ That's the pattern: parse the structured error, summarize it in plain language, 
 >
 > The server doesn't have a `Property` record with that key, so the DELETE failed with a 404. There's no EntityEvent generated — failed writes don't produce events. Two things to know about this case:
 >
-> 1. **`code: 40400` is the RESO "record not found" code** — same outer envelope as the validation error in §5.6, just with an empty `details[]` since there's nothing field-level to report.
+> 1. **`code: 40400` is the RESO "record not found" code** — same outer envelope as the validation error in §4.6, just with an empty `details[]` since there's nothing field-level to report.
 > 2. **It's a no-op from the consumer's perspective.** If you were treating this as part of a sync loop, the right response is "the record was already gone, my local cache is consistent, move on." Don't retry, don't error out — just acknowledge and continue.
 
 #### The silent failure: when the server *accepts* bad data
 
-This one is the trap nobody warns you about. The user asks for a status change to a value that isn't in the lookup, and on the ref server you get back **HTTP 200** — not a 400.
+This one is the trap nobody warns you about. The user asks for a status change to a value that is not in the lookup, and on the ref server you get back **HTTP 200** – not a 400.
 
 > **User:** Set listing `50ddad45-…`'s `StandardStatus` to `ImaginaryStatus`.
 >
@@ -1174,8 +1176,8 @@ This one is the trap nobody warns you about. The user asks for a status change t
 >
 > Server returned **HTTP 200** with the full updated record, and `"StandardStatus": "ImaginaryStatus"` is sitting right there in the response body. The server *accepted the bad value*. Worth pausing on what just happened:
 >
-> - **Not every server enforces lookup membership on PATCH.** The reference server validates required fields (you saw that in §5.6) but does *not* validate that lookup-backed string fields contain values from the corresponding `Lookup` resource. This is a real-world quirk — different servers make different choices about which validations to enforce on the write path versus the read path.
-> - **An EntityEvent row is still produced.** Sequence 4 in the §5.9 summary above is exactly this PATCH. From the EntityEvent feed's perspective, "ImaginaryStatus" is a perfectly normal change — the feed doesn't validate either.
+> - **Not every server enforces lookup membership on PATCH.** The reference server validates required fields (you saw that in §4.6) but does *not* validate that lookup-backed string fields contain values from the corresponding `Lookup` resource. This is a real-world quirk — different servers make different choices about which validations to enforce on the write path versus the read path.
+> - **An EntityEvent row is still produced.** Sequence 4 in the §4.9 summary above is exactly this PATCH. From the EntityEvent feed's perspective, "ImaginaryStatus" is a perfectly normal change — the feed doesn't validate either.
 > - **An AI assistant should not treat HTTP 200 as proof of correctness.** "The server accepted my call" and "the value I sent was valid" are not the same statement. The right pattern is: warn before sending if the assistant has reason to suspect the value is wrong (as above), and after a successful response, sanity-check the field if it touches a lookup, an enum, or any constrained type.
 >
 > The cleanup in our case was a second PATCH putting `StandardStatus` back to `Pending` — sequence 5 in the feed. The assistant produced two events (the bad write and the revert) on a record that ideally should have stayed on a single Pending state the whole time. A more cautious assistant would have refused to send the bad value at all without explicit override.
@@ -1184,22 +1186,22 @@ This one is the trap nobody warns you about. The user asks for a status change t
 
 | Server response | What it means for the assistant | Recovery |
 |---|---|---|
-| `400` with `details[]` | Structured validation failure — server told you exactly what's wrong | Parse `details`, summarize to user, propose fix, retry with consent |
-| `404` with empty `details[]` | The target record isn't there | Acknowledge, treat as no-op in sync loops, don't retry |
-| `200` with the bad value visible in the response | Server accepted something it probably shouldn't have | Don't trust silence — sanity-check constrained fields after every write |
+| `400` with `details[]` | Structured validation failure – server told you exactly what is wrong | Parse `details`, summarize to user, propose fix, retry with consent |
+| `404` with empty `details[]` | The target record is not there | Acknowledge, treat as no-op in sync loops, do not retry |
+| `200` with the bad value visible in the response | Server accepted something it probably should not have | Do not trust silence – sanity-check constrained fields after every write |
 
 These three cover the vast majority of Add/Edit failure modes. Network errors and 5xx responses exist too, but those are infrastructure problems and need infrastructure responses (retry with backoff, surface to the user as "the server is unreachable") rather than RESO-specific reasoning.
 
-### 5.11 What's next for EntityEvent
+### 4.11 What Is Next for EntityEvent
 
 The current spec is solid for batched, polling-based replication. Two things on the RESO roadmap will make it more interactive:
 
-- **Subscriptions** — clients will be able to register a long-lived subscription against EntityEvent and have new rows pushed to them as they're produced, instead of having to poll. The protocol will likely use server-sent events or webhooks; the underlying data shape stays the same.
-- **Filtering on subscription** — `subscribe to EntityEvent where ResourceName eq 'Property' and PostalCode in ('94000', '94001')`. This is the piece that turns EntityEvent from "raw firehose" into "personalized change stream" and is what most production clients are actually waiting for.
+- **Subscriptions** – clients will be able to register a long-lived subscription against EntityEvent and have new rows pushed to them as they are produced, instead of having to poll. The protocol will likely use server-sent events or webhooks; the underlying data shape stays the same.
+- **Filtering on subscription** – `subscribe to EntityEvent where ResourceName eq 'Property' and PostalCode in ('94000', '94001')`. This is the piece that turns EntityEvent from "raw firehose" into "personalized change stream" and is what most production clients are actually waiting for.
 
-There's also an optional **`EventTypes`** extension coming that will let servers advertise change types up front so consumers can skip the disambiguation fetch from §5.8 when the server cares to opt in. The polling rules in §5.1 will continue to work either way.
+There is also an optional **`EventTypes`** extension coming that will let servers advertise change types up front so consumers can skip the disambiguation fetch from §4.8 when the server cares to opt in. The polling rules in §4.1 will continue to work either way.
 
-When those land, the MCP server's `query` tool will support them on day one (it's a generic OData passthrough), and a future `subscribe` tool in this MCP server will surface the push side. Until then, build against the polling model — it's portable, it's standard, and it works against every compliant server today.
+When those land, the MCP server's `query` tool will support them on day one (it is a generic OData passthrough), and a future `subscribe` tool in this MCP server will surface the push side. Until then, build against the polling model – it is portable, it is standard and it works against every compliant server today.
 
 ---
 
