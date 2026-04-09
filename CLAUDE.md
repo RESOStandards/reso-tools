@@ -1,4 +1,4 @@
-# CLAUDE.md — RESO Tools
+# CLAUDE.md – RESO Tools
 
 ## Project overview
 
@@ -95,17 +95,17 @@ cd .github/pages/dd-generator && node generate.mjs
 
 ### Release checklist
 
-1. **Run full test suite**: `npm test` from root — all packages must pass
+1. **Run full test suite**: `npm test` from root – all packages must pass
 2. **Security audit**: Review changes for injection, auth bypass, data leakage
 3. **Bump versions**: Update `version` in all package.json files and MCP server config. Use strict SemVer.
 4. **Update READMEs**: Test counts, new features, CLI examples, package table in root README
 5. **Update test badge**: `![Tests](https://img.shields.io/badge/tests-XXXX%20passed-brightgreen)` in root README
 6. **Desktop client**:
-   - Update `version` in `reso-desktop-client/package.json` (the About dialog reads it via `app.getVersion()` automatically — don't hardcode)
+   - Update `version` in `reso-desktop-client/package.json` (the About dialog reads it via `app.getVersion()` automatically – do not hardcode)
    - Pick a release name and update the `RELEASE_NAME` constant in `reso-desktop-client/src/main.ts` (search for the comment block above `setAboutPanelOptions`)
    - Rebuild web client: `cd reso-web-client && npm run build`
-7. **Create PR**: `gh pr create --base main --head vX.Y --title "vX.Y — Release Name"`
-8. **Create draft release**: `gh release create vX.Y --draft --target vX.Y --title "vX.Y — Release Name"`
+7. **Create PR**: `gh pr create --base main --head vX.Y --title "vX.Y – Release Name"`
+8. **Create draft release**: `gh release create vX.Y --draft --target vX.Y --title "vX.Y – Release Name"`
    - Include: highlights, what changed, download instructions, migration guide link
    - Desktop download instructions for unsigned binaries (macOS xattr, Windows SmartScreen, Linux chmod)
 9. **Merge PR**: After review, merge to main
@@ -113,13 +113,13 @@ cd .github/pages/dd-generator && node generate.mjs
 11. **Publish release**: Remove draft status after binaries are attached
 
 ### File naming
-- `schema-validation-settings.json` — committee-approved, NEVER modify
-- `server-metadata.json` — generated from DD XLSX, do not hand-edit
+- `schema-validation-settings.json` – committee-approved, NEVER modify
+- `server-metadata.json` – generated from DD XLSX, do not hand-edit
 - Reference metadata in `reso-certification/reference-metadata/dd-{version}.json`
 
 ## Important patterns
 
 - The reference server uses a metadata-driven architecture: CSDL metadata defines the schema, and routes/queries are generated dynamically
-- The OData client handles URI building, CRUD, pagination, and metadata parsing — it's used by both the web UI and the certification runner
+- The OData client handles URI building, CRUD, pagination, and metadata parsing – it is used by both the web UI and the certification runner
 - Validation rules are isomorphic (shared between client and server)
-- The DD docs generator embeds CSS and JS inside `getPageCSS()` and `getPageJS()` functions in `generate.mjs` — all styling changes happen there, not in separate files
+- The DD docs generator embeds CSS and JS inside `getPageCSS()` and `getPageJS()` functions in `generate.mjs` – all styling changes happen there, not in separate files

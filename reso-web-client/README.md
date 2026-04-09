@@ -102,7 +102,7 @@ Two deployment modes are available via Docker Compose profiles.
 
 ### Proxy Only (External Servers)
 
-Serves the web UI with a lightweight CORS proxy. No local database — connect to external OData servers using Bearer Token or Client Credentials auth.
+Serves the web UI with a lightweight CORS proxy. No local database – connect to external OData servers using Bearer Token or Client Credentials auth.
 
 ```bash
 docker compose --profile proxy up -d

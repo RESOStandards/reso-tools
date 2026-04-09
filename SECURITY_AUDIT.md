@@ -4,7 +4,7 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
-## v0.5 Security Notes — 2026-04-06
+## v0.5 Security Notes – 2026-04-06
 
 ### Findings
 
@@ -20,7 +20,7 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
-## v0.4 Security Notes — 2026-04-05
+## v0.4 Security Notes – 2026-04-05
 
 ### Findings Addressed
 
@@ -37,24 +37,24 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ### Architecture Notes
 
-- **Electron preload API surface**: `contextBridge` exposes three APIs — `electronStorage` (get/set/remove), `electronUpdates` (onUpdateAvailable listener). All are read-only or write-only with no ability to execute arbitrary code. `contextIsolation: true` and `nodeIntegration: false` are set.
+- **Electron preload API surface**: `contextBridge` exposes three APIs – `electronStorage` (get/set/remove), `electronUpdates` (onUpdateAvailable listener). All are read-only or write-only with no ability to execute arbitrary code. `contextIsolation: true` and `nodeIntegration: false` are set.
 - **Dark mode preference**: Stored in Electron secure storage (encrypted via OS keychain when available, plain JSON fallback). Non-sensitive data.
 - **Splash screen**: Generated as a `data:` URI with inline CSS. No external resources loaded. Images use `file:` protocol for the local logo.
 
 ---
 
-## v0.3 Security Notes — 2026-04-03
+## v0.3 Security Notes – 2026-04-03
 
 - **OAuth2 token storage**: Per-server tokens stored in Electron secure storage (OS keychain encryption) or browser sessionStorage (cleared on tab close). Tokens are never written to localStorage.
 - **CORS proxy SSRF protection**: `/api/proxy` validates that target URLs use `http:` or `https:` protocols only.
 - **IndexedDB caches**: Schema and lookup caches use gzip compression. No sensitive data (tokens, credentials) is stored in IndexedDB.
-- **New package**: `@reso-standards/web-api-proxy` — standalone CORS proxy with same SSRF protections as the reference server.
+- **New package**: `@reso-standards/web-api-proxy` – standalone CORS proxy with same SSRF protections as the reference server.
 
 A full `npm audit` should be run before the v0.3 release.
 
 ---
 
-## Audit: 2026-03-17 — v0.2 Pre-Release npm Audit
+## Audit: 2026-03-17 – v0.2 Pre-Release npm Audit
 
 **Scope:** `npm audit` across all 9 packages
 **Auditor:** Claude Opus 4.6
@@ -73,14 +73,14 @@ A full `npm audit` should be run before the v0.3 release.
 | data-generator | 0 | Clean |
 | certification | 5 | 5 moderate |
 
-### HIGH: fast-xml-parser (CVE-2026-26278) — FIXED
+### HIGH: fast-xml-parser (CVE-2026-26278) – FIXED
 
 - **Affected packages**: reso-reference-server, reso-client
 - **Versions**: 4.0.0-beta.3 – 5.5.5
 - **Advisory**: [GHSA-8gc5-j5rx-235r](https://github.com/advisories/GHSA-8gc5-j5rx-235r)
 - **Description**: Numeric entity expansion bypasses all entity expansion limits
 - **Fix**: Updated via `npm audit fix` in both packages (2026-03-17)
-- **Risk**: Used for CSDL metadata parsing. Limited exposure — metadata is from trusted sources.
+- **Risk**: Used for CSDL metadata parsing. Limited exposure – metadata is from trusted sources.
 
 ### MODERATE: esbuild (dev dependency only)
 
@@ -94,13 +94,13 @@ A full `npm audit` should be run before the v0.3 release.
 ### Recommended Actions
 
 1. Run `npm audit fix` in `reso-reference-server/` and `reso-client/` to patch fast-xml-parser
-2. esbuild/vite/vitest findings are dev-only — track for next major dependency update
+2. esbuild/vite/vitest findings are dev-only – track for next major dependency update
 
 ---
 
-## Audit: 2026-03-12 — v0.2 Full Codebase
+## Audit: 2026-03-12 – v0.2 Full Codebase
 
-**Scope:** Full monorepo — all packages, Docker configs, Electron, web client, server
+**Scope:** Full monorepo – all packages, Docker configs, Electron, web client, server
 **Auditor:** Claude Opus 4.6
 
 This audit covers the complete codebase as of the v0.2 release candidate. Findings from prior audits (2026-03-08, 2026-03-09) are confirmed and cross-referenced below.
@@ -109,23 +109,23 @@ This audit covers the complete codebase as of the v0.2 release candidate. Findin
 
 | Area | Status |
 |------|--------|
-| SQL injection (all backends) | **Pass** — Parameterized queries throughout, field names validated against metadata whitelists |
-| Command injection | **Pass** — No shell execution with user input; `child_process.fork()` uses fixed module paths |
-| XSS | **Pass** — No `dangerouslySetInnerHTML`, `innerHTML`, `eval()`, or `new Function()` in web client |
-| Committed secrets | **Pass** — No credentials in source; `.gitignore` covers `.env`, `*.env`, `*.db` |
-| Electron sandbox | **Pass** — `nodeIntegration: false`, `contextIsolation: true`, external links open in system browser |
-| Security headers | **Pass** — `x-powered-by` disabled, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` |
-| Auth (core) | **Pass** — Timing-safe token comparison, 1-hour TTL with periodic cleanup, `crypto.randomUUID()` |
+| SQL injection (all backends) | **Pass** – Parameterized queries throughout, field names validated against metadata whitelists |
+| Command injection | **Pass** – No shell execution with user input; `child_process.fork()` uses fixed module paths |
+| XSS | **Pass** – No `dangerouslySetInnerHTML`, `innerHTML`, `eval()`, or `new Function()` in web client |
+| Committed secrets | **Pass** – No credentials in source; `.gitignore` covers `.env`, `*.env`, `*.db` |
+| Electron sandbox | **Pass** – `nodeIntegration: false`, `contextIsolation: true`, external links open in system browser |
+| Security headers | **Pass** – `x-powered-by` disabled, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` |
+| Auth (core) | **Pass** – Timing-safe token comparison, 1-hour TTL with periodic cleanup, `crypto.randomUUID()` |
 
 ### Confirmed Prior Findings
 
 All findings from the 2026-03-08 and 2026-03-09 audits remain valid. The five previously fixed findings (#5, #9, #12, #14, #15) are confirmed fixed in the current codebase:
 
-- **#5** Key value interpolation — quotes escaped before filter string interpolation
-- **#9** Token map memory leak — TTL and periodic sweep implemented
-- **#12** Missing security headers — `nosniff`, `DENY`, `x-powered-by` disabled
-- **#14** Non-constant-time token comparison — uses `crypto.timingSafeEqual`
-- **#15** LIKE wildcard injection — `escapeLikeWildcards` helper with `ESCAPE '\'`
+- **#5** Key value interpolation – quotes escaped before filter string interpolation
+- **#9** Token map memory leak – TTL and periodic sweep implemented
+- **#12** Missing security headers – `nosniff`, `DENY`, `x-powered-by` disabled
+- **#14** Non-constant-time token comparison – uses `crypto.timingSafeEqual`
+- **#15** LIKE wildcard injection – `escapeLikeWildcards` helper with `ESCAPE '\'`
 
 ### Compliance Dockerfiles (Reiterated)
 
@@ -133,7 +133,7 @@ Compliance Dockerfiles (`Dockerfile.core`, `Dockerfile.dd`) still run as root. T
 
 ---
 
-## Audit: 2026-03-09 — v0.2 New Code
+## Audit: 2026-03-09 – v0.2 New Code
 
 **Scope:** `reso-reference-server/desktop/`, `reso-reference-server/ui/src/` (server switcher, context, metadata adapter), server proxy changes
 **Auditor:** Claude Opus 4.6
@@ -211,7 +211,7 @@ Compliance Dockerfiles (`Dockerfile.core`, `Dockerfile.dd`) still run as root. T
 **Severity: Medium**
 **File:** `reso-reference-server/server/src/index.ts`, lines 346-352
 
-**Description:** The proxy forwards upstream `Content-Type` and body verbatim. If upstream returns `text/html` with malicious JavaScript, this is a reflected XSS vector via `/api/proxy?url=https://evil.com/xss.html`. The global `X-Content-Type-Options: nosniff` header mitigates but doesn't fully prevent this when Content-Type is `text/html`.
+**Description:** The proxy forwards upstream `Content-Type` and body verbatim. If upstream returns `text/html` with malicious JavaScript, this is a reflected XSS vector via `/api/proxy?url=https://evil.com/xss.html`. The global `X-Content-Type-Options: nosniff` header mitigates but does not fully prevent this when Content-Type is `text/html`.
 
 **Recommended Fix:** Force `Content-Type: application/json` on proxy responses, or strip HTML content types.
 
@@ -222,7 +222,7 @@ Compliance Dockerfiles (`Dockerfile.core`, `Dockerfile.dd`) still run as root. T
 **Severity: Medium**
 **File:** `reso-reference-server/ui/src/api/client.ts`, lines 44-51
 
-**Description:** Localhost detection checks hostname strings (`localhost`, `127.0.0.1`, `::1`) but doesn't account for DNS rebinding (attacker domain resolving to 127.0.0.1) or alternate representations like `0.0.0.0`.
+**Description:** Localhost detection checks hostname strings (`localhost`, `127.0.0.1`, `::1`) but does not account for DNS rebinding (attacker domain resolving to 127.0.0.1) or alternate representations like `0.0.0.0`.
 
 **Recommended Fix:** Accept that the proxy path is the safe default for non-obvious localhost addresses.
 
@@ -316,7 +316,7 @@ Compliance Dockerfiles (`Dockerfile.core`, `Dockerfile.dd`) still run as root. T
 - Database credentials masked in logs
 - Input validation via `@reso-standards/validation`
 
-### Finding 1: SSRF via Proxy Endpoint — Insufficient Private Network Protection
+### Finding 1: SSRF via Proxy Endpoint – Insufficient Private Network Protection
 
 **Severity: Critical**
 **File:** `reso-reference-server/server/src/index.ts`, lines 296-354
@@ -368,7 +368,7 @@ curl -X POST http://localhost:8080/oauth/token?role=admin \
 **Severity: High**
 **File:** `reso-reference-server/server/src/auth/config.ts`, line 44; `middleware.ts`, lines 14-18
 
-**Description:** `AUTH_REQUIRED` defaults to `false`. When disabled, all requests pass through. The OData CRUD routes (POST, PATCH, DELETE) have no auth middleware even when auth IS enabled — only admin routes use `requireAuth`.
+**Description:** `AUTH_REQUIRED` defaults to `false`. When disabled, all requests pass through. The OData CRUD routes (POST, PATCH, DELETE) have no auth middleware even when auth IS enabled – only admin routes use `requireAuth`.
 
 **Proof of Concept:**
 ```bash

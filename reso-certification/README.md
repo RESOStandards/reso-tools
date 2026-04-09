@@ -3,10 +3,10 @@
 Compliance testing toolkit for RESO OData servers. Run certification tests from the command line, integrate them into your CI pipeline, or call the SDK directly from your application.
 
 - **Three endorsements** ready to use: Add/Edit, EntityEvent, Web API Core
-- **No Java required** — pure TypeScript, built on [`reso-client`](../reso-client/) for OData and [`reso-validation`](../reso-validation/) for field validation
-- **Auto-configuring** — samples live server data to build test parameters, auto-detects enum mode from metadata
-- **SDK-first** — the CLI, Desktop Client, and MCP server all call the same SDK functions with progress callbacks
-- **Flexible auth** — bearer tokens, OAuth2 Client Credentials, `.env` files, or environment variables
+- **No Java required** – pure TypeScript, built on [`reso-client`](../reso-client/) for OData and [`reso-validation`](../reso-validation/) for field validation
+- **Auto-configuring** – samples live server data to build test parameters, auto-detects enum mode from metadata
+- **SDK-first** – the CLI, Desktop Client, and MCP server all call the same SDK functions with progress callbacks
+- **Flexible auth** – bearer tokens, OAuth2 Client Credentials, `.env` files, or environment variables
 
 ## Install
 
@@ -106,6 +106,34 @@ reso-cert add-edit --config sample-configs/add-edit-config.json
 ```
 
 See [`sample-configs/`](sample-configs/) for examples.
+
+## Metadata Report Utilities
+
+### `reso-cert metadata-report adapt`
+
+Synthesize the top-level `resources[]` block on a DD 2.0 or 2.1 metadata report so it can be loaded by tools that expect a DD 2.2-shaped report (notably the [Reference Server](../reso-reference-server/)). Idempotent – DD 2.2+ reports pass through unchanged.
+
+```bash
+reso-cert metadata-report adapt \
+  --in path/to/metadata-report.json \
+  --out path/to/adapted-report.json \
+  --pretty
+```
+
+**Why this exists:** cert metadata reports for DD 2.0 and 2.1 do not carry a top-level `resources[]` block. That concept arrives in DD 2.2. Anything that consumes a metadata report and needs to know which entity sets to register has to derive the resource list from the next-best source: distinct values in `fields[].resourceName`. The adapt command does this mechanically and writes a new file with the synthesized block in place.
+
+The same logic is also exposed via the SDK as `synthesizeResourcesFromFields`:
+
+```typescript
+import {
+  synthesizeResourcesFromFields,
+  type MetadataReport,
+} from '@reso-standards/reso-certification';
+
+const adapted: MetadataReport = synthesizeResourcesFromFields(report);
+```
+
+The helper is pure and idempotent – calling it on a report that already has a populated `resources[]` returns the input unchanged.
 
 ## SDK
 

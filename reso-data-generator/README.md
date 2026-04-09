@@ -34,14 +34,14 @@ npx reso-data-generator -r Property -n 10 -f curl -o ./seed.sh -t admin-token
 | Flag | Description | Default |
 |------|-------------|---------|
 | `-u, --url <url>` | Server URL | `http://localhost:8080` |
-| `-r, --resource <name>` | Resource to generate (required for non-interactive) | — |
+| `-r, --resource <name>` | Resource to generate (required for non-interactive) | – |
 | `-n, --count <number>` | Number of records | `10` |
-| `--related <spec>` | Related records (`Resource:count,...`) | — |
+| `--related <spec>` | Related records (`Resource:count,...`) | – |
 | `--deps / --no-deps` | Enable/disable dependency resolution | `true` |
-| `--dep-counts <spec>` | Override dependency counts (`Resource:count,...`) | — |
-| `-t, --auth-token <token>` | Bearer token | — |
+| `--dep-counts <spec>` | Override dependency counts (`Resource:count,...`) | – |
+| `-t, --auth-token <token>` | Bearer token | – |
 | `-f, --format <format>` | Output: `http`, `json`, or `curl` | `http` |
-| `-o, --output <path>` | Output directory (json) or file (curl) | — |
+| `-o, --output <path>` | Output directory (json) or file (curl) | – |
 
 ## Dependency Resolution
 
@@ -57,33 +57,33 @@ For example, requesting 50 Property records will automatically create:
 The **Office ↔ Member circular dependency** is handled via deferred back-fill: Office is created first (without broker/manager FKs), then Member (with valid `OfficeKey`), then Office records are PATCHed with `OfficeBrokerKey`/`OfficeManagerKey` pointing to real Member keys.
 
 All three output modes support dependency resolution:
-- **HTTP** — POSTs dependencies first, then PATCHes back-fill records
-- **JSON** — Creates subdirectories per resource in dependency order
-- **curl** — Generates POST commands in order, followed by PATCH commands for back-fill
+- **HTTP** – POSTs dependencies first, then PATCHes back-fill records
+- **JSON** – Creates subdirectories per resource in dependency order
+- **curl** – Generates POST commands in order, followed by PATCH commands for back-fill
 
 ## Output Modes
 
-- **`http`** — POSTs records to the OData server via the Add/Edit API
-- **`json`** — Writes individual JSON files to `<outputDir>/<resource>/<0001..N>.json`
-- **`curl`** — Generates a `seed.sh` bash script with curl commands and a health-check loop
+- **`http`** – POSTs records to the OData server via the Add/Edit API
+- **`json`** – Writes individual JSON files to `<outputDir>/<resource>/<0001..N>.json`
+- **`curl`** – Generates a `seed.sh` bash script with curl commands and a health-check loop
 
 ## Resource Generators
 
 Each resource has a specialized generator that applies domain-specific overrides on top of generic field generation.
 
-**Property** — Realistic addresses, pricing (ListPrice, ListPriceLow with constraints), structure (bedrooms, bathrooms, living area), geolocation, property type/status, listing dates, public remarks, tax data (state-specific rates), expense fields.
+**Property** – Realistic addresses, pricing (ListPrice, ListPriceLow with constraints), structure (bedrooms, bathrooms, living area), geolocation, property type/status, listing dates, public remarks, tax data (state-specific rates), expense fields.
 
-**Member** — Agent/broker profiles with names, email (firstname.lastname@domain), phone numbers, designations (CRS, ABR, GRI, etc.), NAR IDs.
+**Member** – Agent/broker profiles with names, email (firstname.lastname@domain), phone numbers, designations (CRS, ABR, GRI, etc.), NAR IDs.
 
-**Office** — Brokerage office records with addresses and contact info.
+**Office** – Brokerage office records with addresses and contact info.
 
-**Media** — Image records linked to parent resources via RESO FK convention (ResourceName + ResourceRecordKey). Includes placeholder URLs, descriptions, and ordering.
+**Media** – Image records linked to parent resources via RESO FK convention (ResourceName + ResourceRecordKey). Includes placeholder URLs, descriptions, and ordering.
 
-**OpenHouse** — Open house events linked to parent properties via ListingKey.
+**OpenHouse** – Open house events linked to parent properties via ListingKey.
 
-**Showing** — Showing appointments linked to parent properties via ListingKey.
+**Showing** – Showing appointments linked to parent properties via ListingKey.
 
-**PropertyRooms, PropertyGreenVerification, PropertyPowerProduction, PropertyUnitTypes** — Child collection resources linked to Property via ListingKey, generated with a generic child generator.
+**PropertyRooms, PropertyGreenVerification, PropertyPowerProduction, PropertyUnitTypes** – Child collection resources linked to Property via ListingKey, generated with a generic child generator.
 
 A generic field generator handles all Edm types (String, Boolean, Int16/32/64, Decimal, Date, DateTimeOffset, TimeOfDay, Guid) and enum/collection lookups from metadata.
 
@@ -105,15 +105,15 @@ const result = await generateSeedData(seedOptions, outputOptions, (progress) => 
 
 ### Key Exports
 
-- `generateSeedData(options, output, onProgress?)` — Single-resource data generation
-- `generateWithDependencies(options, output, metadata, onProgress?)` — Multi-resource generation with FK resolution
-- `getGenerator(resourceName)` — Returns the domain-specific generator for a resource
-- `buildSeedPlan(config)` — Builds a generation plan from configuration
-- `getRelatedResources(parent, fieldsByResource)` — Discovers child collection resources via FK convention
-- `getDefaultRelatedCount(resource)` — Default counts: Media=5, OpenHouse=2, Showing=2, Rooms=3, etc.
-- `discoverForeignKeys(resource, fields, fieldsByResource, keyFieldMap)` — Discovers to-one FK relationships from metadata
-- `buildDependencyGraph(targetResources, fieldsByResource, keyFieldMap)` — Builds a resource dependency graph
-- `topologicalSort(dependencies, targetResources)` — Returns seed phases with cycle breaking
+- `generateSeedData(options, output, onProgress?)` – Single-resource data generation
+- `generateWithDependencies(options, output, metadata, onProgress?)` – Multi-resource generation with FK resolution
+- `getGenerator(resourceName)` – Returns the domain-specific generator for a resource
+- `buildSeedPlan(config)` – Builds a generation plan from configuration
+- `getRelatedResources(parent, fieldsByResource)` – Discovers child collection resources via FK convention
+- `getDefaultRelatedCount(resource)` – Default counts: Media=5, OpenHouse=2, Showing=2, Rooms=3, etc.
+- `discoverForeignKeys(resource, fields, fieldsByResource, keyFieldMap)` – Discovers to-one FK relationships from metadata
+- `buildDependencyGraph(targetResources, fieldsByResource, keyFieldMap)` – Builds a resource dependency graph
+- `topologicalSort(dependencies, targetResources)` – Returns seed phases with cycle breaking
 
 ## Metadata Integration
 

@@ -17,8 +17,8 @@ Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compl
 | [`reso-web-client/`](reso-web-client/) | React + Vite browser UI for browsing and editing OData resources | 72 |
 | [`reso-web-api-proxy/`](reso-web-api-proxy/) | Lightweight CORS proxy and static file server for web client deployments | -- |
 | [`reso-desktop-client/`](reso-desktop-client/) | Electron desktop shell with native proxy, secure storage and optional reference server | -- |
-| [`reso-certification/`](reso-certification/) | RESO certification CLI + SDK — Add/Edit, EntityEvent, Web API Core, DD ([docs](reso-certification/README.md)) | 250 |
-| [`reso-mcp-server/`](reso-mcp-server/) | MCP server — exposes OData query, write, validation, certification tools for AI agents ([guide](reso-mcp-server/doc/GUIDE.md)) | 21 |
+| [`reso-certification/`](reso-certification/) | RESO certification CLI + SDK – Add/Edit, EntityEvent, Web API Core, DD ([docs](reso-certification/README.md)) | 250 |
+| [`reso-mcp-server/`](reso-mcp-server/) | MCP server – exposes OData query, write, validation, certification tools for AI agents ([guide](reso-mcp-server/doc/GUIDE.md)) | 21 |
 
 ## Quick Start
 

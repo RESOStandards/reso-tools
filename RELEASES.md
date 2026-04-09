@@ -1,14 +1,14 @@
-# RESO Tools — Release Notes
+# RESO Tools – Release Notes
 
 ---
 
-## v0.7 — 2026-04-06
+## v0.7 – 2026-04-06
 
 ### Return of the MCP
 
 The MCP server picks up where v0.6 left off. v0.6 shipped seven read tools and proved AI agents could drive RESO end to end; v0.7 fills in the gaps that real-world Add/Edit work needs and gives AI integrators a real walkthrough to learn from.
 
-#### Write tools — `create`, `update`, `delete`
+#### Write tools – `create`, `update`, `delete`
 
 Three new tools wrap the OData POST / PATCH / DELETE paths against any RESO resource. Each carries the standard MCP `ToolAnnotations` (`destructiveHint`, `idempotentHint`, `openWorldHint`), so compliant hosts like Claude Code, Claude Desktop, and IDE extensions can prompt the user before invoking destructive operations. `delete` is the only one tagged `destructiveHint: true`; `create` and `update` rely on the assistant-side confirmation dance instead.
 
@@ -18,13 +18,13 @@ The handlers reuse the same `odataRequest` + `buildResourceUrl(serverUrl, resour
 
 [`reso-mcp-server/doc/GUIDE.md`](reso-mcp-server/doc/GUIDE.md) is a dialogue-format walkthrough of working with a RESO OData server through an AI assistant. Every tool call and every response in the guide was captured live against the seeded reference server with `ENTITY_EVENT=true`. Sections cover:
 
-- **Authentication** — both bearer-token and Client Credentials, framed as a real first-contact conversation
-- **Metadata exploration** — what 14 resources look like on the wire, the field-type breakdown of `Property`, the lookup reverse index that powers dd.reso.org
+- **Authentication** – both bearer-token and Client Credentials, framed as a real first-contact conversation
+- **Metadata exploration** – what 14 resources look like on the wire, the field-type breakdown of `Property`, the lookup reverse index that powers dd.reso.org
 - **Querying the Lookup resource** to resolve allowed values for any lookup-backed string
-- **Searching** — range filters, string matching, multi-value lookup lambdas (`Appliances/any(...)`), date windows for incremental sync, and `parse-filter` for sanity-checking complex expressions before sending
-- **Add/Edit and EntityEvent** — the complete write loop, including the polling-replication consumer pattern (404 or empty result on follow-up fetch means delete; otherwise compare or hash to detect change), the canonical 30-line sync loop, and a dedicated section on error handling that walks through structured 400s, structured 404s, and the silent-200 trap when servers don't enforce lookup membership on PATCH
+- **Searching** – range filters, string matching, multi-value lookup lambdas (`Appliances/any(...)`), date windows for incremental sync, and `parse-filter` for sanity-checking complex expressions before sending
+- **Add/Edit and EntityEvent** – the complete write loop, including the polling-replication consumer pattern (404 or empty result on follow-up fetch means delete; otherwise compare or hash to detect change), the canonical 30-line sync loop, and a dedicated section on error handling that walks through structured 400s, structured 404s, and the silent-200 trap when servers do not enforce lookup membership on PATCH
 
-The guide is intentionally written as user-and-assistant dialogue rather than API reference — every section starts with a real question and ends with the assistant's interpretation of the live response.
+The guide is intentionally written as user-and-assistant dialogue rather than API reference – every section starts with a real question and ends with the assistant's interpretation of the live response.
 
 #### EntityEvent end-to-end through MCP
 
@@ -49,7 +49,7 @@ The Pagefind search index is now built and deployed for tools.reso.org via the G
 
 ---
 
-## v0.6 — 2026-04-06
+## v0.6 – 2026-04-06
 
 ### The MCP Strikes Back
 
@@ -59,68 +59,68 @@ The Java-based web-api-commander has been retired. All certification testing now
 
 #### Certification CLI (`reso-cert`)
 
-- **Add/Edit (RCP-010)** — 8 scenarios with auto-generated payloads, listr2 progress, config file support
-- **EntityEvent (RCP-027)** — observe + full mode, 9-12 scenarios
-- **Web API Core 2.0.0/2.1.0** — 45+ data-driven scenarios, auto-detects enum mode (isflags/collections/string), coverage matrix, per-request latency tracking, `--full-coverage` flag
-- **Data Dictionary 2.0/2.1** — full pipeline: metadata serialization, Lookup Resource merge, variations checking, 3 replication strategies (TIMESTAMP_DESC, NEXT_LINK, NEXT_LINK+filter)
-- **Auth chain** — resolves from CLI flags > config file > `.env` > `RESO_*` env vars
-- **Output** — listr2 spinners (default), `--verbose` for CI, `--output json` for piping
+- **Add/Edit (RCP-010)** – 8 scenarios with auto-generated payloads, listr2 progress, config file support
+- **EntityEvent (RCP-027)** – observe + full mode, 9-12 scenarios
+- **Web API Core 2.0.0/2.1.0** – 45+ data-driven scenarios, auto-detects enum mode (isflags/collections/string), coverage matrix, per-request latency tracking, `--full-coverage` flag
+- **Data Dictionary 2.0/2.1** – full pipeline: metadata serialization, Lookup Resource merge, variations checking, 3 replication strategies (TIMESTAMP_DESC, NEXT_LINK, NEXT_LINK+filter)
+- **Auth chain** – resolves from CLI flags > config file > `.env` > `RESO_*` env vars
+- **Output** – listr2 spinners (default), `--verbose` for CI, `--output json` for piping
 
 #### MCP Server (`reso-mcp-server`)
 
-New package — 7 tools: authenticate, query, metadata, validate, parse-filter, run-compliance, metadata-report. Works with Claude, Cursor, VS Code, Windsurf, JetBrains, Zed, and any MCP client.
+New package – 7 tools: authenticate, query, metadata, validate, parse-filter, run-compliance, metadata-report. Works with Claude, Cursor, VS Code, Windsurf, JetBrains, Zed, and any MCP client.
 
 #### Metadata Tooling
 
-- **EDMX → JSON serializer** — replaces Commander's MetadataReport + FieldJson + LookupJson Java serializers
-- **XLSX → JSON generator** — replaces Commander's codegen. Reads DD sheets, produces reference metadata
-- **Lookup Resource fetcher** — `@odata.nextLink` pagination with `$top/$skip` fallback
+- **EDMX → JSON serializer** – replaces Commander's MetadataReport + FieldJson + LookupJson Java serializers
+- **XLSX → JSON generator** – replaces Commander's codegen. Reads DD sheets, produces reference metadata
+- **Lookup Resource fetcher** – `@odata.nextLink` pagination with `$top/$skip` fallback
 - **DD 2.0 and 2.1 reference metadata** generated and validated (41→44 resources, 1745→2170 fields, 3611→4177 lookups)
 
 #### Desktop Client
 
-- **DD version chooser** — Server menu with DD 2.0 / DD 2.1 (Draft) selection
-- **Per-version SQLite databases** — switching versions doesn't destroy data
-- **Version display** — window title and server switcher show active DD version
+- **DD version chooser** – Server menu with DD 2.0 / DD 2.1 (Draft) selection
+- **Per-version SQLite databases** – switching versions does not destroy data
+- **Version display** – window title and server switcher show active DD version
 
 #### Data Generator
 
-- **Lookup resolution fix** — uses LookupName annotations for string-based enum lookup
-- **Collection() type unwrapping** — `buildLookupMap` now unwraps `Collection(org.reso.metadata.enums.X)` so multi-value enum fields resolve their lookups correctly
-- **Human-friendly values** — StandardName annotations produce DD-compliant values
-- **Placeholder filtering** — skips SampleXxxEnumValue placeholders for open enums
-- **Realistic open enum values** — 34 open enum types (City, CountyOrParish, schools, districts, MLS areas, etc.) now have realistic PascalCased lookup values instead of SampleXxxEnumValue placeholders
+- **Lookup resolution fix** – uses LookupName annotations for string-based enum lookup
+- **Collection() type unwrapping** – `buildLookupMap` now unwraps `Collection(org.reso.metadata.enums.X)` so multi-value enum fields resolve their lookups correctly
+- **Human-friendly values** – StandardName annotations produce DD-compliant values
+- **Placeholder filtering** – skips SampleXxxEnumValue placeholders for open enums
+- **Realistic open enum values** – 34 open enum types (City, CountyOrParish, schools, districts, MLS areas, etc.) now have realistic PascalCased lookup values instead of SampleXxxEnumValue placeholders
 
 #### Docker and CI
 
-- **Simplified entrypoints** — all compliance containers use one Dockerfile (no more Dockerfile.core, Dockerfile.dd)
-- **DD strict mode** — `entrypoint-dd.sh` now passes `--strict`, failing on variations and schema validation errors instead of silently logging them
-- **MCP smoke test in CI** — new `compliance-mcp` Docker service builds the MCP server image and runs JSON-RPC requests against the reference server (5/5 tools verified: initialize, tools/list, metadata, query, parse-filter)
-- **Release workflow fix** — `gh release create` would fail when a draft release was published manually before the workflow ran. The workflow now checks if a release already exists and uploads to it instead of trying to create a duplicate.
-- **Express wildcard fix** — updated `*` routes to `/{*path}` for newer path-to-regexp
-- **CI workflow** — added reso-certification and reso-mcp-server to build and test pipeline
+- **Simplified entrypoints** – all compliance containers use one Dockerfile (no more Dockerfile.core, Dockerfile.dd)
+- **DD strict mode** – `entrypoint-dd.sh` now passes `--strict`, failing on variations and schema validation errors instead of silently logging them
+- **MCP smoke test in CI** – new `compliance-mcp` Docker service builds the MCP server image and runs JSON-RPC requests against the reference server (5/5 tools verified: initialize, tools/list, metadata, query, parse-filter)
+- **Release workflow fix** – `gh release create` would fail when a draft release was published manually before the workflow ran. The workflow now checks if a release already exists and uploads to it instead of trying to create a duplicate.
+- **Express wildcard fix** – updated `*` routes to `/{*path}` for newer path-to-regexp
+- **CI workflow** – added reso-certification and reso-mcp-server to build and test pipeline
 
 #### Package Naming
 
-- **Consistent `@reso-standards/reso-*` convention** — renamed `@reso-standards/reference-server`, `@reso-standards/web-client`, `@reso-standards/desktop-client`, and `@reso-standards/web-api-proxy` to include the `reso-` prefix, matching the folder names and other packages
+- **Consistent `@reso-standards/reso-*` convention** – renamed `@reso-standards/reference-server`, `@reso-standards/web-client`, `@reso-standards/desktop-client`, and `@reso-standards/web-api-proxy` to include the `reso-` prefix, matching the folder names and other packages
 
 #### Documentation
 
-- **Per-endorsement READMEs** — test matrices, enum modes, coverage, pipeline steps
-- **Migration guide** — command mapping from cert-utils/Commander to reso-cert
+- **Per-endorsement READMEs** – test matrices, enum modes, coverage, pipeline steps
+- **Migration guide** – command mapping from cert-utils/Commander to reso-cert
 - **Release workflow** added to CLAUDE.md
 - **DD 2.1 documentation** live at dd.reso.org
-- **LICENSE links** — all package READMEs now link to the GitHub LICENSE URL (fixes 404s on GH Pages and npm)
-- **GH Pages** — updated hero stats, test counts, CLI examples, added MCP server to package listing and architecture diagram, fixed mobile nav layout
+- **LICENSE links** – all package READMEs now link to the GitHub LICENSE URL (fixes 404s on GH Pages and npm)
+- **GH Pages** – updated hero stats, test counts, CLI examples, added MCP server to package listing and architecture diagram, fixed mobile nav layout
 
 #### Data Quality
 
-- **Unicode BOM fix** — removed invisible U+FEFF (byte order mark) from "Full Exposure" lookup value in DD 2.1 reference metadata and server metadata. Fixed XLSX source sheets for DD 2.0 and 2.1 (21 NBSP and 1 BOM cleaned)
-- **DD strict compliance** — 8/8 DD steps pass with `--strict` flag: health check, auth, metadata report, replication state, variations (0 found), and all 3 replication strategies (TIMESTAMP_DESC, NEXT_LINK, NEXT_LINK+filter)
+- **Unicode BOM fix** – removed invisible U+FEFF (byte order mark) from "Full Exposure" lookup value in DD 2.1 reference metadata and server metadata. Fixed XLSX source sheets for DD 2.0 and 2.1 (21 NBSP and 1 BOM cleaned)
+- **DD strict compliance** – 8/8 DD steps pass with `--strict` flag: health check, auth, metadata report, replication state, variations (0 found), and all 3 replication strategies (TIMESTAMP_DESC, NEXT_LINK, NEXT_LINK+filter)
 
 #### Performance
 
-- **Vitest benchmarks** — parser (1.1M ops/sec), assertions (18M ops/sec), query building (3.6M ops/sec)
+- **Vitest benchmarks** – parser (1.1M ops/sec), assertions (18M ops/sec), query building (3.6M ops/sec)
 - **`--batch-expand`** option for DD testing (batches $expand per resource)
 - **Coverage reporting** via @vitest/coverage-v8
 
@@ -131,7 +131,7 @@ New package — 7 tools: authenticate, query, metadata, validate, parse-filter, 
 
 ---
 
-## v0.4 — 2026-04-05
+## v0.4 – 2026-04-05
 
 ### Package Restructuring and Desktop Client Improvements
 
@@ -139,37 +139,37 @@ Fourth milestone release restructuring packages for the upcoming RESO compliance
 
 #### Package Restructuring
 
-- **Renamed packages** — `validation/` → `reso-validation/`, `data-generator/` → `reso-data-generator/`, `certification/` → `reso-certification/` with updated package names (`@reso-standards/reso-validation`, `@reso-standards/reso-data-generator`, `@reso-standards/reso-certification`).
-- **Added `reso-certification-utils@3.0.0`** — RESO certification SDK added as a dependency of `reso-certification`, installed from GitHub. Provides DD testing, replication, schema validation, variations detection, and UPI validation.
-- **Updated all cross-references** — Imports, `file:` dependencies, Dockerfiles, CI workflows, docker-compose, lefthook, and documentation.
+- **Renamed packages** – `validation/` → `reso-validation/`, `data-generator/` → `reso-data-generator/`, `certification/` → `reso-certification/` with updated package names (`@reso-standards/reso-validation`, `@reso-standards/reso-data-generator`, `@reso-standards/reso-certification`).
+- **Added `reso-certification-utils@3.0.0`** – RESO certification SDK added as a dependency of `reso-certification`, installed from GitHub. Provides DD testing, replication, schema validation, variations detection, and UPI validation.
+- **Updated all cross-references** – Imports, `file:` dependencies, Dockerfiles, CI workflows, docker-compose, lefthook, and documentation.
 
 #### Desktop Client
 
-- **Splash screen** — RESO logo with spinner shown while the server initializes. Adapts to dark/light mode. No more white flash on startup.
-- **Dark mode persistence** — Theme preference saved to Electron secure storage. Survives app restarts (previously lost because `localStorage` is per-origin and the server uses random ports).
-- **Update checker** — Checks GitHub releases on launch (silent notification badge) and from Help > Check for Updates (interactive dialog). Release URL validated against expected GitHub domain.
-- **Server bundle fix** — Native dependencies (`better-sqlite3`) now resolved from the correct `node_modules`. Stub packages for `pg` and `mongodb` prevent ESM resolution failures in SQLite-only desktop mode.
-- **EPIPE fix** — Broken pipe errors on shutdown no longer crash the app.
-- **Window lifecycle** — Window hidden before close to prevent flash. `show: false` until content is ready.
-- **Help menu** — Added links to Releases, Announcements, and Security Audit on tools.reso.org.
+- **Splash screen** – RESO logo with spinner shown while the server initializes. Adapts to dark/light mode. No more white flash on startup.
+- **Dark mode persistence** – Theme preference saved to Electron secure storage. Survives app restarts (previously lost because `localStorage` is per-origin and the server uses random ports).
+- **Update checker** – Checks GitHub releases on launch (silent notification badge) and from Help > Check for Updates (interactive dialog). Release URL validated against expected GitHub domain.
+- **Server bundle fix** – Native dependencies (`better-sqlite3`) now resolved from the correct `node_modules`. Stub packages for `pg` and `mongodb` prevent ESM resolution failures in SQLite-only desktop mode.
+- **EPIPE fix** – Broken pipe errors on shutdown no longer crash the app.
+- **Window lifecycle** – Window hidden before close to prevent flash. `show: false` until content is ready.
+- **Help menu** – Added links to Releases, Announcements, and Security Audit on tools.reso.org.
 
 #### Security
 
-- **`navigateTo` injection fix** — Menu navigation paths are now JSON-serialized instead of string-interpolated into `executeJavaScript` calls, preventing potential script injection.
-- **Release URL validation** — Update checker validates that release URLs point to `https://github.com/RESOStandards/reso-tools/releases/` before opening in the browser.
+- **`navigateTo` injection fix** – Menu navigation paths are now JSON-serialized instead of string-interpolated into `executeJavaScript` calls, preventing potential script injection.
+- **Release URL validation** – Update checker validates that release URLs point to `https://github.com/RESOStandards/reso-tools/releases/` before opening in the browser.
 
 #### Release Workflow
 
-- **Tag-triggered builds** — Release workflow now triggers on `v*` tag push instead of release events. Builds all three platforms (macOS, Windows, Linux) and creates the GitHub release with binaries attached automatically.
-- **Cross-platform postinstall** — Removed macOS-only `PlistBuddy` commands from `postinstall`.
-- **Linux .deb fix** — Added `artifactName` to electron-builder config to avoid invalid paths from scoped package names.
+- **Tag-triggered builds** – Release workflow now triggers on `v*` tag push instead of release events. Builds all three platforms (macOS, Windows, Linux) and creates the GitHub release with binaries attached automatically.
+- **Cross-platform postinstall** – Removed macOS-only `PlistBuddy` commands from `postinstall`.
+- **Linux .deb fix** – Added `artifactName` to electron-builder config to avoid invalid paths from scoped package names.
 
 #### Site
 
-- **About dropdown** — Consolidated Releases, Announcements, and Security Audit into a dropdown menu in the header navigation.
-- **Dark mode icons** — Added CSS overrides for audience and learn-more icon classes.
-- **Doc page styling** — New `doc` layout wraps markdown content pages in styled cards with proper typography.
-- **Proxy package link** — Added `reso-web-api-proxy` to the Pages workflow (was missing, causing a broken link).
+- **About dropdown** – Consolidated Releases, Announcements, and Security Audit into a dropdown menu in the header navigation.
+- **Dark mode icons** – Added CSS overrides for audience and learn-more icon classes.
+- **Doc page styling** – New `doc` layout wraps markdown content pages in styled cards with proper typography.
+- **Proxy package link** – Added `reso-web-api-proxy` to the Pages workflow (was missing, causing a broken link).
 
 #### Testing
 
@@ -178,7 +178,7 @@ Fourth milestone release restructuring packages for the upcoming RESO compliance
 
 ---
 
-## v0.3 — 2026-04-03
+## v0.3 – 2026-04-03
 
 ### The "Cache Me If You Can" Release
 
@@ -186,50 +186,50 @@ Third milestone release adding OAuth2 Client Credentials authentication, lazy lo
 
 #### OAuth2 Client Credentials
 
-- **Token fetch via proxy** — Client Credentials token requests route through `/api/proxy` to avoid CORS restrictions. Supports body, header (Basic), and query credential transport modes.
-- **Per-server token storage** — Access tokens stored per server ID in Electron secure storage (encrypted) or browser sessionStorage. Tokens survive page reloads.
-- **Proxy availability detection** — Client Credentials auth mode disabled in the connection modal when no proxy backend is detected.
-- **Token readiness gating** — Data and metadata requests wait for token availability on Client Credentials servers, preventing 401 race conditions.
+- **Token fetch via proxy** – Client Credentials token requests route through `/api/proxy` to avoid CORS restrictions. Supports body, header (Basic), and query credential transport modes.
+- **Per-server token storage** – Access tokens stored per server ID in Electron secure storage (encrypted) or browser sessionStorage. Tokens survive page reloads.
+- **Proxy availability detection** – Client Credentials auth mode disabled in the connection modal when no proxy backend is detected.
+- **Token readiness gating** – Data and metadata requests wait for token availability on Client Credentials servers, preventing 401 race conditions.
 
 #### Performance
 
-- **Lazy lookup loading** — Lookups fetched on demand per field or group instead of loading all enum values upfront. BasicSearch fetches only its 2-3 enum fields; AdvancedSearch fetches per expanded group.
-- **Batch lookup fetch** — `LookupName in (...)` queries with `Prefer: odata.maxpagesize` replace individual per-field requests. Configurable via `maxPageSize` on `LookupResolverConfig`.
-- **IndexedDB schema cache** — Parsed CSDL schemas cached with gzip compression and 24-hour TTL. Eliminates repeated `$metadata` fetches that trigger rate limiting.
-- **IndexedDB lookup cache** — Lookup values cached with 1-hour TTL per server per lookup name.
-- **Analytics-driven search fields** — BasicSearch uses `summary-fields.json` (RESO adoption data) to pick the most relevant fields for each resource.
-- **Per-server metadata refresh** — Stale-while-revalidate: only replaces cached metadata if the fresh fetch succeeds and parses.
+- **Lazy lookup loading** – Lookups fetched on demand per field or group instead of loading all enum values upfront. BasicSearch fetches only its 2-3 enum fields; AdvancedSearch fetches per expanded group.
+- **Batch lookup fetch** – `LookupName in (...)` queries with `Prefer: odata.maxpagesize` replace individual per-field requests. Configurable via `maxPageSize` on `LookupResolverConfig`.
+- **IndexedDB schema cache** – Parsed CSDL schemas cached with gzip compression and 24-hour TTL. Eliminates repeated `$metadata` fetches that trigger rate limiting.
+- **IndexedDB lookup cache** – Lookup values cached with 1-hour TTL per server per lookup name.
+- **Analytics-driven search fields** – BasicSearch uses `summary-fields.json` (RESO adoption data) to pick the most relevant fields for each resource.
+- **Per-server metadata refresh** – Stale-while-revalidate: only replaces cached metadata if the fresh fetch succeeds and parses.
 
 #### Standalone CORS Proxy (New Package)
 
-- **`@reso-standards/web-api-proxy`** — Lightweight Express server with CORS proxy, health endpoint, static file serving, and SPA fallback.
-- **Three deployment modes** — Standalone CLI, Express middleware, or Docker container.
-- **Desktop client fallback** — Server entry tries the reference server first, falls back to proxy-only mode when unavailable.
+- **`@reso-standards/web-api-proxy`** – Lightweight Express server with CORS proxy, health endpoint, static file serving, and SPA fallback.
+- **Three deployment modes** – Standalone CLI, Express middleware, or Docker container.
+- **Desktop client fallback** – Server entry tries the reference server first, falls back to proxy-only mode when unavailable.
 
 #### Error Handling
 
-- **Centralized `formatError`** — Maps HTTP status codes to human-readable titles and descriptions. Handles 429 rate limiting, 5xx server errors, auth failures, timeouts, and network errors.
-- **`FriendlyError` component** — Consistent error display across all pages with icon, quip, description, server response, request URL with copy button, and navigation buttons.
-- **Request URL display** — Shows the actual target URL (proxy unpacked) on error pages with copy-to-clipboard.
+- **Centralized `formatError`** – Maps HTTP status codes to human-readable titles and descriptions. Handles 429 rate limiting, 5xx server errors, auth failures, timeouts, and network errors.
+- **`FriendlyError` component** – Consistent error display across all pages with icon, quip, description, server response, request URL with copy button, and navigation buttons.
+- **Request URL display** – Shows the actual target URL (proxy unpacked) on error pages with copy-to-clipboard.
 
 #### Search and UI
 
-- **Filters button** — Direct access to Advanced Search from the search bar. Filter count badge using the OData expression parser.
-- **Apply Filters fix** — Combined URL param update prevents the filter from being lost when closing the advanced search panel.
-- **OData filter editor** — Inline toggle between basic search fields and raw OData filter input with copy button.
-- **Date picker** — Native `<input type="date">` for timestamp fields with dark mode support.
-- **ModificationTimestamp** — Always included in search fields and sort buttons when the server supports it.
-- **Error navigation** — Sticky footer on Add/Edit forms with Previous/Next to walk through validation errors. Scrolls to first error on submit using MutationObserver for collapsed panels.
-- **Collection enum toggle buttons** — Multi-value enum fields render as toggle buttons on Add/Edit forms, stored as arrays per OData standard.
-- **Media carousel** — Loading indicator with 50ms delay for slow images. Broken image placeholder with landscape icon.
-- **Metadata timestamp** — Shows when metadata was last fetched with per-server refresh button.
-- **Clear Metadata Cache** — Connection manager button to clear all cached metadata.
-- **Resource titles** — "Property Resource" instead of just "Property" on page headers.
+- **Filters button** – Direct access to Advanced Search from the search bar. Filter count badge using the OData expression parser.
+- **Apply Filters fix** – Combined URL param update prevents the filter from being lost when closing the advanced search panel.
+- **OData filter editor** – Inline toggle between basic search fields and raw OData filter input with copy button.
+- **Date picker** – Native `<input type="date">` for timestamp fields with dark mode support.
+- **ModificationTimestamp** – Always included in search fields and sort buttons when the server supports it.
+- **Error navigation** – Sticky footer on Add/Edit forms with Previous/Next to walk through validation errors. Scrolls to first error on submit using MutationObserver for collapsed panels.
+- **Collection enum toggle buttons** – Multi-value enum fields render as toggle buttons on Add/Edit forms, stored as arrays per OData standard.
+- **Media carousel** – Loading indicator with 50ms delay for slow images. Broken image placeholder with landscape icon.
+- **Metadata timestamp** – Shows when metadata was last fetched with per-server refresh button.
+- **Clear Metadata Cache** – Connection manager button to clear all cached metadata.
+- **Resource titles** – "Property Resource" instead of just "Property" on page headers.
 
 #### Testing
 
 - **928 unit/integration tests** across 7 packages (up from 856 in v0.2)
-- **72 web client tests** (new) — `getLookupName`, `buildSearchFields`, `humanizeError`, `formatError`, `unpackRequestUrl`, filter condition counting
+- **72 web client tests** (new) – `getLookupName`, `buildSearchFields`, `humanizeError`, `formatError`, `unpackRequestUrl`, filter condition counting
 - **4 compliance suites** pass on PostgreSQL
 - **GitHub issue created** for E2E tests with Playwright (RESOStandards/reso-tools#75)
 
@@ -237,11 +237,11 @@ Third milestone release adding OAuth2 Client Credentials authentication, lazy lo
 
 Pre-built binaries are available on the [GitHub Releases page](https://github.com/RESOStandards/reso-tools/releases). These binaries are **unsigned** and your operating system may warn you before running them.
 
-- **macOS** (.dmg) — On macOS Sequoia and earlier, right-click the app and select Open, then click Open in the confirmation dialog. On macOS Tahoe (26+), unsigned apps are blocked by Gatekeeper. After mounting the DMG and copying the app to Applications, run: `xattr -cr "/Applications/RESO Desktop Client.app"` to remove the quarantine attribute.
-- **Windows** (.exe) — Windows Defender SmartScreen may show "Windows protected your PC." Click "More info" then "Run anyway."
-- **Linux** (.AppImage, .deb) — AppImage: `chmod +x` the file and run it. Deb: install with `sudo dpkg -i`.
+- **macOS** (.dmg) – On macOS Sequoia and earlier, right-click the app and select Open, then click Open in the confirmation dialog. On macOS Tahoe (26+), unsigned apps are blocked by Gatekeeper. After mounting the DMG and copying the app to Applications, run: `xattr -cr "/Applications/RESO Desktop Client.app"` to remove the quarantine attribute.
+- **Windows** (.exe) – Windows Defender SmartScreen may show "Windows protected your PC." Click "More info" then "Run anyway."
+- **Linux** (.AppImage, .deb) – AppImage: `chmod +x` the file and run it. Deb: install with `sudo dpkg -i`.
 
-The app checks for updates on launch and from the Help > Check for Updates menu. When a new version is available, you'll be prompted to download it.
+The app checks for updates on launch and from the Help > Check for Updates menu. When a new version is available, you will be prompted to download it.
 
 #### Other
 
@@ -252,7 +252,7 @@ The app checks for updates on launch and from the Help > Check for Updates menu.
 
 ---
 
-## v0.2 — 2026-03-10
+## v0.2 – 2026-03-10
 
 ### RESO Desktop Client and Other Improvements
 
@@ -260,60 +260,60 @@ Second milestone release introducing a native desktop application, multi-server 
 
 #### Desktop Client (New)
 
-- **Electron desktop application** — Native app wrapping the reference server and UI for macOS, Windows, and Linux. Dual-process architecture: CJS main process for window management, ESM child process for the server (avoids Electron's CJS/ESM interop issues).
-- **Native menus and navigation** — Full menu bar (File, Edit, View, Navigate, Window, Help), keyboard shortcuts (Cmd/Ctrl+[/] for back/forward), three-finger swipe gestures, and trackpad scroll navigation.
-- **RESO-branded icons** — Custom `.icns` (macOS), `.ico` (Windows), and `.png` (Linux) app icons.
-- **Automatic port discovery** — Server starts on a random available port and communicates readiness via IPC.
-- **SQLite backend** — Persistent storage in the user data directory, no external database required.
+- **Electron desktop application** – Native app wrapping the reference server and UI for macOS, Windows, and Linux. Dual-process architecture: CJS main process for window management, ESM child process for the server (avoids Electron's CJS/ESM interop issues).
+- **Native menus and navigation** – Full menu bar (File, Edit, View, Navigate, Window, Help), keyboard shortcuts (Cmd/Ctrl+[/] for back/forward), three-finger swipe gestures, and trackpad scroll navigation.
+- **RESO-branded icons** – Custom `.icns` (macOS), `.ico` (Windows), and `.png` (Linux) app icons.
+- **Automatic port discovery** – Server starts on a random available port and communicates readiness via IPC.
+- **SQLite backend** – Persistent storage in the user data directory, no external database required.
 
 #### Server Switcher & External Server Support
 
-- **Multi-server connectivity** — New server switcher component allows connecting to external OData servers alongside the built-in reference server. Supports Bearer token and Client Credentials OAuth2 authentication.
-- **Server connection modal** — Add/edit/remove server connections with live connection testing. Stored in React context with localStorage persistence.
-- **Server-aware proxy** — Backend proxy endpoint forwards OData requests to external servers, handling authentication and CORS transparently.
-- **Metadata adapter** — Translates external server CSDL metadata into the internal format, enabling the full UI (search, detail, CRUD) against any OData-compliant server.
-- **Granular permissions** — Server context tracks per-server capabilities (read, create, update, delete) and the UI adapts accordingly (hides Add/Edit/Delete for read-only servers).
+- **Multi-server connectivity** – New server switcher component allows connecting to external OData servers alongside the built-in reference server. Supports Bearer token and Client Credentials OAuth2 authentication.
+- **Server connection modal** – Add/edit/remove server connections with live connection testing. Stored in React context with localStorage persistence.
+- **Server-aware proxy** – Backend proxy endpoint forwards OData requests to external servers, handling authentication and CORS transparently.
+- **Metadata adapter** – Translates external server CSDL metadata into the internal format, enabling the full UI (search, detail, CRUD) against any OData-compliant server.
+- **Granular permissions** – Server context tracks per-server capabilities (read, create, update, delete) and the UI adapts accordingly (hides Add/Edit/Delete for read-only servers).
 
 #### UI Enhancements
 
-- **Landing page** — New home page with server status, resource overview cards, and quick navigation.
-- **Metadata Explorer** — Browse entity types, fields, navigation properties, and enumerations from the server's `$metadata`. Searchable and filterable.
-- **Mobile responsive layout** — Collapsible sidebar, responsive grid layouts, and touch-friendly controls.
-- **Advanced search overlay** — Full-screen search panel with field-type-aware inputs, date pickers, and lookup dropdowns.
-- **Human-friendly lookups** — Unified lookup resolver translates enum values to display names throughout the UI.
-- **Loading spinner** — Consistent loading state across all pages.
-- **Password field masking** — Sensitive fields (tokens, passwords) masked by default with toggle to reveal.
-- **Dynamic key discovery** — Detail/edit pages work with any key field, not just hardcoded `ListingKey`.
-- **Generic media display** — Media carousel works with any resource that has navigation to Media, not just Property.
-- **Organizations page** — Browse the RESO member directory with multi-select filters (type, location, status), sortable columns, sticky table header, zebra-striped rows, and expandable detail rows with endorsements, address, certification link, and embedded OpenStreetMap.
-- **Friendly error pages** — Reusable `FriendlyError` component and redesigned 404 page with real-estate quips, styled server message blocks, navigation buttons, and Contact Support link. Applied consistently across all page-level error states.
-- **Sidebar navigation polish** — Added Organizations link, replaced chevron arrows with semantic icons (search for Resources, code brackets for Metadata, gear for Admin, chart for Data Generator), renamed "Metadata Explorer" to "Metadata", consistent spacing via `space-y-4`.
-- **Metadata filter labels** — Renamed "Properties" filter to "Fields" to avoid ambiguity with the Property resource in real estate contexts.
+- **Landing page** – New home page with server status, resource overview cards, and quick navigation.
+- **Metadata Explorer** – Browse entity types, fields, navigation properties, and enumerations from the server's `$metadata`. Searchable and filterable.
+- **Mobile responsive layout** – Collapsible sidebar, responsive grid layouts, and touch-friendly controls.
+- **Advanced search overlay** – Full-screen search panel with field-type-aware inputs, date pickers, and lookup dropdowns.
+- **Human-friendly lookups** – Unified lookup resolver translates enum values to display names throughout the UI.
+- **Loading spinner** – Consistent loading state across all pages.
+- **Password field masking** – Sensitive fields (tokens, passwords) masked by default with toggle to reveal.
+- **Dynamic key discovery** – Detail/edit pages work with any key field, not just hardcoded `ListingKey`.
+- **Generic media display** – Media carousel works with any resource that has navigation to Media, not just Property.
+- **Organizations page** – Browse the RESO member directory with multi-select filters (type, location, status), sortable columns, sticky table header, zebra-striped rows, and expandable detail rows with endorsements, address, certification link, and embedded OpenStreetMap.
+- **Friendly error pages** – Reusable `FriendlyError` component and redesigned 404 page with real-estate quips, styled server message blocks, navigation buttons, and Contact Support link. Applied consistently across all page-level error states.
+- **Sidebar navigation polish** – Added Organizations link, replaced chevron arrows with semantic icons (search for Resources, code brackets for Metadata, gear for Admin, chart for Data Generator), renamed "Metadata Explorer" to "Metadata", consistent spacing via `space-y-4`.
+- **Metadata filter labels** – Renamed "Properties" filter to "Fields" to avoid ambiguity with the Property resource in real estate contexts.
 
 #### Data Dictionary Documentation Site
 
-- **Sticky column headers** — FIELD/DEFINITION/TYPE/USAGE headers stick below the sort controls as you scroll through fields, in both grouped and flat views.
-- **Group tree improvements** — Sidebar group tree syncs with content: hides when flat-sorting, reappears when Show Groups is toggled. Groups with subgroups show expand/collapse chevrons. Clicking a group scrolls to it with correct offset accounting for sticky headers.
-- **Parent-first group ordering** — Parent group fields now render before subgroups (e.g., Structure fields appear before Structure > Performance > GreenMarketing).
-- **Cross-reference links on lookup values** — The References field on lookup value pages now links to property type cross-reference pages.
-- **Terms and Definitions link** — Every resource, field, and lookup page links to the version-specific terms glossary.
-- **Mobile layout overhaul** — Sticky resource header pins breadcrumb, title, definition and sort controls below the nav bar. Sort pills replaced with a compact dropdown + direction toggle. Sticky column headers in both grouped and ungrouped modes. StandardName truncation with ellipsis. Definition callout collapses to 2 lines with overflow-aware "... more" toggle.
-- **Dark/light mode toggle** — Moved out of the hamburger menu and placed in the header bar, always accessible.
-- **404 page** — Real estate dad jokes with a "tell me another one" button.
-- **Copy buttons on detail pages** — Clipboard icons on Standard Name and Display Name (fields) and Lookup Name, Standard Value, and Legacy OData Value (lookups).
-- **Show Groups toggle** — Now a proper toggle: click to activate groups, click again to deactivate and revert to flat Name sort.
+- **Sticky column headers** – FIELD/DEFINITION/TYPE/USAGE headers stick below the sort controls as you scroll through fields, in both grouped and flat views.
+- **Group tree improvements** – Sidebar group tree syncs with content: hides when flat-sorting, reappears when Show Groups is toggled. Groups with subgroups show expand/collapse chevrons. Clicking a group scrolls to it with correct offset accounting for sticky headers.
+- **Parent-first group ordering** – Parent group fields now render before subgroups (e.g., Structure fields appear before Structure > Performance > GreenMarketing).
+- **Cross-reference links on lookup values** – The References field on lookup value pages now links to property type cross-reference pages.
+- **Terms and Definitions link** – Every resource, field, and lookup page links to the version-specific terms glossary.
+- **Mobile layout overhaul** – Sticky resource header pins breadcrumb, title, definition and sort controls below the nav bar. Sort pills replaced with a compact dropdown + direction toggle. Sticky column headers in both grouped and ungrouped modes. StandardName truncation with ellipsis. Definition callout collapses to 2 lines with overflow-aware "... more" toggle.
+- **Dark/light mode toggle** – Moved out of the hamburger menu and placed in the header bar, always accessible.
+- **404 page** – Real estate dad jokes with a "tell me another one" button.
+- **Copy buttons on detail pages** – Clipboard icons on Standard Name and Display Name (fields) and Lookup Name, Standard Value, and Legacy OData Value (lookups).
+- **Show Groups toggle** – Now a proper toggle: click to activate groups, click again to deactivate and revert to flat Name sort.
 
 #### Monorepo Restructuring
 
-- **Flat package layout** — Extracted `reso-web-client/` and `reso-desktop-client/` to top-level packages (previously nested under `reso-reference-server/ui/` and `reso-reference-server/desktop/`).
-- **Updated READMEs** — All package READMEs reviewed and updated for the new layout: fixed stale paths, LICENSE links, package references, and CLI examples.
-- **Desktop client documentation** — Added prerequisites, local dev quick-start, architecture overview, packaging notes, and connection storage details.
+- **Flat package layout** – Extracted `reso-web-client/` and `reso-desktop-client/` to top-level packages (previously nested under `reso-reference-server/ui/` and `reso-reference-server/desktop/`).
+- **Updated READMEs** – All package READMEs reviewed and updated for the new layout: fixed stale paths, LICENSE links, package references, and CLI examples.
+- **Desktop client documentation** – Added prerequisites, local dev quick-start, architecture overview, packaging notes, and connection storage details.
 
 #### OData Client Improvements
 
-- **HTTP keep-alive and gzip compression** — Connection pooling and response compression for faster metadata and data fetching.
-- **CSDL parser enhancements** — Extended parser handles navigation property bindings, enum type members, and complex type definitions from external servers.
-- **Lookup resolver library** — New `@reso-standards/reso-client` export for resolving human-friendly lookup values from CSDL metadata.
+- **HTTP keep-alive and gzip compression** – Connection pooling and response compression for faster metadata and data fetching.
+- **CSDL parser enhancements** – Extended parser handles navigation property bindings, enum type members, and complex type definitions from external servers.
+- **Lookup resolver library** – New `@reso-standards/reso-client` export for resolving human-friendly lookup values from CSDL metadata.
 
 #### Compliance Testing
 
@@ -326,33 +326,33 @@ All four RESO certification suites pass against the reference server with Postgr
 | Add/Edit (RCP-010) | All passed |
 | EntityEvent (RCP-027) | All passed, 1000 events validated |
 
-- **Docker compliance infrastructure** — Added data seeding to DD and Web API Core compliance entrypoints. Fixed Dockerfile runtime stage to include server config files required by `import.meta.dirname` resolution.
-- **Fixed OData `$skip` handling** — `$top` is now correctly treated as a per-page limit per the OData spec, independent of `$skip`. Previously, `$top=5&$skip=5` returned empty results because the handler calculated `remaining = 5-5 = 0`.
+- **Docker compliance infrastructure** – Added data seeding to DD and Web API Core compliance entrypoints. Fixed Dockerfile runtime stage to include server config files required by `import.meta.dirname` resolution.
+- **Fixed OData `$skip` handling** – `$top` is now correctly treated as a per-page limit per the OData spec, independent of `$skip`. Previously, `$top=5&$skip=5` returned empty results because the handler calculated `remaining = 5-5 = 0`.
 
 #### CI/CD
 
-- **Compliance workflow on PR** — GitHub Actions runs all four compliance suites (DD 2.0, Web API Core, Add/Edit, EntityEvent) against PostgreSQL, MongoDB, and SQLite on every pull request. Seeds 1K Property records per backend.
-- **GitHub Pages on merge** — Pages workflow triggers on merge to `main` (was temporarily set to `v0.2` during development). DD documentation auto-generated from CSV data.
+- **Compliance workflow on PR** – GitHub Actions runs all four compliance suites (DD 2.0, Web API Core, Add/Edit, EntityEvent) against PostgreSQL, MongoDB, and SQLite on every pull request. Seeds 1K Property records per backend.
+- **GitHub Pages on merge** – Pages workflow triggers on merge to `main` (was temporarily set to `v0.2` during development). DD documentation auto-generated from CSV data.
 
 #### Housekeeping
 
-- **Root CLAUDE.md** — Added project-wide coding standards (functional/declarative, no classes, no `any`, arrow functions, immutability). Removed redundant package-level CLAUDE.md files.
-- **LICENSE** — Renamed from `License.txt`; updated all package README references.
-- **README badges** — Tests (856 passed), coverage (97%), RESO compliance (4/4 suites).
-- **Doc/ cleanup** — Removed stale project summary files.
+- **Root CLAUDE.md** – Added project-wide coding standards (functional/declarative, no classes, no `any`, arrow functions, immutability). Removed redundant package-level CLAUDE.md files.
+- **LICENSE** – Renamed from `License.txt`; updated all package README references.
+- **README badges** – Tests (856 passed), coverage (97%), RESO compliance (4/4 suites).
+- **Doc/ cleanup** – Removed stale project summary files.
 
 #### Security
 
-- **v0.2 security audit** — 11 new findings across desktop client, server switcher, proxy, and UI. 3 High, 5 Medium, 3 Low severity.
-- **5 prior findings confirmed fixed** — Token expiry, timing-safe auth, LIKE escaping, key interpolation, and security headers (matching closed GitHub issues).
+- **v0.2 security audit** – 11 new findings across desktop client, server switcher, proxy, and UI. 3 High, 5 Medium, 3 Low severity.
+- **5 prior findings confirmed fixed** – Token expiry, timing-safe auth, LIKE escaping, key interpolation, and security headers (matching closed GitHub issues).
 
 #### Bug Fixes
 
-- **Fix detail page summary fields** — Summary section now displays correctly with proper field resolution.
-- **Fix expansion card layout** — Related record cards handle non-entity-set expansions with key field fallback.
-- **Fix search lookups** — Lookup fields in search filters resolve to correct display values.
-- **Fix MongoDB Add/Edit compliance** — CRUD operations work correctly with MongoDB backend.
-- **Remove `ListPrice >= ListPriceLow` cross-field rule** — The comparison prevented setting a low list price. Both fields are now validated independently as > 0, which is sufficient. A proper RESO Validation Expressions engine will replace hardcoded rules in a future release.
+- **Fix detail page summary fields** – Summary section now displays correctly with proper field resolution.
+- **Fix expansion card layout** – Related record cards handle non-entity-set expansions with key field fallback.
+- **Fix search lookups** – Lookup fields in search filters resolve to correct display values.
+- **Fix MongoDB Add/Edit compliance** – CRUD operations work correctly with MongoDB backend.
+- **Remove `ListPrice >= ListPriceLow` cross-field rule** – The comparison prevented setting a low list price. Both fields are now validated independently as > 0, which is sufficient. A proper RESO Validation Expressions engine will replace hardcoded rules in a future release.
 
 | SHA | Description |
 |-----|-------------|
@@ -372,7 +372,7 @@ All four RESO certification suites pass against the reference server with Postgr
 
 ---
 
-## v0.1 — 2026-03-06
+## v0.1 – 2026-03-06
 
 ### UI Polish, Developer Experience, and Compliance Fixes
 
@@ -380,24 +380,24 @@ First milestone release focusing on UI improvements, developer workflow enhancem
 
 #### UI Improvements
 
-- **Pin action buttons to bottom of Add/Edit pages (#20)** — Submit buttons stay visible via `sticky bottom-0` as users scroll through long forms. Pinned header with back navigation and page title at the top.
-- **Fix detail page layout** — Restored side-by-side summary + media carousel using flexbox (`lg:flex-row`). Field groups render in two columns instead of one.
-- **Zebra striping on Related Records** — Alternating row backgrounds in expanded navigation property panels for improved readability.
+- **Pin action buttons to bottom of Add/Edit pages (#20)** – Submit buttons stay visible via `sticky bottom-0` as users scroll through long forms. Pinned header with back navigation and page title at the top.
+- **Fix detail page layout** – Restored side-by-side summary + media carousel using flexbox (`lg:flex-row`). Field groups render in two columns instead of one.
+- **Zebra striping on Related Records** – Alternating row backgrounds in expanded navigation property panels for improved readability.
 
 #### Developer Experience
 
-- **Docker hot-reload dev mode** — New `docker-compose.dev.yml` overlay runs the Vite dev server inside Docker with source volume mounts. Edits to `ui/src/` are reflected instantly without container rebuilds.
-- **Smart Vite proxy routing** — Rewrote `vite.config.ts` to mirror nginx routing logic: bare resource paths serve the SPA on browser navigation but proxy to the API for `fetch()` requests (`Accept: application/json`). Fixes the JSON-on-refresh bug in dev mode.
+- **Docker hot-reload dev mode** – New `docker-compose.dev.yml` overlay runs the Vite dev server inside Docker with source volume mounts. Edits to `ui/src/` are reflected instantly without container rebuilds.
+- **Smart Vite proxy routing** – Rewrote `vite.config.ts` to mirror nginx routing logic: bare resource paths serve the SPA on browser navigation but proxy to the API for `fetch()` requests (`Accept: application/json`). Fixes the JSON-on-refresh bug in dev mode.
 
 #### Documentation & Infrastructure
 
-- **RESO-branded GitHub Pages site** — Jekyll site in `.github/pages/` with custom layout matching certification.reso.org design (navy header, card-based content, green/blue badges). GitHub Actions workflow auto-syncs package READMEs into the site on every push to main.
+- **RESO-branded GitHub Pages site** – Jekyll site in `.github/pages/` with custom layout matching certification.reso.org design (navy header, card-based content, green/blue badges). GitHub Actions workflow auto-syncs package READMEs into the site on every push to main.
 
 #### Compliance Fixes
 
-- **Fix DD 2.0 schema validation errors** — Navigation properties (`HistoryTransactional`, `SocialMedia`) were leaking as empty arrays in MongoDB Property responses. Excluded `isExpansion` fields from collection field coercion.
-- **Fix SQLite readonly database** — Created `/data` directory with correct ownership in Dockerfile so the non-root `reso` user can write to mounted volumes.
-- **Fix Add/Edit compliance entrypoint** — Added `add-edit` subcommand after certification package consolidation.
+- **Fix DD 2.0 schema validation errors** – Navigation properties (`HistoryTransactional`, `SocialMedia`) were leaking as empty arrays in MongoDB Property responses. Excluded `isExpansion` fields from collection field coercion.
+- **Fix SQLite readonly database** – Created `/data` directory with correct ownership in Dockerfile so the non-root `reso` user can write to mounted volumes.
+- **Fix Add/Edit compliance entrypoint** – Added `add-edit` subcommand after certification package consolidation.
 - **All three backends** (PostgreSQL, MongoDB, SQLite) now pass DD 2.0 compliance with 0 schema validation errors.
 
 | SHA | Description |
@@ -411,7 +411,7 @@ First milestone release focusing on UI improvements, developer workflow enhancem
 
 ---
 
-## v0.0.28 — 2026-03-06
+## v0.0.28 – 2026-03-06
 
 ### EntityEvent Compliance Testing Tool (#44)
 
@@ -420,9 +420,9 @@ Validates that servers correctly implement change tracking via monotonically inc
 sequence numbers.
 
 **Two testing modes:**
-- **Observe mode** — read-only, for third-party servers. Polls for new events with
+- **Observe mode** – read-only, for third-party servers. Polls for new events with
   configurable timeout (`--poll-timeout`). Tests 8 scenarios + incremental sync via polling.
-- **Full mode** — write access, for reference server or servers with a writable canary
+- **Full mode** – write access, for reference server or servers with a writable canary
   resource. Creates/updates/deletes records and verifies corresponding EntityEvent entries.
   Tests all 11 scenarios.
 
@@ -440,10 +440,10 @@ sequence numbers.
 - `--strict` flag: unknown fields are failures (default: warnings)
 
 **Lightweight Edm type checker** (`edm-validator.ts`):
-- Shared infrastructure in `test-runner/` — reusable by future compliance tools
+- Shared infrastructure in `test-runner/` – reusable by future compliance tools
 - Validates: `Edm.String`, `Boolean`, `Int16/32/64`, `Decimal/Double/Single`,
   `DateTimeOffset`, `Date`, `TimeOfDay`, `Guid`, `Binary`, `Duration`, `Collection(X)`
-- Non-Edm types (enum types) return `skip` status — full enum validation deferred to
+- Non-Edm types (enum types) return `skip` status – full enum validation deferred to
   DD compliance tool (#42)
 
 **Compliance report generation:**
@@ -464,17 +464,17 @@ sequence numbers.
 - Simple OData `$filter` parser (`eq`, `gt`, `in` operators, `and` combinator)
 
 **New files (10):**
-- `src/entity-event/types.ts` — config, mode, scenario names, record shape, report types
-- `src/entity-event/test-runner.ts` — scenario runner for both modes
-- `src/entity-event/data-validator.ts` — batch record fetching and Edm validation
-- `src/entity-event/compliance-report.ts` — report generation
-- `src/entity-event/index.ts` — public exports
-- `src/entity-event/mock/handlers.ts` — mock server request handlers
-- `src/entity-event/mock/server.ts` — mock server setup/teardown
-- `src/test-runner/edm-validator.ts` — shared Edm type checker
-- `tests/edm-validator.test.ts` — 30 tests for Edm validator
-- `tests/entity-event-runner.test.ts` — 6 integration tests with mock server
-- `tests/entity-event-compliance-report.test.ts` — 6 report generation tests
+- `src/entity-event/types.ts` – config, mode, scenario names, record shape, report types
+- `src/entity-event/test-runner.ts` – scenario runner for both modes
+- `src/entity-event/data-validator.ts` – batch record fetching and Edm validation
+- `src/entity-event/compliance-report.ts` – report generation
+- `src/entity-event/index.ts` – public exports
+- `src/entity-event/mock/handlers.ts` – mock server request handlers
+- `src/entity-event/mock/server.ts` – mock server setup/teardown
+- `src/test-runner/edm-validator.ts` – shared Edm type checker
+- `tests/edm-validator.test.ts` – 30 tests for Edm validator
+- `tests/entity-event-runner.test.ts` – 6 integration tests with mock server
+- `tests/entity-event-compliance-report.test.ts` – 6 report generation tests
 
 **Tests:**
 - 42 new tests (30 edm-validator + 6 runner + 6 compliance-report)
@@ -483,9 +483,9 @@ sequence numbers.
 
 ---
 
-## v0.0.27 — 2026-03-06
+## v0.0.27 – 2026-03-06
 
-### EntityEvent Resource — RCP-27 (#43)
+### EntityEvent Resource – RCP-27 (#43)
 
 Adds the RESO EntityEvent Resource for change tracking via monotonically
 increasing sequence numbers. Every Create, Update, or Delete operation on the
@@ -493,13 +493,13 @@ server automatically writes an EntityEvent record with the affected ResourceName
 ResourceRecordKey, and a database-managed auto-increment EntityEventSequence.
 
 **Core implementation:**
-- DAL decorator pattern — wraps any `DataAccessLayer` to intercept all writes
+- DAL decorator pattern – wraps any `DataAccessLayer` to intercept all writes
   (including seeding and admin data generation) without modifying handler code
 - Database-native auto-increment sequences: PostgreSQL `BIGSERIAL`, SQLite
   `AUTOINCREMENT`, MongoDB atomic counter collection
-- `EntityEventWriter` interface — backend-agnostic abstraction for event persistence
+- `EntityEventWriter` interface – backend-agnostic abstraction for event persistence
 - EntityEvent exposed as read-only OData resource (GET collection + GET by key,
-  `$filter`, `$orderby`, `$top`, `$skip`, `$count` — no POST/PATCH/DELETE)
+  `$filter`, `$orderby`, `$top`, `$skip`, `$count` – no POST/PATCH/DELETE)
 - Opt-in via `ENTITY_EVENT=true` environment variable (disabled by default)
 
 **Compaction:**
@@ -511,13 +511,13 @@ ResourceRecordKey, and a database-managed auto-increment EntityEventSequence.
 - MongoDB: `$group` aggregation + `deleteMany`
 
 **Configuration:**
-- `ENTITY_EVENT=true` — enable EntityEvent tracking
-- `ENTITY_EVENT_RESOURCE_RECORD_URL=true` — include optional ResourceRecordUrl field
-- `COMPACTION_INTERVAL_MS=3600000` — compaction interval (default 1 hour)
+- `ENTITY_EVENT=true` – enable EntityEvent tracking
+- `ENTITY_EVENT_RESOURCE_RECORD_URL=true` – include optional ResourceRecordUrl field
+- `COMPACTION_INTERVAL_MS=3600000` – compaction interval (default 1 hour)
 
 **Docker Compose:**
 - All three server services (PostgreSQL, MongoDB, SQLite) pass through `ENTITY_EVENT`
-  via `${ENTITY_EVENT:-false}` — enable from the shell:
+  via `${ENTITY_EVENT:-false}` – enable from the shell:
   `ENTITY_EVENT=true docker compose --profile mongodb up -d mongodb server-mongo ui-mongo`
 
 **Schema:**
@@ -538,7 +538,7 @@ surface. npm audit: 5 moderate (dev-only: vitest/vite/esbuild).
 
 ---
 
-## v0.0.26 — 2026-03-06
+## v0.0.26 – 2026-03-06
 
 ### Add/Edit Compliance Report + PATCH Validation Fix (#41)
 
@@ -580,7 +580,7 @@ required fields.
 
 ---
 
-## v0.0.25 — 2026-03-05
+## v0.0.25 – 2026-03-05
 
 ### UI: Human-Friendly Field Names, Detail Page Improvements (#40)
 
@@ -589,7 +589,7 @@ Display human-friendly field names throughout the UI using
 
 **Human-friendly display names (#40):**
 - Added `getDisplayName(field)` and `getDisplayNameFromMap(fieldName, fieldMap)`
-  utilities to extract `StandardName` annotations — O(1) via `Map.get()` lookup
+  utilities to extract `StandardName` annotations – O(1) via `Map.get()` lookup
 - Applied across all UI surfaces: detail pages, search results cards, advanced
   search form, add/edit form labels, sort-by buttons
 - Labels show display name with tooltip; raw `fieldName` no longer exposed in UI
@@ -599,7 +599,7 @@ Display human-friendly field names throughout the UI using
   comma-separated strings
 - Zebra-striped rows on field lists (light/dark mode compatible)
 - Media preview floated right with fields flowing around and below it, replacing
-  the rigid 50/50 split — gives fields full width and eliminates value truncation
+  the rigid 50/50 split – gives fields full width and eliminates value truncation
 - Summary header (key, timestamp, address) separated into its own card
 - Tooltips on all truncated labels and values site-wide (detail, results cards,
   advanced search, form inputs)
@@ -611,7 +611,7 @@ Display human-friendly field names throughout the UI using
 
 ---
 
-## v0.0.24 — 2026-03-05
+## v0.0.24 – 2026-03-05
 
 ### DD 2.0 Compliance: Collection Nulls + Lookup/Data Generator Sync (#32)
 
@@ -628,7 +628,7 @@ testing with human-friendly string enumerations and the Lookup Resource.
 **Data generator / Lookup Resource value sync (143 errors):**
 - `PropertyType`, `PropertySubType`: Generator now draws from DD lookup map values
   instead of hardcoded arrays, with hardcoded fallback when no lookups exist
-- `MemberDesignation`: Same pattern — prefers DD lookup values over hardcoded list
+- `MemberDesignation`: Same pattern – prefers DD lookup values over hardcoded list
 - `City`: Added 15 real city names to `server-metadata.json` lookup entries
   (was a single placeholder)
 - `StreetSuffix`: Added 10 real suffixes to `server-metadata.json` lookup entries
@@ -638,13 +638,13 @@ testing with human-friendly string enumerations and the Lookup Resource.
 **DD 2.0 compliance result:** 1,034 passed, 0 failed, 0 schema validation errors,
 0 variations. Full compliance achieved on PostgreSQL with string enumerations.
 
-**Test counts:** 198 server tests, 104 data generator tests — all passing.
+**Test counts:** 198 server tests, 104 data generator tests – all passing.
 
 ---
 
-## v0.0.23 — 2026-03-05
+## v0.0.23 – 2026-03-05
 
-### EnumType Mode — OData Edm.EnumType Support (#30, #27)
+### EnumType Mode – OData Edm.EnumType Support (#30, #27)
 
 Added `ENUM_MODE=enum-type` as an alternative to string enumerations. When
 enabled, the server uses OData `Edm.EnumType` definitions in EDMX metadata
@@ -664,7 +664,7 @@ instead of `Edm.String` with `LookupName` annotations.
 
 **Compliance testing:**
 - RESOScript generator (`generate-resoscripts.sh`) updated for dual-mode
-  field extraction — matches `Type="org.reso.metadata.enums.*"` in enum-type
+  field extraction – matches `Type="org.reso.metadata.enums.*"` in enum-type
   mode vs `Edm.String` with `LookupName` in string mode
 - Namespace parameters (`SingleValueLookupNamespace`,
   `MultipleValueLookupNamespace`) populated from EDMX type attributes
@@ -679,37 +679,37 @@ instead of `Edm.String` with `LookupName` annotations.
 
 ---
 
-## v0.0.22 — 2026-03-05
+## v0.0.22 – 2026-03-05
 
 ### SQLite Data Access Layer Backend (#3)
 
 Added SQLite as a third database backend alongside PostgreSQL and MongoDB.
-Lightweight option requiring no external database — ideal for local development
+Lightweight option requiring no external database – ideal for local development
 and testing.
 
 **New files:**
-- `filter-to-sqlite.ts` — OData $filter to SQLite SQL translator (32 tests)
-- `sqlite-schema-generator.ts` — Edm type to SQLite type mapping + DDL (14 tests)
-- `sqlite-dal.ts` — Full `DataAccessLayer` implementation with CTE + LEFT JOIN
+- `filter-to-sqlite.ts` – OData $filter to SQLite SQL translator (32 tests)
+- `sqlite-schema-generator.ts` – Edm type to SQLite type mapping + DDL (14 tests)
+- `sqlite-dal.ts` – Full `DataAccessLayer` implementation with CTE + LEFT JOIN
   for `$expand`, `json_each()` for collection lambda expressions, `strftime()` for
   date functions, and `REGEXP` for `matchesPattern()`
-- `sqlite-pool.ts` — Database handle factory with WAL journal mode
+- `sqlite-pool.ts` – Database handle factory with WAL journal mode
 
 **Configuration:**
 - `DB_BACKEND=sqlite` selects the SQLite backend
 - `SQLITE_DB_PATH` sets the database file path (default: `./reso_reference.db`)
 
 **Docker Compose:**
-- `docker compose --profile sqlite up -d` — starts server + UI with SQLite
-- `docker compose --profile sqlite --profile seed-sqlite up` — seeds test data
+- `docker compose --profile sqlite up -d` – starts server + UI with SQLite
+- `docker compose --profile sqlite --profile seed-sqlite up` – seeds test data
 - Compliance profiles: `compliance-dd-sqlite`, `compliance-core-sqlite`
 
-**Compliance:** Web API Core 2.0.0 — 42/42 passed, 3 skipped (identical to
+**Compliance:** Web API Core 2.0.0 – 42/42 passed, 3 skipped (identical to
 PostgreSQL and MongoDB).
 
 ---
 
-## v0.0.21 — 2026-03-04
+## v0.0.21 – 2026-03-04
 
 ### Lookup Resource + Human-Friendly String Enumerations (#29)
 
@@ -769,9 +769,9 @@ required for DD 2.0 compliance when using `Edm.String` enumeration mode.
 
 ---
 
-## v0.0.20 — 2026-03-04
+## v0.0.20 – 2026-03-04
 
-### Web API Core 2.0.0 Compliance — All Tests Passing (#19)
+### Web API Core 2.0.0 Compliance – All Tests Passing (#19)
 
 The reference server now passes all applicable Web API Core 2.0.0 compliance
 tests: **42 passed, 0 failed, 3 skipped** (the 3 skipped are `has` operator
@@ -779,15 +779,15 @@ tests, not applicable when using string enumerations).
 
 **Server fixes:**
 
-- **PostgreSQL numeric coercion** — `pg` driver returns BIGINT/NUMERIC as
+- **PostgreSQL numeric coercion** – `pg` driver returns BIGINT/NUMERIC as
   strings; `deserializeValue()` now coerces Edm.Int* to JavaScript integers
   and Edm.Decimal/Double/Single to JavaScript decimals
-- **Edm.Date truncation** — Edm.Date fields now return ISO 8601 date-only
+- **Edm.Date truncation** – Edm.Date fields now return ISO 8601 date-only
   (`YYYY-MM-DD`), not full timestamps, in API responses
-- **Lambda `any()`/`all()` support** — OData collection lambda expressions
+- **Lambda `any()`/`all()` support** – OData collection lambda expressions
   translated to PostgreSQL JSONB containment (`@>`, `<@`) and MongoDB native
   array operators (`$in`, `$all`), with 6 new tests
-- **Service document endpoint** — `GET /` returns the OData service document
+- **Service document endpoint** – `GET /` returns the OData service document
 
 **RESOScript generator improvements:**
 
@@ -804,7 +804,7 @@ tests, not applicable when using string enumerations).
 
 ---
 
-## v0.0.19 — 2026-03-04
+## v0.0.19 – 2026-03-04
 
 ### UI: Expansion Cards for Navigation Properties (#25)
 
@@ -828,7 +828,7 @@ causing "not valid JSON" errors.
 
 ---
 
-## v0.0.18 — 2026-03-04
+## v0.0.18 – 2026-03-04
 
 ### Data Generator: Referentially Correct Multi-Resource Seed Data (#24)
 
@@ -873,10 +873,10 @@ Member→Office, Office→OfficeBroker).
 
 **Bug fixes during testing:**
 
-- TaxAssessedValue: Edm.Int64 but generated as decimal — fixed with `Math.round()`
+- TaxAssessedValue: Edm.Int64 but generated as decimal – fixed with `Math.round()`
 - PostgreSQL CTE $expand JOIN: parent-fk strategy used raw column name instead of CTE alias
 - PostgreSQL CTE $expand: FK columns now included when `$select` is used with `$expand`
-- PostgreSQL $count with $top=0: window function returns nothing — added fallback `SELECT COUNT(*)`
+- PostgreSQL $count with $top=0: window function returns nothing – added fallback `SELECT COUNT(*)`
 - Removed hardcoded `OfficeBrokerKey = 'BRK0001'` from office generator
 - UI data generator: added `resolveDependencies: true` to API call
 - Added Teams, TeamMembers, OUID to TARGET_RESOURCES in server and UI
@@ -885,12 +885,12 @@ Member→Office, Office→OfficeBroker).
 
 ---
 
-## v0.0.17 — 2026-03-04
+## v0.0.17 – 2026-03-04
 
 ### UI: Pinned Search Toolbar and Detail Header (#23)
 
 On search pages, the resource title, action buttons, search bar, advanced search
-panel, sort buttons, and result count now stay pinned at the top — only the result
+panel, sort buttons, and result count now stay pinned at the top – only the result
 cards scroll. On detail pages, the back link, title, and Edit/Delete buttons stay
 pinned while summary, media, and field groups scroll beneath.
 
@@ -899,27 +899,27 @@ scroll container. This enables per-page pinning without `position: sticky` hacks
 
 **Affected files:**
 
-- `ui/src/components/layout.tsx` — removed padding and scroll from `<main>`
-- `ui/src/pages/search-page.tsx` — flex layout: pinned toolbar + scrollable results
-- `ui/src/components/results-list.tsx` — count display moved to search page pinned area
-- `ui/src/pages/detail-page.tsx` — flex layout: pinned header + scrollable content
+- `ui/src/components/layout.tsx` – removed padding and scroll from `<main>`
+- `ui/src/pages/search-page.tsx` – flex layout: pinned toolbar + scrollable results
+- `ui/src/components/results-list.tsx` – count display moved to search page pinned area
+- `ui/src/pages/detail-page.tsx` – flex layout: pinned header + scrollable content
 - `ui/src/pages/add-page.tsx`, `edit-page.tsx`, `delete-page.tsx`,
-  `not-found-page.tsx`, `admin/admin-layout.tsx` — scroll wrappers with padding
+  `not-found-page.tsx`, `admin/admin-layout.tsx` – scroll wrappers with padding
 
 ---
 
-## v0.0.16 — 2026-03-04
+## v0.0.16 – 2026-03-04
 
 ### Validation Improvements, Tax/Expense Data, and UI Fixes
 
 **Validation: Pattern-based field rules and negative coordinate fix (#22):**
 
-- Added `fieldPattern` to `FieldRule` for regex-based field matching — expense,
+- Added `fieldPattern` to `FieldRule` for regex-based field matching – expense,
   fee, and amount fields (matching `/(?:Expense|Amount|Fee\d?)$/`) now validated
   against a $0–$10,000 range without enumerating all 25+ field names
 - Price fields (ListPrice, OriginalListPrice, etc.) now require values > 0
   (previously accepted 0)
-- Latitude and Longitude exempt from the "must be >= 0" rule — negative
+- Latitude and Longitude exempt from the "must be >= 0" rule – negative
   coordinates are valid for Western/Southern hemispheres
 - 11 new validation tests (expense patterns, negative coordinates)
 
@@ -936,7 +936,7 @@ scroll container. This enables per-page pinning without `position: sticky` hacks
 
 **UI: Auto-expand field groups with validation errors (#22):**
 
-- `FieldGroupSection` now accepts an `errorCount` prop — groups auto-expand
+- `FieldGroupSection` now accepts an `errorCount` prop – groups auto-expand
   when errors are present, with a red error count badge on the section header
   and a red border highlight
 - `RecordForm` computes per-group error counts via `useMemo` and passes them
@@ -951,17 +951,17 @@ scroll container. This enables per-page pinning without `position: sticky` hacks
 
 **Affected files:**
 
-- `validation/src/business-rules/types.ts` — `fieldPattern` on `FieldRule`
-- `validation/src/business-rules/property-rules.ts` — expense pattern rule, price min > 0
-- `validation/src/business-rules/index.ts` — pattern rule matching logic
-- `validation/src/metadata/validate.ts` — `ALLOW_NEGATIVE_FIELDS` set
-- `validation/tests/business-rules.test.ts` — 9 new expense tests
-- `validation/tests/validate.test.ts` — 2 new coordinate tests
-- `data-generator/src/generators/property.ts` — state tax rates, expense generation
-- `data-generator/tests/generators.test.ts` — 5 new tests
-- `ui/src/components/field-group-section.tsx` — errorCount prop, auto-expand
-- `ui/src/components/record-form.tsx` — per-group error counts
-- `ui/src/hooks/use-dark-mode.ts` — localStorage persistence
+- `validation/src/business-rules/types.ts` – `fieldPattern` on `FieldRule`
+- `validation/src/business-rules/property-rules.ts` – expense pattern rule, price min > 0
+- `validation/src/business-rules/index.ts` – pattern rule matching logic
+- `validation/src/metadata/validate.ts` – `ALLOW_NEGATIVE_FIELDS` set
+- `validation/tests/business-rules.test.ts` – 9 new expense tests
+- `validation/tests/validate.test.ts` – 2 new coordinate tests
+- `data-generator/src/generators/property.ts` – state tax rates, expense generation
+- `data-generator/tests/generators.test.ts` – 5 new tests
+- `ui/src/components/field-group-section.tsx` – errorCount prop, auto-expand
+- `ui/src/components/record-form.tsx` – per-group error counts
+- `ui/src/hooks/use-dark-mode.ts` – localStorage persistence
 
 ### Test Summary
 
@@ -977,7 +977,7 @@ scroll container. This enables per-page pinning without `position: sticky` hacks
 
 ---
 
-## v0.0.15 — 2026-03-05
+## v0.0.15 – 2026-03-05
 
 ### DD 2.0 Compliance and Expansion Field Fixes
 
@@ -1014,7 +1014,7 @@ variations, 0 schema validation errors) and fixed several OData spec issues.
 **OData filter parser:**
 
 - Fixed DateTimeOffset lexer regex to handle fractional seconds
-  (e.g., `2026-03-04T13:02:21.582Z`) — previously only matched whole seconds
+  (e.g., `2026-03-04T13:02:21.582Z`) – previously only matched whole seconds
 
 **Other fixes:**
 
@@ -1026,11 +1026,11 @@ variations, 0 schema validation errors) and fixed several OData spec issues.
 
 **Compliance infrastructure (new `compliance/` directory):**
 
-- `Dockerfile.dd` — reso-certification-utils v3.0.0 (multi-stage build)
-- `Dockerfile.core` — web-api-commander (Gradle build)
-- `dd-config.json` — DD 2.0 config with bearer token and client credentials
-- `entrypoint-dd.sh` — wait for server, run DD tests (supports `RECORD_LIMIT`)
-- `entrypoint-core.sh` — wait for server, generate RESOScripts, run Core tests
+- `Dockerfile.dd` – reso-certification-utils v3.0.0 (multi-stage build)
+- `Dockerfile.core` – web-api-commander (Gradle build)
+- `dd-config.json` – DD 2.0 config with bearer token and client credentials
+- `entrypoint-dd.sh` – wait for server, run DD tests (supports `RECORD_LIMIT`)
+- `entrypoint-core.sh` – wait for server, generate RESOScripts, run Core tests
 
 ### Test Summary
 
@@ -1046,7 +1046,7 @@ variations, 0 schema validation errors) and fixed several OData spec issues.
 
 ---
 
-## v0.0.14 — 2026-03-04
+## v0.0.14 – 2026-03-04
 
 ### EDMX Metadata: EntityContainer and Nullable Fixes
 
@@ -1063,15 +1063,15 @@ Fixed two OData spec compliance issues in the generated EDMX XML metadata
 
 **Nullable attribute corrections:**
 
-- Removed `Nullable="true"` from all properties — this is the OData default
+- Removed `Nullable="true"` from all properties – this is the OData default
   for non-collection properties and should not be emitted
 - Collection properties now always emit `Nullable="false"` since they return
   the empty list `[]` instead of `null`
 
 **Modified files:**
 
-- `edmx-generator.ts` — EntityContainer generation, Nullable logic
-- `edmx-generator.test.ts` — 4 new tests (EntityContainer, EntitySet,
+- `edmx-generator.ts` – EntityContainer generation, Nullable logic
+- `edmx-generator.test.ts` – 4 new tests (EntityContainer, EntitySet,
   NavigationPropertyBinding, Nullable)
 
 ### Test Summary
@@ -1088,7 +1088,7 @@ Fixed two OData spec compliance issues in the generated EDMX XML metadata
 
 ---
 
-## v0.0.13 — 2026-03-04
+## v0.0.13 – 2026-03-04
 
 ### OData $filter Two-Way Sync and Validation
 
@@ -1098,7 +1098,7 @@ parser.
 
 **AST serializer (`astToFilterString`):**
 
-- New `serializer.ts` in `@reso-standards/odata-expression-parser` — walks the AST and
+- New `serializer.ts` in `@reso-standards/odata-expression-parser` – walks the AST and
   produces a canonical OData `$filter` string
 - Handles all node types: comparison, logical, not, arithmetic, function,
   lambda, literal, property, collection
@@ -1106,10 +1106,10 @@ parser.
 
 **Filter sync utility (`filter-sync.ts`):**
 
-- `parseFilterToEntries()` — parses an OData filter string into form-compatible
+- `parseFilterToEntries()` – parses an OData filter string into form-compatible
   entries using the AST, detecting simple comparisons, `contains()`, lambda
   `any`/`all` patterns, and flagging unrepresentable expressions
-- `buildFilterString()` — moved from advanced-search, builds OData filter from
+- `buildFilterString()` – moved from advanced-search, builds OData filter from
   form entries
 
 **Search page state management:**
@@ -1126,7 +1126,7 @@ parser.
 - Form state derived from incoming filter string via `parseFilterToEntries()`
 - `lastEmittedRef` prevents infinite update loops in bidirectional sync
 - Live sync: field changes rebuild filter string and update search bar
-- Amber info bar when filter contains expressions the form can't represent
+- Amber info bar when filter contains expressions the form cannot represent
 - Expansion fields disabled with "filtering not yet supported" message
 
 **Server-side validation:**
@@ -1136,16 +1136,16 @@ parser.
 
 **Modified files:**
 
-- `odata-expression-parser/src/serializer.ts` — New
-- `odata-expression-parser/src/index.ts` — Added export
-- `odata-expression-parser/tests/serializer.test.ts` — New (54 tests)
-- `ui/package.json` — Added `@reso-standards/odata-expression-parser` dependency
-- `ui/Dockerfile` — Copy parser into Docker build
-- `ui/src/utils/filter-sync.ts` — New
-- `ui/src/pages/search-page.tsx` — Lifted state, validation
-- `ui/src/components/search-bar.tsx` — Controlled component rewrite
-- `ui/src/components/advanced-search.tsx` — Two-way sync
-- `server/src/odata/handlers.ts` — 400 for invalid filters
+- `odata-expression-parser/src/serializer.ts` – New
+- `odata-expression-parser/src/index.ts` – Added export
+- `odata-expression-parser/tests/serializer.test.ts` – New (54 tests)
+- `ui/package.json` – Added `@reso-standards/odata-expression-parser` dependency
+- `ui/Dockerfile` – Copy parser into Docker build
+- `ui/src/utils/filter-sync.ts` – New
+- `ui/src/pages/search-page.tsx` – Lifted state, validation
+- `ui/src/components/search-bar.tsx` – Controlled component rewrite
+- `ui/src/components/advanced-search.tsx` – Two-way sync
+- `server/src/odata/handlers.ts` – 400 for invalid filters
 
 ### Test Summary
 
@@ -1161,7 +1161,7 @@ parser.
 
 ---
 
-## v0.0.12 — 2026-03-04
+## v0.0.12 – 2026-03-04
 
 ### $expand: Property Child Resources and Three FK Strategies
 
@@ -1170,17 +1170,17 @@ Property child resources, and refactored navigation property discovery to suppor
 three distinct foreign key strategies.
 
 **New child resources:** PropertyRooms, PropertyGreenVerification,
-PropertyPowerProduction, PropertyUnitTypes — all linked to Property via
+PropertyPowerProduction, PropertyUnitTypes – all linked to Property via
 `ListingKey` (direct FK strategy).
 
 **Three FK strategies in `buildNavigationBindings`:**
 
-- **resource-record-key** — polymorphic FK via `ResourceName` +
+- **resource-record-key** – polymorphic FK via `ResourceName` +
   `ResourceRecordKey` columns (Media on any parent resource)
-- **direct** — child has the parent's key field directly (OpenHouse, Showing,
+- **direct** – child has the parent's key field directly (OpenHouse, Showing,
   PropertyRooms, PropertyGreenVerification, PropertyPowerProduction,
   PropertyUnitTypes all have `ListingKey`)
-- **parent-fk** — parent entity holds a FK to the target (to-one nav props like
+- **parent-fk** – parent entity holds a FK to the target (to-one nav props like
   BuyerAgent, ListAgent, BuyerOffice, ListOffice on Property → Member/Office)
 
 **OpenAPI and EDMX metadata:**
@@ -1192,24 +1192,24 @@ PropertyPowerProduction, PropertyUnitTypes — all linked to Property via
 
 **Modified files:**
 
-- `router.ts` — Three-strategy `buildNavigationBindings`, exported for testing
-- `openapi-generator.ts` — `$expand` query parameter on GET collection endpoints
-- `edmx-generator.ts` — `NavigationProperty` elements from expansion metadata
-- `types.ts` — Extended `TARGET_RESOURCES` with 4 new child resources,
+- `router.ts` – Three-strategy `buildNavigationBindings`, exported for testing
+- `openapi-generator.ts` – `$expand` query parameter on GET collection endpoints
+- `edmx-generator.ts` – `NavigationProperty` elements from expansion metadata
+- `types.ts` – Extended `TARGET_RESOURCES` with 4 new child resources,
   added `FieldMetadata.isExpansion` support
-- `postgres-dal.ts` — Updated expand query for direct FK strategy
-- `mongo-dal.ts` — Updated expand query for direct FK strategy
-- `data-access.ts` — Generalized `ExpandBinding` type for all FK strategies
+- `postgres-dal.ts` – Updated expand query for direct FK strategy
+- `mongo-dal.ts` – Updated expand query for direct FK strategy
+- `data-access.ts` – Generalized `ExpandBinding` type for all FK strategies
 
 ### Data Generator: Property Child Resources
 
 Added generators for 4 new child resources and made the seed plan dynamic.
 
-- `property-child.ts` — Generic generator for PropertyRooms,
+- `property-child.ts` – Generic generator for PropertyRooms,
   PropertyGreenVerification, PropertyPowerProduction, PropertyUnitTypes
-- `plan.ts` — `getRelatedResources()` discovers valid child resources per parent
+- `plan.ts` – `getRelatedResources()` discovers valid child resources per parent
   using FK field analysis; `getDefaultRelatedCount()` returns sensible defaults
-- `open-house.ts`, `showing.ts` — Added `ListingKey` to generated records
+- `open-house.ts`, `showing.ts` – Added `ListingKey` to generated records
 - Docker Compose seed scripts updated with all 7 child resources
 
 ### UI: Data Generator Improvements
@@ -1223,11 +1223,11 @@ Added generators for 4 new child resources and made the seed plan dynamic.
 
 **Modified files:**
 
-- `admin-client.ts` — Added `RelatedResourceInfo` type and `relatedResources`
+- `admin-client.ts` – Added `RelatedResourceInfo` type and `relatedResources`
   field to `ResourceStatus`
-- `data-generator.ts` (server) — Status endpoint returns `relatedResources`
+- `data-generator.ts` (server) – Status endpoint returns `relatedResources`
   per resource using `getRelatedResources()` from `@reso-standards/data-generator`
-- `data-generator-page.tsx` — Context-sensitive related records UI
+- `data-generator-page.tsx` – Context-sensitive related records UI
 
 ### nginx SPA Routing Fix
 
@@ -1253,7 +1253,7 @@ to the OData entity and collection regex patterns.
 
 ---
 
-## v0.0.11 — 2026-03-03
+## v0.0.11 – 2026-03-03
 
 ### UI: Detail Page Layout and Field Grouping Improvements
 
@@ -1288,16 +1288,16 @@ all UI views.
 
 **Modified files:**
 
-- `layout.tsx` — Fixed header/sidebar with scrollable content area
-- `search-page.tsx` — Omit `$select` for `__all__` resources
-- `nginx.conf.template` — Increased header buffer limit
-- `detail-page.tsx` — Summary pane + carousel layout, summary field extraction
-- `record-form.tsx` — Flat field grid when no groups exist
-- `advanced-search.tsx` — Flat field rows when no groups exist
+- `layout.tsx` – Fixed header/sidebar with scrollable content area
+- `search-page.tsx` – Omit `$select` for `__all__` resources
+- `nginx.conf.template` – Increased header buffer limit
+- `detail-page.tsx` – Summary pane + carousel layout, summary field extraction
+- `record-form.tsx` – Flat field grid when no groups exist
+- `advanced-search.tsx` – Flat field rows when no groups exist
 
 ---
 
-## v0.0.10 — 2026-03-03
+## v0.0.10 – 2026-03-03
 
 ### MongoDB Document Store Backend
 
@@ -1306,26 +1306,26 @@ the `DB_BACKEND` environment variable.
 
 **New files:**
 
-- `filter-to-mongo.ts` — OData `$filter` AST to MongoDB query translator with
+- `filter-to-mongo.ts` – OData `$filter` AST to MongoDB query translator with
   two modes: native query operators (index-friendly) for simple comparisons, and
   `$expr` aggregation expressions for functions and arithmetic
-- `filter-to-mongo.test.ts` — 33 tests covering all comparison, logical, string,
+- `filter-to-mongo.test.ts` – 33 tests covering all comparison, logical, string,
   date, math, and arithmetic operators
-- `mongo-dal.ts` — Production MongoDB `DataAccessLayer` adapter with cursor
+- `mongo-dal.ts` – Production MongoDB `DataAccessLayer` adapter with cursor
   pagination and batch `$in` queries for `$expand` resolution
-- `mongo-init.ts` — Collection and index setup (unique PK index per resource,
+- `mongo-init.ts` – Collection and index setup (unique PK index per resource,
   compound FK index for child collections)
 
 **Modified files:**
 
-- `config.ts` — Added `DB_BACKEND` (`postgres` | `mongodb`) and `MONGODB_URL`
+- `config.ts` – Added `DB_BACKEND` (`postgres` | `mongodb`) and `MONGODB_URL`
   environment variables
-- `index.ts` — Conditional DAL instantiation via dynamic imports (mongodb package
+- `index.ts` – Conditional DAL instantiation via dynamic imports (mongodb package
   only loaded when `DB_BACKEND=mongodb`)
-- `docker-compose.yml` — Added `mongodb` profile with `mongodb`, `server-mongo`,
+- `docker-compose.yml` – Added `mongodb` profile with `mongodb`, `server-mongo`,
   `ui-mongo`, and `seed-mongo` services
 
-**Deleted:** `mongo-dal.example.ts` — superseded by production `mongo-dal.ts`
+**Deleted:** `mongo-dal.example.ts` – superseded by production `mongo-dal.ts`
 
 **Docker usage:**
 
@@ -1343,7 +1343,7 @@ the `DB_BACKEND` environment variable.
 
 ---
 
-## v0.0.9 — 2026-03-03
+## v0.0.9 – 2026-03-03
 
 ### Server-Driven Pagination with @odata.nextLink
 
@@ -1370,13 +1370,13 @@ scroll instead of manually computing `$skip` offsets. The `fetchCollectionByUrl`
 client function fetches raw nextLink URLs.
 
 **DAL abstraction**: The `DataAccessLayer` interface (`data-access.ts`) is
-unchanged — the CTE logic is PostgreSQL-specific. The MongoDB adapter sketch
+unchanged – the CTE logic is PostgreSQL-specific. The MongoDB adapter sketch
 already handles this correctly (cursor pagination + batch expand). The nextLink
 generation is OData protocol logic in the handler layer.
 
 ---
 
-## v0.0.8 — 2026-03-03
+## v0.0.8 – 2026-03-03
 
 ### Required Address Fields
 
@@ -1396,9 +1396,9 @@ Member and Office) must always be present.
 
 Added relationship constraints between fields in the Property resource:
 
-- **ListPrice >= ListPriceLow** — when both are present, ListPrice must be
+- **ListPrice >= ListPriceLow** – when both are present, ListPrice must be
   greater than or equal to ListPriceLow
-- **BathroomsTotalInteger = sum of parts** — when BathroomsTotalInteger and any
+- **BathroomsTotalInteger = sum of parts** – when BathroomsTotalInteger and any
   bathroom part fields (BathroomsFull, BathroomsHalf, BathroomsPartial,
   BathroomsOneQuarter, BathroomsThreeQuarter) are present, the total must equal
   the sum of the parts
@@ -1416,13 +1416,13 @@ Fixed USPS-format address separators in the UI:
 
 - Added comma between City and StateOrProvince (was missing)
 - Added space between StateOrProvince and PostalCode (was missing)
-- Fixed StreetDirSuffix separator (was comma, should be space — it's part of
+- Fixed StreetDirSuffix separator (was comma, should be space – it is part of
   the street line)
 - Addresses now render correctly: `8653 Main Blvd, Salem, OR 45241`
 
 ### Summary Display
 
-- Summary cards now show all configured fields in fixed order, displaying `—`
+- Summary cards now show all configured fields in fixed order, displaying ` – `
   for missing values instead of hiding empty fields
 
 ### Test Summary
@@ -1439,7 +1439,7 @@ Fixed USPS-format address separators in the UI:
 
 ---
 
-## v0.0.7 — 2026-03-03
+## v0.0.7 – 2026-03-03
 
 ### Business Rules Validation
 
@@ -1455,7 +1455,7 @@ and the UI input forms.
   BathroomsOneQuarter, BathroomsPartial, BathroomsThreeQuarter, MainLevelBathrooms):
   must be between 0 and 100
 - Rule registry pattern (`getBusinessRules(resourceName)`) extensible to other resources
-- Integrated into `validateRecord` with deduplication — fields that already have
+- Integrated into `validateRecord` with deduplication – fields that already have
   type-level failures skip business rule checks
 - **24 new tests** in `business-rules.test.ts`
 
@@ -1507,7 +1507,7 @@ from TOAST for large values.
 
 ---
 
-## v0.0.6 — 2026-03-03
+## v0.0.6 – 2026-03-03
 
 ### PostgreSQL Schema: TEXT instead of VARCHAR
 
@@ -1545,7 +1545,7 @@ resources vs 1,316 fields, 2,951 lookups in 1.7).
 
 ---
 
-## v0.0.5 — 2026-03-03
+## v0.0.5 – 2026-03-03
 
 ### Data Generator: `@reso-standards/data-generator`
 
@@ -1554,20 +1554,20 @@ Dictionary records for seeding OData servers with test data.
 
 #### Three Output Modes
 
-- **HTTP** — POSTs records directly to a running OData server via the Add/Edit API
-- **JSON** — Writes records as JSON files to a directory structure (`<resource>/<key>.json`)
-- **curl** — Generates a `seed.sh` script with curl commands for later execution
+- **HTTP** – POSTs records directly to a running OData server via the Add/Edit API
+- **JSON** – Writes records as JSON files to a directory structure (`<resource>/<key>.json`)
+- **curl** – Generates a `seed.sh` script with curl commands for later execution
 
 #### Resource Generators
 
 Six resource-specific generators produce realistic field values:
 
-- **Property** — addresses, pricing ($50k–$10M), bedrooms, bathrooms, coordinates (US bounds), public remarks
-- **Member** — first/last name pools, email patterns, phone numbers, designations
-- **Office** — brokerage names, office phones, addresses, national association IDs
-- **Media** — image URLs, sequential ordering, MIME types, linked to parent via ResourceName/ResourceRecordKey
-- **OpenHouse** — future-dated events with weekend preference, time ranges, linked to parent Property
-- **Showing** — future-dated appointments with time ranges, instructions, linked to parent Property
+- **Property** – addresses, pricing ($50k–$10M), bedrooms, bathrooms, coordinates (US bounds), public remarks
+- **Member** – first/last name pools, email patterns, phone numbers, designations
+- **Office** – brokerage names, office phones, addresses, national association IDs
+- **Media** – image URLs, sequential ordering, MIME types, linked to parent via ResourceName/ResourceRecordKey
+- **OpenHouse** – future-dated events with weekend preference, time ranges, linked to parent Property
+- **Showing** – future-dated appointments with time ranges, instructions, linked to parent Property
 
 A generic field generator handles all Edm types (String, Boolean, Int16/32/64, Decimal,
 Date, DateTimeOffset, TimeOfDay, Guid) and enum/collection lookups from metadata.
@@ -1595,8 +1595,8 @@ Added role-based authentication to `@reso-standards/reference-server`.
 - **Static tokens** from environment variables (`ADMIN_TOKEN`, `WRITE_TOKEN`, `READ_TOKEN`)
   with development defaults
 - **Dynamic tokens** issued by the mock OAuth2 endpoint with optional `role` query parameter
-- **Express middleware** (`requireAuth`) — 401 for missing/invalid token, 403 for insufficient role
-- **Backward compatible** — auth is optional by default (`AUTH_REQUIRED=false`) so existing
+- **Express middleware** (`requireAuth`) – 401 for missing/invalid token, 403 for insufficient role
+- **Backward compatible** – auth is optional by default (`AUTH_REQUIRED=false`) so existing
   workflows continue without tokens
 - **9 auth tests**
 
@@ -1604,8 +1604,8 @@ Added role-based authentication to `@reso-standards/reference-server`.
 
 #### Server: Admin Data Generator Endpoint
 
-- `POST /admin/data-generator` — generates records using the DAL directly (requires admin role)
-- `GET /admin/data-generator/status` — returns available resources with field and record counts
+- `POST /admin/data-generator` – generates records using the DAL directly (requires admin role)
+- `GET /admin/data-generator/status` – returns available resources with field and record counts
 - Admin router mounted at `/admin` with admin auth middleware
 
 #### UI: Data Generator Page
@@ -1619,7 +1619,7 @@ Added role-based authentication to `@reso-standards/reference-server`.
 
 ### Seed Script and Docker
 
-- `seed.sh` — executable bash script that waits for server health, then seeds
+- `seed.sh` – executable bash script that waits for server health, then seeds
   50 Properties (with Media, OpenHouse, Showing), 20 Members, and 10 Offices
 - Docker Compose updated with server healthcheck and optional seed service
   (`docker-compose --profile seed up`)
@@ -1643,7 +1643,7 @@ Added role-based authentication to `@reso-standards/reference-server`.
 
 ---
 
-## v0.0.4 — 2026-03-03
+## v0.0.4 – 2026-03-03
 
 ### Certification Test Runner: `@reso-standards/certification-test-runner`
 
@@ -1652,15 +1652,15 @@ into a reusable package at `tools/certification/test-runner/`. Future certificat
 modules (e.g., read-only, search) can import the shared framework instead of
 duplicating test logic.
 
-- **OData protocol validators** — status codes, headers (OData-Version, Location,
+- **OData protocol validators** – status codes, headers (OData-Version, Location,
   EntityId, Preference-Applied), response body validators (JSON, annotations, etag,
   error format), payload echo checks
-- **Reporter** — console (human-readable) and JSON output formats
-- **HTTP client** — OData request wrapper delegating to `@reso-standards/reso-client`
-- **Auth helpers** — bearer token and OAuth2 Client Credentials resolution
-- **Metadata helpers** — CSDL parsing, entity type lookup, payload validation
+- **Reporter** – console (human-readable) and JSON output formats
+- **HTTP client** – OData request wrapper delegating to `@reso-standards/reso-client`
+- **Auth helpers** – bearer token and OAuth2 Client Credentials resolution
+- **Metadata helpers** – CSDL parsing, entity type lookup, payload validation
   against metadata using `@reso-standards/validation`
-- **Generic test helpers** — primary key extraction, schema assertions, scenario
+- **Generic test helpers** – primary key extraction, schema assertions, scenario
   result building
 
 ### Validation Integration in Certification
@@ -1671,7 +1671,7 @@ checking (unknown fields, Edm type mismatches, negative numerics, MaxLength,
 integer enforcement, collection/enum checks) via the shared validation package.
 
 The certification scenario pre-flight check (`makeSchemaAssertion`) validates
-field existence only — value validation is the server's responsibility and is
+field existence only – value validation is the server's responsibility and is
 exercised by the failure test scenarios.
 
 ### Package Restructure
@@ -1696,7 +1696,7 @@ exercised by the failure test scenarios.
 
 ---
 
-## v0.0.3 — 2026-03-03
+## v0.0.3 – 2026-03-03
 
 ### Shared Validation Package: `@reso-standards/validation`
 
@@ -1704,13 +1704,13 @@ Extracted field validation logic into a standalone isomorphic package at
 `tools/validation/`. Both the reference server API and the React UI now import
 from this single source of truth.
 
-- **Isomorphic** — no Node.js or browser APIs; works in any JS runtime
+- **Isomorphic** – no Node.js or browser APIs; works in any JS runtime
 - **Metadata-driven** field validation: unknown field detection, type checking
   for all Edm types, negative number rejection, MaxLength enforcement,
   integer-only enforcement for Int types, collection and enum validation
-- **Subpath exports** — `@reso-standards/validation` (top-level barrel) and
+- **Subpath exports** – `@reso-standards/validation` (top-level barrel) and
   `@reso-standards/validation/metadata` (direct subpath) for future extensibility
-- **41 tests** — `tests/validate.test.ts`
+- **41 tests** – `tests/validate.test.ts`
 - `// TODO: Add executable business rules validation` placeholder for future
   grammar-based rules engine
 
@@ -1731,10 +1731,10 @@ Added a React UI for the reference server at `tools/reso-reference-server/ui/`.
 
 ### Improved Error Messages
 
-- **Server API** — OData error responses now include `target` (operation name)
+- **Server API** – OData error responses now include `target` (operation name)
   at the top level, and per-field errors use human-friendly messages with
   `target` (field name) and `message` properties in the `details` array
-- **UI** — Fixed client-server error mapping (`target`/`message` instead of
+- **UI** – Fixed client-server error mapping (`target`/`message` instead of
   `field`/`reason`), added submit error banner with auto-clear
 
 ### Test Summary
@@ -1750,29 +1750,29 @@ Added a React UI for the reference server at `tools/reso-reference-server/ui/`.
 
 ---
 
-## v0.0.2 — 2026-03-02
+## v0.0.2 – 2026-03-02
 
 ### Developer Tooling: Biome + Lefthook
 
 Added pre-commit hooks and a shared linter/formatter to enforce code quality across all packages.
 
-- **[Biome](https://biomejs.dev/)** for linting and formatting — configured to match the
+- **[Biome](https://biomejs.dev/)** for linting and formatting – configured to match the
   [RESO certification-utils](https://github.com/RESOStandards/reso-certification-utils)
   style (single quotes, semicolons, no trailing commas, 140 char line width, LF line
   endings, arrow parens avoided)
-  — [biome.json](https://github.com/RESOStandards/reso-tools/blob/main/biome.json)
+ – [biome.json](https://github.com/RESOStandards/reso-tools/blob/main/biome.json)
 - **[Lefthook](https://github.com/evilmartians/lefthook)** for git pre-commit hooks
-  — [lefthook.yml](https://github.com/RESOStandards/reso-tools/blob/main/lefthook.yml)
+ – [lefthook.yml](https://github.com/RESOStandards/reso-tools/blob/main/lefthook.yml)
 - **Root `package.json`** with `lint`, `lint:fix`, and `test` convenience scripts
-  — [package.json](https://github.com/RESOStandards/reso-tools/blob/main/package.json)
+ – [package.json](https://github.com/RESOStandards/reso-tools/blob/main/package.json)
 
 #### Pre-commit Hook Flow
 
-1. **Lint + auto-fix** — Biome checks staged `.ts` files, auto-fixes formatting and lint
+1. **Lint + auto-fix** – Biome checks staged `.ts` files, auto-fixes formatting and lint
    issues, and re-stages the fixed files
-2. **Type check** — `tsc --noEmit` in all 4 packages, respecting the build dependency
+2. **Type check** – `tsc --noEmit` in all 4 packages, respecting the build dependency
    order (filter-parser first, then client/server/test-tool)
-3. **Tests** — `vitest run` in all 4 packages (314 tests)
+3. **Tests** – `vitest run` in all 4 packages (314 tests)
 
 #### Codebase Reformatted
 
@@ -1788,7 +1788,7 @@ npx lefthook install  # activates git hooks
 
 ---
 
-## v0.0.1 — 2026-03-02
+## v0.0.1 – 2026-03-02
 
 Initial release of the RESO Transport tooling suite. Introduces four interconnected
 packages for building, testing, and validating OData 4.01 services that conform to
@@ -1796,7 +1796,7 @@ the RESO Data Dictionary and Web API specifications.
 
 ### New Packages
 
-#### `@reso-standards/odata-expression-parser` — [odata-expression-parser/](https://github.com/RESOStandards/reso-tools/blob/main/odata-expression-parser/)
+#### `@reso-standards/odata-expression-parser` – [odata-expression-parser/](https://github.com/RESOStandards/reso-tools/blob/main/odata-expression-parser/)
 
 Standalone, zero-dependency library for parsing OData `$filter` expressions into a
 typed AST. Shared by both the client SDK (query validation) and the reference server
@@ -1812,9 +1812,9 @@ typed AST. Shared by both the client SDK (query validation) and the reference se
 - **Lambda operators**: `any` and `all` with variable binding
 - **Literal types**: string, number, boolean, null, date, datetimeoffset, timeofday,
   duration, guid, enum
-- **97 tests** — [tests/filter-parser.test.ts](https://github.com/RESOStandards/reso-tools/blob/main/odata-expression-parser/tests/filter-parser.test.ts)
+- **97 tests** – [tests/filter-parser.test.ts](https://github.com/RESOStandards/reso-tools/blob/main/odata-expression-parser/tests/filter-parser.test.ts)
 
-#### `@reso-standards/reso-client` — [reso-client/](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/)
+#### `@reso-standards/reso-client` – [reso-client/](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/)
 
 OData 4.01 client SDK for TypeScript, inspired by
 [Apache Olingo](https://olingo.apache.org/doc/odata4/index.html). Provides URI
@@ -1823,26 +1823,26 @@ and response parsing.
 
 - **URI Builder** with compound keys, `$filter`, `$select`, `$orderby`, `$top`,
   `$skip`, `$count`, `$expand`, `$search`, `$compute`, `$format`
-  — [src/uri/builder.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/uri/builder.ts)
+ – [src/uri/builder.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/uri/builder.ts)
 - **CSDL/EDMX Parser** supporting EntityType, ComplexType, EnumType,
   NavigationProperty (with ReferentialConstraint, Partner, ContainsTarget),
   Action, Function, Singleton, EntityContainer, inheritance (BaseType/Abstract),
   OpenType, HasStream, IsFlags
-  — [src/csdl/parser.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/csdl/parser.ts)
+ – [src/csdl/parser.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/csdl/parser.ts)
 - **CSDL Validator** for structural correctness
-  — [src/csdl/validator.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/csdl/validator.ts)
+ – [src/csdl/validator.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/csdl/validator.ts)
 - **HTTP Client** with OAuth2 Client Credentials and bearer token auth
-  — [src/http/client.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/http/client.ts)
+ – [src/http/client.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/http/client.ts)
 - **CRUD Helpers**: `createEntity`, `readEntity`, `updateEntity` (PATCH),
   `replaceEntity` (PUT), `deleteEntity` with If-Match/If-None-Match ETag support
-  — [src/crud/](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/crud/)
+ – [src/crud/](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/crud/)
 - **Query Validator** checking `$filter`, `$select`, `$orderby`, `$expand` against
-  CSDL metadata — [src/query/validator.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/query/validator.ts)
+  CSDL metadata – [src/query/validator.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/query/validator.ts)
 - **Response Parser** with `@odata.nextLink` auto-paging (`followAllPages`),
   annotation extraction, and OData error parsing
-  — [src/response/parser.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/response/parser.ts)
+ – [src/response/parser.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/response/parser.ts)
 - **Metadata Fetcher** (`fetchRawMetadata`, `fetchAndParseMetadata`)
-  — [src/metadata/fetcher.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/metadata/fetcher.ts)
+ – [src/metadata/fetcher.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/src/metadata/fetcher.ts)
 - **101 tests** across 5 test files
 - **5 runnable examples**:
   - [Fetch a Property by key](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/examples/fetch-property.ts)
@@ -1851,32 +1851,32 @@ and response parsing.
   - [Validate CSDL metadata](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/examples/validate-metadata.ts)
   - [OAuth2 Client Credentials flow](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/examples/oauth-flow.ts)
 
-#### `@reso-standards/reference-server` — [reso-reference-server/](https://github.com/RESOStandards/reso-tools/blob/main/reso-reference-server/)
+#### `@reso-standards/reference-server` – [reso-reference-server/](https://github.com/RESOStandards/reso-tools/blob/main/reso-reference-server/)
 
 Metadata-driven OData 4.01 reference server for the RESO Data Dictionary. Reads
 RESO JSON metadata and dynamically generates PostgreSQL tables, OData CRUD endpoints,
 EDMX metadata, and OpenAPI documentation.
 
 - **Data Access Layer** interface abstracting persistence from query handling
-  — `server/src/db/data-access.ts`
+ – `server/src/db/data-access.ts`
 - **PostgreSQL implementation** using LEFT JOIN + app-side grouping for `$expand`
-  — `server/src/db/postgres-dal.ts`
+ – `server/src/db/postgres-dal.ts`
 - **MongoDB example** demonstrating batch-query pattern for document stores
-  — `server/src/db/mongo-dal.example.ts`
+ – `server/src/db/mongo-dal.example.ts`
 - **`$filter` → SQL translation** using `@reso-standards/odata-expression-parser` AST with
   parameterized queries (SQL injection safe)
-  — `server/src/db/filter-to-sql.ts`
+ – `server/src/db/filter-to-sql.ts`
 - **Collection GET handler** with `$filter`, `$select`, `$orderby`, `$top`, `$skip`,
   `$count`, `$expand` support
-  — `server/src/odata/handlers.ts`
+ – `server/src/odata/handlers.ts`
 - **Navigation property auto-detection** via RESO `ResourceName`/`ResourceRecordKey`
   FK convention
-  — `server/src/odata/router.ts`
+ – `server/src/odata/router.ts`
 - **6 target resources**: Property, Member, Office, Media, OpenHouse, Showing
   (1,316 fields, 2,951 lookup values)
 - **67 tests** across 5 test files
 
-#### `@reso-standards/certification-add-edit` — `certification/add-edit/`
+#### `@reso-standards/certification-add-edit` – `certification/add-edit/`
 
 RESO Web API Add/Edit Endorsement (RCP-010) compliance testing tool. Sends
 known-good and known-bad JSON payloads to OData servers and validates responses
@@ -1884,7 +1884,7 @@ against 8 Gherkin BDD certification scenarios.
 
 - **Refactored** to use `@reso-standards/reso-client` for HTTP, authentication, and
   CSDL metadata parsing (previously used raw `fetch` and `fast-xml-parser` directly)
-- **49 tests** across 4 test files — all passing after refactoring
+- **49 tests** across 4 test files – all passing after refactoring
 
 ### Cross-Package Architecture
 
@@ -1900,7 +1900,7 @@ odata-expression-parser (zero deps)
 ```
 
 - The **shared filter parser** is used by the client SDK for query validation and by
-  the server for SQL WHERE clause generation — ensuring consistent `$filter` behavior
+  the server for SQL WHERE clause generation – ensuring consistent `$filter` behavior
 - The **data access layer** abstraction allows swapping persistence backends (Postgres,
   MongoDB, in-memory) without changing handler logic
 - The **test tool refactoring** removes duplicated HTTP and metadata parsing code in

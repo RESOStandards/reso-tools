@@ -23,7 +23,7 @@ reso-cert core --url https://api.example.com --auth-token TOKEN --full-coverage
 1. **Fetch metadata** from `/$metadata` and parse entity types
 2. **Sample records** (up to 100 per resource) to find test values for each data type
 3. **Auto-detect enum mode** from the metadata (or use `--enum-mode` to override)
-4. **Run scenarios** — each one builds an OData query, makes the request, and validates the response
+4. **Run scenarios** – each one builds an OData query, makes the request, and validates the response
 5. **Generate reports** with a coverage matrix showing what was tested
 
 Test values are selected using median sampling so filter tests work bidirectionally (records exist both above and below the test value).
@@ -58,7 +58,7 @@ The actual number of scenarios executed depends on the server's enum mode, spec 
 
 ### Structural Tests
 
-| Scenario | What's Tested |
+| Scenario | What is Tested |
 |----------|---------------|
 | metadata-validation | Valid EDMX XML, OData-Version header, required resources |
 | service-document | Service root returns 200, valid JSON |
@@ -72,13 +72,13 @@ The actual number of scenarios executed depends on the server's enum mode, spec 
 
 Require a field of the matching data type with sampled data. Test values use **median selection** so records exist both above and below the test value.
 
-**Integer** (9) — Edm.Int16, Int32, Int64: `eq`, `ne`, `gt`, `ge`, `lt`, `le`, `and`, `or`, `not()`
+**Integer** (9) – Edm.Int16, Int32, Int64: `eq`, `ne`, `gt`, `ge`, `lt`, `le`, `and`, `or`, `not()`
 
-**Decimal** (5) — Edm.Decimal, Double: `ne`, `gt`, `ge`, `lt`, `le`
+**Decimal** (5) – Edm.Decimal, Double: `ne`, `gt`, `ge`, `lt`, `le`
 
-**Date** (6) — Edm.Date (ISO 8601 `yyyy-mm-dd`): `eq`, `ne`, `gt`, `ge`, `lt`, `le`
+**Date** (6) – Edm.Date (ISO 8601 `yyyy-mm-dd`): `eq`, `ne`, `gt`, `ge`, `lt`, `le`
 
-**Timestamp** (5) — Edm.DateTimeOffset: `gt`, `ge`, plus `lt`/`le`/`ne` with `now()`
+**Timestamp** (5) – Edm.DateTimeOffset: `gt`, `ge`, plus `lt`/`le`/`ne` with `now()`
 
 ### OrderBy Tests
 
