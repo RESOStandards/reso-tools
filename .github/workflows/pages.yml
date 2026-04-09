@@ -274,9 +274,17 @@ jobs:
             fi
           }
 
+          # Rewrite relative links in guide markdown so they resolve
+          # on tools.reso.org. Handles both ../sibling/ (from package
+          # root) and ../../sibling/ (from doc/GUIDE.md which is one
+          # level deeper). The ../../ patterns must come BEFORE the
+          # ../ patterns so sed matches the longer form first.
           rewrite_guide_links() {
             local pkg_dir="$1"
             sed -E \
+              -e "s|\]\(\.\./\.\./reso-([a-z0-9-]+)/\)|\](/packages/reso-\1/)|g" \
+              -e "s|\]\(\.\./\.\./odata-expression-parser/\)|\](/packages/odata-expression-parser/)|g" \
+              -e "s|\]\(\.\./\.\./\)|\](${GH_TREE}/${pkg_dir})|g" \
               -e "s|\]\(\.\./reso-([a-z0-9-]+)/\)|\](/packages/reso-\1/)|g" \
               -e "s|\]\(\.\./odata-expression-parser/\)|\](/packages/odata-expression-parser/)|g" \
               -e "s|\]\(\.\./\)|\](${GH_TREE}/${pkg_dir})|g" \
@@ -321,6 +329,7 @@ jobs:
             "RELEASES.md:Release Notes:releases"
             "ANNOUNCEMENTS.md:Announcements:announcements"
             "SECURITY_AUDIT.md:Security Audit:security"
+            "reso-mcp-server/doc/GUIDE.md:MCP Server User Guide:mcp-guide"
           )
           for entry in "${docs[@]}"; do
             IFS=':' read -r file title slug <<< "$entry"
