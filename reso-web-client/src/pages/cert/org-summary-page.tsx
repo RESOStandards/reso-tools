@@ -21,6 +21,7 @@
 
 import { useMemo, useState } from 'react';
 import { NavLink, useParams } from 'react-router';
+// NavLink is still used in the NotFoundState component below
 import {
   type CoverageReport,
   type FieldCut,
@@ -33,18 +34,11 @@ import { summaryToCoverageReport } from '../../api/cert-summary-adapter';
 import { useCertReportSummary } from '../../hooks/use-cert-report-summary';
 import type { CertReportSummary } from '../../api/cert-client';
 import type { Endorsement, EndorsementStatus, EndorsementType } from '../../api/cert-fixtures';
-import { AuthPill } from '../../components/cert/auth-pill';
 import { EndorsementSubRow } from '../../components/cert/endorsement-sub-row';
-import { useDarkMode } from '../../hooks/use-dark-mode';
 import { useCertOrgDetail } from '../../hooks/use-cert-org-detail';
 import { useEndorsements } from '../../hooks/use-endorsements';
 import { useOrganizationNames } from '../../hooks/use-organization-names';
 import type { ResoEndorsement, ResoOrganization } from '../../types';
-
-const LOGO_LIGHT =
-  'https://www.reso.org/wp-content/uploads/2020/06/RESO-Logo_Horizontal_Blue.png';
-const LOGO_DARK =
-  'https://www.reso.org/wp-content/uploads/2020/06/RESO-Logo_Horizontal_White.png';
 
 const PAGE_CONTAINER = 'max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8';
 
@@ -100,69 +94,12 @@ const adaptEndorsement = (
 
 export const OrgSummaryPage = () => {
   const { uoi } = useParams<{ readonly uoi: string }>();
-  const { isDark, toggle } = useDarkMode();
   const { org, isLoading, error } = useCertOrgDetail(uoi);
   const { reports: certReports } = useCertReportSummary(uoi);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
-      {/* Top header — duplicated from CertHomePage. Extract to a
-          CertLayout when the third public Cert page lands. */}
-      <header className="sticky top-0 z-30 bg-white/95 dark:bg-gray-800/95 backdrop-blur border-b border-gray-200 dark:border-gray-700">
-        <div className={`${PAGE_CONTAINER} py-3 flex items-center justify-between`}>
-          <div className="flex items-center gap-4 min-w-0">
-            <NavLink to="/" className="shrink-0" aria-label="Back to RESO Tools">
-              <img
-                src={isDark ? LOGO_DARK : LOGO_LIGHT}
-                alt="RESO"
-                className="h-8"
-              />
-            </NavLink>
-            <div className="hidden sm:block w-px h-7 bg-gray-200 dark:bg-gray-700" />
-            <nav className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 min-w-0">
-              <NavLink to="/cert" className="hover:text-gray-900 dark:hover:text-gray-200">
-                Endorsements
-              </NavLink>
-              <svg className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path
-                  fillRule="evenodd"
-                  d="M7.21 14.77a.75.75 0 010-1.06l3.71-3.71-3.71-3.71a.75.75 0 111.06-1.06l4.24 4.24a.75.75 0 010 1.06l-4.24 4.24a.75.75 0 01-1.06 0z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <span className="text-gray-700 dark:text-gray-200 font-medium truncate">
-                {org?.OrganizationName ?? 'Organization'}
-              </span>
-            </nav>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={toggle}
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors"
-            >
-              {isDark ? (
-                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM10 7a3 3 0 100 6 3 3 0 000-6zM15.657 5.404a.75.75 0 10-1.06-1.06l-1.061 1.06a.75.75 0 001.06 1.06l1.06-1.06zM6.464 14.596a.75.75 0 10-1.06-1.06l-1.06 1.06a.75.75 0 001.06 1.06l1.06-1.06zM18 10a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0118 10zM5 10a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 015 10zM14.596 15.657a.75.75 0 001.06-1.06l-1.06-1.061a.75.75 0 10-1.06 1.06l1.06 1.06zM5.404 6.464a.75.75 0 001.06-1.06l-1.06-1.06a.75.75 0 10-1.06 1.06l1.06 1.06z" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path
-                    fillRule="evenodd"
-                    d="M7.455 2.004a.75.75 0 01.26.77 7 7 0 009.958 7.967.75.75 0 011.067.853A8.5 8.5 0 116.647 1.921a.75.75 0 01.808.083z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              )}
-            </button>
-            <AuthPill />
-          </div>
-        </div>
-      </header>
-
-      <main className={`${PAGE_CONTAINER} pt-10 pb-20`}>
+    <div className="h-full overflow-y-auto bg-gray-50 dark:bg-gray-900">
+      <div className={`${PAGE_CONTAINER} pt-10 pb-20`}>
         {isLoading && !org && <LoadingState />}
         {!isLoading && error && <ErrorState message={error} />}
         {!isLoading && !error && !org && <NotFoundState uoi={uoi ?? ''} />}
@@ -172,7 +109,7 @@ export const OrgSummaryPage = () => {
             certReports={certReports}
           />
         )}
-      </main>
+      </div>
     </div>
   );
 };

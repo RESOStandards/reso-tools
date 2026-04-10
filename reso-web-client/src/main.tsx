@@ -22,15 +22,10 @@ import { OrganizationsPage } from './pages/organizations-page';
 import { SearchPage } from './pages/search-page';
 
 const router = createBrowserRouter([
-  // Cert workspace — its own top-level branch with no shared chrome.
-  // The Cert UI has its own visual baseline (clean centered card for login,
-  // Cert-specific layout shell to land in the next slice) and its own auth
-  // context, so it intentionally sits outside the OData browser Layout.
+  // Login stays outside the Layout — clean centered card, no sidebar.
   { path: '/cert/login', element: <LoginPage /> },
-  { path: '/cert', element: <CertHomePage /> },
-  { path: '/cert/orgs/:uoi', element: <OrgSummaryPage /> },
 
-  // OData server browser — the existing app, untouched.
+  // Everything else shares the unified Layout with the sidebar. #109
   {
     path: '/',
     element: <Layout />,
@@ -46,6 +41,11 @@ const router = createBrowserRouter([
         ]
       },
       { path: 'organizations', element: <OrganizationsPage /> },
+      // Cert pages — now inside the Layout with the unified sidebar.
+      // The cert-specific header chrome is removed; they inherit the
+      // Layout header with the auth pill and theme toggle.
+      { path: 'cert', element: <CertHomePage /> },
+      { path: 'cert/orgs/:uoi', element: <OrgSummaryPage /> },
       { path: 'metadata', element: <MetadataPage /> },
       { path: 'metadata/:resource', element: <MetadataPage /> },
       { path: ':resource', element: <SearchPage /> },

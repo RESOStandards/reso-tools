@@ -3,7 +3,7 @@ import { NavLink, useLocation, useParams } from 'react-router';
 import { useServer } from '../context/server-context';
 import { READ_ONLY_RESOURCES } from '../types';
 
-type Section = 'home' | 'organizations' | 'resources' | 'metadata';
+type Section = 'home' | 'organizations' | 'certification' | 'resources' | 'metadata';
 
 /** Sidebar navigation with Home link and collapsible Resources and Metadata Explorer sections. */
 export const ResourceNav = () => {
@@ -20,6 +20,7 @@ export const ResourceNav = () => {
   const activeSection: Section =
     location.pathname === '/' ? 'home'
     : location.pathname.startsWith('/organizations') ? 'organizations'
+    : location.pathname.startsWith('/cert') ? 'certification'
     : location.pathname.startsWith('/metadata') ? 'metadata'
     : 'resources';
 
@@ -49,6 +50,17 @@ export const ResourceNav = () => {
         </svg>
         Organizations
       </NavLink>
+
+      {/* Certification section */}
+      <div>
+        <NavLink to="/cert" className={sectionHeaderClass('certification')}>
+          <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+            <title>Certification</title>
+            <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          Certification
+        </NavLink>
+      </div>
 
       {/* Resources section */}
       <div>
