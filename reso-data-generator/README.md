@@ -2,6 +2,8 @@
 
 Generates realistic RESO Data Dictionary test data for OData servers. Supports three output modes (HTTP, JSON, curl), automatic dependency resolution with FK linkage, and domain-specific generators for Property, Member, Office, Media, OpenHouse, Showing, Teams, TeamMembers, OUID, and Property child resources.
 
+> **[User Guide](doc/GUIDE.md)** – a task-oriented walkthrough with realistic examples.
+
 ## CLI Usage
 
 ### Interactive Mode

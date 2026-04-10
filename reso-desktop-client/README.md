@@ -2,6 +2,8 @@
 
 Electron desktop application for browsing any RESO-compliant OData server. Connects to external servers out of the box with OAuth2 Client Credentials or Bearer Token authentication. Optionally runs the built-in reference server for local test data.
 
+> **[User Guide](doc/GUIDE.md)** – a task-oriented walkthrough with realistic examples.
+
 ## Quick Start
 
 ```bash

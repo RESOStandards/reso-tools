@@ -2,6 +2,8 @@
 
 Standalone, zero-dependency library for parsing OData 4.01 `$filter` and `$expand` expressions into typed ASTs (abstract syntax trees). Used by both [`@reso-standards/reso-client`](../reso-client/) for query validation and [`@reso-standards/reso-reference-server`](../reso-reference-server/) for SQL WHERE clause generation and multi-level navigation property expansion.
 
+> **[User Guide](doc/GUIDE.md)** – a task-oriented walkthrough with realistic examples.
+
 ## Install
 
 ```bash

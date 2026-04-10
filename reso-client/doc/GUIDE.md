@@ -296,7 +296,7 @@ if (!result.valid) {
 }
 ```
 
-Useful for compliance work, but also for catching half-broken servers in production before they break your client. A schema that does not validate is a server you should not trust to round-trip data.
+Useful for compliance work and for verifying a server's metadata before relying on it in production. A schema that does not validate is worth investigating before round-tripping data through it.
 
 ### Validate Query Options Against the Schema
 

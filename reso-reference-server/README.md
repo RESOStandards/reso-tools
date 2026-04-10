@@ -2,6 +2,8 @@
 
 A metadata-driven OData 4.01 reference server for the [RESO Data Dictionary](https://www.reso.org/data-dictionary/). Reads the RESO JSON metadata format and dynamically generates PostgreSQL tables, OData CRUD endpoints, EDMX metadata, and OpenAPI documentation.
 
+> **[User Guide](doc/GUIDE.md)** – a task-oriented walkthrough with realistic examples.
+
 ## Quick Start (Docker)
 
 The server supports three database backends: **PostgreSQL** (default), **MongoDB**, and **SQLite**. Each has its own Docker Compose profile.

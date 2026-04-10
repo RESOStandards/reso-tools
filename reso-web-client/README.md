@@ -2,6 +2,8 @@
 
 React-based OData browser UI with server switcher for connecting to external OData servers, metadata explorer, and CRUD interface.
 
+> **[User Guide](doc/GUIDE.md)** – a task-oriented walkthrough with realistic examples.
+
 ## Features
 
 - **Resource browser**: Select from Property, Member, Office, Media, OpenHouse, Showing
