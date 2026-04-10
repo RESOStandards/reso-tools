@@ -8,6 +8,8 @@ Compliance testing toolkit for RESO OData servers. Run certification tests from 
 - **SDK-first** – the CLI, Desktop Client, and MCP server all call the same SDK functions with progress callbacks
 - **Flexible auth** – bearer tokens, OAuth2 Client Credentials, `.env` files, or environment variables
 
+> **[User Guide](doc/GUIDE.md)** – a task-oriented walkthrough with realistic examples.
+
 ## Install
 
 ```bash

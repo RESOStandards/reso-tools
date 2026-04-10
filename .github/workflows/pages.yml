@@ -130,6 +130,7 @@ jobs:
               -e "s|\]\(([a-z0-9][a-z0-9_/-]*)/README\.md\)|\](\1/)|g" \
               -e "s|\]\(examples/([^)]+)\)|\](${GH_BLOB}/${pkg_dir}/examples/\1)|g" \
               -e "s|\]\(examples/\)|\](${GH_TREE}/${pkg_dir}/examples)|g" \
+              -e "s|\]\(doc/GUIDE\.md\)|\](/guides/${pkg_dir}/)|g" \
               -e "s|\]\(doc/([^)]+)\)|\](${GH_BLOB}/${pkg_dir}/doc/\1)|g"
           }
 

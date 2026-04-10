@@ -2,6 +2,8 @@
 
 OData 4.01 client SDK for TypeScript. Provides URI building, CRUD helpers, CSDL metadata parsing and validation, query option validation, and response parsing.
 
+> **[User Guide](doc/GUIDE.md)** – a task-oriented walkthrough with realistic examples.
+
 ## Install
 
 ```bash

@@ -184,7 +184,7 @@ ListPrice .GT. 0 .AND. ListPrice .LT. 1000000000
 * **Rules are portable.** A rule written in RCP-19 syntax runs identically against any compliant implementation. Today, every implementation has its own rule format.
 * **Rules can travel with the data.** RCP-19 defines a `Rules` resource shape so rules ship over the same OData mechanics as records. A server can advertise its rules to clients; a client can fetch them and apply them locally before submitting.
 * **Rules are inspectable.** A static expression can be analyzed, displayed in a UI, translated between dialects and reasoned about by tooling. A TypeScript function cannot.
-* **Rules are spec-grounded.** RCP-19 is part of the RESO transport specification. Validators that implement it can make compliance claims that hand-rolled rule engines cannot.
+* **Rules are spec-grounded.** RCP-19 is part of the RESO transport specification. Validators that implement it can make compliance claims that custom rule engines cannot.
 
 ### What the RCP-19 Implementation Will Look Like
 
