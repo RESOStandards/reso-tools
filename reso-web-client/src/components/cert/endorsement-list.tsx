@@ -718,33 +718,6 @@ export const EndorsementList = ({
           </div>
         ) : totalShown > 0 ? (
           <>
-            <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-              <span className="font-medium text-gray-700 dark:text-gray-300">
-                {totalShown}
-              </span>{' '}
-              endorsement{totalShown === 1 ? '' : 's'}
-              {isGroupedMode && (
-                <>
-                  {' '}across{' '}
-                  <span className="font-medium text-gray-700 dark:text-gray-300">
-                    {groupedEndorsements.length}
-                  </span>{' '}
-                  organization{groupedEndorsements.length === 1 ? '' : 's'}
-                </>
-              )}
-              {hasMore && (
-                <span className="inline-flex items-center gap-0.5 text-gray-400 dark:text-gray-500">
-                  {' · scroll to view more'}
-                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path
-                      fillRule="evenodd"
-                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </span>
-              )}
-            </div>
             {isGroupedMode ? (
               <ul className="space-y-3">
                 {groupedEndorsements.map((g) => (

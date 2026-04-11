@@ -75,12 +75,12 @@ export const EndorsementGroupCard = ({
   };
 
   return (
-  <article className="bg-white dark:bg-gray-800/70 border border-gray-300/80 dark:border-gray-700/80 rounded-xl overflow-hidden shadow dark:shadow-none hover:border-gray-400 dark:hover:border-gray-600/80 hover:shadow-md dark:hover:shadow-none transition-all">
+  <article className="bg-gray-50 dark:bg-gray-800/70 border border-gray-300/80 dark:border-gray-700/80 rounded-xl overflow-hidden shadow dark:shadow-none hover:border-gray-400 dark:hover:border-gray-600/80 hover:shadow-md dark:hover:shadow-none transition-all">
     {/* Org header — clickable, navigates to the recipient summary */}
     <button
       type="button"
       onClick={handleHeaderClick}
-      className="group/header w-full flex items-center justify-between gap-4 px-5 py-3 cursor-pointer bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-black/40 transition-colors text-left"
+      className="group/header w-full flex items-center justify-between gap-4 px-5 py-3 cursor-pointer bg-gray-200 dark:bg-gray-900 border-b border-gray-300 dark:border-gray-700 hover:bg-gray-300 dark:hover:bg-black/40 transition-colors text-left"
     >
       <div className="flex items-center gap-2.5 min-w-0">
         <svg

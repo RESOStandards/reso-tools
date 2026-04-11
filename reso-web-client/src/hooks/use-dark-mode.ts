@@ -24,33 +24,22 @@ export const useDarkMode = () => {
     if (themeParam === 'dark') return true;
     if (themeParam === 'light') return false;
 
-    // Check localStorage (may have been hydrated from Electron storage)
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'dark') return true;
-    if (stored === 'light') return false;
-
-    // Fall back to system preference
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // Must match the anti-flash script in index.html exactly:
+    // the script reads localStorage then system pref, and only
+    // adds the dark class — never removes it. So our initial
+    // state must agree with what the DOM currently shows.
+    return document.documentElement.classList.contains('dark');
   };
 
   const [isDark, setIsDark] = useState(getInitial);
-
-  // On mount, hydrate from Electron storage if available (async)
-  useEffect(() => {
-    const storage = electronStorage();
-    if (storage) {
-      storage.get(STORAGE_KEY).then(value => {
-        if (value === 'dark') setIsDark(true);
-        else if (value === 'light') setIsDark(false);
-      });
-    }
-  }, []);
 
   // Apply dark class to <html> element and persist preference
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark);
     const value = isDark ? 'dark' : 'light';
     localStorage.setItem(STORAGE_KEY, value);
+    // Cookie survives Electron's random-port localStorage partitioning
+    document.cookie = `${STORAGE_KEY}=${value};path=/;max-age=31536000;SameSite=Lax`;
     electronStorage()?.set(STORAGE_KEY, value);
   }, [isDark]);
 
