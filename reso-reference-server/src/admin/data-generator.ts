@@ -2,9 +2,11 @@ import { randomUUID } from 'node:crypto';
 import {
   KEY_FIELD_MAP,
   buildMultiResourcePlan,
+  clearRecordPools,
   getDefaultRelatedCount,
   getGenerator,
   getRelatedResources,
+  setRecordPool,
   transformLookupsForHumanFriendly
 } from '@reso-standards/reso-data-generator';
 import type { ResoField, ResoLookup } from '@reso-standards/reso-data-generator';
@@ -140,6 +142,7 @@ export const createDataGeneratorHandler =
         // Multi-resource generation with FK resolution
         const plan = buildMultiResourcePlan(body.resource, body.count, body.relatedRecords, fieldsByResource);
         const keyPool: Record<string, string[]> = {};
+        clearRecordPools();
 
         // Execute each phase in dependency order
         for (const phase of plan.phases) {
@@ -183,6 +186,9 @@ export const createDataGeneratorHandler =
               errors.push(`${phase.resource} ${i + 1}: ${err instanceof Error ? err.message : 'Insert failed'}`);
             }
           }
+
+          // Stash records for cross-resource references (Property needs Member/Office pools)
+          setRecordPool(phase.resource, records);
 
           if (phase.resource === body.resource) {
             created = phaseCreated;
