@@ -6,6 +6,7 @@ import {
   getDefaultRelatedCount,
   getGenerator,
   getRelatedResources,
+  reflattenAgentFields,
   setRecordPool,
   transformLookupsForHumanFriendly
 } from '@reso-standards/reso-data-generator';
@@ -142,6 +143,7 @@ export const createDataGeneratorHandler =
         // Multi-resource generation with FK resolution
         const plan = buildMultiResourcePlan(body.resource, body.count, body.relatedRecords, fieldsByResource);
         const keyPool: Record<string, string[]> = {};
+        const generatedRecords: Record<string, Array<Record<string, unknown>>> = {};
         clearRecordPools();
 
         // Execute each phase in dependency order
@@ -178,6 +180,11 @@ export const createDataGeneratorHandler =
                 }
               }
 
+              // Re-flatten agent/office fields to match FK-assigned keys
+              if (phase.resource === 'Property' && generatedRecords['Member'] && generatedRecords['Office']) {
+                reflattenAgentFields(records[i], generatedRecords['Member'], generatedRecords['Office']);
+              }
+
               await dal.insert(phaseCtx, records[i]);
               keyPool[phase.resource].push(key);
               phaseCreated++;
@@ -188,6 +195,7 @@ export const createDataGeneratorHandler =
           }
 
           // Stash records for cross-resource references (Property needs Member/Office pools)
+          generatedRecords[phase.resource] = records;
           setRecordPool(phase.resource, records);
 
           if (phase.resource === body.resource) {

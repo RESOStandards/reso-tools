@@ -4,7 +4,7 @@ import { generateMediaRecords } from '../src/generators/media.js';
 import { generateMemberRecords } from '../src/generators/member.js';
 import { generateOfficeRecords } from '../src/generators/office.js';
 import { generateOpenHouseRecords } from '../src/generators/open-house.js';
-import { generatePropertyRecords } from '../src/generators/property.js';
+import { generatePropertyRecords, reflattenAgentFields } from '../src/generators/property.js';
 import { generateShowingRecords } from '../src/generators/showing.js';
 import type { ResoField, ResoLookup } from '../src/generators/types.js';
 
@@ -451,6 +451,92 @@ describe('Property relational integrity', () => {
     expect(records).toHaveLength(3);
     // No ListAgentKey since pools are empty
     expect(records[0].ListAgentKey).toBeUndefined();
+  });
+});
+
+describe('reflattenAgentFields', () => {
+  // Simulate the server flow: generate pools, generate property, assign FK, reflatten
+  const offices = generateOfficeRecords(OFFICE_FIELDS, {}, 3);
+  const officesWithKeys = offices.map((o, i) => ({ ...o, OfficeKey: `office-${i}` }));
+
+  const members = generateMemberRecords(MEMBER_FIELDS, {}, 10);
+  const membersWithKeys = members.map((m, i) => ({
+    ...m,
+    MemberKey: `member-${i}`,
+    OfficeKey: officesWithKeys[i % officesWithKeys.length].OfficeKey
+  }));
+
+  it('corrects flattened fields to match FK-assigned keys', () => {
+    // Generate a property with pools (flattening picks random members)
+    clearRecordPools();
+    setRecordPool('Member', membersWithKeys);
+    setRecordPool('Office', officesWithKeys);
+    const gen = getGenerator('Property');
+    const records = [...gen(PROPERTY_FIELDS, SAMPLE_LOOKUPS, 10)];
+
+    for (const record of records) {
+      // Simulate FK resolver overwriting ListAgentKey with a specific member
+      const targetMember = membersWithKeys[3];
+      record.ListAgentKey = targetMember.MemberKey;
+
+      // Before reflatten, the flattened fields may not match the FK key
+      // (they were picked randomly during generation)
+
+      // Reflatten to fix the mismatch
+      reflattenAgentFields(record, membersWithKeys, officesWithKeys);
+
+      // After reflatten, the flattened fields MUST match the FK-assigned member
+      expect(record.ListAgentKey).toBe(targetMember.MemberKey);
+      expect(record.ListAgentFirstName).toBe(targetMember.MemberFirstName);
+      expect(record.ListAgentLastName).toBe(targetMember.MemberLastName);
+      expect(record.ListAgentFullName).toBe(targetMember.MemberFullName);
+      expect(record.ListAgentEmail).toBe(targetMember.MemberEmail);
+      expect(record.ListAgentMlsId).toBe(targetMember.MemberMlsId);
+
+      // Office should match the target member's office
+      const expectedOffice = officesWithKeys.find(o => o.OfficeKey === targetMember.OfficeKey);
+      expect(record.ListOfficeKey).toBe(expectedOffice!.OfficeKey);
+      expect(record.ListOfficeName).toBe(expectedOffice!.OfficeName);
+    }
+  });
+
+  it('handles missing member key gracefully (no crash)', () => {
+    const record: Record<string, unknown> = { ListAgentKey: 'nonexistent-key' };
+    // Should not throw, just leave fields unchanged
+    reflattenAgentFields(record, membersWithKeys, officesWithKeys);
+    expect(record.ListAgentFirstName).toBeUndefined();
+  });
+
+  it('skips roles with no key assigned', () => {
+    const record: Record<string, unknown> = {};
+    reflattenAgentFields(record, membersWithKeys, officesWithKeys);
+    // No keys = no flattening
+    expect(record.ListAgentFirstName).toBeUndefined();
+    expect(record.BuyerAgentFirstName).toBeUndefined();
+  });
+
+  it('handles multiple roles independently', () => {
+    clearRecordPools();
+    setRecordPool('Member', membersWithKeys);
+    setRecordPool('Office', officesWithKeys);
+    const gen = getGenerator('Property');
+    const records = [...gen(PROPERTY_FIELDS, SAMPLE_LOOKUPS, 5)];
+
+    for (const record of records) {
+      // Assign different members to different roles
+      const listMember = membersWithKeys[0];
+      const buyerMember = membersWithKeys[5];
+      record.ListAgentKey = listMember.MemberKey;
+      record.BuyerAgentKey = buyerMember.MemberKey;
+
+      reflattenAgentFields(record, membersWithKeys, officesWithKeys);
+
+      // Each role should have the correct member's data
+      expect(record.ListAgentFirstName).toBe(listMember.MemberFirstName);
+      expect(record.BuyerAgentFirstName).toBe(buyerMember.MemberFirstName);
+      // They should be different people
+      expect(record.ListAgentFirstName).not.toBe(record.BuyerAgentFirstName);
+    }
   });
 });
 

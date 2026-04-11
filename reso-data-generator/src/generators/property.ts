@@ -66,6 +66,33 @@ const FALLBACK_STREET_NAMES = [
 
 const STREET_SUFFIXES = ['St', 'Ave', 'Blvd', 'Dr', 'Ln', 'Ct', 'Pl', 'Way', 'Rd', 'Cir'];
 
+/**
+ * Representative MLS system names and IDs for OriginatingSystem / SourceSystem
+ * fields. Sampled from the RESO OUID directory for realistic test data.
+ */
+const MLS_SYSTEMS: ReadonlyArray<{ readonly name: string; readonly id: string }> = [
+  { name: 'Bright MLS', id: 'BMLS' },
+  { name: 'Stellar MLS', id: 'STLR' },
+  { name: 'CRMLS', id: 'CRMLS' },
+  { name: 'Realcomp', id: 'RCOMP' },
+  { name: 'MRED', id: 'MRED' },
+  { name: 'HAR.com', id: 'HAR' },
+  { name: 'NWMLS', id: 'NWMLS' },
+  { name: 'Canopy MLS', id: 'CMLS' },
+  { name: 'REcolorado', id: 'RECO' },
+  { name: 'BeachesMLS', id: 'BMFL' },
+  { name: 'ARMLS', id: 'ARMLS' },
+  { name: 'Flexmls', id: 'FLEX' },
+  { name: 'GAMLS', id: 'GAMLS' },
+  { name: 'MLS PIN', id: 'PIN' },
+  { name: 'OneKey MLS', id: 'OKEY' },
+  { name: 'Triangle MLS', id: 'TMLS' },
+  { name: 'Northstar MLS', id: 'NSTAR' },
+  { name: 'ACTRIS', id: 'ACTRS' },
+  { name: 'IRMLS', id: 'IRMLS' },
+  { name: 'My Florida Regional MLS', id: 'MFRMLS' },
+];
+
 const PROPERTY_TYPES = ['Residential', 'Commercial', 'Land', 'Farm'];
 
 const PROPERTY_SUBTYPES = ['SingleFamilyResidence', 'Condominium', 'Townhouse', 'Apartment', 'ManufacturedHome', 'MultiFamily'];
@@ -153,6 +180,50 @@ const flattenOffice = (
   }
 };
 
+/**
+ * Re-flatten agent/office fields on a Property record using the FK keys
+ * already assigned (e.g., by the FK resolver). Looks up the member/office
+ * by their key in the pool and overwrites the flattened fields to match.
+ * Call this after FK injection to ensure consistency.
+ */
+export const reflattenAgentFields = (
+  record: Record<string, unknown>,
+  memberPool: ReadonlyArray<Record<string, unknown>>,
+  officePool: ReadonlyArray<Record<string, unknown>>
+): void => {
+  const memberByKey = new Map(
+    [...memberPool].map(m => [m.MemberKey as string, m])
+  );
+  const officeByKey = new Map(
+    [...officePool].map(o => [o.OfficeKey as string, o])
+  );
+
+  const rolePairs: ReadonlyArray<readonly [string, string]> = [
+    ['ListAgent', 'ListOffice'],
+    ['BuyerAgent', 'BuyerOffice'],
+    ['CoBuyerAgent', 'CoBuyerOffice'],
+    ['CoListAgent', 'CoListOffice'],
+    ['SellingAgent', 'SellingOffice'],
+    ['CoSellingAgent', 'CoSellingOffice'],
+  ];
+
+  for (const [agentPrefix, officePrefix] of rolePairs) {
+    const agentKey = record[`${agentPrefix}Key`] as string | undefined;
+    if (!agentKey) continue;
+
+    const member = memberByKey.get(agentKey);
+    if (member) {
+      flattenMember(record, member, agentPrefix);
+      // Derive office from the member's OfficeKey
+      const memberOfficeKey = member.OfficeKey as string | undefined;
+      const office = memberOfficeKey ? officeByKey.get(memberOfficeKey) : undefined;
+      if (office) {
+        flattenOffice(record, office, officePrefix);
+      }
+    }
+  }
+};
+
 /** Generates realistic Property records with domain-specific overrides. */
 export const generatePropertyRecords = (
   fields: ReadonlyArray<ResoField>,
@@ -169,6 +240,14 @@ export const generatePropertyRecords = (
     // ListingId — human-friendly MLS-style ID (e.g., "24-012345", "MLS-78901")
     const listingIdPrefixes = ['', 'MLS-', `${new Date().getFullYear().toString().slice(-2)}-`];
     record.ListingId = `${randomChoice(listingIdPrefixes)}${randomInt(100000, 999999)}`;
+
+    // Originating / Source system — realistic MLS names from RESO OUID directory
+    const originSystem = randomChoice([...MLS_SYSTEMS]);
+    const sourceSystem = randomChoice([...MLS_SYSTEMS]);
+    record.OriginatingSystemName = originSystem.name;
+    record.OriginatingSystemID = originSystem.id;
+    record.SourceSystemName = sourceSystem.name;
+    record.SourceSystemID = sourceSystem.id;
 
     // Address overrides — use city-specific street names from geo-data
     const location = randomLocation();

@@ -5,6 +5,7 @@ import { generateOfficeRecords } from './office.js';
 import { generateOpenHouseRecords } from './open-house.js';
 import { generatePropertyChildRecords } from './property-child.js';
 import { generatePropertyRecords } from './property.js';
+export { reflattenAgentFields } from './property.js';
 import { generateShowingRecords } from './showing.js';
 import type { RecordGenerator, ResoField, ResoLookup } from './types.js';
 
@@ -48,6 +49,10 @@ const recordPools: Record<string, ReadonlyArray<Record<string, unknown>>> = {};
 export const setRecordPool = (resource: string, records: ReadonlyArray<Record<string, unknown>>): void => {
   recordPools[resource] = records;
 };
+
+/** Retrieve generated records from the pool. */
+export const getRecordPool = (resource: string): ReadonlyArray<Record<string, unknown>> | undefined =>
+  recordPools[resource];
 
 /** Clear all record pools (call between seed runs). */
 export const clearRecordPools = (): void => {
