@@ -61,10 +61,16 @@ export const useCollection = (
   const [errorUrl, setErrorUrl] = useState<string | null>(null);
   const nextLinkRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Track which resource the current rows belong to.
+  // When the resource changes, we return empty rows immediately
+  // (without waiting for the useEffect to fire) so stale data
+  // from the previous resource never renders.
+  const rowsResourceRef = useRef(resource);
 
   // Reset when resource or params change
   useEffect(() => {
     let cancelled = false;
+    rowsResourceRef.current = resource;
     setRows([]);
     setCount(undefined);
     setHasMore(true);
@@ -138,5 +144,17 @@ export const useCollection = (
     }
   }, [isLoading, hasMore]);
 
-  return { rows, count, isLoading, hasMore, error, errorUrl, loadMore };
+  // If the resource has changed but the effect hasn't fired yet,
+  // return empty rows so stale data from the previous resource
+  // never renders.
+  const stale = rowsResourceRef.current !== resource;
+  return {
+    rows: stale ? [] : rows,
+    count: stale ? undefined : count,
+    isLoading: stale || isLoading,
+    hasMore: stale ? true : hasMore,
+    error: stale ? null : error,
+    errorUrl: stale ? null : errorUrl,
+    loadMore
+  };
 };

@@ -30,9 +30,9 @@ export const DataGeneratorPage = () => {
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<GenerateResponse | null>(null);
 
-  const loadStatus = useCallback(async () => {
+  const loadStatus = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const status = await getGeneratorStatus();
       setResources(status.resources);
@@ -84,7 +84,7 @@ export const DataGeneratorPage = () => {
         resolveDependencies: true
       });
       setResult(response);
-      await loadStatus();
+      await loadStatus(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Generation failed');
     } finally {
@@ -243,15 +243,28 @@ export const DataGeneratorPage = () => {
         {/* Summary + Button — full width below the two columns */}
         <div className="mt-6 space-y-4">
           <div className="bg-gray-50 dark:bg-gray-900 rounded p-3 text-sm text-gray-600 dark:text-gray-400">
-            <strong>Plan:</strong> {count.toLocaleString()} {selectedResource} records
-            {enabledRelated.length > 0 && (
-              <>
-                {' + '}
-                {enabledRelated
-                  .map(r => `${((relatedConfig[r.resource]?.count ?? r.defaultCount) * count).toLocaleString()} ${displayName(r.resource)}`)
-                  .join(', ')}
-              </>
-            )}
+            {(() => {
+              const relatedTotal = enabledRelated.reduce(
+                (sum, r) => sum + (relatedConfig[r.resource]?.count ?? r.defaultCount) * count,
+                0
+              );
+              const grandTotal = count + relatedTotal;
+              return (
+                <>
+                  <strong>Plan:</strong> {count.toLocaleString()} {selectedResource} records
+                  {enabledRelated.length > 0 && (
+                    <>
+                      {' + '}
+                      {enabledRelated
+                        .map(r => `${((relatedConfig[r.resource]?.count ?? r.defaultCount) * count).toLocaleString()} ${displayName(r.resource)}`)
+                        .join(', ')}
+                      {' = '}
+                      <strong>{grandTotal.toLocaleString()} total</strong>
+                    </>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           <button
@@ -268,17 +281,44 @@ export const DataGeneratorPage = () => {
       {result && (
         <div className="mt-6 bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded-lg p-5">
           <h3 className="text-sm font-semibold text-green-800 dark:text-green-200 mb-3">Generation Complete</h3>
-          <div className="space-y-1 text-sm text-green-700 dark:text-green-300">
-            <p>
-              {result.resource}: {result.created.toLocaleString()} created, {result.failed.toLocaleString()} failed
-            </p>
-            {result.relatedResults.map(r => (
-              <p key={r.resource}>
-                {displayName(r.resource)}: {r.created.toLocaleString()} created, {r.failed.toLocaleString()} failed
-              </p>
-            ))}
-            <p className="text-xs text-green-600 dark:text-green-400 mt-2">Duration: {(result.durationMs / 1000).toFixed(1)}s</p>
-          </div>
+          {(() => {
+            // Separate requested results from auto-generated dependencies
+            const requestedResources = new Set([
+              result.resource,
+              ...enabledRelated.map(r => r.resource)
+            ]);
+            const requested = result.relatedResults.filter(r => requestedResources.has(r.resource));
+            const dependencies = result.relatedResults.filter(r => !requestedResources.has(r.resource));
+            const totalCreated = result.created + result.relatedResults.reduce((s, r) => s + r.created, 0);
+            const totalFailed = result.failed + result.relatedResults.reduce((s, r) => s + r.failed, 0);
+            const depCreated = dependencies.reduce((s, r) => s + r.created, 0);
+
+            return (
+              <div className="space-y-1 text-sm text-green-700 dark:text-green-300">
+                <p>
+                  {result.resource}: {result.created.toLocaleString()} created, {result.failed.toLocaleString()} failed
+                </p>
+                {requested.map(r => (
+                  <p key={r.resource}>
+                    {displayName(r.resource)}: {r.created.toLocaleString()} created, {r.failed.toLocaleString()} failed
+                  </p>
+                ))}
+                {(requested.length > 0 || dependencies.length > 0) && (
+                  <p className="font-medium mt-1">
+                    Total: {totalCreated.toLocaleString()} created
+                    {totalFailed > 0 && `, ${totalFailed.toLocaleString()} failed`}
+                  </p>
+                )}
+                {dependencies.length > 0 && (
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                    Includes {depCreated.toLocaleString()} records auto-generated for dependencies
+                    ({dependencies.map(r => `${r.created.toLocaleString()} ${displayName(r.resource)}`).join(', ')})
+                  </p>
+                )}
+                <p className="text-xs text-green-600 dark:text-green-400 mt-2">Duration: {(result.durationMs / 1000).toFixed(1)}s</p>
+              </div>
+            );
+          })()}
           {result.errors.length > 0 && (
             <div className="mt-3 text-xs text-red-600 dark:text-red-400">
               <p className="font-medium">Errors:</p>

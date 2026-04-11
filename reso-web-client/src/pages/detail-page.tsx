@@ -41,6 +41,14 @@ export const DetailPage = () => {
   const [errorUrl, setErrorUrl] = useState<string | null>(null);
   const [showDelete, setShowDelete] = useState(false);
   const [keyCopied, setKeyCopied] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const handleCopyField = useCallback((fieldName: string, value: string) => {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopiedField(fieldName);
+      setTimeout(() => setCopiedField(null), 1500);
+    });
+  }, []);
 
   const handleCopyKey = useCallback(() => {
     navigator.clipboard.writeText(String(key ?? '')).then(() => {
@@ -205,12 +213,48 @@ export const DetailPage = () => {
   // Right pane shows either an expanded Media carousel or a direct Media record preview
   const hasMediaPreview = resourceName === 'Media' && isUrlValue(record.MediaURL);
 
+  /** Fields that show a copy-to-clipboard icon. */
+  const isCopyableField = (fieldName: string): boolean =>
+    fieldName === 'ListingId' ||
+    fieldName.endsWith('MlsId') ||
+    fieldName.endsWith('Key') ||
+    fieldName.endsWith('NationalAssociationId');
+
+  const renderCopyButton = (field: ResoField, value: string) => {
+    const isCopied = copiedField === field.fieldName;
+    return (
+      <button
+        type="button"
+        onClick={() => handleCopyField(field.fieldName, value)}
+        title={isCopied ? 'Copied!' : 'Copy to clipboard'}
+        className="ml-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0">
+        {isCopied ? (
+          <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <title>Copied</title>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        ) : (
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <title>Copy to clipboard</title>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+            />
+          </svg>
+        )}
+      </button>
+    );
+  };
+
   const renderFieldItem = (field: ResoField) => {
     const value = record[field.fieldName];
     const isArray = Array.isArray(value) && value.length > 0;
     const displayName = getDisplayName(field);
     const sensitive = isSensitiveField(field.fieldName);
     const formattedValue = formatFieldValue(value, field);
+    const copyable = isCopyableField(field.fieldName) && value != null && !isArray;
     return (
       <div className={`flex flex-col sm:flex-row ${isArray ? 'sm:items-start' : 'sm:items-baseline'} gap-0.5 sm:gap-2 py-1 text-sm min-w-0`}>
         <span className="text-gray-500 dark:text-gray-400 shrink-0 sm:w-48 truncate text-xs sm:text-sm" title={displayName}>
@@ -239,8 +283,9 @@ export const DetailPage = () => {
             {value}
           </a>
         ) : (
-          <span className="text-gray-800 dark:text-gray-200 break-all min-w-0" title={formattedValue}>
+          <span className="text-gray-800 dark:text-gray-200 break-all min-w-0 flex items-center" title={formattedValue}>
             {formattedValue}
+            {copyable && renderCopyButton(field, String(value))}
           </span>
         )}
       </div>

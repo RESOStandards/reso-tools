@@ -18,14 +18,14 @@ export { KEY_FIELD_MAP } from './generators/types.js';
 export type { BatchCreateResult, OutputFormat, OutputOptions } from './client.js';
 export { patchRecordsViaHttp } from './client.js';
 export { buildDependencyGraph, buildMultiResourcePlan, discoverForeignKeys, topologicalSort } from './fk-resolver.js';
-export { getGenerator, getLookupDisplayValue, transformLookupsForHumanFriendly } from './generators/index.js';
+export { clearRecordPools, getGenerator, getLookupDisplayValue, setRecordPool, transformLookupsForHumanFriendly } from './generators/index.js';
 export { buildSeedPlan, getDefaultRelatedCount, getRelatedResources } from './plan.js';
 
 import { randomUUID } from 'node:crypto';
 import { createRecordsViaHttp, generateCurlScript, patchRecordsViaHttp, writeRecordsAsJson } from './client.js';
 import type { OutputOptions } from './client.js';
 import { buildMultiResourcePlan } from './fk-resolver.js';
-import { getGenerator } from './generators/index.js';
+import { clearRecordPools, getGenerator, setRecordPool } from './generators/index.js';
 import type { ForeignKeyBinding, SeedOptions, SeedResult } from './generators/types.js';
 import { KEY_FIELD_MAP } from './generators/types.js';
 
@@ -72,6 +72,7 @@ const generateWithDependencies = async (
   const { resource, count, relatedRecords, fieldsByResource, lookupsByType } = options;
   const plan = buildMultiResourcePlan(resource, count, relatedRecords, fieldsByResource);
   const keyPool: Record<string, string[]> = {};
+  clearRecordPools();
   const isOffline = output.format === 'json' || output.format === 'curl';
   const curlRecordSets: Array<{ resource: string; records: ReadonlyArray<Record<string, unknown>> }> = [];
 
@@ -112,6 +113,9 @@ const generateWithDependencies = async (
 
     // Inject FK values from key pool
     injectForeignKeys(records, bindings, keyPool);
+
+    // Stash records for cross-resource references (e.g., Property needs Member/Office pools)
+    setRecordPool(phase.resource, records);
 
     // Output records
     if (output.format === 'http') {

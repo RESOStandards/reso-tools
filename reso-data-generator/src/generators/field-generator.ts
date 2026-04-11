@@ -100,6 +100,127 @@ const randomLookupValue = (type: string, lookups: Readonly<Record<string, Readon
 };
 
 /**
+ * Field-name-based numeric bounds. Matched by substring so they apply
+ * across all resources without per-generator overrides. Order matters —
+ * first match wins. More specific patterns go first.
+ */
+const NUMERIC_BOUNDS: ReadonlyArray<{
+  readonly match: (name: string) => boolean;
+  readonly min: number;
+  readonly max: number;
+  readonly decimals?: number;
+}> = [
+  // Coordinates
+  { match: n => /Latitude/i.test(n), min: 25.0, max: 48.0, decimals: 6 },
+  { match: n => /Longitude/i.test(n), min: -124.0, max: -71.0, decimals: 6 },
+
+  // Years
+  { match: n => /Year(Built|Renovated|Established|BuiltEffective)/i.test(n), min: 1920, max: 2025, decimals: 0 },
+  { match: n => /Year/i.test(n), min: 2015, max: 2026, decimals: 0 },
+
+  // Rates and percentages (0–1 scale)
+  { match: n => /Rate|Ratio|Percent/i.test(n), min: 0.01, max: 0.15, decimals: 4 },
+
+  // Prices (keep in property generator, but cap the fallback)
+  { match: n => /Price|ClosePrice/i.test(n), min: 50000, max: 10000000, decimals: 2 },
+
+  // Area / size
+  { match: n => /Acres|IrrigationWaterRights/i.test(n), min: 0.1, max: 500, decimals: 2 },
+  { match: n => /SquareFeet|SqFt|LivingArea|BuildingArea|FinishedArea|UnfinishedArea|GrossLivingArea|LeasableArea|AvailableArea|TotalGrossArea|TotalNetArea|ContiguousArea|DivisibleArea|FoundationArea|CultivatedArea|RangeArea|RoomArea|CommercialArea/i.test(n),
+    min: 200, max: 50000, decimals: 2 },
+  { match: n => /LotSize(?!Acres)/i.test(n), min: 1000, max: 200000, decimals: 2 },
+
+  // Counts — specific small ranges
+  { match: n => /Bathrooms|Bedrooms|MainLevel/i.test(n), min: 0, max: 6, decimals: 0 },
+  { match: n => /Fireplaces|Stories|StoriesTotal/i.test(n), min: 1, max: 4, decimals: 0 },
+  { match: n => /GarageSpaces|CarportSpaces|ParkingSpaces|CoveredSpaces|OpenParking/i.test(n), min: 0, max: 6, decimals: 0 },
+  { match: n => /NumberOfPads/i.test(n), min: 1, max: 10, decimals: 0 },
+  { match: n => /NumberOfUnits|NumberOfBuildings|NumberOfLots/i.test(n), min: 1, max: 75, decimals: 0 },
+  { match: n => /NumberOf(Elevators|FreightElevators|Cranes|DockDoors|DriveInDoors|LoadingDocks|RailDoors)/i.test(n), min: 0, max: 10, decimals: 0 },
+  { match: n => /NumberOf(FullTime|PartTime)Employees/i.test(n), min: 1, max: 200, decimals: 0 },
+  { match: n => /NumberOf(Tenants|Branches)/i.test(n), min: 1, max: 50, decimals: 0 },
+  { match: n => /NumberOf(SeparateElectric|SeparateGas|SeparateWater)Meters/i.test(n), min: 1, max: 20, decimals: 0 },
+  { match: n => /MaximumNumberOfPets|MaximumPetsAllowed/i.test(n), min: 0, max: 5, decimals: 0 },
+  { match: n => /Rooms|Seating/i.test(n), min: 1, max: 20, decimals: 0 },
+  { match: n => /Count$|Logins$|ViewCount|ImpressionCount/i.test(n), min: 0, max: 500, decimals: 0 },
+
+  // Days on market
+  { match: n => /Days(On|In)/i.test(n), min: 1, max: 365, decimals: 0 },
+
+  // Expense fields (monthly amounts)
+  { match: n => /Expense|Fee(?!d)|Deposit|Rent(?!al)|ParkingFee/i.test(n), min: 25, max: 5000, decimals: 2 },
+
+  // Income
+  { match: n => /Income|RentCollected/i.test(n), min: 5000, max: 500000, decimals: 2 },
+
+  // Tax
+  { match: n => /Tax(Annual|Assessed|Other)/i.test(n), min: 500, max: 50000, decimals: 2 },
+
+  // Lease amounts
+  { match: n => /Lease(Amount|Rate)/i.test(n), min: 500, max: 10000, decimals: 2 },
+
+  // Dimensions (feet)
+  { match: n => /Height|Length|Width|Frontage/i.test(n), min: 5, max: 200, decimals: 1 },
+  { match: n => /Elevation/i.test(n), min: 0, max: 14000, decimals: 0 },
+
+  // Scores
+  { match: n => /Score$/i.test(n), min: 0, max: 100, decimals: 0 },
+
+  // Weight (pets)
+  { match: n => /Weight/i.test(n), min: 5, max: 150, decimals: 0 },
+
+  // Power/electrical
+  { match: n => /Amperage/i.test(n), min: 100, max: 800, decimals: 0 },
+  { match: n => /Voltage/i.test(n), min: 110, max: 480, decimals: 0 },
+  { match: n => /NameplateCapacity|PowerProduction(Annual|Size)/i.test(n), min: 1, max: 500, decimals: 1 },
+
+  // Sale price per unit/area
+  { match: n => /SalePricePer/i.test(n), min: 50, max: 1000, decimals: 2 },
+  { match: n => /LeasePricePer/i.test(n), min: 5, max: 100, decimals: 2 },
+
+  // Vacancy allowance (dollar amount)
+  { match: n => /VacancyAllowance$/i.test(n), min: 1000, max: 25000, decimals: 2 },
+
+  // Image/screen dimensions (pixels)
+  { match: n => /ImageHeight|ImageWidth|ScreenHeight|ScreenWidth/i.test(n), min: 100, max: 4096, decimals: 0 },
+  { match: n => /ColorDepth/i.test(n), min: 8, max: 32, decimals: 0 },
+
+  // Pasture / irrigated area
+  { match: n => /PastureArea/i.test(n), min: 0, max: 500, decimals: 2 },
+
+  // Order / sequence
+  { match: n => /Order$|Sequence$/i.test(n), min: 1, max: 100, decimals: 0 },
+
+  // Street number
+  { match: n => /StreetNumberNumeric/i.test(n), min: 100, max: 9999, decimals: 0 },
+
+  // Entry / floor level
+  { match: n => /EntryLevel|Level/i.test(n), min: 1, max: 10, decimals: 0 },
+
+  // Timezone offset
+  { match: n => /TimeZone.*Offset/i.test(n), min: -12, max: -4, decimals: 0 },
+
+  // Air rights
+  { match: n => /AirRights/i.test(n), min: 0, max: 100, decimals: 0 },
+
+  // Showing advance notice (hours)
+  { match: n => /AdvanceNotice/i.test(n), min: 1, max: 48, decimals: 0 },
+
+  // Green verification metric
+  { match: n => /GreenVerificationMetric/i.test(n), min: 0, max: 100, decimals: 1 },
+
+  // Organization member count
+  { match: n => /MemberCount|CommitteeCount/i.test(n), min: 10, max: 5000, decimals: 0 },
+
+  // Mobile home dimensions
+  { match: n => /MobileLength|MobileWidth/i.test(n), min: 10, max: 80, decimals: 0 },
+];
+
+/** Find field-name-based bounds, if any. */
+const findBounds = (fieldName: string): { min: number; max: number; decimals?: number } | undefined =>
+  NUMERIC_BOUNDS.find(b => b.match(fieldName));
+
+/**
  * Generates a value for a single field based on its Edm type and constraints.
  * Returns undefined if the field should be skipped.
  */
@@ -146,14 +267,20 @@ export const generateFieldValue = (
     case 'Edm.Boolean':
       return randomBool();
 
-    case 'Edm.Int16':
-      return randomInt(0, 100);
+    case 'Edm.Int16': {
+      const b16 = findBounds(fieldName);
+      return randomInt(b16?.min ?? 0, b16?.max ?? 100);
+    }
 
-    case 'Edm.Int32':
-      return randomInt(0, 10000);
+    case 'Edm.Int32': {
+      const b32 = findBounds(fieldName);
+      return randomInt(b32?.min ?? 0, b32?.max ?? 10000);
+    }
 
-    case 'Edm.Int64':
-      return randomInt(0, 100000);
+    case 'Edm.Int64': {
+      const b64 = findBounds(fieldName);
+      return randomInt(b64?.min ?? 0, b64?.max ?? 100000);
+    }
 
     case 'Edm.Byte':
       return randomInt(0, 255);
@@ -161,9 +288,13 @@ export const generateFieldValue = (
     case 'Edm.Decimal':
     case 'Edm.Double':
     case 'Edm.Single': {
+      const bounds = findBounds(fieldName);
+      if (bounds) {
+        return randomDecimal(bounds.min, bounds.max, bounds.decimals ?? scale ?? 2);
+      }
       const s = scale ?? 2;
-      // Respect RESO metadata precision/scale: max integer digits = precision - scale
-      const maxVal = field.precision ? 10 ** (field.precision - s) - 1 : 10000;
+      // Respect RESO metadata precision/scale but cap to avoid absurd values
+      const maxVal = field.precision ? Math.min(10 ** (field.precision - s) - 1, 100000) : 10000;
       return randomDecimal(0, maxVal, s);
     }
 

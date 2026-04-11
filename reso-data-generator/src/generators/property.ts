@@ -1,4 +1,5 @@
 import { generateRecord, randomChoice, randomDecimal, randomInt, isPlaceholderValue } from './field-generator.js';
+import { randomLocation, jitterCoords } from './geo-data.js';
 import type { ResoField, ResoLookup } from './types.js';
 
 /**
@@ -58,100 +59,116 @@ const STATE_TAX_RATES: Readonly<Record<string, number>> = {
   WY: 0.0058
 };
 
-const STREET_NAMES = [
-  'Main',
-  'Oak',
-  'Maple',
-  'Cedar',
-  'Elm',
-  'Pine',
-  'Washington',
-  'Park',
-  'Lake',
-  'Hill',
-  'Sunset',
-  'River',
-  'Spring',
-  'Valley',
-  'Highland',
-  'Forest',
-  'Meadow',
-  'Willow',
-  'Birch',
-  'Cherry',
-  'Walnut',
-  'Magnolia'
+const FALLBACK_STREET_NAMES = [
+  'Main', 'Oak', 'Maple', 'Cedar', 'Elm', 'Pine', 'Washington',
+  'Park', 'Lake', 'Hill', 'Sunset', 'River', 'Spring', 'Valley'
 ];
 
 const STREET_SUFFIXES = ['St', 'Ave', 'Blvd', 'Dr', 'Ln', 'Ct', 'Pl', 'Way', 'Rd', 'Cir'];
 
-const CITY_NAMES = [
-  'Springfield',
-  'Fairview',
-  'Madison',
-  'Georgetown',
-  'Arlington',
-  'Salem',
-  'Franklin',
-  'Clinton',
-  'Greenville',
-  'Bristol',
-  'Manchester',
-  'Oxford',
-  'Burlington',
-  'Ashland',
-  'Centerville'
-];
-
 const PROPERTY_TYPES = ['Residential', 'Commercial', 'Land', 'Farm'];
 
-const US_STATES = [
-  'AL',
-  'AZ',
-  'CA',
-  'CO',
-  'CT',
-  'FL',
-  'GA',
-  'IL',
-  'MA',
-  'MD',
-  'MI',
-  'MN',
-  'NC',
-  'NJ',
-  'NY',
-  'OH',
-  'OR',
-  'PA',
-  'RI',
-  'TX',
-  'VA',
-  'WA'
+const PROPERTY_SUBTYPES = ['SingleFamilyResidence', 'Condominium', 'Townhouse', 'Apartment', 'ManufacturedHome', 'MultiFamily'];
+
+/**
+ * RESO agent/office role prefixes. Each Property can have up to 6 agent
+ * roles and 6 office roles, flattened from Member and Office records.
+ */
+const AGENT_PREFIXES = ['BuyerAgent', 'CoBuyerAgent', 'ListAgent', 'CoListAgent', 'SellingAgent', 'CoSellingAgent'] as const;
+const OFFICE_PREFIXES = ['BuyerOffice', 'CoBuyerOffice', 'ListOffice', 'CoListOffice', 'SellingOffice', 'CoSellingOffice'] as const;
+
+/** Map from Member field names to their Property-flattened suffixes. */
+const MEMBER_FIELD_MAP: ReadonlyArray<readonly [string, string]> = [
+  ['MemberKey', 'Key'],
+  ['MemberFirstName', 'FirstName'],
+  ['MemberLastName', 'LastName'],
+  ['MemberFullName', 'FullName'],
+  ['MemberEmail', 'Email'],
+  ['MemberDirectPhone', 'DirectPhone'],
+  ['MemberOfficePhone', 'OfficePhone'],
+  ['MemberMobilePhone', 'MobilePhone'],
+  ['MemberPreferredPhone', 'PreferredPhone'],
+  ['MemberStateLicense', 'StateLicense'],
+  ['MemberNationalAssociationId', 'NationalAssociationId'],
+  ['MemberAddress1', 'Address1'],
+  ['MemberCity', 'City'],
+  ['MemberStateOrProvince', 'StateOrProvince'],
+  ['MemberPostalCode', 'PostalCode'],
 ];
 
-const PROPERTY_SUBTYPES = ['SingleFamilyResidence', 'Condominium', 'Townhouse', 'Apartment', 'ManufacturedHome', 'MultiFamily'];
+/** Map from Office field names to their Property-flattened suffixes. */
+const OFFICE_FIELD_MAP: ReadonlyArray<readonly [string, string]> = [
+  ['OfficeKey', 'Key'],
+  ['OfficeName', 'Name'],
+  ['OfficePhone', 'Phone'],
+  ['OfficeFax', 'Fax'],
+  ['OfficeEmail', 'Email'],
+  ['OfficeAddress1', 'Address1'],
+  ['OfficeCity', 'City'],
+  ['OfficeStateOrProvince', 'StateOrProvince'],
+  ['OfficePostalCode', 'PostalCode'],
+  ['OfficeNationalAssociationId', 'NationalAssociationId'],
+];
+
+/** Flatten a Member record into a Property record under a role prefix. */
+const flattenMember = (
+  record: Record<string, unknown>,
+  member: Record<string, unknown>,
+  prefix: string
+): void => {
+  for (const [memberField, suffix] of MEMBER_FIELD_MAP) {
+    const val = member[memberField];
+    if (val !== undefined) record[`${prefix}${suffix}`] = val;
+  }
+};
+
+/** Flatten an Office record into a Property record under a role prefix. */
+const flattenOffice = (
+  record: Record<string, unknown>,
+  office: Record<string, unknown>,
+  prefix: string
+): void => {
+  for (const [officeField, suffix] of OFFICE_FIELD_MAP) {
+    const val = office[officeField];
+    if (val !== undefined) record[`${prefix}${suffix}`] = val;
+  }
+};
 
 /** Generates realistic Property records with domain-specific overrides. */
 export const generatePropertyRecords = (
   fields: ReadonlyArray<ResoField>,
   lookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>>,
-  count: number
+  count: number,
+  _parentResource?: string,
+  _parentKey?: string,
+  memberPool?: ReadonlyArray<Record<string, unknown>>,
+  officePool?: ReadonlyArray<Record<string, unknown>>
 ): ReadonlyArray<Record<string, unknown>> =>
   Array.from({ length: count }, (_, i) => {
     const record = generateRecord(fields, lookups, i);
 
-    // Address overrides
+    // ListingId — human-friendly MLS-style ID (e.g., "24-012345", "MLS-78901")
+    const listingIdPrefixes = ['', 'MLS-', `${new Date().getFullYear().toString().slice(-2)}-`];
+    record.ListingId = `${randomChoice(listingIdPrefixes)}${randomInt(100000, 999999)}`;
+
+    // Address overrides — use city-specific street names from geo-data
+    const location = randomLocation();
     record.StreetNumber = String(randomInt(100, 9999));
-    record.StreetName = randomChoice(STREET_NAMES);
+    record.StreetName = location.streets.length
+      ? randomChoice([...location.streets])
+      : randomChoice(FALLBACK_STREET_NAMES);
     const streetSuffixValues = lookups['StreetSuffix'];
     record.StreetSuffix = streetSuffixValues?.length ? randomChoice(streetSuffixValues).lookupValue : randomChoice(STREET_SUFFIXES);
     record.UnparsedAddress = `${record.StreetNumber} ${record.StreetName} ${record.StreetSuffix}`;
+    // Use consistent city/state/zip/lat/lon from the selected location
     const cityValues = lookups['City']?.filter(v => !isPlaceholderValue(v.lookupValue));
-    record.City = cityValues?.length ? randomChoice(cityValues).lookupValue : randomChoice(CITY_NAMES);
-    record.StateOrProvince = randomChoice(US_STATES);
-    record.PostalCode = String(randomInt(10000, 99999));
+    record.City = cityValues?.length ? randomChoice(cityValues).lookupValue : location.city;
+    record.StateOrProvince = location.state;
+    record.PostalCode = location.zip;
     record.Country = 'US';
+    const coords = jitterCoords(location.lat, location.lon);
+    record.Latitude = Number(coords.lat.toFixed(6));
+    record.Longitude = Number(coords.lon.toFixed(6));
 
     // Pricing — ListPrice >= ListPriceLow
     record.ListPrice = randomDecimal(50000, 10000000, 2);
@@ -176,10 +193,6 @@ export const generatePropertyRecords = (
     record.LivingArea = randomDecimal(500, 8000, 2);
     record.LotSizeSquareFeet = randomDecimal(2000, 50000, 2);
     record.YearBuilt = randomInt(1950, 2024);
-
-    // Geo coordinates (continental US bounds)
-    record.Latitude = randomDecimal(25.0, 48.0, 6);
-    record.Longitude = randomDecimal(-124.0, -71.0, 6);
 
     // Property type — prefer lookup values, fall back to hardcoded
     const propertyTypeValues = lookups['PropertyType'];
@@ -207,7 +220,15 @@ export const generatePropertyRecords = (
     record.TaxAssessedValue = Math.round(randomDecimal(listPrice * 0.7, listPrice * 0.95, 0));
     record.TaxYear = new Date().getFullYear() - randomInt(0, 1);
 
-    // Expense fields (realistic monthly amounts)
+    // Unit counts (for multi-family / manufactured / mobile home)
+    record.NumberOfUnitsTotal = randomInt(1, 75);
+    record.NumberOfPads = randomInt(1, 10);
+    const unitsTotal = record.NumberOfUnitsTotal as number;
+    record.NumberOfUnitsLeased = randomInt(0, unitsTotal);
+    record.NumberOfUnitsVacant = unitsTotal - (record.NumberOfUnitsLeased as number);
+    record.NumberOfUnitsMonthToMonth = randomInt(0, record.NumberOfUnitsLeased as number);
+
+    // Expense fields (realistic monthly/annual amounts)
     record.AssociationFee = randomDecimal(50, 800, 2);
     record.AssociationFee2 = Math.random() > 0.7 ? randomDecimal(25, 200, 2) : 0;
     record.InsuranceExpense = randomDecimal(50, 500, 2);
@@ -218,6 +239,31 @@ export const generatePropertyRecords = (
     record.MaintenanceExpense = randomDecimal(50, 500, 2);
     record.OperatingExpense = randomDecimal(100, 2000, 2);
     record.OtherExpense = randomDecimal(0, 300, 2);
+    record.GardenerExpense = randomDecimal(50, 500, 2);
+    record.ManagerExpense = randomDecimal(200, 3000, 2);
+    record.PoolExpense = randomDecimal(50, 400, 2);
+    record.SuppliesExpense = randomDecimal(25, 500, 2);
+    record.ProfessionalManagementExpense = randomDecimal(200, 5000, 2);
+    record.FurnitureReplacementExpense = randomDecimal(0, 2000, 2);
+    record.NewTaxesExpense = randomDecimal(500, 15000, 2);
+
+    // Income — derive from units × realistic monthly rent
+    const monthlyRent = randomDecimal(800, 3500, 2);
+    record.GrossScheduledIncome = randomDecimal(
+      monthlyRent * unitsTotal * 10,
+      monthlyRent * unitsTotal * 12,
+      2
+    );
+    record.VacancyAllowance = randomDecimal(1000, 15000, 2);
+
+    // Cap rate (3%–12%)
+    record.CapRate = randomDecimal(0.03, 0.12, 4);
+
+    // Land / lot
+    record.LotSizeAcres = randomDecimal(0.1, 500, 2);
+    record.LandLeaseAmount = randomDecimal(500, 5000, 2);
+    record.LotSizeUnits = 'Square Feet';
+    record.PastureArea = randomDecimal(0, 200, 2);
 
     // Dates
     const listDate = new Date(Date.now() - randomInt(1, 365) * 86400000);
@@ -226,6 +272,62 @@ export const generatePropertyRecords = (
 
     // Text fields
     record.PublicRemarks = `Beautiful ${record.BedroomsTotal}-bedroom home located at ${record.UnparsedAddress}, ${record.City}. Features ${record.LivingArea} sqft of living space built in ${record.YearBuilt}.`;
+
+    // Flatten agent/office roles from pools when available.
+    // Strategy: pick a Member, find their Office, fill co-agents
+    // from the same office for relational integrity.
+    if (memberPool && memberPool.length > 0 && officePool && officePool.length > 0) {
+      const officeByKey = new Map(
+        [...officePool].map(o => [o.OfficeKey as string, o])
+      );
+
+      // Group members by their office for co-agent selection
+      const membersByOffice = new Map<string, Array<Record<string, unknown>>>();
+      for (const m of memberPool) {
+        const oKey = m.OfficeKey as string | undefined;
+        if (oKey) {
+          const list = membersByOffice.get(oKey) ?? [];
+          list.push(m);
+          membersByOffice.set(oKey, list);
+        }
+      }
+
+      // Each agent role pair: pick a member, derive their office,
+      // pick co-agent from same office
+      const rolePairs: ReadonlyArray<readonly [string, string, string, string]> = [
+        ['ListAgent', 'ListOffice', 'CoListAgent', 'CoListOffice'],
+        ['BuyerAgent', 'BuyerOffice', 'CoBuyerAgent', 'CoBuyerOffice'],
+        ['SellingAgent', 'SellingOffice', 'CoSellingAgent', 'CoSellingOffice'],
+      ];
+
+      for (const [agentPrefix, officePrefix, coAgentPrefix, coOfficePrefix] of rolePairs) {
+        const isRequired = agentPrefix === 'ListAgent' || agentPrefix === 'BuyerAgent';
+        if (!isRequired && Math.random() > 0.3) continue;
+
+        const agent = randomChoice([...memberPool]);
+        flattenMember(record, agent, agentPrefix);
+
+        // Derive office from the agent's OfficeKey
+        const agentOfficeKey = agent.OfficeKey as string | undefined;
+        const office = agentOfficeKey ? officeByKey.get(agentOfficeKey) : undefined;
+        if (office) {
+          flattenOffice(record, office, officePrefix);
+        }
+
+        // Co-agent: pick a different member from the same office (~40% chance)
+        if (Math.random() > 0.6 && agentOfficeKey) {
+          const sameOfficeMembers = membersByOffice.get(agentOfficeKey) ?? [];
+          const coAgentCandidates = sameOfficeMembers.filter(
+            m => m.MemberKey !== agent.MemberKey
+          );
+          if (coAgentCandidates.length > 0) {
+            const coAgent = randomChoice(coAgentCandidates);
+            flattenMember(record, coAgent, coAgentPrefix);
+            if (office) flattenOffice(record, office, coOfficePrefix);
+          }
+        }
+      }
+    }
 
     return record;
   });

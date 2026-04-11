@@ -1,4 +1,5 @@
 import { generateRecord, randomChoice, randomInt } from './field-generator.js';
+import { randomLocation } from './geo-data.js';
 import type { ResoField, ResoLookup } from './types.js';
 
 const FIRST_NAMES = [
@@ -70,45 +71,7 @@ const LAST_NAMES = [
   'Walker'
 ];
 
-const CITY_NAMES = [
-  'Springfield',
-  'Fairview',
-  'Madison',
-  'Georgetown',
-  'Arlington',
-  'Salem',
-  'Franklin',
-  'Clinton',
-  'Greenville',
-  'Bristol'
-];
-
-const US_STATES = [
-  'AL',
-  'AZ',
-  'CA',
-  'CO',
-  'CT',
-  'FL',
-  'GA',
-  'IL',
-  'MA',
-  'MD',
-  'MI',
-  'MN',
-  'NC',
-  'NJ',
-  'NY',
-  'OH',
-  'OR',
-  'PA',
-  'RI',
-  'TX',
-  'VA',
-  'WA'
-];
-
-const STREET_NAMES = ['Main', 'Oak', 'Maple', 'Cedar', 'Elm', 'Pine', 'Washington', 'Park'];
+const FALLBACK_STREET_NAMES = ['Main', 'Oak', 'Maple', 'Cedar', 'Elm', 'Pine', 'Washington', 'Park'];
 
 const STREET_SUFFIXES = ['St', 'Ave', 'Blvd', 'Dr', 'Ln', 'Rd'];
 
@@ -146,11 +109,15 @@ export const generateMemberRecords = (
     record.MemberOfficePhone = randomPhone();
     record.MemberMobilePhone = randomPhone();
 
-    // Address
-    record.MemberAddress1 = `${randomInt(100, 9999)} ${randomChoice(STREET_NAMES)} ${randomChoice(STREET_SUFFIXES)}`;
-    record.MemberCity = randomChoice(CITY_NAMES);
-    record.MemberStateOrProvince = randomChoice(US_STATES);
-    record.MemberPostalCode = String(randomInt(10000, 99999));
+    // Address — geo-consistent from real US locations
+    const location = randomLocation();
+    const streetName = location.streets.length
+      ? randomChoice([...location.streets])
+      : randomChoice(FALLBACK_STREET_NAMES);
+    record.MemberAddress1 = `${randomInt(100, 9999)} ${streetName} ${randomChoice(STREET_SUFFIXES)}`;
+    record.MemberCity = location.city;
+    record.MemberStateOrProvince = location.state;
+    record.MemberPostalCode = location.zip;
     record.MemberCountry = 'US';
 
     // Designations — prefer lookup values, fall back to hardcoded
@@ -169,8 +136,9 @@ export const generateMemberRecords = (
       record.MemberStatus = active ? 'Active' : randomChoice(statusValues).lookupValue;
     }
 
-    // National association ID
+    // IDs
     record.MemberNationalAssociationId = `NAR${String(randomInt(100000, 999999))}`;
+    record.MemberMlsId = `M${String(randomInt(10000, 99999))}`;
 
     return record;
   });
