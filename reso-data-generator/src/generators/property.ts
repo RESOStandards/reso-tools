@@ -83,13 +83,27 @@ const MEMBER_FIELD_MAP: ReadonlyArray<readonly [string, string]> = [
   ['MemberFirstName', 'FirstName'],
   ['MemberLastName', 'LastName'],
   ['MemberFullName', 'FullName'],
+  ['MemberMiddleName', 'MiddleName'],
+  ['MemberNamePrefix', 'NamePrefix'],
+  ['MemberNameSuffix', 'NameSuffix'],
+  ['MemberNickname', 'Nickname'],
   ['MemberEmail', 'Email'],
   ['MemberDirectPhone', 'DirectPhone'],
   ['MemberOfficePhone', 'OfficePhone'],
+  ['MemberOfficePhoneExt', 'OfficePhoneExt'],
   ['MemberMobilePhone', 'MobilePhone'],
   ['MemberPreferredPhone', 'PreferredPhone'],
+  ['MemberTollFreePhone', 'TollFreePhone'],
+  ['MemberFax', 'Fax'],
+  ['MemberVoiceMail', 'VoiceMail'],
+  ['MemberVoiceMailExt', 'VoiceMailExt'],
   ['MemberStateLicense', 'StateLicense'],
   ['MemberNationalAssociationId', 'NationalAssociationId'],
+  ['MemberDesignation', 'Designation'],
+  ['MemberAOR', 'AOR'],
+  ['MemberAORMlsId', 'AORMlsId'],
+  ['MemberMlsId', 'MlsId'],
+  ['MemberUrl', 'URL'],
   ['MemberAddress1', 'Address1'],
   ['MemberCity', 'City'],
   ['MemberStateOrProvince', 'StateOrProvince'],
@@ -101,13 +115,18 @@ const OFFICE_FIELD_MAP: ReadonlyArray<readonly [string, string]> = [
   ['OfficeKey', 'Key'],
   ['OfficeName', 'Name'],
   ['OfficePhone', 'Phone'],
+  ['OfficePhoneExt', 'PhoneExt'],
   ['OfficeFax', 'Fax'],
   ['OfficeEmail', 'Email'],
+  ['OfficeUrl', 'URL'],
+  ['OfficeMlsId', 'MlsId'],
+  ['OfficeNationalAssociationId', 'NationalAssociationId'],
+  ['OfficeAOR', 'AOR'],
+  ['OfficeAORMlsId', 'AORMlsId'],
   ['OfficeAddress1', 'Address1'],
   ['OfficeCity', 'City'],
   ['OfficeStateOrProvince', 'StateOrProvince'],
   ['OfficePostalCode', 'PostalCode'],
-  ['OfficeNationalAssociationId', 'NationalAssociationId'],
 ];
 
 /** Flatten a Member record into a Property record under a role prefix. */
@@ -324,6 +343,19 @@ export const generatePropertyRecords = (
             const coAgent = randomChoice(coAgentCandidates);
             flattenMember(record, coAgent, coAgentPrefix);
             if (office) flattenOffice(record, office, coOfficePrefix);
+          }
+        }
+      }
+
+      // Clean up: null out any agent/office prefixed fields that still
+      // have Sample placeholder values from the base generator. These
+      // are fields not present on the real Member/Office records.
+      const allPrefixes = [...AGENT_PREFIXES, ...OFFICE_PREFIXES];
+      for (const key of Object.keys(record)) {
+        if (allPrefixes.some(p => key.startsWith(p))) {
+          const val = record[key];
+          if (typeof val === 'string' && val.startsWith('Sample ')) {
+            delete record[key];
           }
         }
       }

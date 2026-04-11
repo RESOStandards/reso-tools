@@ -73,6 +73,13 @@ export const generateOfficeRecords = (
       record.OfficeStatus = active ? 'Active' : randomChoice(statusValues).lookupValue;
     }
 
+    // Contact details
+    record.OfficeFax = randomPhone();
+    record.OfficePhoneExt = String(randomInt(100, 999));
+    record.OfficeUrl = `https://${prefix.toLowerCase()}${suffix.replace(/\s/g, '').toLowerCase()}.example.com`;
+    record.OfficeAOR = `AOR-${randomInt(1000, 9999)}`;
+    record.OfficeAORMlsId = `AORMLS-${randomInt(1000, 9999)}`;
+
     // IDs
     record.OfficeNationalAssociationId = `NRDS${String(randomInt(100000, 999999))}`;
     record.OfficeMlsId = `O${String(randomInt(10000, 99999))}`;

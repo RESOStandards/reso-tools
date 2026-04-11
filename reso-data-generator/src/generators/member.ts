@@ -99,6 +99,7 @@ export const generateMemberRecords = (
     const firstName = randomChoice(FIRST_NAMES);
     const lastName = randomChoice(LAST_NAMES);
     const domain = randomChoice(EMAIL_DOMAINS);
+    const location = randomLocation();
 
     record.MemberFirstName = firstName;
     record.MemberLastName = lastName;
@@ -108,9 +109,21 @@ export const generateMemberRecords = (
     record.MemberDirectPhone = randomPhone();
     record.MemberOfficePhone = randomPhone();
     record.MemberMobilePhone = randomPhone();
+    record.MemberTollFreePhone = randomPhone();
+    record.MemberFax = randomPhone();
+    record.MemberVoiceMail = randomPhone();
+    record.MemberVoiceMailExt = String(randomInt(100, 999));
+    record.MemberOfficePhoneExt = String(randomInt(100, 999));
+    record.MemberNamePrefix = randomChoice(['', '', '', 'Dr.', 'Rev.']);
+    record.MemberNameSuffix = randomChoice(['', '', '', '', 'Jr.', 'Sr.', 'III']);
+    record.MemberMiddleName = Math.random() > 0.6 ? randomChoice(FIRST_NAMES).charAt(0) + '.' : '';
+    record.MemberNickname = Math.random() > 0.7 ? firstName.slice(0, 3) : '';
+    record.MemberStateLicense = `${location.state}-${randomInt(100000, 999999)}`;
+    record.MemberAOR = `AOR-${randomInt(1000, 9999)}`;
+    record.MemberUrl = `https://${firstName.toLowerCase()}${lastName.toLowerCase()}.example.com`;
+    record.MemberAORMlsId = `AORMLS-${randomInt(1000, 9999)}`;
 
     // Address — geo-consistent from real US locations
-    const location = randomLocation();
     const streetName = location.streets.length
       ? randomChoice([...location.streets])
       : randomChoice(FALLBACK_STREET_NAMES);
