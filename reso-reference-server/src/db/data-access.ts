@@ -174,4 +174,10 @@ export interface DataAccessLayer {
    * Delete an entity by key. Returns `true` if deleted, `false` if not found.
    */
   readonly deleteByKey: (ctx: ResourceContext, keyValue: string) => Promise<boolean>;
+
+  /**
+   * Delete all records from a resource table. Returns the number of rows deleted.
+   * Schema is preserved — only data is removed.
+   */
+  readonly truncateResource?: (ctx: ResourceContext) => Promise<number>;
 }

@@ -667,5 +667,10 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
     return result.changes > 0;
   };
 
-  return { queryCollection, readByKey, insert, update, deleteByKey };
+  const truncateResource = async (ctx: ResourceContext): Promise<number> => {
+    const result = db.prepare(`DELETE FROM "${ctx.resource}"`).run();
+    return result.changes;
+  };
+
+  return { queryCollection, readByKey, insert, update, deleteByKey, truncateResource };
 };

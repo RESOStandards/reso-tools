@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { GenerateResponse, ResourceStatus } from '../../api/admin-client';
-import { generateData, getGeneratorStatus } from '../../api/admin-client';
+import { generateData, getGeneratorStatus, resetData } from '../../api/admin-client';
 
 /** Short display labels for child resources with long names. */
 const CHILD_DISPLAY_NAMES: Record<string, string> = {
@@ -29,6 +29,10 @@ export const DataGeneratorPage = () => {
   // Generation state
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<GenerateResponse | null>(null);
+
+  // Reset state
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const loadStatus = useCallback(async (silent = false) => {
     try {
@@ -104,6 +108,21 @@ export const DataGeneratorPage = () => {
       ...prev,
       [resource]: { ...prev[resource], count: Math.max(1, newCount) }
     }));
+  };
+
+  const handleReset = async () => {
+    setResetting(true);
+    setError(null);
+    setResult(null);
+    try {
+      await resetData();
+      setShowResetConfirm(false);
+      await loadStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Reset failed');
+    } finally {
+      setResetting(false);
+    }
   };
 
   // Parent resources are those that have related resources defined
@@ -327,6 +346,46 @@ export const DataGeneratorPage = () => {
                   {err}
                 </p>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Reset section */}
+      {!loading && resources.some(r => r.count > 0) && (
+        <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+          {!showResetConfirm ? (
+            <button
+              type="button"
+              onClick={() => setShowResetConfirm(true)}
+              disabled={generating || resetting}
+              className="px-4 py-2 text-sm text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+              Reset All Data
+            </button>
+          ) : (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg p-4">
+              <p className="text-sm font-medium text-red-800 dark:text-red-200 mb-1">
+                This will permanently delete all records from every resource.
+              </p>
+              <p className="text-xs text-red-600 dark:text-red-400 mb-3">
+                {resources.reduce((s, r) => s + r.count, 0).toLocaleString()} records across {resources.filter(r => r.count > 0).length} resources will be removed. Schema will be preserved.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  disabled={resetting}
+                  className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">
+                  {resetting ? 'Resetting...' : 'Confirm Reset'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowResetConfirm(false)}
+                  disabled={resetting}
+                  className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
         </div>

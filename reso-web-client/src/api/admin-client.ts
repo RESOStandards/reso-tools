@@ -77,6 +77,23 @@ export const getGeneratorStatus = async (): Promise<GeneratorStatusResponse> => 
   return res.json();
 };
 
+/** Response from DELETE /admin/data-generator/reset. */
+export interface ResetResponse {
+  readonly message: string;
+  readonly results: ReadonlyArray<{ readonly resource: string; readonly deleted: number }>;
+  readonly totalDeleted: number;
+}
+
+/** Resets (truncates) all data in the database. Preserves schema. */
+export const resetData = async (): Promise<ResetResponse> => {
+  const res = await adminFetch('/admin/data-generator/reset', { method: 'DELETE' });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error((errorBody as { error?: { message?: string } })?.error?.message ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+};
+
 /** Triggers data generation for a resource. */
 export const generateData = async (request: GenerateRequest): Promise<GenerateResponse> => {
   const res = await adminFetch('/admin/data-generator', {
