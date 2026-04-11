@@ -31,13 +31,13 @@ Because the MCP server runs inside a container, use `http://host.docker.internal
 >
 > **Assistant:** The MCP server supports two auth methods. **Bearer token** is the simplest – if you already have a token from your IdP, just pass it as `authToken` on every call. **Client Credentials** is the full OAuth2 round-trip: you give me a `clientId`, `clientSecret`, and `tokenUrl`, and I fetch a fresh token before each request. Use that one if your server issues short-lived tokens or if you want to exercise the full handshake. Which would you like?
 >
-> **User:** Let's use Client Credentials – it'll exercise both code paths.
+> **User:** Let us use Client Credentials – it will exercise both code paths.
 >
 > **Assistant:** Great. What credentials should I use?
 >
-> **User:** It's the reference server, so anything works – its mock OAuth endpoint hands out tokens for any client id and secret. Let's use `test` / `test`.
+> **User:** It is the reference server, so anything works – its mock OAuth endpoint hands out tokens for any client id and secret. Let us use `test` / `test`.
 >
-> **Assistant:** Perfect. From here on I'll use these as your auth context for every call:
+> **Assistant:** Perfect. From here on I will use these as your auth context for every call:
 >
 > ```jsonc
 > {
@@ -48,7 +48,7 @@ Because the MCP server runs inside a container, use `http://host.docker.internal
 > }
 > ```
 >
-> If you ever want to switch to bearer-token auth instead, just hand me a token and I'll use this shape:
+> If you ever want to switch to bearer-token auth instead, just hand me a token and I will use this shape:
 >
 > ```jsonc
 > {
@@ -57,7 +57,7 @@ Because the MCP server runs inside a container, use `http://host.docker.internal
 > }
 > ```
 >
-> > **Tip:** if you ever see `Error: fetch failed`, the `url` or `tokenUrl` isn't reachable from inside the MCP container. Double-check the port and that you're using `host.docker.internal` (not `localhost`).
+> > **Tip:** if you ever see `Error: fetch failed`, the `url` or `tokenUrl` is not reachable from inside the MCP container. Double-check the port and that you are using `host.docker.internal` (not `localhost`).
 
 For the rest of the guide, assume the Client Credentials shape above is implicitly attached to every tool call. The collapsed tool-call blocks omit the auth fields to keep the dialogue scannable.
 
@@ -140,7 +140,7 @@ For the rest of the guide, assume the Client Credentials shape above is implicit
 
 ### 1.3 How Is `Property` Shaped Overall?
 
-> **User:** Of those 722 fields, what's the type breakdown?
+> **User:** Of those 722 fields, what is the type breakdown?
 >
 > **Assistant:** Grouping `Property`'s fields by OData type:
 >
@@ -230,7 +230,7 @@ For the rest of the guide, assume the Client Credentials shape above is implicit
 > Two columns matter:
 >
 > - **`LookupValue`** is what shows up in the actual data – the string a server returns when you `$select=AboveGradeFinishedAreaSource`.
-> - **`StandardLookupValue`** is the DD-standard label. On the seeded reference server they match, but on a real MLS feed they often don't – `LookupValue` may be `"Appr"` or `"PUB REC"` while `StandardLookupValue` stays canonical. That's the column to join on when normalizing across multiple feeds.
+> - **`StandardLookupValue`** is the DD-standard label. On the seeded reference server they match, but on a real MLS feed they often do not – `LookupValue` may be `"Appr"` or `"PUB REC"` while `StandardLookupValue` stays canonical. That is the column to join on when normalizing across multiple feeds.
 
 ### 2.2 Just Give Me the First Few
 
@@ -350,7 +350,7 @@ Section 2 used `$filter` for the simplest possible cases – equality and a sing
 > Three things worth noticing:
 >
 > - **`and` chains naturally** – three predicates joined left-to-right, no parentheses needed.
-> - **`StandardStatus eq 'Active'`** is the canonical "is this listing on the market?" filter. It's the lookup-backed string we resolved in §2.1, used here directly as a literal.
+> - **`StandardStatus eq 'Active'`** is the canonical "is this listing on the market?" filter. It is the lookup-backed string we resolved in §2.1, used here directly as a literal.
 > - **`orderby` is a thin pass-through to `$orderby`** – `asc`/`desc` modifiers work, multi-column ordering works (`ListPrice asc, ModificationTimestamp desc`), and ordering on lookup-backed strings sorts alphabetically by `LookupValue`.
 
 ### 3.2 String Matching – Anything in a Springfield
@@ -439,7 +439,7 @@ Section 2 used `$filter` for the simplest possible cases – equality and a sing
 
 > **User:** Before I run this, can you confirm I built the filter correctly? `StandardStatus eq 'Active' and ListPrice ge 300000 and ListPrice le 600000 and contains(City, 'spring')`
 >
-> **Assistant:** That's exactly what `parse-filter` is for. It runs the same OData expression parser the rest of the RESO toolchain uses and returns the AST. If the parse succeeds, the syntax is valid; if it fails, you get a precise error. No server round-trip needed.
+> **Assistant:** That is exactly what `parse-filter` is for. It runs the same OData expression parser the rest of the RESO toolchain uses and returns the AST. If the parse succeeds, the syntax is valid; if it fails, you get a precise error. No server round-trip needed.
 >
 > <details><summary>Tool call – <code>mcp__reso__parse-filter</code></summary>
 >
@@ -474,15 +474,15 @@ Section 2 used `$filter` for the simplest possible cases – equality and a sing
 >
 > 1. **The left-associativity is correct** – `a and b and c and d` parses as `((a and b) and c) and d`, which is what you want for a chain of conjunctions.
 > 2. **Literal types were inferred correctly** – `'Active'` is a string, `300000` is a number. If `ListPrice` had accidentally been quoted (`'300000'`) the literal would come back as `string` and the eventual server query would 400.
-> 3. **`contains` parses as a function call**, not a comparison – confirming it'll be sent as `contains(City,'spring')` rather than mangled.
+> 3. **`contains` parses as a function call**, not a comparison – confirming it will be sent as `contains(City,'spring')` rather than mangled.
 >
-> Use `parse-filter` whenever you're hand-building a filter from string concatenation, especially when user input is involved – it catches quoting errors and operator typos before they reach the network.
+> Use `parse-filter` whenever you are hand-building a filter from string concatenation, especially when user input is involved – it catches quoting errors and operator typos before they reach the network.
 
 ### 3.5 Date Windows – The Foundation of Incremental Sync
 
 > **User:** Show me listings modified since the start of 2025, newest first.
 >
-> **Assistant:** `ModificationTimestamp` is the standard DD field for "when did this record last change". Combine it with `ge` and an ISO-8601 literal and you have an incremental-sync filter – the same shape every replication client uses to pull only what's new since its last sync cursor.
+> **Assistant:** `ModificationTimestamp` is the standard DD field for "when did this record last change". Combine it with `ge` and an ISO-8601 literal and you have an incremental-sync filter – the same shape every replication client uses to pull only what is new since its last sync cursor.
 >
 > <details><summary>Tool call – <code>mcp__reso__query</code></summary>
 >
@@ -513,11 +513,11 @@ Section 2 used `$filter` for the simplest possible cases – equality and a sing
 > }
 > ```
 >
-> Notice that all three results have nearly identical timestamps in early April 2026 – that's the moment the seed step ran, not the moment the listings were "actually" modified. This is what you'd expect from a freshly bulk-loaded database: every record's `ModificationTimestamp` reflects the load, and the *real* incremental-sync story starts when the next mutation happens. Which is exactly what Section 4 is about.
+> Notice that all three results have nearly identical timestamps in early April 2026 – that is the moment the seed step ran, not the moment the listings were "actually" modified. This is what you'd expect from a freshly bulk-loaded database: every record's `ModificationTimestamp` reflects the load, and the *real* incremental-sync story starts when the next mutation happens. Which is exactly what Section 4 is about.
 >
 > Two things worth knowing about timestamp filters:
 >
-> - **`Edm.DateTimeOffset` literals don't take quotes.** It's `ge 2025-01-01T00:00:00Z`, not `ge '2025-01-01T00:00:00Z'`. This is one of the most common mistakes when hand-building filters; `parse-filter` will catch it for you.
+> - **`Edm.DateTimeOffset` literals do not take quotes.** It is `ge 2025-01-01T00:00:00Z`, not `ge '2025-01-01T00:00:00Z'`. This is one of the most common mistakes when hand-building filters; `parse-filter` will catch it for you.
 > - **The DD also defines `ModificationTimestamp`'s Date sibling, `ListingContractDate`**, which is `Edm.Date` (no time component). For Date fields the literal is `2025-01-01` with no `T...Z` suffix.
 
 ### 3.6 What Is *Not* Covered Here
@@ -540,7 +540,7 @@ Reading data is half the story. The other half – making changes and *knowing* 
 
 > **User:** Before we touch anything, what *is* EntityEvent and why should I care?
 >
-> **Assistant:** EntityEvent is RESO's standard change feed. Every time a record on the server changes – created, updated, or deleted – the server appends a row to the `EntityEvent` resource. Clients pull from it on a cursor (`EntityEventSequence`) to learn what's new since their last sync. It's the foundation of incremental replication in the RESO ecosystem.
+> **Assistant:** EntityEvent is the RESO standard change feed. Every time a record on the server changes – created, updated, or deleted – the server appends a row to the `EntityEvent` resource. Clients pull from it on a cursor (`EntityEventSequence`) to learn what is new since their last sync. It is the foundation of incremental replication in the RESO ecosystem.
 >
 > The schema is intentionally lean. The DD 2.1 definition has just five fields:
 >
@@ -552,12 +552,12 @@ Reading data is half the story. The other half – making changes and *knowing* 
 > | `ResourceRecordUrl` | `Edm.String` | a fetchable URL pointing at the current state of the record |
 > | `FeedTypes` | `Collection(Edm.String)` | which feed(s) the event belongs to, for multi-feed servers |
 >
-> Three things to absorb up front, because they'll shape how you use it:
+> Three things to absorb up front, because they will shape how you use it:
 >
-> 1. **The event is a *pointer*, not a *diff*.** It tells you "record X in resource Y changed, here's where to fetch the new version" – not what changed about it. If you want to know whether the price moved or the status flipped, you follow the pointer and compare.
-> 2. **There's no `EventType` field, and that's intentional.** Creates, updates, and deletes all produce the same row shape. The polling client derives the semantics for itself, using two simple rules:
->    - **If the follow-up fetch returns 404 (or an empty result for a key you used to know about), it's a delete.** Drop it from your local feed.
->    - **Otherwise it's a change.** Compare the freshly-fetched record against your last-known copy field-by-field, or hash the records and compare hashes – whichever is cheaper for your data shape. If anything differs, apply the change. If nothing differs, treat the event as a no-op (which can happen with re-saves and re-publishes).
+> 1. **The event is a *pointer*, not a *diff*.** It tells you "record X in resource Y changed, here is where to fetch the new version" – not what changed about it. If you want to know whether the price moved or the status flipped, you follow the pointer and compare.
+> 2. **There is no `EventType` field, and that is intentional.** Creates, updates, and deletes all produce the same row shape. The polling client derives the semantics for itself, using two simple rules:
+>    - **If the follow-up fetch returns 404 (or an empty result for a key you used to know about), it is a delete.** Drop it from your local feed.
+>    - **Otherwise it is a change.** Compare the freshly-fetched record against your last-known copy field-by-field, or hash the records and compare hashes – whichever is cheaper for your data shape. If anything differs, apply the change. If nothing differs, treat the event as a no-op (which can happen with re-saves and re-publishes).
 >
 >    A future optional `EventTypes` extension is on the roadmap to make this distinction explicit on the server side, but the polling rules above work against every compliant server today.
 > 3. **Today's model is pull, not push.** You poll `EntityEvent` on whatever interval suits you – every few seconds for near-real-time sync, every few minutes for slower feeds. Subscription/push semantics are on the RESO roadmap (server-sent events, webhooks, filterable subscriptions) but not in the current spec. Build your client around polling for now and the migration to push will be a layer on top, not a rewrite.
@@ -581,11 +581,11 @@ Reading data is half the story. The other half – making changes and *knowing* 
 >   Registered routes for EntityEvent (5 fields, key: EntityEventSequence, read-only, navProps: none)
 > ```
 >
-> "Read-only" is important: clients can `GET` from `EntityEvent` but can't `POST`/`PATCH`/`DELETE` against it directly. Rows appear there *only* as a side effect of writes against other resources.
+> "Read-only" is important: clients can `GET` from `EntityEvent` but cannot `POST`/`PATCH`/`DELETE` against it directly. Rows appear there *only* as a side effect of writes against other resources.
 
 ### 4.3 The Empty Feed
 
-> **User:** Cool. Show me what's changed in my feed lately.
+> **User:** Cool. Show me what is changed in my feed lately.
 >
 > **Assistant:** Pulling the most recent rows.
 >
@@ -612,19 +612,19 @@ Reading data is half the story. The other half – making changes and *knowing* 
 > }
 > ```
 >
-> Empty – and that's expected. The seed step bulk-loaded the fixture data directly into the underlying tables, bypassing the data-access layer that emits EntityEvent rows. This is consistent with how real replication works: a fresh database load is a *backfill*, not a stream of events. EntityEvent only starts populating once mutations flow through the OData API.
+> Empty – and that is expected. The seed step bulk-loaded the fixture data directly into the underlying tables, bypassing the data-access layer that emits EntityEvent rows. This is consistent with how real replication works: a fresh database load is a *backfill*, not a stream of events. EntityEvent only starts populating once mutations flow through the OData API.
 >
-> Let's generate one. I'll edit a listing and we'll watch it appear in the feed.
+> Let us generate one. I will edit a listing and we will watch it appear in the feed.
 
 ### 4.4 Editing a Listing – The Confirm-Then-PATCH Dance
 
 > **User:** Mark listing `50ddad45-e172-448d-8e9e-9aa5e2746873` as Pending.
 >
-> **Assistant:** Just to confirm before I touch anything: that's the Ashland AZ Land listing from §2.3 – the one currently `Active` at $6.17M. You want me to PATCH it to `StandardStatus: Pending`. Anything else change with it? In RESO it's customary to set `PurchaseContractDate` at the same time so downstream consumers know when the contract went under negotiation.
+> **Assistant:** Just to confirm before I touch anything: that is the Ashland AZ Land listing from §2.3 – the one currently `Active` at $6.17M. You want me to PATCH it to `StandardStatus: Pending`. Anything else change with it? In RESO it is customary to set `PurchaseContractDate` at the same time so downstream consumers know when the contract went under negotiation.
 >
 > **User:** Yeah, set `PurchaseContractDate` to today.
 >
-> **Assistant:** OK, here's what I'm about to send. Confirm and I'll run it.
+> **Assistant:** OK, here is what I'm about to send. Confirm and I will run it.
 >
 > ```jsonc
 > { "StandardStatus": "Pending", "PurchaseContractDate": "2026-04-06" }
@@ -665,7 +665,7 @@ Reading data is half the story. The other half – making changes and *knowing* 
 > }
 > ```
 >
-> The PATCH landed. Notice the server bumped `ModificationTimestamp` automatically and returned a fresh `@odata.etag` – those are both standard OData behaviors and useful if you're holding a local cache.
+> The PATCH landed. Notice the server bumped `ModificationTimestamp` automatically and returned a fresh `@odata.etag` – those are both standard OData behaviors and useful if you are holding a local cache.
 
 ### 4.5 The First Event Appears
 
@@ -706,16 +706,16 @@ Reading data is half the story. The other half – making changes and *knowing* 
 >
 > Sequence #1, pointing at exactly the record we just edited. A few things to notice:
 >
-> - **`EntityEventSequence` started at 1** – that's the very first event ever produced by this server. Production servers will be at much higher numbers, and your client persists "I last saw sequence N" between syncs.
-> - **`ResourceRecordUrl` is `null`** on this server. That's vendor-specific – the ref server has it disabled by default (controlled by a separate flag). Servers that populate it return something like `http://server:8080/Property('50ddad45-…')` so a client can navigate straight to the new state with a single GET.
+> - **`EntityEventSequence` started at 1** – that is the very first event ever produced by this server. Production servers will be at much higher numbers, and your client persists "I last saw sequence N" between syncs.
+> - **`ResourceRecordUrl` is `null`** on this server. That is vendor-specific – the ref server has it disabled by default (controlled by a separate flag). Servers that populate it return something like `http://server:8080/Property('50ddad45-…')` so a client can navigate straight to the new state with a single GET.
 > - **`FeedTypes` is empty** for the same reason – single-feed server, no need to tag events.
-> - **There's no `EventType: 'Update'` here.** A consumer that wants "what kind of change was this?" has to derive it: keep a known-keys set, and treat events for unknown keys as creates, events for known keys as updates, and events whose follow-up GET returns 404 as deletes.
+> - **There is no `EventType: 'Update'` here.** A consumer that wants "what kind of change was this?" has to derive it: keep a known-keys set, and treat events for unknown keys as creates, events for known keys as updates, and events whose follow-up GET returns 404 as deletes.
 
 ### 4.6 Adding a Brand New Listing
 
 > **User:** OK now add a brand new listing – minimal fields, just enough to pass validation.
 >
-> **Assistant:** I'll start small and let the server tell me what's required.
+> **Assistant:** I will start small and let the server tell me what is required.
 >
 > <details><summary>Tool call – <code>mcp__reso__create</code> (first attempt)</summary>
 >
@@ -754,7 +754,7 @@ Reading data is half the story. The other half – making changes and *knowing* 
 > }
 > ```
 >
-> The server told me exactly what's missing – `PostalCode` and `Country`. This is the ref server's RESO Add/Edit certification behavior in action: it validates inbound payloads against the DD's required-field rules and returns structured 400s with field-level error codes. Adding both:
+> The server told me exactly what is missing – `PostalCode` and `Country`. This is the ref server's RESO Add/Edit certification behavior in action: it validates inbound payloads against the DD's required-field rules and returns structured 400s with field-level error codes. Adding both:
 >
 > <details><summary>Tool call – <code>mcp__reso__create</code> (retry)</summary>
 >
@@ -799,7 +799,7 @@ Reading data is half the story. The other half – making changes and *knowing* 
 > }
 > ```
 >
-> One thing worth flagging: **the server assigned its own `ListingKey`** (`1bd91490-…`). On the ref server, `ListingKey` is server-generated regardless of what you supply. Different servers have different policies – some accept client-supplied keys, some require them, some always overwrite. Always read the response body to learn the canonical key, don't assume your input survived.
+> One thing worth flagging: **the server assigned its own `ListingKey`** (`1bd91490-…`). On the ref server, `ListingKey` is server-generated regardless of what you supply. Different servers have different policies – some accept client-supplied keys, some require them, some always overwrite. Always read the response body to learn the canonical key, do not assume your input survived.
 
 ### 4.7 Deleting a Record – The Destructive Path
 
@@ -828,7 +828,7 @@ Reading data is half the story. The other half – making changes and *knowing* 
 > { "status": 204, "body": null }
 > ```
 >
-> HTTP **204 No Content** – the OData convention for a successful DELETE. There's no body, just the status code. The record is gone from `Property` and a new EntityEvent row has been appended.
+> HTTP **204 No Content** – the OData convention for a successful DELETE. There is no body, just the status code. The record is gone from `Property` and a new EntityEvent row has been appended.
 
 ### 4.8 Wearing the Consumer's Hat – Verifying a Delete From the Feed
 
@@ -1006,7 +1006,7 @@ Sections 4.4–4.7 were about *making* writes. Now let us flip the perspective: 
 >
 > If the follow-up fetch had *returned* the record instead, the next step would be to compare it against my cached copy field-by-field – or, more efficiently for a 700-field resource like `Property`, hash both records and compare the hashes. Equal hash = no-op event (some servers emit those when a record is re-saved without actual changes). Different hash = real update; either compute a field-level diff for downstream consumers, or just replace the cached record wholesale.
 >
-> That's the entire polling-replication loop for EntityEvent, in pseudocode:
+> That is the entire polling-replication loop for EntityEvent, in pseudocode:
 >
 > ```
 > while true:
@@ -1028,7 +1028,7 @@ Sections 4.4–4.7 were about *making* writes. Now let us flip the perspective: 
 
 ### 4.9 Summarizing Recent Changes From the Feed
 
-> **User:** Show me everything that's happened in my feed today, oldest first, and summarize.
+> **User:** Show me everything that is happened in my feed today, oldest first, and summarize.
 >
 > **Assistant:** Pulling the full feed in sequence order.
 >
@@ -1063,7 +1063,7 @@ Sections 4.4–4.7 were about *making* writes. Now let us flip the perspective: 
 > }
 > ```
 >
-> Seven events on `Property`, in the order they happened. Notice what the rows *don't* tell you on their own – there's nothing here that distinguishes a create from an update from a delete. Applying the polling rules from §4.1 and §4.8, here's what a fresh consumer would reconstruct:
+> Seven events on `Property`, in the order they happened. Notice what the rows *do not* tell you on their own – there is nothing here that distinguishes a create from an update from a delete. Applying the polling rules from §4.1 and §4.8, here is what a fresh consumer would reconstruct:
 >
 > | Seq | Key | Known before? | Follow-up fetch | Verdict |
 > |---|---|---|---|---|
@@ -1075,7 +1075,7 @@ Sections 4.4–4.7 were about *making* writes. Now let us flip the perspective: 
 > | 6 | `bc4fb5d7-…` | No | Returns record | **Create** – add to cache (§4.8 Faraway, OR) |
 > | 7 | `bc4fb5d7-…` | Yes (just learned at seq 6) | Returns empty | **Delete** – drop from cache (§4.8) |
 >
-> A real incremental-sync client doesn't need to do any of this reasoning by hand – it just runs the loop from §4.8 and the `if record is empty / elif key not in cache / elif hash differs` branches do the work mechanically. But it's worth seeing the *shape* of the reasoning at least once: the feed gives you the sequence and the pointer; you decide what kind of change it represents by comparing what you knew to what you can fetch now.
+> A real incremental-sync client does not need to do any of this reasoning by hand – it just runs the loop from §4.8 and the `if record is empty / elif key not in cache / elif hash differs` branches do the work mechanically. But it is worth seeing the *shape* of the reasoning at least once: the feed gives you the sequence and the pointer; you decide what kind of change it represents by comparing what you knew to what you can fetch now.
 
 ### 4.10 When Things Go Wrong – Error Handling
 
@@ -1109,7 +1109,7 @@ The recovery dialogue in §4.6 is the natural shape for handling this:
 
 > **Assistant:** The server rejected the create with two validation errors – `PostalCode` and `Country` are both required and we didn't include them. Want me to add `PostalCode: "94000"` and `Country: "US"` and retry?
 
-That's the pattern: parse the structured error, summarize it in plain language, propose a concrete fix, retry with consent. No raw JSON in the user-facing dialogue unless the user asks for it.
+That is the pattern: parse the structured error, summarize it in plain language, propose a concrete fix, retry with consent. No raw JSON in the user-facing dialogue unless the user asks for it.
 
 #### Acting on a Record That Does Not Exist (HTTP 404 With Structured Body)
 
@@ -1143,10 +1143,10 @@ That's the pattern: parse the structured error, summarize it in plain language, 
 > }
 > ```
 >
-> The server doesn't have a `Property` record with that key, so the DELETE failed with a 404. There's no EntityEvent generated – failed writes don't produce events. Two things to know about this case:
+> The server does not have a `Property` record with that key, so the DELETE failed with a 404. There is no EntityEvent generated – failed writes do not produce events. Two things to know about this case:
 >
-> 1. **`code: 40400` is the RESO "record not found" code** – same outer envelope as the validation error in §4.6, just with an empty `details[]` since there's nothing field-level to report.
-> 2. **It's a no-op from the consumer's perspective.** If you were treating this as part of a sync loop, the right response is "the record was already gone, my local cache is consistent, move on." Don't retry, don't error out – just acknowledge and continue.
+> 1. **`code: 40400` is the RESO "record not found" code** – same outer envelope as the validation error in §4.6, just with an empty `details[]` since there is nothing field-level to report.
+> 2. **It is a no-op from the consumer's perspective.** If you were treating this as part of a sync loop, the right response is "the record was already gone, my local cache is consistent, move on." Do not retry, do not error out – just acknowledge and continue.
 
 #### The silent failure: when the server *accepts* bad data
 
@@ -1154,7 +1154,7 @@ This one is the trap nobody warns you about. The user asks for a status change t
 
 > **User:** Set listing `50ddad45-…`'s `StandardStatus` to `ImaginaryStatus`.
 >
-> **Assistant:** OK, but heads up before I send this – `ImaginaryStatus` isn't a value in the `StandardStatus` lookup. From §2.1's pattern, the allowed values come from `Lookup` with `LookupName eq 'StandardStatus'`, and the standard ones are `Active`, `Pending`, `Closed`, `Hold`, `Expired`, `Withdrawn`, etc. Did you mean one of those, or do you want me to try `ImaginaryStatus` anyway to see what the server does?
+> **Assistant:** OK, but heads up before I send this – `ImaginaryStatus` is not a value in the `StandardStatus` lookup. From §2.1's pattern, the allowed values come from `Lookup` with `LookupName eq 'StandardStatus'`, and the standard ones are `Active`, `Pending`, `Closed`, `Hold`, `Expired`, `Withdrawn`, etc. Did you mean one of those, or do you want me to try `ImaginaryStatus` anyway to see what the server does?
 >
 > **User:** Try it anyway.
 >
@@ -1177,7 +1177,7 @@ This one is the trap nobody warns you about. The user asks for a status change t
 > Server returned **HTTP 200** with the full updated record, and `"StandardStatus": "ImaginaryStatus"` is sitting right there in the response body. The server *accepted the bad value*. Worth pausing on what just happened:
 >
 > - **Not every server enforces lookup membership on PATCH.** The reference server validates required fields (you saw that in §4.6) but does *not* validate that lookup-backed string fields contain values from the corresponding `Lookup` resource. This is a real-world quirk – different servers make different choices about which validations to enforce on the write path versus the read path.
-> - **An EntityEvent row is still produced.** Sequence 4 in the §4.9 summary above is exactly this PATCH. From the EntityEvent feed's perspective, "ImaginaryStatus" is a perfectly normal change – the feed doesn't validate either.
+> - **An EntityEvent row is still produced.** Sequence 4 in the §4.9 summary above is exactly this PATCH. From the EntityEvent feed's perspective, "ImaginaryStatus" is a perfectly normal change – the feed does not validate either.
 > - **An AI assistant should not treat HTTP 200 as proof of correctness.** "The server accepted my call" and "the value I sent was valid" are not the same statement. The right pattern is: warn before sending if the assistant has reason to suspect the value is wrong (as above), and after a successful response, sanity-check the field if it touches a lookup, an enum, or any constrained type.
 >
 > The cleanup in our case was a second PATCH putting `StandardStatus` back to `Pending` – sequence 5 in the feed. The assistant produced two events (the bad write and the revert) on a record that ideally should have stayed on a single Pending state the whole time. A more cautious assistant would have refused to send the bad value at all without explicit override.
