@@ -70,7 +70,8 @@ const start = async () => {
   try {
     cleanup = await startReferenceServer();
   } catch (err) {
-    console.log(`Reference server not available (${err instanceof Error ? err.message : String(err)}), falling back to proxy-only mode`);
+    console.error(`Reference server not available:`, err);
+    console.log('Falling back to proxy-only mode');
     cleanup = await startProxyOnly();
   }
 

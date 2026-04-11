@@ -392,7 +392,15 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
   if (options.uiDistPath) {
     app.use(express.static(options.uiDistPath));
     const uiIndexPath = resolve(options.uiDistPath, 'index.html');
-    app.get('*', async (_req, res) => {
+    app.get('*', async (req, res) => {
+      // Only serve the SPA shell for browser navigation requests.
+      // API calls (Accept: application/json, fetch requests without
+      // text/html) should get a proper 404 instead of index.html.
+      const accept = req.headers.accept ?? '';
+      if (!accept.includes('text/html')) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
       res.sendFile(uiIndexPath);
     });
   }

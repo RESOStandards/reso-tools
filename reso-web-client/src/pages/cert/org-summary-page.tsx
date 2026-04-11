@@ -95,7 +95,7 @@ const adaptEndorsement = (
 export const OrgSummaryPage = () => {
   const { uoi } = useParams<{ readonly uoi: string }>();
   const { org, isLoading, error } = useCertOrgDetail(uoi);
-  const { reports: certReports } = useCertReportSummary(uoi);
+  const { reports: certReports, isLoading: isLoadingReports } = useCertReportSummary(uoi);
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 dark:bg-gray-900">
@@ -107,6 +107,7 @@ export const OrgSummaryPage = () => {
           <OrgSummaryBody
             org={org}
             certReports={certReports}
+            isLoadingReports={isLoadingReports}
           />
         )}
       </div>
@@ -119,9 +120,10 @@ export const OrgSummaryPage = () => {
 interface OrgSummaryBodyProps {
   readonly org: ResoOrganization;
   readonly certReports: ReadonlyArray<CertReportSummary>;
+  readonly isLoadingReports?: boolean;
 }
 
-const OrgSummaryBody = ({ org, certReports }: OrgSummaryBodyProps) => {
+const OrgSummaryBody = ({ org, certReports, isLoadingReports }: OrgSummaryBodyProps) => {
   // Load endorsements from the cert reports API, scoped to this org
   // by searching on the org name. This gives us the provider/system
   // info on each endorsement that powers the Shape A switcher.
@@ -236,6 +238,15 @@ const OrgSummaryBody = ({ org, certReports }: OrgSummaryBodyProps) => {
 
   return (
     <>
+      {/* Breadcrumbs */}
+      <nav className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-2" aria-label="Breadcrumb">
+        <NavLink to="/cert" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Certification</NavLink>
+        <svg className="w-3 h-3 text-gray-400 dark:text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 010-1.06l3.71-3.71-3.71-3.71a.75.75 0 111.06-1.06l4.24 4.24a.75.75 0 010 1.06l-4.24 4.24a.75.75 0 01-1.06 0z" clipRule="evenodd" />
+        </svg>
+        <span className="text-gray-700 dark:text-gray-300 font-medium truncate max-w-xs">{org.OrganizationName}</span>
+      </nav>
+
       {/* Compact identity header */}
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -318,7 +329,7 @@ const OrgSummaryBody = ({ org, certReports }: OrgSummaryBodyProps) => {
       {/* Active DD report context — shows which DD report is
           driving the coverage and performance sections below. */}
       {activeDdSummary && (
-        <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           Showing coverage from{' '}
           <span className="font-medium text-gray-700 dark:text-gray-300">
             Data Dictionary {activeDdSummary.version}
@@ -334,7 +345,7 @@ const OrgSummaryBody = ({ org, certReports }: OrgSummaryBodyProps) => {
 
       {/* Coverage — driven by the selected provider's DD report,
           now from real cert API data via the summary endpoint. */}
-      <CoverageSectionView coverage={activeCoverage} />
+      <CoverageSectionView coverage={activeCoverage} isLoading={isLoadingReports} />
 
       {/* Performance — TODO: wire from DD report or separate
           endpoint. Placeholder for now. */}
@@ -408,7 +419,7 @@ const OrgSummaryBody = ({ org, certReports }: OrgSummaryBodyProps) => {
                   rel="noopener noreferrer"
                   className="text-blue-600 dark:text-blue-400 hover:underline"
                 >
-                  {org.OrganizationWebsite.replace(/^https?:\/\//, '')}
+                  View Website
                 </a>
               ) : (
                 '—'
@@ -463,11 +474,13 @@ const SynthesisLine = ({ summary }: { readonly summary: OrgSummaryData }) => (
 // ── Coverage section ─────────────────────────────────────────────────────
 
 const CoverageSectionView = ({
-  coverage
+  coverage,
+  isLoading
 }: {
   readonly coverage: CoverageReport | null;
+  readonly isLoading?: boolean;
 }) => (
-  <section className="mt-12">
+  <section className="mt-6">
     <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
       <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
         Coverage
@@ -484,7 +497,17 @@ const CoverageSectionView = ({
       fields and enumerations carry data that consumers can rely on.
     </p>
 
-    {coverage ? (
+    {isLoading && !coverage ? (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-5 animate-pulse">
+            <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-4" />
+            <div className="h-10 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-3" />
+            <div className="h-2 w-32 bg-gray-100 dark:bg-gray-800 rounded" />
+          </div>
+        ))}
+      </div>
+    ) : coverage ? (
       <>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
           {coverage.fieldCuts.map((c) => (
@@ -512,12 +535,12 @@ const FieldCutTile = ({ cut }: { readonly cut: FieldCut }) => {
         </p>
         <p className="mt-2 flex items-baseline gap-1.5">
           <span className="text-4xl font-bold tabular-nums text-gray-900 dark:text-gray-50">
-            {cut.providerCount}
+            {cut.providerCount.toLocaleString()}
           </span>
           <span className="text-xs text-gray-500 dark:text-gray-400">fields</span>
         </p>
         <p className="mt-3 text-[11px] text-gray-500 dark:text-gray-400 tabular-nums">
-          Industry avg: {cut.industryAvgCount}
+          Industry avg: {cut.industryAvgCount.toLocaleString()}
         </p>
       </div>
     );
@@ -562,7 +585,11 @@ const FieldCutTile = ({ cut }: { readonly cut: FieldCut }) => {
       />
       <p className="mt-2 text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
         {sign}
-        {delta} pts vs industry avg ({cut.industryPercent}%)
+        {delta}{' '}
+        <span className="border-b border-dashed border-gray-400 dark:border-gray-500 cursor-help" title="Percentage points above or below the industry average">
+          pts
+        </span>{' '}
+        vs industry avg ({cut.industryPercent}%)
       </p>
     </div>
   );
@@ -590,12 +617,16 @@ const PayloadCard = ({ payload }: { readonly payload: PayloadCoverage }) => {
               </span>
             </span>
             <span className="text-sm text-gray-500 dark:text-gray-400 tabular-nums">
-              {payload.providerFields} of {payload.totalFields} fields
+              {payload.providerFields.toLocaleString()} of {payload.totalFields.toLocaleString()} fields
             </span>
           </p>
           <p className={`mt-1 text-xs font-medium tabular-nums ${deltaColor}`}>
             {sign}
-            {delta} pts vs industry average ({payload.industryPercent}%)
+            {delta}{' '}
+            <span className="border-b border-dashed border-gray-400 dark:border-gray-500 cursor-help" title="Percentage points above or below the industry average">
+              pts
+            </span>{' '}
+            vs industry average ({payload.industryPercent}%)
           </p>
         </div>
         <div className="w-full sm:w-72">

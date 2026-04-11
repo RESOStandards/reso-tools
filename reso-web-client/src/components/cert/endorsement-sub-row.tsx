@@ -113,10 +113,10 @@ export const EndorsementSubRow = ({
     <button
       type="button"
       onClick={handleClick}
-      className="group w-full text-left px-5 py-3.5 flex items-start gap-4 hover:bg-gray-50/70 dark:hover:bg-gray-700/30 transition-colors focus:outline-none focus:bg-gray-50/70 dark:focus:bg-gray-700/30"
+      className="group w-full text-left px-5 py-3.5 flex items-start gap-4 cursor-pointer hover:bg-gray-50/70 dark:hover:bg-gray-700/30 transition-colors focus:outline-none focus:bg-gray-50/70 dark:focus:bg-gray-700/30"
     >
       <div className="flex-1 min-w-0">
-        {/* Headline: type + version + provider context */}
+        {/* Headline: type + version */}
         <div className="flex items-baseline gap-x-2.5 gap-y-0.5 flex-wrap">
           <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {typeLabel}{' '}
@@ -124,22 +124,6 @@ export const EndorsementSubRow = ({
               {version}
             </span>
           </h4>
-          {showProviderLine && (
-            <span className="inline-flex items-baseline gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-              Provided by{' '}
-              <span className="font-medium text-gray-800 dark:text-gray-200">
-                {providerName}
-              </span>
-              {systemName && (
-                <>
-                  <span className="text-gray-300 dark:text-gray-600">·</span>
-                  <span className="text-gray-600 dark:text-gray-400">
-                    {systemName}
-                  </span>
-                </>
-              )}
-            </span>
-          )}
           {local && (
             <span
               className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
@@ -149,10 +133,27 @@ export const EndorsementSubRow = ({
             </span>
           )}
         </div>
+        {/* Provider branding — own line for prominence */}
+        {showProviderLine && (
+          <div className="mt-0.5 flex items-center gap-1.5 text-xs">
+            <span className="text-gray-500 dark:text-gray-500">Provided by</span>
+            <span className="font-semibold text-gray-700 dark:text-gray-200">
+              {providerName}
+            </span>
+            {systemName && (
+              <>
+                <span className="text-gray-300 dark:text-gray-600">&middot;</span>
+                <span className="font-medium text-gray-500 dark:text-gray-400">
+                  {systemName}
+                </span>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Stats — bold but not overpowering */}
         {ddStatsAvailable && !showFailedStep && (
-          <div className="mt-1.5 flex items-center gap-x-5 gap-y-0.5 flex-wrap text-xs text-gray-500 dark:text-gray-400">
+          <div className="mt-1.5 flex items-center gap-x-5 gap-y-0.5 flex-wrap text-xs text-gray-600 dark:text-gray-400">
             <span>
               <span className="text-base font-semibold tabular-nums text-gray-900 dark:text-gray-100">
                 {formatNumber((standardResourcesCount ?? 0) + (localResourcesCount ?? 0))}
@@ -206,10 +207,10 @@ export const EndorsementSubRow = ({
             {formatAbsoluteShort(statusTimestamp)}
           </time>
         </div>
-        <span className="text-[11px] text-gray-500 dark:text-gray-400 tabular-nums">
+        <span className="text-[11px] text-gray-600 dark:text-gray-400 tabular-nums">
           {formatRelative(statusTimestamp)}
         </span>
-        <span className="mt-0.5 inline-flex items-center gap-0.5 text-[11px] font-medium text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300">
+        <span className="mt-0.5 inline-flex items-center gap-0.5 text-xs font-medium text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 group-hover:underline underline-offset-2">
           View details
           <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path

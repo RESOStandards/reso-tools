@@ -72,10 +72,11 @@ export const DateRangePresets = ({
   onChange,
   onCustomChange
 }: DateRangePresetsProps) => (
-  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-    <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 min-w-16">
+  <div className="space-y-1.5">
+    <span className="block text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
       Date
     </span>
+    <div className="flex flex-wrap items-center gap-1.5">
     {PRESETS.map((p) => (
       <FacetButton
         key={p.value}
@@ -101,6 +102,7 @@ export const DateRangePresets = ({
         />
       </>
     )}
+    </div>
   </div>
 );
 

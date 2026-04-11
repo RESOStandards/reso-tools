@@ -559,12 +559,12 @@ export const EndorsementList = ({
     <>
       {/* Sticky sub-chrome — title + search/sort/filters + active pills */}
       <div className="sticky top-[52px] z-20 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur border-b border-gray-200/60 dark:border-gray-700/60">
-        <div className={`${containerClassName} pt-6 pb-4 space-y-4`}>
+        <div className={`${containerClassName} pt-3 pb-3 space-y-3`}>
           {/* Title row — title left, action slot right */}
           <div className="flex items-end justify-between gap-6 flex-wrap">
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline gap-x-4 gap-y-1 flex-wrap">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
                   Endorsements
                 </h1>
                 {!isSignedIn && typeof headlineCount === 'number' && (
@@ -592,9 +592,7 @@ export const EndorsementList = ({
                         </span>
                       )}
                     </span>
-                    <span className="ml-1 self-center">
-                      <SourceBadge source={source} title={fallbackError ?? undefined} />
-                    </span>
+                    {/* Source badge hidden for production — re-enable for diagnostics */}
                   </div>
                 )}
               </div>
@@ -686,7 +684,7 @@ export const EndorsementList = ({
                 <h3 className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 pt-3">
                   Endorsements
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-x-4 gap-y-3">
                   {endorsementGroupOptions.map(({ group, options }) => (
                     <FacetGroup
                       key={group.groupKey}
@@ -694,6 +692,7 @@ export const EndorsementList = ({
                       options={options}
                       selected={activeEndorsements}
                       onToggle={toggleEndorsement}
+                      stacked
                     />
                   ))}
                 </div>
@@ -710,11 +709,8 @@ export const EndorsementList = ({
 
       {/* Scrolling content — list */}
       <div className={`${containerClassName} py-6`}>
-        {fallbackError && source === 'fixtures' && (
-          <div className="mb-4 text-xs text-gray-500 dark:text-gray-400 bg-amber-50/40 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-lg px-3 py-2">
-            {fallbackError}
-          </div>
-        )}
+        {/* Fixture fallback warning — hidden from UI for production testing.
+            Keep the code for dev diagnostics; re-enable when needed. */}
 
         {isLoadingInitial ? (
           <div className="py-16 text-center text-sm text-gray-400 dark:text-gray-500">
@@ -757,6 +753,7 @@ export const EndorsementList = ({
                       recipientUoi={g.recipientUoi}
                       recipientName={g.recipientName}
                       endorsements={g.endorsements}
+                      isGrouped
                     />
                   </li>
                 ))}
@@ -769,6 +766,7 @@ export const EndorsementList = ({
                       recipientUoi={e.recipientUoi}
                       recipientName={e.recipientName ?? e.recipientUoi}
                       endorsements={[e]}
+                      isGrouped={false}
                     />
                   </li>
                 ))}

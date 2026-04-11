@@ -10,8 +10,8 @@ import { AuthPill } from './cert/auth-pill';
 import { ResourceNav } from './resource-nav';
 import { ServerSwitcher } from './server-switcher';
 
-const LOGO_LIGHT = 'https://www.reso.org/wp-content/uploads/2020/06/RESO-Logo_Horizontal_Blue.png';
-const LOGO_DARK = 'https://www.reso.org/wp-content/uploads/2020/06/RESO-Logo_Horizontal_White.png';
+const LOGO_LIGHT = '/reso-logo-blue.png';
+const LOGO_DARK = '/reso-logo-white.png';
 
 /** Derives the current page indicator from the URL path. */
 const getPageIndicator = (pathname: string, resource?: string): string | null => {
@@ -79,7 +79,7 @@ export const Layout = () => {
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 transition-colors">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 sm:px-6">
+      <header className="relative z-30 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 sm:px-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {/* Hamburger menu — mobile only */}
@@ -100,12 +100,15 @@ export const Layout = () => {
                 </svg>
               )}
             </button>
-            {/* RESO Logo — fixed width matches sidebar so switcher aligns with content */}
+            {/* RESO Logo — renders both variants; CSS dark: class toggles visibility
+                so the correct logo shows immediately without waiting for React state. */}
             <NavLink to="/" className="shrink-0 hidden sm:flex sm:w-44 sm:items-center">
-              <img src={isDark ? LOGO_DARK : LOGO_LIGHT} alt="RESO" className="h-10" />
+              <img src={LOGO_LIGHT} alt="RESO" className="h-10 dark:hidden" />
+              <img src={LOGO_DARK} alt="RESO" className="h-10 hidden dark:block" />
             </NavLink>
             <NavLink to="/" className="shrink-0 sm:hidden">
-              <img src={isDark ? LOGO_DARK : LOGO_LIGHT} alt="RESO" className="h-8" />
+              <img src={LOGO_LIGHT} alt="RESO" className="h-8 dark:hidden" />
+              <img src={LOGO_DARK} alt="RESO" className="h-8 hidden dark:block" />
             </NavLink>
             {/* Server switcher — aligns with main content area */}
             <ServerSwitcher />
@@ -113,20 +116,6 @@ export const Layout = () => {
           </div>
 
           <div className="flex items-center gap-3">
-          {/* Cert workspace — dual entry point alongside Organizations.
-              Organizations shows the full org directory (public feed);
-              Certification shows endorsements with cert-specific filters
-              (live cert API). Both use the same card components and link
-              to the same Org Summary page. #109 */}
-          <NavLink
-            to="/cert"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            title="RESO Certification endorsements">
-            <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-            </svg>
-            <span className="hidden sm:inline">Certification</span>
-          </NavLink>
           {/* Update badge */}
           {availableUpdate && (
             <a

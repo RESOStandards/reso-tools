@@ -124,7 +124,7 @@ export const DataGeneratorPage = () => {
             {resources.map(r => (
               <div key={r.resource} className="bg-gray-100 dark:bg-gray-800 rounded px-3 py-2 text-center min-w-[5rem]">
                 <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{displayName(r.resource)}</div>
-                <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">{r.count}</div>
+                <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">{r.count.toLocaleString()}</div>
               </div>
             ))}
           </div>
@@ -154,7 +154,7 @@ export const DataGeneratorPage = () => {
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 {(parentResources.length > 0 ? parentResources : resources).map(r => (
                   <option key={r.resource} value={r.resource}>
-                    {r.resource} ({r.fields} fields, {r.count} existing)
+                    {r.resource} ({r.fields.toLocaleString()} fields, {r.count.toLocaleString()} existing)
                   </option>
                 ))}
               </select>
@@ -243,12 +243,12 @@ export const DataGeneratorPage = () => {
         {/* Summary + Button — full width below the two columns */}
         <div className="mt-6 space-y-4">
           <div className="bg-gray-50 dark:bg-gray-900 rounded p-3 text-sm text-gray-600 dark:text-gray-400">
-            <strong>Plan:</strong> {count} {selectedResource} records
+            <strong>Plan:</strong> {count.toLocaleString()} {selectedResource} records
             {enabledRelated.length > 0 && (
               <>
                 {' + '}
                 {enabledRelated
-                  .map(r => `${(relatedConfig[r.resource]?.count ?? r.defaultCount) * count} ${displayName(r.resource)}`)
+                  .map(r => `${((relatedConfig[r.resource]?.count ?? r.defaultCount) * count).toLocaleString()} ${displayName(r.resource)}`)
                   .join(', ')}
               </>
             )}
@@ -270,11 +270,11 @@ export const DataGeneratorPage = () => {
           <h3 className="text-sm font-semibold text-green-800 dark:text-green-200 mb-3">Generation Complete</h3>
           <div className="space-y-1 text-sm text-green-700 dark:text-green-300">
             <p>
-              {result.resource}: {result.created} created, {result.failed} failed
+              {result.resource}: {result.created.toLocaleString()} created, {result.failed.toLocaleString()} failed
             </p>
             {result.relatedResults.map(r => (
               <p key={r.resource}>
-                {displayName(r.resource)}: {r.created} created, {r.failed} failed
+                {displayName(r.resource)}: {r.created.toLocaleString()} created, {r.failed.toLocaleString()} failed
               </p>
             ))}
             <p className="text-xs text-green-600 dark:text-green-400 mt-2">Duration: {(result.durationMs / 1000).toFixed(1)}s</p>

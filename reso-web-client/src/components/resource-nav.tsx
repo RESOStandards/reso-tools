@@ -32,8 +32,8 @@ export const ResourceNav = () => {
     }`;
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Dashboard link */}
+    <div className="flex flex-col gap-2.5">
+      {/* Main nav */}
       <NavLink to="/" className={sectionHeaderClass('home')}>
         <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
           <title>Dashboard</title>
@@ -41,8 +41,6 @@ export const ResourceNav = () => {
         </svg>
         Dashboard
       </NavLink>
-
-      {/* Organizations link */}
       <NavLink to="/organizations" className={sectionHeaderClass('organizations')}>
         <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
           <title>Organizations</title>
@@ -50,20 +48,16 @@ export const ResourceNav = () => {
         </svg>
         Organizations
       </NavLink>
-
-      {/* Certification section */}
-      <div>
-        <NavLink to="/cert" className={sectionHeaderClass('certification')}>
-          <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-            <title>Certification</title>
-            <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+      <NavLink to="/cert" className={sectionHeaderClass('certification')}>
+        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <title>Certification</title>
+          <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
           </svg>
-          Certification
-        </NavLink>
-      </div>
+        Certification
+      </NavLink>
 
-      {/* Resources section */}
-      <div>
+      {/* Data section — divider separates from main nav */}
+      <div className="pt-2 border-t border-gray-200 dark:border-gray-700 space-y-2.5">
       <NavLink to={activeSection === 'resources' ? '/metadata' : `/${resourceNames[0] ?? 'Property'}`} className={sectionHeaderClass('resources')}>
           <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
             <title>Resources</title>
@@ -181,14 +175,14 @@ export const ResourceNav = () => {
 
       {/* Admin section — only show for local server */}
       {isLocal && (
-        <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-          <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+        <div className="pt-2 border-t border-gray-200 dark:border-gray-700 flex flex-col gap-1">
+          <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
             <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
               <title>Admin</title>
               <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
             </svg>
             Admin
-          </h2>
+          </span>
           <NavLink
             to="/admin/data-generator"
             className={({ isActive }) =>

@@ -14,7 +14,7 @@
     "build:server-bundle": "node scripts/bundle-server.mjs",
     "start": "env -u ELECTRON_RUN_AS_NODE electron dist/main.js",
     "dev": "tsc && cp src/server-entry.mjs dist/ && env -u ELECTRON_RUN_AS_NODE electron dist/main.js",
-    "postinstall": "electron-rebuild || true",
+    "postinstall": "electron-rebuild -m ../reso-reference-server -o better-sqlite3 || true",
     "package": "npm run build && npm run build:server-bundle && electron-builder"
   },
   "dependencies": {

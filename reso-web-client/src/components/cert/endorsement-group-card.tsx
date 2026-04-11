@@ -11,6 +11,7 @@
  */
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router';
 import type { Endorsement } from '../../api/cert-fixtures';
 import { EndorsementSubRow } from './endorsement-sub-row';
 
@@ -18,6 +19,7 @@ interface EndorsementGroupCardProps {
   readonly recipientUoi: string;
   readonly recipientName: string;
   readonly endorsements: ReadonlyArray<Endorsement>;
+  readonly isGrouped?: boolean;
   readonly onSelectGroup?: (recipientUoi: string) => void;
   readonly onSelectEndorsement?: (endorsement: Endorsement) => void;
 }
@@ -58,17 +60,37 @@ export const EndorsementGroupCard = ({
   recipientUoi,
   recipientName,
   endorsements,
+  isGrouped = true,
   onSelectGroup,
   onSelectEndorsement
-}: EndorsementGroupCardProps) => (
-  <article className="bg-white dark:bg-gray-800/70 border border-gray-300 dark:border-gray-700/80 rounded-xl overflow-hidden shadow-sm dark:shadow-none hover:border-gray-400 dark:hover:border-gray-600/80 hover:shadow dark:hover:shadow-none transition-all">
+}: EndorsementGroupCardProps) => {
+  const navigate = useNavigate();
+
+  const handleHeaderClick = () => {
+    if (onSelectGroup) {
+      onSelectGroup(recipientUoi);
+    } else {
+      navigate(`/cert/orgs/${recipientUoi}`);
+    }
+  };
+
+  return (
+  <article className="bg-white dark:bg-gray-800/70 border border-gray-300/80 dark:border-gray-700/80 rounded-xl overflow-hidden shadow dark:shadow-none hover:border-gray-400 dark:hover:border-gray-600/80 hover:shadow-md dark:hover:shadow-none transition-all">
     {/* Org header — clickable, navigates to the recipient summary */}
     <button
       type="button"
-      onClick={() => onSelectGroup?.(recipientUoi)}
-      className="group/header w-full flex items-center justify-between gap-4 px-5 py-3 bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-200/70 dark:hover:bg-black/40 transition-colors text-left"
+      onClick={handleHeaderClick}
+      className="group/header w-full flex items-center justify-between gap-4 px-5 py-3 cursor-pointer bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-black/40 transition-colors text-left"
     >
       <div className="flex items-center gap-2.5 min-w-0">
+        <svg
+          className="w-4 h-4 text-gray-500 dark:text-gray-500 group-hover/header:text-blue-500 dark:group-hover/header:text-blue-400 transition-colors shrink-0"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" />
+        </svg>
         <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate group-hover/header:text-blue-700 dark:group-hover/header:text-blue-300 transition-colors">
           {recipientName}
         </h3>
@@ -86,9 +108,11 @@ export const EndorsementGroupCard = ({
         </svg>
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        <span className="text-[11px] text-gray-500 dark:text-gray-400">
-          {endorsements.length} endorsement{endorsements.length === 1 ? '' : 's'}
-        </span>
+        {isGrouped && endorsements.length > 1 && (
+          <span className="text-[11px] text-gray-500 dark:text-gray-400">
+            {endorsements.length} endorsement{endorsements.length === 1 ? '' : 's'}
+          </span>
+        )}
         <CopyableUoi uoi={recipientUoi} />
       </div>
     </button>
@@ -104,4 +128,5 @@ export const EndorsementGroupCard = ({
       ))}
     </div>
   </article>
-);
+  );
+};

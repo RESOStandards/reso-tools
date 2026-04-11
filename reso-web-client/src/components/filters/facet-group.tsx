@@ -70,6 +70,8 @@ interface FacetGroupProps<T extends string> {
   readonly onToggle: (value: T) => void;
   /** Optional trailing slot — e.g. a "Show all" link. */
   readonly trailing?: ReactNode;
+  /** Stack label above pills instead of inline. Better for compact grids. */
+  readonly stacked?: boolean;
 }
 
 export const FacetGroup = <T extends string>({
@@ -77,10 +79,35 @@ export const FacetGroup = <T extends string>({
   options,
   selected,
   onToggle,
-  trailing
+  trailing,
+  stacked
 }: FacetGroupProps<T>) => {
   const visible = options.filter((o) => !o.hidden);
   if (visible.length === 0) return null;
+
+  if (stacked) {
+    return (
+      <div className="space-y-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          {label}
+        </span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {visible.map((opt) => (
+            <FacetButton
+              key={opt.value}
+              label={opt.label}
+              count={opt.count}
+              active={selected.has(opt.value)}
+              disabled={opt.disabled}
+              onClick={() => onToggle(opt.value)}
+            />
+          ))}
+          {trailing}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
       <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 min-w-16">
