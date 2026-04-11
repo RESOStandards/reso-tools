@@ -211,7 +211,7 @@ export const EndorsementSubRow = ({
           {formatRelative(statusTimestamp)}
         </span>
         <span className="mt-0.5 inline-flex items-center gap-0.5 text-xs font-medium text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 group-hover:underline underline-offset-2">
-          View details
+          View Details
           <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path
               fillRule="evenodd"

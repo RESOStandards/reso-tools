@@ -10,6 +10,7 @@ import { AdminLayout } from './pages/admin/admin-layout';
 import { DataGeneratorPage } from './pages/admin/data-generator-page';
 import { CertHomePage } from './pages/cert/cert-home-page';
 import { LoginPage } from './pages/cert/login-page';
+import { DetailReportPage } from './pages/cert/detail-report-page';
 import { OrgSummaryPage } from './pages/cert/org-summary-page';
 import { DeletePage } from './pages/delete-page';
 import { ErrorPage } from './pages/error-page';
@@ -46,6 +47,7 @@ const router = createBrowserRouter([
       // Layout header with the auth pill and theme toggle.
       { path: 'cert', element: <CertHomePage /> },
       { path: 'cert/orgs/:uoi', element: <OrgSummaryPage /> },
+      { path: 'cert/orgs/:uoi/detail/:endorsementId', element: <DetailReportPage /> },
       { path: 'metadata', element: <MetadataPage /> },
       { path: 'metadata/:resource', element: <MetadataPage /> },
       { path: ':resource', element: <SearchPage /> },

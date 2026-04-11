@@ -7,15 +7,14 @@
  * adapter rolls them up into the field-cut tiles and per-resource
  * bars the page expects.
  *
- * Industry averages are not available from the summary endpoint.
- * They are set to 0 here and will be populated from a separate
- * analytics endpoint when it lands. The UI handles 0 gracefully
- * (no comparison bar, no "above/below" pill).
+ * Industry averages come from the market-average endpoint and are
+ * passed as an optional second argument.
  */
 
 import type {
   CertAdvertisedResource,
   CertReportSummary,
+  MarketAverages,
 } from './cert-client.js';
 import type {
   CoverageReport,
@@ -37,7 +36,8 @@ const pct = (num: number, den: number): number =>
  * advertised data.
  */
 export const summaryToCoverageReport = (
-  report: CertReportSummary
+  report: CertReportSummary,
+  marketAvg?: MarketAverages | null
 ): CoverageReport | null => {
   if (!report.advertised || report.type !== 'data_dictionary') return null;
 
@@ -67,6 +67,14 @@ export const summaryToCoverageReport = (
   const totalStandardFields = resoFields + localFields;
   const totalStandardLookups = resoLookups + localLookups;
 
+  // Industry averages from the market-average endpoint
+  const avgAllFields = marketAvg ? Math.round(marketAvg.fields.total) : 0;
+  const avgResoFields = marketAvg ? Math.round(marketAvg.fields.reso) : 0;
+  const avgResoLookups = marketAvg ? Math.round(marketAvg.lookups.reso) : 0;
+  const avgLocalFields = marketAvg ? Math.round(marketAvg.fields.local) : 0;
+  const avgIdxFields = marketAvg ? Math.round(marketAvg.fields.idx) : 0;
+  const avgAllLookups = marketAvg ? Math.round(marketAvg.lookups.total) : 0;
+
   const fieldCuts: ReadonlyArray<FieldCut> = [
     {
       key: 'all',
@@ -74,7 +82,7 @@ export const summaryToCoverageReport = (
       providerCount: allFields,
       totalCount: allFields,
       providerPercent: 100,
-      industryPercent: 0,
+      industryPercent: avgAllFields > 0 ? pct(avgAllFields, avgAllFields) : 0,
     },
     {
       key: 'reso-fields',
@@ -82,7 +90,7 @@ export const summaryToCoverageReport = (
       providerCount: resoFields,
       totalCount: allFields,
       providerPercent: pct(resoFields, allFields),
-      industryPercent: 0,
+      industryPercent: avgAllFields > 0 ? pct(avgResoFields, avgAllFields) : 0,
       motivational: true,
     },
     {
@@ -91,14 +99,14 @@ export const summaryToCoverageReport = (
       providerCount: resoLookups,
       totalCount: allLookups,
       providerPercent: pct(resoLookups, allLookups),
-      industryPercent: 0,
+      industryPercent: avgAllLookups > 0 ? pct(avgResoLookups, avgAllLookups) : 0,
       motivational: true,
     },
     {
       key: 'local',
       label: 'Local Fields',
       providerCount: localFields,
-      industryAvgCount: 0,
+      industryAvgCount: avgLocalFields,
       isCount: true as const,
     },
   ];
@@ -123,7 +131,7 @@ export const summaryToCoverageReport = (
       providerFields: idxFields,
       totalFields: allFields,
       providerPercent: pct(idxFields, allFields),
-      industryPercent: 0,
+      industryPercent: avgAllFields > 0 ? pct(avgIdxFields, avgAllFields) : 0,
       resourceCoverage: idxResourceCoverage,
     },
   ];

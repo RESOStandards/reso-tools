@@ -110,7 +110,7 @@ const SORT_OPTIONS: ReadonlyArray<SortSpec> = [
   { value: 'name-za', label: 'Name Z→A',    sortBy: 'desc', sortByTimestamp: false }
 ];
 
-const DEFAULT_SORT = SORT_OPTIONS[0];
+const DEFAULT_SORT = SORT_OPTIONS[2]; // Name A→Z
 
 // ── URL state helpers ────────────────────────────────────────────────────
 
@@ -558,7 +558,7 @@ export const EndorsementList = ({
   return (
     <>
       {/* Sticky sub-chrome — title + search/sort/filters + active pills */}
-      <div className="sticky top-[52px] z-20 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur border-b border-gray-200/60 dark:border-gray-700/60">
+      <div className="sticky top-0 z-20 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
         <div className={`${containerClassName} pt-3 pb-3 space-y-3`}>
           {/* Title row — title left, action slot right */}
           <div className="flex items-end justify-between gap-6 flex-wrap">

@@ -453,6 +453,51 @@ export const fetchCertReportSummary = async (
   return (await res.json()) as ReadonlyArray<CertReportSummary>;
 };
 
+// ── Market Averages ──────────────────────────────────────────────────────
+//
+// GET /certification_reports/market-average/data_dictionary returns global
+// averages across all certified DD reports. Public, no auth needed.
+
+export interface MarketAverages {
+  readonly docCount: number;
+  readonly standardMeta: {
+    readonly iDXFieldsCount: number;
+    readonly iDXResourcesCount: number;
+    readonly iDXLookupsCount: number;
+  };
+  readonly fields: {
+    readonly total: number;
+    readonly reso: number;
+    readonly idx: number;
+    readonly local: number;
+  };
+  readonly lookups: {
+    readonly total: number;
+    readonly reso: number;
+    readonly idx: number;
+    readonly local: number;
+  };
+}
+
+let marketAveragesCache: MarketAverages | null = null;
+
+export const fetchMarketAverages = async (): Promise<MarketAverages> => {
+  if (marketAveragesCache) return marketAveragesCache;
+
+  const res = await fetch(
+    proxiedCertUrl('/certification_reports/market-average/data_dictionary'),
+    { headers: { Accept: 'application/json' } }
+  );
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch market averages (HTTP ${res.status})`);
+  }
+
+  const data = (await res.json()) as MarketAverages;
+  marketAveragesCache = data;
+  return data;
+};
+
 export const fetchCertificationCounts = async (
   apiKey: string | null
 ): Promise<CertificationCounts> => {

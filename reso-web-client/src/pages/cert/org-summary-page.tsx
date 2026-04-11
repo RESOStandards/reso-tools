@@ -32,7 +32,8 @@ import {
 } from '../../api/org-summary-fixtures';
 import { summaryToCoverageReport } from '../../api/cert-summary-adapter';
 import { useCertReportSummary } from '../../hooks/use-cert-report-summary';
-import type { CertReportSummary } from '../../api/cert-client';
+import { useMarketAverages } from '../../hooks/use-market-averages';
+import type { CertReportSummary, MarketAverages } from '../../api/cert-client';
 import type { Endorsement, EndorsementStatus, EndorsementType } from '../../api/cert-fixtures';
 import { EndorsementSubRow } from '../../components/cert/endorsement-sub-row';
 import { useCertOrgDetail } from '../../hooks/use-cert-org-detail';
@@ -96,6 +97,7 @@ export const OrgSummaryPage = () => {
   const { uoi } = useParams<{ readonly uoi: string }>();
   const { org, isLoading, error } = useCertOrgDetail(uoi);
   const { reports: certReports, isLoading: isLoadingReports } = useCertReportSummary(uoi);
+  const { averages: marketAverages } = useMarketAverages();
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 dark:bg-gray-900">
@@ -108,6 +110,7 @@ export const OrgSummaryPage = () => {
             org={org}
             certReports={certReports}
             isLoadingReports={isLoadingReports}
+            marketAverages={marketAverages}
           />
         )}
       </div>
@@ -121,9 +124,10 @@ interface OrgSummaryBodyProps {
   readonly org: ResoOrganization;
   readonly certReports: ReadonlyArray<CertReportSummary>;
   readonly isLoadingReports?: boolean;
+  readonly marketAverages?: MarketAverages | null;
 }
 
-const OrgSummaryBody = ({ org, certReports, isLoadingReports }: OrgSummaryBodyProps) => {
+const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: OrgSummaryBodyProps) => {
   // Load endorsements from the cert reports API, scoped to this org
   // by searching on the org name. This gives us the provider/system
   // info on each endorsement that powers the Shape A switcher.
@@ -215,8 +219,8 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports }: OrgSummaryBodyPr
   }, [activeGroup, certReports]);
 
   const activeCoverage = useMemo<CoverageReport | null>(
-    () => (activeDdSummary ? summaryToCoverageReport(activeDdSummary) : null),
-    [activeDdSummary]
+    () => (activeDdSummary ? summaryToCoverageReport(activeDdSummary, marketAverages) : null),
+    [activeDdSummary, marketAverages]
   );
 
   const cityState = [
