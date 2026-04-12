@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { clearConfigCache } from '../api/config';
 import { setApiConfig } from '../api/client';
@@ -9,6 +9,8 @@ import { useUpdateCheck } from '../hooks/use-update-check';
 import { AuthPill } from './cert/auth-pill';
 import { ResourceNav } from './resource-nav';
 import { ServerSwitcher } from './server-switcher';
+
+const OpenHouseRush = lazy(() => import('./open-house-rush').then((m) => ({ default: m.OpenHouseRush })));
 
 const LOGO_LIGHT = '/reso-logo-blue.png';
 const LOGO_DARK = '/reso-logo-white.png';
@@ -37,6 +39,20 @@ export const Layout = () => {
   const navigate = useNavigate();
   const { activeServer, resources, currentToken } = useServer();
   const prevServerIdRef = useRef(activeServer.id);
+
+  // Easter egg: 5 rapid clicks on the logo triggers Open House Rush
+  const [showGame, setShowGame] = useState(false);
+  const logoClicksRef = useRef<ReadonlyArray<number>>([]);
+  const handleLogoClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const now = Date.now();
+    const recent = [...logoClicksRef.current, now].filter((t) => now - t < 2000);
+    logoClicksRef.current = recent;
+    if (recent.length >= 5) {
+      logoClicksRef.current = [];
+      setShowGame(true);
+    }
+  }, []);
 
   // Close sidebar on navigation (mobile)
   useEffect(() => {
@@ -102,11 +118,11 @@ export const Layout = () => {
             </button>
             {/* RESO Logo — renders both variants; CSS dark: class toggles visibility
                 so the correct logo shows immediately without waiting for React state. */}
-            <NavLink to="/" className="shrink-0 hidden sm:flex sm:w-44 sm:items-center">
+            <NavLink to="/" className="shrink-0 hidden sm:flex sm:w-44 sm:items-center" onClick={handleLogoClick}>
               <img src={LOGO_LIGHT} alt="RESO" className="h-10 dark:hidden" />
               <img src={LOGO_DARK} alt="RESO" className="h-10 hidden dark:block" />
             </NavLink>
-            <NavLink to="/" className="shrink-0 sm:hidden">
+            <NavLink to="/" className="shrink-0 sm:hidden" onClick={handleLogoClick}>
               <img src={LOGO_LIGHT} alt="RESO" className="h-8 dark:hidden" />
               <img src={LOGO_DARK} alt="RESO" className="h-8 hidden dark:block" />
             </NavLink>
@@ -200,6 +216,11 @@ export const Layout = () => {
           <Outlet />
         </main>
       </div>
+      {showGame && (
+        <Suspense fallback={null}>
+          <OpenHouseRush onClose={() => setShowGame(false)} />
+        </Suspense>
+      )}
     </div>
   );
 };
