@@ -138,7 +138,7 @@ const AvailabilityBars = ({
                   <div
                     className="absolute top-0 h-full border-r-2 border-dashed border-gray-400 dark:border-gray-500 z-10"
                     style={{ left: `${pct(row.industryValue, maxValue)}%` }}
-                    title={`Industry avg: ${Math.round(row.industryValue)}`}
+                    title={`Industry avg: ${Math.round(row.industryValue).toLocaleString()}`}
                   />
                 )}
                 {/* Provider bar */}
@@ -148,7 +148,7 @@ const AvailabilityBars = ({
                 />
               </div>
               <span className="w-8 text-right font-semibold text-gray-900 dark:text-gray-100 tabular-nums shrink-0">
-                {Math.round(row.value)}
+                {Math.round(row.value).toLocaleString()}
               </span>
             </div>
           </div>
