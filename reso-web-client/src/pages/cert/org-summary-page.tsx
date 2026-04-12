@@ -876,60 +876,73 @@ const PerformanceSectionView = ({
   </section>
 );
 
-const PerformanceVisible = ({ perf }: { readonly perf: PerformanceReport }) => (
-  <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
-    <div className="flex items-end justify-between gap-6 flex-wrap">
-      <div>
-        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-          Replication speed (per 1,000 records)
-        </p>
-        <p className="mt-1 flex items-baseline gap-2">
-          <span className="text-5xl font-bold tabular-nums text-gray-900 dark:text-gray-50">
-            {perf.secPer1k.toFixed(2)}
-            <span className="text-2xl text-gray-400 dark:text-gray-500 font-semibold">
+const PerformanceVisible = ({ perf }: { readonly perf: PerformanceReport }) => {
+  const payloadDelta = perf.industryPayloadMb - perf.payloadMb;
+  const responseDelta = perf.industryResponseS - perf.responseS;
+  const throughputDelta = perf.throughputMbS - perf.industryThroughputMbS;
+
+  return (
+    <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
+      <div className="flex items-end justify-between gap-6 flex-wrap">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            Replication speed (per 1,000 records)
+          </p>
+          <p className="mt-1 flex items-baseline gap-2">
+            <span className="text-5xl font-bold tabular-nums text-gray-900 dark:text-gray-50">
+              {perf.secPer1k.toFixed(2)}
+              <span className="text-2xl text-gray-400 dark:text-gray-500 font-semibold">
+                s
+              </span>
+            </span>
+          </p>
+          <p className={`mt-1 text-xs font-medium tabular-nums ${perf.deltaPercent >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+            {perf.deltaPercent >= 0
+              ? `${perf.deltaPercent}% faster than industry average (${perf.industrySecPer1k.toFixed(2)}s)`
+              : `${Math.abs(perf.deltaPercent)}% slower than industry average (${perf.industrySecPer1k.toFixed(2)}s)`}
+          </p>
+        </div>
+        <div className="border-l border-gray-200 dark:border-gray-700 pl-6">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            Industry average
+          </p>
+          <p className="mt-1 text-3xl font-semibold tabular-nums text-gray-700 dark:text-gray-300">
+            {perf.industrySecPer1k.toFixed(2)}
+            <span className="text-base text-gray-400 dark:text-gray-500 font-medium ml-0.5">
               s
             </span>
-          </span>
-        </p>
-        <p className="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 tabular-nums">
-          {perf.deltaPercent}% faster than industry average (
-          {perf.industrySecPer1k.toFixed(2)}s)
-        </p>
+          </p>
+        </div>
       </div>
-      <div className="border-l border-gray-200 dark:border-gray-700 pl-6">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-          Industry average
-        </p>
-        <p className="mt-1 text-3xl font-semibold tabular-nums text-gray-700 dark:text-gray-300">
-          {perf.industrySecPer1k.toFixed(2)}
-          <span className="text-base text-gray-400 dark:text-gray-500 font-medium ml-0.5">
-            s
-          </span>
-        </p>
+      <div className="mt-6 pt-5 border-t border-gray-100 dark:border-gray-700/60 grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <PerfMetric
+          label="Avg payload"
+          value={perf.payloadMb.toFixed(2)}
+          unit="MB"
+          industry={`${perf.industryPayloadMb.toFixed(2)} MB`}
+          delta={payloadDelta > 0 ? `${payloadDelta.toFixed(2)} MB smaller` : payloadDelta < 0 ? `${Math.abs(payloadDelta).toFixed(2)} MB larger` : undefined}
+          deltaPositive={payloadDelta > 0}
+        />
+        <PerfMetric
+          label="Avg response"
+          value={perf.responseS.toFixed(2)}
+          unit="s"
+          industry={`${perf.industryResponseS.toFixed(2)} s`}
+          delta={responseDelta > 0 ? `${responseDelta.toFixed(2)}s faster` : responseDelta < 0 ? `${Math.abs(responseDelta).toFixed(2)}s slower` : undefined}
+          deltaPositive={responseDelta > 0}
+        />
+        <PerfMetric
+          label="Throughput"
+          value={perf.throughputMbS.toFixed(2)}
+          unit="MB/s"
+          industry={`${perf.industryThroughputMbS.toFixed(2)} MB/s`}
+          delta={throughputDelta > 0 ? `${throughputDelta.toFixed(2)} MB/s faster` : throughputDelta < 0 ? `${Math.abs(throughputDelta).toFixed(2)} MB/s slower` : undefined}
+          deltaPositive={throughputDelta > 0}
+        />
       </div>
     </div>
-    <div className="mt-6 pt-5 border-t border-gray-100 dark:border-gray-700/60 grid grid-cols-1 sm:grid-cols-3 gap-6">
-      <PerfMetric
-        label="Avg payload"
-        value={perf.payloadMb.toFixed(2)}
-        unit="MB"
-        industry={`${perf.industryPayloadMb.toFixed(2)} MB`}
-      />
-      <PerfMetric
-        label="Avg response"
-        value={perf.responseS.toFixed(2)}
-        unit="s"
-        industry={`${perf.industryResponseS.toFixed(2)} s`}
-      />
-      <PerfMetric
-        label="Throughput"
-        value={perf.throughputMbS.toFixed(2)}
-        unit="MB/s"
-        industry={`${perf.industryThroughputMbS.toFixed(2)} MB/s`}
-      />
-    </div>
-  </div>
-);
+  );
+};
 
 const PerformanceOptedOut = ({
   perf
@@ -944,26 +957,11 @@ const PerformanceOptedOut = ({
         </p>
         <p className="mt-1 flex items-baseline gap-2">
           <span className="text-5xl font-bold tabular-nums text-gray-300 dark:text-gray-600">
-            — <span className="text-2xl">s</span>
-          </span>
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
-            <svg
-              className="w-3.5 h-3.5"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                fillRule="evenodd"
-                d="M3.28 2.22a.75.75 0 00-1.06 1.06l14.5 14.5a.75.75 0 101.06-1.06l-1.745-1.745a10.029 10.029 0 003.3-4.38 1.651 1.651 0 000-1.185A10.004 10.004 0 009.999 3a9.956 9.956 0 00-4.744 1.194L3.28 2.22zM7.752 6.69l1.092 1.092a2.5 2.5 0 013.374 3.373l1.091 1.092a4 4 0 00-5.557-5.557z"
-                clipRule="evenodd"
-              />
-            </svg>
-            Not publicly available
+            N/A
           </span>
         </p>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          This provider has opted out of publishing performance metrics.
+          Provider has opted out of publishing performance metrics
         </p>
       </div>
       <div className="border-l border-gray-200 dark:border-gray-700 pl-6">
@@ -978,6 +976,26 @@ const PerformanceOptedOut = ({
         </p>
       </div>
     </div>
+    <div className="mt-6 pt-5 border-t border-gray-100 dark:border-gray-700/60 grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <PerfMetric
+        label="Avg payload"
+        value="N/A"
+        unit=""
+        industry={`${perf.industryPayloadMb.toFixed(2)} MB`}
+      />
+      <PerfMetric
+        label="Avg response"
+        value="N/A"
+        unit=""
+        industry={`${perf.industryResponseS.toFixed(2)} s`}
+      />
+      <PerfMetric
+        label="Throughput"
+        value="N/A"
+        unit=""
+        industry={`${perf.industryThroughputMbS.toFixed(2)} MB/s`}
+      />
+    </div>
   </div>
 );
 
@@ -985,12 +1003,16 @@ const PerfMetric = ({
   label,
   value,
   unit,
-  industry
+  industry,
+  delta,
+  deltaPositive,
 }: {
   readonly label: string;
   readonly value: string;
   readonly unit: string;
   readonly industry: string;
+  readonly delta?: string;
+  readonly deltaPositive?: boolean;
 }) => (
   <div>
     <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -998,14 +1020,20 @@ const PerfMetric = ({
     </p>
     <p className="mt-1 text-xl font-semibold tabular-nums text-gray-900 dark:text-gray-100">
       {value}
-      <span className="text-sm text-gray-400 dark:text-gray-500 font-medium ml-0.5">
-        {' '}
-        {unit}
-      </span>
+      {unit && (
+        <span className="text-sm text-gray-400 dark:text-gray-500 font-medium ml-0.5">
+          {' '}{unit}
+        </span>
+      )}
     </p>
     <p className="text-[11px] text-gray-500 dark:text-gray-400 tabular-nums">
       Industry: {industry}
     </p>
+    {delta && (
+      <p className={`text-[11px] font-medium tabular-nums mt-0.5 ${deltaPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+        {delta}
+      </p>
+    )}
   </div>
 );
 
