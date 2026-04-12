@@ -421,7 +421,16 @@ export interface CertReportSummary {
   // DD-specific
   readonly totalResourcesCount?: number;
   readonly localResourcesCount?: number;
+  readonly standardResourcesCount?: number;
+  readonly totalFieldsCount?: number;
+  readonly standardFieldsCount?: number;
+  readonly localFieldsCount?: number;
+  readonly totalLookupsCount?: number;
+  readonly standardLookupsCount?: number;
   readonly localLookupsCount?: number;
+  readonly iDXFieldsCount?: number;
+  readonly iDXLookupsCount?: number;
+  readonly iDXResourcesCount?: number;
   readonly advertised?: Readonly<Record<string, CertAdvertisedResource>>;
   // Core-specific
   readonly odataVersion?: string;

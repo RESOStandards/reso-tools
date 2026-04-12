@@ -31,14 +31,20 @@ export interface FieldCutCount {
   readonly providerCount: number;
   readonly industryAvgCount: number;
   readonly isCount: true;
+  /** Optional subtitle shown below the hero count (e.g., "out of 811 advertised"). */
+  readonly subtitle?: string;
 }
 
 export type FieldCut = FieldCutPercent | FieldCutCount;
 
 export interface ResourceCoverage {
   readonly resource: string;
+  /** Available count (fields with data) or provider percentage. */
   readonly providerPercent: number;
+  /** Industry average available count or percentage. */
   readonly industryPercent: number;
+  /** Advertised count (total fields in metadata). */
+  readonly providerAdvertised?: number;
 }
 
 export interface PayloadCoverage {

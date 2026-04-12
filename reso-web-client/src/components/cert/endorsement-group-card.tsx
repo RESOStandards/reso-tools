@@ -123,7 +123,7 @@ export const EndorsementGroupCard = ({
         <EndorsementSubRow
           key={e.id}
           endorsement={e}
-          onSelect={onSelectEndorsement ?? (() => navigate(`/cert/orgs/${recipientUoi}`))}
+          onSelect={onSelectEndorsement}
         />
       ))}
     </div>

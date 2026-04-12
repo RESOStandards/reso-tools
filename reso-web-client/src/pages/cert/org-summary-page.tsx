@@ -553,30 +553,45 @@ const CoverageSectionView = ({
 
 const FieldCutTile = ({ cut }: { readonly cut: FieldCut }) => {
   if (cut.isCount) {
-    // Render count tiles with the same visual treatment as percent tiles
+    const above = cut.providerCount >= cut.industryAvgCount;
+    const hasIndustry = cut.industryAvgCount > 0;
+    const numberColor = hasIndustry && above
+      ? 'text-emerald-700 dark:text-emerald-400'
+      : hasIndustry
+        ? 'text-gray-900 dark:text-gray-50'
+        : 'text-gray-900 dark:text-gray-50';
+    const ringClass = hasIndustry && above
+      ? 'ring-1 ring-emerald-200 dark:ring-emerald-900/50'
+      : '';
     return (
-      <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+      <div className={`bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-5 ${ringClass}`}>
         <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
           {cut.label}
         </p>
         <p className="mt-2 flex items-baseline gap-1.5">
-          <span className="text-4xl font-bold tabular-nums text-gray-900 dark:text-gray-50">
+          <span className={`text-4xl font-bold tabular-nums ${numberColor}`}>
             {cut.providerCount.toLocaleString()}
           </span>
-          <span className="text-xs text-gray-500 dark:text-gray-400">fields</span>
+          {hasIndustry && (above ? <AboveIndustryPill /> : <BelowIndustryPill />)}
         </p>
-        {cut.industryAvgCount > 0 && (
+        {cut.subtitle && (
+          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{cut.subtitle}</p>
+        )}
+        {hasIndustry && (() => {
+          const maxVal = Math.max(cut.providerCount, cut.industryAvgCount, 1);
+          return (
           <>
             <ComparisonBar
-              providerPercent={Math.min(100, Math.round((cut.providerCount / cut.industryAvgCount) * 100))}
-              industryPercent={100}
-              above={cut.providerCount >= cut.industryAvgCount}
+              providerPercent={Math.round((cut.providerCount / maxVal) * 100)}
+              industryPercent={Math.round((cut.industryAvgCount / maxVal) * 100)}
+              above={above}
             />
             <p className="mt-2 text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
               Industry avg: {cut.industryAvgCount.toLocaleString()}
             </p>
           </>
-        )}
+          );
+        })()}
       </div>
     );
   }
@@ -691,17 +706,13 @@ const PayloadCard = ({ payload }: { readonly payload: PayloadCoverage }) => {
 
 const ResourceRow = ({ row }: { readonly row: ResourceCoverage }) => {
   const hasIndustry = row.industryPercent > 0;
-  const delta = row.providerPercent - row.industryPercent;
-  const above = delta >= 0;
-  const barColor = !hasIndustry
-    ? 'bg-blue-500 dark:bg-blue-400'
-    : above
-      ? 'bg-emerald-500 dark:bg-emerald-400'
-      : 'bg-amber-500 dark:bg-amber-400';
-  const deltaColor = above
-    ? 'text-emerald-600 dark:text-emerald-400'
-    : 'text-amber-600 dark:text-amber-400';
-  const sign = above ? '+' : '';
+  const maxVal = Math.max(row.providerPercent, row.industryPercent, row.providerAdvertised ?? 0, 1);
+  const provBarWidth = Math.round((row.providerPercent / maxVal) * 100);
+  const advBarWidth = row.providerAdvertised ? Math.round((row.providerAdvertised / maxVal) * 100) : 0;
+  const above = !hasIndustry || row.providerPercent >= row.industryPercent;
+  const barColor = above
+    ? 'bg-emerald-500 dark:bg-emerald-400'
+    : 'bg-amber-500 dark:bg-amber-400';
   return (
     <li className="flex items-center gap-4 py-3">
       <div className="w-32 shrink-0">
@@ -711,27 +722,38 @@ const ResourceRow = ({ row }: { readonly row: ResourceCoverage }) => {
       </div>
       <div className="flex-1 min-w-0">
         <div className="relative h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-visible">
+          {/* Advertised bar (track) */}
+          {advBarWidth > 0 && (
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-gray-300 dark:bg-gray-600"
+              style={{ width: `${advBarWidth}%` }}
+            />
+          )}
+          {/* Available bar (fill) */}
           <div
             className={`absolute inset-y-0 left-0 rounded-full ${barColor}`}
-            style={{ width: `${row.providerPercent}%` }}
+            style={{ width: `${provBarWidth}%` }}
           />
+          {/* Industry average marker */}
           {hasIndustry && (
             <div
-              className="absolute -top-1 -bottom-1 w-0.5 bg-gray-500 dark:bg-gray-300"
-              style={{ left: `${row.industryPercent}%` }}
-              title={`Industry avg ${row.industryPercent}%`}
+              className="absolute -top-1.5 -bottom-1.5 w-0.5 bg-gray-500 dark:bg-gray-300 cursor-help"
+              style={{ left: `${Math.round((row.industryPercent / maxVal) * 100)}%` }}
+              title={`Industry average: ${Math.round(row.industryPercent).toLocaleString()} fields with data`}
             />
           )}
         </div>
       </div>
-      <div className="w-28 shrink-0 text-right">
-        <p className="text-base font-semibold tabular-nums text-gray-900 dark:text-gray-100">
-          {row.providerPercent}%
+      <div className="w-36 shrink-0 text-right">
+        <p className="text-sm tabular-nums text-gray-900 dark:text-gray-100">
+          <span className="font-semibold">{Math.round(row.providerPercent).toLocaleString()}</span>
+          {row.providerAdvertised !== undefined && (
+            <span className="text-gray-400 dark:text-gray-500"> / {Math.round(row.providerAdvertised).toLocaleString()}</span>
+          )}
         </p>
         {hasIndustry && (
-          <p className={`text-[11px] tabular-nums ${deltaColor}`}>
-            {sign}
-            {delta} vs {row.industryPercent}%
+          <p className="text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
+            Industry avg: {Math.round(row.industryPercent).toLocaleString()}
           </p>
         )}
       </div>
