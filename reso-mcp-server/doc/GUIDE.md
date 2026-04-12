@@ -513,7 +513,7 @@ Section 2 used `$filter` for the simplest possible cases – equality and a sing
 > }
 > ```
 >
-> Notice that all three results have nearly identical timestamps in early April 2026 – that is the moment the seed step ran, not the moment the listings were "actually" modified. This is what you'd expect from a freshly bulk-loaded database: every record's `ModificationTimestamp` reflects the load, and the *real* incremental-sync story starts when the next mutation happens. Which is exactly what Section 4 is about.
+> Notice that all three results have nearly identical timestamps in early April 2026 – that is the moment the seed step ran, not the moment the listings were "actually" modified. This is what you'd expect from a freshly bulk-loaded database: every record's `ModificationTimestamp` reflects the load, and the *real* incremental-sync story starts when the next mutation happens. Sections 4 and 5 cover both sides of that: making changes (Add/Edit) and tracking them (EntityEvent).
 >
 > Two things worth knowing about timestamp filters:
 >
@@ -532,11 +532,323 @@ These are best learned the same way Sections 3.1–3.5 demonstrated: form a ques
 
 ---
 
-## Section 4 – Add/Edit and EntityEvent
+## Section 4 – Add/Edit
 
-Reading data is half the story. The other half – making changes and *knowing* a change happened – is what `create`, `update`, `delete` and the `EntityEvent` resource are for. This section walks through the full write loop: enabling the change feed, editing a record, watching the event land and reasoning about how a real client would consume it.
+Reading data is half the story. The other half is making changes – creating listings, updating fields, deleting records – and the MCP server's `create`, `update`, and `delete` tools make that possible through natural conversation. This section walks through CRUD operations against a RESO server: what happens when things work, what happens when they do not and how an AI assistant can turn structured errors into actionable guidance.
 
-### 4.1 Why EntityEvent Matters
+### 4.1 Creating a Listing
+
+> **User:** Add a new residential listing in Bend, Oregon. 4 bedrooms, 3 baths, 2,200 sqft on a quarter acre, listed at $425,000.
+>
+> **Assistant:** I will create a Property record with those details. Let me start with the basics and see what the server requires.
+>
+> <details><summary>Tool call – <code>mcp__reso__create</code> (first attempt)</summary>
+>
+> ```jsonc
+> {
+>   "tool": "mcp__reso__create",
+>   "arguments": {
+>     /* auth context */
+>     "resource": "Property",
+>     "record": {
+>       "StandardStatus": "Active",
+>       "ListPrice": 425000,
+>       "City": "Bend",
+>       "StateOrProvince": "OR",
+>       "PropertyType": "Residential",
+>       "BedroomsTotal": 4,
+>       "BathroomsTotalInteger": 3,
+>       "LivingArea": 2200,
+>       "LotSizeAcres": 0.25
+>     }
+>   }
+> }
+> ```
+>
+> </details>
+>
+> ```json
+> {
+>   "error": {
+>     "code": "20100",
+>     "message": "2 validation errors occurred",
+>     "target": "Create",
+>     "details": [
+>       { "code": "30212", "target": "PostalCode", "message": "PostalCode is required." },
+>       { "code": "30212", "target": "Country",    "message": "Country is required." }
+>     ]
+>   }
+> }
+> ```
+>
+> The server rejected the create with two validation errors – `PostalCode` and `Country` are both required. This is RESO Add/Edit certification behavior in action: the server validates inbound payloads against the Data Dictionary's required-field rules and returns structured 400s with field-level error codes. Adding both and retrying:
+>
+> <details><summary>Tool call – <code>mcp__reso__create</code> (retry)</summary>
+>
+> ```jsonc
+> {
+>   "tool": "mcp__reso__create",
+>   "arguments": {
+>     /* auth context */
+>     "resource": "Property",
+>     "record": {
+>       "StandardStatus": "Active",
+>       "ListPrice": 425000,
+>       "City": "Bend",
+>       "StateOrProvince": "OR",
+>       "PostalCode": "97702",
+>       "Country": "US",
+>       "PropertyType": "Residential",
+>       "BedroomsTotal": 4,
+>       "BathroomsTotalInteger": 3,
+>       "LivingArea": 2200,
+>       "LotSizeAcres": 0.25
+>     }
+>   }
+> }
+> ```
+>
+> </details>
+>
+> Server returned **HTTP 201** with the created record:
+>
+> ```json
+> {
+>   "@odata.id":       "http://server:8080/Property('e00039a8-b71c-448f-93b3-adf35bcd1980')",
+>   "@odata.editLink": "http://server:8080/Property('e00039a8-b71c-448f-93b3-adf35bcd1980')",
+>   "@odata.etag":     "W/\"MjAyNi0wNC0xMlQxOTo0ODo0Mi40ODNa\"",
+>   "ListingKey":      "e00039a8-b71c-448f-93b3-adf35bcd1980",
+>   "StandardStatus":  "Active",
+>   "ListPrice":       425000,
+>   "City":            "Bend",
+>   "StateOrProvince": "OR",
+>   "PostalCode":      "97702",
+>   "Country":         "US",
+>   "PropertyType":    "Residential",
+>   "BedroomsTotal":   4,
+>   "BathroomsTotalInteger": 3,
+>   "LivingArea":      2200,
+>   "LotSizeAcres":    0.25,
+>   "ModificationTimestamp": "2026-04-12T19:48:42.465Z"
+> }
+> ```
+>
+> A few things to notice:
+>
+> - **The server assigned its own `ListingKey`** (`e00039a8-…`). On this server, `ListingKey` is always server-generated. Different servers have different policies – some accept client-supplied keys, some require them, some always overwrite. Always read the response body to learn the canonical key.
+> - **`ModificationTimestamp` was set automatically.** You did not send it; the server stamped the record at creation time.
+> - **`@odata.etag`** is there for optimistic concurrency. If you want to update this record later, you can send the ETag back in an `If-Match` header to prevent clobbering a change someone else made in between.
+
+### 4.2 Updating a Record
+
+> **User:** That Bend listing just went under contract. Mark it as Pending and set the contract date to today.
+>
+> **Assistant:** Just to confirm before I touch anything: you want me to PATCH listing `e00039a8-…` – the Bend, OR property at $425,000 – to `StandardStatus: Pending` with `PurchaseContractDate: 2026-04-12`. Correct?
+>
+> **User:** Correct.
+>
+> <details><summary>Tool call – <code>mcp__reso__update</code></summary>
+>
+> ```jsonc
+> {
+>   "tool": "mcp__reso__update",
+>   "arguments": {
+>     /* auth context */
+>     "resource": "Property",
+>     "key": "e00039a8-b71c-448f-93b3-adf35bcd1980",
+>     "record": {
+>       "StandardStatus": "Pending",
+>       "PurchaseContractDate": "2026-04-12"
+>     }
+>   }
+> }
+> ```
+>
+> </details>
+>
+> Server returned **HTTP 200** with the updated record:
+>
+> ```json
+> {
+>   "ListingKey": "e00039a8-b71c-448f-93b3-adf35bcd1980",
+>   "StandardStatus": "Pending",
+>   "PurchaseContractDate": "2026-04-12",
+>   "ListPrice": 425000,
+>   "ModificationTimestamp": "2026-04-12T19:48:52.873Z",
+>   "@odata.etag": "W/\"MjAyNi0wNC0xMlQxOTo0ODo1Mi44ODVa\""
+> }
+> ```
+>
+> The PATCH landed. Notice the server bumped `ModificationTimestamp` automatically and returned a fresh `@odata.etag`. Both are standard OData behaviors and are useful if you maintain a local cache.
+>
+> **User:** Now reduce the price to $399,000.
+>
+> <details><summary>Tool call – <code>mcp__reso__update</code></summary>
+>
+> ```jsonc
+> {
+>   "tool": "mcp__reso__update",
+>   "arguments": {
+>     /* auth context */
+>     "resource": "Property",
+>     "key": "e00039a8-b71c-448f-93b3-adf35bcd1980",
+>     "record": { "ListPrice": 399000 }
+>   }
+> }
+> ```
+>
+> </details>
+>
+> ```json
+> {
+>   "ListingKey": "e00039a8-b71c-448f-93b3-adf35bcd1980",
+>   "StandardStatus": "Pending",
+>   "ListPrice": 399000,
+>   "ModificationTimestamp": "2026-04-12T19:49:00.202Z",
+>   "@odata.etag": "W/\"MjAyNi0wNC0xMlQxOTo0OTowMC4yMTNa\""
+> }
+> ```
+>
+> Price reduction applied. Each PATCH touches only the fields you send – `StandardStatus` stayed at `Pending` because we did not include it in this call. This is the standard OData PATCH semantic: merge the supplied fields into the existing record, leave everything else unchanged.
+
+### 4.3 Deleting a Record
+
+> **User:** That Portland listing from earlier was a test. Delete it.
+>
+> **Assistant:** Just to confirm – you want me to permanently delete listing `21d8fa80-af04-41c8-96e0-ce52d0200474`. This is a destructive operation: the `delete` tool advertises `destructiveHint: true`, so any MCP-aware host should also prompt you before invoking it. Proceed?
+>
+> **User:** Yes, delete it.
+>
+> <details><summary>Tool call – <code>mcp__reso__delete</code></summary>
+>
+> ```jsonc
+> {
+>   "tool": "mcp__reso__delete",
+>   "arguments": {
+>     /* auth context */
+>     "resource": "Property",
+>     "key": "21d8fa80-af04-41c8-96e0-ce52d0200474"
+>   }
+> }
+> ```
+>
+> </details>
+>
+> ```json
+> { "status": 204, "body": null }
+> ```
+>
+> HTTP **204 No Content** – the OData convention for a successful DELETE. There is no body, just the status code. The record is gone from `Property`.
+
+### 4.4 When Things Go Wrong – Error Handling
+
+The happy path is the easy part. What separates a usable AI integration from a frustrating one is how it walks the user through *errors* – and RESO Add/Edit servers return them in a structured way the assistant can translate into plain language.
+
+#### Missing required fields (HTTP 400)
+
+We already hit this in §4.1 – the first `create` attempt left out `PostalCode` and `Country`. The error shape is worth understanding:
+
+```json
+{
+  "error": {
+    "code": "20100",
+    "message": "2 validation errors occurred",
+    "target": "Create",
+    "details": [
+      { "code": "30212", "target": "PostalCode", "message": "PostalCode is required." },
+      { "code": "30212", "target": "Country",    "message": "Country is required." }
+    ]
+  }
+}
+```
+
+Three things make this useful for AI-assisted Add/Edit:
+
+- **The outer `error` envelope follows the OData JSON error format** – every compliant Add/Edit server returns this shape, so the assistant can parse it the same way regardless of whose server is on the other end.
+- **`details[]` is the field-level breakdown.** Each entry has `target` (the field name) and `message` (a human-readable description). The assistant does not have to guess which fields need fixing – the server is explicit.
+- **`code: 30212` is a stable RESO error code** for "required field missing." A more sophisticated client could map error codes to localized messages or trigger automatic remediation (e.g., "looks like you forgot Country – should I default it to `US`?").
+
+The recovery pattern: parse the structured error, summarize it in plain language, propose a concrete fix, retry with consent. No raw JSON in the user-facing dialogue unless the user asks for it.
+
+#### Record not found (HTTP 404)
+
+> **User:** Delete listing `does-not-exist-12345`.
+>
+> **Assistant:** Sending the DELETE.
+>
+> <details><summary>Tool call – <code>mcp__reso__delete</code></summary>
+>
+> ```jsonc
+> {
+>   "tool": "mcp__reso__delete",
+>   "arguments": {
+>     /* auth context */
+>     "resource": "Property",
+>     "key": "does-not-exist-12345"
+>   }
+> }
+> ```
+>
+> </details>
+>
+> ```json
+> {
+>   "error": {
+>     "code": "40400",
+>     "message": "No Property record found with key 'does-not-exist-12345'.",
+>     "target": "Delete",
+>     "details": []
+>   }
+> }
+> ```
+>
+> The server does not have a record with that key, so the DELETE failed with a 404. No EntityEvent is generated – failed writes do not produce events. If you were treating this as part of a sync loop, the right response is "the record was already gone, my local cache is consistent, move on."
+
+#### The silent failure: when the server accepts bad data
+
+This is the trap nobody warns you about. The user asks for a status change to a value that is not in the lookup and the server returns **HTTP 200** instead of a 400.
+
+> **User:** Set that listing's `StandardStatus` to `ImaginaryStatus`.
+>
+> **Assistant:** Heads up – `ImaginaryStatus` is not a value in the `StandardStatus` lookup. From §2.1's pattern, the allowed values come from `Lookup` with `LookupName eq 'StandardStatus'`, and the standard ones are `Active`, `Pending`, `Closed`, `Hold`, `Expired`, `Withdrawn`, etc. Did you mean one of those, or do you want me to try it anyway to see what the server does?
+>
+> **User:** Try it anyway.
+>
+> The server returned **HTTP 200** with `"StandardStatus": "ImaginaryStatus"` in the response body. The server *accepted the bad value*. Worth pausing on what just happened:
+>
+> - **Not every server enforces lookup membership on PATCH.** This server validates required fields but does not validate that lookup-backed string fields contain values from the corresponding `Lookup` resource. Different servers make different choices about write-path validation.
+> - **An AI assistant should not treat HTTP 200 as proof of correctness.** "The server accepted my call" and "the value I sent was valid" are not the same statement. The right pattern is: warn before sending if the assistant suspects the value is wrong, and sanity-check constrained fields after a successful response.
+
+#### Putting the three patterns together
+
+| Server response | What it means | Recovery |
+|---|---|---|
+| `400` with `details[]` | Structured validation failure – server told you exactly what is wrong | Parse `details`, summarize to user, propose fix, retry with consent |
+| `404` with empty `details[]` | The target record is not there | Acknowledge, treat as no-op, do not retry |
+| `200` with a bad value visible | Server accepted something it probably should not have | Do not trust silence – sanity-check constrained fields after every write |
+
+These three cover the vast majority of Add/Edit failure modes. Network errors and 5xx responses need infrastructure responses (retry with backoff, surface to the user) rather than RESO-specific reasoning.
+
+### 4.5 What Add/Edit Makes Possible
+
+With just the three write tools covered above, an AI assistant can act as a full data-entry and management interface for any RESO-compliant server:
+
+- **Listing input** – create new listings conversationally, with the server's validation rules catching anything the assistant misses. No forms, no dropdowns, no training on a specific MLS system's UI.
+- **Status management** – walk a listing through its lifecycle (`Active` → `Pending` → `Closed`) with appropriate companion fields set at each transition.
+- **Price adjustments** – apply price changes with a single instruction and confirm the new price in the response.
+- **Bulk corrections** – "update every listing in ZIP 97702 to `Country: US`" becomes a query-then-iterate loop the assistant can execute with consent at each step.
+- **Data cleanup** – find and delete test or duplicate records, with the assistant confirming each destructive action.
+- **Validation exploration** – intentionally test edge cases to discover what a specific server enforces and what it lets through, as we did with `ImaginaryStatus` above.
+
+The next section builds on these operations by adding *change tracking* – the ability to know when *someone else* made a change and to consume those changes programmatically.
+
+---
+
+## Section 5 – EntityEvent
+
+Reading data is half the story. Tracking *other people's* changes – and knowing what changed, when and to which records – is what the `EntityEvent` resource is for. This section walks through enabling the change feed, watching events land as mutations happen and reasoning about how a real polling client consumes them. It builds on the Add/Edit operations from Section 4.
+
+### 5.1 Why EntityEvent Matters
 
 > **User:** Before we touch anything, what *is* EntityEvent and why should I care?
 >
@@ -562,7 +874,7 @@ Reading data is half the story. The other half – making changes and *knowing* 
 >    A future optional `EventTypes` extension is on the roadmap to make this distinction explicit on the server side, but the polling rules above work against every compliant server today.
 > 3. **Today's model is pull, not push.** You poll `EntityEvent` on whatever interval suits you – every few seconds for near-real-time sync, every few minutes for slower feeds. Subscription/push semantics are on the RESO roadmap (server-sent events, webhooks, filterable subscriptions) but not in the current spec. Build your client around polling for now and the migration to push will be a layer on top, not a rewrite.
 
-### 4.2 Enabling EntityEvent on the Reference Server
+### 5.2 Enabling EntityEvent on the Reference Server
 
 > **User:** OK, I want to try it. How do I turn it on?
 >
@@ -583,7 +895,7 @@ Reading data is half the story. The other half – making changes and *knowing* 
 >
 > "Read-only" is important: clients can `GET` from `EntityEvent` but cannot `POST`/`PATCH`/`DELETE` against it directly. Rows appear there *only* as a side effect of writes against other resources.
 
-### 4.3 The Empty Feed
+### 5.3 The Empty Feed
 
 > **User:** Cool. Show me what is changed in my feed lately.
 >
@@ -616,7 +928,7 @@ Reading data is half the story. The other half – making changes and *knowing* 
 >
 > Let us generate one. I will edit a listing and we will watch it appear in the feed.
 
-### 4.4 Editing a Listing – The Confirm-Then-PATCH Dance
+### 5.4 Editing a Listing – The Confirm-Then-PATCH Dance
 
 > **User:** Mark listing `50ddad45-e172-448d-8e9e-9aa5e2746873` as Pending.
 >
@@ -667,7 +979,7 @@ Reading data is half the story. The other half – making changes and *knowing* 
 >
 > The PATCH landed. Notice the server bumped `ModificationTimestamp` automatically and returned a fresh `@odata.etag` – those are both standard OData behaviors and useful if you are holding a local cache.
 
-### 4.5 The First Event Appears
+### 5.5 The First Event Appears
 
 > **User:** Did it land in the feed?
 >
@@ -711,7 +1023,7 @@ Reading data is half the story. The other half – making changes and *knowing* 
 > - **`FeedTypes` is empty** for the same reason – single-feed server, no need to tag events.
 > - **There is no `EventType: 'Update'` here.** A consumer that wants "what kind of change was this?" has to derive it: keep a known-keys set, and treat events for unknown keys as creates, events for known keys as updates, and events whose follow-up GET returns 404 as deletes.
 
-### 4.6 Adding a Brand New Listing
+### 5.6 Adding a Brand New Listing
 
 > **User:** OK now add a brand new listing – minimal fields, just enough to pass validation.
 >
@@ -801,7 +1113,7 @@ Reading data is half the story. The other half – making changes and *knowing* 
 >
 > One thing worth flagging: **the server assigned its own `ListingKey`** (`1bd91490-…`). On the ref server, `ListingKey` is server-generated regardless of what you supply. Different servers have different policies – some accept client-supplied keys, some require them, some always overwrite. Always read the response body to learn the canonical key, do not assume your input survived.
 
-### 4.7 Deleting a Record – The Destructive Path
+### 5.7 Deleting a Record – The Destructive Path
 
 > **User:** OK that was a throwaway, delete it.
 >
@@ -830,7 +1142,7 @@ Reading data is half the story. The other half – making changes and *knowing* 
 >
 > HTTP **204 No Content** – the OData convention for a successful DELETE. There is no body, just the status code. The record is gone from `Property` and a new EntityEvent row has been appended.
 
-### 4.8 Wearing the Consumer's Hat – Verifying a Delete From the Feed
+### 5.8 Wearing the Consumer's Hat – Verifying a Delete From the Feed
 
 Sections 4.4–4.7 were about *making* writes. Now let us flip the perspective: you are a polling replication client, you have just pulled a new batch of EntityEvent rows and you need to figure out what each one means. The cleanest way to teach this is to do a clean add → observe → delete → re-observe cycle on a fresh record.
 
@@ -896,7 +1208,7 @@ Sections 4.4–4.7 were about *making* writes. Now let us flip the perspective: 
 > }
 > ```
 >
-> One new event, sequence 6, for a key I've never seen before. Per the rules in §4.1: **unknown key + record exists on follow-up fetch = create**. Let me verify by fetching the record:
+> One new event, sequence 6, for a key I've never seen before. Per the rules in §5.1: **unknown key + record exists on follow-up fetch = create**. Let me verify by fetching the record:
 >
 > <details><summary>Tool call – <code>mcp__reso__query</code></summary>
 >
@@ -1026,7 +1338,7 @@ Sections 4.4–4.7 were about *making* writes. Now let us flip the perspective: 
 >
 > Every consumer in the RESO ecosystem is, at heart, some variation on that loop. The forthcoming optional `EventTypes` extension will let servers advertise the change type up front so consumers can skip the disambiguation fetch when they care, but the loop above works against every compliant server today.
 
-### 4.9 Summarizing Recent Changes From the Feed
+### 5.9 Summarizing Recent Changes From the Feed
 
 > **User:** Show me everything that is happened in my feed today, oldest first, and summarize.
 >
@@ -1063,143 +1375,32 @@ Sections 4.4–4.7 were about *making* writes. Now let us flip the perspective: 
 > }
 > ```
 >
-> Seven events on `Property`, in the order they happened. Notice what the rows *do not* tell you on their own – there is nothing here that distinguishes a create from an update from a delete. Applying the polling rules from §4.1 and §4.8, here is what a fresh consumer would reconstruct:
+> Seven events on `Property`, in the order they happened. Notice what the rows *do not* tell you on their own – there is nothing here that distinguishes a create from an update from a delete. Applying the polling rules from §5.1 and §5.8, here is what a fresh consumer would reconstruct:
 >
 > | Seq | Key | Known before? | Follow-up fetch | Verdict |
 > |---|---|---|---|---|
-> | 1 | `50ddad45-…` | Yes (seed) | Returns record | **Update** – compare to cached copy; `StandardStatus` and `PurchaseContractDate` differ → apply (§4.4 PATCH to Pending) |
-> | 2 | `1bd91490-…` | No | Returns record | **Create** – add to cache (§4.6 Demo City throwaway) |
-> | 3 | `1bd91490-…` | Yes (just learned at seq 2) | Returns empty | **Delete** – drop from cache (§4.7) |
-> | 4 | `50ddad45-…` | Yes | Returns record | **Update** – compare; `StandardStatus` differs → apply (foreshadowing §4.10) |
+> | 1 | `50ddad45-…` | Yes (seed) | Returns record | **Update** – compare to cached copy; `StandardStatus` and `PurchaseContractDate` differ → apply (§5.4 PATCH to Pending) |
+> | 2 | `1bd91490-…` | No | Returns record | **Create** – add to cache (§5.6 Demo City throwaway) |
+> | 3 | `1bd91490-…` | Yes (just learned at seq 2) | Returns empty | **Delete** – drop from cache (§5.7) |
+> | 4 | `50ddad45-…` | Yes | Returns record | **Update** – compare; `StandardStatus` differs → apply (foreshadowing §5.10) |
 > | 5 | `50ddad45-…` | Yes | Returns record | **Update** – compare; `StandardStatus` differs again → apply |
-> | 6 | `bc4fb5d7-…` | No | Returns record | **Create** – add to cache (§4.8 Faraway, OR) |
-> | 7 | `bc4fb5d7-…` | Yes (just learned at seq 6) | Returns empty | **Delete** – drop from cache (§4.8) |
+> | 6 | `bc4fb5d7-…` | No | Returns record | **Create** – add to cache (§5.8 Faraway, OR) |
+> | 7 | `bc4fb5d7-…` | Yes (just learned at seq 6) | Returns empty | **Delete** – drop from cache (§5.8) |
 >
-> A real incremental-sync client does not need to do any of this reasoning by hand – it just runs the loop from §4.8 and the `if record is empty / elif key not in cache / elif hash differs` branches do the work mechanically. But it is worth seeing the *shape* of the reasoning at least once: the feed gives you the sequence and the pointer; you decide what kind of change it represents by comparing what you knew to what you can fetch now.
+> A real incremental-sync client does not need to do any of this reasoning by hand – it just runs the loop from §5.8 and the `if record is empty / elif key not in cache / elif hash differs` branches do the work mechanically. But it is worth seeing the *shape* of the reasoning at least once: the feed gives you the sequence and the pointer; you decide what kind of change it represents by comparing what you knew to what you can fetch now.
 
-### 4.10 When Things Go Wrong – Error Handling
+### 5.10 Error Handling in the Context of EntityEvent
 
-The happy path is the easy part. What separates a usable AI integration from a frustrating one is how it walks the user through *errors* – and RESO Add/Edit servers return them in a structured way that the assistant can translate into plain language. This section walks through the three error shapes you will see most often.
+The Add/Edit error patterns from §4.4 apply here too – structured 400s for validation failures, 404s for missing records, and silent acceptance of bad data. The key difference in the EntityEvent context: **failed writes do not produce events.** Only successful mutations (HTTP 2xx) append a row to EntityEvent. A 400 or 404 is invisible to the feed, which means a polling consumer never needs to reason about server-side validation failures – it only sees the changes that actually landed.
 
-#### Missing required fields (HTTP 400 with field-level details)
-
-This is the one we already hit in §4.6 when the first `create` attempt left out `PostalCode` and `Country`. Worth seeing the full shape:
-
-```json
-{
-  "error": {
-    "code": "20100",
-    "message": "2 validation errors occurred",
-    "target": "Create",
-    "details": [
-      { "code": "30212", "target": "PostalCode", "message": "PostalCode is required." },
-      { "code": "30212", "target": "Country",    "message": "Country is required." }
-    ]
-  }
-}
-```
-
-Three things make this useful for AI-assisted Add/Edit:
-
-- **The outer `error` envelope follows the OData JSON error format** – every compliant Add/Edit server returns this shape, so the assistant can parse it the same way no matter whose server is on the other end.
-- **`details[]` is the field-level breakdown.** Each entry has `target` (the field name) and `message` (a human-readable description). The assistant does not have to guess which fields the user needs to add – the server tells it explicitly.
-- **`code: 30212` is a stable RESO error code** for "required field missing." A more sophisticated client could map error codes to localized messages or trigger automatic remediation (e.g. "looks like you forgot Country – should I default it to `US`?"). The assistant can pattern-match on the code rather than the English text.
-
-The recovery dialogue in §4.6 is the natural shape for handling this:
-
-> **Assistant:** The server rejected the create with two validation errors – `PostalCode` and `Country` are both required and we didn't include them. Want me to add `PostalCode: "94000"` and `Country: "US"` and retry?
-
-That is the pattern: parse the structured error, summarize it in plain language, propose a concrete fix, retry with consent. No raw JSON in the user-facing dialogue unless the user asks for it.
-
-#### Acting on a Record That Does Not Exist (HTTP 404 With Structured Body)
-
-> **User:** Delete listing `does-not-exist-12345`.
->
-> **Assistant:** Sending the DELETE.
->
-> <details><summary>Tool call – <code>mcp__reso__delete</code></summary>
->
-> ```jsonc
-> {
->   "tool": "mcp__reso__delete",
->   "arguments": {
->     /* auth context */
->     "resource": "Property",
->     "key": "does-not-exist-12345"
->   }
-> }
-> ```
->
-> </details>
->
-> ```
-> Server returned HTTP 404: {
->   "error": {
->     "code": "40400",
->     "message": "No Property record found with key 'does-not-exist-12345'.",
->     "target": "Delete",
->     "details": []
->   }
-> }
-> ```
->
-> The server does not have a `Property` record with that key, so the DELETE failed with a 404. There is no EntityEvent generated – failed writes do not produce events. Two things to know about this case:
->
-> 1. **`code: 40400` is the RESO "record not found" code** – same outer envelope as the validation error in §4.6, just with an empty `details[]` since there is nothing field-level to report.
-> 2. **It is a no-op from the consumer's perspective.** If you were treating this as part of a sync loop, the right response is "the record was already gone, my local cache is consistent, move on." Do not retry, do not error out – just acknowledge and continue.
-
-#### The silent failure: when the server *accepts* bad data
-
-This one is the trap nobody warns you about. The user asks for a status change to a value that is not in the lookup, and on the ref server you get back **HTTP 200** – not a 400.
-
-> **User:** Set listing `50ddad45-…`'s `StandardStatus` to `ImaginaryStatus`.
->
-> **Assistant:** OK, but heads up before I send this – `ImaginaryStatus` is not a value in the `StandardStatus` lookup. From §2.1's pattern, the allowed values come from `Lookup` with `LookupName eq 'StandardStatus'`, and the standard ones are `Active`, `Pending`, `Closed`, `Hold`, `Expired`, `Withdrawn`, etc. Did you mean one of those, or do you want me to try `ImaginaryStatus` anyway to see what the server does?
->
-> **User:** Try it anyway.
->
-> <details><summary>Tool call – <code>mcp__reso__update</code></summary>
->
-> ```jsonc
-> {
->   "tool": "mcp__reso__update",
->   "arguments": {
->     /* auth context */
->     "resource": "Property",
->     "key": "50ddad45-e172-448d-8e9e-9aa5e2746873",
->     "record": { "StandardStatus": "ImaginaryStatus" }
->   }
-> }
-> ```
->
-> </details>
->
-> Server returned **HTTP 200** with the full updated record, and `"StandardStatus": "ImaginaryStatus"` is sitting right there in the response body. The server *accepted the bad value*. Worth pausing on what just happened:
->
-> - **Not every server enforces lookup membership on PATCH.** The reference server validates required fields (you saw that in §4.6) but does *not* validate that lookup-backed string fields contain values from the corresponding `Lookup` resource. This is a real-world quirk – different servers make different choices about which validations to enforce on the write path versus the read path.
-> - **An EntityEvent row is still produced.** Sequence 4 in the §4.9 summary above is exactly this PATCH. From the EntityEvent feed's perspective, "ImaginaryStatus" is a perfectly normal change – the feed does not validate either.
-> - **An AI assistant should not treat HTTP 200 as proof of correctness.** "The server accepted my call" and "the value I sent was valid" are not the same statement. The right pattern is: warn before sending if the assistant has reason to suspect the value is wrong (as above), and after a successful response, sanity-check the field if it touches a lookup, an enum, or any constrained type.
->
-> The cleanup in our case was a second PATCH putting `StandardStatus` back to `Pending` – sequence 5 in the feed. The assistant produced two events (the bad write and the revert) on a record that ideally should have stayed on a single Pending state the whole time. A more cautious assistant would have refused to send the bad value at all without explicit override.
-
-#### Putting the three patterns together
-
-| Server response | What it means for the assistant | Recovery |
-|---|---|---|
-| `400` with `details[]` | Structured validation failure – server told you exactly what is wrong | Parse `details`, summarize to user, propose fix, retry with consent |
-| `404` with empty `details[]` | The target record is not there | Acknowledge, treat as no-op in sync loops, do not retry |
-| `200` with the bad value visible in the response | Server accepted something it probably should not have | Do not trust silence – sanity-check constrained fields after every write |
-
-These three cover the vast majority of Add/Edit failure modes. Network errors and 5xx responses exist too, but those are infrastructure problems and need infrastructure responses (retry with backoff, surface to the user as "the server is unreachable") rather than RESO-specific reasoning.
-
-### 4.11 What Is Next for EntityEvent
+### 5.11 What Is Next for EntityEvent
 
 The current spec is solid for batched, polling-based replication. Two things on the RESO roadmap will make it more interactive:
 
 - **Subscriptions** – clients will be able to register a long-lived subscription against EntityEvent and have new rows pushed to them as they are produced, instead of having to poll. The protocol will likely use server-sent events or webhooks; the underlying data shape stays the same.
 - **Filtering on subscription** – `subscribe to EntityEvent where ResourceName eq 'Property' and PostalCode in ('94000', '94001')`. This is the piece that turns EntityEvent from "raw firehose" into "personalized change stream" and is what most production clients are actually waiting for.
 
-There is also an optional **`EventTypes`** extension coming that will let servers advertise change types up front so consumers can skip the disambiguation fetch from §4.8 when the server cares to opt in. The polling rules in §4.1 will continue to work either way.
+There is also an optional **`EventTypes`** extension coming that will let servers advertise change types up front so consumers can skip the disambiguation fetch from §5.8 when the server cares to opt in. The polling rules in §5.1 will continue to work either way.
 
 When those land, the MCP server's `query` tool will support them on day one (it is a generic OData passthrough), and a future `subscribe` tool in this MCP server will surface the push side. Until then, build against the polling model – it is portable, it is standard and it works against every compliant server today.
 
