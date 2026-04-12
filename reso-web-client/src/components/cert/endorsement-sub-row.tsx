@@ -10,6 +10,7 @@
  * single 1-click action this row offers.
  */
 
+import { useNavigate } from 'react-router';
 import type { Endorsement } from '../../api/cert-fixtures';
 import { StatusPill } from './status-pill';
 
@@ -68,6 +69,7 @@ export const EndorsementSubRow = ({
   endorsement,
   onSelect
 }: EndorsementSubRowProps) => {
+  const navigate = useNavigate();
   const {
     typeLabel,
     version,
@@ -115,7 +117,13 @@ export const EndorsementSubRow = ({
   const showFailedStep =
     failedStep && (status === 'failed' || status === 'in_review');
 
-  const handleClick = () => onSelect?.(endorsement);
+  const handleClick = () => {
+    if (onSelect) {
+      onSelect(endorsement);
+    } else {
+      navigate(`/cert/orgs/${encodeURIComponent(endorsement.recipientUoi)}/detail/${encodeURIComponent(endorsement.id)}`);
+    }
+  };
 
   return (
     <button

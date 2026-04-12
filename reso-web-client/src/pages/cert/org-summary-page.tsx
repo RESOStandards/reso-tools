@@ -490,9 +490,19 @@ const CoverageSectionView = ({
         Coverage
       </h2>
       {coverage && (
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          From {coverage.typeLabel} {coverage.version} report · {coverage.date}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            From {coverage.typeLabel} {coverage.version} report · {coverage.date}
+          </p>
+          {coverage.date && new Date(coverage.date).getTime() < Date.now() - 2 * 365.25 * 86_400_000 && (
+            <span
+              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 cursor-help"
+              title="RESO endorsements are valid for two years from the date of certification. Endorsements older than two years will transition to Legacy status and will need to be renewed to remain current. This update is part of RESO's versioning policy, which helps ensure that certified implementations reflect the latest standards."
+            >
+              Expiring Soon
+            </span>
+          )}
+        </div>
       )}
     </div>
     <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
@@ -502,7 +512,7 @@ const CoverageSectionView = ({
     </p>
 
     {isLoading && !coverage ? (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {[1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-5 animate-pulse">
             <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-4" />
@@ -513,7 +523,7 @@ const CoverageSectionView = ({
       </div>
     ) : coverage ? (
       <>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
           {coverage.fieldCuts.map((c) => (
             <FieldCutTile key={c.key} cut={c} />
           ))}
@@ -532,6 +542,7 @@ const CoverageSectionView = ({
 
 const FieldCutTile = ({ cut }: { readonly cut: FieldCut }) => {
   if (cut.isCount) {
+    // Render count tiles with the same visual treatment as percent tiles
     return (
       <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
         <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -543,9 +554,18 @@ const FieldCutTile = ({ cut }: { readonly cut: FieldCut }) => {
           </span>
           <span className="text-xs text-gray-500 dark:text-gray-400">fields</span>
         </p>
-        <p className="mt-3 text-[11px] text-gray-500 dark:text-gray-400 tabular-nums">
-          Industry avg: {cut.industryAvgCount.toLocaleString()}
-        </p>
+        {cut.industryAvgCount > 0 && (
+          <>
+            <ComparisonBar
+              providerPercent={Math.min(100, Math.round((cut.providerCount / cut.industryAvgCount) * 100))}
+              industryPercent={100}
+              above={cut.providerCount >= cut.industryAvgCount}
+            />
+            <p className="mt-2 text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
+              Industry avg: {cut.industryAvgCount.toLocaleString()}
+            </p>
+          </>
+        )}
       </div>
     );
   }
@@ -564,12 +584,9 @@ const FieldCutTile = ({ cut }: { readonly cut: FieldCut }) => {
     <div
       className={`bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-5 ${ringClass}`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-          {cut.label}
-        </p>
-        {above ? <AboveIndustryPill /> : <BelowIndustryPill />}
-      </div>
+      <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+        {cut.label}
+      </p>
       <p className="mt-2 flex items-baseline gap-1.5">
         <span className={`text-4xl font-bold tabular-nums ${numberColor}`}>
           {cut.providerPercent}
@@ -581,6 +598,7 @@ const FieldCutTile = ({ cut }: { readonly cut: FieldCut }) => {
           {cut.providerCount.toLocaleString()} /{' '}
           {cut.totalCount.toLocaleString()}
         </span>
+        {above ? <AboveIndustryPill /> : <BelowIndustryPill />}
       </p>
       <ComparisonBar
         providerPercent={cut.providerPercent}
@@ -661,11 +679,14 @@ const PayloadCard = ({ payload }: { readonly payload: PayloadCoverage }) => {
 };
 
 const ResourceRow = ({ row }: { readonly row: ResourceCoverage }) => {
+  const hasIndustry = row.industryPercent > 0;
   const delta = row.providerPercent - row.industryPercent;
   const above = delta >= 0;
-  const barColor = above
-    ? 'bg-emerald-500 dark:bg-emerald-400'
-    : 'bg-amber-500 dark:bg-amber-400';
+  const barColor = !hasIndustry
+    ? 'bg-blue-500 dark:bg-blue-400'
+    : above
+      ? 'bg-emerald-500 dark:bg-emerald-400'
+      : 'bg-amber-500 dark:bg-amber-400';
   const deltaColor = above
     ? 'text-emerald-600 dark:text-emerald-400'
     : 'text-amber-600 dark:text-amber-400';
@@ -683,21 +704,25 @@ const ResourceRow = ({ row }: { readonly row: ResourceCoverage }) => {
             className={`absolute inset-y-0 left-0 rounded-full ${barColor}`}
             style={{ width: `${row.providerPercent}%` }}
           />
-          <div
-            className="absolute -top-1 -bottom-1 w-0.5 bg-gray-500 dark:bg-gray-300"
-            style={{ left: `${row.industryPercent}%` }}
-            title={`Industry avg ${row.industryPercent}%`}
-          />
+          {hasIndustry && (
+            <div
+              className="absolute -top-1 -bottom-1 w-0.5 bg-gray-500 dark:bg-gray-300"
+              style={{ left: `${row.industryPercent}%` }}
+              title={`Industry avg ${row.industryPercent}%`}
+            />
+          )}
         </div>
       </div>
       <div className="w-28 shrink-0 text-right">
         <p className="text-base font-semibold tabular-nums text-gray-900 dark:text-gray-100">
           {row.providerPercent}%
         </p>
-        <p className={`text-[11px] tabular-nums ${deltaColor}`}>
-          {sign}
-          {delta} vs {row.industryPercent}%
-        </p>
+        {hasIndustry && (
+          <p className={`text-[11px] tabular-nums ${deltaColor}`}>
+            {sign}
+            {delta} vs {row.industryPercent}%
+          </p>
+        )}
       </div>
     </li>
   );
