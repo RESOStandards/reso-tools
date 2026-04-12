@@ -628,24 +628,23 @@ export const ServerExplorer = ({
                   <span className="tabular-nums">{enrichedFields.length}</span>
                   {' '}fields
                 </p>
-                {/* Sort pills — widths match field row badge columns */}
-                <div className="hidden sm:flex items-center gap-3 flex-1 justify-end text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => setSortKey('name')}
-                    className={`px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer ${sortKey === 'name' ? 'bg-blue-600 text-white font-medium' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-                  >name</button>
-                  <button
-                    type="button"
-                    onClick={() => setSortKey('type')}
-                    className={`w-32 text-center px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer ${sortKey === 'type' ? 'bg-blue-600 text-white font-medium' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-                  >type</button>
-                  <button
-                    type="button"
-                    onClick={() => setSortKey('availability')}
-                    title="Median fill factor – how often this field has data across all sampled records"
-                    className={`w-10 text-center px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer border-b border-dashed border-gray-400 dark:border-gray-500 ${sortKey === 'availability' ? 'bg-blue-600 text-white font-medium' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-                  >avail</button>
+                {/* Sort pills — right-aligned to approximate badge column positions */}
+                <div className="hidden sm:flex items-center gap-4 flex-1 justify-end text-[11px]">
+                  {(['name', 'type', 'availability'] as const).map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setSortKey(k)}
+                      title={k === 'availability' ? 'Median fill factor – how often this field has data across all sampled records' : undefined}
+                      className={`px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer ${
+                        sortKey === k
+                          ? 'bg-blue-600 text-white font-medium'
+                          : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      } ${k === 'availability' ? 'border-b border-dashed border-gray-400 dark:border-gray-500' : ''}`}
+                    >
+                      {k === 'availability' ? 'avail' : k}
+                    </button>
+                  ))}
                 </div>
               </div>
 
