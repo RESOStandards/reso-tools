@@ -301,7 +301,12 @@ export const PerformanceReport = ({
 
       {/* Replication throughput by resource */}
       {optedIn && replicationStats.length > 0 && (() => {
-        const maxRps = Math.max(...replicationStats.map((r) => r.recordsPerSecond), 1);
+        // Industry average rec/s: use the most common page size from the provider's resources
+        const defaultPageSize = replicationStats[0]?.pageSize ?? 200;
+        const industryRps = market.averageResponseTimeMillis > 0
+          ? Math.round(defaultPageSize / (market.averageResponseTimeMillis / 1000))
+          : 0;
+        const maxRps = Math.max(...replicationStats.map((r) => r.recordsPerSecond), industryRps, 1);
         return (
           <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-6 space-y-4">
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -311,7 +316,15 @@ export const PerformanceReport = ({
               {replicationStats.map((r) => (
                 <div key={r.name} className="flex items-center gap-3">
                   <span className="text-sm font-medium text-gray-900 dark:text-gray-100 w-24 shrink-0 truncate">{r.name}</span>
-                  <div className="flex-1 h-3 bg-gray-100 dark:bg-gray-700/50 rounded-full overflow-hidden">
+                  <div className="flex-1 h-3 bg-gray-100 dark:bg-gray-700/50 rounded-full overflow-hidden relative">
+                    {/* Industry average marker */}
+                    {industryRps > 0 && (
+                      <div
+                        className="absolute top-0 h-full border-r-2 border-dashed border-gray-400 dark:border-gray-500 z-10"
+                        style={{ left: `${Math.min((industryRps / maxRps) * 100, 100)}%` }}
+                        title={`Industry avg: ${formatNumber(industryRps)} rec/s`}
+                      />
+                    )}
                     <div
                       className="h-full rounded-full bg-blue-500"
                       style={{ width: `${(r.recordsPerSecond / maxRps) * 100}%` }}
@@ -332,7 +345,7 @@ export const PerformanceReport = ({
               ))}
             </div>
             <p className="text-[10px] text-gray-400 dark:text-gray-500">
-              Records per second based on page size and average response time per resource
+              Records per second based on page size and average response time · dashed line = industry avg ({formatNumber(industryRps)} rec/s at {formatMs(market.averageResponseTimeMillis)})
             </p>
           </div>
         );

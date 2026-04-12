@@ -214,7 +214,8 @@ export const DetailReportPage = () => {
   // Find the specific report by endorsement ID
   const report = reports.find((r) => r.id === endorsementId) ?? null;
 
-  // Resolve provider/system names from the org directory
+  // Resolve org/provider/system names from the org directory
+  const recipientName = uoi ? (lookupOrgName(uoi) ?? uoi) : '';
   const providerName = report ? (lookupOrgName(report.providerUoi) ?? report.providerUoi) : '';
   const systemName = report?.providerUsi ? (lookupSystem(report.providerUoi, report.providerUsi) ?? report.providerUsi) : '';
 
@@ -280,6 +281,9 @@ export const DetailReportPage = () => {
         <div className="mb-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
+              {recipientName && (
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-0.5">{recipientName}</p>
+              )}
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-50">
                 {reportTitle(report.type, report.version)}
               </h1>
