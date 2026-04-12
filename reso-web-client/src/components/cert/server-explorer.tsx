@@ -426,26 +426,7 @@ export const ServerExplorer = ({
 
   return (
     <div className="space-y-4">
-      {/* Search + filters bar */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <SearchInput
-          value={searchQuery}
-          onChange={setSearchQuery}
-          placeholder="Filter by field or lookup value…"
-        />
-        <div className="flex items-center gap-1.5">
-          {(['all', 'reso', 'local', 'payload'] as const).map((f) => (
-            <FilterPill
-              key={f}
-              label={categoryLabel[f]}
-              active={categoryFilter === f}
-              onClick={() => setCategoryFilter(f)}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Resource chooser + availability threshold */}
+      {/* Row 1: Resource chooser + availability threshold */}
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Resource</span>
@@ -478,15 +459,37 @@ export const ServerExplorer = ({
             list="avail-ticks"
           />
           <datalist id="avail-ticks">
-            <option value="0" />
-            <option value="25" />
-            <option value="50" />
-            <option value="75" />
-            <option value="100" />
+            <option value="0" label="0%" />
+            <option value="25" label="25%" />
+            <option value="50" label="50%" />
+            <option value="75" label="75%" />
+            <option value="90" label="p90" />
+            <option value="95" label="p95" />
+            <option value="99" label="p99" />
+            <option value="100" label="100%" />
           </datalist>
           <span className="text-xs font-semibold tabular-nums text-gray-900 dark:text-gray-100 w-20 text-right shrink-0">
             {availThreshold === 0 ? 'No Data' : availThreshold === 1 ? 'Above 0%' : `Above ${availThreshold}%`}
           </span>
+        </div>
+      </div>
+
+      {/* Row 2: Search + category filters */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <SearchInput
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Filter by field or lookup value…"
+        />
+        <div className="flex items-center gap-1.5">
+          {(['all', 'reso', 'local', 'payload'] as const).map((f) => (
+            <FilterPill
+              key={f}
+              label={categoryLabel[f]}
+              active={categoryFilter === f}
+              onClick={() => setCategoryFilter(f)}
+            />
+          ))}
         </div>
       </div>
 
@@ -498,25 +501,24 @@ export const ServerExplorer = ({
             </div>
           ) : (
             <div>
-              {/* Sort controls */}
-              <div className="flex items-center justify-between mb-3">
+              {/* Field count + sort */}
+              <div className="flex items-center justify-between mb-2">
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   <span className="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">{filteredFields.length}</span>
                   {' '}of{' '}
                   <span className="tabular-nums">{enrichedFields.length}</span>
                   {' '}fields
                 </p>
-                <div className="flex items-center gap-1 text-xs">
-                  <span className="text-gray-500 dark:text-gray-400">Sort:</span>
+                <div className="flex items-center gap-0.5">
                   {(['name', 'type', 'availability'] as const).map((k) => (
                     <button
                       key={k}
                       type="button"
                       onClick={() => setSortKey(k)}
-                      className={`px-2 py-0.5 rounded text-xs transition-colors cursor-pointer ${
+                      className={`px-2.5 py-1 rounded-md text-[11px] transition-colors cursor-pointer ${
                         sortKey === k
-                          ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium'
-                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                          ? 'bg-blue-600 text-white font-medium'
+                          : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                       }`}
                     >
                       {k === 'availability' ? 'avail' : k}
@@ -541,7 +543,7 @@ export const ServerExplorer = ({
                         striped={idx % 2 === 1}
                         badges={
                           <>
-                            <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 w-20 truncate">
+                            <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 w-28 truncate">
                               {friendlyType(f.type, f.isEnum)}
                             </span>
                             {f.standardRESO ? (

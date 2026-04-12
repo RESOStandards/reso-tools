@@ -114,17 +114,17 @@ export const FieldRow = ({
   <button
     type="button"
     onClick={onClick}
-    className={`w-full text-left px-4 py-2.5 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors cursor-pointer ${
+    className={`w-full text-left px-4 py-3 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors cursor-pointer ${
       striped ? 'bg-gray-50/50 dark:bg-gray-800/30' : ''
     }`}
   >
     <div className="flex items-center gap-3">
       <ExpandChevron expanded={expanded} />
-      <span className="font-medium text-sm text-gray-900 dark:text-gray-100 min-w-0 truncate flex-1">
+      <span className="font-medium text-sm text-gray-900 dark:text-gray-100 min-w-0 truncate sm:max-w-[40%]">
         {fieldName}
       </span>
       {badges && (
-        <div className="hidden sm:flex items-center gap-1.5 min-w-0">
+        <div className="hidden sm:flex items-center gap-2 flex-1 min-w-0 justify-end">
           {badges}
         </div>
       )}
