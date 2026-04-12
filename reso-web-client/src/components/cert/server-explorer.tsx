@@ -467,9 +467,9 @@ export const ServerExplorer = ({
               { value: 25, label: '≥ 25%', title: 'Fields present in at least 25% of records' },
               { value: 50, label: '≥ 50%', title: 'Fields present in at least half of records' },
               { value: 75, label: '≥ 75%', title: 'Fields present in most records' },
-              { value: 90, label: 'p90', title: '90th percentile – fields present in 90%+ of records' },
-              { value: 95, label: 'p95', title: '95th percentile – near-universal fields' },
-              { value: 99, label: 'p99', title: '99th percentile – effectively required fields' },
+              { value: 90, label: 'p90', title: '90th percentile – fields present in 90%+ of records', hint: true },
+              { value: 95, label: 'p95', title: '95th percentile – near-universal fields', hint: true },
+              { value: 99, label: 'p99', title: '99th percentile – effectively required fields', hint: true },
               { value: 100, label: '100%', title: 'Fields present in every record' },
             ] as const;
             const isCustom = !STOPS.some((s) => s.value === availThreshold);
@@ -486,7 +486,7 @@ export const ServerExplorer = ({
                       availThreshold === stop.value && !customAvailEditing
                         ? 'bg-blue-600 text-white'
                         : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                    }`}
+                    } ${'hint' in stop && stop.hint ? 'border-b border-dashed border-gray-400 dark:border-gray-500' : ''}`}
                   >
                     {stop.label}
                   </button>
@@ -501,15 +501,18 @@ export const ServerExplorer = ({
                     placeholder="%"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
-                        const v = Number((e.target as HTMLInputElement).value);
-                        if (v >= 0 && v <= 100) { setAvailThreshold(v); setCustomAvailEditing(false); }
+                        const v = Math.min(100, Math.max(0, Math.round(Number((e.target as HTMLInputElement).value) || 0)));
+                        setAvailThreshold(v);
+                        setCustomAvailEditing(false);
                       } else if (e.key === 'Escape') {
                         setCustomAvailEditing(false);
                       }
                     }}
                     onBlur={(e) => {
-                      const v = Number(e.target.value);
-                      if (e.target.value && v >= 0 && v <= 100) { setAvailThreshold(v); }
+                      if (e.target.value) {
+                        const v = Math.min(100, Math.max(0, Math.round(Number(e.target.value) || 0)));
+                        setAvailThreshold(v);
+                      }
                       setCustomAvailEditing(false);
                     }}
                     className="w-10 px-1 py-0.5 text-[11px] text-center rounded border border-blue-400 dark:border-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 tabular-nums focus:outline-none focus:ring-1 focus:ring-blue-500"
