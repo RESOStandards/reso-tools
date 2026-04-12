@@ -349,6 +349,16 @@ export const ServerExplorer = ({
     }
   }, [initialResource]);
   const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortAsc((prev) => !prev);
+    } else {
+      setSortKey(key);
+      setSortAsc(key === 'availability' ? false : true);
+    }
+  };
   const [searchQuery, setSearchQuery] = useState('');
   // Availability threshold is controlled by the parent (DD renderer)
   const setAvailThreshold = onAvailThresholdChange;
@@ -444,14 +454,15 @@ export const ServerExplorer = ({
         return true;
       })
       .sort((a, b) => {
-        if (sortKey === 'name') return a.fieldName.localeCompare(b.fieldName);
-        if (sortKey === 'type') return a.type.localeCompare(b.type);
+        const dir = sortAsc ? 1 : -1;
+        if (sortKey === 'name') return dir * a.fieldName.localeCompare(b.fieldName);
+        if (sortKey === 'type') return dir * normalizeTypeName(a.type).localeCompare(normalizeTypeName(b.type));
         // availability — nulls last
         const aa = a.availability ?? -1;
         const ba = b.availability ?? -1;
-        return ba - aa;
+        return dir * (aa - ba);
       });
-  }, [enrichedFields, categoryFilter, elementTypeFilter, availThreshold, searchQuery, sortKey, lookupsByField]);
+  }, [enrichedFields, categoryFilter, elementTypeFilter, availThreshold, searchQuery, sortKey, sortAsc, lookupsByField]);
 
   // Resource-level counts for sidebar
   const resourceCounts = useMemo(() => {
@@ -471,19 +482,7 @@ export const ServerExplorer = ({
 
   return (
     <div className="space-y-3">
-      {/* Row 1: Data set filter (All/RESO/Local/IDX) */}
-      <div className="flex items-center gap-1.5">
-        {(['all', 'reso', 'local', 'payload'] as const).map((f) => (
-          <FilterPill
-            key={f}
-            label={categoryLabel[f]}
-            active={categoryFilter === f}
-            onClick={() => setCategoryFilter(f)}
-          />
-        ))}
-      </div>
-
-      {/* Row 2: Resource chooser */}
+      {/* Row 1: Resource chooser + data set filter */}
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Resource</span>
@@ -502,6 +501,16 @@ export const ServerExplorer = ({
               </option>
             ))}
           </select>
+        </div>
+        <div className="flex items-center gap-1.5 ml-auto">
+          {(['all', 'reso', 'local', 'payload'] as const).map((f) => (
+            <FilterPill
+              key={f}
+              label={categoryLabel[f]}
+              active={categoryFilter === f}
+              onClick={() => setCategoryFilter(f)}
+            />
+          ))}
         </div>
       </div>
 
@@ -548,15 +557,20 @@ export const ServerExplorer = ({
                     <button
                       key={k}
                       type="button"
-                      onClick={() => setSortKey(k)}
+                      onClick={() => handleSort(k)}
                       title={k === 'availability' ? 'Median fill factor – how often this field has data across all sampled records' : undefined}
-                      className={`px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer ${
+                      className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer ${
                         sortKey === k
                           ? 'bg-blue-600 text-white font-medium'
                           : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                       } ${k === 'availability' ? 'border-b border-dashed border-gray-400 dark:border-gray-500' : ''}`}
                     >
                       {k === 'availability' ? 'avail' : k}
+                      {sortKey === k && (
+                        <svg className={`w-2.5 h-2.5 ${sortAsc ? '' : 'rotate-180'}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M10 17a.75.75 0 01-.75-.75V5.612L5.29 9.77a.75.75 0 01-1.08-1.04l5.25-5.5a.75.75 0 011.08 0l5.25 5.5a.75.75 0 11-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0110 17z" clipRule="evenodd" />
+                        </svg>
+                      )}
                     </button>
                   ))}
                 </div>
