@@ -499,10 +499,10 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
                       {provAvail && (
                         <span className="ml-auto flex items-center gap-3 text-[10px]">
                           <span className="text-green-600 dark:text-green-400">
-                            <span className="font-semibold tabular-nums">{Math.round(provAvail.fields.total.gtZero)}</span> fields with data
+                            <span className="font-semibold tabular-nums">{Math.round(provAvail.fields.total.gtZero).toLocaleString()}</span> fields with data
                           </span>
                           <span className="text-green-600 dark:text-green-400">
-                            <span className="font-semibold tabular-nums">{Math.round(provAvail.lookups.total.gtZero)}</span> lookups with data
+                            <span className="font-semibold tabular-nums">{Math.round(provAvail.lookups.total.gtZero).toLocaleString()}</span> lookups with data
                           </span>
                         </span>
                       )}

@@ -33,9 +33,11 @@ type CategoryFilter = 'all' | 'reso' | 'local' | 'payload';
 
 const ENUM_NS = 'org.reso.metadata.enums.';
 
-/** Build a dd.reso.org wiki URL for a field. */
-const fieldWikiUrl = (version: string, fieldName: string): string =>
-  `https://dd.reso.org/DD${version}/${encodeURIComponent(fieldName)}`;
+/** Build a dd.reso.org wiki URL for a field or lookup field. */
+const fieldWikiUrl = (version: string, fieldName: string, lookupName?: string | null): string =>
+  lookupName
+    ? `https://dd.reso.org/DD${version}/lookups/${encodeURIComponent(lookupName)}`
+    : `https://dd.reso.org/DD${version}/${encodeURIComponent(fieldName)}`;
 
 /** Build a dd.reso.org wiki URL for a lookup value. */
 const lookupWikiUrl = (version: string, lookupName: string, lookupValue: string): string =>
@@ -134,7 +136,11 @@ const FieldDetailPanel = ({
           </div>
           {field.frequency !== null && (
             <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
-              {field.frequency.toLocaleString()} records
+              {field.frequency.toLocaleString()}
+              {field.availability !== null && field.availability > 0 && (
+                <> of {Math.round(field.frequency / field.availability).toLocaleString()}</>
+              )}
+              {' '}records
             </span>
           )}
         </div>
@@ -222,7 +228,7 @@ const FieldDetailPanel = ({
           )}
           <div className="col-span-2 sm:col-span-3">
             <a
-              href={fieldWikiUrl(version, field.fieldName)}
+              href={fieldWikiUrl(version, field.fieldName, field.lookupName)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
@@ -309,7 +315,8 @@ export const ServerExplorer = ({
   }, [initialResource]);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [searchQuery, setSearchQuery] = useState('');
-  const [minAvailability, setMinAvailability] = useState(0);
+  // Availability threshold stops: 0 = no data, 1 = any data (default), 25/50/75/100
+  const [availThreshold, setAvailThreshold] = useState(1);
 
   // Build availability lookup maps
   const fieldAvailMap = useMemo(() => {
@@ -372,9 +379,14 @@ export const ServerExplorer = ({
         if (categoryFilter === 'payload' && !f.payloads.some((p) => p && p !== '')) return false;
 
         // Availability threshold
-        if (minAvailability > 0) {
+        if (availThreshold === 0) {
+          // Show only fields with no data
+          if (f.availability !== null && f.availability > 0) return false;
+        } else {
+          // Show fields above the threshold
           const pct = f.availability !== null ? f.availability * 100 : 0;
-          if (pct < minAvailability) return false;
+          if (availThreshold === 1 && pct <= 0) return false;
+          if (availThreshold > 1 && pct < availThreshold) return false;
         }
 
         // Search — fields and lookup values
@@ -394,7 +406,7 @@ export const ServerExplorer = ({
         const ba = b.availability ?? -1;
         return ba - aa;
       });
-  }, [enrichedFields, categoryFilter, minAvailability, searchQuery, sortKey, lookupsByField]);
+  }, [enrichedFields, categoryFilter, availThreshold, searchQuery, sortKey, lookupsByField]);
 
   // Resource-level counts for sidebar
   const resourceCounts = useMemo(() => {
@@ -433,42 +445,53 @@ export const ServerExplorer = ({
         </div>
       </div>
 
-      {/* Availability threshold slider */}
-      <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-        <span className="shrink-0">Availability Threshold</span>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={minAvailability}
-          onChange={(e) => setMinAvailability(Number(e.target.value))}
-          className="flex-1 max-w-xs accent-blue-600"
-        />
-        <span className="font-semibold tabular-nums text-gray-900 dark:text-gray-100 w-12 text-right">
-          Above {minAvailability}%
-        </span>
+      {/* Resource chooser + availability threshold */}
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Resource</span>
+          <select
+            value={selectedResource ?? ''}
+            onChange={(e) => {
+              setSelectedResource(e.target.value || null);
+              setExpandedField(null);
+            }}
+            className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+          >
+            <option value="">Select a resource…</option>
+            {resourceNames.map((name) => (
+              <option key={name} value={name}>
+                {name} ({resourceCounts.get(name) ?? 0})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-sm">
+          <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Availability</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={availThreshold}
+            onChange={(e) => setAvailThreshold(Number(e.target.value))}
+            className="flex-1 accent-blue-600"
+            list="avail-ticks"
+          />
+          <datalist id="avail-ticks">
+            <option value="0" />
+            <option value="25" />
+            <option value="50" />
+            <option value="75" />
+            <option value="100" />
+          </datalist>
+          <span className="text-xs font-semibold tabular-nums text-gray-900 dark:text-gray-100 w-20 text-right shrink-0">
+            {availThreshold === 0 ? 'No Data' : availThreshold === 1 ? 'Above 0%' : `Above ${availThreshold}%`}
+          </span>
+        </div>
       </div>
 
-      {/* Two-column layout: resources + fields */}
-      <div className="flex gap-4">
-        {/* Resource sidebar */}
-        <div className="w-48 shrink-0 space-y-1">
-          {resourceNames.map((name) => (
-            <ResourceButton
-              key={name}
-              name={name}
-              count={resourceCounts.get(name) ?? 0}
-              active={selectedResource === name}
-              onClick={() => {
-                setSelectedResource(name);
-                setExpandedField(null);
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Field list */}
-        <div className="flex-1 min-w-0">
+      {/* Field list — full width */}
+      <div>
           {!selectedResource ? (
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center text-sm text-gray-500 dark:text-gray-400">
               Select a resource to browse fields
@@ -549,7 +572,6 @@ export const ServerExplorer = ({
               </div>
             </div>
           )}
-        </div>
       </div>
     </div>
   );
