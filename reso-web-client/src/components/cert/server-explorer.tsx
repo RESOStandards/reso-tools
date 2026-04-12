@@ -53,7 +53,10 @@ const resourceWikiUrl = (version: string, resourceName: string): string =>
 
 /** Derive a friendly DD type from the OData type string. */
 const friendlyType = (odataType: string, isCollection: boolean): string => {
-  if (isEnumType(odataType)) return isCollection ? 'String List, Multi' : 'String List, Single';
+  if (isEnumType(odataType)) {
+    const lastDot = odataType.lastIndexOf('.');
+    return lastDot >= 0 ? odataType.slice(lastDot + 1) : odataType;
+  }
   const simple: Readonly<Record<string, string>> = {
     'Edm.String': 'String',
     'Edm.Boolean': 'Boolean',
