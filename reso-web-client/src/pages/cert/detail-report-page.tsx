@@ -300,7 +300,7 @@ export const DetailReportPage = () => {
               <StatusPill status={report.status as EndorsementStatus} />
               {expiring && (
                 <span
-                  className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 cursor-help"
+                  className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border-b border-dashed border-amber-400 dark:border-amber-500 cursor-help"
                   title="RESO endorsements are valid for two years from the date of certification. Endorsements older than two years will transition to Legacy status and will need to be renewed to remain current. This update is part of RESO's versioning policy, which helps ensure that certified implementations reflect the latest standards."
                 >
                   Expiring Soon
