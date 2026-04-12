@@ -147,7 +147,7 @@ const FieldDetailPanel = ({
             key={tab.key}
             type="button"
             onClick={() => setActiveTab(tab.key)}
-            className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors ${
+            className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
               activeTab === tab.key
                 ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
@@ -490,7 +490,7 @@ export const ServerExplorer = ({
                       key={k}
                       type="button"
                       onClick={() => setSortKey(k)}
-                      className={`px-2 py-0.5 rounded text-xs transition-colors ${
+                      className={`px-2 py-0.5 rounded text-xs transition-colors cursor-pointer ${
                         sortKey === k
                           ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium'
                           : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'

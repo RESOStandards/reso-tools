@@ -290,7 +290,7 @@ const ResourceCard = ({
   <button
     type="button"
     onClick={onClick}
-    className="text-left p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-all">
+    className="text-left p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-all cursor-pointer">
     <div className="font-semibold text-gray-900 dark:text-gray-100">{name}</div>
     <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono truncate">{entityType}</div>
     <div className="flex gap-2 mt-2">
@@ -573,7 +573,7 @@ export const MetadataPage = () => {
                   key={filter}
                   type="button"
                   onClick={() => setTypeFilter(filter)}
-                  className={`px-2 py-1 rounded text-xs transition-colors ${
+                  className={`px-2 py-1 rounded text-xs transition-colors cursor-pointer ${
                     typeFilter === filter
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'

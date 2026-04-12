@@ -40,7 +40,7 @@ export const FilterPill = ({
   <button
     type="button"
     onClick={onClick}
-    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
       active
         ? 'bg-blue-600 text-white'
         : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
@@ -151,7 +151,7 @@ export const ResourceButton = ({
   <button
     type="button"
     onClick={onClick}
-    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
       active
         ? 'bg-blue-600 text-white'
         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
