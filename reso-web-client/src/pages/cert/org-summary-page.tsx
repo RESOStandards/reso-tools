@@ -400,14 +400,9 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: 
         </h2>
         <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-5">
           <AboutCell label="Type" value={org.OrganizationType} />
-          <AboutCell
-            label="Members"
-            value={
-              org.OrganizationMemberCount != null
-                ? org.OrganizationMemberCount.toLocaleString()
-                : '—'
-            }
-          />
+          {/* Member count removed — cert API value is stale for some orgs
+              (reso-certification#2540). Available on the Organizations page
+              via the services.reso.org feed which is authoritative. */}
           <AboutCell
             label="Address"
             value={fullAddress || '—'}
@@ -982,21 +977,33 @@ const BelowIndustryPill = () => (
   </span>
 );
 
-const CopyableUoi = ({ uoi }: { readonly uoi: string }) => (
-  <button
-    type="button"
-    onClick={() => {
-      void navigator.clipboard.writeText(uoi);
-    }}
-    title={`Copy ${uoi}`}
-    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded font-mono text-[11px] uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-  >
-    {uoi}
-    <svg className="w-3 h-3 opacity-60" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-      <path d="M7 3a1 1 0 011-1h7a1 1 0 011 1v10a1 1 0 01-1 1h-2v2a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h2V3zm2 4h4v6H9V7z" />
-    </svg>
-  </button>
-);
+const CopyableUoi = ({ uoi }: { readonly uoi: string }) => {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard.writeText(uoi).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        });
+      }}
+      title={copied ? 'Copied!' : `Copy ${uoi}`}
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded font-mono text-[11px] uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+    >
+      {uoi}
+      {copied ? (
+        <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+      ) : (
+        <svg className="w-3 h-3 opacity-60" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path d="M7 3a1 1 0 011-1h7a1 1 0 011 1v10a1 1 0 01-1 1h-2v2a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h2V3zm2 4h4v6H9V7z" />
+        </svg>
+      )}
+    </button>
+  );
+};
 
 const AboutCell = ({
   label,
