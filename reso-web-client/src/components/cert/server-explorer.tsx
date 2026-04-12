@@ -11,7 +11,7 @@
  *   - DataAvailabilityReport.lookupValues[] — per-lookup availability
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type {
   DDDetailField,
   DDDetailReport,
@@ -280,16 +280,33 @@ const FieldDetailPanel = ({
 
 // ── Main Component ──────────────────────────────────────────────────
 
+export type { CategoryFilter };
+
 export const ServerExplorer = ({
   detail,
   availability,
+  initialCategory,
+  initialResource,
 }: {
   readonly detail: DDDetailReport;
   readonly availability: DataAvailabilityReport | null;
+  readonly initialCategory?: CategoryFilter;
+  readonly initialResource?: string | null;
 }) => {
-  const [selectedResource, setSelectedResource] = useState<string | null>(null);
+  const [selectedResource, setSelectedResource] = useState<string | null>(initialResource ?? null);
   const [expandedField, setExpandedField] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>(initialCategory ?? 'all');
+
+  // Respond to external navigation (e.g., clicking counts on analytics view)
+  useEffect(() => {
+    if (initialCategory) setCategoryFilter(initialCategory);
+  }, [initialCategory]);
+  useEffect(() => {
+    if (initialResource !== undefined) {
+      setSelectedResource(initialResource);
+      setExpandedField(null);
+    }
+  }, [initialResource]);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [searchQuery, setSearchQuery] = useState('');
   const [minAvailability, setMinAvailability] = useState(0);

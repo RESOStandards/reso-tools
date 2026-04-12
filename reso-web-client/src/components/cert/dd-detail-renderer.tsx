@@ -17,7 +17,7 @@ import type {
 import { useDAMarketAverage } from '../../hooks/use-da-market-average.js';
 import { useDDDetailReport } from '../../hooks/use-dd-detail-report.js';
 import { useDataAvailability } from '../../hooks/use-data-availability.js';
-import { ServerExplorer } from './server-explorer.js';
+import { ServerExplorer, type CategoryFilter as ExplorerCategory } from './server-explorer.js';
 import { FilterPill } from '../metadata/shared.js';
 
 type FieldFilter = 'all' | 'reso' | 'idx' | 'local';
@@ -298,6 +298,15 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
   const [expandedResource, setExpandedResource] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<FieldFilter>('all');
   const [activeView, setActiveView] = useState<DetailView>('analytics');
+  const [explorerCategory, setExplorerCategory] = useState<ExplorerCategory>('all');
+  const [explorerResource, setExplorerResource] = useState<string | null>(null);
+
+  /** Navigate to the Server Explorer with a specific filter and optional resource. */
+  const openExplorer = (category: ExplorerCategory, resource?: string) => {
+    setExplorerCategory(category);
+    setExplorerResource(resource ?? null);
+    setActiveView('explorer');
+  };
 
   const advertised = report.advertised;
   const resources = advertised ? Object.keys(advertised).sort() : [];
@@ -369,17 +378,25 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className={TILE}>
           <p className={TILE_LABEL}>Resources</p>
-          <p className={TILE_VALUE}>{resources.length}</p>
+          <button type="button" onClick={() => openExplorer('all')} className={`${TILE_VALUE} hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer`}>{resources.length}</button>
         </div>
         <div className={TILE}>
           <p className={TILE_LABEL}>Fields</p>
-          <p className={TILE_VALUE}>{totals.fields.toLocaleString()}</p>
-          <p className={TILE_SUB}>{totals.resoFields.toLocaleString()} RESO · {totals.localFields.toLocaleString()} local</p>
+          <button type="button" onClick={() => openExplorer('all')} className={`${TILE_VALUE} hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer`}>{totals.fields.toLocaleString()}</button>
+          <p className={TILE_SUB}>
+            <button type="button" onClick={() => openExplorer('reso')} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer">{totals.resoFields.toLocaleString()} RESO</button>
+            {' · '}
+            <button type="button" onClick={() => openExplorer('local')} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer">{totals.localFields.toLocaleString()} local</button>
+          </p>
         </div>
         <div className={TILE}>
           <p className={TILE_LABEL}>Lookups</p>
-          <p className={TILE_VALUE}>{totals.lookups.toLocaleString()}</p>
-          <p className={TILE_SUB}>{totals.resoLookups.toLocaleString()} RESO · {(totals.lookups - totals.resoLookups).toLocaleString()} local</p>
+          <button type="button" onClick={() => openExplorer('all')} className={`${TILE_VALUE} hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer`}>{totals.lookups.toLocaleString()}</button>
+          <p className={TILE_SUB}>
+            <button type="button" onClick={() => openExplorer('reso')} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer">{totals.resoLookups.toLocaleString()} RESO</button>
+            {' · '}
+            <button type="button" onClick={() => openExplorer('local')} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer">{(totals.lookups - totals.resoLookups).toLocaleString()} local</button>
+          </p>
         </div>
         <div className={TILE}>
           <p className={TILE_LABEL}>Standardization</p>
@@ -500,6 +517,16 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
                         providerAvail={provAvail}
                         industryAvail={indAvail}
                       />
+                      <button
+                        type="button"
+                        onClick={() => openExplorer('all', name)}
+                        className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors cursor-pointer"
+                      >
+                        Browse in Server Explorer
+                        <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638l-3.96-4.158a.75.75 0 011.08-1.04l5.25 5.5a.75.75 0 010 1.04l-5.25 5.5a.75.75 0 11-1.08-1.04l3.96-4.158H3.75A.75.75 0 013 10z" clipRule="evenodd" />
+                        </svg>
+                      </button>
                     </div>
                   )}
                 </div>
@@ -515,6 +542,8 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
           <ServerExplorer
             detail={ddDetail}
             availability={dataAvail}
+            initialCategory={explorerCategory}
+            initialResource={explorerResource}
           />
         ) : (ddDetailLoading || daAvailLoading) ? (
           <div className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">
