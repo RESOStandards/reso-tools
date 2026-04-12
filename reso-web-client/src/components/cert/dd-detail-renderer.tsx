@@ -306,9 +306,10 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
     setExplorerCategory(category);
     setExplorerResource(resource ?? null);
     setActiveView('explorer');
-    // Scroll to the top so the explorer is visible
+    // Scroll the page's scroll container to the top
     requestAnimationFrame(() => {
-      document.getElementById('dd-detail-top')?.scrollIntoView({ behavior: 'smooth' });
+      const scrollContainer = document.getElementById('dd-detail-top')?.closest('.overflow-y-auto');
+      if (scrollContainer) scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
     });
   };
 
