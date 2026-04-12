@@ -51,13 +51,16 @@ const lookupWikiUrl = (version: string, lookupName: string, lookupValue: string)
 const resourceWikiUrl = (version: string, resourceName: string): string =>
   `https://dd.reso.org/DD${version}/${encodeURIComponent(resourceName)}`;
 
-/** Derive a friendly DD type from the OData type string. */
-const friendlyType = (odataType: string, isCollection: boolean): string => {
+/** Normalize an OData type name by stripping namespace prefixes.
+ *  e.g., "org.reso.metadata.enums.Appliances" → "Appliances",
+ *  "PropertyEnums.AccessibilityFeatures" → "AccessibilityFeatures",
+ *  "Edm.String" → "String", "Edm.DateTimeOffset" → "Timestamp". */
+const normalizeTypeName = (odataType: string): string => {
   if (isEnumType(odataType)) {
     const lastDot = odataType.lastIndexOf('.');
     return lastDot >= 0 ? odataType.slice(lastDot + 1) : odataType;
   }
-  const simple: Readonly<Record<string, string>> = {
+  const shortNames: Readonly<Record<string, string>> = {
     'Edm.String': 'String',
     'Edm.Boolean': 'Boolean',
     'Edm.Decimal': 'Decimal',
@@ -68,7 +71,7 @@ const friendlyType = (odataType: string, isCollection: boolean): string => {
     'Edm.Date': 'Date',
     'Edm.DateTimeOffset': 'Timestamp',
   };
-  return simple[odataType] ?? odataType;
+  return shortNames[odataType] ?? odataType;
 };
 
 /** Extract lookup name from enum type: org.reso.metadata.enums.Appliances → Appliances,
@@ -222,7 +225,7 @@ const FieldDetailPanel = ({
           <div>
             <span className="text-xs text-gray-500 dark:text-gray-400 block">Type</span>
             <span className="font-medium text-gray-800 dark:text-gray-200">
-              {friendlyType(field.type, isCollection)}
+              {normalizeTypeName(field.type, isCollection)}
             </span>
           </div>
           <div>
@@ -638,7 +641,7 @@ export const ServerExplorer = ({
                         badges={
                           <>
                             <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 w-32 truncate text-right">
-                              {friendlyType(f.type, f.isEnum)}
+                              {normalizeTypeName(f.type, f.isEnum)}
                             </span>
                             {f.standardRESO ? (
                               <Badge label="RESO" color="green" />
