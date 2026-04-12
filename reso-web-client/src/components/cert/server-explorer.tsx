@@ -217,7 +217,7 @@ const FieldDetailPanel = ({
           <div>
             <span className="text-xs text-gray-500 dark:text-gray-400 block">Payloads</span>
             <span className="font-medium text-gray-800 dark:text-gray-200">
-              {field.payloads.filter(Boolean).join(', ') || '—'}
+              {(field.payloads ?? []).filter(Boolean).join(', ') || '—'}
             </span>
           </div>
           {field.lookupName && (
@@ -300,6 +300,15 @@ export const ServerExplorer = ({
   readonly initialResource?: string | null;
 }) => {
   const [selectedResource, setSelectedResource] = useState<string | null>(initialResource ?? null);
+
+  // Auto-select Property (or first resource) when resource list loads
+  useEffect(() => {
+    if (selectedResource) return;
+    const names = Object.keys(detail.fields.reduce<Record<string, boolean>>((acc, f) => { acc[f.resourceName] = true; return acc; }, {})).sort();
+    if (names.length > 0) {
+      setSelectedResource(names.includes('Property') ? 'Property' : names[0]);
+    }
+  }, [detail.fields, selectedResource]);
   const [expandedField, setExpandedField] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>(initialCategory ?? 'all');
 
@@ -361,6 +370,8 @@ export const ServerExplorer = ({
         const isEnum = f.type.startsWith(ENUM_NS);
         return {
           ...f,
+          payloads: f.payloads ?? [],
+          annotations: f.annotations ?? [],
           availability: avail?.availability ?? null,
           frequency: avail?.frequency ?? null,
           lookupName: extractLookupName(f.type),
@@ -377,7 +388,7 @@ export const ServerExplorer = ({
         // Category filter
         if (categoryFilter === 'reso' && !f.standardRESO) return false;
         if (categoryFilter === 'local' && f.standardRESO) return false;
-        if (categoryFilter === 'payload' && !f.payloads.some((p) => p && p !== '')) return false;
+        if (categoryFilter === 'payload' && !(f.payloads ?? []).some((p) => p && p !== '')) return false;
 
         // Availability threshold
         if (availThreshold === 0) {
@@ -480,21 +491,38 @@ export const ServerExplorer = ({
                     {stop.label}
                   </button>
                 ))}
-                {customAvailEditing || isCustom ? (
+                {customAvailEditing ? (
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    defaultValue={isCustom ? String(availThreshold) : ''}
+                    autoFocus
+                    placeholder="%"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const v = Number((e.target as HTMLInputElement).value);
+                        if (v >= 0 && v <= 100) { setAvailThreshold(v); setCustomAvailEditing(false); }
+                      } else if (e.key === 'Escape') {
+                        setCustomAvailEditing(false);
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const v = Number(e.target.value);
+                      if (e.target.value && v >= 0 && v <= 100) { setAvailThreshold(v); }
+                      setCustomAvailEditing(false);
+                    }}
+                    className="w-10 px-1 py-0.5 text-[11px] text-center rounded border border-blue-400 dark:border-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 tabular-nums focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                ) : isCustom ? (
                   <span className="inline-flex items-center gap-0.5">
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={availThreshold}
-                      autoFocus
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        if (v >= 0 && v <= 100) setAvailThreshold(v);
-                      }}
-                      onBlur={() => { if (!isCustom) setCustomAvailEditing(false); }}
-                      className="w-12 px-1.5 py-0.5 text-[11px] text-center rounded border border-blue-400 dark:border-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 tabular-nums focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setCustomAvailEditing(true)}
+                      className="px-2 py-0.5 rounded text-[11px] font-medium bg-blue-600 text-white cursor-pointer"
+                    >
+                      {availThreshold}%
+                    </button>
                     <button
                       type="button"
                       title="Clear custom value"
