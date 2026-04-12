@@ -20,7 +20,7 @@ import { useDataAvailability } from '../../hooks/use-data-availability.js';
 import { ServerExplorer, type CategoryFilter as ExplorerCategory } from './server-explorer.js';
 import { PerformanceReport } from './performance-report.js';
 import { usePerformanceMetrics } from '../../hooks/use-performance-metrics.js';
-import { FilterPill } from '../metadata/shared.js';
+import { AvailabilityThresholdPills, FilterPill } from '../metadata/shared.js';
 
 type FieldFilter = 'all' | 'reso' | 'idx' | 'local';
 
@@ -302,6 +302,8 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
   const [activeView, setActiveView] = useState<DetailView>('analytics');
   const [explorerCategory, setExplorerCategory] = useState<ExplorerCategory>('all');
   const [explorerResource, setExplorerResource] = useState<string | null>(null);
+  const [explorerAvailThreshold, setExplorerAvailThreshold] = useState(1);
+  const [explorerCustomAvailEditing, setExplorerCustomAvailEditing] = useState(false);
 
   /** Navigate to the Server Explorer with a specific filter and optional resource. */
   const openExplorer = (category: ExplorerCategory, resource?: string) => {
@@ -424,8 +426,8 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
         </div>
       </div>
 
-      {/* View toggle */}
-      <div className="flex items-center gap-1">
+      {/* View toggle + availability (when explorer active) */}
+      <div className="flex items-center gap-1 flex-wrap">
         <FilterPill
           label="RESO Analytics"
           active={activeView === 'analytics'}
@@ -444,6 +446,16 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
           onClick={() => setActiveView('performance')}
           icon={<svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M12.577 4.878a.75.75 0 01.919-.53l4.78 1.281a.75.75 0 01.531.919l-1.281 4.78a.75.75 0 01-1.449-.388l.81-3.022a19.407 19.407 0 00-5.594 5.203.75.75 0 01-1.139.093L7 10.06l-4.72 4.72a.75.75 0 01-1.06-1.06l5.25-5.25a.75.75 0 011.06 0l3.074 3.073a20.923 20.923 0 015.545-4.931l-3.042.815a.75.75 0 01-.53-.919z" clipRule="evenodd" /></svg>}
         />
+        {activeView === 'explorer' && (
+          <div className="ml-auto">
+            <AvailabilityThresholdPills
+              value={explorerAvailThreshold}
+              onChange={setExplorerAvailThreshold}
+              customEditing={explorerCustomAvailEditing}
+              onCustomEditingChange={setExplorerCustomAvailEditing}
+            />
+          </div>
+        )}
       </div>
 
       {/* ── RESO Analytics view (kept mounted to preserve state) ── */}
@@ -562,6 +574,10 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
             availability={dataAvail}
             initialCategory={explorerCategory}
             initialResource={explorerResource}
+            availThreshold={explorerAvailThreshold}
+            onAvailThresholdChange={setExplorerAvailThreshold}
+            customAvailEditing={explorerCustomAvailEditing}
+            onCustomAvailEditingChange={setExplorerCustomAvailEditing}
           />
         ) : (ddDetailLoading || daAvailLoading) ? (
           <div className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">

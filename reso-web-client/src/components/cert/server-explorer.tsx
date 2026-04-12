@@ -21,6 +21,7 @@ import type {
 } from '../../api/cert-client.js';
 import {
   AvailBar,
+  AvailabilityThresholdPills,
   Badge,
   FieldRow,
   FilterPill,
@@ -310,11 +311,19 @@ export const ServerExplorer = ({
   availability,
   initialCategory,
   initialResource,
+  availThreshold,
+  onAvailThresholdChange,
+  customAvailEditing,
+  onCustomAvailEditingChange,
 }: {
   readonly detail: DDDetailReport;
   readonly availability: DataAvailabilityReport | null;
   readonly initialCategory?: CategoryFilter;
   readonly initialResource?: string | null;
+  readonly availThreshold: number;
+  readonly onAvailThresholdChange: (v: number) => void;
+  readonly customAvailEditing: boolean;
+  readonly onCustomAvailEditingChange: (editing: boolean) => void;
 }) => {
   const [selectedResource, setSelectedResource] = useState<string | null>(initialResource ?? null);
 
@@ -341,9 +350,9 @@ export const ServerExplorer = ({
   }, [initialResource]);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [searchQuery, setSearchQuery] = useState('');
-  // Availability threshold stops: 0 = no data, 1 = any data (default), 25/50/75/100
-  const [availThreshold, setAvailThreshold] = useState(1);
-  const [customAvailEditing, setCustomAvailEditing] = useState(false);
+  // Availability threshold is controlled by the parent (DD renderer)
+  const setAvailThreshold = onAvailThresholdChange;
+  const setCustomAvailEditing = onCustomAvailEditingChange;
   const [elementTypeFilter, setElementTypeFilter] = useState<ElementTypeFilter>('all');
 
   // Build availability lookup maps
@@ -474,7 +483,7 @@ export const ServerExplorer = ({
         ))}
       </div>
 
-      {/* Row 2: Resource chooser + availability threshold */}
+      {/* Row 2: Resource chooser */}
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Resource</span>
@@ -493,101 +502,6 @@ export const ServerExplorer = ({
               </option>
             ))}
           </select>
-        </div>
-        <div className="flex items-center gap-1 flex-wrap ml-auto">
-          <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0 mr-1">Availability</span>
-          {(() => {
-            const STOPS = [
-              { value: 0, label: '0%', title: 'Fields with no data' },
-              { value: 1, label: '> 0%', title: 'Fields with any data (default)' },
-              { value: 25, label: '≥ 25%', title: 'Fields present in at least 25% of records' },
-              { value: 50, label: '≥ 50%', title: 'Fields present in at least half of records' },
-              { value: 75, label: '≥ 75%', title: 'Fields present in most records' },
-              { value: 90, label: 'p90', title: '90th percentile – fields present in 90%+ of records', hint: true },
-              { value: 95, label: 'p95', title: '95th percentile – near-universal fields', hint: true },
-              { value: 99, label: 'p99', title: '99th percentile – effectively required fields', hint: true },
-              { value: 100, label: '100%', title: 'Fields present in every record' },
-            ] as const;
-            const isCustom = !STOPS.some((s) => s.value === availThreshold);
-
-            return (
-              <>
-                {STOPS.map((stop) => (
-                  <button
-                    key={stop.value}
-                    type="button"
-                    title={stop.title}
-                    onClick={() => { setAvailThreshold(stop.value); setCustomAvailEditing(false); }}
-                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-                      availThreshold === stop.value && !customAvailEditing
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                    } ${'hint' in stop && stop.hint ? 'border-b border-dashed border-gray-400 dark:border-gray-500' : ''}`}
-                  >
-                    {stop.label}
-                  </button>
-                ))}
-                {customAvailEditing ? (
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    defaultValue={isCustom ? String(availThreshold) : ''}
-                    autoFocus
-                    placeholder="%"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        const v = Math.min(100, Math.max(0, Math.round(Number((e.target as HTMLInputElement).value) || 0)));
-                        setAvailThreshold(v);
-                        setCustomAvailEditing(false);
-                      } else if (e.key === 'Escape') {
-                        setCustomAvailEditing(false);
-                      }
-                    }}
-                    onBlur={(e) => {
-                      if (e.target.value) {
-                        const v = Math.min(100, Math.max(0, Math.round(Number(e.target.value) || 0)));
-                        setAvailThreshold(v);
-                      }
-                      setCustomAvailEditing(false);
-                    }}
-                    className="w-10 px-1 py-0.5 text-[11px] text-center rounded border border-blue-400 dark:border-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 tabular-nums focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                ) : isCustom ? (
-                  <span className="inline-flex items-center gap-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setCustomAvailEditing(true)}
-                      className="px-2 py-0.5 rounded text-[11px] font-medium bg-blue-600 text-white cursor-pointer"
-                    >
-                      {availThreshold}%
-                    </button>
-                    <button
-                      type="button"
-                      title="Clear custom value"
-                      onClick={() => { setAvailThreshold(1); setCustomAvailEditing(false); }}
-                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
-                    >
-                      <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                      </svg>
-                    </button>
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    title="Enter a custom threshold"
-                    onClick={() => setCustomAvailEditing(true)}
-                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer p-0.5"
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
-                    </svg>
-                  </button>
-                )}
-              </>
-            );
-          })()}
         </div>
       </div>
 
