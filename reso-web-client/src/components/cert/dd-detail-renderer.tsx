@@ -306,6 +306,10 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
     setExplorerCategory(category);
     setExplorerResource(resource ?? null);
     setActiveView('explorer');
+    // Scroll to the top so the explorer is visible
+    requestAnimationFrame(() => {
+      document.getElementById('dd-detail-top')?.scrollIntoView({ behavior: 'smooth' });
+    });
   };
 
   const advertised = report.advertised;
@@ -373,7 +377,7 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
     setExpandedResource((prev) => (prev === name ? null : name));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" id="dd-detail-top">
       {/* Hero tiles */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className={TILE}>
