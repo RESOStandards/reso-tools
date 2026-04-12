@@ -18,6 +18,8 @@ import { useDAMarketAverage } from '../../hooks/use-da-market-average.js';
 import { useDDDetailReport } from '../../hooks/use-dd-detail-report.js';
 import { useDataAvailability } from '../../hooks/use-data-availability.js';
 import { ServerExplorer, type CategoryFilter as ExplorerCategory } from './server-explorer.js';
+import { PerformanceReport } from './performance-report.js';
+import { usePerformanceMetrics } from '../../hooks/use-performance-metrics.js';
 import { FilterPill } from '../metadata/shared.js';
 
 type FieldFilter = 'all' | 'reso' | 'idx' | 'local';
@@ -292,7 +294,7 @@ const ChevronDown = ({ expanded }: { readonly expanded: boolean }) => (
 
 // ── Main renderer ───────────────────────────────────────────────────
 
-type DetailView = 'analytics' | 'explorer';
+type DetailView = 'analytics' | 'explorer' | 'performance';
 
 export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummary }) => {
   const [expandedResource, setExpandedResource] = useState<string | null>(null);
@@ -329,6 +331,7 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
     report.providerUsi
   );
   const { data: dataAvail, isLoading: daAvailLoading } = useDataAvailability(report.id);
+  const { data: perfData, isLoading: perfLoading } = usePerformanceMetrics(report.id);
 
   const providerResources = daData?.availabilityReports?.[0]?.availability?.resourcesBinary;
   const industryResources = daData?.marketAverage?.resourcesBinary;
@@ -421,7 +424,7 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
         </div>
       </div>
 
-      {/* View toggle: RESO Analytics / Server Explorer */}
+      {/* View toggle */}
       <div className="flex items-center gap-1">
         <FilterPill
           label="RESO Analytics"
@@ -432,6 +435,11 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
           label="Server Explorer"
           active={activeView === 'explorer'}
           onClick={() => setActiveView('explorer')}
+        />
+        <FilterPill
+          label="Performance"
+          active={activeView === 'performance'}
+          onClick={() => setActiveView('performance')}
         />
       </div>
 
@@ -559,6 +567,21 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
         ) : (
           <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center text-sm text-gray-500 dark:text-gray-400">
             Server metadata not available for this report
+          </div>
+        )}
+      </div>
+
+      {/* ── Performance view (kept mounted to preserve state) ──── */}
+      <div className={activeView !== 'performance' ? 'hidden' : undefined}>
+        {perfData ? (
+          <PerformanceReport data={perfData} />
+        ) : perfLoading ? (
+          <div className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">
+            Loading performance data…
+          </div>
+        ) : (
+          <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            Performance data not available for this report
           </div>
         )}
       </div>

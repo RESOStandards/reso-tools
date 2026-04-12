@@ -759,3 +759,78 @@ export const fetchDataAvailability = async (
   daCache.set(reportId, data);
   return data;
 };
+
+// ── Performance Metrics ─────────────────────────────────────────────
+//
+// GET /payload/performance/provider-metrics/:reportId
+// Returns per-resource performance stats with provider vs. industry comparison.
+
+/** Per-resource performance stats from the sampling run. */
+export interface ResourcePerformanceStats {
+  readonly averageResponseTimeMs: number;
+  readonly averageResponseTimeMillis: number;
+  readonly medianResponseTimeMs: number;
+  readonly averageResponseBytes: number;
+  readonly medianResponseBytes: number;
+  readonly stdDevResponseTimeMs: number;
+  readonly stdDevResponseBytes: number;
+  readonly bandwidth: number;
+  readonly numSamples: number;
+  readonly numRecordsFetched: number;
+  readonly numUniqueRecordsFetched: number;
+  readonly recordCount: number;
+  readonly pageSize: number;
+  readonly dateField: string;
+  readonly dateLow: string;
+  readonly dateHigh: string;
+  readonly postalCodes: ReadonlyArray<string>;
+  readonly expansions?: Readonly<Record<string, ResourcePerformanceStats>>;
+}
+
+/** Full performance report from the provider-metrics endpoint. */
+export interface PerformanceMetricsReport {
+  readonly reportId: string;
+  readonly performanceReport: {
+    readonly reportId: string;
+    readonly type: string;
+    readonly version: string;
+    readonly description: string;
+    readonly generatedOn: string;
+    readonly recipientUoi: string;
+    readonly providerUoi: string;
+    readonly providerUsi: string;
+    readonly optInStatus: string;
+    readonly opted_in: boolean;
+    readonly averageResponseTimeMillis: number;
+    readonly averageBandwidth: number;
+    readonly averageResponseBytes: number;
+    readonly [resourceName: string]: unknown;
+  };
+  readonly marketAverage: {
+    readonly averageResponseTimeMillis: number;
+    readonly averageBandwidth: number;
+    readonly averageResponseBytes: number;
+  };
+}
+
+const perfCache = new Map<string, PerformanceMetricsReport>();
+
+export const fetchPerformanceMetrics = async (
+  reportId: string
+): Promise<PerformanceMetricsReport> => {
+  const cached = perfCache.get(reportId);
+  if (cached) return cached;
+
+  const res = await fetch(
+    proxiedCertUrl(`/payload/performance/provider-metrics/${encodeURIComponent(reportId)}`),
+    { headers: { Accept: 'application/json' } }
+  );
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch performance metrics (HTTP ${res.status})`);
+  }
+
+  const data = (await res.json()) as PerformanceMetricsReport;
+  perfCache.set(reportId, data);
+  return data;
+};
