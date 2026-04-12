@@ -56,6 +56,14 @@ const formatNumber = (n: number | undefined): string =>
 
 const isDD = (e: Endorsement): boolean => e.type === 'data_dictionary';
 
+const TWO_YEARS_MS = 2 * 365.25 * 86_400_000;
+
+/** Returns true if the endorsement date is older than two years. */
+const isExpiringSoon = (iso: string): boolean => {
+  const then = new Date(iso).getTime();
+  return !Number.isNaN(then) && Date.now() - then > TWO_YEARS_MS;
+};
+
 export const EndorsementSubRow = ({
   endorsement,
   onSelect
@@ -130,6 +138,14 @@ export const EndorsementSubRow = ({
               title="Run from a local CLI runner"
             >
               Local
+            </span>
+          )}
+          {isExpiringSoon(statusTimestamp) && status === 'certified' && (
+            <span
+              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 cursor-help"
+              title="RESO endorsements are valid for two years from the date of certification. Endorsements older than two years will transition to Legacy status and will need to be renewed to remain current. This update is part of RESO's versioning policy, which helps ensure that certified implementations reflect the latest standards."
+            >
+              Expiring Soon
             </span>
           )}
         </div>

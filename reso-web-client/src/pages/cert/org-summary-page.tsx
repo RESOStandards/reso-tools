@@ -243,7 +243,7 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: 
   return (
     <>
       {/* Breadcrumbs */}
-      <nav className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-2" aria-label="Breadcrumb">
+      <nav className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-1" aria-label="Breadcrumb">
         <NavLink to="/cert" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Certification</NavLink>
         <svg className="w-3 h-3 text-gray-400 dark:text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 010-1.06l3.71-3.71-3.71-3.71a.75.75 0 111.06-1.06l4.24 4.24a.75.75 0 010 1.06l-4.24 4.24a.75.75 0 01-1.06 0z" clipRule="evenodd" />
@@ -333,7 +333,7 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: 
       {/* Active DD report context — shows which DD report is
           driving the coverage and performance sections below. */}
       {activeDdSummary && (
-        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           Showing coverage from{' '}
           <span className="font-medium text-gray-700 dark:text-gray-300">
             Data Dictionary {activeDdSummary.version}
@@ -484,7 +484,7 @@ const CoverageSectionView = ({
   readonly coverage: CoverageReport | null;
   readonly isLoading?: boolean;
 }) => (
-  <section className="mt-6">
+  <section className="mt-4">
     <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
       <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
         Coverage
@@ -495,15 +495,15 @@ const CoverageSectionView = ({
         </p>
       )}
     </div>
-    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+    <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
       How much of the standard data dictionary is actually populated in this
       provider's payloads, compared to the industry average. Higher means more
       fields and enumerations carry data that consumers can rely on.
     </p>
 
     {isLoading && !coverage ? (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {[1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-5 animate-pulse">
             <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-4" />
             <div className="h-10 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-3" />
@@ -513,7 +513,7 @@ const CoverageSectionView = ({
       </div>
     ) : coverage ? (
       <>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
           {coverage.fieldCuts.map((c) => (
             <FieldCutTile key={c.key} cut={c} />
           ))}

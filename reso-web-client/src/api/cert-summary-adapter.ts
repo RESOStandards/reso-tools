@@ -75,31 +75,44 @@ export const summaryToCoverageReport = (
   const avgIdxFields = marketAvg ? Math.round(marketAvg.fields.idx) : 0;
   const avgAllLookups = marketAvg ? Math.round(marketAvg.lookups.total) : 0;
 
+  // Standardization rate: what % of this provider's fields are RESO standard
+  const stdRate = allFields > 0 ? pct(resoFields, allFields) : 0;
+  const avgStdRate = avgAllFields > 0 ? pct(avgResoFields, avgAllFields) : 0;
+
   const fieldCuts: ReadonlyArray<FieldCut> = [
     {
       key: 'all',
       label: 'All Fields Advertised',
       providerCount: allFields,
-      totalCount: allFields,
-      providerPercent: 100,
-      industryPercent: avgAllFields > 0 ? pct(avgAllFields, avgAllFields) : 0,
+      totalCount: avgAllFields || allFields,
+      providerPercent: avgAllFields > 0 ? pct(allFields, avgAllFields) : 100,
+      industryPercent: 100,
     },
     {
       key: 'reso-fields',
       label: 'RESO Standard Fields',
       providerCount: resoFields,
-      totalCount: allFields,
-      providerPercent: pct(resoFields, allFields),
-      industryPercent: avgAllFields > 0 ? pct(avgResoFields, avgAllFields) : 0,
+      totalCount: avgResoFields || resoFields,
+      providerPercent: avgResoFields > 0 ? pct(resoFields, avgResoFields) : 100,
+      industryPercent: 100,
       motivational: true,
     },
     {
       key: 'reso-enums',
       label: 'RESO Enumerations',
       providerCount: resoLookups,
-      totalCount: allLookups,
-      providerPercent: pct(resoLookups, allLookups),
-      industryPercent: avgAllLookups > 0 ? pct(avgResoLookups, avgAllLookups) : 0,
+      totalCount: avgResoLookups || resoLookups,
+      providerPercent: avgResoLookups > 0 ? pct(resoLookups, avgResoLookups) : 100,
+      industryPercent: 100,
+      motivational: true,
+    },
+    {
+      key: 'standardization',
+      label: 'Standardization Rate',
+      providerCount: resoFields,
+      totalCount: allFields,
+      providerPercent: stdRate,
+      industryPercent: avgStdRate,
       motivational: true,
     },
     {
