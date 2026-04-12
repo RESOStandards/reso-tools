@@ -86,6 +86,8 @@ const extractLookupName = (odataType: string): string | null => {
 
 // ── Types ────────────────────────────────────────────────────────────
 
+type ElementTypeFilter = 'all' | 'fields' | 'enums' | 'expansions';
+
 interface EnrichedField {
   readonly fieldName: string;
   readonly resourceName: string;
@@ -93,6 +95,7 @@ interface EnrichedField {
   readonly nullable: boolean;
   readonly payloads: ReadonlyArray<string>;
   readonly standardRESO: boolean;
+  readonly isExpansion: boolean;
   readonly annotations: ReadonlyArray<{ term: string; value: string }>;
   readonly availability: number | null;
   readonly frequency: number | null;
@@ -225,7 +228,7 @@ const FieldDetailPanel = ({
           <div>
             <span className="text-xs text-gray-500 dark:text-gray-400 block">Type</span>
             <span className="font-medium text-gray-800 dark:text-gray-200">
-              {normalizeTypeName(field.type, isCollection)}
+              {normalizeTypeName(field.type)}
             </span>
           </div>
           <div>
@@ -341,6 +344,7 @@ export const ServerExplorer = ({
   // Availability threshold stops: 0 = no data, 1 = any data (default), 25/50/75/100
   const [availThreshold, setAvailThreshold] = useState(1);
   const [customAvailEditing, setCustomAvailEditing] = useState(false);
+  const [elementTypeFilter, setElementTypeFilter] = useState<ElementTypeFilter>('all');
 
   // Build availability lookup maps
   const fieldAvailMap = useMemo(() => {
@@ -386,6 +390,7 @@ export const ServerExplorer = ({
           ...f,
           payloads: f.payloads ?? [],
           annotations: f.annotations ?? [],
+          isExpansion: f.isExpansion ?? false,
           availability: avail?.availability ?? null,
           frequency: avail?.frequency ?? null,
           lookupName: extractLookupName(f.type),
@@ -399,10 +404,15 @@ export const ServerExplorer = ({
     const query = searchQuery.toLowerCase();
     return enrichedFields
       .filter((f) => {
-        // Category filter
+        // Category filter (data set)
         if (categoryFilter === 'reso' && !f.standardRESO) return false;
         if (categoryFilter === 'local' && f.standardRESO) return false;
         if (categoryFilter === 'payload' && !(f.payloads ?? []).some((p) => p && p !== '')) return false;
+
+        // Element type filter
+        if (elementTypeFilter === 'fields' && (f.isExpansion || f.isEnum)) return false;
+        if (elementTypeFilter === 'enums' && !f.isEnum) return false;
+        if (elementTypeFilter === 'expansions' && !f.isExpansion) return false;
 
         // Availability threshold
         if (availThreshold === 0) {
@@ -432,7 +442,7 @@ export const ServerExplorer = ({
         const ba = b.availability ?? -1;
         return ba - aa;
       });
-  }, [enrichedFields, categoryFilter, availThreshold, searchQuery, sortKey, lookupsByField]);
+  }, [enrichedFields, categoryFilter, elementTypeFilter, availThreshold, searchQuery, sortKey, lookupsByField]);
 
   // Resource-level counts for sidebar
   const resourceCounts = useMemo(() => {
@@ -447,12 +457,24 @@ export const ServerExplorer = ({
     all: 'All',
     reso: 'RESO',
     local: 'Local',
-    payload: 'Payload',
+    payload: 'IDX',
   };
 
   return (
-    <div className="space-y-4">
-      {/* Row 1: Resource chooser + availability threshold */}
+    <div className="space-y-3">
+      {/* Row 1: Data set filter (All/RESO/Local/IDX) */}
+      <div className="flex items-center gap-1.5">
+        {(['all', 'reso', 'local', 'payload'] as const).map((f) => (
+          <FilterPill
+            key={f}
+            label={categoryLabel[f]}
+            active={categoryFilter === f}
+            onClick={() => setCategoryFilter(f)}
+          />
+        ))}
+      </div>
+
+      {/* Row 2: Resource chooser + availability threshold */}
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Resource</span>
@@ -569,7 +591,7 @@ export const ServerExplorer = ({
         </div>
       </div>
 
-      {/* Row 2: Search + category filters */}
+      {/* Row 3: Search + element type filter */}
       <div className="flex items-center gap-3 flex-wrap">
         <SearchInput
           value={searchQuery}
@@ -577,12 +599,12 @@ export const ServerExplorer = ({
           placeholder="Filter by field or lookup value…"
         />
         <div className="flex items-center gap-1.5">
-          {(['all', 'reso', 'local', 'payload'] as const).map((f) => (
+          {(['all', 'fields', 'enums', 'expansions'] as const).map((f) => (
             <FilterPill
-              key={f}
-              label={categoryLabel[f]}
-              active={categoryFilter === f}
-              onClick={() => setCategoryFilter(f)}
+              key={`et-${f}`}
+              label={f === 'all' ? 'All' : f === 'fields' ? 'Fields' : f === 'enums' ? 'Enums' : 'Expansions'}
+              active={elementTypeFilter === f}
+              onClick={() => setElementTypeFilter(f)}
             />
           ))}
         </div>
@@ -596,31 +618,34 @@ export const ServerExplorer = ({
             </div>
           ) : (
             <div>
-              {/* Field count + sort */}
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+              {/* Field count + sort — laid out to match field row columns */}
+              <div className="flex items-center mb-2 px-4">
+                {/* Chevron spacer + field count (matches FieldRow left side) */}
+                <div className="w-3 shrink-0 mr-3" />
+                <p className="text-sm text-gray-500 dark:text-gray-400 sm:max-w-[35%] truncate">
                   <span className="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">{filteredFields.length}</span>
                   {' '}of{' '}
                   <span className="tabular-nums">{enrichedFields.length}</span>
                   {' '}fields
                 </p>
-                <div className="flex items-center gap-3 text-[11px] text-gray-400 dark:text-gray-500">
-                  <span className="hidden sm:inline">Sort:</span>
-                  {(['name', 'type', 'availability'] as const).map((k) => (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setSortKey(k)}
-                      title={k === 'availability' ? 'Median fill factor – how often this field has data across all sampled records' : undefined}
-                      className={`px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer ${
-                        sortKey === k
-                          ? 'bg-blue-600 text-white font-medium'
-                          : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                      } ${k === 'availability' ? 'border-b border-dashed border-gray-400 dark:border-gray-500' : ''}`}
-                    >
-                      {k === 'availability' ? 'avail' : k}
-                    </button>
-                  ))}
+                {/* Sort pills — widths match field row badge columns */}
+                <div className="hidden sm:flex items-center gap-3 flex-1 justify-end text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setSortKey('name')}
+                    className={`px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer ${sortKey === 'name' ? 'bg-blue-600 text-white font-medium' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                  >name</button>
+                  <button
+                    type="button"
+                    onClick={() => setSortKey('type')}
+                    className={`w-32 text-center px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer ${sortKey === 'type' ? 'bg-blue-600 text-white font-medium' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                  >type</button>
+                  <button
+                    type="button"
+                    onClick={() => setSortKey('availability')}
+                    title="Median fill factor – how often this field has data across all sampled records"
+                    className={`w-10 text-center px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer border-b border-dashed border-gray-400 dark:border-gray-500 ${sortKey === 'availability' ? 'bg-blue-600 text-white font-medium' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                  >avail</button>
                 </div>
               </div>
 
@@ -641,7 +666,7 @@ export const ServerExplorer = ({
                         badges={
                           <>
                             <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 w-32 truncate text-right">
-                              {normalizeTypeName(f.type, f.isEnum)}
+                              {normalizeTypeName(f.type)}
                             </span>
                             {f.standardRESO ? (
                               <Badge label="RESO" color="green" />

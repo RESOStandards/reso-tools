@@ -1,6 +1,6 @@
 {
   "name": "@reso-standards/reso-data-generator",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "RESO Data Dictionary test data generator — creates realistic OData records via the Add/Edit API",
   "type": "module",
   "bin": {
