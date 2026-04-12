@@ -21,8 +21,8 @@ import type { CertReportSummary } from '../../api/cert-client';
 
 const PAGE_CONTAINER = 'max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8';
 
-/** Spec URLs for each endorsement type. */
-const SPEC_LINKS: Readonly<Record<string, ReadonlyArray<{ label: string; url: string }>>> = {
+/** Spec URLs for each endorsement type. Exported for testing. */
+export const SPEC_LINKS: Readonly<Record<string, ReadonlyArray<{ label: string; url: string }>>> = {
   data_dictionary: [
     { label: 'DD Specification', url: 'https://transport.reso.org/proposals/data-dictionary/' },
     { label: 'DD Documentation', url: 'https://dd.reso.org' },
@@ -286,8 +286,8 @@ const DDDetailRenderer = ({ report }: { readonly report: CertReportSummary }) =>
 
 // ── Shared Shell ─────────────────────────────────────────────────────
 
-/** Select the renderer based on report type. */
-const selectRenderer = (report: CertReportSummary): React.FC<{ report: CertReportSummary }> => {
+/** Select the renderer based on report type. Exported for testing. */
+export const selectRenderer = (report: CertReportSummary): React.FC<{ report: CertReportSummary }> => {
   if (report.type === 'data_dictionary' && report.advertised) return DDDetailRenderer;
   if (report.type === 'web_api_server_core') return CoreDetailRenderer;
   return GenericDetailRenderer;
