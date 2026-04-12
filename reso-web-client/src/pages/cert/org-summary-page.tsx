@@ -921,7 +921,7 @@ const PerformanceVisible = ({ perf }: { readonly perf: PerformanceReport }) => {
           unit="MB"
           industry={`${perf.industryPayloadMb.toFixed(2)} MB`}
           delta={payloadDelta > 0 ? `${payloadDelta.toFixed(2)} MB smaller` : payloadDelta < 0 ? `${Math.abs(payloadDelta).toFixed(2)} MB larger` : undefined}
-          deltaPositive={payloadDelta > 0}
+          deltaPositive={payloadDelta < 0}
         />
         <PerfMetric
           label="Avg response"

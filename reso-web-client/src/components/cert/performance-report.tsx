@@ -295,7 +295,7 @@ export const PerformanceReport = ({
           providerValue={optedIn ? perf.averageResponseBytes : null}
           industryValue={market.averageResponseBytes}
           format={formatBytes}
-          lowerIsBetter={true}
+          lowerIsBetter={false}
         />
       </div>
 
