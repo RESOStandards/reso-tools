@@ -31,11 +31,13 @@ export const FilterPill = ({
   count,
   active,
   onClick,
+  icon,
 }: {
   readonly label: string;
   readonly count?: number;
   readonly active: boolean;
   readonly onClick: () => void;
+  readonly icon?: ReactNode;
 }) => (
   <button
     type="button"
@@ -46,6 +48,7 @@ export const FilterPill = ({
         : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
     }`}
   >
+    {icon}
     {label}
     {count !== undefined && (
       <span className={`tabular-nums ${active ? 'text-blue-200' : 'text-gray-400 dark:text-gray-500'}`}>
