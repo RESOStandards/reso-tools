@@ -317,7 +317,7 @@ export const ServerExplorer = ({
     if (initialCategory) setCategoryFilter(initialCategory);
   }, [initialCategory]);
   useEffect(() => {
-    if (initialResource !== undefined) {
+    if (initialResource) {
       setSelectedResource(initialResource);
       setExpandedField(null);
     }
