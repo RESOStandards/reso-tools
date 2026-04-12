@@ -15,6 +15,7 @@ import { useCertReportSummary } from '../../hooks/use-cert-report-summary';
 import { useOrganizationNames } from '../../hooks/use-organization-names';
 import { LoadingSpinner } from '../../components/loading-spinner';
 import { StatusPill } from '../../components/cert/status-pill';
+import { DDDetailRenderer } from '../../components/cert/dd-detail-renderer';
 import type { EndorsementStatus } from '../../api/cert-fixtures';
 import { fetchFullCertReport } from '../../api/cert-client';
 import type { CertReportSummary } from '../../api/cert-client';
@@ -60,20 +61,23 @@ const formatDate = (iso: string): string => {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
-/** Map raw type strings to display labels. */
-const typeLabel = (type: string, description?: string): string => {
-  if (description) return description;
-  const labels: Record<string, string> = {
-    data_dictionary: 'Data Dictionary',
-    web_api_server_core: 'Web API Server Core',
-    add_edit: 'Web API Add/Edit',
-    common_format: 'RESO Common Format',
-    webhooks: 'Webhooks',
-    validation_expressions: 'Validation Expressions',
-    upi: 'Universal Property Identifier',
-  };
-  return labels[type] ?? type;
+/** Map raw type strings to RESO display labels. */
+const TYPE_LABELS: Readonly<Record<string, string>> = {
+  data_dictionary: 'Data Dictionary',
+  web_api_server_core: 'Web API Core',
+  add_edit: 'Web API Add/Edit',
+  common_format: 'Common Format',
+  webhooks: 'Webhooks',
+  validation_expressions: 'Validation Expressions',
+  upi: 'Universal Property Identifier',
 };
+
+/** Short label for breadcrumbs and fallback. */
+const typeLabel = (type: string): string => TYPE_LABELS[type] ?? type;
+
+/** Full report title: "RESO Data Dictionary 2.0 Report". Exported for testing. */
+export const reportTitle = (type: string, version: string): string =>
+  `RESO ${typeLabel(type)} ${version} Report`;
 
 // ── Renderers ────────────────────────────────────────────────────────
 
@@ -187,102 +191,7 @@ const CoreDetailRenderer = ({ report }: { readonly report: CertReportSummary }) 
   );
 };
 
-/** DD renderer — placeholder for now, will be enhanced with metadata browser + availability. */
-const DDDetailRenderer = ({ report }: { readonly report: CertReportSummary }) => {
-  const advertised = report.advertised;
-  const resources = advertised ? Object.keys(advertised).sort() : [];
-  const generatedOn = report.generatedOn ?? report.statusUpdatedAt;
-
-  // Roll up totals
-  let totalFields = 0;
-  let resoFields = 0;
-  let totalLookups = 0;
-  let resoLookups = 0;
-  if (advertised) {
-    for (const res of Object.values(advertised)) {
-      totalFields += res.fields.total;
-      resoFields += res.fields.reso;
-      totalLookups += res.lookups.total;
-      resoLookups += res.lookups.reso;
-    }
-  }
-
-  const stdRate = totalFields > 0 ? Math.round((resoFields / totalFields) * 100) : 0;
-
-  return (
-    <div className="space-y-6">
-      {/* Hero tiles */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Resources</p>
-          <p className="mt-1 text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100">{resources.length}</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Fields</p>
-          <p className="mt-1 text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100">{totalFields.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">{resoFields.toLocaleString()} RESO · {(totalFields - resoFields).toLocaleString()} local</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Lookups</p>
-          <p className="mt-1 text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100">{totalLookups.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">{resoLookups.toLocaleString()} RESO · {(totalLookups - resoLookups).toLocaleString()} local</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Standardization</p>
-          <p className="mt-1 text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100">{stdRate}%</p>
-          <div className="mt-2 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full ${stdRate >= 50 ? 'bg-green-500' : stdRate >= 25 ? 'bg-amber-500' : 'bg-red-500'}`}
-              style={{ width: `${stdRate}%` }}
-            />
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Report Date</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900 dark:text-gray-100">
-            {generatedOn ? formatDate(generatedOn) : '—'}
-          </p>
-        </div>
-      </div>
-
-      {/* Resource tiles */}
-      {resources.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Resources</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {resources.map((name) => {
-              const res = advertised![name];
-              const resStdRate = res.fields.total > 0
-                ? Math.round((res.fields.reso / res.fields.total) * 100)
-                : 0;
-              return (
-                <div
-                  key={name}
-                  className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:border-blue-400 dark:hover:border-blue-600 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-baseline justify-between mb-2">
-                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{name}</h4>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{resStdRate}% RESO</span>
-                  </div>
-                  <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-2">
-                    <div
-                      className={`h-full rounded-full ${resStdRate >= 50 ? 'bg-green-500' : resStdRate >= 25 ? 'bg-amber-500' : 'bg-red-500'}`}
-                      style={{ width: `${resStdRate}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                    <span><span className="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">{res.fields.total}</span> fields</span>
-                    <span><span className="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">{res.lookups.total}</span> lookups</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+// DDDetailRenderer is imported from ../../components/cert/dd-detail-renderer
 
 // ── Shared Shell ─────────────────────────────────────────────────────
 
@@ -363,7 +272,7 @@ export const DetailReportPage = () => {
             </>
           )}
           <span className="text-gray-700 dark:text-gray-300 font-medium truncate max-w-xs">
-            {typeLabel(report.type, report.description)}
+            {typeLabel(report.type)}
           </span>
         </nav>
 
@@ -372,8 +281,7 @@ export const DetailReportPage = () => {
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-50">
-                {typeLabel(report.type, report.description)}
-                <span className="ml-2 text-lg font-normal text-gray-500 dark:text-gray-400">{report.version}</span>
+                {reportTitle(report.type, report.version)}
               </h1>
               {providerName && (
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">

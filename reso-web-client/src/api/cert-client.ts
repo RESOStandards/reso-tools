@@ -627,3 +627,135 @@ export const fetchCertificationCounts = async (
 
   return (await res.json()) as CertificationCounts;
 };
+
+// ── DD Detail Report ──────────────────────────────────────────────────
+//
+// GET /certification_reports/data_dictionary/detail/:version/:recipientUoi/:providerUoi/:providerUsi?status=certified
+// Returns the full DD metadata report including per-field catalog.
+
+/** A single field from the DD detail report. */
+export interface DDDetailField {
+  readonly fieldName: string;
+  readonly resourceName: string;
+  readonly type: string;
+  readonly nullable: boolean;
+  readonly payloads: ReadonlyArray<string>;
+  readonly standardRESO: boolean;
+  readonly annotations: ReadonlyArray<{ term: string; value: string }>;
+}
+
+/** Full DD detail report response. */
+export interface DDDetailReport {
+  readonly id: string;
+  readonly type: 'data_dictionary';
+  readonly version: string;
+  readonly status: string;
+  readonly description: string;
+  readonly recipientUoi: string;
+  readonly providerUoi: string;
+  readonly providerUsi: string;
+  readonly generatedOn: string;
+  readonly statusUpdatedAt: string;
+  readonly totalResourcesCount: number;
+  readonly standardResourcesCount: number;
+  readonly localResourcesCount: number;
+  readonly totalFieldsCount: number;
+  readonly standardFieldsCount: number;
+  readonly localFieldsCount: number;
+  readonly totalLookupsCount: number;
+  readonly standardLookupsCount: number;
+  readonly localLookupsCount: number;
+  readonly iDXFieldsCount: number;
+  readonly iDXLookupsCount: number;
+  readonly iDXResourcesCount: number;
+  readonly advertised: Readonly<Record<string, CertAdvertisedResource>>;
+  readonly fields: ReadonlyArray<DDDetailField>;
+  readonly notificationCount?: number;
+}
+
+const ddDetailCache = new Map<string, DDDetailReport>();
+
+export const fetchDDDetailReport = async (
+  version: string,
+  recipientUoi: string,
+  providerUoi: string,
+  providerUsi: string,
+  status = 'certified'
+): Promise<DDDetailReport> => {
+  const cacheKey = `${version}:${recipientUoi}:${providerUoi}:${providerUsi}:${status}`;
+  const cached = ddDetailCache.get(cacheKey);
+  if (cached) return cached;
+
+  const path = `/certification_reports/data_dictionary/detail/${encodeURIComponent(version)}/${encodeURIComponent(recipientUoi)}/${encodeURIComponent(providerUoi)}/${encodeURIComponent(providerUsi)}?status=${encodeURIComponent(status)}`;
+  const res = await fetch(proxiedCertUrl(path), {
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch DD detail report (HTTP ${res.status})`);
+  }
+
+  const data = (await res.json()) as DDDetailReport;
+  ddDetailCache.set(cacheKey, data);
+  return data;
+};
+
+// ── Data Availability ────────────────────────────────────────────────
+//
+// GET /payload/data_availability/:reportId
+// Returns per-field and per-lookup-value availability data.
+
+/** Per-field availability from the data availability report. */
+export interface DataAvailabilityField {
+  readonly resourceName: string;
+  readonly fieldName: string;
+  readonly frequency: number;
+  readonly availability: number;
+}
+
+/** Per-lookup-value availability from the data availability report. */
+export interface DataAvailabilityLookup {
+  readonly resourceName: string;
+  readonly fieldName: string;
+  readonly lookupValue: string;
+  readonly frequency: number;
+  readonly availability: number;
+  readonly standardRESO: boolean;
+  readonly wikiPageURL?: string;
+  readonly type: string;
+}
+
+/** Full data availability report response. */
+export interface DataAvailabilityReport {
+  readonly reportId: string;
+  readonly version: string;
+  readonly description: string;
+  readonly generatedOn: string;
+  readonly recipientUoi: string;
+  readonly providerUoi: string;
+  readonly providerUsi: string;
+  readonly fields: ReadonlyArray<DataAvailabilityField>;
+  readonly lookupValues: ReadonlyArray<DataAvailabilityLookup>;
+}
+
+const daCache = new Map<string, DataAvailabilityReport>();
+
+export const fetchDataAvailability = async (
+  reportId: string
+): Promise<DataAvailabilityReport> => {
+  const cached = daCache.get(reportId);
+  if (cached) return cached;
+
+  const res = await fetch(
+    proxiedCertUrl(`/payload/data_availability/${encodeURIComponent(reportId)}`),
+    { headers: { Accept: 'application/json' } }
+  );
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch data availability (HTTP ${res.status})`);
+  }
+
+  const data = (await res.json()) as DataAvailabilityReport;
+  daCache.set(reportId, data);
+  return data;
+};

@@ -230,7 +230,7 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: 
     () => (activeDdSummary ? [activeDdSummary.id] : undefined),
     [activeDdSummary?.id]
   );
-  const { data: daMarketAvg } = useDAMarketAverage(daReportIds);
+  const { data: daMarketAvg, isLoading: isLoadingDA } = useDAMarketAverage(daReportIds);
 
   const activeCoverage = useMemo<CoverageReport | null>(
     () => (activeDdSummary ? summaryToCoverageReport(activeDdSummary, marketAverages, daMarketAvg) : null),
@@ -340,7 +340,32 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: 
                 </button>
               );
             })}
+            {activeDdSummary && (
+              <NavLink
+                to={`/cert/orgs/${encodeURIComponent(org.OrganizationUniqueId)}/detail/${encodeURIComponent(activeDdSummary.id)}`}
+                className="ml-auto inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors cursor-pointer"
+              >
+                View Details
+                <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638l-3.96-4.158a.75.75 0 011.08-1.04l5.25 5.5a.75.75 0 010 1.04l-5.25 5.5a.75.75 0 11-1.08-1.04l3.96-4.158H3.75A.75.75 0 013 10z" clipRule="evenodd" />
+                </svg>
+              </NavLink>
+            )}
           </div>
+        </div>
+      )}
+      {/* View Details link for single-provider orgs (no switcher) */}
+      {!hasMultipleProviders && activeDdSummary && (
+        <div className="mt-8 mb-2 flex justify-end">
+          <NavLink
+            to={`/cert/orgs/${encodeURIComponent(org.OrganizationUniqueId)}/detail/${encodeURIComponent(activeDdSummary.id)}`}
+            className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors cursor-pointer"
+          >
+            View Details
+            <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638l-3.96-4.158a.75.75 0 011.08-1.04l5.25 5.5a.75.75 0 010 1.04l-5.25 5.5a.75.75 0 11-1.08-1.04l3.96-4.158H3.75A.75.75 0 013 10z" clipRule="evenodd" />
+            </svg>
+          </NavLink>
         </div>
       )}
 
@@ -350,7 +375,7 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: 
           now from real cert API data via the summary endpoint. */}
       <CoverageSectionView
         coverage={activeCoverage}
-        isLoading={isLoadingReports}
+        isLoading={isLoadingReports || isLoadingDA}
         providerName={activeGroup?.providerName}
         systemName={activeGroup?.systemName}
       />
