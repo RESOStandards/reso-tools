@@ -19,6 +19,15 @@ import type {
   DataAvailabilityLookup,
   DataAvailabilityReport,
 } from '../../api/cert-client.js';
+import {
+  AvailBar,
+  Badge,
+  FieldRow,
+  FilterPill,
+  ResourceButton,
+  SearchInput,
+  availColorClass,
+} from '../metadata/shared.js';
 
 type CategoryFilter = 'all' | 'reso' | 'local' | 'payload';
 
@@ -57,28 +66,7 @@ const friendlyType = (odataType: string, isCollection: boolean): string => {
 const extractLookupName = (odataType: string): string | null =>
   odataType.startsWith(ENUM_NS) ? odataType.slice(ENUM_NS.length) : null;
 
-/** Color class for availability percentage. */
-const availColor = (pct: number): string =>
-  pct >= 75 ? 'text-green-600 dark:text-green-400'
-    : pct >= 25 ? 'text-amber-600 dark:text-amber-400'
-    : 'text-red-600 dark:text-red-400';
-
-/** Availability bar. */
-const AvailBar = ({ pct: value }: { readonly pct: number }) => (
-  <div className="flex items-center gap-2">
-    <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-      <div
-        className={`h-full rounded-full ${
-          value >= 75 ? 'bg-green-500' : value >= 25 ? 'bg-amber-500' : 'bg-red-500'
-        }`}
-        style={{ width: `${Math.min(value, 100)}%` }}
-      />
-    </div>
-    <span className={`text-xs font-semibold tabular-nums w-10 text-right ${availColor(value)}`}>
-      {Math.round(value)}%
-    </span>
-  </div>
-);
+// AvailBar, availColorClass imported from ../metadata/shared
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -175,21 +163,13 @@ const FieldDetailPanel = ({
         <div className="space-y-3">
           <div className="flex items-center gap-1.5">
             {(['all', 'reso', 'local'] as const).map((f) => (
-              <button
+              <FilterPill
                 key={f}
-                type="button"
+                label={f === 'all' ? 'All' : f === 'reso' ? 'RESO' : 'Local'}
+                count={lookupCounts[f]}
+                active={lookupFilter === f}
                 onClick={() => setLookupFilter(f)}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  lookupFilter === f
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
-                }`}
-              >
-                {f === 'all' ? 'All' : f === 'reso' ? 'RESO' : 'Local'}
-                <span className={`text-[10px] tabular-nums ${lookupFilter === f ? 'text-blue-200' : 'text-gray-400'}`}>
-                  ({lookupCounts[f]})
-                </span>
-              </button>
+              />
             ))}
           </div>
           <div className="max-h-64 overflow-y-auto space-y-1">
@@ -419,32 +399,19 @@ export const ServerExplorer = ({
     <div className="space-y-4">
       {/* Search + filters bar */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clipRule="evenodd" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Filter by field or lookup value…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+        <SearchInput
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Filter by field or lookup value…"
+        />
         <div className="flex items-center gap-1.5">
           {(['all', 'reso', 'local', 'payload'] as const).map((f) => (
-            <button
+            <FilterPill
               key={f}
-              type="button"
+              label={categoryLabel[f]}
+              active={categoryFilter === f}
               onClick={() => setCategoryFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                categoryFilter === f
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
-              }`}
-            >
-              {categoryLabel[f]}
-            </button>
+            />
           ))}
         </div>
       </div>
@@ -469,38 +436,18 @@ export const ServerExplorer = ({
       <div className="flex gap-4">
         {/* Resource sidebar */}
         <div className="w-48 shrink-0 space-y-1">
-          {resourceNames.map((name) => {
-            const isActive = selectedResource === name;
-            const count = resourceCounts.get(name) ?? 0;
-            return (
-              <button
-                key={name}
-                type="button"
-                onClick={() => {
-                  setSelectedResource(name);
-                  setExpandedField(null);
-                }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                  isActive
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                <a
-                  href={resourceWikiUrl(detail.version, name)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className={`font-medium truncate ${isActive ? 'text-white' : 'hover:underline'}`}
-                >
-                  {name}
-                </a>
-                <span className={`text-xs tabular-nums ${isActive ? 'text-blue-200' : 'text-gray-400 dark:text-gray-500'}`}>
-                  ({count})
-                </span>
-              </button>
-            );
-          })}
+          {resourceNames.map((name) => (
+            <ResourceButton
+              key={name}
+              name={name}
+              count={resourceCounts.get(name) ?? 0}
+              active={selectedResource === name}
+              onClick={() => {
+                setSelectedResource(name);
+                setExpandedField(null);
+              }}
+            />
+          ))}
         </div>
 
         {/* Field list */}
@@ -540,43 +487,36 @@ export const ServerExplorer = ({
 
               {/* Field rows */}
               <div className="space-y-1">
-                {filteredFields.map((f) => {
+                {filteredFields.map((f, idx) => {
                   const isExpanded = expandedField === f.fieldName;
                   const availPct = f.availability !== null ? Math.round(f.availability * 100) : null;
                   const lookups = lookupsByField.get(`${f.resourceName}:${f.fieldName}`) ?? [];
 
                   return (
                     <div key={f.fieldName}>
-                      <button
-                        type="button"
+                      <FieldRow
+                        fieldName={f.fieldName}
+                        expanded={isExpanded}
                         onClick={() => setExpandedField(isExpanded ? null : f.fieldName)}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
-                          isExpanded
-                            ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-                            : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
-                        }`}
-                      >
-                        <span className="font-medium text-gray-900 dark:text-gray-100 min-w-0 truncate flex-1">
-                          {f.fieldName}
-                        </span>
-                        <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 w-20 truncate">
-                          {friendlyType(f.type, f.isEnum)}
-                        </span>
-                        {f.standardRESO ? (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 shrink-0">
-                            RESO
-                          </span>
-                        ) : (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 shrink-0">
-                            local
-                          </span>
-                        )}
-                        {availPct !== null && (
-                          <span className={`text-xs font-semibold tabular-nums w-10 text-right shrink-0 ${availColor(availPct)}`}>
+                        striped={idx % 2 === 1}
+                        badges={
+                          <>
+                            <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 w-20 truncate">
+                              {friendlyType(f.type, f.isEnum)}
+                            </span>
+                            {f.standardRESO ? (
+                              <Badge label="RESO" color="green" />
+                            ) : (
+                              <Badge label="local" color="gray" />
+                            )}
+                          </>
+                        }
+                        trailing={availPct !== null ? (
+                          <span className={`text-xs font-semibold tabular-nums w-10 text-right shrink-0 ${availColorClass(availPct)}`}>
                             {availPct}%
                           </span>
-                        )}
-                      </button>
+                        ) : undefined}
+                      />
                       {isExpanded && (
                         <div className="mt-1 ml-3">
                           <FieldDetailPanel

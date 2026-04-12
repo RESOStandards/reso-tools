@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { FriendlyError } from '../components/friendly-error';
 import { LoadingSpinner } from '../components/loading-spinner';
+import { Badge, FieldRow } from '../components/metadata/shared';
 import { useServer } from '../context/server-context';
 import { getSchemaTimestamp } from '../api/schema-cache';
 import { refreshSchema } from '../api/metadata';
@@ -43,17 +44,7 @@ const fetchSchema = async (baseUrl?: string, token?: string): Promise<CsdlSchema
   return parseCsdlXml(await res.text());
 };
 
-/** Badge component for field type indicators. */
-const Badge = ({ label, color = 'gray' }: { readonly label: string; readonly color?: string }) => {
-  const colors: Record<string, string> = {
-    gray: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-    blue: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-    green: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
-    amber: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-    purple: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
-  };
-  return <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${colors[color] ?? colors.gray}`}>{label}</span>;
-};
+// Badge imported from ../components/metadata/shared
 
 /** Render complex type properties recursively. */
 const ComplexTypeDetail = ({
@@ -603,43 +594,29 @@ export const MetadataPage = () => {
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {filteredFields.map((field, idx) => {
               const isExpanded = expandedField === field.fieldName;
-              const stripe = idx % 2 === 1 ? 'bg-gray-50/50 dark:bg-gray-800/30' : '';
               return (
                 <div key={field.fieldName}>
-                  <button
-                    type="button"
+                  <FieldRow
+                    fieldName={field.fieldName}
+                    expanded={isExpanded}
                     onClick={() => handleToggleField(field.fieldName)}
-                    className={`w-full text-left px-4 sm:px-6 py-2.5 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors cursor-pointer ${stripe}`}>
-                    <div className="flex items-center gap-3">
-                      {/* Expand indicator */}
-                      <svg className={`w-3 h-3 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="currentColor" viewBox="0 0 20 20">
-                        <title>Expand</title>
-                        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-                      </svg>
-
-                      {/* Field name + key icon */}
-                      <span className="font-medium text-sm text-gray-900 dark:text-gray-100 min-w-0 truncate sm:w-64 flex items-center gap-1.5">
-                        {field.fieldName}
+                    striped={idx % 2 === 1}
+                    badges={
+                      <>
                         {keyFields.has(field.fieldName) && (
                           <span className="text-amber-500 dark:text-amber-400" title="Primary key"><KeyIcon /></span>
                         )}
-                      </span>
-
-                      {/* Type badges */}
-                      <div className="hidden sm:flex items-center gap-1.5 flex-1 min-w-0">
                         <span className="text-xs font-mono text-gray-500 dark:text-gray-400 truncate">{field.type}</span>
                         {field.isExpansion && <Badge label="expansion" color="purple" />}
                         {field.isCollection && <Badge label="collection" color="blue" />}
                         {field.lookupName && <Badge label="lookup" color="green" />}
                         {field.nullable === false && <Badge label="non-nullable" color="amber" />}
-                      </div>
-
-                      {/* Max length */}
-                      {field.maxLength && (
-                        <span className="hidden sm:inline text-xs text-gray-400 dark:text-gray-500">[{field.maxLength}]</span>
-                      )}
-                    </div>
-                  </button>
+                      </>
+                    }
+                    trailing={field.maxLength ? (
+                      <span className="hidden sm:inline text-xs text-gray-400 dark:text-gray-500">[{field.maxLength}]</span>
+                    ) : undefined}
+                  />
 
                   {/* Expanded detail */}
                   {isExpanded && schema && (

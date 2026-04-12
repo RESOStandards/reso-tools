@@ -15,6 +15,10 @@ import type {
   AvailabilityBuckets,
 } from '../../api/cert-client.js';
 import { useDAMarketAverage } from '../../hooks/use-da-market-average.js';
+import { useDDDetailReport } from '../../hooks/use-dd-detail-report.js';
+import { useDataAvailability } from '../../hooks/use-data-availability.js';
+import { ServerExplorer } from './server-explorer.js';
+import { FilterPill } from '../metadata/shared.js';
 
 type FieldFilter = 'all' | 'reso' | 'idx' | 'local';
 
@@ -288,9 +292,12 @@ const ChevronDown = ({ expanded }: { readonly expanded: boolean }) => (
 
 // ── Main renderer ───────────────────────────────────────────────────
 
+type DetailView = 'analytics' | 'explorer';
+
 export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummary }) => {
   const [expandedResource, setExpandedResource] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<FieldFilter>('all');
+  const [activeView, setActiveView] = useState<DetailView>('analytics');
 
   const advertised = report.advertised;
   const resources = advertised ? Object.keys(advertised).sort() : [];
@@ -299,6 +306,15 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
   // Fetch DA market average for this report
   const reportIds = useMemo(() => [report.id], [report.id]);
   const { data: daData, isLoading: daLoading } = useDAMarketAverage(reportIds);
+
+  // Fetch DD detail report + data availability for Server Explorer
+  const { data: ddDetail, isLoading: ddDetailLoading } = useDDDetailReport(
+    report.version,
+    report.recipientUoi,
+    report.providerUoi,
+    report.providerUsi
+  );
+  const { data: dataAvail, isLoading: daAvailLoading } = useDataAvailability(report.id);
 
   const providerResources = daData?.availabilityReports?.[0]?.availability?.resourcesBinary;
   const industryResources = daData?.marketAverage?.resourcesBinary;
@@ -383,8 +399,22 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
         </div>
       </div>
 
-      {/* Filter toggles + resource grid */}
-      {resources.length > 0 && (
+      {/* View toggle: RESO Analytics / Server Explorer */}
+      <div className="flex items-center gap-1">
+        <FilterPill
+          label="RESO Analytics"
+          active={activeView === 'analytics'}
+          onClick={() => setActiveView('analytics')}
+        />
+        <FilterPill
+          label="Server Explorer"
+          active={activeView === 'explorer'}
+          onClick={() => setActiveView('explorer')}
+        />
+      </div>
+
+      {/* ── RESO Analytics view ─────────────────────────────────── */}
+      {activeView === 'analytics' && resources.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Resources</h3>
@@ -477,6 +507,24 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
             })}
           </div>
         </div>
+      )}
+
+      {/* ── Server Explorer view ────────────────────────────────── */}
+      {activeView === 'explorer' && (
+        ddDetail ? (
+          <ServerExplorer
+            detail={ddDetail}
+            availability={dataAvail}
+          />
+        ) : (ddDetailLoading || daAvailLoading) ? (
+          <div className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">
+            Loading server metadata…
+          </div>
+        ) : (
+          <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            Server metadata not available for this report
+          </div>
+        )
       )}
     </div>
   );
