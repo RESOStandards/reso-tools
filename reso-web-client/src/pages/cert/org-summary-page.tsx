@@ -295,7 +295,11 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: 
 
   const activePerformance = useMemo<PerformanceReport | null>(() => {
     if (!perfMetrics) return null;
-    return perfMetricsToSummary(perfMetrics, activeDdSummary);
+    try {
+      return perfMetricsToSummary(perfMetrics, activeDdSummary);
+    } catch {
+      return null;
+    }
   }, [perfMetrics, activeDdSummary]);
 
   const cityState = [
