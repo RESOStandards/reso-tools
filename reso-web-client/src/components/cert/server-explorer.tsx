@@ -33,6 +33,10 @@ type CategoryFilter = 'all' | 'reso' | 'local' | 'payload';
 
 const ENUM_NS = 'org.reso.metadata.enums.';
 
+/** True if the OData type is an enum (any namespace pattern). */
+const isEnumType = (type: string): boolean =>
+  type.startsWith(ENUM_NS) || /^[A-Z]\w*Enums\./.test(type) || type.includes('.enums.');
+
 /** Build a dd.reso.org wiki URL for a field or lookup field. */
 const fieldWikiUrl = (version: string, fieldName: string, lookupName?: string | null): string =>
   lookupName
@@ -49,7 +53,7 @@ const resourceWikiUrl = (version: string, resourceName: string): string =>
 
 /** Derive a friendly DD type from the OData type string. */
 const friendlyType = (odataType: string, isCollection: boolean): string => {
-  if (odataType.startsWith(ENUM_NS)) return isCollection ? 'String List, Multi' : 'String List, Single';
+  if (isEnumType(odataType)) return isCollection ? 'String List, Multi' : 'String List, Single';
   const simple: Readonly<Record<string, string>> = {
     'Edm.String': 'String',
     'Edm.Boolean': 'Boolean',
@@ -64,9 +68,13 @@ const friendlyType = (odataType: string, isCollection: boolean): string => {
   return simple[odataType] ?? odataType;
 };
 
-/** Extract lookup name from enum type: org.reso.metadata.enums.Appliances → Appliances */
-const extractLookupName = (odataType: string): string | null =>
-  odataType.startsWith(ENUM_NS) ? odataType.slice(ENUM_NS.length) : null;
+/** Extract lookup name from enum type: org.reso.metadata.enums.Appliances → Appliances,
+ *  PropertyEnums.AccessibilityFeatures → AccessibilityFeatures */
+const extractLookupName = (odataType: string): string | null => {
+  if (!isEnumType(odataType)) return null;
+  const lastDot = odataType.lastIndexOf('.');
+  return lastDot >= 0 ? odataType.slice(lastDot + 1) : null;
+};
 
 // AvailBar, availColorClass imported from ../metadata/shared
 
@@ -367,7 +375,7 @@ export const ServerExplorer = ({
       .map((f): EnrichedField => {
         const key = `${f.resourceName}:${f.fieldName}`;
         const avail = fieldAvailMap.get(key);
-        const isEnum = f.type.startsWith(ENUM_NS);
+        const isEnum = isEnumType(f.type);
         return {
           ...f,
           payloads: f.payloads ?? [],
@@ -590,17 +598,19 @@ export const ServerExplorer = ({
                   <span className="tabular-nums">{enrichedFields.length}</span>
                   {' '}fields
                 </p>
-                <div className="flex items-center gap-0.5">
+                <div className="flex items-center gap-3 text-[11px] text-gray-400 dark:text-gray-500">
+                  <span className="hidden sm:inline">Sort:</span>
                   {(['name', 'type', 'availability'] as const).map((k) => (
                     <button
                       key={k}
                       type="button"
                       onClick={() => setSortKey(k)}
-                      className={`px-2.5 py-1 rounded-md text-[11px] transition-colors cursor-pointer ${
+                      title={k === 'availability' ? 'Median fill factor – how often this field has data across all sampled records' : undefined}
+                      className={`px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer ${
                         sortKey === k
                           ? 'bg-blue-600 text-white font-medium'
                           : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                      }`}
+                      } ${k === 'availability' ? 'border-b border-dashed border-gray-400 dark:border-gray-500' : ''}`}
                     >
                       {k === 'availability' ? 'avail' : k}
                     </button>
@@ -609,7 +619,7 @@ export const ServerExplorer = ({
               </div>
 
               {/* Field rows */}
-              <div className="space-y-1">
+              <div className="divide-y divide-gray-100 dark:divide-gray-800">
                 {filteredFields.map((f, idx) => {
                   const isExpanded = expandedField === f.fieldName;
                   const availPct = f.availability !== null ? Math.round(f.availability * 100) : null;
