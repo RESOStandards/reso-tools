@@ -435,8 +435,9 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
         />
       </div>
 
-      {/* ── RESO Analytics view ─────────────────────────────────── */}
-      {activeView === 'analytics' && resources.length > 0 && (
+      {/* ── RESO Analytics view (kept mounted to preserve state) ── */}
+      {resources.length > 0 && (
+        <div className={activeView !== 'analytics' ? 'hidden' : undefined}>
         <div>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Resources</h3>
@@ -539,11 +540,12 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
             })}
           </div>
         </div>
+      </div>
       )}
 
-      {/* ── Server Explorer view ────────────────────────────────── */}
-      {activeView === 'explorer' && (
-        ddDetail ? (
+      {/* ── Server Explorer view (kept mounted to preserve state) ── */}
+      <div className={activeView !== 'explorer' ? 'hidden' : undefined}>
+        {ddDetail ? (
           <ServerExplorer
             detail={ddDetail}
             availability={dataAvail}
@@ -558,8 +560,8 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
           <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center text-sm text-gray-500 dark:text-gray-400">
             Server metadata not available for this report
           </div>
-        )
-      )}
+        )}
+      </div>
     </div>
   );
 };
