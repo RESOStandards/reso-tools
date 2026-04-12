@@ -234,7 +234,7 @@ export const EndorsementSubRow = ({
         <span className="text-[11px] text-gray-600 dark:text-gray-400 tabular-nums">
           {formatRelative(statusTimestamp)}
         </span>
-        <span className="mt-0.5 inline-flex items-center gap-0.5 text-xs font-medium text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 group-hover:underline underline-offset-2">
+        <span className="mt-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 transition-colors">
           View Details
           <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path

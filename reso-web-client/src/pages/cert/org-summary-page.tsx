@@ -33,6 +33,7 @@ import {
 import { summaryToCoverageReport } from '../../api/cert-summary-adapter';
 import { useCertReportSummary } from '../../hooks/use-cert-report-summary';
 import { useMarketAverages } from '../../hooks/use-market-averages';
+import { useDAMarketAverage } from '../../hooks/use-da-market-average';
 import type { CertReportSummary, MarketAverages } from '../../api/cert-client';
 import type { Endorsement, EndorsementStatus, EndorsementType } from '../../api/cert-fixtures';
 import { EndorsementSubRow } from '../../components/cert/endorsement-sub-row';
@@ -101,7 +102,7 @@ export const OrgSummaryPage = () => {
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 dark:bg-gray-900">
-      <div className={`${PAGE_CONTAINER} pt-10 pb-20`}>
+      <div className={`${PAGE_CONTAINER} pt-4 pb-20`}>
         {isLoading && !org && <LoadingState />}
         {!isLoading && error && <ErrorState message={error} />}
         {!isLoading && !error && !org && <NotFoundState uoi={uoi ?? ''} />}
@@ -149,7 +150,13 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: 
           recipientName: lookupOrgName(e.recipientUoi) ?? e.recipientName ?? e.recipientUoi,
           providerName: lookupOrgName(e.providerUoi) ?? e.providerName ?? e.providerUoi,
           systemName: lookupSystem(e.providerUoi, e.providerUsi) ?? e.systemName
-        })),
+        }))
+        .sort((a, b) =>
+          a.typeLabel.localeCompare(b.typeLabel)
+          || a.version.localeCompare(b.version)
+          || a.providerName.localeCompare(b.providerName)
+          || (a.systemName ?? '').localeCompare(b.systemName ?? '')
+        ),
     [rawEndorsements, org.OrganizationUniqueId, lookupOrgName, lookupSystem]
   );
 
@@ -218,9 +225,16 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: 
     return ddSummaries[0] ?? null;
   }, [activeGroup, certReports]);
 
+  // Fetch per-resource DA market averages using the active DD report ID
+  const daReportIds = useMemo(
+    () => (activeDdSummary ? [activeDdSummary.id] : undefined),
+    [activeDdSummary?.id]
+  );
+  const { data: daMarketAvg } = useDAMarketAverage(daReportIds);
+
   const activeCoverage = useMemo<CoverageReport | null>(
-    () => (activeDdSummary ? summaryToCoverageReport(activeDdSummary, marketAverages) : null),
-    [activeDdSummary, marketAverages]
+    () => (activeDdSummary ? summaryToCoverageReport(activeDdSummary, marketAverages, daMarketAvg) : null),
+    [activeDdSummary, marketAverages, daMarketAvg]
   );
 
   const cityState = [
@@ -330,26 +344,16 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: 
         </div>
       )}
 
-      {/* Active DD report context — shows which DD report is
-          driving the coverage and performance sections below. */}
-      {activeDdSummary && (
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Showing coverage from{' '}
-          <span className="font-medium text-gray-700 dark:text-gray-300">
-            Data Dictionary {activeDdSummary.version}
-          </span>
-          {activeGroup && (
-            <span>
-              {' '}by {activeGroup.providerName}
-              {activeGroup.systemName && ` / ${activeGroup.systemName}`}
-            </span>
-          )}
-        </p>
-      )}
+      {/* Provider context moved into Coverage section header */}
 
       {/* Coverage — driven by the selected provider's DD report,
           now from real cert API data via the summary endpoint. */}
-      <CoverageSectionView coverage={activeCoverage} isLoading={isLoadingReports} />
+      <CoverageSectionView
+        coverage={activeCoverage}
+        isLoading={isLoadingReports}
+        providerName={activeGroup?.providerName}
+        systemName={activeGroup?.systemName}
+      />
 
       {/* Performance — TODO: wire from DD report or separate
           endpoint. Placeholder for now. */}
@@ -479,10 +483,14 @@ const SynthesisLine = ({ summary }: { readonly summary: OrgSummaryData }) => (
 
 const CoverageSectionView = ({
   coverage,
-  isLoading
+  isLoading,
+  providerName,
+  systemName
 }: {
   readonly coverage: CoverageReport | null;
   readonly isLoading?: boolean;
+  readonly providerName?: string;
+  readonly systemName?: string;
 }) => (
   <section className="mt-4">
     <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
@@ -490,9 +498,12 @@ const CoverageSectionView = ({
         Coverage
       </h2>
       {coverage && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            From {coverage.typeLabel} {coverage.version} report · {coverage.date}
+            {coverage.typeLabel} {coverage.version}
+            {providerName && ` · ${providerName}`}
+            {systemName && ` / ${systemName}`}
+            {coverage.date && ` · ${coverage.date}`}
           </p>
           {coverage.date && new Date(coverage.date).getTime() < Date.now() - 2 * 365.25 * 86_400_000 && (
             <span

@@ -498,6 +498,104 @@ export const fetchMarketAverages = async (): Promise<MarketAverages> => {
   return data;
 };
 
+// ── Data Availability Market Averages ────────────────────────────────────
+//
+// POST /payload/data_availability/market-average with { reportIds: [...] }
+// returns per-resource industry averages alongside the provider's own
+// availability buckets. Used to populate per-resource comparison bars.
+
+/** Availability bucket counts at various thresholds. */
+export interface AvailabilityBuckets {
+  readonly eqZero: number;
+  readonly gtZero: number;
+  readonly gte25: number;
+  readonly gte50: number;
+  readonly gte75: number;
+  readonly eq100: number;
+}
+
+/** Per-category (total/reso/idx/local) availability breakdown. */
+export interface AvailabilityCategoryBuckets {
+  readonly total: AvailabilityBuckets;
+  readonly reso: AvailabilityBuckets;
+  readonly idx: AvailabilityBuckets;
+  readonly local: AvailabilityBuckets;
+}
+
+/** Per-resource availability data with field and lookup breakdowns. */
+export interface ResourceAvailability {
+  readonly fields: AvailabilityCategoryBuckets;
+  readonly lookups: AvailabilityCategoryBuckets;
+}
+
+/** Response from POST /payload/data_availability/market-average. */
+export interface DAMarketAverageResponse {
+  readonly marketAverage: {
+    readonly fields: AvailabilityCategoryBuckets;
+    readonly lookups: AvailabilityCategoryBuckets;
+    readonly resourcesBinary: Readonly<Record<string, ResourceAvailability>>;
+  };
+  readonly availabilityReports: ReadonlyArray<{
+    readonly reportId: string;
+    readonly providerUoi: string;
+    readonly providerUsi: string;
+    readonly version: string;
+    readonly availability: {
+      readonly fields: AvailabilityCategoryBuckets;
+      readonly lookups: AvailabilityCategoryBuckets;
+      readonly resources: ReadonlyArray<unknown>;
+      readonly resourcesBinary: Readonly<Record<string, ResourceAvailability>>;
+    };
+  }>;
+}
+
+// ── Full Report Fetch ────────────────────────────────────────────────────
+//
+// GET /certification_reports/web_api/:id returns the full Core report
+// including test parameters. Other types use similar patterns.
+
+export const fetchFullCertReport = async (
+  type: string,
+  reportId: string
+): Promise<Record<string, unknown>> => {
+  const typeSlug = type === 'web_api_server_core' ? 'web_api' : type;
+  const res = await fetch(
+    proxiedCertUrl(`/certification_reports/${typeSlug}/${encodeURIComponent(reportId)}`),
+    { headers: { Accept: 'application/json' } }
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to fetch full report (HTTP ${res.status})`);
+  }
+  return res.json();
+};
+
+const daMarketCache = new Map<string, DAMarketAverageResponse>();
+
+export const fetchDAMarketAverage = async (
+  reportIds: ReadonlyArray<string>
+): Promise<DAMarketAverageResponse> => {
+  const cacheKey = [...reportIds].sort().join(',');
+  const cached = daMarketCache.get(cacheKey);
+  if (cached) return cached;
+
+  const res = await fetch(
+    proxiedCertUrl('/payload/data_availability/market-average'),
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ reportIds }),
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch DA market averages (HTTP ${res.status})`);
+  }
+
+  const data = (await res.json()) as DAMarketAverageResponse;
+  daMarketCache.set(cacheKey, data);
+  return data;
+};
+
 export const fetchCertificationCounts = async (
   apiKey: string | null
 ): Promise<CertificationCounts> => {

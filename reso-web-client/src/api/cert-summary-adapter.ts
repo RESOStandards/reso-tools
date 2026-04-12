@@ -14,6 +14,7 @@
 import type {
   CertAdvertisedResource,
   CertReportSummary,
+  DAMarketAverageResponse,
   MarketAverages,
 } from './cert-client.js';
 import type {
@@ -37,7 +38,8 @@ const pct = (num: number, den: number): number =>
  */
 export const summaryToCoverageReport = (
   report: CertReportSummary,
-  marketAvg?: MarketAverages | null
+  marketAvg?: MarketAverages | null,
+  daMarketAvg?: DAMarketAverageResponse | null
 ): CoverageReport | null => {
   if (!report.advertised || report.type !== 'data_dictionary') return null;
 
@@ -125,15 +127,22 @@ export const summaryToCoverageReport = (
   ];
 
   // ── IDX payload breakdown ──────────────────────────────────────
-  const idxTotalFields = idxFields;
+  const industryResources = daMarketAvg?.marketAverage?.resourcesBinary;
   const idxResourceCoverage: ReadonlyArray<ResourceCoverage> = TOP_RESOURCES
     .filter((name) => advertised[name])
     .map((name) => {
       const res = advertised[name];
+      const indRes = industryResources?.[name];
+      // Provider: % of this resource's fields that are in IDX
+      const provPct = pct(res.fields.idx, res.fields.total);
+      // Industry: average IDX fields / average total fields for this resource
+      const indTotal = indRes?.fields?.total?.gtZero ?? 0;
+      const indIdx = indRes?.fields?.idx?.gtZero ?? 0;
+      const indPct = indTotal > 0 ? pct(indIdx, indTotal) : 0;
       return {
         resource: name,
-        providerPercent: pct(res.fields.idx, res.fields.total),
-        industryPercent: 0,
+        providerPercent: provPct,
+        industryPercent: indPct,
       };
     });
 

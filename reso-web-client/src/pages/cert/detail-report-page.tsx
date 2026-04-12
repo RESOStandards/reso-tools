@@ -9,11 +9,14 @@
  *   - everything else → GenericDetailRenderer (remarks, status, spec link)
  */
 
+import { useEffect, useState } from 'react';
 import { NavLink, useParams } from 'react-router';
 import { useCertReportSummary } from '../../hooks/use-cert-report-summary';
+import { useOrganizationNames } from '../../hooks/use-organization-names';
 import { LoadingSpinner } from '../../components/loading-spinner';
 import { StatusPill } from '../../components/cert/status-pill';
 import type { EndorsementStatus } from '../../api/cert-fixtures';
+import { fetchFullCertReport } from '../../api/cert-client';
 import type { CertReportSummary } from '../../api/cert-client';
 
 const PAGE_CONTAINER = 'max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8';
@@ -112,11 +115,19 @@ const GenericDetailRenderer = ({ report }: { readonly report: CertReportSummary 
 
 /** Core renderer — extends generic with parameters table, auth, OData version. */
 const CoreDetailRenderer = ({ report }: { readonly report: CertReportSummary }) => {
-  const auth = report.authentication ?? [];
-  const odataVersion = report.odataVersion ?? '—';
-  const parameters = (report as unknown as Record<string, unknown>).parameters as
-    ReadonlyArray<{ name: string; value: string }> | undefined;
-  const remarks = (report as unknown as Record<string, unknown>).remarks as string | undefined;
+  const [fullReport, setFullReport] = useState<Record<string, unknown> | null>(null);
+
+  useEffect(() => {
+    fetchFullCertReport(report.type, report.id)
+      .then(setFullReport)
+      .catch(() => {});
+  }, [report.id, report.type]);
+
+  const auth = report.authentication ?? (fullReport?.authentication as string[] | undefined) ?? [];
+  const odataVersion = report.odataVersion ?? (fullReport?.odataVersion as string | undefined) ?? '—';
+  const parameters = (fullReport?.parameters ?? (report as unknown as Record<string, unknown>).parameters) as
+    ReadonlyArray<{ name: string; value: string; wikiPageURL?: string }> | undefined;
+  const remarks = (fullReport?.remarks ?? (report as unknown as Record<string, unknown>).remarks) as string | undefined;
   const generatedOn = report.generatedOn ?? report.statusUpdatedAt;
 
   return (
@@ -153,7 +164,12 @@ const CoreDetailRenderer = ({ report }: { readonly report: CertReportSummary }) 
             {parameters.map((p) => (
               <div key={p.name} className="flex items-baseline justify-between py-2 text-sm">
                 <span className="text-gray-500 dark:text-gray-400">{p.name}</span>
-                <span className="font-medium text-gray-900 dark:text-gray-100 font-mono text-xs">{p.value}</span>
+                {p.wikiPageURL ? (
+                  <a href={p.wikiPageURL} target="_blank" rel="noopener noreferrer"
+                    className="font-medium text-blue-600 dark:text-blue-400 hover:underline font-mono text-xs">{p.value}</a>
+                ) : (
+                  <span className="font-medium text-gray-900 dark:text-gray-100 font-mono text-xs">{p.value}</span>
+                )}
               </div>
             ))}
           </div>
@@ -284,9 +300,14 @@ export const DetailReportPage = () => {
   }>();
 
   const { reports, isLoading, error } = useCertReportSummary(uoi);
+  const { lookup: lookupOrgName, lookupSystem } = useOrganizationNames();
 
   // Find the specific report by endorsement ID
   const report = reports.find((r) => r.id === endorsementId) ?? null;
+
+  // Resolve provider/system names from the org directory
+  const providerName = report ? (lookupOrgName(report.providerUoi) ?? report.providerUoi) : '';
+  const systemName = report?.providerUsi ? (lookupSystem(report.providerUoi, report.providerUsi) ?? report.providerUsi) : '';
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -354,11 +375,11 @@ export const DetailReportPage = () => {
                 {typeLabel(report.type, report.description)}
                 <span className="ml-2 text-lg font-normal text-gray-500 dark:text-gray-400">{report.version}</span>
               </h1>
-              {(report.providerUoi || report.providerUsi) && (
+              {providerName && (
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Provider: <span className="font-medium text-gray-700 dark:text-gray-300">{report.providerUoi}</span>
-                  {report.providerUsi && (
-                    <span className="text-gray-400 dark:text-gray-500"> / {report.providerUsi}</span>
+                  Provider: <span className="font-medium text-gray-700 dark:text-gray-300">{providerName}</span>
+                  {systemName && (
+                    <span className="text-gray-400 dark:text-gray-500"> / {systemName}</span>
                   )}
                 </p>
               )}
