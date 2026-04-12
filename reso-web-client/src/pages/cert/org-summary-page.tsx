@@ -34,7 +34,8 @@ import { summaryToCoverageReport } from '../../api/cert-summary-adapter';
 import { useCertReportSummary } from '../../hooks/use-cert-report-summary';
 import { useMarketAverages } from '../../hooks/use-market-averages';
 import { useDAMarketAverage } from '../../hooks/use-da-market-average';
-import type { CertReportSummary, MarketAverages } from '../../api/cert-client';
+import type { CertReportSummary, MarketAverages, PerformanceMetricsReport, ResourcePerformanceStats } from '../../api/cert-client';
+import { usePerformanceMetrics } from '../../hooks/use-performance-metrics';
 import type { Endorsement, EndorsementStatus, EndorsementType } from '../../api/cert-fixtures';
 import { EndorsementSubRow } from '../../components/cert/endorsement-sub-row';
 import { useCertOrgDetail } from '../../hooks/use-cert-org-detail';
@@ -73,6 +74,58 @@ const STATUS_KEY: Record<string, EndorsementStatus> = {
   Withdrawn: 'withdrawn',
   Revoked: 'revoked',
   Legacy: 'legacy'
+};
+
+/** Known resource keys to skip when extracting per-resource perf stats. */
+const PERF_META_KEYS = new Set([
+  'reportId', 'type', 'version', 'description', 'generatedOn',
+  'recipientUoi', 'providerUoi', 'providerUsi', 'optInStatus', 'opted_in',
+  'averageResponseTimeMillis', 'averageBandwidth', 'averageResponseBytes',
+]);
+
+/** Convert API performance metrics to the PerformanceReport shape the summary page renders. Exported for testing. */
+export const perfMetricsToSummary = (
+  data: PerformanceMetricsReport,
+  ddReport: CertReportSummary | null
+): PerformanceReport => {
+  const perf = data.performanceReport;
+  const market = data.marketAverage;
+  const optedIn = perf.opted_in;
+
+  // Find the Property resource stats for the headline number
+  const propertyStats = optedIn
+    ? Object.entries(perf).find(
+        ([key, val]) => !PERF_META_KEYS.has(key) && key === 'Property' && typeof val === 'object' && val !== null
+      )?.[1] as ResourcePerformanceStats | undefined
+    : undefined;
+
+  // Compute seconds per 1,000 records from Property resource (or overall avg)
+  const avgResponseMs = propertyStats?.averageResponseTimeMs ?? perf.averageResponseTimeMillis;
+  const pageSize = propertyStats?.pageSize ?? 200;
+  const secPer1k = (avgResponseMs / 1000) * (1000 / pageSize);
+  const industrySecPer1k = (market.averageResponseTimeMillis / 1000) * (1000 / pageSize);
+  const delta = industrySecPer1k > 0 ? Math.round(((industrySecPer1k - secPer1k) / industrySecPer1k) * 100) : 0;
+
+  const avgBytes = optedIn ? perf.averageResponseBytes : 0;
+  const avgBw = optedIn ? perf.averageBandwidth : 0;
+
+  const date = (ddReport?.statusUpdatedAt || ddReport?.generatedOn || perf.generatedOn) ?? '';
+
+  return {
+    typeLabel: 'Data Dictionary',
+    version: ddReport?.version ?? perf.version,
+    date: date ? date.split('T')[0] : '',
+    secPer1k: optedIn ? secPer1k : 0,
+    industrySecPer1k,
+    deltaPercent: optedIn ? delta : 0,
+    payloadMb: avgBytes / (1024 * 1024),
+    industryPayloadMb: market.averageResponseBytes / (1024 * 1024),
+    responseS: avgResponseMs / 1000,
+    industryResponseS: market.averageResponseTimeMillis / 1000,
+    throughputMbS: avgBw / 1024,
+    industryThroughputMbS: market.averageBandwidth / 1024,
+    optedOut: !optedIn,
+  };
 };
 
 const adaptEndorsement = (
@@ -237,6 +290,14 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: 
     [activeDdSummary, marketAverages, daMarketAvg]
   );
 
+  // Fetch performance metrics for the active DD report
+  const { data: perfMetrics, isLoading: isLoadingPerf } = usePerformanceMetrics(activeDdSummary?.id);
+
+  const activePerformance = useMemo<PerformanceReport | null>(() => {
+    if (!perfMetrics) return null;
+    return perfMetricsToSummary(perfMetrics, activeDdSummary);
+  }, [perfMetrics, activeDdSummary]);
+
   const cityState = [
     org.OrganizationCity,
     org.OrganizationStateOrProvince
@@ -380,9 +441,8 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: 
         systemName={activeGroup?.systemName}
       />
 
-      {/* Performance — TODO: wire from DD report or separate
-          endpoint. Placeholder for now. */}
-      <PerformanceSectionView performance={null} />
+      {/* Performance — from DD report's performance metrics endpoint */}
+      <PerformanceSectionView performance={activePerformance} />
 
       {/* Endorsements — ALL endorsements for this org, ALL providers,
           always visible. The provider switcher above does NOT filter

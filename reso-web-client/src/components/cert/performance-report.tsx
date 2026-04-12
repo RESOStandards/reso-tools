@@ -147,7 +147,7 @@ const ResourcePerfCard = ({
           </p>
         </div>
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">Median Response</p>
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">Median</p>
           <p className="text-lg font-bold tabular-nums text-gray-900 dark:text-gray-100">
             {formatMs(stats.medianResponseTimeMs)}
           </p>
@@ -244,20 +244,22 @@ export const PerformanceReport = ({
     return entries.sort((a, b) => a.name.localeCompare(b.name));
   }, [perf]);
 
-  // Projected replication stats (from largest resource)
-  const replicationEstimate = useMemo(() => {
-    if (resourceStats.length === 0) return null;
-    const largest = resourceStats.reduce((a, b) =>
-      a.stats.numRecordsFetched > b.stats.numRecordsFetched ? a : b
-    );
-    const recordsPerSecond = largest.stats.pageSize / (largest.stats.averageResponseTimeMs / 1000);
-    return {
-      resource: largest.name,
-      recordsPerSecond: Math.round(recordsPerSecond),
-      timeFor10k: (10_000 / recordsPerSecond),
-      timeFor100k: (100_000 / recordsPerSecond),
-    };
-  }, [resourceStats]);
+  // Per-resource replication estimates
+  const replicationStats = useMemo(() =>
+    resourceStats.map(({ name, stats }) => {
+      const recordsPerSecond = stats.averageResponseTimeMs > 0
+        ? stats.pageSize / (stats.averageResponseTimeMs / 1000)
+        : 0;
+      return {
+        name,
+        recordsPerSecond: Math.round(recordsPerSecond),
+        avgResponseMs: stats.averageResponseTimeMs,
+        bandwidth: stats.bandwidth,
+        pageSize: stats.pageSize,
+      };
+    }),
+    [resourceStats]
+  );
 
   return (
     <div className="space-y-6">
@@ -297,26 +299,44 @@ export const PerformanceReport = ({
         />
       </div>
 
-      {/* Projected replication */}
-      {optedIn && replicationEstimate && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className={TILE}>
-            <p className={TILE_LABEL}>Records per Second</p>
-            <p className={TILE_VALUE}>{formatNumber(replicationEstimate.recordsPerSecond)}</p>
-            <p className={TILE_SUB}>Based on {replicationEstimate.resource} resource</p>
+      {/* Replication throughput by resource */}
+      {optedIn && replicationStats.length > 0 && (() => {
+        const maxRps = Math.max(...replicationStats.map((r) => r.recordsPerSecond), 1);
+        return (
+          <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-6 space-y-4">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Replication Throughput by Resource
+            </h3>
+            <div className="space-y-3">
+              {replicationStats.map((r) => (
+                <div key={r.name} className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100 w-24 shrink-0 truncate">{r.name}</span>
+                  <div className="flex-1 h-3 bg-gray-100 dark:bg-gray-700/50 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-blue-500"
+                      style={{ width: `${(r.recordsPerSecond / maxRps) * 100}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0 text-xs tabular-nums">
+                    <span className="font-semibold text-gray-900 dark:text-gray-100 w-20 text-right">
+                      {formatNumber(r.recordsPerSecond)} rec/s
+                    </span>
+                    <span className="text-gray-500 dark:text-gray-400 w-16 text-right">
+                      {formatMs(r.avgResponseMs)}
+                    </span>
+                    <span className="text-gray-500 dark:text-gray-400 w-20 text-right">
+                      {formatBandwidth(r.bandwidth)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-400 dark:text-gray-500">
+              Records per second based on page size and average response time per resource
+            </p>
           </div>
-          <div className={TILE}>
-            <p className={TILE_LABEL}>Time to Replicate 10K Records</p>
-            <p className={TILE_VALUE}>{formatMs(replicationEstimate.timeFor10k * 1000)}</p>
-            <p className={TILE_SUB}>Projected from sampling data</p>
-          </div>
-          <div className={TILE}>
-            <p className={TILE_LABEL}>Time to Replicate 100K Records</p>
-            <p className={TILE_VALUE}>{formatMs(replicationEstimate.timeFor100k * 1000)}</p>
-            <p className={TILE_SUB}>Projected from sampling data</p>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Per-resource breakdown */}
       {optedIn && resourceStats.length > 0 && (
