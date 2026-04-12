@@ -446,31 +446,45 @@ export const ServerExplorer = ({
             ))}
           </select>
         </div>
-        <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-sm">
-          <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Availability</span>
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0 mr-1">Availability</span>
+          {([
+            { value: 0, label: '0%', title: 'Fields with no data' },
+            { value: 1, label: '> 0%', title: 'Fields with any data (default)' },
+            { value: 25, label: '≥ 25%', title: 'Fields present in at least 25% of records' },
+            { value: 50, label: '≥ 50%', title: 'Fields present in at least half of records' },
+            { value: 75, label: '≥ 75%', title: 'Fields present in most records' },
+            { value: 90, label: 'p90', title: '90th percentile – fields present in 90%+ of records' },
+            { value: 95, label: 'p95', title: '95th percentile – near-universal fields' },
+            { value: 99, label: 'p99', title: '99th percentile – effectively required fields' },
+            { value: 100, label: '100%', title: 'Fields present in every record' },
+          ] as const).map((stop) => (
+            <button
+              key={stop.value}
+              type="button"
+              title={stop.title}
+              onClick={() => setAvailThreshold(stop.value)}
+              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                availThreshold === stop.value
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              {stop.label}
+            </button>
+          ))}
           <input
-            type="range"
+            type="number"
             min={0}
             max={100}
-            step={1}
             value={availThreshold}
-            onChange={(e) => setAvailThreshold(Number(e.target.value))}
-            className="flex-1 accent-blue-600"
-            list="avail-ticks"
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (v >= 0 && v <= 100) setAvailThreshold(v);
+            }}
+            className="w-12 px-1.5 py-0.5 text-[11px] text-center rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 tabular-nums focus:outline-none focus:ring-1 focus:ring-blue-500"
+            title="Enter a custom availability threshold (0–100)"
           />
-          <datalist id="avail-ticks">
-            <option value="0" label="0%" />
-            <option value="25" label="25%" />
-            <option value="50" label="50%" />
-            <option value="75" label="75%" />
-            <option value="90" label="p90" />
-            <option value="95" label="p95" />
-            <option value="99" label="p99" />
-            <option value="100" label="100%" />
-          </datalist>
-          <span className="text-xs font-semibold tabular-nums text-gray-900 dark:text-gray-100 w-20 text-right shrink-0">
-            {availThreshold === 0 ? 'No Data' : availThreshold === 1 ? 'Above 0%' : `Above ${availThreshold}%`}
-          </span>
         </div>
       </div>
 
@@ -543,7 +557,7 @@ export const ServerExplorer = ({
                         striped={idx % 2 === 1}
                         badges={
                           <>
-                            <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 w-28 truncate">
+                            <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 w-32 truncate text-right">
                               {friendlyType(f.type, f.isEnum)}
                             </span>
                             {f.standardRESO ? (

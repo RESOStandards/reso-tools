@@ -120,11 +120,11 @@ export const FieldRow = ({
   >
     <div className="flex items-center gap-3">
       <ExpandChevron expanded={expanded} />
-      <span className="font-medium text-sm text-gray-900 dark:text-gray-100 min-w-0 truncate sm:max-w-[40%]">
+      <span className="font-medium text-sm text-gray-900 dark:text-gray-100 min-w-0 truncate sm:max-w-[35%]">
         {fieldName}
       </span>
       {badges && (
-        <div className="hidden sm:flex items-center gap-2 flex-1 min-w-0 justify-end">
+        <div className="hidden sm:flex items-center gap-3 flex-1 min-w-0 justify-end">
           {badges}
         </div>
       )}

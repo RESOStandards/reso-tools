@@ -320,7 +320,7 @@ export const PerformanceReport = ({
                     {/* Industry average marker */}
                     {industryRps > 0 && (
                       <div
-                        className="absolute top-0 h-full border-r-2 border-dashed border-gray-400 dark:border-gray-500 z-10"
+                        className="absolute top-0 h-full border-r-[3px] border-dashed border-amber-500 dark:border-amber-400 z-10"
                         style={{ left: `${Math.min((industryRps / maxRps) * 100, 100)}%` }}
                         title={`Industry avg: ${formatNumber(industryRps)} rec/s`}
                       />
@@ -345,7 +345,7 @@ export const PerformanceReport = ({
               ))}
             </div>
             <p className="text-[10px] text-gray-400 dark:text-gray-500">
-              Records per second based on page size and average response time · dashed line = industry avg ({formatNumber(industryRps)} rec/s at {formatMs(market.averageResponseTimeMillis)})
+              Records per second based on page size and average response time · <span className="text-amber-500">dashed line</span> = industry avg ({formatNumber(industryRps)} rec/s at {formatMs(market.averageResponseTimeMillis)})
             </p>
           </div>
         );

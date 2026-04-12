@@ -148,17 +148,43 @@ Click any organization in the Endorsements list to open its Summary view. This i
 
 > **[ Image placeholder: Per-organization Summary view ]**
 >
-> *Alt text:* "Screenshot of the per-organization Summary page. The header shows the organization name, type, location, UOI, and website. A synthesis line below the header summarizes their certification status (e.g., 'Certified Current in 3 of 3 active endorsements, most recent run 6 months ago'). Below that, a Coverage section shows field-cut tiles (All Fields Available, RESO Standard Fields, RESO Enumerations, Local Fields) with bar charts comparing this provider to the industry average. Below Coverage is a Performance section with replication-speed metrics, and below Performance is the list of individual endorsements as expandable cards."
+> *Alt text:* "Screenshot of the per-organization Summary page. The header shows the organization name, type badge, location, UOI (copyable), and website link. A provider switcher row shows pill-shaped buttons for each provider/system combination, with a 'View Details' link right-aligned. Below the switcher, the Coverage section shows five tiles: RESO Fields with Data, RESO Lookups with Data, Field Standardization, Lookup Standardization, and Local Fields – each with the provider's count or percentage and the industry average. An IDX Payload section shows coverage with per-resource bars (Property, Member, Office, Media, OpenHouse) comparing provider to industry. Below Coverage is a Performance section with a hero replication-speed metric (seconds per 1,000 records), a percentage-faster-than-industry callout, and three supporting metrics (Avg Payload, Avg Response, Throughput) each with industry comparisons and green/amber delta labels. If the provider has opted out of performance metrics, the section shows 'N/A' with industry averages still visible."
+
+### Detail Report
+
+Click "View Details" on any endorsement to open the full Detail Report. The detail page uses a consistent "RESO \<type\> \<version\> Report" title format (e.g., "RESO Data Dictionary 2.0 Report") and shows the recipient name, provider, status, and spec links.
+
+For Data Dictionary endorsements, the detail page has three views accessible via a toggle:
+
+**RESO Analytics** – the default view. Shows hero tiles (resources, fields, lookups, standardization rate, report date), filter toggles (All/RESO/IDX/Local) with count badges, and expandable per-resource cards. Each resource card shows field and lookup counts, a standardization bar, and available-field/lookup counts from the data availability report. Expanding a card reveals category breakdowns (RESO/IDX/Local segmented bars) and availability distribution (bucket bars at each threshold with industry average markers). Counts are clickable – clicking "382 RESO" switches to the Server Explorer pre-filtered to RESO fields.
+
+> **[ Image placeholder: RESO Analytics view ]**
+>
+> *Alt text:* "Screenshot of the RESO Analytics view for a DD 2.0 report. Five hero tiles across the top: Resources (16), Fields (293), Lookups (1,682), Standardization (97%), Report Date (Sep 22, 2025). Below, a toggle row shows 'RESO Analytics' active with 'Server Explorer' and 'Performance' as alternatives. Filter pills (All/RESO/IDX/Local) sit above a grid of expandable resource cards. One resource card is expanded showing segmented RESO/IDX/Local bars for fields and lookups, and availability distribution bucket charts with dashed industry-average markers."
+
+**Server Explorer** – a metadata browser powered entirely by the cert API. No live server connection required. Shows a resource dropdown, an availability threshold slider (default: 'Above 0%'), a search bar that filters across both field names and lookup values, and category pills (All/RESO/Local/Payload). The field list shows each field's name, friendly DD type, RESO/local badge, and availability percentage. Expanding a field reveals four tabs mirroring the old cert app: Lookup Values (with All/RESO/Local pills and per-value availability bars), Data Dictionary (type, payloads, lookup name, DD Wiki link), OData Info (OData type, nullable, collection, underlying enum type), and Annotations.
+
+> **[ Image placeholder: Server Explorer view ]**
+>
+> *Alt text:* "Screenshot of the Server Explorer view. The top row has a Resource dropdown set to 'Property (691)' and an availability slider at 'Above 0%'. Below, a search bar and category pills (All, RESO active, Local, Payload). The field list shows fields like 'Appliances' with type 'String List, Multi', a green RESO badge, and '62%' availability. One field is expanded showing the Data Dictionary tab with Type, Payloads (IDX), LookupName, and a DD Wiki link."
+
+**Performance** – provider vs. industry comparison. Three horizontal comparison bars (Average Response Time, Throughput, Average Payload Size) each showing provider and industry values with green/amber 'Better/Below' delta badges. A Replication Throughput by Resource section shows per-resource bars (Field, Lookup, Property) with records-per-second, response time, and bandwidth, plus a dashed industry-average marker. Per-resource cards show detailed sampling stats. If the provider has opted out, an explanation banner appears and industry averages are shown alone.
+
+> **[ Image placeholder: Performance view ]**
+>
+> *Alt text:* "Screenshot of the Performance view. A card titled 'Provider vs. Industry Performance' shows three comparison bars: Average Response Time (provider 183ms in green, industry 1.10s in gray, 'Better 83%'), Throughput (provider 523 KB/s in amber, industry 886 KB/s in gray, 'Below 41%'), Average Payload Size (provider 71.6 KB, industry 1,013.1 KB). Below, a 'Replication Throughput by Resource' chart shows bars for Field, Lookup, and Property with records-per-second labels and a dashed industry-average marker line. Per-resource cards at the bottom show avg/median response times, throughput, payload size, records fetched, unique records, page size, and date range."
+
+For Web API Core endorsements, the detail page shows version, OData version, authentication method, report date, a test parameters table with wiki links, and remarks.
+
+For all other endorsement types (DD 1.7, Common Format, Add/Edit, Webhooks), the detail page shows version, status, report date, and remarks.
 
 ### Running Cert From the Desktop
 
-For provider users (signed-in users with write access to their org's certification jobs), the workspace includes a **Run Cert** flow that calls the **[RESO Certification](../reso-certification/)** runners directly against any connected server.
+For provider users (signed-in users with write access to their org's certification jobs), the workspace will include a **Run Cert** flow that calls the **[RESO Certification](../reso-certification/)** runners directly against any connected server. This feature is on the roadmap.
 
 > **[ Image placeholder: Run Cert dialog ]**
 >
 > *Alt text:* "Screenshot of the Run Cert dialog. The dialog has fields for selecting the target server (defaults to the active connection), the endorsement to test (Web API Core, Data Dictionary, Add/Edit, EntityEvent), the cert version, and any per-flow options. A 'Start' button kicks off the run; a real-time log panel below the form shows the cert progress streaming as it runs. Upon completion, the dialog shows a per-scenario pass/fail summary and a 'View Full Report' button."
-
-The cert run executes locally inside the desktop client process – there is no cloud component, no external service, no submission required. You see the same per-scenario results the official RESO cert process produces. When you are ready to submit for official certification, the same JSON report can be uploaded directly.
 
 ### Local Job Management
 
