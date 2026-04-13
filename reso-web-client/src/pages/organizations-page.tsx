@@ -463,9 +463,7 @@ const OrgRow = ({ org, stripe, expanded, onToggle }: {
 
                 <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">Certification:</span>
                 <a
-                  href={org.CertificationSummaryUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href={`/cert/orgs/${encodeURIComponent(org.OrganizationUniqueId)}`}
                   className="text-blue-600 dark:text-blue-400 hover:underline"
                 >
                   View Summary

@@ -2,6 +2,30 @@
 
 ---
 
+## v0.8 – 2026-04-12
+
+### Eight Days a Week
+
+**The cert UI ships.** The desktop client now includes a full certification analytics workspace with three detail views for every Data Dictionary endorsement:
+
+- **RESO Analytics** – hero metrics, expandable resource cards with per-resource standardization rates, availability distribution with industry comparison and clickable counts that navigate to the Server Explorer
+- **Server Explorer** – a metadata browser powered entirely by the cert API (no live server needed), with per-field availability, four-tab field detail (Lookup Values, Data Dictionary, OData Info, Annotations), search across fields and lookup values, data set filters (All/RESO/Local/IDX), element type filters (All/Fields/Enums/Expansions) and an availability threshold with preset stops at p90, p95 and p99
+- **Performance** – provider vs. industry comparison bars for response time, throughput and payload size, per-resource replication throughput with industry average markers, and per-resource sampling cards with detailed stats
+
+**The Org Summary page is live.** Coverage tiles, per-resource bars with industry comparison, performance headlines with delta callouts, provider switcher, "View Details" navigation and an "Expiring Soon" badge for endorsements older than two years.
+
+**The data generator got realistic.** City-specific street names from 75 real U.S. locations, field-name-aware numeric bounds (~40 rules), geo-consistent addresses across Property, Member and Office, co-agents from the same office as the primary agent, 20 real MLS system names and a reset button with two-step confirmation.
+
+**The MCP guide gained an Add/Edit section.** Section 4 is now a standalone walkthrough of create, update, delete and error handling – including the three error patterns every AI integration needs to handle (structured 400s, 404s and silent acceptance of bad data). Section 5 builds on it with EntityEvent change tracking.
+
+**Shared metadata components keep things consistent.** Badge, FieldRow, FilterPill, SearchInput, ResourceButton and AvailabilityThresholdPills are extracted into a shared module so the live metadata browser and the cert Server Explorer stay visually in sync.
+
+**1,185 tests passing across 8 packages** (up from 1,097 in v0.7).
+
+**[Download the desktop client](https://github.com/RESOStandards/reso-tools/releases/latest)** for macOS, Windows and Linux from the GitHub releases page. New test coverage for the cert summary adapter, detail report renderer selection and performance metrics adapter.
+
+---
+
 ## v0.7 – 2026-04-06
 
 ### Return of the MCP
@@ -18,7 +42,7 @@
 
 **1,097 tests passing across 8 packages.** The MCP server's test suite now asserts the destructive-hint annotations on the new write tools so the safety contract is enforced in CI.
 
-**What is next.** v0.8 – "License to Cert" – focuses on the desktop client Cert UI: Endorsements, Certification dashboard, and the role-based access work that has been waiting since v0.5.
+**What is next.** v0.8 – "Eight Days a Week" – the cert UI in the desktop client with analytics, server explorer, and performance views.
 
 ---
 

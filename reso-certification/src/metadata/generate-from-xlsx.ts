@@ -246,7 +246,6 @@ const extractResources = (
         : `${baseUrl}/${field.resourceName}+Resource`;
       resources.push({
         resourceName: field.resourceName,
-        // @ts-expect-error — wikiPageURL is in the reference format but not in our strict type
         wikiPageURL: resourceUrl,
       });
     }

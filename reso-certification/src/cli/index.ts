@@ -11,9 +11,11 @@
  * Exit codes: 0 = all scenarios passed, 1 = one or more failed, 2 = runtime error.
  */
 
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Command } from 'commander';
+import { synthesizeResourcesFromFields } from '../metadata/index.js';
+import type { MetadataReport } from '../metadata/index.js';
 import { startMockServer, stopMockServer } from '../add-edit/mock/server.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
 import { loadConfigFile, configEntryToAddEdit, configEntryToEntityEvent, configEntryToCore } from '../sdk/config.js';
@@ -479,5 +481,52 @@ ddCmd.action(
     }
   },
 );
+
+// ── Metadata Report subcommand group ──
+//
+// Utilities for working with metadata reports outside of a full
+// certification run. Today this is just the `adapt` subcommand,
+// which fills in the top-level resources[] block on DD 2.0/2.1
+// reports so they can be loaded by tools that expect a DD 2.2-shaped
+// report (notably the Reference Server).
+
+const metadataReportCmd = program
+  .command('metadata-report')
+  .description('Utilities for working with metadata report JSON files');
+
+metadataReportCmd
+  .command('adapt')
+  .description(
+    'Synthesize the top-level resources[] block on a DD 2.0/2.1 metadata report so it can be loaded by tools that expect a DD 2.2-shaped report. Idempotent — DD 2.2+ reports pass through unchanged.'
+  )
+  .requiredOption('--in <path>', 'Input metadata report JSON file')
+  .requiredOption('--out <path>', 'Output path for the adapted report')
+  .option('--pretty', 'Pretty-print the output JSON (2-space indent)')
+  .action(async (opts: { in: string; out: string; pretty?: boolean }) => {
+    try {
+      const inPath = resolve(opts.in);
+      const outPath = resolve(opts.out);
+
+      const raw = await readFile(inPath, 'utf-8');
+      const parsed = JSON.parse(raw) as MetadataReport;
+      const adapted = synthesizeResourcesFromFields(parsed);
+
+      const output = opts.pretty
+        ? JSON.stringify(adapted, null, 2)
+        : JSON.stringify(adapted);
+
+      await writeFile(outPath, output, 'utf-8');
+
+      const wasNoOp = adapted === parsed;
+      const resourceCount = adapted.resources.length;
+      const verb = wasNoOp ? 'passed through' : 'adapted';
+      console.error(
+        `${verb} ${inPath} → ${outPath} (${resourceCount} resources${wasNoOp ? ', already populated' : ', synthesized'})`
+      );
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exitCode = 2;
+    }
+  });
 
 program.parse();

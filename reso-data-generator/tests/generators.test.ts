@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { getGenerator } from '../src/generators/index.js';
+import { getGenerator, setRecordPool, clearRecordPools } from '../src/generators/index.js';
 import { generateMediaRecords } from '../src/generators/media.js';
 import { generateMemberRecords } from '../src/generators/member.js';
 import { generateOfficeRecords } from '../src/generators/office.js';
 import { generateOpenHouseRecords } from '../src/generators/open-house.js';
-import { generatePropertyRecords } from '../src/generators/property.js';
+import { generatePropertyRecords, reflattenAgentFields } from '../src/generators/property.js';
 import { generateShowingRecords } from '../src/generators/showing.js';
 import type { ResoField, ResoLookup } from '../src/generators/types.js';
 
@@ -336,6 +336,207 @@ describe('generateShowingRecords', () => {
     expect(records[0]).not.toHaveProperty('ShowingStartTime');
     expect(records[0]).not.toHaveProperty('ShowingEndTime');
     expect(records[0]).not.toHaveProperty('ShowingInstructions');
+  });
+});
+
+describe('Property relational integrity', () => {
+  const offices = generateOfficeRecords(OFFICE_FIELDS, {}, 3);
+  // Assign synthetic keys
+  const officesWithKeys = offices.map((o, i) => ({ ...o, OfficeKey: `office-${i}` }));
+
+  const members = generateMemberRecords(MEMBER_FIELDS, {}, 10);
+  // Assign synthetic keys and link each member to an office
+  const membersWithKeys = members.map((m, i) => ({
+    ...m,
+    MemberKey: `member-${i}`,
+    OfficeKey: officesWithKeys[i % officesWithKeys.length].OfficeKey
+  }));
+
+  // Populate pools so getGenerator('Property') can access them
+  clearRecordPools();
+  setRecordPool('Member', membersWithKeys);
+  setRecordPool('Office', officesWithKeys);
+
+  // Use getGenerator to go through the GENERATORS registry which wires pools
+  const propertyGenerator = getGenerator('Property');
+  const propertyRecords = propertyGenerator(PROPERTY_FIELDS, SAMPLE_LOOKUPS, 20);
+
+  it('flattens ListAgent fields from the Member pool', () => {
+    for (const record of propertyRecords) {
+      // ListAgent is always populated when pools exist
+      expect(record.ListAgentFirstName).toBeDefined();
+      expect(record.ListAgentLastName).toBeDefined();
+      expect(record.ListAgentFullName).toBeDefined();
+      expect(record.ListAgentKey).toBeDefined();
+      // The key should reference a real member from the pool
+      const memberKeys = membersWithKeys.map(m => m.MemberKey);
+      expect(memberKeys).toContain(record.ListAgentKey);
+    }
+  });
+
+  it('flattens BuyerAgent fields from the Member pool', () => {
+    for (const record of propertyRecords) {
+      expect(record.BuyerAgentFirstName).toBeDefined();
+      expect(record.BuyerAgentKey).toBeDefined();
+      const memberKeys = membersWithKeys.map(m => m.MemberKey);
+      expect(memberKeys).toContain(record.BuyerAgentKey);
+    }
+  });
+
+  it('derives Office from the agent Member OfficeKey', () => {
+    for (const record of propertyRecords) {
+      const agentKey = record.ListAgentKey as string;
+      const agent = membersWithKeys.find(m => m.MemberKey === agentKey);
+      expect(agent).toBeDefined();
+      // The ListOffice should match the agent's office
+      const expectedOffice = officesWithKeys.find(o => o.OfficeKey === agent!.OfficeKey);
+      expect(record.ListOfficeKey).toBe(expectedOffice!.OfficeKey);
+      expect(record.ListOfficeName).toBe(expectedOffice!.OfficeName);
+    }
+  });
+
+  it('selects co-agents from the same office as the primary agent', () => {
+    // Not every record has co-agents (probabilistic), so check those that do
+    const withCoList = propertyRecords.filter(r => r.CoListAgentKey !== undefined);
+    for (const record of withCoList) {
+      const agentKey = record.ListAgentKey as string;
+      const coAgentKey = record.CoListAgentKey as string;
+      const agent = membersWithKeys.find(m => m.MemberKey === agentKey);
+      const coAgent = membersWithKeys.find(m => m.MemberKey === coAgentKey);
+      expect(agent).toBeDefined();
+      expect(coAgent).toBeDefined();
+      // Same office
+      expect(coAgent!.OfficeKey).toBe(agent!.OfficeKey);
+      // Different person
+      expect(coAgentKey).not.toBe(agentKey);
+    }
+  });
+
+  it('does not produce billion-dollar values for expense fields', () => {
+    for (const record of propertyRecords) {
+      const expenseFields = [
+        'GardenerExpense', 'ManagerExpense', 'PoolExpense',
+        'SuppliesExpense', 'ProfessionalManagementExpense',
+        'FurnitureReplacementExpense', 'NewTaxesExpense'
+      ];
+      for (const field of expenseFields) {
+        const val = record[field] as number;
+        expect(val).toBeLessThanOrEqual(15000);
+      }
+    }
+  });
+
+  it('generates realistic unit counts', () => {
+    for (const record of propertyRecords) {
+      expect(record.NumberOfUnitsTotal as number).toBeLessThanOrEqual(75);
+      expect(record.NumberOfPads as number).toBeLessThanOrEqual(10);
+      const total = record.NumberOfUnitsTotal as number;
+      const leased = record.NumberOfUnitsLeased as number;
+      const vacant = record.NumberOfUnitsVacant as number;
+      expect(leased + vacant).toBe(total);
+    }
+  });
+
+  it('generates cap rate between 3% and 12%', () => {
+    for (const record of propertyRecords) {
+      const cap = record.CapRate as number;
+      expect(cap).toBeGreaterThanOrEqual(0.03);
+      expect(cap).toBeLessThanOrEqual(0.12);
+    }
+  });
+
+  it('generates without pools (no crash, no flattened fields)', () => {
+    clearRecordPools();
+    const records = generatePropertyRecords(PROPERTY_FIELDS, SAMPLE_LOOKUPS, 3);
+    expect(records).toHaveLength(3);
+    // No ListAgentKey since pools are empty
+    expect(records[0].ListAgentKey).toBeUndefined();
+  });
+});
+
+describe('reflattenAgentFields', () => {
+  // Simulate the server flow: generate pools, generate property, assign FK, reflatten
+  const offices = generateOfficeRecords(OFFICE_FIELDS, {}, 3);
+  const officesWithKeys = offices.map((o, i) => ({ ...o, OfficeKey: `office-${i}` }));
+
+  const members = generateMemberRecords(MEMBER_FIELDS, {}, 10);
+  const membersWithKeys = members.map((m, i) => ({
+    ...m,
+    MemberKey: `member-${i}`,
+    OfficeKey: officesWithKeys[i % officesWithKeys.length].OfficeKey
+  }));
+
+  it('corrects flattened fields to match FK-assigned keys', () => {
+    // Generate a property with pools (flattening picks random members)
+    clearRecordPools();
+    setRecordPool('Member', membersWithKeys);
+    setRecordPool('Office', officesWithKeys);
+    const gen = getGenerator('Property');
+    const records = [...gen(PROPERTY_FIELDS, SAMPLE_LOOKUPS, 10)];
+
+    for (const record of records) {
+      // Simulate FK resolver overwriting ListAgentKey with a specific member
+      const targetMember = membersWithKeys[3];
+      record.ListAgentKey = targetMember.MemberKey;
+
+      // Before reflatten, the flattened fields may not match the FK key
+      // (they were picked randomly during generation)
+
+      // Reflatten to fix the mismatch
+      reflattenAgentFields(record, membersWithKeys, officesWithKeys);
+
+      // After reflatten, the flattened fields MUST match the FK-assigned member
+      expect(record.ListAgentKey).toBe(targetMember.MemberKey);
+      expect(record.ListAgentFirstName).toBe(targetMember.MemberFirstName);
+      expect(record.ListAgentLastName).toBe(targetMember.MemberLastName);
+      expect(record.ListAgentFullName).toBe(targetMember.MemberFullName);
+      expect(record.ListAgentEmail).toBe(targetMember.MemberEmail);
+      expect(record.ListAgentMlsId).toBe(targetMember.MemberMlsId);
+
+      // Office should match the target member's office
+      const expectedOffice = officesWithKeys.find(o => o.OfficeKey === targetMember.OfficeKey);
+      expect(record.ListOfficeKey).toBe(expectedOffice!.OfficeKey);
+      expect(record.ListOfficeName).toBe(expectedOffice!.OfficeName);
+    }
+  });
+
+  it('handles missing member key gracefully (no crash)', () => {
+    const record: Record<string, unknown> = { ListAgentKey: 'nonexistent-key' };
+    // Should not throw, just leave fields unchanged
+    reflattenAgentFields(record, membersWithKeys, officesWithKeys);
+    expect(record.ListAgentFirstName).toBeUndefined();
+  });
+
+  it('skips roles with no key assigned', () => {
+    const record: Record<string, unknown> = {};
+    reflattenAgentFields(record, membersWithKeys, officesWithKeys);
+    // No keys = no flattening
+    expect(record.ListAgentFirstName).toBeUndefined();
+    expect(record.BuyerAgentFirstName).toBeUndefined();
+  });
+
+  it('handles multiple roles independently', () => {
+    clearRecordPools();
+    setRecordPool('Member', membersWithKeys);
+    setRecordPool('Office', officesWithKeys);
+    const gen = getGenerator('Property');
+    const records = [...gen(PROPERTY_FIELDS, SAMPLE_LOOKUPS, 5)];
+
+    for (const record of records) {
+      // Assign different members to different roles
+      const listMember = membersWithKeys[0];
+      const buyerMember = membersWithKeys[5];
+      record.ListAgentKey = listMember.MemberKey;
+      record.BuyerAgentKey = buyerMember.MemberKey;
+
+      reflattenAgentFields(record, membersWithKeys, officesWithKeys);
+
+      // Each role should have the correct member's data
+      expect(record.ListAgentFirstName).toBe(listMember.MemberFirstName);
+      expect(record.BuyerAgentFirstName).toBe(buyerMember.MemberFirstName);
+      // They should be different people
+      expect(record.ListAgentFirstName).not.toBe(record.BuyerAgentFirstName);
+    }
   });
 });
 

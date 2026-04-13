@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ page.title | default: site.title }}</title>
   <meta name="description" content="{{ page.description | default: site.description }}">
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <meta property="og:title" content="{{ page.title | default: site.title }}">
+  <meta property="og:description" content="{{ page.description | default: site.description }}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="RESO Tools">
+  <meta property="og:image" content="https://www.reso.org/wp-content/uploads/2020/06/RESO-Logo-Fullname_Horizontal_Blue.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="{{ page.title | default: site.title }}">
+  <meta name="twitter:description" content="{{ page.description | default: site.description }}">
+  <meta name="twitter:image" content="https://www.reso.org/wp-content/uploads/2020/06/RESO-Logo-Fullname_Horizontal_Blue.png">
   {% seo %}
   <style>
     :root {
@@ -584,6 +594,20 @@
       line-height: 1.7;
     }
 
+    /* Heading anchor links — copy permalink on click */
+    .content h1[id], .content h2[id], .content h3[id], .content h4[id] { position: relative; cursor: pointer; }
+    .content h1[id]::after, .content h2[id]::after, .content h3[id]::after, .content h4[id]::after {
+      content: '#';
+      font-size: 0.75em;
+      font-weight: 400;
+      color: var(--reso-gray-400);
+      margin-left: 0.5rem;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .content h1[id]:hover::after, .content h2[id]:hover::after, .content h3[id]:hover::after, .content h4[id]:hover::after { opacity: 1; }
+    .content h1[id].copied::after, .content h2[id].copied::after, .content h3[id].copied::after, .content h4[id].copied::after { content: '✓ copied'; opacity: 1; color: var(--reso-green); }
+
     /* Markdown content */
     .content h1, .content h2, .content h3, .content h4 { color: var(--reso-gray-800); }
     .content h1 {
@@ -859,6 +883,17 @@
         headerNav.classList.toggle('open');
       });
 
+      // Heading permalink copy
+      document.querySelectorAll('.content h1[id], .content h2[id], .content h3[id], .content h4[id]').forEach(function(h) {
+        h.addEventListener('click', function() {
+          var url = location.origin + location.pathname + '#' + h.id;
+          navigator.clipboard.writeText(url).then(function() {
+            h.classList.add('copied');
+            setTimeout(function() { h.classList.remove('copied'); }, 1500);
+          });
+        });
+      });
+
       // About dropdown toggle
       var aboutDropdown = document.getElementById('aboutDropdown');
       var aboutTrigger = aboutDropdown.querySelector('.nav-dropdown-trigger');
@@ -917,6 +952,77 @@
         if (e.key === 'Escape') overlay.classList.remove('active');
       });
     });
+  </script>
+
+  <!-- Open House Rush easter egg (vanilla JS) -->
+  <div id="ohr-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+    <div id="ohr-game" style="background:var(--reso-navy);border-radius:1rem;padding:1.5rem;max-width:420px;width:calc(100% - 2rem);color:#e2e8f0;font-family:system-ui,sans-serif;"></div>
+  </div>
+  <script>
+  (function(){
+    var GRID=5,DURATION=30,SPAWN=1200,clicks=[],overlay=document.getElementById('ohr-overlay'),game=document.getElementById('ohr-game');
+    var HOUSES=['🏠','🏡','🏘️','🏚️','🏗️'],LOT='🌳';
+    var PUNS=['Location, location, location!','Great curb appeal!','Move-in ready!','Charming fixer-upper!','Open floor plan!',
+      'Close to schools!','Won\'t last long!','Priced to sell!','Turnkey property!','A real gem!','Below market value!',
+      'Just listed!','Multiple offers expected!','Needs a little TLC 🔨','Starter home dreams!','Perfect for investors!',
+      'HOA? Never heard of her!','Seller motivated!','As-is, where-is!','Cash only, no inspections!'];
+    var logo=document.querySelector('.header-logo');
+    if(!logo)return;
+    logo.addEventListener('click',function(e){
+      var now=Date.now();clicks=clicks.filter(function(t){return now-t<2000;});clicks.push(now);
+      if(clicks.length>=5){clicks=[];e.preventDefault();startGame();}
+    });
+    overlay.addEventListener('click',function(e){if(e.target===overlay)closeGame();});
+    function closeGame(){overlay.style.display='none';game.innerHTML='';}
+    function startGame(){
+      var grid=[],score=0,missed=0,timeLeft=DURATION,over=false,pun='',timer,spawner;
+      for(var i=0;i<GRID*GRID;i++)grid[i]={c:LOT,a:false,s:false};
+      overlay.style.display='flex';
+      timer=setInterval(function(){timeLeft--;if(timeLeft<=0){over=true;clearInterval(timer);clearInterval(spawner);render();}else render();},1000);
+      spawner=setInterval(function(){
+        for(var i=0;i<GRID*GRID;i++)if(grid[i].a&&!grid[i].s){grid[i]={c:LOT,a:false,s:false};missed++;}
+        var empties=[];for(var i=0;i<GRID*GRID;i++)if(!grid[i].a&&!grid[i].s)empties.push(i);
+        var n=Math.min(1+Math.floor(Math.random()*2),empties.length);
+        for(var j=0;j<n;j++){var idx=Math.floor(Math.random()*empties.length);var ci=empties.splice(idx,1)[0];grid[ci]={c:HOUSES[Math.floor(Math.random()*HOUSES.length)],a:true,s:false};}
+        render();
+      },SPAWN);
+      function click(i){if(over||!grid[i].a||grid[i].s)return;grid[i]={c:'🏠',a:false,s:true};score++;pun=PUNS[Math.floor(Math.random()*PUNS.length)];render();}
+      function render(){
+        var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">';
+        h+='<div><div style="font-size:1.1rem;font-weight:700;">🏠 Open House Rush</div><div style="font-size:0.7rem;color:#a0aec0;">Click the houses before they leave!</div></div>';
+        h+='<button onclick="this.closest(\'#ohr-overlay\').style.display=\'none\'" style="background:none;border:none;color:#a0aec0;cursor:pointer;font-size:1.2rem;">✕</button></div>';
+        h+='<div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:0.5rem;">';
+        h+='<span><b style="color:#48bb78;">Sold: '+score+'</b> &nbsp; <span style="color:#fc8181;">Missed: '+missed+'</span></span>';
+        h+='<b style="'+(timeLeft<=5?'color:#fc8181;':'')+'">'+timeLeft+'s</b></div>';
+        h+='<div style="height:6px;background:#2d3748;border-radius:3px;overflow:hidden;margin-bottom:0.75rem;">';
+        h+='<div style="height:100%;border-radius:3px;background:'+(timeLeft<=5?'#fc8181':'#48bb78')+';width:'+(timeLeft/DURATION*100)+'%;transition:width 1s;"></div></div>';
+        h+='<div style="display:grid;grid-template-columns:repeat('+GRID+',1fr);gap:4px;">';
+        for(var i=0;i<GRID*GRID;i++){
+          var g=grid[i],bg=g.s?'rgba(72,187,120,0.15)':g.a?'rgba(237,137,54,0.15)':'#2d3748';
+          h+='<div data-i="'+i+'" style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:1.5rem;background:'+bg+';border-radius:0.5rem;cursor:'+(g.a?'pointer':'default')+';user-select:none;'+(g.a?'animation:ohr-bounce 0.6s ease-in-out infinite;':'')+'">'+g.c+'</div>';
+        }
+        h+='</div>';
+        h+='<div style="height:1.5rem;text-align:center;margin-top:0.5rem;">';
+        if(pun&&!over)h+='<span style="font-size:0.7rem;color:#ed8936;font-weight:500;">'+pun+'</span>';
+        h+='</div>';
+        if(over){
+          var rank=score>=20?'🏆 Top Producer!':score>=10?'⭐ Rising Star!':score>=5?'📋 Licensed!':'📝 Studying for the exam...';
+          h+='<div style="text-align:center;padding-top:0.75rem;">';
+          h+='<div style="font-size:1.5rem;font-weight:700;">'+rank+'</div>';
+          h+='<div style="font-size:0.8rem;color:#a0aec0;margin:0.5rem 0;">You sold '+score+' house'+(score!==1?'s':'')+' and missed '+missed+'. '+(score>missed?'Not bad, agent!':'The market is tough out there!')+'</div>';
+          h+='<button id="ohr-retry" style="padding:0.5rem 1rem;font-size:0.8rem;font-weight:600;border-radius:0.5rem;border:none;background:#4299e1;color:white;cursor:pointer;margin-right:0.5rem;">Play Again</button>';
+          h+='<button id="ohr-close" style="padding:0.5rem 1rem;font-size:0.8rem;font-weight:600;border-radius:0.5rem;border:none;background:#4a5568;color:#e2e8f0;cursor:pointer;">Back to Work</button>';
+          h+='</div>';
+        }
+        game.innerHTML=h;
+        game.querySelectorAll('[data-i]').forEach(function(el){el.addEventListener('click',function(){click(parseInt(el.dataset.i));});});
+        var retry=document.getElementById('ohr-retry');if(retry)retry.addEventListener('click',function(){startGame();});
+        var close=document.getElementById('ohr-close');if(close)close.addEventListener('click',closeGame);
+      }
+      render();
+    }
+    if(!document.getElementById('ohr-style')){var s=document.createElement('style');s.id='ohr-style';s.textContent='@keyframes ohr-bounce{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}';document.head.appendChild(s);}
+  })();
   </script>
 
   <footer class="site-footer">

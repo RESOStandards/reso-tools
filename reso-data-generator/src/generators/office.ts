@@ -1,4 +1,5 @@
-import { generateRecord, randomChoice, randomInt } from './field-generator.js';
+import { generateRecord, randomChoice, randomInt, randomLookupValue } from './field-generator.js';
+import { randomLocation } from './geo-data.js';
 import type { ResoField, ResoLookup } from './types.js';
 
 const BROKERAGE_PREFIXES = [
@@ -27,45 +28,7 @@ const BROKERAGE_SUFFIXES = [
   'Brokerage'
 ];
 
-const CITY_NAMES = [
-  'Springfield',
-  'Fairview',
-  'Madison',
-  'Georgetown',
-  'Arlington',
-  'Salem',
-  'Franklin',
-  'Clinton',
-  'Greenville',
-  'Bristol'
-];
-
-const US_STATES = [
-  'AL',
-  'AZ',
-  'CA',
-  'CO',
-  'CT',
-  'FL',
-  'GA',
-  'IL',
-  'MA',
-  'MD',
-  'MI',
-  'MN',
-  'NC',
-  'NJ',
-  'NY',
-  'OH',
-  'OR',
-  'PA',
-  'RI',
-  'TX',
-  'VA',
-  'WA'
-];
-
-const STREET_NAMES = ['Commerce', 'Business', 'Corporate', 'Center', 'Market', 'Trade'];
+const FALLBACK_STREET_NAMES = ['Commerce', 'Business', 'Corporate', 'Center', 'Market', 'Trade'];
 
 /** Generates a realistic phone number. */
 const randomPhone = (): string => {
@@ -92,11 +55,15 @@ export const generateOfficeRecords = (
     record.OfficeFax = randomPhone();
     record.OfficeEmail = `info@${prefix.toLowerCase()}${suffix.replace(/\s/g, '').toLowerCase()}.example.com`;
 
-    // Address
-    record.OfficeAddress1 = `${randomInt(100, 9999)} ${randomChoice(STREET_NAMES)} Blvd`;
-    record.OfficeCity = randomChoice(CITY_NAMES);
-    record.OfficeStateOrProvince = randomChoice(US_STATES);
-    record.OfficePostalCode = String(randomInt(10000, 99999));
+    // Address — geo-consistent from real US locations
+    const location = randomLocation();
+    const streetName = location.streets.length
+      ? randomChoice([...location.streets])
+      : randomChoice(FALLBACK_STREET_NAMES);
+    record.OfficeAddress1 = `${randomInt(100, 9999)} ${streetName} Blvd`;
+    record.OfficeCity = location.city;
+    record.OfficeStateOrProvince = location.state;
+    record.OfficePostalCode = location.zip;
     record.OfficeCountry = 'US';
 
     // Status — prefer Active
@@ -106,8 +73,16 @@ export const generateOfficeRecords = (
       record.OfficeStatus = active ? 'Active' : randomChoice(statusValues).lookupValue;
     }
 
-    // National association ID
+    // Contact details
+    record.OfficeFax = randomPhone();
+    record.OfficePhoneExt = String(randomInt(100, 999));
+    record.OfficeUrl = `https://${prefix.toLowerCase()}${suffix.replace(/\s/g, '').toLowerCase()}.example.com`;
+    record.OfficeAOR = randomLookupValue('AOR', lookups) ?? `AOR-${randomInt(1000, 9999)}`;
+    record.OfficeAORMlsId = `AORMLS-${randomInt(1000, 9999)}`;
+
+    // IDs
     record.OfficeNationalAssociationId = `NRDS${String(randomInt(100000, 999999))}`;
+    record.OfficeMlsId = `O${String(randomInt(10000, 99999))}`;
 
     return record;
   });

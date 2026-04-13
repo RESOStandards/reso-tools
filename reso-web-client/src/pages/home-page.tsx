@@ -114,9 +114,8 @@ export const HomePage = () => {
 
           <Card
             title="Certification"
-            description="Run RESO certification tests against connected servers to validate compliance."
-            to="/certification"
-            disabled
+            description="Sign in to the RESO Cert workspace to view endorsements, manage results, and run compliance tests."
+            to="/cert"
             icon={
               <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                 <title>Certification</title>

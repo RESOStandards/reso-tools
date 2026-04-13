@@ -2,14 +2,26 @@ import { randomUUID } from 'node:crypto';
 import {
   KEY_FIELD_MAP,
   buildMultiResourcePlan,
+  clearRecordPools,
   getDefaultRelatedCount,
   getGenerator,
   getRelatedResources,
+  reflattenAgentFields,
+  setRecordPool,
   transformLookupsForHumanFriendly
 } from '@reso-standards/reso-data-generator';
 import type { ResoField, ResoLookup } from '@reso-standards/reso-data-generator';
 
 const LOOKUP_NAME_ANNOTATION_TERM = 'RESO.OData.Metadata.LookupName';
+
+/** Strip fields from a record that are not declared in the resource's metadata.
+ *  Prevents schema validation errors on schemaless backends (MongoDB). */
+const stripUndeclaredFields = (record: Record<string, unknown>, fields: ReadonlyArray<ResoField>): void => {
+  const declared = new Set(fields.filter(f => !f.isExpansion).map(f => f.fieldName));
+  for (const key of Object.keys(record)) {
+    if (!declared.has(key)) delete record[key];
+  }
+};
 import type { RequestHandler } from 'express';
 import type { EnumMode } from '../config.js';
 import type { DataAccessLayer, ResourceContext } from '../db/data-access.js';
@@ -140,6 +152,8 @@ export const createDataGeneratorHandler =
         // Multi-resource generation with FK resolution
         const plan = buildMultiResourcePlan(body.resource, body.count, body.relatedRecords, fieldsByResource);
         const keyPool: Record<string, string[]> = {};
+        const generatedRecords: Record<string, Array<Record<string, unknown>>> = {};
+        clearRecordPools();
 
         // Execute each phase in dependency order
         for (const phase of plan.phases) {
@@ -175,6 +189,13 @@ export const createDataGeneratorHandler =
                 }
               }
 
+              // Re-flatten agent/office fields to match FK-assigned keys
+              if (phase.resource === 'Property' && generatedRecords['Member'] && generatedRecords['Office']) {
+                const propertyFieldSet = new Set(phaseFields.filter(f => !f.isExpansion).map(f => f.fieldName));
+                reflattenAgentFields(records[i], generatedRecords['Member'], generatedRecords['Office'], propertyFieldSet);
+              }
+
+              stripUndeclaredFields(records[i], phaseFields);
               await dal.insert(phaseCtx, records[i]);
               keyPool[phase.resource].push(key);
               phaseCreated++;
@@ -183,6 +204,10 @@ export const createDataGeneratorHandler =
               errors.push(`${phase.resource} ${i + 1}: ${err instanceof Error ? err.message : 'Insert failed'}`);
             }
           }
+
+          // Stash records for cross-resource references (Property needs Member/Office pools)
+          generatedRecords[phase.resource] = records;
+          setRecordPool(phase.resource, records);
 
           if (phase.resource === body.resource) {
             created = phaseCreated;
@@ -237,11 +262,12 @@ export const createDataGeneratorHandler =
               for (const relRecord of childRecords) {
                 try {
                   const key = randomUUID();
-                  const record = {
+                  const record: Record<string, unknown> = {
                     ...relRecord,
                     [relatedCtx.keyField]: key,
                     ModificationTimestamp: new Date().toISOString()
                   };
+                  stripUndeclaredFields(record, relatedFields);
                   await dal.insert(relatedCtx, record);
                   relatedCreated++;
                 } catch (err) {
@@ -265,11 +291,12 @@ export const createDataGeneratorHandler =
         for (let i = 0; i < records.length; i++) {
           try {
             const key = randomUUID();
-            const record = {
+            const record: Record<string, unknown> = {
               ...records[i],
               [resourceCtx.keyField]: key,
               ModificationTimestamp: new Date().toISOString()
             };
+            stripUndeclaredFields(record, fields);
             await dal.insert(resourceCtx, record);
             created++;
             parentKeys.push(key);
@@ -299,11 +326,12 @@ export const createDataGeneratorHandler =
               for (const relRecord of childRecords) {
                 try {
                   const key = randomUUID();
-                  const record = {
+                  const record: Record<string, unknown> = {
                     ...relRecord,
                     [relatedCtx.keyField]: key,
                     ModificationTimestamp: new Date().toISOString()
                   };
+                  stripUndeclaredFields(record, relatedFields);
                   await dal.insert(relatedCtx, record);
                   relatedCreated++;
                 } catch (err) {
@@ -375,6 +403,55 @@ export const createDataGeneratorStatusHandler =
       }
 
       res.json({ resources });
+    } catch (err) {
+      res.status(500).json({
+        error: {
+          code: '50000',
+          message: err instanceof Error ? err.message : 'Internal server error',
+          details: []
+        }
+      });
+    }
+  };
+
+/**
+ * Creates a DELETE handler for resetting (truncating) all data.
+ * Preserves schema — only removes records from entity tables.
+ */
+export const createDataResetHandler =
+  (metadata: ResoMetadata, dal: DataAccessLayer): RequestHandler =>
+  async (_req, res) => {
+    if (!dal.truncateResource) {
+      res.status(501).json({
+        error: { code: '50100', message: 'Reset is not supported for this database backend', details: [] }
+      });
+      return;
+    }
+
+    try {
+      const results: Array<{ resource: string; deleted: number }> = [];
+
+      // Delete in reverse dependency order (children first)
+      const childResources = TARGET_RESOURCES.filter(r =>
+        ['Media', 'OpenHouse', 'Showing', 'PropertyRooms', 'PropertyGreenVerification',
+         'PropertyPowerProduction', 'PropertyUnitTypes', 'TeamMembers'].includes(r)
+      );
+      const parentResources = TARGET_RESOURCES.filter(r =>
+        !childResources.includes(r) && r !== 'Lookup'
+      );
+
+      for (const resource of [...childResources, ...parentResources]) {
+        const ctx = buildResourceContext(metadata, resource);
+        if (!ctx) continue;
+        const deleted = await dal.truncateResource(ctx);
+        if (deleted > 0) results.push({ resource, deleted });
+      }
+
+      res.json({
+        message: 'All data has been reset',
+        results,
+        totalDeleted: results.reduce((s, r) => s + r.deleted, 0)
+      });
     } catch (err) {
       res.status(500).json({
         error: {

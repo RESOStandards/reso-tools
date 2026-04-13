@@ -238,15 +238,23 @@ The result is a fully populated record object, ready to be inspected or POSTed b
 
 The generator does not just produce values that pass type checks. It produces values that *read* like real data. A short tour:
 
-* **Property** – realistic addresses across U.S. cities, listing prices distributed in plausible ranges by region, structure values (bedrooms, bathrooms, living area, lot size) that are internally consistent, geocoordinates that fall on land, listing dates and status combinations that make sense, public remarks that read like an agent wrote them, tax data based on state-specific assessment patterns
-* **Member** – first and last names from a realistic distribution, email addresses constructed from the names (`firstname.lastname@brokerage.com`), phone numbers in valid U.S. formats, designations drawn from real industry credentials (CRS, ABR, GRI, e-PRO), NAR member IDs in the right shape
-* **Office** – brokerage office records with names that read like real brokerages, addresses that match their declared cities, contact information consistent with the address
+* **Property** – realistic addresses from 75 real U.S. cities with city-specific street names, listing prices bounded by field-name-aware rules (~40 rules that prevent billion-dollar expenses and nonsensical values), structure values (bedrooms, bathrooms, living area, lot size) that are internally consistent, geocoordinates that match the declared city rather than landing in the ocean, listing dates and status combinations that make sense, public remarks that read like an agent wrote them, tax data based on state-specific assessment patterns, co-agent records drawn from the same office as the primary agent, and 20 real MLS system names for OriginatingSystem and SourceSystem fields
+* **Member** – first and last names from a realistic distribution, email addresses constructed from the names (`firstname.lastname@brokerage.com`), phone numbers in valid U.S. formats, designations drawn from real industry credentials (CRS, ABR, GRI, e-PRO), NAR member IDs in the right shape, MLS-style MemberMlsId values
+* **Office** – brokerage office records with names that read like real brokerages, addresses geo-consistent with their declared cities, contact information consistent with the address, MLS-style OfficeMlsId values
 * **Media** – image records with placeholder URLs, descriptions, and ordering, linked back to the parent resource via the RESO `ResourceName` + `ResourceRecordKey` convention so they show up in the right `Property` when expanded
 * **OpenHouse** – open house events with future-dated start times, durations that look like real open houses, linked to a parent property via `ListingKey`
 * **Showing** – showing appointments with realistic time slots, agent and contact references, linked to the parent property
 * **PropertyRooms, PropertyGreenVerification, PropertyPowerProduction, PropertyUnitTypes** – child collection records linked to the parent property via `ListingKey`, generated with a generic child generator that respects the field metadata
 
 For resources without a domain-specific generator, the library falls back to a generic field generator that handles every Edm type (`Edm.String`, `Edm.Boolean`, `Edm.Int16`, `Edm.Int32`, `Edm.Int64`, `Edm.Decimal`, `Edm.Date`, `Edm.DateTimeOffset`, `Edm.TimeOfDay`, `Edm.Guid`) plus enum and collection lookups drawn from the server's metadata.
+
+### Relational Integrity
+
+Generated records maintain referential consistency across resources. Member and Office records form pools that Property records draw from, so a listing's `ListAgentKey` always points to a real Member record and `ListOfficeKey` always points to a real Office record. Co-agents (BuyerAgent, CoBuyerAgent, CoListAgent) are selected from the same office as the primary agent. Expansion records (ListAgent, BuyerAgent, etc.) are flattened into the parent Property record consistently, so querying a Property and its expanded Member returns matching data.
+
+### Reset
+
+In the desktop client and web client, a **Reset** button with a two-step confirmation truncates all generated data while preserving the schema. This lets you regenerate fresh data without restarting the server or rebuilding containers.
 
 ---
 

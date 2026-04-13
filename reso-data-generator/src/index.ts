@@ -18,14 +18,15 @@ export { KEY_FIELD_MAP } from './generators/types.js';
 export type { BatchCreateResult, OutputFormat, OutputOptions } from './client.js';
 export { patchRecordsViaHttp } from './client.js';
 export { buildDependencyGraph, buildMultiResourcePlan, discoverForeignKeys, topologicalSort } from './fk-resolver.js';
-export { getGenerator, getLookupDisplayValue, transformLookupsForHumanFriendly } from './generators/index.js';
+export { clearRecordPools, getGenerator, getRecordPool, getLookupDisplayValue, reflattenAgentFields, setRecordPool, transformLookupsForHumanFriendly } from './generators/index.js';
 export { buildSeedPlan, getDefaultRelatedCount, getRelatedResources } from './plan.js';
 
 import { randomUUID } from 'node:crypto';
 import { createRecordsViaHttp, generateCurlScript, patchRecordsViaHttp, writeRecordsAsJson } from './client.js';
 import type { OutputOptions } from './client.js';
 import { buildMultiResourcePlan } from './fk-resolver.js';
-import { getGenerator } from './generators/index.js';
+import { clearRecordPools, getGenerator, getRecordPool, setRecordPool } from './generators/index.js';
+import { reflattenAgentFields } from './generators/property.js';
 import type { ForeignKeyBinding, SeedOptions, SeedResult } from './generators/types.js';
 import { KEY_FIELD_MAP } from './generators/types.js';
 
@@ -72,6 +73,7 @@ const generateWithDependencies = async (
   const { resource, count, relatedRecords, fieldsByResource, lookupsByType } = options;
   const plan = buildMultiResourcePlan(resource, count, relatedRecords, fieldsByResource);
   const keyPool: Record<string, string[]> = {};
+  clearRecordPools();
   const isOffline = output.format === 'json' || output.format === 'curl';
   const curlRecordSets: Array<{ resource: string; records: ReadonlyArray<Record<string, unknown>> }> = [];
 
@@ -113,15 +115,32 @@ const generateWithDependencies = async (
     // Inject FK values from key pool
     injectForeignKeys(records, bindings, keyPool);
 
+    // Re-flatten agent/office fields to match FK-assigned keys
+    if (phase.resource === 'Property') {
+      const memberRecords = getRecordPool('Member');
+      const officeRecords = getRecordPool('Office');
+      if (memberRecords && officeRecords) {
+        const propertyFieldSet = new Set(fields.filter(f => !f.isExpansion).map(f => f.fieldName));
+        for (const record of records) {
+          reflattenAgentFields(record, memberRecords, officeRecords, propertyFieldSet);
+        }
+      }
+    }
+
+    // Stash records for cross-resource references (e.g., Property needs Member/Office pools)
+    setRecordPool(phase.resource, records);
+
     // Output records
     if (output.format === 'http') {
+      const fieldSet = new Set(fields.filter(f => !f.isExpansion).map(f => f.fieldName));
       const result = await createRecordsViaHttp(
         output.serverUrl,
         phase.resource,
         records,
         options.auth,
         (completed, total) => onProgress?.(`Creating ${phase.resource} records`, completed, total),
-        keyField
+        keyField,
+        fieldSet
       );
       totalCreated += result.created;
       totalFailed += result.failed;
@@ -187,6 +206,7 @@ const generateWithDependencies = async (
           const records = relatedGenerator(relatedFields, lookupsByType, relatedCount, resource, parentKey);
 
           if (output.format === 'http') {
+            const relFieldSet = new Set(relatedFields.filter(f => !f.isExpansion).map(f => f.fieldName));
             const result = await createRecordsViaHttp(
               output.serverUrl,
               relatedResource,
@@ -194,7 +214,8 @@ const generateWithDependencies = async (
               options.auth,
               (completed, total) =>
                 onProgress?.(`Creating ${relatedResource} for ${resource} ${parentIdx + 1}/${parentKeys.length}`, completed, total),
-              KEY_FIELD_MAP[relatedResource]
+              KEY_FIELD_MAP[relatedResource],
+              relFieldSet
             );
             totalCreated += result.created;
             totalFailed += result.failed;

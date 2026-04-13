@@ -10,9 +10,11 @@
   <body>
     <script>
       // Apply dark mode class before first paint to prevent flash of white.
-      // Mirrors the priority order in use-dark-mode.ts: localStorage > system preference.
+      // Read from cookie first (survives Electron's random-port localStorage partition),
+      // then localStorage, then system preference.
       (function() {
-        var stored = localStorage.getItem('reso-theme');
+        var cookie = document.cookie.match(/(?:^|;\s*)reso-theme=(\w+)/);
+        var stored = (cookie && cookie[1]) || localStorage.getItem('reso-theme');
         var isDark = stored === 'dark' || (stored !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
         if (isDark) document.documentElement.classList.add('dark');
         document.documentElement.style.backgroundColor = isDark ? '#111827' : '#fff';

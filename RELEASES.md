@@ -2,6 +2,49 @@
 
 ---
 
+## v0.8 – 2026-04-12
+
+### Eight Days a Week
+
+The cert UI ships in the desktop client with three detail views for every Data Dictionary endorsement, a full Org Summary page with live analytics, and a performance report with industry comparison.
+
+**[Download desktop binaries](https://github.com/RESOStandards/reso-tools/releases/tag/v0.8)** — macOS, Windows and Linux.
+
+#### Cert Detail Report
+
+Three views for DD endorsements, accessible via a toggle with icons:
+
+- **RESO Analytics** — hero tiles with clickable counts, expandable resource cards with per-resource standardization, availability distribution with industry comparison
+- **Server Explorer** — metadata browser powered by the cert API (no live server needed). Data set filters (All/RESO/Local/IDX), element type filters (All/Fields/Enums/Expansions), availability threshold with preset stops at p90/p95/p99, search across fields and lookup values, sort by name/type/availability with direction toggle, four-tab field detail (Lookup Values, Data Dictionary, OData Info, Annotations)
+- **Performance** — provider vs. industry comparison bars for response time, throughput and payload size. Per-resource replication throughput with industry average markers. Per-resource sampling cards with detailed stats
+
+Web API Core and generic renderers for all other endorsement types.
+
+#### Org Summary Page
+
+Coverage tiles (RESO Fields with Data, RESO Lookups with Data, Field Standardization, Lookup Standardization, Local Fields) with industry comparison. IDX Payload section with per-resource bars. Performance section with headline replication speed, payload, response and throughput metrics with delta callouts. Provider switcher with View Details navigation. Expiring Soon badges with dashed-underline tooltips.
+
+#### Data Generator
+
+City-specific street names from 75 real U.S. locations. Field-name-aware numeric bounds (~40 rules). Geo-consistent addresses across Property, Member and Office. Co-agents from the same office as primary agent. 20 real MLS system names. Reset button with two-step confirmation.
+
+#### MCP Guide
+
+Section 4 is now a standalone Add/Edit walkthrough with real server data. Section 5 builds on it with EntityEvent change tracking. All cross-references updated.
+
+#### Shared Components
+
+Badge, FieldRow, FilterPill, SearchInput, ResourceButton, AvailabilityThresholdPills extracted to a shared module so the live metadata browser and cert Server Explorer stay visually consistent.
+
+#### Quality
+
+- **1,185 tests passing** across 8 packages (up from 1,097 in v0.7)
+- Enum detection with 11 dedicated tests
+- Performance metrics adapter with 9 tests
+- Cert summary adapter and detail report renderer selection tests
+
+---
+
 ## v0.7 – 2026-04-06
 
 ### Return of the MCP

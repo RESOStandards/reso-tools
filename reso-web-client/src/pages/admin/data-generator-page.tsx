@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { GenerateResponse, ResourceStatus } from '../../api/admin-client';
-import { generateData, getGeneratorStatus } from '../../api/admin-client';
+import { generateData, getGeneratorStatus, resetData } from '../../api/admin-client';
 
 /** Short display labels for child resources with long names. */
 const CHILD_DISPLAY_NAMES: Record<string, string> = {
@@ -30,9 +30,13 @@ export const DataGeneratorPage = () => {
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<GenerateResponse | null>(null);
 
-  const loadStatus = useCallback(async () => {
+  // Reset state
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const loadStatus = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const status = await getGeneratorStatus();
       setResources(status.resources);
@@ -84,7 +88,7 @@ export const DataGeneratorPage = () => {
         resolveDependencies: true
       });
       setResult(response);
-      await loadStatus();
+      await loadStatus(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Generation failed');
     } finally {
@@ -106,6 +110,21 @@ export const DataGeneratorPage = () => {
     }));
   };
 
+  const handleReset = async () => {
+    setResetting(true);
+    setError(null);
+    setResult(null);
+    try {
+      await resetData();
+      setShowResetConfirm(false);
+      await loadStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Reset failed');
+    } finally {
+      setResetting(false);
+    }
+  };
+
   // Parent resources are those that have related resources defined
   const parentResources = resources.filter(r => r.relatedResources.length > 0);
 
@@ -124,7 +143,7 @@ export const DataGeneratorPage = () => {
             {resources.map(r => (
               <div key={r.resource} className="bg-gray-100 dark:bg-gray-800 rounded px-3 py-2 text-center min-w-[5rem]">
                 <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{displayName(r.resource)}</div>
-                <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">{r.count}</div>
+                <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">{r.count.toLocaleString()}</div>
               </div>
             ))}
           </div>
@@ -154,7 +173,7 @@ export const DataGeneratorPage = () => {
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 {(parentResources.length > 0 ? parentResources : resources).map(r => (
                   <option key={r.resource} value={r.resource}>
-                    {r.resource} ({r.fields} fields, {r.count} existing)
+                    {r.resource} ({r.fields.toLocaleString()} fields, {r.count.toLocaleString()} existing)
                   </option>
                 ))}
               </select>
@@ -243,15 +262,28 @@ export const DataGeneratorPage = () => {
         {/* Summary + Button — full width below the two columns */}
         <div className="mt-6 space-y-4">
           <div className="bg-gray-50 dark:bg-gray-900 rounded p-3 text-sm text-gray-600 dark:text-gray-400">
-            <strong>Plan:</strong> {count} {selectedResource} records
-            {enabledRelated.length > 0 && (
-              <>
-                {' + '}
-                {enabledRelated
-                  .map(r => `${(relatedConfig[r.resource]?.count ?? r.defaultCount) * count} ${displayName(r.resource)}`)
-                  .join(', ')}
-              </>
-            )}
+            {(() => {
+              const relatedTotal = enabledRelated.reduce(
+                (sum, r) => sum + (relatedConfig[r.resource]?.count ?? r.defaultCount) * count,
+                0
+              );
+              const grandTotal = count + relatedTotal;
+              return (
+                <>
+                  <strong>Plan:</strong> {count.toLocaleString()} {selectedResource} records
+                  {enabledRelated.length > 0 && (
+                    <>
+                      {' + '}
+                      {enabledRelated
+                        .map(r => `${((relatedConfig[r.resource]?.count ?? r.defaultCount) * count).toLocaleString()} ${displayName(r.resource)}`)
+                        .join(', ')}
+                      {' = '}
+                      <strong>{grandTotal.toLocaleString()} total</strong>
+                    </>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           <button
@@ -268,17 +300,44 @@ export const DataGeneratorPage = () => {
       {result && (
         <div className="mt-6 bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded-lg p-5">
           <h3 className="text-sm font-semibold text-green-800 dark:text-green-200 mb-3">Generation Complete</h3>
-          <div className="space-y-1 text-sm text-green-700 dark:text-green-300">
-            <p>
-              {result.resource}: {result.created} created, {result.failed} failed
-            </p>
-            {result.relatedResults.map(r => (
-              <p key={r.resource}>
-                {displayName(r.resource)}: {r.created} created, {r.failed} failed
-              </p>
-            ))}
-            <p className="text-xs text-green-600 dark:text-green-400 mt-2">Duration: {(result.durationMs / 1000).toFixed(1)}s</p>
-          </div>
+          {(() => {
+            // Separate requested results from auto-generated dependencies
+            const requestedResources = new Set([
+              result.resource,
+              ...enabledRelated.map(r => r.resource)
+            ]);
+            const requested = result.relatedResults.filter(r => requestedResources.has(r.resource));
+            const dependencies = result.relatedResults.filter(r => !requestedResources.has(r.resource));
+            const totalCreated = result.created + result.relatedResults.reduce((s, r) => s + r.created, 0);
+            const totalFailed = result.failed + result.relatedResults.reduce((s, r) => s + r.failed, 0);
+            const depCreated = dependencies.reduce((s, r) => s + r.created, 0);
+
+            return (
+              <div className="space-y-1 text-sm text-green-700 dark:text-green-300">
+                <p>
+                  {result.resource}: {result.created.toLocaleString()} created, {result.failed.toLocaleString()} failed
+                </p>
+                {requested.map(r => (
+                  <p key={r.resource}>
+                    {displayName(r.resource)}: {r.created.toLocaleString()} created, {r.failed.toLocaleString()} failed
+                  </p>
+                ))}
+                {(requested.length > 0 || dependencies.length > 0) && (
+                  <p className="font-medium mt-1">
+                    Total: {totalCreated.toLocaleString()} created
+                    {totalFailed > 0 && `, ${totalFailed.toLocaleString()} failed`}
+                  </p>
+                )}
+                {dependencies.length > 0 && (
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                    Includes {depCreated.toLocaleString()} records auto-generated for dependencies
+                    ({dependencies.map(r => `${r.created.toLocaleString()} ${displayName(r.resource)}`).join(', ')})
+                  </p>
+                )}
+                <p className="text-xs text-green-600 dark:text-green-400 mt-2">Duration: {(result.durationMs / 1000).toFixed(1)}s</p>
+              </div>
+            );
+          })()}
           {result.errors.length > 0 && (
             <div className="mt-3 text-xs text-red-600 dark:text-red-400">
               <p className="font-medium">Errors:</p>
@@ -287,6 +346,46 @@ export const DataGeneratorPage = () => {
                   {err}
                 </p>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Reset section */}
+      {!loading && resources.some(r => r.count > 0) && (
+        <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+          {!showResetConfirm ? (
+            <button
+              type="button"
+              onClick={() => setShowResetConfirm(true)}
+              disabled={generating || resetting}
+              className="px-4 py-2 text-sm text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+              Reset All Data
+            </button>
+          ) : (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg p-4">
+              <p className="text-sm font-medium text-red-800 dark:text-red-200 mb-1">
+                This will permanently delete all records from every resource.
+              </p>
+              <p className="text-xs text-red-600 dark:text-red-400 mb-3">
+                {resources.reduce((s, r) => s + r.count, 0).toLocaleString()} records across {resources.filter(r => r.count > 0).length} resources will be removed. Schema will be preserved.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  disabled={resetting}
+                  className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">
+                  {resetting ? 'Resetting...' : 'Confirm Reset'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowResetConfirm(false)}
+                  disabled={resetting}
+                  className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
         </div>

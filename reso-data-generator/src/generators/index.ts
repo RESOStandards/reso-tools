@@ -5,6 +5,7 @@ import { generateOfficeRecords } from './office.js';
 import { generateOpenHouseRecords } from './open-house.js';
 import { generatePropertyChildRecords } from './property-child.js';
 import { generatePropertyRecords } from './property.js';
+export { reflattenAgentFields } from './property.js';
 import { generateShowingRecords } from './showing.js';
 import type { RecordGenerator, ResoField, ResoLookup } from './types.js';
 
@@ -37,9 +38,33 @@ export {
   transformLookupsForHumanFriendly
 } from './field-generator.js';
 
+/**
+ * Generated record pools keyed by resource name. Populated during
+ * multi-resource seeding so downstream generators (e.g., Property)
+ * can reference previously generated records for relational integrity.
+ */
+const recordPools: Record<string, ReadonlyArray<Record<string, unknown>>> = {};
+
+/** Store generated records in the pool for cross-resource references. */
+export const setRecordPool = (resource: string, records: ReadonlyArray<Record<string, unknown>>): void => {
+  recordPools[resource] = records;
+};
+
+/** Retrieve generated records from the pool. */
+export const getRecordPool = (resource: string): ReadonlyArray<Record<string, unknown>> | undefined =>
+  recordPools[resource];
+
+/** Clear all record pools (call between seed runs). */
+export const clearRecordPools = (): void => {
+  for (const key of Object.keys(recordPools)) {
+    delete recordPools[key];
+  }
+};
+
 /** Registry of resource-specific generators. Falls back to generic generator. */
 const GENERATORS: Readonly<Record<string, RecordGenerator>> = {
-  Property: (fields, lookups, count) => generatePropertyRecords(fields, lookups, count),
+  Property: (fields, lookups, count, parentResource, parentKey) =>
+    generatePropertyRecords(fields, lookups, count, parentResource, parentKey, recordPools['Member'], recordPools['Office']),
   Member: (fields, lookups, count) => generateMemberRecords(fields, lookups, count),
   Office: (fields, lookups, count) => generateOfficeRecords(fields, lookups, count),
   Media: (fields, lookups, count, parentResource, parentKey) => generateMediaRecords(fields, lookups, count, parentResource, parentKey),

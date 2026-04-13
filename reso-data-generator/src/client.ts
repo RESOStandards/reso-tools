@@ -52,9 +52,14 @@ const postRecord = async (
   resource: string,
   record: Record<string, unknown>,
   authToken: string,
-  keyField?: string
+  keyField?: string,
+  declaredFields?: ReadonlySet<string>
 ): Promise<CreateResult> => {
   try {
+    // Strip fields not in the server's metadata to avoid schema validation errors
+    const payload = declaredFields
+      ? Object.fromEntries(Object.entries(record).filter(([k]) => declaredFields.has(k)))
+      : record;
     const url = `${serverUrl}/${resource}`;
     const res = await fetch(url, {
       method: 'POST',
@@ -65,7 +70,7 @@ const postRecord = async (
         Prefer: 'return=representation',
         Authorization: `Bearer ${authToken}`
       },
-      body: JSON.stringify(record)
+      body: JSON.stringify(payload)
     });
 
     if (!res.ok) {
@@ -94,7 +99,8 @@ export const createRecordsViaHttp = async (
   records: ReadonlyArray<Record<string, unknown>>,
   auth: AuthConfig,
   onProgress?: (completed: number, total: number) => void,
-  keyField?: string
+  keyField?: string,
+  declaredFields?: ReadonlySet<string>
 ): Promise<BatchCreateResult> => {
   const keys: string[] = [];
   const errors: string[] = [];
@@ -102,7 +108,7 @@ export const createRecordsViaHttp = async (
   let failed = 0;
 
   for (let i = 0; i < records.length; i++) {
-    const result = await postRecord(serverUrl, resource, records[i], auth.authToken, keyField);
+    const result = await postRecord(serverUrl, resource, records[i], auth.authToken, keyField, declaredFields);
     if (result.success) {
       created++;
       if (result.key) keys.push(result.key);

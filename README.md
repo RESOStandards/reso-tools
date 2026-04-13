@@ -1,7 +1,8 @@
 # RESO Tools
 
-![Tests](https://img.shields.io/badge/tests-1097%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1185%20passed-brightgreen)
 ![Compliance](https://img.shields.io/badge/RESO%20compliance-4%2F4%20suites-blue)
+[![Download](https://img.shields.io/github/v/release/RESOStandards/reso-tools?label=download&color=blue)](https://github.com/RESOStandards/reso-tools/releases/latest)
 
 Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compliant OData servers. Includes a reference server, desktop client, web UI, certification test runner, MCP server for AI agents and shared libraries for OData parsing, validation and data generation.
 
@@ -12,12 +13,12 @@ Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compl
 | [`reso-client/`](reso-client/) | OData 4.01 client SDK -- URI builder, CRUD helpers, CSDL metadata parsing, OAuth2 Client Credentials | 118 |
 | [`odata-expression-parser/`](odata-expression-parser/) | Zero-dependency `$filter` and `$expand` expression parser | 180 |
 | [`reso-validation/`](reso-validation/) | Isomorphic field and business-rule validation for RESO Data Dictionary records | 98 |
-| [`reso-data-generator/`](reso-data-generator/) | Realistic test data generator with FK dependency resolution | 104 |
+| [`reso-data-generator/`](reso-data-generator/) | Realistic test data generator with geo-consistent addresses, relational integrity and field-aware bounds | 116 |
 | [`reso-reference-server/`](reso-reference-server/) | Metadata-driven OData reference server (PostgreSQL, MongoDB, SQLite) | 254 |
-| [`reso-web-client/`](reso-web-client/) | React + Vite browser UI for browsing and editing OData resources | 72 |
+| [`reso-web-client/`](reso-web-client/) | React + Vite browser UI with cert analytics, server explorer and performance reports | 138 |
 | [`reso-web-api-proxy/`](reso-web-api-proxy/) | Lightweight CORS proxy and static file server for web client deployments | -- |
-| [`reso-desktop-client/`](reso-desktop-client/) | Electron desktop shell with native proxy, secure storage and optional reference server | -- |
-| [`reso-certification/`](reso-certification/) | RESO certification CLI + SDK – Add/Edit, EntityEvent, Web API Core, DD ([docs](reso-certification/README.md)) | 250 |
+| [`reso-desktop-client/`](reso-desktop-client/) | Electron desktop shell with certification workspace, secure storage and bundled reference server | -- |
+| [`reso-certification/`](reso-certification/) | RESO certification CLI + SDK – Add/Edit, EntityEvent, Web API Core, DD ([docs](reso-certification/README.md)) | 260 |
 | [`reso-mcp-server/`](reso-mcp-server/) | MCP server – exposes OData query, write, validation, certification tools for AI agents ([guide](reso-mcp-server/doc/GUIDE.md)) | 21 |
 
 ## Quick Start
