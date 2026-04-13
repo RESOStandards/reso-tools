@@ -378,8 +378,12 @@ export const ServerExplorer = ({
   const lookupsByField = useMemo(() => {
     if (!availability) return new Map<string, ReadonlyArray<DataAvailabilityLookup>>();
     const map = new Map<string, DataAvailabilityLookup[]>();
+    const seen = new Set<string>();
     for (const l of availability.lookupValues) {
       const key = `${l.resourceName}:${l.fieldName}`;
+      const dedupeKey = `${key}:${l.lookupValue}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
       const arr = map.get(key) ?? [];
       arr.push(l);
       map.set(key, arr);
