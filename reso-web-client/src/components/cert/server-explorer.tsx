@@ -34,9 +34,11 @@ type CategoryFilter = 'all' | 'reso' | 'local' | 'payload';
 
 const ENUM_NS = 'org.reso.metadata.enums.';
 
-/** True if the OData type is an enum (any namespace pattern). */
+/** True if the OData type is a non-primitive (enum, complex, or namespaced type).
+ *  In the cert report context, any type with a dot that is not an Edm primitive
+ *  is effectively a lookup/enum type. */
 const isEnumType = (type: string): boolean =>
-  type.startsWith(ENUM_NS) || /^[A-Z]\w*Enums\./.test(type) || type.includes('.enums.');
+  type.includes('.') && !type.startsWith('Edm.');
 
 /** Build a dd.reso.org wiki URL for a field or lookup field. */
 const fieldWikiUrl = (version: string, fieldName: string, lookupName?: string | null): string =>

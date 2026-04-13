@@ -87,7 +87,7 @@ const PERF_META_KEYS = new Set([
 export const perfMetricsToSummary = (
   data: PerformanceMetricsReport,
   ddReport: CertReportSummary | null
-): PerformanceReport => {
+): PerformanceReport | null => {
   const perf = data.performanceReport;
   const market = data.marketAverage;
   if (!perf || !market) return null;
