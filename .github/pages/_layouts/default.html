@@ -594,6 +594,20 @@
       line-height: 1.7;
     }
 
+    /* Heading anchor links — copy permalink on click */
+    .content h1[id], .content h2[id], .content h3[id], .content h4[id] { position: relative; cursor: pointer; }
+    .content h1[id]::after, .content h2[id]::after, .content h3[id]::after, .content h4[id]::after {
+      content: '#';
+      font-size: 0.75em;
+      font-weight: 400;
+      color: var(--reso-gray-400);
+      margin-left: 0.5rem;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .content h1[id]:hover::after, .content h2[id]:hover::after, .content h3[id]:hover::after, .content h4[id]:hover::after { opacity: 1; }
+    .content h1[id].copied::after, .content h2[id].copied::after, .content h3[id].copied::after, .content h4[id].copied::after { content: '✓ copied'; opacity: 1; color: var(--reso-green); }
+
     /* Markdown content */
     .content h1, .content h2, .content h3, .content h4 { color: var(--reso-gray-800); }
     .content h1 {
@@ -867,6 +881,17 @@
       var headerNav = document.getElementById('headerNav');
       menuToggle.addEventListener('click', function() {
         headerNav.classList.toggle('open');
+      });
+
+      // Heading permalink copy
+      document.querySelectorAll('.content h1[id], .content h2[id], .content h3[id], .content h4[id]').forEach(function(h) {
+        h.addEventListener('click', function() {
+          var url = location.origin + location.pathname + '#' + h.id;
+          navigator.clipboard.writeText(url).then(function() {
+            h.classList.add('copied');
+            setTimeout(function() { h.classList.remove('copied'); }, 1500);
+          });
+        });
       });
 
       // About dropdown toggle
