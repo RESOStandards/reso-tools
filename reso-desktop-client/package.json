@@ -34,7 +34,8 @@
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "files": [
       "dist/main.js",
-      "dist/preload.js"
+      "dist/preload.js",
+      "node_modules/**/*"
     ],
     "extraResources": [
       {
@@ -78,7 +79,8 @@
     },
     "mac": {
       "category": "public.app-category.developer-tools",
-      "icon": "build/icon.icns"
+      "icon": "build/icon.icns",
+      "identity": null
     },
     "linux": {
       "target": [
