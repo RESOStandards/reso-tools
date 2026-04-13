@@ -118,7 +118,7 @@ const FieldDetailPanel = ({
   readonly lookupValues: ReadonlyArray<DataAvailabilityLookup>;
   readonly version: string;
 }) => {
-  const [activeTab, setActiveTab] = useState<'lookups' | 'dd' | 'odata' | 'annotations'>('dd');
+  const [activeTab, setActiveTab] = useState<'lookups' | 'dd' | 'odata' | 'annotations'>(lookupValues.length > 0 ? 'lookups' : 'dd');
   const [lookupFilter, setLookupFilter] = useState<LookupFilter>('all');
 
   const filteredLookups = useMemo(() => {
@@ -144,7 +144,7 @@ const FieldDetailPanel = ({
   ];
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
+    <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4 max-h-[28rem] overflow-y-auto">
       {/* Availability hero */}
       {field.availability !== null && (
         <div className="flex items-center gap-4">
