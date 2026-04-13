@@ -1,6 +1,6 @@
 # RESO Tools
 
-![Tests](https://img.shields.io/badge/tests-1174%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1185%20passed-brightgreen)
 ![Compliance](https://img.shields.io/badge/RESO%20compliance-4%2F4%20suites-blue)
 
 Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compliant OData servers. Includes a reference server, desktop client, web UI, certification test runner, MCP server for AI agents and shared libraries for OData parsing, validation and data generation.
@@ -14,7 +14,7 @@ Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compl
 | [`reso-validation/`](reso-validation/) | Isomorphic field and business-rule validation for RESO Data Dictionary records | 98 |
 | [`reso-data-generator/`](reso-data-generator/) | Realistic test data generator with geo-consistent addresses, relational integrity and field-aware bounds | 116 |
 | [`reso-reference-server/`](reso-reference-server/) | Metadata-driven OData reference server (PostgreSQL, MongoDB, SQLite) | 254 |
-| [`reso-web-client/`](reso-web-client/) | React + Vite browser UI with cert analytics, server explorer and performance reports | 127 |
+| [`reso-web-client/`](reso-web-client/) | React + Vite browser UI with cert analytics, server explorer and performance reports | 138 |
 | [`reso-web-api-proxy/`](reso-web-api-proxy/) | Lightweight CORS proxy and static file server for web client deployments | -- |
 | [`reso-desktop-client/`](reso-desktop-client/) | Electron desktop shell with certification workspace, secure storage and bundled reference server | -- |
 | [`reso-certification/`](reso-certification/) | RESO certification CLI + SDK – Add/Edit, EntityEvent, Web API Core, DD ([docs](reso-certification/README.md)) | 260 |

@@ -20,7 +20,7 @@
 
 **Shared metadata components keep things consistent.** Badge, FieldRow, FilterPill, SearchInput, ResourceButton and AvailabilityThresholdPills are extracted into a shared module so the live metadata browser and the cert Server Explorer stay visually in sync.
 
-**1,174 tests passing across 8 packages** (up from 1,097 in v0.7). New test coverage for the cert summary adapter, detail report renderer selection and performance metrics adapter.
+**1,185 tests passing across 8 packages** (up from 1,097 in v0.7). New test coverage for the cert summary adapter, detail report renderer selection and performance metrics adapter.
 
 ---
 
