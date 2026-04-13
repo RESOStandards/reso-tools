@@ -144,7 +144,7 @@ const FieldDetailPanel = ({
   ];
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4 max-h-[28rem] overflow-y-auto">
+    <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
       {/* Availability hero */}
       {field.availability !== null && (
         <div className="flex items-center gap-4">
@@ -196,7 +196,7 @@ const FieldDetailPanel = ({
               />
             ))}
           </div>
-          <div className="max-h-64 overflow-y-auto space-y-1">
+          <div className="max-h-[22rem] overflow-y-auto space-y-1">
             {filteredLookups.map((l) => (
               <div key={`${l.fieldName}-${l.lookupValue}`} className="flex items-center justify-between py-1.5 text-sm">
                 <div className="min-w-0">
