@@ -13,6 +13,15 @@ import {
 import type { ResoField, ResoLookup } from '@reso-standards/reso-data-generator';
 
 const LOOKUP_NAME_ANNOTATION_TERM = 'RESO.OData.Metadata.LookupName';
+
+/** Strip fields from a record that are not declared in the resource's metadata.
+ *  Prevents schema validation errors on schemaless backends (MongoDB). */
+const stripUndeclaredFields = (record: Record<string, unknown>, fields: ReadonlyArray<ResoField>): void => {
+  const declared = new Set(fields.filter(f => !f.isExpansion).map(f => f.fieldName));
+  for (const key of Object.keys(record)) {
+    if (!declared.has(key)) delete record[key];
+  }
+};
 import type { RequestHandler } from 'express';
 import type { EnumMode } from '../config.js';
 import type { DataAccessLayer, ResourceContext } from '../db/data-access.js';
@@ -182,9 +191,11 @@ export const createDataGeneratorHandler =
 
               // Re-flatten agent/office fields to match FK-assigned keys
               if (phase.resource === 'Property' && generatedRecords['Member'] && generatedRecords['Office']) {
-                reflattenAgentFields(records[i], generatedRecords['Member'], generatedRecords['Office']);
+                const propertyFieldSet = new Set(phaseFields.filter(f => !f.isExpansion).map(f => f.fieldName));
+                reflattenAgentFields(records[i], generatedRecords['Member'], generatedRecords['Office'], propertyFieldSet);
               }
 
+              stripUndeclaredFields(records[i], phaseFields);
               await dal.insert(phaseCtx, records[i]);
               keyPool[phase.resource].push(key);
               phaseCreated++;
@@ -251,11 +262,12 @@ export const createDataGeneratorHandler =
               for (const relRecord of childRecords) {
                 try {
                   const key = randomUUID();
-                  const record = {
+                  const record: Record<string, unknown> = {
                     ...relRecord,
                     [relatedCtx.keyField]: key,
                     ModificationTimestamp: new Date().toISOString()
                   };
+                  stripUndeclaredFields(record, relatedFields);
                   await dal.insert(relatedCtx, record);
                   relatedCreated++;
                 } catch (err) {
@@ -279,11 +291,12 @@ export const createDataGeneratorHandler =
         for (let i = 0; i < records.length; i++) {
           try {
             const key = randomUUID();
-            const record = {
+            const record: Record<string, unknown> = {
               ...records[i],
               [resourceCtx.keyField]: key,
               ModificationTimestamp: new Date().toISOString()
             };
+            stripUndeclaredFields(record, fields);
             await dal.insert(resourceCtx, record);
             created++;
             parentKeys.push(key);
@@ -313,11 +326,12 @@ export const createDataGeneratorHandler =
               for (const relRecord of childRecords) {
                 try {
                   const key = randomUUID();
-                  const record = {
+                  const record: Record<string, unknown> = {
                     ...relRecord,
                     [relatedCtx.keyField]: key,
                     ModificationTimestamp: new Date().toISOString()
                   };
+                  stripUndeclaredFields(record, relatedFields);
                   await dal.insert(relatedCtx, record);
                   relatedCreated++;
                 } catch (err) {

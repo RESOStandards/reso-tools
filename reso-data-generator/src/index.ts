@@ -120,8 +120,9 @@ const generateWithDependencies = async (
       const memberRecords = getRecordPool('Member');
       const officeRecords = getRecordPool('Office');
       if (memberRecords && officeRecords) {
+        const propertyFieldSet = new Set(fields.filter(f => !f.isExpansion).map(f => f.fieldName));
         for (const record of records) {
-          reflattenAgentFields(record, memberRecords, officeRecords);
+          reflattenAgentFields(record, memberRecords, officeRecords, propertyFieldSet);
         }
       }
     }
@@ -131,13 +132,15 @@ const generateWithDependencies = async (
 
     // Output records
     if (output.format === 'http') {
+      const fieldSet = new Set(fields.filter(f => !f.isExpansion).map(f => f.fieldName));
       const result = await createRecordsViaHttp(
         output.serverUrl,
         phase.resource,
         records,
         options.auth,
         (completed, total) => onProgress?.(`Creating ${phase.resource} records`, completed, total),
-        keyField
+        keyField,
+        fieldSet
       );
       totalCreated += result.created;
       totalFailed += result.failed;
@@ -203,6 +206,7 @@ const generateWithDependencies = async (
           const records = relatedGenerator(relatedFields, lookupsByType, relatedCount, resource, parentKey);
 
           if (output.format === 'http') {
+            const relFieldSet = new Set(relatedFields.filter(f => !f.isExpansion).map(f => f.fieldName));
             const result = await createRecordsViaHttp(
               output.serverUrl,
               relatedResource,
@@ -210,7 +214,8 @@ const generateWithDependencies = async (
               options.auth,
               (completed, total) =>
                 onProgress?.(`Creating ${relatedResource} for ${resource} ${parentIdx + 1}/${parentKeys.length}`, completed, total),
-              KEY_FIELD_MAP[relatedResource]
+              KEY_FIELD_MAP[relatedResource],
+              relFieldSet
             );
             totalCreated += result.created;
             totalFailed += result.failed;

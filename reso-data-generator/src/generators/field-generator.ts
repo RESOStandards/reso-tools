@@ -104,7 +104,11 @@ export const randomLookupValue = (type: string, lookups: Readonly<Record<string,
     ?? lookups[`${RESO_ENUM_NS}${type}`];
   const values = candidates?.filter(v => !isPlaceholderValue(v.lookupValue));
   if (!values || values.length === 0) return undefined;
-  return randomChoice(values).lookupValue;
+  const chosen = randomChoice(values);
+  // Prefer the StandardName annotation (human-friendly, matches Lookup Resource LookupValue)
+  // over the raw lookupValue (CamelCase OData enum member name)
+  const standardName = chosen.annotations?.find(a => a.term === 'RESO.OData.Metadata.StandardName')?.value;
+  return standardName ?? chosen.lookupValue;
 };
 
 /**
@@ -256,7 +260,10 @@ export const generateFieldValue = (
       if (values && values.length > 0) {
         const count = Math.min(randomInt(1, 3), values.length);
         const shuffled = [...values].sort(() => Math.random() - 0.5);
-        return shuffled.slice(0, count).map(v => v.lookupValue);
+        return shuffled.slice(0, count).map(v => {
+          const sn = v.annotations?.find(a => a.term === 'RESO.OData.Metadata.StandardName')?.value;
+          return sn ?? v.lookupValue;
+        });
       }
     }
     return [];

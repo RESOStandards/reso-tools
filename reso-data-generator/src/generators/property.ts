@@ -156,27 +156,35 @@ const OFFICE_FIELD_MAP: ReadonlyArray<readonly [string, string]> = [
   ['OfficePostalCode', 'PostalCode'],
 ];
 
-/** Flatten a Member record into a Property record under a role prefix. */
+/** Flatten a Member record into a Property record under a role prefix.
+ *  Only writes fields that exist in the target resource's metadata. */
 const flattenMember = (
   record: Record<string, unknown>,
   member: Record<string, unknown>,
-  prefix: string
+  prefix: string,
+  targetFields?: ReadonlySet<string>
 ): void => {
   for (const [memberField, suffix] of MEMBER_FIELD_MAP) {
+    const targetFieldName = `${prefix}${suffix}`;
+    if (targetFields && !targetFields.has(targetFieldName)) continue;
     const val = member[memberField];
-    if (val !== undefined) record[`${prefix}${suffix}`] = val;
+    if (val !== undefined) record[targetFieldName] = val;
   }
 };
 
-/** Flatten an Office record into a Property record under a role prefix. */
+/** Flatten an Office record into a Property record under a role prefix.
+ *  Only writes fields that exist in the target resource's metadata. */
 const flattenOffice = (
   record: Record<string, unknown>,
   office: Record<string, unknown>,
-  prefix: string
+  prefix: string,
+  targetFields?: ReadonlySet<string>
 ): void => {
   for (const [officeField, suffix] of OFFICE_FIELD_MAP) {
+    const targetFieldName = `${prefix}${suffix}`;
+    if (targetFields && !targetFields.has(targetFieldName)) continue;
     const val = office[officeField];
-    if (val !== undefined) record[`${prefix}${suffix}`] = val;
+    if (val !== undefined) record[targetFieldName] = val;
   }
 };
 
@@ -189,7 +197,8 @@ const flattenOffice = (
 export const reflattenAgentFields = (
   record: Record<string, unknown>,
   memberPool: ReadonlyArray<Record<string, unknown>>,
-  officePool: ReadonlyArray<Record<string, unknown>>
+  officePool: ReadonlyArray<Record<string, unknown>>,
+  targetFields?: ReadonlySet<string>
 ): void => {
   const memberByKey = new Map(
     [...memberPool].map(m => [m.MemberKey as string, m])
@@ -213,12 +222,12 @@ export const reflattenAgentFields = (
 
     const member = memberByKey.get(agentKey);
     if (member) {
-      flattenMember(record, member, agentPrefix);
+      flattenMember(record, member, agentPrefix, targetFields);
       // Derive office from the member's OfficeKey
       const memberOfficeKey = member.OfficeKey as string | undefined;
       const office = memberOfficeKey ? officeByKey.get(memberOfficeKey) : undefined;
       if (office) {
-        flattenOffice(record, office, officePrefix);
+        flattenOffice(record, office, officePrefix, targetFields);
       }
     }
   }
@@ -233,8 +242,11 @@ export const generatePropertyRecords = (
   _parentKey?: string,
   memberPool?: ReadonlyArray<Record<string, unknown>>,
   officePool?: ReadonlyArray<Record<string, unknown>>
-): ReadonlyArray<Record<string, unknown>> =>
-  Array.from({ length: count }, (_, i) => {
+): ReadonlyArray<Record<string, unknown>> => {
+  // Build a set of declared non-expansion field names so flattening only writes fields in the metadata
+  const declaredFields = new Set(fields.filter(f => !f.isExpansion).map(f => f.fieldName));
+
+  return Array.from({ length: count }, (_, i) => {
     const record = generateRecord(fields, lookups, i);
 
     // ListingId — human-friendly MLS-style ID (e.g., "24-012345", "MLS-78901")
@@ -444,3 +456,4 @@ export const generatePropertyRecords = (
 
     return record;
   });
+};
