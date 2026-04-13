@@ -633,6 +633,17 @@ export const ServerExplorer = ({
                     </div>
                   );
                 })}
+                {filteredFields.length === 0 && (
+                  <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center mt-4">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      No fields match the current filters.
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                      Try adjusting the availability threshold (0% shows fields with no data, Above 0% shows fields with any data),
+                      the data set filter or the element type filter.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
