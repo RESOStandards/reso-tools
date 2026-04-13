@@ -230,6 +230,7 @@ export const PerformanceReport = ({
 }) => {
   const perf = data.performanceReport;
   const market = data.marketAverage;
+  if (!perf || !market) return null;
   const optedIn = perf.opted_in;
 
   // Extract per-resource stats from the report (keys that aren't metadata)

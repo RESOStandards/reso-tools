@@ -90,6 +90,7 @@ export const perfMetricsToSummary = (
 ): PerformanceReport => {
   const perf = data.performanceReport;
   const market = data.marketAverage;
+  if (!perf || !market) return null;
   const optedIn = perf.opted_in;
 
   // Find the Property resource stats for the headline number
