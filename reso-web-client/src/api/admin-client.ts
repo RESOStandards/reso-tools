@@ -53,7 +53,8 @@ export const setAdminToken = (token: string): void => localStorage.setItem(ADMIN
 /** Clears the stored admin token. */
 export const clearAdminToken = (): void => localStorage.removeItem(ADMIN_TOKEN_KEY);
 
-/** Makes an authenticated request to an admin endpoint. */
+/** Makes an authenticated request to an admin endpoint.
+ *  Throws if the response is not JSON (e.g., SPA catch-all returning HTML). */
 const adminFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
   const token = getAdminToken();
   const headers: Record<string, string> = {
@@ -64,7 +65,12 @@ const adminFetch = async (url: string, options: RequestInit = {}): Promise<Respo
     headers.Authorization = `Bearer ${token}`;
   }
 
-  return fetch(url, { ...options, headers });
+  const res = await fetch(url, { ...options, headers });
+  const contentType = res.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    throw new Error('Server did not return JSON. The data generator admin endpoint may not be available on this server.');
+  }
+  return res;
 };
 
 /** Fetches the data generator status (available resources and counts). */
