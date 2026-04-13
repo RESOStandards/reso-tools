@@ -269,8 +269,8 @@ export const generatePropertyRecords = (
     record.Longitude = Number(coords.lon.toFixed(6));
 
     // Pricing — ListPrice >= ListPriceLow
-    record.ListPrice = randomDecimal(50000, 10000000, 2);
-    record.ListPriceLow = randomDecimal((record.ListPrice as number) * 0.8, record.ListPrice as number, 2);
+    record.ListPrice = Math.round(randomDecimal(50000, 10000000, 0));
+    record.ListPriceLow = Math.round((record.ListPrice as number) * (0.8 + Math.random() * 0.2));
     record.OriginalListPrice = record.ListPrice;
 
     // Bedrooms
@@ -288,8 +288,8 @@ export const generatePropertyRecords = (
       (record.BathroomsPartial as number) +
       (record.BathroomsOneQuarter as number) +
       (record.BathroomsThreeQuarter as number);
-    record.LivingArea = randomDecimal(500, 8000, 2);
-    record.LotSizeSquareFeet = randomDecimal(2000, 50000, 2);
+    record.LivingArea = Math.round(randomDecimal(500, 8000, 0));
+    record.LotSizeSquareFeet = Math.round(randomDecimal(2000, 50000, 0));
     record.YearBuilt = randomInt(1950, 2024);
 
     // Property type — prefer lookup values, fall back to hardcoded
@@ -314,8 +314,8 @@ export const generatePropertyRecords = (
     // Taxes — calculated from ListPrice × state effective rate
     const taxRate = STATE_TAX_RATES[record.StateOrProvince as string] ?? 0.01;
     const listPrice = record.ListPrice as number;
-    record.TaxAnnualAmount = randomDecimal(listPrice * taxRate * 0.9, listPrice * taxRate * 1.1, 2);
-    record.TaxAssessedValue = Math.round(randomDecimal(listPrice * 0.7, listPrice * 0.95, 0));
+    record.TaxAnnualAmount = Math.round(listPrice * taxRate * (0.9 + Math.random() * 0.2));
+    record.TaxAssessedValue = Math.round(listPrice * (0.7 + Math.random() * 0.25));
     record.TaxYear = new Date().getFullYear() - randomInt(0, 1);
 
     // Unit counts (for multi-family / manufactured / mobile home)
@@ -327,39 +327,41 @@ export const generatePropertyRecords = (
     record.NumberOfUnitsMonthToMonth = randomInt(0, record.NumberOfUnitsLeased as number);
 
     // Expense fields (realistic monthly/annual amounts)
-    record.AssociationFee = randomDecimal(50, 800, 2);
-    record.AssociationFee2 = Math.random() > 0.7 ? randomDecimal(25, 200, 2) : 0;
-    record.InsuranceExpense = randomDecimal(50, 500, 2);
-    record.ElectricExpense = randomDecimal(50, 400, 2);
-    record.WaterSewerExpense = randomDecimal(20, 150, 2);
-    record.TrashExpense = randomDecimal(10, 75, 2);
-    record.CableTvExpense = randomDecimal(30, 200, 2);
-    record.MaintenanceExpense = randomDecimal(50, 500, 2);
-    record.OperatingExpense = randomDecimal(100, 2000, 2);
-    record.OtherExpense = randomDecimal(0, 300, 2);
-    record.GardenerExpense = randomDecimal(50, 500, 2);
-    record.ManagerExpense = randomDecimal(200, 3000, 2);
-    record.PoolExpense = randomDecimal(50, 400, 2);
-    record.SuppliesExpense = randomDecimal(25, 500, 2);
-    record.ProfessionalManagementExpense = randomDecimal(200, 5000, 2);
-    record.FurnitureReplacementExpense = randomDecimal(0, 2000, 2);
-    record.NewTaxesExpense = randomDecimal(500, 15000, 2);
+    // Use Math.round on all monetary fields — some DD implementations
+    // type these as Edm.Int64 rather than Edm.Decimal.
+    record.AssociationFee = Math.round(randomDecimal(50, 800, 2));
+    record.AssociationFee2 = Math.random() > 0.7 ? Math.round(randomDecimal(25, 200, 2)) : 0;
+    record.InsuranceExpense = Math.round(randomDecimal(50, 500, 2));
+    record.ElectricExpense = Math.round(randomDecimal(50, 400, 2));
+    record.WaterSewerExpense = Math.round(randomDecimal(20, 150, 2));
+    record.TrashExpense = Math.round(randomDecimal(10, 75, 2));
+    record.CableTvExpense = Math.round(randomDecimal(30, 200, 2));
+    record.MaintenanceExpense = Math.round(randomDecimal(50, 500, 2));
+    record.OperatingExpense = Math.round(randomDecimal(100, 2000, 2));
+    record.OtherExpense = Math.round(randomDecimal(0, 300, 2));
+    record.GardenerExpense = Math.round(randomDecimal(50, 500, 2));
+    record.ManagerExpense = Math.round(randomDecimal(200, 3000, 2));
+    record.PoolExpense = Math.round(randomDecimal(50, 400, 2));
+    record.SuppliesExpense = Math.round(randomDecimal(25, 500, 2));
+    record.ProfessionalManagementExpense = Math.round(randomDecimal(200, 5000, 2));
+    record.FurnitureReplacementExpense = Math.round(randomDecimal(0, 2000, 2));
+    record.NewTaxesExpense = Math.round(randomDecimal(500, 15000, 2));
 
     // Income — derive from units × realistic monthly rent
-    const monthlyRent = randomDecimal(800, 3500, 2);
-    record.GrossScheduledIncome = randomDecimal(
+    const monthlyRent = Math.round(randomDecimal(800, 3500, 2));
+    record.GrossScheduledIncome = Math.round(randomDecimal(
       monthlyRent * unitsTotal * 10,
       monthlyRent * unitsTotal * 12,
-      2
-    );
-    record.VacancyAllowance = randomDecimal(1000, 15000, 2);
+      0
+    ));
+    record.VacancyAllowance = Math.round(randomDecimal(1000, 15000, 2));
 
-    // Cap rate (3%–12%)
+    // Cap rate (3%–12%) — this is genuinely a decimal field
     record.CapRate = randomDecimal(0.03, 0.12, 4);
 
-    // Land / lot
+    // Land / lot — these are genuinely decimal fields
     record.LotSizeAcres = randomDecimal(0.1, 500, 2);
-    record.LandLeaseAmount = randomDecimal(500, 5000, 2);
+    record.LandLeaseAmount = Math.round(randomDecimal(500, 5000, 2));
     record.LotSizeUnits = 'Square Feet';
     record.PastureArea = randomDecimal(0, 200, 2);
 

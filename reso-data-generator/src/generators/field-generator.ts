@@ -92,9 +92,17 @@ export const transformLookupsForHumanFriendly = (
 export const isPlaceholderValue = (value: string): boolean =>
   value.startsWith('Sample') && (value.endsWith('EnumValue') || value.endsWith('Enum Value'));
 
-/** Generates a random lookup value from available lookups for a given type, skipping placeholder values. */
-const randomLookupValue = (type: string, lookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>>): string | undefined => {
-  const values = lookups[type]?.filter(v => !isPlaceholderValue(v.lookupValue));
+const RESO_ENUM_NS = 'org.reso.metadata.enums.';
+
+/** Generates a random lookup value from available lookups for a given type or lookup name, skipping placeholder values.
+ *  Tries multiple key formats: full type, short name, and RESO-namespaced name. */
+export const randomLookupValue = (type: string, lookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>>): string | undefined => {
+  const shortName = type.includes('.') ? type.slice(type.lastIndexOf('.') + 1) : type;
+  const candidates = lookups[type]
+    ?? lookups[shortName]
+    ?? lookups[`${RESO_ENUM_NS}${shortName}`]
+    ?? lookups[`${RESO_ENUM_NS}${type}`];
+  const values = candidates?.filter(v => !isPlaceholderValue(v.lookupValue));
   if (!values || values.length === 0) return undefined;
   return randomChoice(values).lookupValue;
 };
@@ -259,6 +267,16 @@ export const generateFieldValue = (
     return randomLookupValue(type, lookups);
   }
 
+  // Handle Edm.String fields with a LookupName annotation — sample from the lookup pool
+  if (type === 'Edm.String') {
+    const lookupNameAnnotation = field.annotations.find(a => a.term === 'RESO.OData.Metadata.LookupName');
+    if (lookupNameAnnotation) {
+      // Try both short name and fully qualified name to match however the lookups are keyed
+      const value = randomLookupValue(lookupNameAnnotation.value, lookups);
+      if (value) return value;
+    }
+  }
+
   // Handle primitive Edm types
   switch (type) {
     case 'Edm.String':
@@ -269,17 +287,23 @@ export const generateFieldValue = (
 
     case 'Edm.Int16': {
       const b16 = findBounds(fieldName);
-      return randomInt(b16?.min ?? 0, b16?.max ?? 100);
+      const min16 = Math.ceil(b16?.min ?? 0);
+      const max16 = Math.floor(b16?.max ?? 100);
+      return randomInt(min16 <= max16 ? min16 : 0, min16 <= max16 ? max16 : 100);
     }
 
     case 'Edm.Int32': {
       const b32 = findBounds(fieldName);
-      return randomInt(b32?.min ?? 0, b32?.max ?? 10000);
+      const min32 = Math.ceil(b32?.min ?? 0);
+      const max32 = Math.floor(b32?.max ?? 10000);
+      return randomInt(min32 <= max32 ? min32 : 0, min32 <= max32 ? max32 : 10000);
     }
 
     case 'Edm.Int64': {
       const b64 = findBounds(fieldName);
-      return randomInt(b64?.min ?? 0, b64?.max ?? 100000);
+      const min64 = Math.ceil(b64?.min ?? 0);
+      const max64 = Math.floor(b64?.max ?? 100000);
+      return randomInt(min64 <= max64 ? min64 : 0, min64 <= max64 ? max64 : 100000);
     }
 
     case 'Edm.Byte':
@@ -288,13 +312,16 @@ export const generateFieldValue = (
     case 'Edm.Decimal':
     case 'Edm.Double':
     case 'Edm.Single': {
+      const s = scale ?? 2;
+      // Max value allowed by the field's precision and scale
+      const precisionMax = field.precision ? 10 ** (field.precision - s) - 1 : 100000;
       const bounds = findBounds(fieldName);
       if (bounds) {
-        return randomDecimal(bounds.min, bounds.max, bounds.decimals ?? scale ?? 2);
+        const effectiveMax = Math.min(bounds.max, precisionMax);
+        const effectiveMin = Math.min(bounds.min, effectiveMax);
+        return randomDecimal(effectiveMin, effectiveMax, bounds.decimals ?? s);
       }
-      const s = scale ?? 2;
-      // Respect RESO metadata precision/scale but cap to avoid absurd values
-      const maxVal = field.precision ? Math.min(10 ** (field.precision - s) - 1, 100000) : 10000;
+      const maxVal = Math.min(precisionMax, 100000);
       return randomDecimal(0, maxVal, s);
     }
 

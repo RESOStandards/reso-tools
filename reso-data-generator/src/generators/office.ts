@@ -1,4 +1,4 @@
-import { generateRecord, randomChoice, randomInt } from './field-generator.js';
+import { generateRecord, randomChoice, randomInt, randomLookupValue } from './field-generator.js';
 import { randomLocation } from './geo-data.js';
 import type { ResoField, ResoLookup } from './types.js';
 
@@ -77,7 +77,7 @@ export const generateOfficeRecords = (
     record.OfficeFax = randomPhone();
     record.OfficePhoneExt = String(randomInt(100, 999));
     record.OfficeUrl = `https://${prefix.toLowerCase()}${suffix.replace(/\s/g, '').toLowerCase()}.example.com`;
-    record.OfficeAOR = `AOR-${randomInt(1000, 9999)}`;
+    record.OfficeAOR = randomLookupValue('AOR', lookups) ?? `AOR-${randomInt(1000, 9999)}`;
     record.OfficeAORMlsId = `AORMLS-${randomInt(1000, 9999)}`;
 
     // IDs

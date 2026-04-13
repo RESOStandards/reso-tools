@@ -1,4 +1,4 @@
-import { generateRecord, randomChoice, randomInt } from './field-generator.js';
+import { generateRecord, randomChoice, randomInt, randomLookupValue } from './field-generator.js';
 import { randomLocation } from './geo-data.js';
 import type { ResoField, ResoLookup } from './types.js';
 
@@ -119,7 +119,7 @@ export const generateMemberRecords = (
     record.MemberMiddleName = Math.random() > 0.6 ? randomChoice(FIRST_NAMES).charAt(0) + '.' : '';
     record.MemberNickname = Math.random() > 0.7 ? firstName.slice(0, 3) : '';
     record.MemberStateLicense = `${location.state}-${randomInt(100000, 999999)}`;
-    record.MemberAOR = `AOR-${randomInt(1000, 9999)}`;
+    record.MemberAOR = randomLookupValue('AOR', lookups) ?? `AOR-${randomInt(1000, 9999)}`;
     record.MemberUrl = `https://${firstName.toLowerCase()}${lastName.toLowerCase()}.example.com`;
     record.MemberAORMlsId = `AORMLS-${randomInt(1000, 9999)}`;
 
