@@ -34,8 +34,7 @@
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "files": [
       "dist/main.js",
-      "dist/preload.js",
-      "node_modules/**/*"
+      "dist/preload.js"
     ],
     "extraResources": [
       {
