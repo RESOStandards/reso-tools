@@ -642,6 +642,7 @@ export interface DDDetailField {
   readonly payloads: ReadonlyArray<string>;
   readonly standardRESO: boolean;
   readonly isExpansion?: boolean;
+  readonly isComplexType?: boolean;
   readonly annotations: ReadonlyArray<{ term: string; value: string }>;
 }
 

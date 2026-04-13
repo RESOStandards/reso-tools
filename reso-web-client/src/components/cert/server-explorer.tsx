@@ -32,13 +32,17 @@ import {
 
 type CategoryFilter = 'all' | 'reso' | 'local' | 'payload';
 
-const ENUM_NS = 'org.reso.metadata.enums.';
+// Enum detection uses isFieldEnum() — see below
 
-/** True if the OData type is a non-primitive (enum, complex, or namespaced type).
- *  In the cert report context, any type with a dot that is not an Edm primitive
- *  is effectively a lookup/enum type. */
-const isEnumType = (type: string): boolean =>
-  type.includes('.') && !type.startsWith('Edm.');
+/** Determine if a cert report field is an enum.
+ *  Rule: not an Edm primitive, not an expansion, not a complex type.
+ *  When DD 2.2 adds an explicit isEnum field, this can be simplified. */
+export const isFieldEnum = (field: {
+  readonly type: string;
+  readonly isExpansion?: boolean;
+  readonly isComplexType?: boolean;
+}): boolean =>
+  !field.type.startsWith('Edm.') && !field.isExpansion && !field.isComplexType;
 
 /** Build a dd.reso.org wiki URL for a field or lookup field. */
 const fieldWikiUrl = (version: string, fieldName: string, lookupName?: string | null): string =>
@@ -59,30 +63,31 @@ const resourceWikiUrl = (version: string, resourceName: string): string =>
  *  "PropertyEnums.AccessibilityFeatures" → "AccessibilityFeatures",
  *  "Edm.String" → "String", "Edm.DateTimeOffset" → "Timestamp". */
 const normalizeTypeName = (odataType: string): string => {
-  if (isEnumType(odataType)) {
-    const lastDot = odataType.lastIndexOf('.');
-    return lastDot >= 0 ? odataType.slice(lastDot + 1) : odataType;
+  if (odataType.startsWith('Edm.')) {
+    const shortNames: Readonly<Record<string, string>> = {
+      'Edm.String': 'String',
+      'Edm.Boolean': 'Boolean',
+      'Edm.Decimal': 'Decimal',
+      'Edm.Double': 'Number',
+      'Edm.Int16': 'Integer',
+      'Edm.Int32': 'Integer',
+      'Edm.Int64': 'Integer',
+      'Edm.Date': 'Date',
+      'Edm.DateTimeOffset': 'Timestamp',
+    };
+    return shortNames[odataType] ?? odataType;
   }
-  const shortNames: Readonly<Record<string, string>> = {
-    'Edm.String': 'String',
-    'Edm.Boolean': 'Boolean',
-    'Edm.Decimal': 'Decimal',
-    'Edm.Double': 'Number',
-    'Edm.Int16': 'Integer',
-    'Edm.Int32': 'Integer',
-    'Edm.Int64': 'Integer',
-    'Edm.Date': 'Date',
-    'Edm.DateTimeOffset': 'Timestamp',
-  };
-  return shortNames[odataType] ?? odataType;
+  // Non-Edm: strip namespace, keep the last segment
+  const lastDot = odataType.lastIndexOf('.');
+  return lastDot >= 0 ? odataType.slice(lastDot + 1) : odataType;
 };
 
-/** Extract lookup name from enum type: org.reso.metadata.enums.Appliances → Appliances,
- *  PropertyEnums.AccessibilityFeatures → AccessibilityFeatures */
-const extractLookupName = (odataType: string): string | null => {
-  if (!isEnumType(odataType)) return null;
+/** Extract lookup name from a non-Edm type string by taking the last
+ *  segment after the final dot. Returns null for Edm primitives. */
+const extractLookupName = (odataType: string, isEnum: boolean): string | null => {
+  if (!isEnum) return null;
   const lastDot = odataType.lastIndexOf('.');
-  return lastDot >= 0 ? odataType.slice(lastDot + 1) : null;
+  return lastDot >= 0 ? odataType.slice(lastDot + 1) : odataType;
 };
 
 // AvailBar, availColorClass imported from ../metadata/shared
@@ -410,7 +415,7 @@ export const ServerExplorer = ({
       .map((f): EnrichedField => {
         const key = `${f.resourceName}:${f.fieldName}`;
         const avail = fieldAvailMap.get(key);
-        const isEnum = isEnumType(f.type);
+        const isEnum = isFieldEnum(f);
         return {
           ...f,
           payloads: f.payloads ?? [],
@@ -418,7 +423,7 @@ export const ServerExplorer = ({
           isExpansion: f.isExpansion ?? false,
           availability: avail?.availability ?? null,
           frequency: avail?.frequency ?? null,
-          lookupName: extractLookupName(f.type),
+          lookupName: extractLookupName(f.type, isEnum),
           isEnum,
         };
       });
