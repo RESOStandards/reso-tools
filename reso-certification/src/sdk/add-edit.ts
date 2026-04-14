@@ -243,12 +243,22 @@ const writeComplianceReports = (config: AddEditConfig): PipelineStep<AddEditCont
     await archiveCurrentResults(outputDir);
     const generators = addEditReportGenerators(config.specVersion ?? '2.0.0');
 
-    // Build a temporary pipeline result for the report generators
+    // Adapt testReport into resourceReports shape for the detailed report serializer
+    const testReport = ctx.testReport as { scenarios: ReadonlyArray<unknown>; summary: { total: number; passed: number; failed: number; skipped?: number } };
+    const contextWithReports = {
+      ...ctx,
+      resourceReports: [{
+        resource: ctx.resource,
+        summary: testReport.summary,
+        scenarios: testReport.scenarios,
+      }],
+    };
+
     const pipelineResult = {
-      status: (ctx.testReport as { summary: { failed: number } }).summary.failed > 0 ? 'failed' as const : 'passed' as const,
+      status: testReport.summary.failed > 0 ? 'failed' as const : 'passed' as const,
       endorsement: 'add-edit',
       steps: ctx.pipelineSteps as ReadonlyArray<import('./types.js').StepResult> ?? [],
-      context: ctx,
+      context: contextWithReports,
       duration: 0,
     };
 

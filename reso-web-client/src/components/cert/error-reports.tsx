@@ -671,7 +671,7 @@ const GenericErrorCard = ({ err }: { readonly err: StepError }) => {
       <button
         type="button"
         onClick={() => hasDetail && setExpanded(!expanded)}
-        className={`w-full text-left px-4 py-3 flex items-center justify-between gap-3 ${hasDetail ? 'cursor-pointer hover:bg-gray-50/50 dark:hover:bg-gray-700/30' : ''} transition-colors`}
+        className={`w-full text-left px-4 py-3 flex items-center justify-between gap-3 bg-gray-50 dark:bg-gray-800/80 ${hasDetail ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/60' : ''} transition-colors`}
       >
         <div className="flex items-center gap-2 min-w-0">
           {hasDetail && (
@@ -679,7 +679,7 @@ const GenericErrorCard = ({ err }: { readonly err: StepError }) => {
               <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
             </svg>
           )}
-          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{err.stepName}</span>
+          <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{err.stepName}</span>
           <CopyButton text={`${err.stepName}: ${err.message}`} title="Copy error details" />
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -874,39 +874,46 @@ const resolveReport = (
   // Use detailed report for Core/Add-Edit/EntityEvent when available
   if (reports?.reportDetailed) {
     const detailed = reports.reportDetailed as Record<string, unknown>;
-    const resourceReports = (detailed.resourceReports ?? []) as ReadonlyArray<{
-      resource: string;
-      summary: { total: number; passed: number; failed: number; skipped: number };
-      scenarios: ReadonlyArray<{
-        name: string;
-        tag: string;
-        passed: boolean;
-        skipped: boolean;
-        duration: number;
-        requestUrl?: string;
-        assertions: ReadonlyArray<{ description: string; passed: boolean; expected?: string; actual?: string }>;
-      }>;
-    }>;
+    const rawResourceReports = (detailed.resourceReports ?? []) as ReadonlyArray<Record<string, unknown>>;
+
+    // Normalize scenario shapes — Core uses name/passed/assertions[{message,passed}],
+    // Add/Edit uses scenario/passed/assertions[{description,status}],
+    // EE uses scenario/passed/assertions[{description,status}]
+    const normalizeAssertion = (a: Record<string, unknown>): { description: string; passed: boolean; expected?: string; actual?: string } => ({
+      description: (a.description ?? a.message ?? '') as string,
+      passed: a.passed === true || a.status === 'pass',
+      expected: a.expected as string | undefined,
+      actual: a.actual as string | undefined,
+    });
+
+    const normalizeScenario = (s: Record<string, unknown>): { name: string; passed: boolean; skipped: boolean; assertions: ReadonlyArray<ReturnType<typeof normalizeAssertion>> } => ({
+      name: ((s.name ?? s.scenario) as string) ?? 'Unknown',
+      passed: s.passed === true,
+      skipped: s.skipped === true,
+      assertions: ((s.assertions ?? []) as ReadonlyArray<Record<string, unknown>>).map(normalizeAssertion),
+    });
 
     // Extract all failed scenarios across all resources
-    const failedScenarios: ReadonlyArray<StepError> = resourceReports.flatMap(r =>
-      r.scenarios
+    const failedScenarios: ReadonlyArray<StepError> = rawResourceReports.flatMap(r => {
+      const resource = (r.resource as string) ?? '';
+      const scenarios = ((r.scenarios ?? []) as ReadonlyArray<Record<string, unknown>>).map(normalizeScenario);
+
+      return scenarios
         .filter(s => !s.passed && !s.skipped)
         .map(s => {
           const failedAssertions = s.assertions.filter(a => !a.passed);
           const message = failedAssertions.map(a => a.description).filter(Boolean).join('; ') || `Scenario "${s.name}" failed`;
-          // Only include detail when there's expected/actual data beyond the description
           const detailLines = failedAssertions
             .filter(a => a.expected || a.actual)
             .map(a => `Expected: ${a.expected ?? '—'}, Actual: ${a.actual ?? '—'}`);
           return {
-            stepName: `${r.resource}: ${s.name}`,
+            stepName: `${resource}: ${humanizeScenarioName(s.name)}`,
             message,
             detail: detailLines.length > 0 ? detailLines.join('\n') : undefined,
             httpStatus: undefined,
           };
-        })
-    );
+        });
+    });
 
     if (failedScenarios.length > 0) {
       const detailedSteps = (detailed.steps ?? []) as ReadonlyArray<Record<string, unknown>>;
@@ -928,11 +935,24 @@ const resolveReport = (
         type: 'generic',
         endorsement,
         failedStep: failedSteps[0].name,
-        errors: failedSteps.map(s => ({
-          stepName: s.name,
-          message: s.detail ?? s.errors?.join('; ') ?? `Step "${s.name}" failed`,
-          detail: s.summary,
-        })),
+        errors: failedSteps.map(s => {
+          const message = s.detail ?? s.errors?.join('; ') ?? `Step "${s.name}" failed`;
+
+          // Add guidance for common DD failure modes
+          const guidance = s.name.includes('metadata')
+            ? 'Check that the server returns well-formed OData 4.0 CSDL XML at the $metadata endpoint.'
+            : s.name.includes('Health check')
+            ? 'Verify the server URL is correct and the server is running.'
+            : s.name.includes('authentication') || s.name.includes('auth')
+            ? 'Verify the auth token or client credentials are correct and not expired.'
+            : undefined;
+
+          return {
+            stepName: s.name,
+            message,
+            detail: [s.summary, guidance].filter(Boolean).join('\n'),
+          };
+        }),
       };
     }
   }
@@ -954,6 +974,32 @@ const resolveReport = (
         }]
       : SAMPLE_GENERIC_REPORT.errors,
   };
+};
+
+// ── Scenario display names ──────────────────────────────────────────
+
+/** Humanize kebab-case scenario tags into readable names. */
+const humanizeScenarioName = (name: string): string => {
+  // Known scenario display names
+  const KNOWN: Readonly<Record<string, string>> = {
+    'metadata-valid': 'Metadata Validation',
+    'read-only-enforced': 'Read-Only Enforcement',
+    'event-structure': 'Event Structure',
+    'sequence-monotonic': 'Sequence Monotonic',
+    'query-filter': 'Query: $filter',
+    'query-orderby-top-skip': 'Query: $orderby, $top, $skip',
+    'query-count': 'Query: $count',
+    'incremental-sync': 'Incremental Sync',
+    'create-triggers-event': 'Create Triggers Event',
+    'update-triggers-event': 'Update Triggers Event',
+    'delete-triggers-event': 'Delete Triggers Event',
+    'data-validation': 'Data Validation',
+  };
+
+  if (KNOWN[name]) return KNOWN[name];
+
+  // Generic fallback: kebab-case to Title Case
+  return name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 };
 
 // ── Spec links by endorsement ───────────────────────────────────────

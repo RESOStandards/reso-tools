@@ -71,6 +71,7 @@ cd reso-desktop-client && npm run dev
 - DO NOT use classes or `this`.
 - DO NOT use `any`. Use `unknown` and narrow with type guards.
 - Use named constants for repeated string literals (endorsement types, status values, environment URLs, step names). Define them in a shared constants file rather than duplicating across components.
+- Prefer interfaces over implementations — when multiple data sources produce similar shapes, define a normalized interface and map to it rather than handling each shape ad hoc.
 
 ## Style Conventions
 
@@ -93,6 +94,7 @@ cd reso-desktop-client && npm run dev
 ### Version Branches
 - All work done in version branches named `vX.Y` (e.g., `v0.5`)
 - GitHub milestones match the branch version
+- **Release tags**: Use short-form tags (`v0.8`, `v0.9`) until real patch releases ship in production. Package.json versions use full SemVer (`0.8.0`), but Git tags and GitHub Releases use short form so `/releases/tag/v0.8` works.
 
 ### Release Checklist
 

@@ -52,6 +52,7 @@ export const DashboardPage = () => {
   const sysName = (providerUoi: string, usi: string): string | null =>
     lookupSystem(providerUoi, usi) ?? null;
 
+
   // Compute summary from live data
   const uniqueRecipients = useMemo(() =>
     new Set(jobs.map(j => j.recipientUoi)).size,
@@ -81,11 +82,11 @@ export const DashboardPage = () => {
 
   // Jobs with errors — for quick access
   const failedJobs = useMemo(() =>
-    jobs.filter(j => j.status === 'failed' && !j.recipientName.includes('(archived)')),
+    jobs.filter(j => j.status === 'failed'),
   [jobs]);
 
   const passedJobs = useMemo(() =>
-    jobs.filter(j => j.status === 'passed' && !j.recipientName.includes('(archived)')),
+    jobs.filter(j => j.status === 'passed'),
   [jobs]);
 
   // Expiring endorsements — certified more than 2 years ago
@@ -128,7 +129,17 @@ export const DashboardPage = () => {
               </p>
             </div>
             {hasJobs && (
-              <SearchInput value={search} onChange={setSearch} placeholder="Filter by recipient, endorsement..." />
+              <div className="flex items-center gap-3">
+                <div className="min-w-[300px]">
+                  <SearchInput value={search} onChange={setSearch} placeholder="Filter by recipient, endorsement..." />
+                </div>
+                <NavLink
+                  to="/cert/jobs"
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors shrink-0"
+                >
+                  View Jobs
+                </NavLink>
+              </div>
             )}
           </div>
         </div>
@@ -263,7 +274,7 @@ export const DashboardPage = () => {
               <div className="space-y-2">
                 {Array.from(
                   jobs
-                    .filter(j => !j.recipientName.includes('(archived)') && (j.status === 'passed' || j.status === 'failed'))
+                    .filter(j => j.status === 'passed' || j.status === 'failed')
                     .reduce((map, j) => {
                       const key = j.recipientUoi;
                       if (!map.has(key)) map.set(key, { name: orgName(j.recipientUoi), uoi: j.recipientUoi, passed: 0, failed: 0 });

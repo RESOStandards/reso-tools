@@ -531,6 +531,28 @@ export const deleteJob = async (id: string): Promise<boolean> => {
   return true;
 };
 
+/** Delete ALL local results from disk and clear the job store. */
+export const deleteAllLocal = async (): Promise<void> => {
+  const runner = getCertRunner();
+  const localJobs = Array.from(state.jobs.values()).filter(j => j.resultPath);
+
+  for (const job of localJobs) {
+    if (runner && job.resultPath) {
+      await runner.deleteResult(job.resultPath);
+    }
+    state.jobs.delete(job.id);
+  }
+
+  // Also clear any in-memory-only jobs (pipeline-created without resultPath)
+  for (const [id, job] of state.jobs) {
+    if (job.local && (job.status === 'passed' || job.status === 'failed' || job.status === 'cancelled')) {
+      state.jobs.delete(id);
+    }
+  }
+
+  emit({ type: 'queue-complete' });
+};
+
 /** Clear all completed/cancelled jobs from the store. */
 export const clearCompleted = (): void => {
   for (const [id, job] of state.jobs) {
@@ -550,17 +572,26 @@ const localResultToJob = (result: LocalResult): Job => {
   const detailedOutcome = detailedReport?.outcome as string | undefined;
   const failed = hasSchemaErrors || detailedOutcome === 'failed';
 
+  // Hydrate steps from the detailed report when available
+  const detailedSteps = (detailedReport?.steps ?? []) as ReadonlyArray<Record<string, unknown>>;
+  const hydratedSteps: ReadonlyArray<JobStep> = detailedSteps.map(s => ({
+    name: (s.name as string) ?? 'Unknown',
+    status: (s.status as StepStatus) ?? 'passed',
+    duration: s.duration as number | undefined,
+    detail: s.summary as string | undefined,
+  }));
+
   return {
     id: `local-${result.path.replace(/[^a-zA-Z0-9]/g, '-')}`,
     endorsement: result.endorsement,
-    endorsementKey: 'dd',
+    endorsementKey: Object.entries(CERT_ENDORSEMENT_LABELS).find(([, label]) => label === result.endorsement)?.[0] ?? 'dd',
     version: result.version,
     recipientUoi: result.recipientUoi,
     recipientName: `${result.recipientUoi}${result.isCurrent ? '' : ' (archived)'}`,
     providerUoi: result.providerUoi,
     providerUsi: result.providerUsi,
     status: failed ? 'failed' : 'passed',
-    steps: [],
+    steps: hydratedSteps,
     queuedAt: result.timestamp,
     completedAt: result.timestamp,
     local: true,

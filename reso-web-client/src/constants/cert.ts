@@ -36,7 +36,7 @@ export const ENDORSEMENT_DEFAULT_VERSIONS: Readonly<Record<CertEndorsement, stri
   dd: DEFAULT_DD_VERSION,
   core: DEFAULT_CORE_VERSION,
   'add-edit': '2.0.0',
-  'entity-event': '2.0.0',
+  'entity-event': 'RCP-027',
 };
 
 // ── Enum modes (Core endorsement) ────────────────────────────────────

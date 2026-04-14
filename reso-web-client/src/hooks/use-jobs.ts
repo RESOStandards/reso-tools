@@ -16,6 +16,7 @@ import {
   clearCompleted,
   rerunJob,
   deleteJob,
+  deleteAllLocal,
   initLocalResults,
 } from '../services/job-manager';
 import type { Job, JobEvent } from '../services/job-manager';
@@ -30,6 +31,7 @@ export interface UseJobsResult {
   readonly clear: () => void;
   readonly rerun: (jobId: string) => void;
   readonly remove: (jobId: string) => void;
+  readonly removeAll: () => void;
 }
 
 export const useJobs = (): UseJobsResult => {
@@ -74,5 +76,9 @@ export const useJobs = (): UseJobsResult => {
     deleteJob(jobId).then(() => setJobs(getJobs()));
   }, []);
 
-  return { jobs, activeCount, queuedCount, start, cancel, clear, rerun, remove };
+  const removeAll = useCallback(() => {
+    deleteAllLocal().then(() => setJobs(getJobs()));
+  }, []);
+
+  return { jobs, activeCount, queuedCount, start, cancel, clear, rerun, remove, removeAll };
 };

@@ -158,12 +158,21 @@ const writeComplianceReports = (config: EntityEventConfig): PipelineStep<EntityE
     await archiveCurrentResults(outputDir);
     const generators = entityEventReportGenerators('RCP-027');
 
-    const testReport = ctx.testReport as { summary: { failed: number } };
+    const testReport = ctx.testReport as { scenarios: ReadonlyArray<unknown>; summary: { total: number; passed: number; failed: number; skipped?: number } };
+    const contextWithReports = {
+      ...ctx,
+      resourceReports: [{
+        resource: 'EntityEvent',
+        summary: testReport.summary,
+        scenarios: testReport.scenarios,
+      }],
+    };
+
     const pipelineResult = {
       status: testReport.summary.failed > 0 ? 'failed' as const : 'passed' as const,
       endorsement: 'entity-event',
       steps: ctx.pipelineSteps as ReadonlyArray<StepResult> ?? [],
-      context: ctx,
+      context: contextWithReports,
       duration: 0,
     };
 

@@ -442,6 +442,7 @@ const JobCard = ({ job, onRerun, onDelete }: { readonly job: CertJob; readonly o
   const [expanded, setExpanded] = useState(job.status === 'running');
   const [showSubmit, setShowSubmit] = useState(false);
   const [showFailure, setShowFailure] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
@@ -523,7 +524,7 @@ const JobCard = ({ job, onRerun, onDelete }: { readonly job: CertJob; readonly o
             )}
             {job.status === 'passed' && (
               <>
-                <button type="button" className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors">
+                <button type="button" onClick={() => setShowReport(true)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors">
                   View Report
                 </button>
                 <NavLink to={`/cert/compare/${job.id}`} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
@@ -594,6 +595,84 @@ const JobCard = ({ job, onRerun, onDelete }: { readonly job: CertJob; readonly o
         />
       )}
 
+      {/* Compliance Report modal (passed jobs) */}
+      {showReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-3xl w-full mx-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700 shrink-0">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  Compliance Report
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {job.endorsement} {job.version} — {job.recipientName}
+                  <span className="ml-2 text-green-600 dark:text-green-400">Passed</span>
+                </p>
+              </div>
+              <button type="button" onClick={() => setShowReport(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer">
+                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto space-y-3">
+              {job.steps.length > 0 ? (
+                job.steps.map((step, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/40 rounded-lg">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm ${step.status === 'passed' ? 'text-green-600 dark:text-green-400' : step.status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-gray-400'}`}>
+                          {step.status === 'passed' ? '✓' : step.status === 'failed' ? '✗' : '○'}
+                        </span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{step.name}</span>
+                      </div>
+                      {step.detail && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 ml-6">{step.detail}</p>
+                      )}
+                    </div>
+                    {step.duration != null && step.duration > 0 && (
+                      <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums shrink-0">
+                        {step.duration < 1000 ? `${step.duration}ms` : `${(step.duration / 1000).toFixed(1)}s`}
+                      </span>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                  No step details available.
+                </p>
+              )}
+            </div>
+            <div className="flex items-center justify-between p-5 border-t border-gray-200 dark:border-gray-700 shrink-0">
+              {job.reports && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const blob = new Blob([JSON.stringify(job.reports, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${job.endorsement.toLowerCase().replace(/\s+/g, '-')}-${job.version}-report.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
+                    <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+                  </svg>
+                  Download Report
+                </button>
+              )}
+              <button type="button" onClick={() => setShowReport(false)} className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Submit to RESO modal */}
       {showSubmit && (
         <SubmitToCloud
@@ -621,7 +700,8 @@ const JobCard = ({ job, onRerun, onDelete }: { readonly job: CertJob; readonly o
 // ── Main page ───────────────────────────────────────────────────────
 
 export const JobsPage = () => {
-  const { jobs: liveJobs, start, cancel, clear, rerun, remove } = useJobs();
+  const { jobs: liveJobs, start, cancel, clear, rerun, remove, removeAll } = useJobs();
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const { lookup, lookupSystem } = useOrganizationNames();
   const [showNewJob, setShowNewJob] = useState(false);
   const [filter, setFilter] = useState<'all' | JobStatus>('all');
@@ -662,7 +742,6 @@ export const JobsPage = () => {
 
   const filteredJobs = useMemo(() => {
     const query = search.toLowerCase();
-    const statusOrder: Record<string, number> = { running: 0, scheduled: 1, queued: 1, failed: 2, passed: 3, cancelled: 4 };
     return allJobs
       .filter(j => {
         if (filter !== 'all' && j.status !== filter) return false;
@@ -674,10 +753,12 @@ export const JobsPage = () => {
         return true;
       })
       .sort((a, b) => {
-        const aOrder = statusOrder[a.status] ?? 5;
-        const bOrder = statusOrder[b.status] ?? 5;
-        if (aOrder !== bOrder) return aOrder - bOrder;
-        // Within same status, most recent first
+        // Running/scheduled always float to top
+        const isActiveA = a.status === 'running' || a.status === 'scheduled';
+        const isActiveB = b.status === 'running' || b.status === 'scheduled';
+        if (isActiveA && !isActiveB) return -1;
+        if (!isActiveA && isActiveB) return 1;
+        // Otherwise sort by timestamp descending (most recent first)
         const aTime = new Date(a.completedAt ?? a.startedAt ?? a.scheduledAt).getTime();
         const bTime = new Date(b.completedAt ?? b.startedAt ?? b.scheduledAt).getTime();
         return bTime - aTime;
@@ -710,7 +791,7 @@ export const JobsPage = () => {
             <button
               type="button"
               onClick={() => setShowNewJob(true)}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors"
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors shrink-0"
             >
               New Test Run
             </button>
@@ -749,6 +830,44 @@ export const JobsPage = () => {
               <option key={e} value={e}>{e === 'all' ? 'All Endorsements' : e}</option>
             ))}
           </select>
+          {liveJobs.length > 0 && (
+            <div className="relative ml-auto">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteAll(!confirmDeleteAll)}
+                className="p-1.5 text-gray-300 hover:text-red-500 dark:text-gray-600 dark:hover:text-red-400 cursor-pointer transition-colors"
+                title="Delete all local results"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.519.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clipRule="evenodd" />
+                </svg>
+              </button>
+              {confirmDeleteAll && (
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-4 z-20">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">Delete all local results?</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                    This will permanently remove all local certification test results from disk. This action cannot be undone.
+                  </p>
+                  <div className="flex items-center gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteAll(false)}
+                      className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { removeAll(); setConfirmDeleteAll(false); }}
+                      className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 cursor-pointer transition-colors"
+                    >
+                      Delete All
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         </div>
       </div>
