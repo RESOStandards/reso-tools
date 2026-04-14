@@ -1406,4 +1406,4 @@ When those land, the MCP server's `query` tool will support them on day one (it 
 
 ---
 
-> **Note:** the `validate` tool is currently a stub on the MCP server side ([handlers.ts](../src/handlers.ts#L137)) and is intentionally not covered here. It will be wired up to `@reso-standards/reso-validation` in a follow-up and added to this guide once it has something real to demonstrate.
+> **Note:** the `validate` tool is currently a stub on the MCP server side ([handlers.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-mcp-server/src/handlers.ts#L137)) and is intentionally not covered here. It will be wired up to `@reso-standards/reso-validation` in a follow-up and added to this guide once it has something real to demonstrate.
