@@ -53,52 +53,41 @@ export const ENUM_MODE_LABELS: Readonly<Record<EnumMode, string>> = {
 // ── Pipeline step definitions per endorsement ────────────────────────
 
 export const DD_STEPS: ReadonlyArray<string> = [
-  'Health Check',
-  'Authentication',
-  'Generate Metadata Report',
-  'Variations Check',
-  'Initialize Replication',
-  'Replication',
-  'Schema Validation',
-  'Data Availability',
-  'Results Submission',
+  'Health check',
+  'Resolve authentication',
+  'Generate metadata report',
+  'Check variations',
+  'Initialize replication state',
+  'Replicate: TIMESTAMP_DESC',
+  'Replicate: NEXT_LINK',
+  'Replicate: NEXT_LINK + filter',
 ];
 
 export const CORE_STEPS: ReadonlyArray<string> = [
-  'Health Check',
-  'Authentication',
-  'Fetch Metadata',
-  '$select Support',
-  '$filter Support',
-  '$orderby Support',
-  '$top/$skip Pagination',
-  '$count Support',
-  '$expand Support',
-  'Results Submission',
+  'Health check',
+  'Resolve authentication',
+  'Fetch metadata',
+  'Run Core scenarios',
+  'Write compliance reports',
 ];
 
 export const ADD_EDIT_STEPS: ReadonlyArray<string> = [
-  'Health Check',
-  'Authentication',
-  'Fetch Metadata',
-  'Create (Required Fields)',
-  'Create (Valid Record)',
-  'Update (PATCH)',
-  'Delete',
-  'Error Response Validation',
-  'Results Submission',
+  'Health check',
+  'Resolve authentication',
+  'Fetch metadata',
+  'Sample records',
+  'Generate payloads',
+  'Run Add/Edit scenarios',
+  'Write compliance reports',
 ];
 
 export const ENTITY_EVENT_STEPS: ReadonlyArray<string> = [
-  'Health Check',
-  'Authentication',
-  'Verify EntityEvent Resource',
-  'Create Test Record',
-  'Poll EntityEvent Feed',
-  'Verify Event Produced',
-  'Delete Test Record',
-  'Verify Delete Event',
-  'Results Submission',
+  'Health check',
+  'Resolve authentication',
+  'Fetch metadata',
+  'Generate payloads',
+  'Run EntityEvent scenarios',
+  'Write compliance reports',
 ];
 
 export const STEPS_BY_ENDORSEMENT: Readonly<Record<string, ReadonlyArray<string>>> = {

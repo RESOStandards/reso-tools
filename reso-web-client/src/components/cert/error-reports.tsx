@@ -19,6 +19,8 @@ interface SchemaError {
   readonly fieldName: string;
   readonly message: string;
   readonly lookups?: ReadonlyArray<{ lookupValue: string; count: number }>;
+  readonly keyField?: string;
+  readonly keys?: ReadonlyArray<string>;
 }
 
 interface SchemaValidationReport {
@@ -214,79 +216,153 @@ export const SAMPLE_GENERIC_REPORT: GenericFailureReport = {
 
 // ── Schema Validation Error Report ───────────────────────────────────
 
-/** Expandable field-level error card. */
-const SchemaErrorCard = ({ err }: { readonly err: SchemaError }) => {
+/** Copy icon button with brief checkmark feedback. */
+const CopyButton = ({ text, title }: { readonly text: string; readonly title?: string }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className={`cursor-pointer transition-colors ${copied ? 'text-green-500 dark:text-green-400' : 'text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400'}`}
+      title={copied ? 'Copied!' : (title ?? 'Copy')}
+    >
+      {copied ? (
+        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+        </svg>
+      ) : (
+        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z" />
+          <path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.439A1.5 1.5 0 008.378 6H4.5z" />
+        </svg>
+      )}
+    </button>
+  );
+};
+
+/** Expandable field row inside an error group. */
+const FieldErrorRow = ({ err }: { readonly err: SchemaError }) => {
   const [expanded, setExpanded] = useState(false);
-  const totalOccurrences = err.lookups?.reduce((sum, l) => sum + l.count, 0) ?? 0;
+  const hasLookups = err.lookups && err.lookups.length > 0;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors">
+        <div className="flex items-center gap-2 min-w-0">
+          {hasLookups ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setExpanded(!expanded)}
+                className="cursor-pointer flex items-center gap-2"
+              >
+                <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform shrink-0 ${expanded ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                </svg>
+                <Badge label={err.resourceName} color="blue" />
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{err.fieldName}</span>
+              </button>
+              <CopyButton text={err.fieldName} title="Copy field name" />
+            </>
+          ) : (
+            <div className="flex items-center gap-2 pl-5">
+              <Badge label={err.resourceName} color="blue" />
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{err.fieldName}</span>
+              <CopyButton text={err.fieldName} title="Copy field name" />
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {hasLookups && (
+            <Badge label={`${err.lookups!.length} values`} color="gray" />
+          )}
+        </div>
+      </div>
+
+      {expanded && hasLookups && (
+        <div className="px-4 pb-3 pl-11">
+          <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
+            {err.lookups!.map(l => (
+              <div key={l.lookupValue} className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-700 dark:text-gray-300 font-mono">{l.lookupValue}</span>
+                  <CopyButton text={l.lookupValue} title="Copy value" />
+                </div>
+                <span className="text-gray-400 dark:text-gray-500 tabular-nums">{l.count.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/** Expandable error group — groups fields by error message. */
+const ErrorGroup = ({ message, errors }: { readonly message: string; readonly errors: ReadonlyArray<SchemaError> }) => {
+  const [expanded, setExpanded] = useState(true);
+  const totalValues = errors.reduce((sum, e) => sum + (e.lookups?.length ?? 0), 0);
 
   return (
     <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors"
+        className="w-full text-left px-4 py-3 bg-red-50 dark:bg-red-900/20 border-b border-red-100 dark:border-red-900/30 cursor-pointer hover:bg-red-100/50 dark:hover:bg-red-900/30 transition-colors"
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <Badge label={err.resourceName} color="blue" />
-          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{err.fieldName}</span>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {totalOccurrences > 0 && (
-            <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
-              {totalOccurrences.toLocaleString()} occurrences
-            </span>
-          )}
-          {err.lookups && err.lookups.length > 0 && (
-            <Badge label={`${err.lookups.length} values`} color="red" />
-          )}
-          <svg className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-          </svg>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <svg className={`w-4 h-4 text-red-400 transition-transform shrink-0 ${expanded ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm font-semibold text-red-800 dark:text-red-200 truncate">{message}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Badge label={`${errors.length} fields`} color="red" />
+            {totalValues > 0 && (
+              <Badge label={`${totalValues.toLocaleString()} values`} color="gray" />
+            )}
+            {errors[0]?.keys && errors[0].keys.length > 0 && (
+              <button
+                type="button"
+                onClick={e => {
+                  e.stopPropagation();
+                  const keys = errors[0].keys ?? [];
+                  const keyField = errors[0].keyField ?? 'Key';
+                  const csv = [keyField, ...keys].join('\n');
+                  const blob = new Blob([csv], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${message.replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()}-keys.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-medium"
+              >
+                <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
+                  <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+                </svg>
+                {errors[0].keys.length.toLocaleString()} keys
+              </button>
+            )}
+          </div>
         </div>
       </button>
 
       {expanded && (
-        <div className="px-4 pb-3 border-t border-gray-100 dark:border-gray-700/50 pt-3 space-y-2">
-          {/* Error message — copyable */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-red-600 dark:text-red-400 font-medium">{err.message}</span>
-            <button
-              type="button"
-              onClick={() => navigator.clipboard.writeText(err.message)}
-              className="text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 cursor-pointer"
-              title="Copy error message"
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z" />
-                <path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.439A1.5 1.5 0 008.378 6H4.5z" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Lookup values */}
-          {err.lookups && err.lookups.length > 0 && (
-            <div className="space-y-1">
-              {err.lookups.map(l => (
-                <div key={l.lookupValue} className="flex items-center justify-between text-xs pl-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-gray-700 dark:text-gray-300 font-mono">{l.lookupValue}</span>
-                    <button
-                      type="button"
-                      onClick={() => navigator.clipboard.writeText(l.lookupValue)}
-                      className="text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 cursor-pointer"
-                      title="Copy value"
-                    >
-                      <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z" />
-                        <path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.439A1.5 1.5 0 008.378 6H4.5z" />
-                      </svg>
-                    </button>
-                  </div>
-                  <span className="text-gray-400 dark:text-gray-500 tabular-nums">{l.count.toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="divide-y divide-gray-100 dark:divide-gray-700/50">
+          {errors.map((err, i) => (
+            <FieldErrorRow key={`${err.resourceName}-${err.fieldName}-${i}`} err={err} />
+          ))}
         </div>
       )}
     </div>
@@ -296,28 +372,32 @@ const SchemaErrorCard = ({ err }: { readonly err: SchemaError }) => {
 export const SchemaValidationErrorReport = ({ report }: { readonly report: SchemaValidationReport }) => {
   const [search, setSearch] = useState('');
   const [resourceFilter, setResourceFilter] = useState<string>('all');
-  const [messageFilter, setMessageFilter] = useState<string>('all');
 
   const resources = useMemo(() => {
     const set = new Set(report.errors.map(e => e.resourceName));
     return ['all', ...Array.from(set).sort()];
   }, [report.errors]);
 
-  const errorMessages = useMemo(() => {
-    const set = new Set(report.errors.map(e => e.message));
-    return ['all', ...Array.from(set).sort()];
-  }, [report.errors]);
-
-  const filtered = useMemo(() => {
+  // Group by error message, then filter
+  const grouped = useMemo(() => {
     const query = search.toLowerCase();
-    return report.errors.filter(e => {
+    const filtered = report.errors.filter(e => {
       if (resourceFilter !== 'all' && e.resourceName !== resourceFilter) return false;
-      if (messageFilter !== 'all' && e.message !== messageFilter) return false;
       if (query && !e.fieldName.toLowerCase().includes(query) && !e.message.toLowerCase().includes(query)
         && !(e.lookups ?? []).some(l => l.lookupValue.toLowerCase().includes(query))) return false;
       return true;
     });
-  }, [report.errors, search, resourceFilter, messageFilter]);
+
+    const groups = new Map<string, SchemaError[]>();
+    for (const err of filtered) {
+      const existing = groups.get(err.message);
+      if (existing) existing.push(err);
+      else groups.set(err.message, [err]);
+    }
+    return groups;
+  }, [report.errors, search, resourceFilter]);
+
+  const totalFilteredFields = Array.from(grouped.values()).reduce((sum, g) => sum + g.length, 0);
 
   return (
     <div className="space-y-4">
@@ -325,7 +405,10 @@ export const SchemaValidationErrorReport = ({ report }: { readonly report: Schem
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-4">
           <span className="text-sm font-semibold text-red-600 dark:text-red-400 tabular-nums">
-            {report.totalErrors.toLocaleString()} errors across {report.errors.length} fields
+            {totalFilteredFields} {totalFilteredFields === 1 ? 'field' : 'fields'} with errors
+          </span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            {grouped.size} error {grouped.size === 1 ? 'type' : 'types'}
           </span>
           {report.totalWarnings > 0 && (
             <span className="text-sm font-semibold text-amber-600 dark:text-amber-400 tabular-nums">
@@ -348,27 +431,16 @@ export const SchemaValidationErrorReport = ({ report }: { readonly report: Schem
             />
           ))}
         </div>
-        {errorMessages.length > 2 && (
-          <select
-            value={messageFilter}
-            onChange={e => setMessageFilter(e.target.value)}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-pointer"
-          >
-            {errorMessages.map(m => (
-              <option key={m} value={m}>{m === 'all' ? 'All Error Types' : m}</option>
-            ))}
-          </select>
-        )}
       </div>
 
-      {/* Field-level error cards */}
-      <div className="space-y-2">
-        {filtered.map((err, i) => (
-          <SchemaErrorCard key={`${err.resourceName}-${err.fieldName}-${i}`} err={err} />
+      {/* Error groups */}
+      <div className="space-y-3">
+        {Array.from(grouped.entries()).map(([message, errors]) => (
+          <ErrorGroup key={message} message={message} errors={errors} />
         ))}
       </div>
 
-      {filtered.length === 0 && (
+      {grouped.size === 0 && (
         <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center text-sm text-gray-500 dark:text-gray-400">
           No errors match the current filters.
         </div>
@@ -590,33 +662,95 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
 
 // ── Generic Error Report ─────────────────────────────────────────────
 
-export const GenericErrorReport = ({ report }: { readonly report: GenericFailureReport }) => (
-  <div className="space-y-4">
-    <div className="flex items-center gap-3">
-      <span className="text-sm font-semibold text-red-600 dark:text-red-400">
-        Failed at: {report.failedStep}
-      </span>
-      <Badge label={report.endorsement} color="blue" />
-    </div>
+const GenericErrorCard = ({ err }: { readonly err: StepError }) => {
+  const [expanded, setExpanded] = useState(false);
+  const hasDetail = Boolean(err.detail);
 
-    <div className="space-y-2">
-      {report.errors.map((err, i) => (
-        <div key={i} className="bg-white dark:bg-gray-800/60 border border-red-200 dark:border-red-800 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{err.stepName}</span>
-            {err.httpStatus && (
-              <Badge label={`HTTP ${err.httpStatus}`} color="red" />
-            )}
-          </div>
-          <p className="text-sm text-red-700 dark:text-red-300">{err.message}</p>
-          {err.detail && (
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{err.detail}</p>
+  return (
+    <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => hasDetail && setExpanded(!expanded)}
+        className={`w-full text-left px-4 py-3 flex items-center justify-between gap-3 ${hasDetail ? 'cursor-pointer hover:bg-gray-50/50 dark:hover:bg-gray-700/30' : ''} transition-colors`}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          {hasDetail && (
+            <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform shrink-0 ${expanded ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+            </svg>
           )}
+          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{err.stepName}</span>
+          <CopyButton text={err.stepName} title="Copy scenario name" />
         </div>
-      ))}
+        <div className="flex items-center gap-2 shrink-0">
+          {err.httpStatus && <Badge label={`HTTP ${err.httpStatus}`} color="red" />}
+        </div>
+      </button>
+
+      {!expanded && (
+        <div className="px-4 pb-3">
+          <p className="text-xs text-red-600 dark:text-red-400">{err.message}</p>
+        </div>
+      )}
+
+      {expanded && hasDetail && (
+        <div className="px-4 pb-3 border-t border-gray-100 dark:border-gray-700/50 pt-3">
+          <p className="text-xs text-red-600 dark:text-red-400 mb-2">{err.message}</p>
+          <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+            {err.detail!.split('\n').map((line, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs">
+                <span className="text-gray-600 dark:text-gray-400">{line}</span>
+                <CopyButton text={line} title="Copy detail" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
+
+export const GenericErrorReport = ({ report }: { readonly report: GenericFailureReport }) => {
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return report.errors;
+    const query = search.toLowerCase();
+    return report.errors.filter(e =>
+      e.stepName.toLowerCase().includes(query) ||
+      e.message.toLowerCase().includes(query) ||
+      (e.detail ?? '').toLowerCase().includes(query)
+    );
+  }, [report.errors, search]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold text-red-600 dark:text-red-400">
+            {report.errors.length} {report.errors.length === 1 ? 'failure' : 'failures'}
+          </span>
+          <Badge label={report.endorsement} color="blue" />
+        </div>
+      </div>
+
+      {report.errors.length > 3 && (
+        <SearchInput value={search} onChange={setSearch} placeholder="Filter by scenario or error..." />
+      )}
+
+      <div className="space-y-2">
+        {filtered.map((err, i) => (
+          <GenericErrorCard key={i} err={err} />
+        ))}
+        {filtered.length === 0 && (
+          <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            No errors match the current filter.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // ── Error Report Selector ────────────────────────────────────────────
 
@@ -651,11 +785,24 @@ export const ErrorReportDemo = () => {
 const parseRealSchemaErrors = (raw: Record<string, unknown>): SchemaValidationReport => {
   const totalErrors = (raw.totalErrors as number) ?? 0;
   const totalWarnings = (raw.totalWarnings as number) ?? 0;
-  const errorsObj = (raw.errors ?? {}) as Record<string, { resources: Record<string, { fields: Record<string, { lookups?: Record<string, { count: number }> }> }> }>;
+  const errorsObj = (raw.errors ?? {}) as Record<string, {
+    resources: Record<string, {
+      keyField?: string;
+      keys?: ReadonlyArray<string> | Record<string, boolean>;
+      fields: Record<string, { lookups?: Record<string, { count: number }> }>;
+    }>;
+  }>;
 
   const errors: SchemaError[] = [];
   for (const [message, data] of Object.entries(errorsObj)) {
     for (const [resourceName, resourceData] of Object.entries(data.resources ?? {})) {
+      const keyField = resourceData.keyField;
+      const keys = Array.isArray(resourceData.keys)
+        ? resourceData.keys
+        : resourceData.keys
+        ? Object.keys(resourceData.keys)
+        : undefined;
+
       for (const [fieldName, fieldData] of Object.entries(resourceData.fields ?? {})) {
         const lookups = fieldData.lookups
           ? Object.entries(fieldData.lookups).map(([lookupValue, lv]) => ({
@@ -663,7 +810,7 @@ const parseRealSchemaErrors = (raw: Record<string, unknown>): SchemaValidationRe
               count: lv.count,
             }))
           : undefined;
-        errors.push({ resourceName, fieldName, message, lookups });
+        errors.push({ resourceName, fieldName, message, lookups, keyField, keys });
       }
     }
   }
@@ -712,6 +859,7 @@ const resolveReport = (
   endorsement: string,
   failedStep?: string,
   reports?: Record<string, unknown>,
+  steps?: ReadonlyArray<{ name: string; status: string; detail?: string; summary?: string; errors?: ReadonlyArray<string> }>,
 ): ErrorReport => {
   // Use real report data when available
   if (reports) {
@@ -720,6 +868,72 @@ const resolveReport = (
     }
     if (reports.variations) {
       return parseRealVariations(reports.variations as Record<string, unknown>);
+    }
+  }
+
+  // Use detailed report for Core/Add-Edit/EntityEvent when available
+  if (reports?.reportDetailed) {
+    const detailed = reports.reportDetailed as Record<string, unknown>;
+    const resourceReports = (detailed.resourceReports ?? []) as ReadonlyArray<{
+      resource: string;
+      summary: { total: number; passed: number; failed: number; skipped: number };
+      scenarios: ReadonlyArray<{
+        name: string;
+        tag: string;
+        passed: boolean;
+        skipped: boolean;
+        duration: number;
+        requestUrl?: string;
+        assertions: ReadonlyArray<{ description: string; passed: boolean; expected?: string; actual?: string }>;
+      }>;
+    }>;
+
+    // Extract all failed scenarios across all resources
+    const failedScenarios: ReadonlyArray<StepError> = resourceReports.flatMap(r =>
+      r.scenarios
+        .filter(s => !s.passed && !s.skipped)
+        .map(s => {
+          const failedAssertions = s.assertions.filter(a => !a.passed);
+          const message = failedAssertions.map(a => a.description).filter(Boolean).join('; ') || `Scenario "${s.name}" failed`;
+          // Only include detail when there's expected/actual data beyond the description
+          const detailLines = failedAssertions
+            .filter(a => a.expected || a.actual)
+            .map(a => `Expected: ${a.expected ?? '—'}, Actual: ${a.actual ?? '—'}`);
+          return {
+            stepName: `${r.resource}: ${s.name}`,
+            message,
+            detail: detailLines.length > 0 ? detailLines.join('\n') : undefined,
+            httpStatus: undefined,
+          };
+        })
+    );
+
+    if (failedScenarios.length > 0) {
+      const detailedSteps = (detailed.steps ?? []) as ReadonlyArray<Record<string, unknown>>;
+      const summaryStep = detailedSteps.find(s => s.status === 'failed');
+      return {
+        type: 'generic',
+        endorsement,
+        failedStep: (summaryStep?.name as string) ?? failedStep ?? 'Test Scenarios',
+        errors: failedScenarios,
+      };
+    }
+  }
+
+  // Build generic report from step data when available
+  if (steps && steps.length > 0) {
+    const failedSteps = steps.filter(s => s.status === 'failed');
+    if (failedSteps.length > 0) {
+      return {
+        type: 'generic',
+        endorsement,
+        failedStep: failedSteps[0].name,
+        errors: failedSteps.map(s => ({
+          stepName: s.name,
+          message: s.detail ?? s.errors?.join('; ') ?? `Step "${s.name}" failed`,
+          detail: s.summary,
+        })),
+      };
     }
   }
 
@@ -748,6 +962,7 @@ export const FailureReportModal = ({
   recipientName,
   failedStep,
   reports,
+  steps,
   onClose,
 }: {
   readonly endorsement: string;
@@ -755,9 +970,10 @@ export const FailureReportModal = ({
   readonly recipientName: string;
   readonly failedStep?: string;
   readonly reports?: Record<string, unknown>;
+  readonly steps?: ReadonlyArray<{ name: string; status: string; detail?: string; summary?: string; errors?: ReadonlyArray<string> }>;
   readonly onClose: () => void;
 }) => {
-  const report = resolveReport(endorsement, failedStep, reports);
+  const report = resolveReport(endorsement, failedStep, reports, steps);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -792,7 +1008,30 @@ export const FailureReportModal = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 p-5 border-t border-gray-200 dark:border-gray-700 shrink-0">
+        <div className="flex items-center justify-between p-5 border-t border-gray-200 dark:border-gray-700 shrink-0">
+          <div>
+            {reports && (
+              <button
+                type="button"
+                onClick={() => {
+                  const blob = new Blob([JSON.stringify(reports, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${endorsement.toLowerCase().replace(/\s+/g, '-')}-${version}-errors.json`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
+                  <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+                </svg>
+                Download Results
+              </button>
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}

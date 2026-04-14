@@ -96,16 +96,30 @@ const activeRuns = new Map<string, AbortController>();
 const resolveOutputPath = (config: Record<string, unknown>): string | null => {
   try {
     const endorsement = config.endorsement as string;
-    if (endorsement !== 'dd') return null;
+    const slugMap: Record<string, string> = {
+      dd: 'data-dictionary',
+      core: 'web-api-core',
+      'add-edit': 'web-api-add-edit',
+      'entity-event': 'entity-event',
+    };
+    const slug = slugMap[endorsement];
+    if (!slug) return null;
 
-    const version = (config.version as string) ?? '2.0';
+    const versionMap: Record<string, string> = {
+      dd: (config.version as string) ?? '2.0',
+      core: (config.version as string) ?? '2.0.0',
+      'add-edit': (config.specVersion as string) ?? '2.0.0',
+      'entity-event': 'RCP-027',
+    };
+    const version = versionMap[endorsement];
+
     const providerUoi = (config.providerUoi as string) ?? `LOCAL-${Date.now()}`;
     const providerUsi = (config.providerUsi as string) ?? 'LOCAL-SYSTEM';
     const recipientUoi = (config.recipientUoi as string) ?? 'LOCAL-RECIPIENT';
     const outputDir = (config.options as Record<string, unknown>)?.outputDir as string | undefined;
     const resultsPath = outputDir ?? resolve(process.cwd(), '.reso-cert');
 
-    return resolve(resultsPath, `data-dictionary-${version}`, `${providerUoi}-${providerUsi}`, recipientUoi, 'current');
+    return resolve(resultsPath, `${slug}-${version}`, `${providerUoi}-${providerUsi}`, recipientUoi, 'current');
   } catch {
     return null;
   }
@@ -142,6 +156,8 @@ const readReports = (dir: string): Record<string, unknown> => {
     variations: join(dir, 'data-dictionary-variations.json'),
     metadata: join(dir, 'metadata-report.processed.json'),
     ddReport: join(dir, 'data-dictionary-2.0.json'),
+    report: join(dir, 'report.json'),
+    reportDetailed: join(dir, 'report-detailed.json'),
   };
   for (const [key, path] of Object.entries(filesToRead)) {
     try {
@@ -172,10 +188,18 @@ const scanLocalResults = (): ReadonlyArray<LocalResult> => {
       if (!statSync(endorsementPath).isDirectory()) continue;
 
       // Parse endorsement and version from directory name
-      const match = endorsementDir.match(/^(data-dictionary)-(\d+\.\d+)$/);
+      // Supports: data-dictionary-2.0, web-api-core-2.0.0, web-api-add-edit-2.0.0, entity-event-RCP-027
+      const match = endorsementDir.match(/^(.+)-(\d+\.\d+(?:\.\d+)?|RCP-\d+)$/);
       if (!match) continue;
-      const endorsement = 'Data Dictionary';
+      const endorsementSlug = match[1];
       const version = match[2];
+      const endorsementLabels: Record<string, string> = {
+        'data-dictionary': 'Data Dictionary',
+        'web-api-core': 'Web API Core',
+        'web-api-add-edit': 'Web API Add/Edit',
+        'entity-event': 'EntityEvent',
+      };
+      const endorsement = endorsementLabels[endorsementSlug] ?? endorsementSlug;
 
       // Level 2: provider directories (e.g., T00000012-50055)
       for (const providerDir of readdirSync(endorsementPath)) {
@@ -210,9 +234,18 @@ const scanLocalResults = (): ReadonlyArray<LocalResult> => {
             for (const archiveDir of readdirSync(archivedPath)) {
               const archivePath = join(archivedPath, archiveDir);
               if (!statSync(archivePath).isDirectory()) continue;
+              // Reconstruct ISO timestamp from file-safe directory name
+              // e.g., 2026-04-14T034929041Z → 2026-04-14T03:49:29.041Z
+              const ts = archiveDir.replace(
+                /^(\d{4}-\d{2}-\d{2}T)(\d{2})(\d{2})(\d{2})(\d{3})Z$/,
+                '$1$2:$3:$4.$5Z'
+              );
+              const timestamp = isNaN(new Date(ts).getTime())
+                ? statSync(archivePath).mtime.toISOString()
+                : ts;
               results.push({
                 endorsement, version, providerUoi, providerUsi, recipientUoi,
-                path: archivePath, isCurrent: false, timestamp: archiveDir,
+                path: archivePath, isCurrent: false, timestamp,
                 reports: readReports(archivePath),
               });
             }
@@ -274,6 +307,26 @@ const registerCertRunnerHandlers = (): void => {
   /** Start watching for result changes. */
   ipcMain.handle('cert:start-watcher', () => { startCertWatcher(); });
 
+  /** Delete a local result directory. */
+  ipcMain.handle('cert:delete-result', async (_event, resultPath: string) => {
+    // Safety: only allow deleting paths inside .reso-cert/
+    const root = certResultsRoot();
+    const resolved = resolve(resultPath);
+    if (!resolved.startsWith(root)) {
+      log(`Refused to delete path outside .reso-cert: ${resolved}`);
+      return false;
+    }
+    try {
+      const { rm } = await import('node:fs/promises');
+      await rm(resolved, { recursive: true, force: true });
+      log(`Deleted local result: ${resolved}`);
+      return true;
+    } catch (err) {
+      log(`Failed to delete ${resolved}: ${err}`);
+      return false;
+    }
+  });
+
   /**
    * Start a compliance test run.
    * The renderer sends a ComplianceConfig-shaped object plus a jobId.
@@ -283,17 +336,6 @@ const registerCertRunnerHandlers = (): void => {
   ipcMain.handle('cert:run', async (event, jobId: string, config: Record<string, unknown>) => {
     const controller = new AbortController();
     activeRuns.set(jobId, controller);
-
-    // Intercept process.exit() calls from legacy-cert-utils — it calls
-    // process.exit(1) on schema validation errors in strict mode, which
-    // would kill the Electron app. We trap it and convert to a thrown error.
-    const originalExit = process.exit;
-    let exitIntercepted = false;
-    process.exit = ((code?: number) => {
-      exitIntercepted = true;
-      log(`Cert run ${jobId}: process.exit(${code}) intercepted — converting to error`);
-      throw new Error(`Certification test exited with code ${code ?? 0}`);
-    }) as never;
 
     try {
       // Dynamic import so we don't block app startup
@@ -336,6 +378,8 @@ const registerCertRunnerHandlers = (): void => {
             schemaErrors: resolve(outputDir, 'data-availability-schema-validation-errors.json'),
             variations: resolve(outputDir, 'data-dictionary-variations.json'),
             metadata: resolve(outputDir, 'metadata-report.processed.json'),
+            report: resolve(outputDir, 'report.json'),
+            reportDetailed: resolve(outputDir, 'report-detailed.json'),
           };
           for (const [key, path] of Object.entries(filesToRead)) {
             try {
@@ -344,10 +388,25 @@ const registerCertRunnerHandlers = (): void => {
             } catch { /* file doesn't exist — skip */ }
           }
           if (Object.keys(reportFiles).length > 0) reports = reportFiles;
+          log(`Cert run ${jobId}: found reports: ${Object.keys(reportFiles).join(', ')} in ${outputDir}`);
         }
-      } catch { /* ignore */ }
+      } catch (reportErr) {
+        log(`Cert run ${jobId}: error reading reports: ${reportErr}`);
+      }
 
-      return { status: result.status, steps: result.steps, duration: result.duration, reports };
+      // Cross-check: if schema validation errors exist on disk but the pipeline
+      // reported success, override to failed. This catches cases where throwOnError
+      // propagates through the pipeline but the overall status isn't set correctly
+      // (e.g., failFast=false or the error is caught within a sub-step).
+      const hasSchemaErrors = reports?.schemaErrors !== undefined;
+      const actualStatus = hasSchemaErrors && result.status === 'passed' ? 'failed' as const : result.status;
+      const error = hasSchemaErrors && result.status === 'passed'
+        ? 'Schema validation errors found. See the failure report for details.'
+        : undefined;
+
+      log(`Cert run ${jobId} complete: pipeline=${result.status}, actual=${actualStatus}, steps=${result.steps.length}${hasSchemaErrors ? ', schemaErrors=true' : ''}`);
+
+      return { status: actualStatus, steps: result.steps, duration: result.duration, reports, error };
     } catch (err) {
       activeRuns.delete(jobId);
       const message = err instanceof Error ? err.message : String(err);
@@ -361,11 +420,15 @@ const registerCertRunnerHandlers = (): void => {
         const outputDir = resolveOutputPath(config);
         if (outputDir) {
           const reportFiles: Record<string, unknown> = {};
-          const schemaErrorPath = resolve(outputDir, 'data-availability-schema-validation-errors.json');
-          const variationsPath = resolve(outputDir, 'data-dictionary-variations.json');
-          const metadataPath = resolve(outputDir, 'metadata-report.processed.json');
+          const errorFilesToRead: Readonly<Record<string, string>> = {
+            schemaErrors: resolve(outputDir, 'data-availability-schema-validation-errors.json'),
+            variations: resolve(outputDir, 'data-dictionary-variations.json'),
+            metadata: resolve(outputDir, 'metadata-report.processed.json'),
+            report: resolve(outputDir, 'report.json'),
+            reportDetailed: resolve(outputDir, 'report-detailed.json'),
+          };
 
-          for (const [key, path] of Object.entries({ schemaErrors: schemaErrorPath, variations: variationsPath, metadata: metadataPath })) {
+          for (const [key, path] of Object.entries(errorFilesToRead)) {
             try {
               const content = readFileSync(path, 'utf-8');
               reportFiles[key] = JSON.parse(content);
@@ -377,15 +440,11 @@ const registerCertRunnerHandlers = (): void => {
 
       return {
         status: 'failed' as const,
-        error: exitIntercepted
-          ? 'Schema validation errors found. See the failure report for details.'
-          : message,
+        error: message,
         steps: [],
         duration: 0,
         reports,
       };
-    } finally {
-      process.exit = originalExit;
     }
   });
 

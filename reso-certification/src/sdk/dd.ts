@@ -202,6 +202,7 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
   jsonSchemaValidation: config.strictMode ?? true,
   batchExpand: config.batchExpand ?? false,
   outputPath: ctx.outputPath,
+  throwOnError: true,
 });
 
 const initReplicationState: PipelineStep<DDContext> = {

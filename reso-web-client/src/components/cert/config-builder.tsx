@@ -320,7 +320,7 @@ const CoreOptionsSection = ({
             onChange={e => onChange({ ...options, fullCoverage: e.target.checked })}
             className="rounded cursor-pointer"
           />
-          Full Coverage
+          <span title="Fail if any advertised data type category (string, numeric, date, boolean, enum) is not covered by test queries">Full Coverage</span>
         </label>
       </div>
     </div>

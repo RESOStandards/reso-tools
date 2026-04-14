@@ -1,12 +1,12 @@
 /**
- * Submit to Cloud — handoff UI for pushing local test results
+ * Submit to RESO — handoff UI for pushing local test results
  * to the RESO Services API (services.reso.org).
  *
  * Appears after a local job passes. Uses the provider Bearer token
  * (from OAuth2 client_credentials) to authenticate with the backend.
  *
  * Flow:
- *   1. User clicks "Submit to Cloud" on a passed job
+ *   1. User clicks "Submit to RESO" on a passed job
  *   2. Modal shows submission summary (endorsement, recipient, provider)
  *   3. User confirms → POST results to services.reso.org
  *   4. Progress indicator → success/failure with cert API link
@@ -79,7 +79,7 @@ export const SubmitToCloud = ({
         {/* Header */}
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            Submit to Cloud
+            Submit to RESO
           </h3>
           <button
             type="button"
@@ -163,7 +163,7 @@ export const SubmitToCloud = ({
                 onClick={handleSubmit}
                 className="px-4 py-2 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 cursor-pointer transition-colors"
               >
-                Submit Results
+                Start Certification
               </button>
             </div>
           </>

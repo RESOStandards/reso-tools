@@ -17,6 +17,7 @@ import { ConfigBuilder } from '../../components/cert/config-builder';
 import { SubmitToCloud } from '../../components/cert/submit-to-cloud';
 import { FailureReportModal } from '../../components/cert/error-reports';
 import { useJobs } from '../../hooks/use-jobs';
+import { useOrganizationNames } from '../../hooks/use-organization-names';
 import type { BatchConfig } from '../../components/cert/config-builder';
 import type { Job } from '../../services/job-manager';
 import type { EndorsementStatus } from '../../api/cert-fixtures';
@@ -418,7 +419,7 @@ const StepPipeline = ({ steps }: { readonly steps: ReadonlyArray<JobStep> }) => 
             <span className={`text-sm ${step.status === 'skipped' ? 'text-gray-400 dark:text-gray-600 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
               {step.name}
             </span>
-            {step.duration && (
+            {step.duration != null && step.duration > 0 && (
               <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums ml-2">
                 {formatDuration(step.duration)}
               </span>
@@ -430,10 +431,6 @@ const StepPipeline = ({ steps }: { readonly steps: ReadonlyArray<JobStep> }) => 
             </p>
           )}
         </div>
-        {/* Progress connector line */}
-        {i < steps.length - 1 && (
-          <div className="absolute left-[1.1rem] mt-6 w-px h-3 bg-gray-200 dark:bg-gray-700" />
-        )}
       </div>
     ))}
   </div>
@@ -441,10 +438,11 @@ const StepPipeline = ({ steps }: { readonly steps: ReadonlyArray<JobStep> }) => 
 
 // ── Job card ────────────────────────────────────────────────────────
 
-const JobCard = ({ job }: { readonly job: CertJob }) => {
+const JobCard = ({ job, onRerun, onDelete }: { readonly job: CertJob; readonly onRerun?: () => void; readonly onDelete?: () => void }) => {
   const [expanded, setExpanded] = useState(job.status === 'running');
   const [showSubmit, setShowSubmit] = useState(false);
   const [showFailure, setShowFailure] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
     <div className={`bg-white dark:bg-gray-800/60 border rounded-xl overflow-hidden transition-colors ${
@@ -473,7 +471,8 @@ const JobCard = ({ job }: { readonly job: CertJob }) => {
               )}
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
-              {job.recipientName} · {job.providerName}
+              {job.recipientName}
+              {job.providerName && <span className="text-gray-400 dark:text-gray-500"> · {job.providerName}</span>}
             </p>
             {job.status === 'failed' && job.error && (
               <p className="text-xs text-red-500 dark:text-red-400 mt-0.5 truncate">
@@ -531,8 +530,13 @@ const JobCard = ({ job }: { readonly job: CertJob }) => {
                   Compare
                 </NavLink>
                 <button type="button" onClick={() => setShowSubmit(true)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 cursor-pointer transition-colors">
-                  Submit to Cloud
+                  Submit to RESO
                 </button>
+                {onRerun && (
+                  <button type="button" onClick={onRerun} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
+                    Re-run
+                  </button>
+                )}
               </>
             )}
             {job.status === 'failed' && (
@@ -540,10 +544,38 @@ const JobCard = ({ job }: { readonly job: CertJob }) => {
                 <button type="button" onClick={() => setShowFailure(true)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors">
                   View Failure Report
                 </button>
-                <button type="button" className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
-                  Re-run
-                </button>
+                {onRerun && (
+                  <button type="button" onClick={onRerun} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
+                    Re-run
+                  </button>
+                )}
               </>
+            )}
+
+            {/* Delete — available on all completed local jobs */}
+            {onDelete && (job.status === 'passed' || job.status === 'failed') && (
+              confirmDelete ? (
+                <div className="flex items-center gap-1 ml-auto">
+                  <span className="text-xs text-red-500 dark:text-red-400">Delete results?</span>
+                  <button type="button" onClick={() => { onDelete(); setConfirmDelete(false); }} className="px-2 py-1 text-xs font-medium rounded bg-red-600 text-white hover:bg-red-700 cursor-pointer transition-colors">
+                    Yes
+                  </button>
+                  <button type="button" onClick={() => setConfirmDelete(false)} className="px-2 py-1 text-xs font-medium rounded bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 cursor-pointer transition-colors">
+                    No
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(true)}
+                  className="p-1.5 text-gray-300 hover:text-red-500 dark:text-gray-600 dark:hover:text-red-400 cursor-pointer transition-colors ml-auto"
+                  title="Delete results"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.519.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              )
             )}
           </div>
         </div>
@@ -557,11 +589,12 @@ const JobCard = ({ job }: { readonly job: CertJob }) => {
           recipientName={job.recipientName}
           failedStep={job.steps.find(s => s.status === 'failed')?.name ?? job.error}
           reports={job.reports}
+          steps={job.steps}
           onClose={() => setShowFailure(false)}
         />
       )}
 
-      {/* Submit to Cloud modal */}
+      {/* Submit to RESO modal */}
       {showSubmit && (
         <SubmitToCloud
           job={{
@@ -588,7 +621,8 @@ const JobCard = ({ job }: { readonly job: CertJob }) => {
 // ── Main page ───────────────────────────────────────────────────────
 
 export const JobsPage = () => {
-  const { jobs: liveJobs, start, cancel, clear } = useJobs();
+  const { jobs: liveJobs, start, cancel, clear, rerun, remove } = useJobs();
+  const { lookup, lookupSystem } = useOrganizationNames();
   const [showNewJob, setShowNewJob] = useState(false);
   const [filter, setFilter] = useState<'all' | JobStatus>('all');
   const [search, setSearch] = useState('');
@@ -601,9 +635,13 @@ export const JobsPage = () => {
       endorsement: j.endorsement,
       version: j.version,
       recipientUoi: j.recipientUoi,
-      recipientName: j.recipientName,
+      recipientName: lookup(j.recipientUoi) ?? j.recipientName,
       providerUoi: j.providerUoi,
-      providerName: j.providerUsi || j.providerUoi,
+      providerName: (() => {
+        const name = lookup(j.providerUoi) ?? j.providerUoi;
+        const sys = lookupSystem(j.providerUoi, j.providerUsi);
+        return sys ? `${name} / ${sys}` : name;
+      })(),
       status: (j.status === 'queued' ? 'scheduled' : j.status) as JobStatus,
       scheduledAt: j.queuedAt,
       startedAt: j.startedAt,
@@ -624,15 +662,26 @@ export const JobsPage = () => {
 
   const filteredJobs = useMemo(() => {
     const query = search.toLowerCase();
-    return allJobs.filter(j => {
-      if (filter !== 'all' && j.status !== filter) return false;
-      if (endorsementFilter !== 'all' && j.endorsement !== endorsementFilter) return false;
-      if (query) {
-        const searchable = [j.recipientName, j.providerName, j.endorsement, j.recipientUoi, j.providerUoi].join(' ').toLowerCase();
-        if (!searchable.includes(query)) return false;
-      }
-      return true;
-    });
+    const statusOrder: Record<string, number> = { running: 0, scheduled: 1, queued: 1, failed: 2, passed: 3, cancelled: 4 };
+    return allJobs
+      .filter(j => {
+        if (filter !== 'all' && j.status !== filter) return false;
+        if (endorsementFilter !== 'all' && j.endorsement !== endorsementFilter) return false;
+        if (query) {
+          const searchable = [j.recipientName, j.providerName, j.endorsement, j.recipientUoi, j.providerUoi].join(' ').toLowerCase();
+          if (!searchable.includes(query)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const aOrder = statusOrder[a.status] ?? 5;
+        const bOrder = statusOrder[b.status] ?? 5;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        // Within same status, most recent first
+        const aTime = new Date(a.completedAt ?? a.startedAt ?? a.scheduledAt).getTime();
+        const bTime = new Date(b.completedAt ?? b.startedAt ?? b.scheduledAt).getTime();
+        return bTime - aTime;
+      });
   }, [allJobs, filter, search, endorsementFilter]);
 
   const counts = {
@@ -646,38 +695,29 @@ export const JobsPage = () => {
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 dark:bg-gray-900">
-      <div className={`${PAGE_CONTAINER} pt-6 pb-20`}>
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-50">
-              Certification Jobs
-            </h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Run certification tests, monitor progress, and review results.
-            </p>
+      {/* Sticky header */}
+      <div className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900">
+        <div className={`${PAGE_CONTAINER} pt-6 pb-4`}>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-50">
+                Certification Jobs
+              </h1>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Run certification tests, monitor progress, and review results.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowNewJob(true)}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors"
+            >
+              New Test Run
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowNewJob(true)}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors"
-          >
-            New Test Run
-          </button>
-        </div>
 
-        {/* Config builder */}
-        {showNewJob && (
-          <div className="mb-6">
-            <ConfigBuilder
-              onClose={() => setShowNewJob(false)}
-              onStart={(config) => { start(config); setShowNewJob(false); }}
-            />
-          </div>
-        )}
-
-        {/* Search and filters */}
-        <div className="flex items-center gap-3 flex-wrap mb-4">
+          {/* Search and filters */}
+          <div className="flex items-center gap-3 flex-wrap">
           <SearchInput value={search} onChange={setSearch} placeholder="Search recipient, provider, UOI..." />
           <div className="flex items-center gap-1">
             {(['all', 'running', 'scheduled', 'passed', 'failed'] as const).map(f => (
@@ -710,11 +750,25 @@ export const JobsPage = () => {
             ))}
           </select>
         </div>
+        </div>
+      </div>
+
+      {/* Content below sticky header */}
+      <div className={`${PAGE_CONTAINER} pb-20`}>
+        {/* Config builder */}
+        {showNewJob && (
+          <div className="mb-6">
+            <ConfigBuilder
+              onClose={() => setShowNewJob(false)}
+              onStart={(config) => { start(config); setShowNewJob(false); }}
+            />
+          </div>
+        )}
 
         {/* Job list */}
         <div className="space-y-3">
           {filteredJobs.map(job => (
-            <JobCard key={job.id} job={job} />
+            <JobCard key={job.id} job={job} onRerun={job.local ? () => rerun(job.id) : undefined} onDelete={job.local ? () => remove(job.id) : undefined} />
           ))}
           {filteredJobs.length === 0 && (
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center text-sm text-gray-500 dark:text-gray-400">

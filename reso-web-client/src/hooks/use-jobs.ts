@@ -14,6 +14,8 @@ import {
   startBatch,
   cancelJob,
   clearCompleted,
+  rerunJob,
+  deleteJob,
   initLocalResults,
 } from '../services/job-manager';
 import type { Job, JobEvent } from '../services/job-manager';
@@ -26,6 +28,8 @@ export interface UseJobsResult {
   readonly start: (config: BatchConfig) => ReadonlyArray<Job>;
   readonly cancel: (jobId: string) => void;
   readonly clear: () => void;
+  readonly rerun: (jobId: string) => void;
+  readonly remove: (jobId: string) => void;
 }
 
 export const useJobs = (): UseJobsResult => {
@@ -59,8 +63,16 @@ export const useJobs = (): UseJobsResult => {
     setJobs(getJobs());
   }, []);
 
+  const rerun = useCallback((jobId: string) => {
+    rerunJob(jobId).then(() => setJobs(getJobs()));
+  }, []);
+
   const activeCount = jobs.filter(j => j.status === 'running').length;
   const queuedCount = jobs.filter(j => j.status === 'queued').length;
 
-  return { jobs, activeCount, queuedCount, start, cancel, clear };
+  const remove = useCallback((jobId: string) => {
+    deleteJob(jobId).then(() => setJobs(getJobs()));
+  }, []);
+
+  return { jobs, activeCount, queuedCount, start, cancel, clear, rerun, remove };
 };

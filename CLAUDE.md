@@ -70,6 +70,7 @@ cd reso-desktop-client && npm run dev
 
 - DO NOT use classes or `this`.
 - DO NOT use `any`. Use `unknown` and narrow with type guards.
+- Use named constants for repeated string literals (endorsement types, status values, environment URLs, step names). Define them in a shared constants file rather than duplicating across components.
 
 ## Style Conventions
 

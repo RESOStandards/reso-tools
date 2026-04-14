@@ -6,7 +6,7 @@ import { runAllEntityEventScenarios } from '../entity-event/test-runner.js';
 import type { EntityEventConfig as EERunnerConfig } from '../entity-event/types.js';
 import type { EntityEventConfig, PipelineStep, StepOutput } from './types.js';
 import { createPipeline } from './pipeline.js';
-import { entityEventReportGenerators, writeReports } from './reports.js';
+import { entityEventReportGenerators, writeReports, buildOutputPath, archiveCurrentResults } from './reports.js';
 import type { StepResult } from './types.js';
 
 // ── Pipeline Context ──
@@ -154,7 +154,8 @@ const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> =
 const writeComplianceReports = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
   name: 'Write compliance reports',
   run: async (ctx, onProgress) => {
-    const outputDir = config.options?.outputDir ?? join(process.cwd(), '.reso-cert');
+    const outputDir = buildOutputPath('entity-event', 'RCP-027', config);
+    await archiveCurrentResults(outputDir);
     const generators = entityEventReportGenerators('RCP-027');
 
     const testReport = ctx.testReport as { summary: { failed: number } };
@@ -204,6 +205,6 @@ export const runEntityEventCompliance = async (
   return pipeline.run(
     initialContext,
     onProgress,
-    { failFast: config.options?.failFast ?? true },
+    { failFast: config.options?.failFast ?? false },
   );
 };

@@ -43,6 +43,10 @@ contextBridge.exposeInMainWorld('certRunner', {
   scanResults: (): Promise<ReadonlyArray<unknown>> =>
     ipcRenderer.invoke('cert:scan-results'),
 
+  /** Delete a local result directory. Returns true on success. */
+  deleteResult: (resultPath: string): Promise<boolean> =>
+    ipcRenderer.invoke('cert:delete-result', resultPath),
+
   /** Start watching for new results on disk. */
   startWatcher: (): Promise<void> =>
     ipcRenderer.invoke('cert:start-watcher'),

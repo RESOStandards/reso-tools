@@ -1,6 +1,35 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import type { PipelineResult, PipelineContext, ProgressCallback } from './types.js';
+import { mkdir, writeFile, rename } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
+import { existsSync } from 'node:fs';
+import type { BaseComplianceConfig, PipelineResult, PipelineContext, ProgressCallback } from './types.js';
+
+// ── Output Path Builder ──
+
+const DEFAULT_RESULTS_PATH = '.reso-cert';
+
+/**
+ * Build the standard nested output path for any endorsement.
+ * Structure: {base}/{endorsement-version}/{providerUoi}-{providerUsi}/{recipientUoi}/current
+ */
+export const buildOutputPath = (
+  endorsementSlug: string,
+  version: string,
+  config: BaseComplianceConfig,
+): string => {
+  const resultsPath = config.options?.outputDir ?? join(process.cwd(), DEFAULT_RESULTS_PATH);
+  const providerUoi = config.providerUoi ?? `LOCAL-${Date.now()}`;
+  const providerUsi = config.providerUsi ?? 'LOCAL-SYSTEM';
+  const recipientUoi = config.recipientUoi ?? 'LOCAL-RECIPIENT';
+  return join(resultsPath, `${endorsementSlug}-${version}`, `${providerUoi}-${providerUsi}`, recipientUoi, 'current');
+};
+
+/** Archive existing current results before a new run. */
+export const archiveCurrentResults = async (currentPath: string): Promise<void> => {
+  if (!existsSync(currentPath)) return;
+  const archivedDir = join(dirname(currentPath), 'archived', new Date().toISOString().replace(/[:.]/g, ''));
+  await mkdir(dirname(archivedDir), { recursive: true });
+  await rename(currentPath, archivedDir);
+};
 
 // ── Report Types ──
 
@@ -95,25 +124,52 @@ export const createDetailedReportGenerator = (
 ): ReportGenerator => ({
   name: 'Detailed',
   filename: 'report-detailed.json',
-  generate: (result) => ({
-    description,
-    version,
-    generatedOn: new Date().toISOString(),
-    remarks: serializeRemarks(result),
-    outcome: result.status,
-    endorsement: result.endorsement,
-    duration: result.duration,
-    steps: result.steps.map(({ name, status, duration, summary, params, counts, artifacts, errors }) => ({
-      name,
-      status,
-      duration,
-      ...(summary ? { summary } : {}),
-      ...(params ? { params } : {}),
-      ...(counts ? { counts } : {}),
-      ...(artifacts ? { artifacts } : {}),
-      ...(errors && errors.length > 0 ? { errors } : {}),
-    })),
-  }),
+  generate: (result) => {
+    // Extract resource-level test reports if available (Core, Add/Edit, EntityEvent)
+    const ctx = result.context as Record<string, unknown>;
+    const resourceReports = ctx.resourceReports as ReadonlyArray<Record<string, unknown>> | undefined;
+
+    return {
+      description,
+      version,
+      generatedOn: new Date().toISOString(),
+      remarks: serializeRemarks(result),
+      outcome: result.status,
+      endorsement: result.endorsement,
+      duration: result.duration,
+      steps: result.steps.map(({ name, status, duration, summary, params, counts, artifacts, errors }) => ({
+        name,
+        status,
+        duration,
+        ...(summary ? { summary } : {}),
+        ...(params ? { params } : {}),
+        ...(counts ? { counts } : {}),
+        ...(artifacts ? { artifacts } : {}),
+        ...(errors && errors.length > 0 ? { errors } : {}),
+      })),
+      // Include per-resource scenario results for test-running endorsements
+      ...(resourceReports ? {
+        resourceReports: resourceReports.map((r: Record<string, unknown>) => ({
+          resource: r.resource,
+          summary: r.summary,
+          scenarios: (r.scenarios as ReadonlyArray<Record<string, unknown>> ?? []).map(s => ({
+            name: s.name,
+            tag: s.tag,
+            passed: s.passed,
+            skipped: s.skipped,
+            duration: s.duration,
+            requestUrl: s.requestUrl,
+            assertions: (s.assertions as ReadonlyArray<Record<string, unknown>> ?? []).map(a => ({
+              description: a.description ?? a.message,
+              passed: a.passed,
+              ...(a.expected !== undefined ? { expected: a.expected } : {}),
+              ...(a.actual !== undefined ? { actual: a.actual } : {}),
+            })),
+          })),
+        })),
+      } : {}),
+    };
+  },
 });
 
 // ── Report Writer ──

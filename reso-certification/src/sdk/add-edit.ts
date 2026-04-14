@@ -13,7 +13,7 @@ import {
 import { runAllScenarios } from '../add-edit/index.js';
 import type { AddEditConfig, PipelineStep, StepOutput } from './types.js';
 import { createPipeline } from './pipeline.js';
-import { addEditReportGenerators, writeReports } from './reports.js';
+import { addEditReportGenerators, writeReports, buildOutputPath, archiveCurrentResults } from './reports.js';
 
 // ── Pipeline Context ──
 
@@ -239,7 +239,8 @@ const runTests = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
 const writeComplianceReports = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
   name: 'Write compliance reports',
   run: async (ctx, onProgress) => {
-    const outputDir = config.options?.outputDir ?? join(process.cwd(), '.reso-cert');
+    const outputDir = buildOutputPath('web-api-add-edit', config.specVersion ?? '2.0.0', config);
+    await archiveCurrentResults(outputDir);
     const generators = addEditReportGenerators(config.specVersion ?? '2.0.0');
 
     // Build a temporary pipeline result for the report generators
@@ -301,7 +302,7 @@ export const runAddEditCompliance = async (
   return pipeline.run(
     initialContext,
     onProgress,
-    { failFast: config.options?.failFast ?? true },
+    { failFast: config.options?.failFast ?? false },
   );
 };
 

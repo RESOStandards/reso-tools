@@ -564,7 +564,7 @@ export const EndorsementList = ({
           <div className="flex items-end justify-between gap-6 flex-wrap">
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline gap-x-4 gap-y-1 flex-wrap">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-50 tracking-tight">
                   Endorsements
                 </h1>
                 {!isSignedIn && typeof headlineCount === 'number' && (
