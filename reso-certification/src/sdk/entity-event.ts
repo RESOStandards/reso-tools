@@ -118,7 +118,7 @@ const generatePayloads = (config: EntityEventConfig): PipelineStep<EntityEventCo
 /** Run all EntityEvent compliance scenarios. */
 const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
   name: 'Run EntityEvent scenarios',
-  run: async (ctx) => {
+  run: async (ctx, onProgress) => {
     const runnerConfig: EERunnerConfig = {
       serverUrl: ctx.serverUrl,
       auth: config.server.auth,
@@ -132,7 +132,9 @@ const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> =
       strict: false,
     };
 
-    const testReport = await runAllEntityEventScenarios(runnerConfig);
+    const testReport = await runAllEntityEventScenarios(runnerConfig, (message) => {
+      onProgress({ step: 'Run EntityEvent scenarios', status: 'running', message });
+    });
     const { passed, failed } = testReport.summary;
     const status = failed > 0 ? 'failed' as const : 'passed' as const;
 

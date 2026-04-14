@@ -615,28 +615,23 @@ const JobCard = ({ job, onRerun, onDelete }: { readonly job: CertJob; readonly o
                 </svg>
               </button>
             </div>
-            <div className="p-5 overflow-y-auto space-y-3">
+            <div className="p-5 overflow-y-auto space-y-2">
               {job.steps.length > 0 ? (
-                job.steps.map((step, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/40 rounded-lg">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-sm ${step.status === 'passed' ? 'text-green-600 dark:text-green-400' : step.status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-gray-400'}`}>
-                          {step.status === 'passed' ? '✓' : step.status === 'failed' ? '✗' : '○'}
-                        </span>
-                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{step.name}</span>
-                      </div>
-                      {step.detail && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 ml-6">{step.detail}</p>
-                      )}
-                    </div>
-                    {step.duration != null && step.duration > 0 && (
-                      <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums shrink-0">
-                        {step.duration < 1000 ? `${step.duration}ms` : `${(step.duration / 1000).toFixed(1)}s`}
-                      </span>
-                    )}
-                  </div>
-                ))
+                job.steps.map((step, i) => {
+                  // Check if this step has scenario data in the detailed report
+                  const detailed = job.reports?.reportDetailed as Record<string, unknown> | undefined;
+                  const resourceReports = (detailed?.resourceReports ?? []) as ReadonlyArray<Record<string, unknown>>;
+                  const isScenarioStep = step.name.includes('Run ') && step.name.includes('scenarios');
+                  const hasScenarios = isScenarioStep && resourceReports.length > 0;
+
+                  return (
+                    <ReportStepCard
+                      key={i}
+                      step={step}
+                      scenarios={hasScenarios ? resourceReports : undefined}
+                    />
+                  );
+                })
               ) : (
                 <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
                   No step details available.
@@ -692,6 +687,82 @@ const JobCard = ({ job, onRerun, onDelete }: { readonly job: CertJob; readonly o
           }}
           onClose={() => setShowSubmit(false)}
         />
+      )}
+    </div>
+  );
+};
+
+// ── Report step card (expandable for scenario steps) ────────────────
+
+const ReportStepCard = ({
+  step,
+  scenarios,
+}: {
+  readonly step: { name: string; status: string; detail?: string; duration?: number };
+  readonly scenarios?: ReadonlyArray<Record<string, unknown>>;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  const hasScenarios = scenarios && scenarios.length > 0;
+
+  return (
+    <div className="bg-gray-50 dark:bg-gray-800/40 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => hasScenarios && setExpanded(!expanded)}
+        className={`w-full text-left p-3 flex items-center justify-between ${hasScenarios ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/40' : ''} transition-colors`}
+      >
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            {hasScenarios && (
+              <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform shrink-0 ${expanded ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+              </svg>
+            )}
+            <span className={`text-sm ${step.status === 'passed' ? 'text-green-600 dark:text-green-400' : step.status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-gray-400'}`}>
+              {step.status === 'passed' ? '✓' : step.status === 'failed' ? '✗' : '○'}
+            </span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{step.name}</span>
+          </div>
+          {step.detail && (
+            <p className={`text-xs mt-0.5 ${hasScenarios ? 'ml-9' : 'ml-6'} text-gray-500 dark:text-gray-400`}>{step.detail}</p>
+          )}
+        </div>
+        {step.duration != null && step.duration > 0 && (
+          <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums shrink-0">
+            {step.duration < 1000 ? `${step.duration}ms` : `${(step.duration / 1000).toFixed(1)}s`}
+          </span>
+        )}
+      </button>
+
+      {expanded && hasScenarios && (
+        <div className="border-t border-gray-200 dark:border-gray-700/50 px-3 pb-3 pt-2 ml-9 space-y-1.5">
+          {scenarios.flatMap(r => {
+            const resource = (r.resource as string) ?? '';
+            const scenarioList = (r.scenarios as ReadonlyArray<Record<string, unknown>>) ?? [];
+            return scenarioList.map((s, si) => {
+              const name = ((s.name ?? s.scenario) as string) ?? 'Unknown';
+              const passed = s.passed === true;
+              const skipped = s.skipped === true;
+              return (
+                <div key={`${resource}-${si}`} className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className={passed ? 'text-green-500' : skipped ? 'text-gray-400' : 'text-red-500'}>
+                      {passed ? '✓' : skipped ? '–' : '✗'}
+                    </span>
+                    <span className={`${skipped ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}>
+                      {resource}: {name}
+                    </span>
+                  </div>
+                  {s.duration != null && (s.duration as number) > 0 && (
+                    <span className="text-gray-400 dark:text-gray-500 tabular-nums">
+                      {(s.duration as number) < 1000 ? `${s.duration}ms` : `${((s.duration as number) / 1000).toFixed(1)}s`}
+                    </span>
+                  )}
+                </div>
+              );
+            });
+          })}
+        </div>
       )}
     </div>
   );

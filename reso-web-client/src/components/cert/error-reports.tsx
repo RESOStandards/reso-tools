@@ -6,7 +6,11 @@
  * formats (from reso-tools local and cloud testing). The report
  * format is always driven by reso-tools regardless of where it runs.
  *
- * Stub with fixture data for layout review.
+ * TODO: Extract a shared ReportViewer component that handles both
+ * passed (compliance report) and failed (failure report) views with
+ * consistent expandable step/scenario cards. Currently the compliance
+ * report modal is in jobs-page.tsx and the failure renderers are here.
+ * Unify into a single component with a shared step card interface.
  */
 
 import { useState, useMemo } from 'react';

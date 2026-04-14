@@ -480,11 +480,27 @@ const RecipientCard = ({
   const [showRecipientDropdown, setShowRecipientDropdown] = useState(false);
   const [recipientName, setRecipientName] = useState(recipient.description || '');
 
+  const [endorsementWarning, setEndorsementWarning] = useState('');
+
   const toggleEndorsement = (type: EndorsementType) => {
     const current = recipient.endorsements;
-    const next = current.includes(type)
-      ? current.filter(e => e !== type)
-      : [...current, type];
+    const adding = !current.includes(type);
+    const next = adding ? [...current, type] : current.filter(e => e !== type);
+
+    // Warn if both Add/Edit and EntityEvent (observe) are selected
+    if (adding) {
+      const eeObserve = recipient.entityEventOptions.mode === 'observe';
+      if (type === 'add-edit' && next.includes('entity-event') && eeObserve) {
+        setEndorsementWarning('EntityEvent in observe mode should run separately from Add/Edit. Run Add/Edit first, then EntityEvent observe in a separate job so there are events to detect.');
+        return;
+      }
+      if (type === 'entity-event' && next.includes('add-edit') && eeObserve) {
+        setEndorsementWarning('EntityEvent in observe mode should run separately from Add/Edit. Run Add/Edit first, then EntityEvent observe in a separate job so there are events to detect.');
+        return;
+      }
+    }
+
+    setEndorsementWarning('');
     onChange({ ...recipient, endorsements: next });
   };
 
@@ -642,6 +658,14 @@ const RecipientCard = ({
                 </label>
               ))}
             </div>
+            {endorsementWarning && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-1">
+                <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                </svg>
+                {endorsementWarning}
+              </p>
+            )}
           </div>
 
           {/* Per-endorsement options */}
