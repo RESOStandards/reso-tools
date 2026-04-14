@@ -17,3 +17,40 @@ contextBridge.exposeInMainWorld('electronUpdates', {
     ipcRenderer.on('update:available', (_event, release) => callback(release));
   }
 });
+
+contextBridge.exposeInMainWorld('certRunner', {
+  /** Start a compliance test run. Returns the PipelineResult when done. */
+  run: (jobId: string, config: Record<string, unknown>): Promise<unknown> =>
+    ipcRenderer.invoke('cert:run', jobId, config),
+
+  /** Cancel a running cert job. */
+  cancel: (jobId: string): Promise<void> =>
+    ipcRenderer.invoke('cert:cancel', jobId),
+
+  /** Subscribe to step-level progress events for a job. Returns an unsubscribe function. */
+  onProgress: (callback: (jobId: string, progress: { step: string; status: string; message?: string; duration?: number }) => void): (() => void) => {
+    const handler = (_event: unknown, jobId: string, progress: { step: string; status: string; message?: string; duration?: number }) =>
+      callback(jobId, progress);
+    ipcRenderer.on('cert:progress', handler);
+    return () => { ipcRenderer.removeListener('cert:progress', handler); };
+  },
+
+  /** Get the local reference server URL. */
+  localServerUrl: (): Promise<string | null> =>
+    ipcRenderer.invoke('cert:localServerUrl'),
+
+  /** Scan local results directory for completed runs. */
+  scanResults: (): Promise<ReadonlyArray<unknown>> =>
+    ipcRenderer.invoke('cert:scan-results'),
+
+  /** Start watching for new results on disk. */
+  startWatcher: (): Promise<void> =>
+    ipcRenderer.invoke('cert:start-watcher'),
+
+  /** Subscribe to results-changed events (from watcher). Returns unsubscribe. */
+  onResultsChanged: (callback: (results: ReadonlyArray<unknown>) => void): (() => void) => {
+    const handler = (_event: unknown, results: ReadonlyArray<unknown>) => callback(results);
+    ipcRenderer.on('cert:results-changed', handler);
+    return () => { ipcRenderer.removeListener('cert:results-changed', handler); };
+  },
+});

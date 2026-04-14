@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, shell } from 'electron';
-import { resolve } from 'node:path';
+import { resolve, join, basename, dirname, relative } from 'node:path';
 import { fork, type ChildProcess } from 'node:child_process';
-import { appendFileSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync, readdirSync, statSync, watch, type FSWatcher } from 'node:fs';
 
 // Suppress EPIPE errors from broken pipes (e.g., child process stdout closed on shutdown).
 // These are harmless but surface as uncaught exceptions that crash the app.
@@ -82,6 +82,324 @@ const registerStorageHandlers = (): void => {
     delete store[key];
     writeStore(store);
   });
+};
+
+// ── Certification runner (SDK in main process, progress via IPC) ──
+
+/**
+ * Active cert runs keyed by a client-provided jobId.
+ * AbortControllers allow the renderer to cancel a running job.
+ */
+const activeRuns = new Map<string, AbortController>();
+
+/** Mirror the SDK's buildOutputPath to find report files after a run. */
+const resolveOutputPath = (config: Record<string, unknown>): string | null => {
+  try {
+    const endorsement = config.endorsement as string;
+    if (endorsement !== 'dd') return null;
+
+    const version = (config.version as string) ?? '2.0';
+    const providerUoi = (config.providerUoi as string) ?? `LOCAL-${Date.now()}`;
+    const providerUsi = (config.providerUsi as string) ?? 'LOCAL-SYSTEM';
+    const recipientUoi = (config.recipientUoi as string) ?? 'LOCAL-RECIPIENT';
+    const outputDir = (config.options as Record<string, unknown>)?.outputDir as string | undefined;
+    const resultsPath = outputDir ?? resolve(process.cwd(), '.reso-cert');
+
+    return resolve(resultsPath, `data-dictionary-${version}`, `${providerUoi}-${providerUsi}`, recipientUoi, 'current');
+  } catch {
+    return null;
+  }
+};
+
+// ── Local results scanner + watcher ──────────────────────────────────
+
+const CERT_RESULTS_DIR = '.reso-cert';
+
+/** Get the root results directory. */
+const certResultsRoot = (): string => resolve(process.cwd(), CERT_RESULTS_DIR);
+
+/**
+ * Shape of a scanned local result — one per current/ or archived/ directory.
+ * Returned to the renderer to hydrate the jobs list on startup.
+ */
+interface LocalResult {
+  readonly endorsement: string;
+  readonly version: string;
+  readonly providerUoi: string;
+  readonly providerUsi: string;
+  readonly recipientUoi: string;
+  readonly path: string;
+  readonly isCurrent: boolean;
+  readonly timestamp: string;
+  readonly reports: Record<string, unknown>;
+}
+
+/** Read report files from a results directory. */
+const readReports = (dir: string): Record<string, unknown> => {
+  const reports: Record<string, unknown> = {};
+  const filesToRead: Readonly<Record<string, string>> = {
+    schemaErrors: join(dir, 'data-availability-schema-validation-errors.json'),
+    variations: join(dir, 'data-dictionary-variations.json'),
+    metadata: join(dir, 'metadata-report.processed.json'),
+    ddReport: join(dir, 'data-dictionary-2.0.json'),
+  };
+  for (const [key, path] of Object.entries(filesToRead)) {
+    try {
+      const content = readFileSync(path, 'utf-8');
+      reports[key] = JSON.parse(content);
+    } catch { /* file doesn't exist — skip */ }
+  }
+  return reports;
+};
+
+/**
+ * Scan the .reso-cert/ directory tree and return all local results.
+ *
+ * Structure:
+ *   .reso-cert/data-dictionary-{version}/{providerUoi}-{providerUsi}/{recipientUoi}/current/
+ *   .reso-cert/data-dictionary-{version}/{providerUoi}-{providerUsi}/{recipientUoi}/archived/{timestamp}/
+ */
+const scanLocalResults = (): ReadonlyArray<LocalResult> => {
+  const root = certResultsRoot();
+  if (!existsSync(root)) return [];
+
+  const results: LocalResult[] = [];
+
+  try {
+    // Level 1: endorsement-version directories (e.g., data-dictionary-2.0)
+    for (const endorsementDir of readdirSync(root)) {
+      const endorsementPath = join(root, endorsementDir);
+      if (!statSync(endorsementPath).isDirectory()) continue;
+
+      // Parse endorsement and version from directory name
+      const match = endorsementDir.match(/^(data-dictionary)-(\d+\.\d+)$/);
+      if (!match) continue;
+      const endorsement = 'Data Dictionary';
+      const version = match[2];
+
+      // Level 2: provider directories (e.g., T00000012-50055)
+      for (const providerDir of readdirSync(endorsementPath)) {
+        const providerPath = join(endorsementPath, providerDir);
+        if (!statSync(providerPath).isDirectory()) continue;
+
+        // Split on first dash to get providerUoi and providerUsi
+        const dashIdx = providerDir.indexOf('-');
+        const providerUoi = dashIdx > 0 ? providerDir.slice(0, dashIdx) : providerDir;
+        const providerUsi = dashIdx > 0 ? providerDir.slice(dashIdx + 1) : '';
+
+        // Level 3: recipient directories (e.g., M00000570)
+        for (const recipientDir of readdirSync(providerPath)) {
+          const recipientPath = join(providerPath, recipientDir);
+          if (!statSync(recipientPath).isDirectory()) continue;
+          const recipientUoi = recipientDir;
+
+          // Check for current/ directory
+          const currentPath = join(recipientPath, 'current');
+          if (existsSync(currentPath) && statSync(currentPath).isDirectory()) {
+            const mtime = statSync(currentPath).mtime.toISOString();
+            results.push({
+              endorsement, version, providerUoi, providerUsi, recipientUoi,
+              path: currentPath, isCurrent: true, timestamp: mtime,
+              reports: readReports(currentPath),
+            });
+          }
+
+          // Check for archived/ directories
+          const archivedPath = join(recipientPath, 'archived');
+          if (existsSync(archivedPath) && statSync(archivedPath).isDirectory()) {
+            for (const archiveDir of readdirSync(archivedPath)) {
+              const archivePath = join(archivedPath, archiveDir);
+              if (!statSync(archivePath).isDirectory()) continue;
+              results.push({
+                endorsement, version, providerUoi, providerUsi, recipientUoi,
+                path: archivePath, isCurrent: false, timestamp: archiveDir,
+                reports: readReports(archivePath),
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    log(`Error scanning cert results: ${err}`);
+  }
+
+  return results;
+};
+
+/** Watch the results directory for changes and notify the renderer. */
+let certWatcher: FSWatcher | null = null;
+
+const startCertWatcher = (): void => {
+  const root = certResultsRoot();
+  mkdirSync(root, { recursive: true });
+
+  try {
+    certWatcher = watch(root, { recursive: true }, (eventType, filename) => {
+      if (!filename) return;
+      // Only notify on JSON file changes (report writes)
+      if (!filename.endsWith('.json')) return;
+
+      log(`Cert results change detected: ${eventType} ${filename}`);
+
+      // Debounce — multiple files written in quick succession
+      if (certWatcherTimeout) clearTimeout(certWatcherTimeout);
+      certWatcherTimeout = setTimeout(() => {
+        const results = scanLocalResults();
+        // Notify all renderer windows
+        for (const win of BrowserWindow.getAllWindows()) {
+          win.webContents.send('cert:results-changed', results);
+        }
+      }, 500);
+    });
+  } catch (err) {
+    log(`Failed to start cert results watcher: ${err}`);
+  }
+};
+
+let certWatcherTimeout: ReturnType<typeof setTimeout> | undefined;
+
+const stopCertWatcher = (): void => {
+  if (certWatcher) {
+    certWatcher.close();
+    certWatcher = null;
+  }
+};
+
+const registerCertRunnerHandlers = (): void => {
+
+  /** Scan local results directory and return all found results. */
+  ipcMain.handle('cert:scan-results', () => scanLocalResults());
+
+  /** Start watching for result changes. */
+  ipcMain.handle('cert:start-watcher', () => { startCertWatcher(); });
+
+  /**
+   * Start a compliance test run.
+   * The renderer sends a ComplianceConfig-shaped object plus a jobId.
+   * Progress events are pushed to the renderer via 'cert:progress'.
+   * Resolves with the PipelineResult when the run completes.
+   */
+  ipcMain.handle('cert:run', async (event, jobId: string, config: Record<string, unknown>) => {
+    const controller = new AbortController();
+    activeRuns.set(jobId, controller);
+
+    // Intercept process.exit() calls from legacy-cert-utils — it calls
+    // process.exit(1) on schema validation errors in strict mode, which
+    // would kill the Electron app. We trap it and convert to a thrown error.
+    const originalExit = process.exit;
+    let exitIntercepted = false;
+    process.exit = ((code?: number) => {
+      exitIntercepted = true;
+      log(`Cert run ${jobId}: process.exit(${code}) intercepted — converting to error`);
+      throw new Error(`Certification test exited with code ${code ?? 0}`);
+    }) as never;
+
+    try {
+      // Dynamic import so we don't block app startup
+      const { runComplianceTests } = await import('@reso-standards/reso-certification');
+
+      // If the config targets the local server, inject the actual server URL
+      const resolvedConfig = {
+        ...config,
+        server: {
+          ...(config.server as Record<string, unknown>),
+          url: (config.server as Record<string, unknown>)?.url === 'LOCAL_SERVER'
+            ? state.serverUrl
+            : (config.server as Record<string, unknown>)?.url,
+        },
+      };
+
+      const result = await runComplianceTests(
+        resolvedConfig as Parameters<typeof runComplianceTests>[0],
+        (progress) => {
+          if (controller.signal.aborted) return;
+          // Send progress to the renderer
+          event.sender.send('cert:progress', jobId, {
+            step: progress.step,
+            status: progress.status,
+            message: progress.message,
+            duration: progress.duration,
+          });
+        },
+      );
+
+      activeRuns.delete(jobId);
+
+      // Read any generated reports (available on both pass and fail)
+      let reports: Record<string, unknown> | undefined;
+      try {
+        const outputDir = resolveOutputPath(resolvedConfig);
+        if (outputDir) {
+          const reportFiles: Record<string, unknown> = {};
+          const filesToRead: Readonly<Record<string, string>> = {
+            schemaErrors: resolve(outputDir, 'data-availability-schema-validation-errors.json'),
+            variations: resolve(outputDir, 'data-dictionary-variations.json'),
+            metadata: resolve(outputDir, 'metadata-report.processed.json'),
+          };
+          for (const [key, path] of Object.entries(filesToRead)) {
+            try {
+              const content = readFileSync(path, 'utf-8');
+              reportFiles[key] = JSON.parse(content);
+            } catch { /* file doesn't exist — skip */ }
+          }
+          if (Object.keys(reportFiles).length > 0) reports = reportFiles;
+        }
+      } catch { /* ignore */ }
+
+      return { status: result.status, steps: result.steps, duration: result.duration, reports };
+    } catch (err) {
+      activeRuns.delete(jobId);
+      const message = err instanceof Error ? err.message : String(err);
+      log(`Cert run ${jobId} failed: ${message}`);
+
+      // If exit was intercepted, the run produced reports before dying.
+      // Return failed status so the UI can show the error report.
+      // Try to read any generated reports from the output directory
+      let reports: Record<string, unknown> | undefined;
+      try {
+        const outputDir = resolveOutputPath(config);
+        if (outputDir) {
+          const reportFiles: Record<string, unknown> = {};
+          const schemaErrorPath = resolve(outputDir, 'data-availability-schema-validation-errors.json');
+          const variationsPath = resolve(outputDir, 'data-dictionary-variations.json');
+          const metadataPath = resolve(outputDir, 'metadata-report.processed.json');
+
+          for (const [key, path] of Object.entries({ schemaErrors: schemaErrorPath, variations: variationsPath, metadata: metadataPath })) {
+            try {
+              const content = readFileSync(path, 'utf-8');
+              reportFiles[key] = JSON.parse(content);
+            } catch { /* file doesn't exist yet — skip */ }
+          }
+          if (Object.keys(reportFiles).length > 0) reports = reportFiles;
+        }
+      } catch { /* ignore report reading errors */ }
+
+      return {
+        status: 'failed' as const,
+        error: exitIntercepted
+          ? 'Schema validation errors found. See the failure report for details.'
+          : message,
+        steps: [],
+        duration: 0,
+        reports,
+      };
+    } finally {
+      process.exit = originalExit;
+    }
+  });
+
+  /** Cancel a running cert job. */
+  ipcMain.handle('cert:cancel', (_event, jobId: string) => {
+    const controller = activeRuns.get(jobId);
+    if (controller) {
+      controller.abort();
+      activeRuns.delete(jobId);
+    }
+  });
+
+  /** Get the local server URL (for config builder auto-fill). */
+  ipcMain.handle('cert:localServerUrl', () => state.serverUrl);
 };
 
 // ── DD version management ──
@@ -676,6 +994,7 @@ app.whenReady().then(async () => {
   });
 
   registerStorageHandlers();
+  registerCertRunnerHandlers();
   buildMenu();
 
   // Show splash screen immediately while server starts

@@ -18,6 +18,7 @@
     "package": "npm run build && npm run build:server-bundle && electron-builder"
   },
   "dependencies": {
+    "@reso-standards/reso-certification": "file:../reso-certification",
     "@reso-standards/reso-web-api-proxy": "file:../reso-web-api-proxy",
     "@reso-standards/reso-reference-server": "file:../reso-reference-server"
   },
