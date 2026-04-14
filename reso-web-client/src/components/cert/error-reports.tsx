@@ -680,7 +680,7 @@ const GenericErrorCard = ({ err }: { readonly err: StepError }) => {
             </svg>
           )}
           <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{err.stepName}</span>
-          <CopyButton text={err.stepName} title="Copy scenario name" />
+          <CopyButton text={`${err.stepName}: ${err.message}`} title="Copy error details" />
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {err.httpStatus && <Badge label={`HTTP ${err.httpStatus}`} color="red" />}
