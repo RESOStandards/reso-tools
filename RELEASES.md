@@ -2,6 +2,42 @@
 
 ---
 
+## v0.9 – 2026-04-14
+
+### To the Nines
+
+End-to-end certification testing from the RESO Desktop Client, plus a cloud MCP server for AI agents.
+
+**[Download desktop binaries](https://github.com/RESOStandards/reso-tools/releases/tag/v0.9)** — macOS, Windows and Linux.
+
+#### Certification Testing
+
+Run **Data Dictionary**, **Web API Core**, **Add/Edit**, and **EntityEvent** tests directly from the desktop app — no CLI, no Docker required for basic testing.
+
+- **Config Builder** — RESO org picker from the certification directory, multi-recipient support, per-endorsement option panels (DD, Core, Add/Edit, EntityEvent), concurrency settings, JSON import/export compatible with legacy dd-config format
+- **Job Manager** — real-time step progress, re-run with secure config storage, delete individual or all results, job history persists across app restarts
+- **Error Reports** — DD schema validation errors grouped by error type with expandable fields, scrollable lookup values, copy icons, CSV key download. Core/Add/Edit/EntityEvent scenario failures with humanized names and assertion-level details. Variations with cross-field mapping and multi-suggestion support. Spec links for all endorsement types.
+- **Compliance Reports** — passed job step breakdown with expandable scenario accordions showing individual pass/fail results
+- **Dashboard** — live testing activity overview with org name resolution, expiring endorsements from cert API, passing/failing summary cards
+- **EntityEvent** — enabled on the embedded reference server, observe mode with live polling progress counter
+
+#### Cloud MCP Server
+
+RESO now hosts a cloud MCP server at `services.reso.org/mcp`. Any MCP-capable AI agent can query RESO-compliant servers through it with an API key. Contact **dev@reso.org** to request access.
+
+Available tools: `authenticate`, `query`, `metadata`, `create`, `update`, `delete`, `parse-filter`.
+
+#### SDK and Infrastructure
+
+- Consistent nested output paths for all endorsements
+- `throwOnError` flag on cert-utils `replicate()` for clean Electron error propagation
+- SHA-256 for Electron BoringSSL compatibility
+- Server-driven paging test fix (single page with no nextLink is valid)
+- Detailed reports include per-scenario assertions for all endorsement types
+- 1,197 tests passing across 8 packages
+
+---
+
 ## v0.8 – 2026-04-12
 
 ### Eight Days a Week
