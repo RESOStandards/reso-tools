@@ -6,6 +6,18 @@ The format is intentional – this is what working with a RESO OData server *sho
 
 > **A note on tone.** The dialogues below are real captures from working sessions, and the conversational voice in the assistant's replies is deliberate. Do not normalize them to a more formal register – the whole point of the guide is to show what working with the MCP server actually feels like, not to read as polished marketing copy. Style-guide rules (Title Case headings, spaced en-dashes, no contractions) apply to the narration prose around the dialogue blocks; everything inside a blockquoted dialogue stays exactly as it was captured.
 
+## How It Works
+
+AI agents never touch provider APIs directly. The MCP server sits between the AI and the data – the agent forms queries and interprets results, while RESO's certified OData client handles all API communication and authentication.
+
+<a href="reso-mcp-architecture.svg" target="_blank">
+  <img src="reso-mcp-architecture.svg" alt="RESO MCP Server Architecture – AI agents use RESO-certified tooling, never touching provider APIs directly" width="720" />
+</a>
+
+<sub>Click to expand full size</sub>
+
+---
+
 ## Setup
 
 The MCP server runs in Docker and is wired into your client via `.mcp.json` at the repo root:

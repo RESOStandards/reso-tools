@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <defs>
+    <filter id="shadow" x="-4%" y="-4%" width="108%" height="112%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.12"/>
+    </filter>
+    <linearGradient id="aiGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="mcpGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="clientGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="providerGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <marker id="arrowRight" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="10" markerHeight="7" orient="auto-start-auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 7" refX="5" refY="7" markerWidth="10" markerHeight="7" orient="auto">
+      <polygon points="0 0, 10 0, 5 7" fill="#0284c7"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="10" markerHeight="7" orient="auto-start-auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#059669"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="620" rx="12" fill="#f8fafc"/>
+
+  <!-- Title -->
+  <text x="450" y="40" text-anchor="middle" font-size="20" font-weight="700" fill="#0f172a">RESO MCP Server Architecture</text>
+  <text x="450" y="62" text-anchor="middle" font-size="13" fill="#64748b">AI agents use RESO-certified tooling — they never touch provider APIs directly</text>
+
+  <!-- Boundary: AI Side -->
+  <rect x="30" y="85" width="260" height="440" rx="10" fill="none" stroke="#c4b5fd" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.7"/>
+  <text x="160" y="108" text-anchor="middle" font-size="11" font-weight="600" fill="#7c3aed" letter-spacing="1">AI LAYER</text>
+
+  <!-- Boundary: RESO Side -->
+  <rect x="320" y="85" width="260" height="440" rx="10" fill="none" stroke="#7dd3fc" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.7"/>
+  <text x="450" y="108" text-anchor="middle" font-size="11" font-weight="600" fill="#0284c7" letter-spacing="1">RESO TOOLS</text>
+
+  <!-- Boundary: Provider Side -->
+  <rect x="610" y="85" width="260" height="440" rx="10" fill="none" stroke="#fcd34d" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.7"/>
+  <text x="740" y="108" text-anchor="middle" font-size="11" font-weight="600" fill="#d97706" letter-spacing="1">DATA PROVIDERS</text>
+
+  <!-- AI Agent Box -->
+  <rect x="60" y="140" width="200" height="100" rx="10" fill="url(#aiGrad)" filter="url(#shadow)"/>
+  <text x="160" y="175" text-anchor="middle" font-size="15" font-weight="600" fill="white">AI Agent</text>
+  <text x="160" y="197" text-anchor="middle" font-size="11" fill="#e0d4fc">Claude, GPT, Gemini,</text>
+  <text x="160" y="213" text-anchor="middle" font-size="11" fill="#e0d4fc">custom agents, etc.</text>
+
+  <!-- What AI does callout -->
+  <rect x="50" y="265" width="220" height="115" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow)"/>
+  <text x="160" y="287" text-anchor="middle" font-size="11" font-weight="600" fill="#7c3aed">What the AI does:</text>
+  <text x="70" y="308" font-size="11" fill="#475569">&#x2713;  Forms OData queries</text>
+  <text x="70" y="328" font-size="11" fill="#475569">&#x2713;  Fills in tool parameters</text>
+  <text x="70" y="348" font-size="11" fill="#475569">&#x2713;  Interprets results</text>
+  <text x="70" y="368" font-size="11" fill="#475569">&#x2713;  Explains data to users</text>
+
+  <!-- What AI doesn't do callout -->
+  <rect x="50" y="395" width="220" height="115" rx="8" fill="#fef2f2" stroke="#fecaca" stroke-width="1" filter="url(#shadow)"/>
+  <text x="160" y="417" text-anchor="middle" font-size="11" font-weight="600" fill="#dc2626">What the AI never does:</text>
+  <text x="70" y="438" font-size="11" fill="#991b1b">&#x2717;  Direct API calls to providers</text>
+  <text x="70" y="458" font-size="11" fill="#991b1b">&#x2717;  Handle auth credentials</text>
+  <text x="70" y="478" font-size="11" fill="#991b1b">&#x2717;  Bypass RESO standards</text>
+  <text x="70" y="498" font-size="11" fill="#991b1b">&#x2717;  Access raw provider data</text>
+
+  <!-- MCP Server Box -->
+  <rect x="345" y="140" width="210" height="100" rx="10" fill="url(#mcpGrad)" filter="url(#shadow)"/>
+  <text x="450" y="170" text-anchor="middle" font-size="15" font-weight="600" fill="white">RESO MCP Server</text>
+  <text x="450" y="192" text-anchor="middle" font-size="11" fill="#bae6fd">services.reso.org/mcp</text>
+  <text x="450" y="210" text-anchor="middle" font-size="11" fill="#bae6fd">JSON-RPC + Bearer auth</text>
+
+  <!-- Tools list -->
+  <rect x="345" y="265" width="210" height="165" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow)"/>
+  <text x="450" y="287" text-anchor="middle" font-size="11" font-weight="600" fill="#0284c7">MCP Tools</text>
+  <text x="365" y="310" font-size="11" fill="#475569" font-family="'SF Mono', 'Fira Code', monospace">query</text>
+  <text x="440" y="310" font-size="10" fill="#94a3b8">OData requests</text>
+  <text x="365" y="330" font-size="11" fill="#475569" font-family="'SF Mono', 'Fira Code', monospace">metadata</text>
+  <text x="440" y="330" font-size="10" fill="#94a3b8">Schema inspection</text>
+  <text x="365" y="350" font-size="11" fill="#475569" font-family="'SF Mono', 'Fira Code', monospace">validate</text>
+  <text x="440" y="350" font-size="10" fill="#94a3b8">Data Dictionary</text>
+  <text x="365" y="370" font-size="11" fill="#475569" font-family="'SF Mono', 'Fira Code', monospace">create</text>
+  <text x="440" y="370" font-size="10" fill="#94a3b8">Add records</text>
+  <text x="365" y="390" font-size="11" fill="#475569" font-family="'SF Mono', 'Fira Code', monospace">update</text>
+  <text x="440" y="390" font-size="10" fill="#94a3b8">Edit records</text>
+  <text x="365" y="410" font-size="11" fill="#475569" font-family="'SF Mono', 'Fira Code', monospace">parse-filter</text>
+  <text x="465" y="410" font-size="10" fill="#94a3b8">$filter</text>
+
+  <!-- RESO Client Box -->
+  <rect x="345" y="455" width="210" height="60" rx="10" fill="url(#clientGrad)" filter="url(#shadow)"/>
+  <text x="450" y="480" text-anchor="middle" font-size="13" font-weight="600" fill="white">@reso-client</text>
+  <text x="450" y="498" text-anchor="middle" font-size="10" fill="#a7f3d0">RESO-certified OData client</text>
+
+  <!-- Provider boxes -->
+  <rect x="635" y="140" width="210" height="70" rx="10" fill="url(#providerGrad)" filter="url(#shadow)"/>
+  <text x="740" y="168" text-anchor="middle" font-size="13" font-weight="600" fill="white">MLS Provider A</text>
+  <text x="740" y="188" text-anchor="middle" font-size="10" fill="#fef3c7">OData API</text>
+
+  <rect x="635" y="230" width="210" height="70" rx="10" fill="url(#providerGrad)" filter="url(#shadow)"/>
+  <text x="740" y="258" text-anchor="middle" font-size="13" font-weight="600" fill="white">MLS Provider B</text>
+  <text x="740" y="278" text-anchor="middle" font-size="10" fill="#fef3c7">OData API</text>
+
+  <rect x="635" y="320" width="210" height="70" rx="10" fill="url(#providerGrad)" filter="url(#shadow)"/>
+  <text x="740" y="348" text-anchor="middle" font-size="13" font-weight="600" fill="white">MLS Provider C</text>
+  <text x="740" y="368" text-anchor="middle" font-size="10" fill="#fef3c7">OData API</text>
+
+  <text x="740" y="420" text-anchor="middle" font-size="24" fill="#d97706">&#x22EE;</text>
+  <text x="740" y="455" text-anchor="middle" font-size="11" fill="#92400e">500+ RESO-certified servers</text>
+
+  <!-- Certified badge -->
+  <rect x="645" y="472" width="190" height="46" rx="8" fill="#fefce8" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="740" y="491" text-anchor="middle" font-size="12" font-weight="600" fill="#92400e">RESO Data Dictionary</text>
+  <text x="740" y="508" text-anchor="middle" font-size="10" fill="#a16207">Standardized Schema</text>
+
+  <!-- Arrows -->
+  <!-- AI to MCP -->
+  <line x1="260" y1="175" x2="342" y2="175" stroke="#64748b" stroke-width="2" marker-end="url(#arrowRight)"/>
+  <text x="301" y="167" text-anchor="middle" font-size="9" fill="#64748b">JSON-RPC</text>
+
+  <!-- MCP to Client -->
+  <line x1="450" y1="432" x2="450" y2="448" stroke="#0284c7" stroke-width="2"/>
+  <polygon points="443,448 450,458 457,448" fill="#0284c7"/>
+
+  <!-- Client to Providers -->
+  <line x1="555" y1="480" x2="600" y2="480" stroke="#059669" stroke-width="1.5" stroke-dasharray="1 0"/>
+  <line x1="600" y1="175" x2="600" y2="480" stroke="#059669" stroke-width="1.5"/>
+  <line x1="600" y1="175" x2="632" y2="175" stroke="#059669" stroke-width="1.5" marker-end="url(#arrowGreen)"/>
+  <line x1="600" y1="265" x2="632" y2="265" stroke="#059669" stroke-width="1.5" marker-end="url(#arrowGreen)"/>
+  <line x1="600" y1="355" x2="632" y2="355" stroke="#059669" stroke-width="1.5" marker-end="url(#arrowGreen)"/>
+  <text x="593" y="507" text-anchor="end" font-size="9" fill="#059669">OData</text>
+
+  <!-- No direct access line -->
+  <line x1="262" y1="220" x2="632" y2="355" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.4"/>
+  <rect x="370" y="270" width="10" height="10" fill="none" opacity="0"/>
+  <!-- X mark on the red line -->
+  <g transform="translate(430, 290)">
+    <circle r="12" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5"/>
+    <line x1="-5" y1="-5" x2="5" y2="5" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="5" y1="-5" x2="-5" y2="5" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Footer -->
+  <text x="450" y="560" text-anchor="middle" font-size="13" font-weight="600" fill="#0f172a">The AI forms queries and interprets results.</text>
+  <text x="450" y="580" text-anchor="middle" font-size="13" fill="#475569">RESO's certified client handles all API communication.</text>
+  <text x="450" y="603" text-anchor="middle" font-size="11" fill="#94a3b8">reso.org</text>
+</svg>
