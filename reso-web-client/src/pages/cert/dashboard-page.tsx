@@ -224,8 +224,8 @@ export const DashboardPage = () => {
               </div>
               <div className="space-y-3">
                 {recentJobList.map(job => (
-                  <div key={job.id} className="flex items-center justify-between">
-                    <div className="min-w-0">
+                  <div key={job.id} className="flex items-center justify-between gap-4">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                           {job.endorsement} {job.version}
@@ -237,26 +237,25 @@ export const DashboardPage = () => {
                         )}
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {orgName(job.recipientUoi)}
+                        {orgName(job.recipientUoi)}
+                      </p>
                       {job.providerUoi && (
-                        <span className="text-gray-400 dark:text-gray-500">
-                          {' · '}{orgName(job.providerUoi)}
+                        <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                          {orgName(job.providerUoi)}
                           {(() => { const sn = sysName(job.providerUoi, job.providerUsi); return sn ? ` / ${sn}` : ''; })()}
-                        </span>
+                        </p>
                       )}
-                    </p>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className={`text-xs font-semibold uppercase ${
+                    <div className="flex items-center gap-3 shrink-0 text-right">
+                      <span className={`text-xs font-semibold uppercase w-16 ${
                         job.status === 'passed' ? 'text-green-600 dark:text-green-400' :
                         job.status === 'failed' ? 'text-red-600 dark:text-red-400' :
                         job.status === 'running' ? 'text-blue-600 dark:text-blue-400' :
-                        job.status === 'queued' ? 'text-gray-500 dark:text-gray-400' :
                         'text-gray-500 dark:text-gray-400'
                       }`}>
                         {job.status === 'queued' ? 'scheduled' : job.status}
                       </span>
-                      <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
+                      <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums w-12 text-right">
                         {formatRelative(job.completedAt ?? job.startedAt ?? job.queuedAt)}
                       </span>
                     </div>

@@ -47,14 +47,4 @@ contextBridge.exposeInMainWorld('certRunner', {
   deleteResult: (resultPath: string): Promise<boolean> =>
     ipcRenderer.invoke('cert:delete-result', resultPath),
 
-  /** Start watching for new results on disk. */
-  startWatcher: (): Promise<void> =>
-    ipcRenderer.invoke('cert:start-watcher'),
-
-  /** Subscribe to results-changed events (from watcher). Returns unsubscribe. */
-  onResultsChanged: (callback: (results: ReadonlyArray<unknown>) => void): (() => void) => {
-    const handler = (_event: unknown, results: ReadonlyArray<unknown>) => callback(results);
-    ipcRenderer.on('cert:results-changed', handler);
-    return () => { ipcRenderer.removeListener('cert:results-changed', handler); };
-  },
 });

@@ -95,7 +95,7 @@ const resolveAuth = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Resolve authentication',
   run: async (ctx) => {
     const authToken = await resolveAuthToken(config.server.auth);
-    return { context: { ...ctx, authToken }, summary: `Authenticated via ${config.server.auth.mode}` };
+    return { context: { ...ctx, authToken }, summary: 'Auth credentials present' };
   },
 });
 

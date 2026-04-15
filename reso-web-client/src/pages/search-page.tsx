@@ -11,6 +11,7 @@ import { useMetadata } from '../hooks/use-metadata';
 import { useUiConfig } from '../hooks/use-ui-config';
 import { useServer } from '../context/server-context';
 import { FriendlyError } from '../components/friendly-error';
+import { READ_ONLY_RESOURCES } from '../types';
 import { NotFoundPage } from './not-found-page';
 import { getDisplayNameFromMap } from '../utils/format';
 
@@ -167,7 +168,7 @@ export const SearchPage = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{resourceName} Resource</h2>
-          {(permissions.canAdd || permissions.canEdit || permissions.canDelete) && (
+          {!READ_ONLY_RESOURCES.has(resourceName) && (permissions.canAdd || permissions.canEdit || permissions.canDelete) && (
             <div className="flex gap-2">
               {permissions.canAdd && (
                 <button

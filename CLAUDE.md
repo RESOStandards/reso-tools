@@ -72,6 +72,7 @@ cd reso-desktop-client && npm run dev
 - DO NOT use `any`. Use `unknown` and narrow with type guards.
 - Use named constants for repeated string literals (endorsement types, status values, environment URLs, step names). Define them in a shared constants file rather than duplicating across components.
 - Prefer interfaces over implementations — when multiple data sources produce similar shapes, define a normalized interface and map to it rather than handling each shape ad hoc.
+- Always remove dead code when disabling a feature. If removal effort is high, ask first and open a ticket instead of leaving dead code with comments.
 
 ## Style Conventions
 

@@ -52,8 +52,6 @@ interface CertRunnerAPI {
   readonly onProgress: (callback: (jobId: string, progress: { step: string; status: string; message?: string; duration?: number }) => void) => () => void;
   readonly localServerUrl: () => Promise<string | null>;
   readonly scanResults: () => Promise<ReadonlyArray<LocalResult>>;
-  readonly startWatcher: () => Promise<void>;
-  readonly onResultsChanged: (callback: (results: ReadonlyArray<LocalResult>) => void) => () => void;
   readonly deleteResult: (resultPath: string) => Promise<boolean>;
 }
 
@@ -152,8 +150,6 @@ const state = {
   jobs: new Map<string, Job>(),
   listeners: new Set<JobEventListener>(),
   running: false,
-  /** Provider:recipient keys with active runs — suppress watcher hydration for these. */
-  activeRunKeys: new Set<string>(),
 };
 
 /** Subscribe to job events. Returns an unsubscribe function. */
@@ -294,9 +290,6 @@ const runJobElectron = async (job: Job): Promise<void> => {
   const runner = getCertRunner()!;
   const steps = stepsForEndorsement(job.endorsement);
   const initialSteps: ReadonlyArray<JobStep> = steps.map(name => ({ name, status: 'pending' }));
-  const activeKey = `${job.providerUoi}:${job.providerUsi}:${job.recipientUoi}:${job.endorsement}:${job.version}`;
-  state.activeRunKeys.add(activeKey);
-
   updateJob(job.id, {
     status: 'running',
     startedAt: new Date().toISOString(),
@@ -353,7 +346,6 @@ const runJobElectron = async (job: Job): Promise<void> => {
     emit({ type: 'job-completed', jobId: job.id, status: 'failed', error: String(err) });
   } finally {
     unsubscribe();
-    state.activeRunKeys.delete(activeKey);
   }
 };
 
@@ -534,20 +526,20 @@ export const deleteJob = async (id: string): Promise<boolean> => {
 /** Delete ALL local results from disk and clear the job store. */
 export const deleteAllLocal = async (): Promise<void> => {
   const runner = getCertRunner();
-  const localJobs = Array.from(state.jobs.values()).filter(j => j.resultPath);
 
-  for (const job of localJobs) {
-    if (runner && job.resultPath) {
-      await runner.deleteResult(job.resultPath);
+  if (runner) {
+    // Delete all individual result directories
+    const localJobs = Array.from(state.jobs.values()).filter(j => j.resultPath);
+    for (const job of localJobs) {
+      if (job.resultPath) await runner.deleteResult(job.resultPath);
     }
-    state.jobs.delete(job.id);
+    // Also delete the root .reso-cert directory to clean up empty parent dirs
+    await runner.deleteResult('__ALL__');
   }
 
-  // Also clear any in-memory-only jobs (pipeline-created without resultPath)
+  // Clear all local jobs from memory
   for (const [id, job] of state.jobs) {
-    if (job.local && (job.status === 'passed' || job.status === 'failed' || job.status === 'cancelled')) {
-      state.jobs.delete(id);
-    }
+    if (job.local) state.jobs.delete(id);
   }
 
   emit({ type: 'queue-complete' });
@@ -574,12 +566,27 @@ const localResultToJob = (result: LocalResult): Job => {
 
   // Hydrate steps from the detailed report when available
   const detailedSteps = (detailedReport?.steps ?? []) as ReadonlyArray<Record<string, unknown>>;
-  const hydratedSteps: ReadonlyArray<JobStep> = detailedSteps.map(s => ({
-    name: (s.name as string) ?? 'Unknown',
-    status: (s.status as StepStatus) ?? 'passed',
-    duration: s.duration as number | undefined,
-    detail: s.summary as string | undefined,
-  }));
+  const hydratedSteps: ReadonlyArray<JobStep> = detailedSteps.map(s => {
+    const summary = s.summary as string | undefined;
+    const counts = s.counts as Record<string, number> | undefined;
+
+    // Enrich summary with counts when present
+    const countParts: ReadonlyArray<string> = counts
+      ? Object.entries(counts)
+          .filter(([key]) => !['total'].includes(key))
+          .map(([key, val]) => `${val.toLocaleString()} ${key}`)
+      : [];
+    const detail = countParts.length > 0 && !summary?.includes(String(countParts[0]))
+      ? [summary, countParts.join(', ')].filter(Boolean).join(' · ')
+      : summary;
+
+    return {
+      name: (s.name as string) ?? 'Unknown',
+      status: (s.status as StepStatus) ?? 'passed',
+      duration: s.duration as number | undefined,
+      detail,
+    };
+  });
 
   return {
     id: `local-${result.path.replace(/[^a-zA-Z0-9]/g, '-')}`,
@@ -614,28 +621,9 @@ const hydrateFromLocal = (results: ReadonlyArray<LocalResult>): void => {
     return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
   });
 
-  // Limit archived results per recipient to prevent UI bloat
   const archivedCounts = new Map<string, number>();
 
-  // Build a set of provider:recipient:endorsement keys that already have
-  // pipeline-created jobs (not hydrated from disk). This prevents the watcher
-  // from creating phantom duplicates alongside real pipeline results.
-  const pipelineJobKeys = new Set<string>();
-  for (const job of state.jobs.values()) {
-    if (!job.id.startsWith('local-')) {
-      pipelineJobKeys.add(`${job.providerUoi}:${job.providerUsi}:${job.recipientUoi}:${job.endorsement}:${job.version}`);
-    }
-  }
-
   for (const result of sorted) {
-    // Skip results for active runs — the watcher fires mid-run as
-    // files are written, which creates phantom jobs from partial results.
-    const runKey = `${result.providerUoi}:${result.providerUsi}:${result.recipientUoi}:${result.endorsement}:${result.version}`;
-    if (state.activeRunKeys.has(runKey)) continue;
-
-    // Skip current results that already have a pipeline job — avoids duplicates
-    if (result.isCurrent && pipelineJobKeys.has(runKey)) continue;
-
     if (!result.isCurrent) {
       const archiveKey = `${result.providerUoi}:${result.providerUsi}:${result.recipientUoi}`;
       const count = archivedCounts.get(archiveKey) ?? 0;
@@ -663,15 +651,10 @@ export const initLocalResults = async (): Promise<void> => {
   const runner = getCertRunner();
   if (!runner) return;
 
-  // Scan existing results
+  // Scan existing results on startup only — no file watcher.
+  // CLI and RDC are separate contexts; RDC manages its own state
+  // through the IPC pipeline and startup scan.
   const results = await runner.scanResults();
   hydrateFromLocal(results);
-  emit({ type: 'queue-complete' }); // trigger UI refresh
-
-  // Start file watcher
-  await runner.startWatcher();
-  runner.onResultsChanged((updatedResults) => {
-    hydrateFromLocal(updatedResults as ReadonlyArray<LocalResult>);
-    emit({ type: 'queue-complete' }); // trigger UI refresh
-  });
+  emit({ type: 'queue-complete' });
 };

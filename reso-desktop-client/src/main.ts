@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, shell } from 'electron';
 import { resolve, join, basename, dirname, relative } from 'node:path';
 import { fork, type ChildProcess } from 'node:child_process';
-import { appendFileSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync, readdirSync, statSync, watch, type FSWatcher } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync, readdirSync, statSync } from 'node:fs';
 
 // Suppress EPIPE errors from broken pipes (e.g., child process stdout closed on shutdown).
 // These are harmless but surface as uncaught exceptions that crash the app.
@@ -109,7 +109,7 @@ const resolveOutputPath = (config: Record<string, unknown>): string | null => {
       dd: (config.version as string) ?? '2.0',
       core: (config.version as string) ?? '2.0.0',
       'add-edit': (config.specVersion as string) ?? '2.0.0',
-      'entity-event': 'RCP-027',
+      'entity-event': '1.0.0',
     };
     const version = versionMap[endorsement];
 
@@ -188,8 +188,8 @@ const scanLocalResults = (): ReadonlyArray<LocalResult> => {
       if (!statSync(endorsementPath).isDirectory()) continue;
 
       // Parse endorsement and version from directory name
-      // Supports: data-dictionary-2.0, web-api-core-2.0.0, web-api-add-edit-2.0.0, entity-event-RCP-027
-      const match = endorsementDir.match(/^(.+)-(\d+\.\d+(?:\.\d+)?|RCP-\d+)$/);
+      // Supports: data-dictionary-2.0, web-api-core-2.0.0, web-api-add-edit-2.0.0, entity-event-1.0.0
+      const match = endorsementDir.match(/^(.+)-(\d+\.\d+(?:\.\d+)?)$/);
       if (!match) continue;
       const endorsementSlug = match[1];
       const version = match[2];
@@ -260,66 +260,56 @@ const scanLocalResults = (): ReadonlyArray<LocalResult> => {
   return results;
 };
 
-/** Watch the results directory for changes and notify the renderer. */
-let certWatcher: FSWatcher | null = null;
-
-const startCertWatcher = (): void => {
-  const root = certResultsRoot();
-  mkdirSync(root, { recursive: true });
-
-  try {
-    certWatcher = watch(root, { recursive: true }, (eventType, filename) => {
-      if (!filename) return;
-      // Only notify on JSON file changes (report writes)
-      if (!filename.endsWith('.json')) return;
-
-      log(`Cert results change detected: ${eventType} ${filename}`);
-
-      // Debounce — multiple files written in quick succession
-      if (certWatcherTimeout) clearTimeout(certWatcherTimeout);
-      certWatcherTimeout = setTimeout(() => {
-        const results = scanLocalResults();
-        // Notify all renderer windows
-        for (const win of BrowserWindow.getAllWindows()) {
-          win.webContents.send('cert:results-changed', results);
-        }
-      }, 500);
-    });
-  } catch (err) {
-    log(`Failed to start cert results watcher: ${err}`);
-  }
-};
-
-let certWatcherTimeout: ReturnType<typeof setTimeout> | undefined;
-
-const stopCertWatcher = (): void => {
-  if (certWatcher) {
-    certWatcher.close();
-    certWatcher = null;
-  }
-};
-
 const registerCertRunnerHandlers = (): void => {
 
   /** Scan local results directory and return all found results. */
   ipcMain.handle('cert:scan-results', () => scanLocalResults());
 
-  /** Start watching for result changes. */
-  ipcMain.handle('cert:start-watcher', () => { startCertWatcher(); });
-
-  /** Delete a local result directory. */
+  /** Delete a local result directory, or all results if '__ALL__' is passed. */
   ipcMain.handle('cert:delete-result', async (_event, resultPath: string) => {
-    // Safety: only allow deleting paths inside .reso-cert/
     const root = certResultsRoot();
+
+    // Special sentinel: delete the entire .reso-cert directory
+    if (resultPath === '__ALL__') {
+      try {
+        const { rm } = await import('node:fs/promises');
+        if (existsSync(root)) {
+          await rm(root, { recursive: true, force: true });
+          log(`Deleted all local results: ${root}`);
+        }
+        return true;
+      } catch (err) {
+        log(`Failed to delete all results: ${err}`);
+        return false;
+      }
+    }
+
+    // Safety: only allow deleting paths inside .reso-cert/
     const resolved = resolve(resultPath);
     if (!resolved.startsWith(root)) {
       log(`Refused to delete path outside .reso-cert: ${resolved}`);
       return false;
     }
     try {
-      const { rm } = await import('node:fs/promises');
+      const { rm, readdir, rmdir } = await import('node:fs/promises');
       await rm(resolved, { recursive: true, force: true });
       log(`Deleted local result: ${resolved}`);
+
+      // Clean up empty parent directories up to .reso-cert/
+      let parent = dirname(resolved);
+      while (parent.startsWith(root) && parent !== root) {
+        try {
+          const entries = await readdir(parent);
+          if (entries.length === 0) {
+            await rmdir(parent);
+            log(`Cleaned up empty parent: ${parent}`);
+            parent = dirname(parent);
+          } else {
+            break;
+          }
+        } catch { break; }
+      }
+
       return true;
     } catch (err) {
       log(`Failed to delete ${resolved}: ${err}`);
@@ -770,7 +760,7 @@ const startReferenceServer = (): Promise<string> => {
       [paths.sqliteDbPath, paths.metadataPath, paths.serverRoot, paths.uiDistPath],
       {
         stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', ENTITY_EVENT: 'true' }
       }
     );
 

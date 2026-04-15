@@ -49,7 +49,7 @@ const resolveAuth = (config: EntityEventConfig): PipelineStep<EntityEventContext
   name: 'Resolve authentication',
   run: async (ctx) => {
     const authToken = await resolveAuthToken(config.server.auth);
-    return { context: { ...ctx, authToken }, summary: `Authenticated via ${config.server.auth.mode}` };
+    return { context: { ...ctx, authToken }, summary: `Auth credentials present` };
   },
 });
 
@@ -141,7 +141,7 @@ const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> =
     return {
       context: { ...ctx, testReport },
       status,
-      summary: `${passed} passed, ${failed} failed (${testReport.scenarios.length} scenarios, ${testReport.mode} mode)`,
+      summary: `${passed} passed, ${failed} failed (${testReport.scenarios.length} scenarios, ${testReport.mode} mode). ${testReport.dataValidation.eventsValidated} events validated`,
       counts: {
         total: testReport.scenarios.length,
         passed,
@@ -156,9 +156,9 @@ const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> =
 const writeComplianceReports = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
   name: 'Write compliance reports',
   run: async (ctx, onProgress) => {
-    const outputDir = buildOutputPath('entity-event', 'RCP-027', config);
+    const outputDir = buildOutputPath('entity-event', '1.0.0', config);
     await archiveCurrentResults(outputDir);
-    const generators = entityEventReportGenerators('RCP-027');
+    const generators = entityEventReportGenerators('1.0.0');
 
     const testReport = ctx.testReport as { scenarios: ReadonlyArray<unknown>; summary: { total: number; passed: number; failed: number; skipped?: number } };
     const contextWithReports = {

@@ -15,6 +15,7 @@
 
 import { useState, useMemo } from 'react';
 import { SearchInput, FilterPill, Badge, AvailBar } from '../metadata/shared.js';
+import { humanizeScenarioName } from '../../constants/cert';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -983,28 +984,7 @@ const resolveReport = (
 // ── Scenario display names ──────────────────────────────────────────
 
 /** Humanize kebab-case scenario tags into readable names. */
-const humanizeScenarioName = (name: string): string => {
-  // Known scenario display names
-  const KNOWN: Readonly<Record<string, string>> = {
-    'metadata-valid': 'Metadata Validation',
-    'read-only-enforced': 'Read-Only Enforcement',
-    'event-structure': 'Event Structure',
-    'sequence-monotonic': 'Sequence Monotonic',
-    'query-filter': 'Query: $filter',
-    'query-orderby-top-skip': 'Query: $orderby, $top, $skip',
-    'query-count': 'Query: $count',
-    'incremental-sync': 'Incremental Sync',
-    'create-triggers-event': 'Create Triggers Event',
-    'update-triggers-event': 'Update Triggers Event',
-    'delete-triggers-event': 'Delete Triggers Event',
-    'data-validation': 'Data Validation',
-  };
-
-  if (KNOWN[name]) return KNOWN[name];
-
-  // Generic fallback: kebab-case to Title Case
-  return name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-};
+// humanizeScenarioName imported from constants/cert.ts
 
 // ── Spec links by endorsement ───────────────────────────────────────
 

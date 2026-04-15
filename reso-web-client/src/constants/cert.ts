@@ -36,7 +36,7 @@ export const ENDORSEMENT_DEFAULT_VERSIONS: Readonly<Record<CertEndorsement, stri
   dd: DEFAULT_DD_VERSION,
   core: DEFAULT_CORE_VERSION,
   'add-edit': '2.0.0',
-  'entity-event': 'RCP-027',
+  'entity-event': '1.0.0',
 };
 
 // ── Enum modes (Core endorsement) ────────────────────────────────────
@@ -48,6 +48,39 @@ export const ENUM_MODE_LABELS: Readonly<Record<EnumMode, string>> = {
   isflags: 'IsFlags',
   collections: 'Collections',
   string: 'String + Lookup',
+};
+
+// ── Scenario display names ───────────────────────────────────────────
+
+const KNOWN_SCENARIO_NAMES: Readonly<Record<string, string>> = {
+  'metadata-valid': 'Metadata Validation',
+  'read-only-enforced': 'Read-Only Enforcement',
+  'event-structure': 'Event Structure',
+  'sequence-monotonic': 'Sequence Monotonic',
+  'query-filter': 'Query: $filter',
+  'query-orderby-top-skip': 'Query: $orderby, $top, $skip',
+  'query-count': 'Query: $count',
+  'incremental-sync': 'Incremental Sync',
+  'create-triggers-event': 'Create Triggers Event',
+  'update-triggers-event': 'Update Triggers Event',
+  'delete-triggers-event': 'Delete Triggers Event',
+  'data-validation': 'Data Validation',
+};
+
+/** Humanize kebab-case scenario tags into readable names. */
+export const humanizeScenarioName = (name: string): string =>
+  KNOWN_SCENARIO_NAMES[name] ?? name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+// ── Common step names ────────────────────────────────────────────────
+
+export const STEP_HEALTH_CHECK = 'Health check';
+export const STEP_RESOLVE_AUTH = 'Resolve authentication';
+export const STEP_FETCH_METADATA = 'Fetch metadata';
+
+// ── Step tooltips ────────────────────────────────────────────────────
+
+export const STEP_TOOLTIPS: Readonly<Record<string, string>> = {
+  [STEP_RESOLVE_AUTH]: 'Validates that credentials are present in the config. No credentials are exchanged with the server at this step.',
 };
 
 // ── Pipeline step definitions per endorsement ────────────────────────

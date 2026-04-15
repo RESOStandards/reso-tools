@@ -96,7 +96,7 @@ export const TARGET_RESOURCES = [
 export type ResourceName = (typeof TARGET_RESOURCES)[number];
 
 /** Resources that are read-only (no Add/Edit/Delete). */
-export const READ_ONLY_RESOURCES: ReadonlySet<string> = new Set(['Lookup']);
+export const READ_ONLY_RESOURCES: ReadonlySet<string> = new Set(['Lookup', 'EntityEvent']);
 
 /** A RESO member organization from the Organizations and Endorsements service. */
 export interface ResoOrganization {

@@ -390,6 +390,7 @@ import {
   STEP_STATUS_ICONS,
   STEP_STATUS_COLORS,
 } from '../../constants/cert';
+import { STEP_TOOLTIPS, humanizeScenarioName } from '../../constants/cert';
 import type { StepStatus } from '../../constants/cert';
 
 const statusColor = (status: JobStatus): string =>
@@ -416,7 +417,10 @@ const StepPipeline = ({ steps }: { readonly steps: ReadonlyArray<JobStep> }) => 
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between">
-            <span className={`text-sm ${step.status === 'skipped' ? 'text-gray-400 dark:text-gray-600 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
+            <span
+              className={`text-sm ${step.status === 'skipped' ? 'text-gray-400 dark:text-gray-600 line-through' : 'text-gray-900 dark:text-gray-100'}`}
+              title={STEP_TOOLTIPS[step.name]}
+            >
               {step.name}
             </span>
             {step.duration != null && step.duration > 0 && (
@@ -713,18 +717,23 @@ const ReportStepCard = ({
       >
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            {hasScenarios && (
-              <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform shrink-0 ${expanded ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-              </svg>
-            )}
             <span className={`text-sm ${step.status === 'passed' ? 'text-green-600 dark:text-green-400' : step.status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-gray-400'}`}>
               {step.status === 'passed' ? '✓' : step.status === 'failed' ? '✗' : '○'}
             </span>
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{step.name}</span>
+            <span
+              className="text-sm font-medium text-gray-900 dark:text-gray-100"
+              title={STEP_TOOLTIPS[step.name]}
+            >
+              {step.name}
+            </span>
+            {hasScenarios && (
+              <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform shrink-0 ${expanded ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+              </svg>
+            )}
           </div>
           {step.detail && (
-            <p className={`text-xs mt-0.5 ${hasScenarios ? 'ml-9' : 'ml-6'} text-gray-500 dark:text-gray-400`}>{step.detail}</p>
+            <p className="text-xs mt-0.5 ml-6 text-gray-500 dark:text-gray-400">{step.detail}</p>
           )}
         </div>
         {step.duration != null && step.duration > 0 && (
@@ -750,7 +759,7 @@ const ReportStepCard = ({
                       {passed ? '✓' : skipped ? '–' : '✗'}
                     </span>
                     <span className={`${skipped ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}>
-                      {resource}: {name}
+                      {resource}: {humanizeScenarioName(name)}
                     </span>
                   </div>
                   {s.duration != null && (s.duration as number) > 0 && (
