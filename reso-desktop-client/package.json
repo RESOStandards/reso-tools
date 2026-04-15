@@ -1,6 +1,6 @@
 {
   "name": "@reso-standards/reso-desktop-client",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "RESO Reference Server — Desktop Client",
   "author": {
     "name": "Real Estate Standards Organization",
@@ -18,6 +18,7 @@
     "package": "npm run build && npm run build:server-bundle && electron-builder"
   },
   "dependencies": {
+    "@reso-standards/reso-certification": "file:../reso-certification",
     "@reso-standards/reso-web-api-proxy": "file:../reso-web-api-proxy",
     "@reso-standards/reso-reference-server": "file:../reso-reference-server"
   },
