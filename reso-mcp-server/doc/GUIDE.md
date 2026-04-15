@@ -1407,3 +1407,94 @@ When those land, the MCP server's `query` tool will support them on day one (it 
 ---
 
 > **Note:** the `validate` tool is currently a stub on the MCP server side ([handlers.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-mcp-server/src/handlers.ts#L137)) and is intentionally not covered here. It will be wired up to `@reso-standards/reso-validation` in a follow-up and added to this guide once it has something real to demonstrate.
+
+---
+
+## 6. RESO Cloud MCP Server
+
+RESO hosts a cloud MCP server at `services.reso.org/mcp` that provides the same tools as the local MCP server without requiring any local installation. Any MCP-capable AI agent can connect to it with an API key and start querying RESO-compliant servers immediately.
+
+### 6.1 Requesting Access
+
+The cloud MCP server requires an API key. To request one, contact **dev@reso.org** with:
+
+- Your name and organization
+- Your intended use case (development, testing, demo, integration)
+
+RESO will issue a bearer token for the beta program. Keys are available for RESO members and conference attendees.
+
+### 6.2 Connecting
+
+The cloud server uses MCP's Streamable HTTP transport. Point your MCP client at:
+
+```
+URL:    https://services.reso.org/mcp
+Method: POST
+Auth:   Authorization: Bearer <your-api-key>
+```
+
+Each request is a standard MCP JSON-RPC message. For example, to list available tools:
+
+```json
+POST https://services.reso.org/mcp
+Authorization: Bearer <your-api-key>
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/list"
+}
+```
+
+### 6.3 Available Tools
+
+The cloud server exposes the core RESO tools:
+
+| Tool | Description |
+|------|-------------|
+| `authenticate` | Obtain a bearer token via OAuth2 Client Credentials |
+| `query` | Query any RESO OData resource with $filter, $select, $orderby, $top, $skip, $expand |
+| `metadata` | Fetch and parse OData CSDL metadata from any RESO server |
+| `create` | Create a new record (POST) |
+| `update` | Update a record (PATCH) |
+| `delete` | Delete a record (DELETE) |
+| `parse-filter` | Parse an OData $filter expression into an AST |
+
+Certification tools (`run-compliance`, `metadata-report`) will be added in a future update.
+
+### 6.4 Example: Query via the Cloud Server
+
+To query a RESO server through the cloud MCP, your AI agent sends:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/call",
+  "params": {
+    "name": "query",
+    "arguments": {
+      "url": "https://api.example.com/odata",
+      "resource": "Property",
+      "top": 5,
+      "select": "ListingKey,ListPrice,City,StandardStatus",
+      "filter": "ListPrice ge 200000 and StandardStatus eq 'Active'",
+      "authToken": "Bearer your-server-token"
+    }
+  }
+}
+```
+
+The cloud server makes the OData request on your behalf and returns the results. Your agent never needs to know OData syntax, it just calls the tool.
+
+### 6.5 Cloud vs. Local
+
+| | Cloud (`services.reso.org/mcp`) | Local (`reso-mcp`) |
+|---|---|---|
+| **Setup** | Just an API key | Install Node.js, clone repo |
+| **Tools** | Core tools (query, metadata, CRUD) | All tools including certification |
+| **Latency** | Network round-trip through AWS | Direct on your machine |
+| **Use case** | Quick demos, remote agents, conference | Development, cert testing, offline |
+
+Both use the same tool interfaces and return the same response shapes. An agent built against the cloud server will work identically with the local server and vice versa.
