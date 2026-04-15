@@ -1490,7 +1490,7 @@ The cloud server makes the OData request on your behalf and returns the results.
 
 ### 6.5 Authentication: Bearer Token vs. Client Credentials
 
-About 40% of RESO servers support OAuth2 Client Credentials. The cloud MCP server handles both patterns:
+Some RESO servers support OAuth2 Client Credentials. The cloud MCP server handles both patterns:
 
 **Bearer token** — if you already have a token, pass it directly as `authToken` in any tool call:
 
