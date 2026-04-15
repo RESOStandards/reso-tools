@@ -33,9 +33,7 @@ jobs:
 
       - name: Build reso-certification (for desktop client cert runner)
         run: |
-          git clone --depth 1 --branch v3.0.0 https://github.com/RESOStandards/reso-certification-utils.git /tmp/cert-utils
-          cd /tmp/cert-utils && npm pkg delete scripts.prepare && cd -
-          cd reso-certification && npm pkg delete dependencies.@reso/reso-certification-utils && npm install && npm install --ignore-scripts /tmp/cert-utils && npx tsc && cd ..
+          cd reso-certification && npm pkg delete dependencies.@reso/reso-certification-utils && npm install && npx tsc && cd ..
 
       - name: Install desktop client dependencies
         run: cd reso-desktop-client && npm install
