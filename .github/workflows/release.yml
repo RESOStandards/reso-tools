@@ -28,6 +28,7 @@ jobs:
           cd reso-client && npm install && npx tsc && cd ..
           cd reso-data-generator && npm install && npx tsc && cd ..
           cd reso-reference-server && npm install && npm run build && cd ..
+          cd reso-certification && npm install --ignore-scripts && npx tsc && cd ..
           cd reso-web-api-proxy && npm install && npm run build && cd ..
           cd reso-web-client && npm install && npm run build && cd ..
 
