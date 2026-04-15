@@ -331,7 +331,10 @@ const registerCertRunnerHandlers = (): void => {
       // Dynamic import so we don't block app startup
       // Dynamic import — reso-certification is not bundled with electron-builder,
       // it's resolved from node_modules at runtime.
-      const certModule = await import('@reso-standards/reso-certification') as unknown as {
+      // Use a variable to prevent TypeScript from resolving the module at compile time.
+      // The package is available at runtime from the monorepo but not declared as a dependency.
+      const certPkg = '@reso-standards/reso-certification';
+      const certModule = await import(/* webpackIgnore: true */ certPkg) as unknown as {
         runComplianceTests: (config: Record<string, unknown>, onProgress?: (progress: Record<string, unknown>) => void) => Promise<{ status: string; steps: ReadonlyArray<Record<string, unknown>>; duration: number }>;
       };
 
