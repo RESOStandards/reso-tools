@@ -1,0 +1,963 @@
+/**
+ * Certification Config Builder — provider-centric batch configuration
+ * for running certification tests against multiple recipients.
+ *
+ * Supports all four endorsement types (DD, Core, Add/Edit, EntityEvent)
+ * with per-endorsement config fields. Configs can be imported/exported
+ * as JSON matching the legacy dd-config.json format.
+ */
+
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { SearchInput, FilterPill, Badge } from '../metadata/shared';
+import { fetchOrganizations } from '../../api/cert-client';
+import type { CertOrganization, CertOrganizationSystem } from '../../api/cert-client';
+import {
+  CERT_ENDORSEMENT_LABELS,
+  CERT_ENDORSEMENT_COLORS,
+  ENDORSEMENT_DEFAULT_VERSIONS,
+  MEMORY_WARNING_THRESHOLD,
+  MAX_LOCAL_CONCURRENCY,
+  DEFAULT_CONCURRENCY,
+} from '../../constants/cert';
+import type { CertEndorsement, DDVersion, CoreVersion, EnumMode } from '../../constants/cert';
+
+// ── Types ────────────────────────────────────────────────────────────
+
+type EndorsementType = CertEndorsement;
+type AuthMode = 'token' | 'client_credentials';
+
+export interface AuthTokenConfig {
+  readonly mode: 'token';
+  readonly authToken: string;
+}
+
+export interface ClientCredentialsConfig {
+  readonly mode: 'client_credentials';
+  readonly clientId: string;
+  readonly clientSecret: string;
+  readonly tokenUrl: string;
+  readonly scope?: string;
+}
+
+export type AuthConfig = AuthTokenConfig | ClientCredentialsConfig;
+
+interface DDOptions {
+  readonly version: '1.7' | '2.0' | '2.1';
+  readonly originatingSystemName?: string;
+  readonly originatingSystemId?: string;
+  readonly limit?: number;
+  readonly strictMode?: boolean;
+  readonly batchExpand?: boolean;
+}
+
+interface CoreOptions {
+  readonly version: '2.0.0' | '2.1.0';
+  readonly resources?: string;
+  readonly enumMode?: 'auto' | 'isflags' | 'collections' | 'string';
+  readonly fullCoverage?: boolean;
+}
+
+interface AddEditOptions {
+  readonly resource: string;
+  readonly specVersion?: string;
+  readonly payloadsDir?: string;
+}
+
+interface EntityEventOptions {
+  readonly mode: 'observe' | 'full';
+  readonly writableResource?: string;
+  readonly maxEvents?: number;
+  readonly pollInterval?: number;
+  readonly pollTimeout?: number;
+}
+
+export interface RecipientConfig {
+  readonly id: string;
+  readonly description: string;
+  readonly serviceRootUri: string;
+  readonly recipientUoi: string;
+  readonly providerUsi: string;
+  readonly auth: AuthConfig;
+  readonly endorsements: ReadonlyArray<EndorsementType>;
+  readonly ddOptions: DDOptions;
+  readonly coreOptions: CoreOptions;
+  readonly addEditOptions: AddEditOptions;
+  readonly entityEventOptions: EntityEventOptions;
+}
+
+export interface BatchConfig {
+  readonly providerUoi: string;
+  readonly concurrency: number;
+  readonly recipients: ReadonlyArray<RecipientConfig>;
+}
+
+// ── Defaults ─────────────────────────────────────────────────────────
+
+const DEFAULT_DD: DDOptions = { version: '2.0', strictMode: true };
+const DEFAULT_CORE: CoreOptions = { version: '2.0.0', enumMode: 'auto' };
+const DEFAULT_ADD_EDIT: AddEditOptions = { resource: 'Property' };
+const DEFAULT_ENTITY_EVENT: EntityEventOptions = { mode: 'observe', maxEvents: 1000, pollInterval: 5000, pollTimeout: 30000 };
+
+const DEFAULT_AUTH: AuthConfig = { mode: 'token', authToken: '' };
+
+const makeRecipient = (): RecipientConfig => ({
+  id: crypto.randomUUID(),
+  description: '',
+  serviceRootUri: '',
+  recipientUoi: '',
+  providerUsi: '',
+  auth: DEFAULT_AUTH,
+  endorsements: ['dd'],
+  ddOptions: DEFAULT_DD,
+  coreOptions: DEFAULT_CORE,
+  addEditOptions: DEFAULT_ADD_EDIT,
+  entityEventOptions: DEFAULT_ENTITY_EVENT,
+});
+
+// ── Styles ───────────────────────────────────────────────────────────
+
+const CARD = 'bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl';
+const LABEL = 'block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1';
+const INPUT = 'w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400';
+const SELECT = `${INPUT} cursor-pointer`;
+
+// ── Endorsement labels (from shared constants) ──────────────────────
+
+const ENDORSEMENT_LABELS = CERT_ENDORSEMENT_LABELS;
+
+// ── Auth section ─────────────────────────────────────────────────────
+
+const AuthSection = ({
+  auth,
+  onChange,
+}: {
+  readonly auth: AuthConfig;
+  readonly onChange: (auth: AuthConfig) => void;
+}) => {
+  const switchMode = (mode: AuthMode) => {
+    if (mode === 'token') onChange({ mode: 'token', authToken: '' });
+    else onChange({ mode: 'client_credentials', clientId: '', clientSecret: '', tokenUrl: '' });
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <label className={LABEL}>Authentication</label>
+        <div className="flex items-center gap-1 ml-auto">
+          <FilterPill label="Bearer Token" active={auth.mode === 'token'} onClick={() => switchMode('token')} />
+          <FilterPill label="Client Credentials" active={auth.mode === 'client_credentials'} onClick={() => switchMode('client_credentials')} />
+        </div>
+      </div>
+
+      {auth.mode === 'token' ? (
+        <div>
+          <label className={LABEL}>Auth Token</label>
+          <input
+            type="password"
+            value={auth.authToken}
+            onChange={e => onChange({ ...auth, authToken: e.target.value })}
+            placeholder="Bearer token"
+            className={INPUT}
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className={LABEL}>Client ID</label>
+            <input
+              type="text"
+              value={auth.clientId}
+              onChange={e => onChange({ ...auth, clientId: e.target.value })}
+              placeholder="client_id"
+              className={INPUT}
+            />
+          </div>
+          <div>
+            <label className={LABEL}>Client Secret</label>
+            <input
+              type="password"
+              value={auth.clientSecret}
+              onChange={e => onChange({ ...auth, clientSecret: e.target.value })}
+              placeholder="client_secret"
+              className={INPUT}
+            />
+          </div>
+          <div>
+            <label className={LABEL}>Token URL</label>
+            <input
+              type="url"
+              value={auth.tokenUrl}
+              onChange={e => onChange({ ...auth, tokenUrl: e.target.value })}
+              placeholder="https://auth.example.com/oauth2/token"
+              className={INPUT}
+            />
+          </div>
+          <div>
+            <label className={LABEL}>Scope <span className="text-gray-400">(optional)</span></label>
+            <input
+              type="text"
+              value={auth.scope ?? ''}
+              onChange={e => onChange({ ...auth, scope: e.target.value || undefined })}
+              placeholder="api"
+              className={INPUT}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── DD options ───────────────────────────────────────────────────────
+
+const DDOptionsSection = ({
+  options,
+  onChange,
+}: {
+  readonly options: DDOptions;
+  readonly onChange: (opts: DDOptions) => void;
+}) => (
+  <div className="space-y-3 pt-3 border-t border-gray-100 dark:border-gray-700/50">
+    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Data Dictionary Options</p>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div>
+        <label className={LABEL}>DD Version</label>
+        <select value={options.version} onChange={e => onChange({ ...options, version: e.target.value as DDOptions['version'] })} className={SELECT}>
+          <option value="2.1">2.1</option>
+          <option value="2.0">2.0</option>
+          <option value="1.7">1.7</option>
+        </select>
+      </div>
+      <div>
+        <label className={LABEL}>Record Limit <span className="text-gray-400">(optional)</span></label>
+        <input
+          type="number"
+          value={options.limit ?? ''}
+          onChange={e => onChange({ ...options, limit: e.target.value ? Number(e.target.value) : undefined })}
+          placeholder="100000"
+          className={INPUT}
+        />
+      </div>
+      <div className="flex items-end gap-4 pb-1">
+        <label className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={options.strictMode ?? false}
+            onChange={e => onChange({ ...options, strictMode: e.target.checked })}
+            className="rounded cursor-pointer"
+          />
+          Strict Mode
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={options.batchExpand ?? false}
+            onChange={e => onChange({ ...options, batchExpand: e.target.checked })}
+            className="rounded cursor-pointer"
+          />
+          Batch $expand
+        </label>
+      </div>
+    </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label className={LABEL}>Originating System Name <span className="text-gray-400">(optional)</span></label>
+        <input
+          type="text"
+          value={options.originatingSystemName ?? ''}
+          onChange={e => onChange({ ...options, originatingSystemName: e.target.value || undefined })}
+          placeholder="Used to filter by OriginatingSystemName"
+          className={INPUT}
+        />
+      </div>
+      <div>
+        <label className={LABEL}>Originating System ID <span className="text-gray-400">(optional)</span></label>
+        <input
+          type="text"
+          value={options.originatingSystemId ?? ''}
+          onChange={e => onChange({ ...options, originatingSystemId: e.target.value || undefined })}
+          placeholder="Used to filter by OriginatingSystemID"
+          className={INPUT}
+        />
+      </div>
+    </div>
+  </div>
+);
+
+// ── Core options ─────────────────────────────────────────────────────
+
+const CoreOptionsSection = ({
+  options,
+  onChange,
+}: {
+  readonly options: CoreOptions;
+  readonly onChange: (opts: CoreOptions) => void;
+}) => (
+  <div className="space-y-3 pt-3 border-t border-gray-100 dark:border-gray-700/50">
+    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Web API Core Options</p>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div>
+        <label className={LABEL}>Spec Version</label>
+        <select value={options.version} onChange={e => onChange({ ...options, version: e.target.value as CoreOptions['version'] })} className={SELECT}>
+          <option value="2.0.0">2.0.0</option>
+          <option value="2.1.0">2.1.0</option>
+        </select>
+      </div>
+      <div>
+        <label className={LABEL}>Enum Mode</label>
+        <select value={options.enumMode ?? 'auto'} onChange={e => onChange({ ...options, enumMode: e.target.value as CoreOptions['enumMode'] })} className={SELECT}>
+          <option value="auto">Auto-detect</option>
+          <option value="isflags">IsFlags</option>
+          <option value="collections">Collections</option>
+          <option value="string">String + Lookup</option>
+        </select>
+      </div>
+      <div className="flex items-end pb-1">
+        <label className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={options.fullCoverage ?? false}
+            onChange={e => onChange({ ...options, fullCoverage: e.target.checked })}
+            className="rounded cursor-pointer"
+          />
+          <span title="Fail if any advertised data type category (string, numeric, date, boolean, enum) is not covered by test queries">Full Coverage</span>
+        </label>
+      </div>
+    </div>
+    <div>
+      <label className={LABEL}>Resources <span className="text-gray-400">(comma-separated, optional)</span></label>
+      <input
+        type="text"
+        value={options.resources ?? ''}
+        onChange={e => onChange({ ...options, resources: e.target.value || undefined })}
+        placeholder="Property, Member, Office, Media, OpenHouse"
+        className={INPUT}
+      />
+    </div>
+  </div>
+);
+
+// ── Add/Edit options ─────────────────────────────────────────────────
+
+const AddEditOptionsSection = ({
+  options,
+  onChange,
+}: {
+  readonly options: AddEditOptions;
+  readonly onChange: (opts: AddEditOptions) => void;
+}) => (
+  <div className="space-y-3 pt-3 border-t border-gray-100 dark:border-gray-700/50">
+    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Add/Edit Options</p>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label className={LABEL}>Resource</label>
+        <input
+          type="text"
+          value={options.resource}
+          onChange={e => onChange({ ...options, resource: e.target.value })}
+          placeholder="Property"
+          className={INPUT}
+        />
+      </div>
+      <div>
+        <label className={LABEL}>Payloads Directory <span className="text-gray-400">(optional)</span></label>
+        <input
+          type="text"
+          value={options.payloadsDir ?? ''}
+          onChange={e => onChange({ ...options, payloadsDir: e.target.value || undefined })}
+          placeholder="./payloads"
+          className={INPUT}
+        />
+      </div>
+    </div>
+  </div>
+);
+
+// ── EntityEvent options ──────────────────────────────────────────────
+
+const EntityEventOptionsSection = ({
+  options,
+  onChange,
+}: {
+  readonly options: EntityEventOptions;
+  readonly onChange: (opts: EntityEventOptions) => void;
+}) => (
+  <div className="space-y-3 pt-3 border-t border-gray-100 dark:border-gray-700/50">
+    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">EntityEvent Options</p>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div>
+        <label className={LABEL}>Mode</label>
+        <select value={options.mode} onChange={e => onChange({ ...options, mode: e.target.value as 'observe' | 'full' })} className={SELECT}>
+          <option value="observe">Observe (read-only)</option>
+          <option value="full">Full (write + verify)</option>
+        </select>
+      </div>
+      {options.mode === 'full' && (
+        <div>
+          <label className={LABEL}>Writable Resource</label>
+          <input
+            type="text"
+            value={options.writableResource ?? ''}
+            onChange={e => onChange({ ...options, writableResource: e.target.value || undefined })}
+            placeholder="Property"
+            className={INPUT}
+          />
+        </div>
+      )}
+      <div>
+        <label className={LABEL}>Max Events</label>
+        <input
+          type="number"
+          value={options.maxEvents ?? ''}
+          onChange={e => onChange({ ...options, maxEvents: e.target.value ? Number(e.target.value) : undefined })}
+          placeholder="1000"
+          className={INPUT}
+        />
+      </div>
+    </div>
+  </div>
+);
+
+// ── Shared org dropdown ──────────────────────────────────────────────
+
+const OrgDropdown = ({
+  orgs,
+  search,
+  onSelect,
+}: {
+  readonly orgs: ReadonlyArray<CertOrganization>;
+  readonly search: string;
+  readonly onSelect: (org: CertOrganization) => void;
+}) => {
+  const filtered = useMemo(() => {
+    if (!search.trim()) return orgs.slice(0, 20);
+    const query = search.toLowerCase();
+    return orgs.filter(o =>
+      o.name.toLowerCase().includes(query) || o.id.toLowerCase().includes(query)
+    ).slice(0, 20);
+  }, [orgs, search]);
+
+  if (filtered.length === 0) return null;
+
+  return (
+    <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+      {filtered.map(org => (
+        <button
+          key={org.id}
+          type="button"
+          onMouseDown={e => { e.preventDefault(); onSelect(org); }}
+          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+        >
+          <span className="font-medium text-gray-900 dark:text-gray-100">{org.name}</span>
+          <span className="ml-2 text-xs text-gray-400 dark:text-gray-500 font-mono">{org.id}</span>
+        </button>
+      ))}
+    </div>
+  );
+};
+
+// ── Recipient card ───────────────────────────────────────────────────
+
+const RecipientCard = ({
+  recipient,
+  index,
+  onChange,
+  onRemove,
+  onDuplicate,
+  orgs,
+  providerSystems,
+}: {
+  readonly recipient: RecipientConfig;
+  readonly index: number;
+  readonly onChange: (r: RecipientConfig) => void;
+  readonly onRemove: () => void;
+  readonly onDuplicate: () => void;
+  readonly orgs: ReadonlyArray<CertOrganization>;
+  readonly providerSystems: ReadonlyArray<CertOrganizationSystem>;
+}) => {
+  const [expanded, setExpanded] = useState(true);
+  const [recipientSearch, setRecipientSearch] = useState('');
+  const [showRecipientDropdown, setShowRecipientDropdown] = useState(false);
+  const [recipientName, setRecipientName] = useState(recipient.description || '');
+
+  const [endorsementWarning, setEndorsementWarning] = useState('');
+
+  const toggleEndorsement = (type: EndorsementType) => {
+    const current = recipient.endorsements;
+    const adding = !current.includes(type);
+    const next = adding ? [...current, type] : current.filter(e => e !== type);
+
+    // Warn if both Add/Edit and EntityEvent (observe) are selected
+    if (adding) {
+      const eeObserve = recipient.entityEventOptions.mode === 'observe';
+      if (type === 'add-edit' && next.includes('entity-event') && eeObserve) {
+        setEndorsementWarning('EntityEvent in observe mode should run separately from Add/Edit. Run Add/Edit first, then EntityEvent observe in a separate job so there are events to detect.');
+        return;
+      }
+      if (type === 'entity-event' && next.includes('add-edit') && eeObserve) {
+        setEndorsementWarning('EntityEvent in observe mode should run separately from Add/Edit. Run Add/Edit first, then EntityEvent observe in a separate job so there are events to detect.');
+        return;
+      }
+    }
+
+    setEndorsementWarning('');
+    onChange({ ...recipient, endorsements: next });
+  };
+
+  return (
+    <div className={`${CARD} overflow-hidden`}>
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700">
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-2 cursor-pointer"
+        >
+          <svg className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+          </svg>
+          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {recipient.description || recipient.recipientUoi || `Recipient ${index + 1}`}
+          </span>
+          <div className="flex items-center gap-1 ml-2">
+            {recipient.endorsements.map(e => (
+              <Badge key={e} label={ENDORSEMENT_LABELS[e]} color={CERT_ENDORSEMENT_COLORS[e]} />
+            ))}
+          </div>
+        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onDuplicate}
+            className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
+            title="Duplicate"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z" />
+              <path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.439A1.5 1.5 0 008.378 6H4.5z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="p-1.5 text-gray-400 hover:text-red-500 cursor-pointer"
+            title="Remove"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.519.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Body */}
+      {expanded && (
+        <div className="p-4 space-y-4">
+          {/* Recipient org + system + server */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Recipient org picker */}
+            <div className="relative">
+              <label className={LABEL}>Recipient</label>
+              {recipient.recipientUoi ? (
+                <div className={`${INPUT} flex items-center justify-between`}>
+                  <div className="min-w-0">
+                    <span className="text-sm font-medium">{recipientName || recipient.recipientUoi}</span>
+                    <span className="ml-2 text-xs text-gray-400 dark:text-gray-500 font-mono">{recipient.recipientUoi}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { onChange({ ...recipient, recipientUoi: '', description: '' }); setRecipientName(''); }}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer shrink-0 ml-2"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    value={recipientSearch}
+                    onChange={e => { setRecipientSearch(e.target.value); setShowRecipientDropdown(true); }}
+                    onFocus={() => setShowRecipientDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowRecipientDropdown(false), 200)}
+                    placeholder="Search recipient by name or UOI..."
+                    className={INPUT}
+                  />
+                  {showRecipientDropdown && (
+                    <OrgDropdown
+                      orgs={orgs}
+                      search={recipientSearch}
+                      onSelect={org => {
+                        onChange({ ...recipient, recipientUoi: org.id, description: org.name });
+                        setRecipientName(org.name);
+                        setRecipientSearch('');
+                        setShowRecipientDropdown(false);
+                      }}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Provider system (USI) — per recipient */}
+            <div>
+              <label className={LABEL}>Provider System (USI)</label>
+              {providerSystems.length > 0 ? (
+                <select
+                  value={recipient.providerUsi}
+                  onChange={e => onChange({ ...recipient, providerUsi: e.target.value })}
+                  className={SELECT}
+                >
+                  <option value="">Select a system...</option>
+                  {providerSystems.map(s => (
+                    <option key={s.usi} value={s.usi}>{s.systemName} ({s.usi})</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={recipient.providerUsi}
+                  onChange={e => onChange({ ...recipient, providerUsi: e.target.value })}
+                  placeholder="System identifier"
+                  className={INPUT}
+                />
+              )}
+            </div>
+
+            {/* Server URL */}
+            <div className="sm:col-span-2">
+              <label className={LABEL}>Server URL</label>
+              <input
+                type="url"
+                value={recipient.serviceRootUri}
+                onChange={e => onChange({ ...recipient, serviceRootUri: e.target.value })}
+                placeholder="https://api.example.com/odata"
+                className={INPUT}
+              />
+            </div>
+          </div>
+
+          {/* Auth */}
+          <AuthSection auth={recipient.auth} onChange={auth => onChange({ ...recipient, auth })} />
+
+          {/* Endorsement toggles */}
+          <div className="space-y-2">
+            <label className={LABEL}>Endorsements</label>
+            <div className="flex items-center gap-2 flex-wrap">
+              {(Object.entries(ENDORSEMENT_LABELS) as ReadonlyArray<[EndorsementType, string]>).map(([type, label]) => (
+                <label key={type} className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={recipient.endorsements.includes(type)}
+                    onChange={() => toggleEndorsement(type)}
+                    className="rounded cursor-pointer"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+            {endorsementWarning && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-1">
+                <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                </svg>
+                {endorsementWarning}
+              </p>
+            )}
+          </div>
+
+          {/* Per-endorsement options */}
+          {recipient.endorsements.includes('dd') && (
+            <DDOptionsSection options={recipient.ddOptions} onChange={ddOptions => onChange({ ...recipient, ddOptions })} />
+          )}
+          {recipient.endorsements.includes('core') && (
+            <CoreOptionsSection options={recipient.coreOptions} onChange={coreOptions => onChange({ ...recipient, coreOptions })} />
+          )}
+          {recipient.endorsements.includes('add-edit') && (
+            <AddEditOptionsSection options={recipient.addEditOptions} onChange={addEditOptions => onChange({ ...recipient, addEditOptions })} />
+          )}
+          {recipient.endorsements.includes('entity-event') && (
+            <EntityEventOptionsSection options={recipient.entityEventOptions} onChange={entityEventOptions => onChange({ ...recipient, entityEventOptions })} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Main Config Builder ──────────────────────────────────────────────
+
+export const ConfigBuilder = ({
+  onClose,
+  onStart,
+}: {
+  readonly onClose: () => void;
+  readonly onStart: (config: BatchConfig) => void;
+}) => {
+  const [providerUoi, setProviderUoi] = useState('');
+  const [providerName, setProviderName] = useState('');
+  const [providerSystems, setProviderSystems] = useState<ReadonlyArray<CertOrganizationSystem>>([]);
+  const [concurrency, setConcurrency] = useState(DEFAULT_CONCURRENCY);
+  const [recipients, setRecipients] = useState<ReadonlyArray<RecipientConfig>>([makeRecipient()]);
+
+  // Org directory for provider/recipient pickers
+  const [orgs, setOrgs] = useState<ReadonlyArray<CertOrganization>>([]);
+  const [orgsLoading, setOrgsLoading] = useState(false);
+  const [providerSearch, setProviderSearch] = useState('');
+  const [showProviderDropdown, setShowProviderDropdown] = useState(false);
+
+  useEffect(() => {
+    setOrgsLoading(true);
+    fetchOrganizations(null)
+      .then(setOrgs)
+      .catch(() => {})
+      .finally(() => setOrgsLoading(false));
+  }, []);
+
+  const selectProvider = useCallback((org: CertOrganization) => {
+    setProviderUoi(org.id);
+    setProviderName(org.name);
+    setProviderSearch('');
+    setShowProviderDropdown(false);
+    setProviderSystems(org.systems ?? []);
+  }, []);
+
+  const updateRecipient = useCallback((index: number, updated: RecipientConfig) => {
+    setRecipients(prev => prev.map((r, i) => i === index ? updated : r));
+  }, []);
+
+  const removeRecipient = useCallback((index: number) => {
+    setRecipients(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const duplicateRecipient = useCallback((index: number) => {
+    setRecipients(prev => {
+      const copy = { ...prev[index], id: crypto.randomUUID(), description: `${prev[index].description} (copy)` };
+      return [...prev.slice(0, index + 1), copy, ...prev.slice(index + 1)];
+    });
+  }, []);
+
+  const addRecipient = () => setRecipients(prev => [...prev, makeRecipient()]);
+
+  const totalJobs = recipients.reduce((sum, r) => sum + r.endorsements.length, 0);
+
+  const handleExport = () => {
+    const config: BatchConfig = { providerUoi, concurrency, recipients };
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'cert-config.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      try {
+        const parsed = JSON.parse(text) as Record<string, unknown>;
+        // Support both legacy dd-config format and our BatchConfig format
+        if ('providerUoi' in parsed && typeof parsed.providerUoi === 'string') {
+          setProviderUoi(parsed.providerUoi);
+        }
+        if ('concurrency' in parsed && typeof parsed.concurrency === 'number') {
+          setConcurrency(parsed.concurrency);
+        }
+        if ('recipients' in parsed && Array.isArray(parsed.recipients)) {
+          setRecipients(parsed.recipients as ReadonlyArray<RecipientConfig>);
+        } else if ('configs' in parsed && Array.isArray(parsed.configs)) {
+          // Legacy dd-config format
+          const legacyConfigs = parsed.configs as ReadonlyArray<Record<string, unknown>>;
+          const imported: ReadonlyArray<RecipientConfig> = legacyConfigs.map(c => ({
+            id: crypto.randomUUID(),
+            description: (c.description as string) ?? '',
+            serviceRootUri: (c.serviceRootUri as string) ?? '',
+            recipientUoi: (c.recipientUoi as string) ?? '',
+            providerUsi: (c.providerUsi as string) ?? '',
+            auth: c.token
+              ? { mode: 'token' as const, authToken: c.token as string }
+              : c.clientCredentials
+              ? {
+                  mode: 'client_credentials' as const,
+                  clientId: (c.clientCredentials as Record<string, string>).clientId ?? '',
+                  clientSecret: (c.clientCredentials as Record<string, string>).clientSecret ?? '',
+                  tokenUrl: (c.clientCredentials as Record<string, string>).tokenUri ?? '',
+                  scope: (c.clientCredentials as Record<string, string>).scope,
+                }
+              : DEFAULT_AUTH,
+            endorsements: ['dd'],
+            ddOptions: {
+              ...DEFAULT_DD,
+              originatingSystemName: c.originatingSystemName as string | undefined,
+              originatingSystemId: c.originatingSystemId as string | undefined,
+            },
+            coreOptions: DEFAULT_CORE,
+            addEditOptions: DEFAULT_ADD_EDIT,
+            entityEventOptions: DEFAULT_ENTITY_EVENT,
+          }));
+          setRecipients(imported);
+        }
+      } catch {
+        // Invalid JSON — silently ignore
+      }
+    };
+    input.click();
+  };
+
+  const handleStart = () => {
+    onStart({ providerUoi, concurrency, recipients });
+  };
+
+  const canStart = providerUoi.trim() !== '' &&
+    recipients.length > 0 &&
+    recipients.every(r => r.recipientUoi.trim() !== '');
+
+  return (
+    <div className={`${CARD} p-6 space-y-5`}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Test Configuration</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            Configure one or more recipients to test against.
+          </p>
+        </div>
+        <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer">
+          <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Provider + concurrency */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Provider org picker */}
+        <div className="relative">
+          <label className={LABEL}>Provider</label>
+          {providerUoi ? (
+            <div className={`${INPUT} flex items-center justify-between`}>
+              <div className="min-w-0">
+                <span className="text-sm font-medium">{providerName}</span>
+                <span className="ml-2 text-xs text-gray-400 dark:text-gray-500 font-mono">{providerUoi}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setProviderUoi(''); setProviderName(''); setProviderSystems([]); }}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer shrink-0 ml-2"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <>
+              <input
+                type="text"
+                value={providerSearch}
+                onChange={e => { setProviderSearch(e.target.value); setShowProviderDropdown(true); }}
+                onFocus={() => setShowProviderDropdown(true)}
+                onBlur={() => setTimeout(() => setShowProviderDropdown(false), 200)}
+                placeholder={orgsLoading ? 'Loading organizations...' : 'Search by name or UOI...'}
+                className={INPUT}
+              />
+              {showProviderDropdown && (
+                <OrgDropdown
+                  orgs={orgs}
+                  search={providerSearch}
+                  onSelect={selectProvider}
+                />
+              )}
+            </>
+          )}
+        </div>
+        <div>
+          <label className={LABEL}>Concurrency</label>
+          <div className="flex items-center gap-3">
+            <select value={concurrency} onChange={e => setConcurrency(Number(e.target.value))} className={SELECT}>
+              {Array.from({ length: MAX_LOCAL_CONCURRENCY }, (_, i) => i + 1).map(n => (
+                <option key={n} value={n}>{n === 1 ? 'Sequential (1 job)' : `${n} concurrent jobs`}</option>
+              ))}
+            </select>
+          </div>
+          {concurrency > MEMORY_WARNING_THRESHOLD && (
+            <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
+              <svg className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+              </svg>
+              DD jobs can use ~4 GB of memory each for large markets. Monitor system resources when running 3+ concurrently.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Recipient configs */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+            Recipients ({recipients.length})
+          </p>
+          <button
+            type="button"
+            onClick={addRecipient}
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-medium"
+          >
+            + Add Recipient
+          </button>
+        </div>
+
+        {recipients.map((r, i) => (
+          <RecipientCard
+            key={r.id}
+            recipient={r}
+            index={i}
+            onChange={updated => updateRecipient(i, updated)}
+            onRemove={() => removeRecipient(i)}
+            onDuplicate={() => duplicateRecipient(i)}
+            orgs={orgs}
+            providerSystems={providerSystems}
+          />
+        ))}
+      </div>
+
+      {/* Import / Export / Summary */}
+      <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-700/50">
+        <button type="button" onClick={handleImport} className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
+          Import Config
+        </button>
+        <span className="text-gray-300 dark:text-gray-600">·</span>
+        <button type="button" onClick={handleExport} className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
+          Export Config
+        </button>
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+            {recipients.length} {recipients.length === 1 ? 'recipient' : 'recipients'} · {totalJobs} {totalJobs === 1 ? 'job' : 'jobs'}
+          </span>
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleStart}
+            disabled={!canStart}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              canStart
+                ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+                : 'bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed'
+            }`}
+          >
+            Start {totalJobs > 1 ? `${totalJobs} Jobs` : 'Test'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, shell } from 'electron';
-import { resolve } from 'node:path';
+import { resolve, join, basename, dirname, relative } from 'node:path';
 import { fork, type ChildProcess } from 'node:child_process';
-import { appendFileSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync, readdirSync, statSync } from 'node:fs';
 
 // Suppress EPIPE errors from broken pipes (e.g., child process stdout closed on shutdown).
 // These are harmless but surface as uncaught exceptions that crash the app.
@@ -82,6 +82,373 @@ const registerStorageHandlers = (): void => {
     delete store[key];
     writeStore(store);
   });
+};
+
+// ── Certification runner (SDK in main process, progress via IPC) ──
+
+/**
+ * Active cert runs keyed by a client-provided jobId.
+ * AbortControllers allow the renderer to cancel a running job.
+ */
+const activeRuns = new Map<string, AbortController>();
+
+/** Mirror the SDK's buildOutputPath to find report files after a run. */
+const resolveOutputPath = (config: Record<string, unknown>): string | null => {
+  try {
+    const endorsement = config.endorsement as string;
+    const slugMap: Record<string, string> = {
+      dd: 'data-dictionary',
+      core: 'web-api-core',
+      'add-edit': 'web-api-add-edit',
+      'entity-event': 'entity-event',
+    };
+    const slug = slugMap[endorsement];
+    if (!slug) return null;
+
+    const versionMap: Record<string, string> = {
+      dd: (config.version as string) ?? '2.0',
+      core: (config.version as string) ?? '2.0.0',
+      'add-edit': (config.specVersion as string) ?? '2.0.0',
+      'entity-event': '1.0.0',
+    };
+    const version = versionMap[endorsement];
+
+    const providerUoi = (config.providerUoi as string) ?? `LOCAL-${Date.now()}`;
+    const providerUsi = (config.providerUsi as string) ?? 'LOCAL-SYSTEM';
+    const recipientUoi = (config.recipientUoi as string) ?? 'LOCAL-RECIPIENT';
+    const outputDir = (config.options as Record<string, unknown>)?.outputDir as string | undefined;
+    const resultsPath = outputDir ?? resolve(process.cwd(), '.reso-cert');
+
+    return resolve(resultsPath, `${slug}-${version}`, `${providerUoi}-${providerUsi}`, recipientUoi, 'current');
+  } catch {
+    return null;
+  }
+};
+
+// ── Local results scanner + watcher ──────────────────────────────────
+
+const CERT_RESULTS_DIR = '.reso-cert';
+
+/** Get the root results directory. */
+const certResultsRoot = (): string => resolve(process.cwd(), CERT_RESULTS_DIR);
+
+/**
+ * Shape of a scanned local result — one per current/ or archived/ directory.
+ * Returned to the renderer to hydrate the jobs list on startup.
+ */
+interface LocalResult {
+  readonly endorsement: string;
+  readonly version: string;
+  readonly providerUoi: string;
+  readonly providerUsi: string;
+  readonly recipientUoi: string;
+  readonly path: string;
+  readonly isCurrent: boolean;
+  readonly timestamp: string;
+  readonly reports: Record<string, unknown>;
+}
+
+/** Read report files from a results directory. */
+const readReports = (dir: string): Record<string, unknown> => {
+  const reports: Record<string, unknown> = {};
+  const filesToRead: Readonly<Record<string, string>> = {
+    schemaErrors: join(dir, 'data-availability-schema-validation-errors.json'),
+    variations: join(dir, 'data-dictionary-variations.json'),
+    metadata: join(dir, 'metadata-report.processed.json'),
+    ddReport: join(dir, 'data-dictionary-2.0.json'),
+    report: join(dir, 'report.json'),
+    reportDetailed: join(dir, 'report-detailed.json'),
+  };
+  for (const [key, path] of Object.entries(filesToRead)) {
+    try {
+      const content = readFileSync(path, 'utf-8');
+      reports[key] = JSON.parse(content);
+    } catch { /* file doesn't exist — skip */ }
+  }
+  return reports;
+};
+
+/**
+ * Scan the .reso-cert/ directory tree and return all local results.
+ *
+ * Structure:
+ *   .reso-cert/data-dictionary-{version}/{providerUoi}-{providerUsi}/{recipientUoi}/current/
+ *   .reso-cert/data-dictionary-{version}/{providerUoi}-{providerUsi}/{recipientUoi}/archived/{timestamp}/
+ */
+const scanLocalResults = (): ReadonlyArray<LocalResult> => {
+  const root = certResultsRoot();
+  if (!existsSync(root)) return [];
+
+  const results: LocalResult[] = [];
+
+  try {
+    // Level 1: endorsement-version directories (e.g., data-dictionary-2.0)
+    for (const endorsementDir of readdirSync(root)) {
+      const endorsementPath = join(root, endorsementDir);
+      if (!statSync(endorsementPath).isDirectory()) continue;
+
+      // Parse endorsement and version from directory name
+      // Supports: data-dictionary-2.0, web-api-core-2.0.0, web-api-add-edit-2.0.0, entity-event-1.0.0
+      const match = endorsementDir.match(/^(.+)-(\d+\.\d+(?:\.\d+)?)$/);
+      if (!match) continue;
+      const endorsementSlug = match[1];
+      const version = match[2];
+      const endorsementLabels: Record<string, string> = {
+        'data-dictionary': 'Data Dictionary',
+        'web-api-core': 'Web API Core',
+        'web-api-add-edit': 'Web API Add/Edit',
+        'entity-event': 'EntityEvent',
+      };
+      const endorsement = endorsementLabels[endorsementSlug] ?? endorsementSlug;
+
+      // Level 2: provider directories (e.g., T00000012-50055)
+      for (const providerDir of readdirSync(endorsementPath)) {
+        const providerPath = join(endorsementPath, providerDir);
+        if (!statSync(providerPath).isDirectory()) continue;
+
+        // Split on first dash to get providerUoi and providerUsi
+        const dashIdx = providerDir.indexOf('-');
+        const providerUoi = dashIdx > 0 ? providerDir.slice(0, dashIdx) : providerDir;
+        const providerUsi = dashIdx > 0 ? providerDir.slice(dashIdx + 1) : '';
+
+        // Level 3: recipient directories (e.g., M00000570)
+        for (const recipientDir of readdirSync(providerPath)) {
+          const recipientPath = join(providerPath, recipientDir);
+          if (!statSync(recipientPath).isDirectory()) continue;
+          const recipientUoi = recipientDir;
+
+          // Check for current/ directory
+          const currentPath = join(recipientPath, 'current');
+          if (existsSync(currentPath) && statSync(currentPath).isDirectory()) {
+            const mtime = statSync(currentPath).mtime.toISOString();
+            results.push({
+              endorsement, version, providerUoi, providerUsi, recipientUoi,
+              path: currentPath, isCurrent: true, timestamp: mtime,
+              reports: readReports(currentPath),
+            });
+          }
+
+          // Check for archived/ directories
+          const archivedPath = join(recipientPath, 'archived');
+          if (existsSync(archivedPath) && statSync(archivedPath).isDirectory()) {
+            for (const archiveDir of readdirSync(archivedPath)) {
+              const archivePath = join(archivedPath, archiveDir);
+              if (!statSync(archivePath).isDirectory()) continue;
+              // Reconstruct ISO timestamp from file-safe directory name
+              // e.g., 2026-04-14T034929041Z → 2026-04-14T03:49:29.041Z
+              const ts = archiveDir.replace(
+                /^(\d{4}-\d{2}-\d{2}T)(\d{2})(\d{2})(\d{2})(\d{3})Z$/,
+                '$1$2:$3:$4.$5Z'
+              );
+              const timestamp = isNaN(new Date(ts).getTime())
+                ? statSync(archivePath).mtime.toISOString()
+                : ts;
+              results.push({
+                endorsement, version, providerUoi, providerUsi, recipientUoi,
+                path: archivePath, isCurrent: false, timestamp,
+                reports: readReports(archivePath),
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    log(`Error scanning cert results: ${err}`);
+  }
+
+  return results;
+};
+
+const registerCertRunnerHandlers = (): void => {
+
+  /** Scan local results directory and return all found results. */
+  ipcMain.handle('cert:scan-results', () => scanLocalResults());
+
+  /** Delete a local result directory, or all results if '__ALL__' is passed. */
+  ipcMain.handle('cert:delete-result', async (_event, resultPath: string) => {
+    const root = certResultsRoot();
+
+    // Special sentinel: delete the entire .reso-cert directory
+    if (resultPath === '__ALL__') {
+      try {
+        const { rm } = await import('node:fs/promises');
+        if (existsSync(root)) {
+          await rm(root, { recursive: true, force: true });
+          log(`Deleted all local results: ${root}`);
+        }
+        return true;
+      } catch (err) {
+        log(`Failed to delete all results: ${err}`);
+        return false;
+      }
+    }
+
+    // Safety: only allow deleting paths inside .reso-cert/
+    const resolved = resolve(resultPath);
+    if (!resolved.startsWith(root)) {
+      log(`Refused to delete path outside .reso-cert: ${resolved}`);
+      return false;
+    }
+    try {
+      const { rm, readdir, rmdir } = await import('node:fs/promises');
+      await rm(resolved, { recursive: true, force: true });
+      log(`Deleted local result: ${resolved}`);
+
+      // Clean up empty parent directories up to .reso-cert/
+      let parent = dirname(resolved);
+      while (parent.startsWith(root) && parent !== root) {
+        try {
+          const entries = await readdir(parent);
+          if (entries.length === 0) {
+            await rmdir(parent);
+            log(`Cleaned up empty parent: ${parent}`);
+            parent = dirname(parent);
+          } else {
+            break;
+          }
+        } catch { break; }
+      }
+
+      return true;
+    } catch (err) {
+      log(`Failed to delete ${resolved}: ${err}`);
+      return false;
+    }
+  });
+
+  /**
+   * Start a compliance test run.
+   * The renderer sends a ComplianceConfig-shaped object plus a jobId.
+   * Progress events are pushed to the renderer via 'cert:progress'.
+   * Resolves with the PipelineResult when the run completes.
+   */
+  ipcMain.handle('cert:run', async (event, jobId: string, config: Record<string, unknown>) => {
+    const controller = new AbortController();
+    activeRuns.set(jobId, controller);
+
+    try {
+      // Dynamic import so we don't block app startup
+      const { runComplianceTests } = await import('@reso-standards/reso-certification');
+
+      // If the config targets the local server, inject the actual server URL
+      const resolvedConfig = {
+        ...config,
+        server: {
+          ...(config.server as Record<string, unknown>),
+          url: (config.server as Record<string, unknown>)?.url === 'LOCAL_SERVER'
+            ? state.serverUrl
+            : (config.server as Record<string, unknown>)?.url,
+        },
+      };
+
+      const result = await runComplianceTests(
+        resolvedConfig as Parameters<typeof runComplianceTests>[0],
+        (progress) => {
+          if (controller.signal.aborted) return;
+          // Send progress to the renderer
+          event.sender.send('cert:progress', jobId, {
+            step: progress.step,
+            status: progress.status,
+            message: progress.message,
+            duration: progress.duration,
+          });
+        },
+      );
+
+      activeRuns.delete(jobId);
+
+      // Read any generated reports (available on both pass and fail)
+      let reports: Record<string, unknown> | undefined;
+      try {
+        const outputDir = resolveOutputPath(resolvedConfig);
+        if (outputDir) {
+          const reportFiles: Record<string, unknown> = {};
+          const filesToRead: Readonly<Record<string, string>> = {
+            schemaErrors: resolve(outputDir, 'data-availability-schema-validation-errors.json'),
+            variations: resolve(outputDir, 'data-dictionary-variations.json'),
+            metadata: resolve(outputDir, 'metadata-report.processed.json'),
+            report: resolve(outputDir, 'report.json'),
+            reportDetailed: resolve(outputDir, 'report-detailed.json'),
+          };
+          for (const [key, path] of Object.entries(filesToRead)) {
+            try {
+              const content = readFileSync(path, 'utf-8');
+              reportFiles[key] = JSON.parse(content);
+            } catch { /* file doesn't exist — skip */ }
+          }
+          if (Object.keys(reportFiles).length > 0) reports = reportFiles;
+          log(`Cert run ${jobId}: found reports: ${Object.keys(reportFiles).join(', ')} in ${outputDir}`);
+        }
+      } catch (reportErr) {
+        log(`Cert run ${jobId}: error reading reports: ${reportErr}`);
+      }
+
+      // Cross-check: if schema validation errors exist on disk but the pipeline
+      // reported success, override to failed. This catches cases where throwOnError
+      // propagates through the pipeline but the overall status isn't set correctly
+      // (e.g., failFast=false or the error is caught within a sub-step).
+      const hasSchemaErrors = reports?.schemaErrors !== undefined;
+      const actualStatus = hasSchemaErrors && result.status === 'passed' ? 'failed' as const : result.status;
+      const error = hasSchemaErrors && result.status === 'passed'
+        ? 'Schema validation errors found. See the failure report for details.'
+        : undefined;
+
+      log(`Cert run ${jobId} complete: pipeline=${result.status}, actual=${actualStatus}, steps=${result.steps.length}${hasSchemaErrors ? ', schemaErrors=true' : ''}`);
+
+      return { status: actualStatus, steps: result.steps, duration: result.duration, reports, error };
+    } catch (err) {
+      activeRuns.delete(jobId);
+      const message = err instanceof Error ? err.message : String(err);
+      log(`Cert run ${jobId} failed: ${message}`);
+
+      // If exit was intercepted, the run produced reports before dying.
+      // Return failed status so the UI can show the error report.
+      // Try to read any generated reports from the output directory
+      let reports: Record<string, unknown> | undefined;
+      try {
+        const outputDir = resolveOutputPath(config);
+        if (outputDir) {
+          const reportFiles: Record<string, unknown> = {};
+          const errorFilesToRead: Readonly<Record<string, string>> = {
+            schemaErrors: resolve(outputDir, 'data-availability-schema-validation-errors.json'),
+            variations: resolve(outputDir, 'data-dictionary-variations.json'),
+            metadata: resolve(outputDir, 'metadata-report.processed.json'),
+            report: resolve(outputDir, 'report.json'),
+            reportDetailed: resolve(outputDir, 'report-detailed.json'),
+          };
+
+          for (const [key, path] of Object.entries(errorFilesToRead)) {
+            try {
+              const content = readFileSync(path, 'utf-8');
+              reportFiles[key] = JSON.parse(content);
+            } catch { /* file doesn't exist yet — skip */ }
+          }
+          if (Object.keys(reportFiles).length > 0) reports = reportFiles;
+        }
+      } catch { /* ignore report reading errors */ }
+
+      return {
+        status: 'failed' as const,
+        error: message,
+        steps: [],
+        duration: 0,
+        reports,
+      };
+    }
+  });
+
+  /** Cancel a running cert job. */
+  ipcMain.handle('cert:cancel', (_event, jobId: string) => {
+    const controller = activeRuns.get(jobId);
+    if (controller) {
+      controller.abort();
+      activeRuns.delete(jobId);
+    }
+  });
+
+  /** Get the local server URL (for config builder auto-fill). */
+  ipcMain.handle('cert:localServerUrl', () => state.serverUrl);
 };
 
 // ── DD version management ──
@@ -393,7 +760,7 @@ const startReferenceServer = (): Promise<string> => {
       [paths.sqliteDbPath, paths.metadataPath, paths.serverRoot, paths.uiDistPath],
       {
         stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', ENTITY_EVENT: 'true' }
       }
     );
 
@@ -676,6 +1043,7 @@ app.whenReady().then(async () => {
   });
 
   registerStorageHandlers();
+  registerCertRunnerHandlers();
   buildMenu();
 
   // Show splash screen immediately while server starts

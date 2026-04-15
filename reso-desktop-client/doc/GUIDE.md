@@ -188,21 +188,77 @@ For all other endorsement types (DD 1.7, Common Format, Add/Edit, Webhooks), the
 
 ### Running Cert From the Desktop
 
-For provider users (signed-in users with write access to their org's certification jobs), the workspace will include a **Run Cert** flow that calls the **[RESO Certification](../reso-certification/)** runners directly against any connected server. This feature is on the roadmap.
+The desktop client runs certification tests directly against any server – the embedded reference server or any external OData endpoint. All four endorsement types are supported: Data Dictionary, Web API Core, Web API Add/Edit, and EntityEvent.
 
-> **[ Image placeholder: Run Cert dialog ]**
+Click **New Test Run** on the Certification Jobs page to open the Config Builder:
+
+> **[ Image placeholder: Config Builder with provider org picker and endorsement options ]**
 >
-> *Alt text:* "Screenshot of the Run Cert dialog. The dialog has fields for selecting the target server (defaults to the active connection), the endorsement to test (Web API Core, Data Dictionary, Add/Edit, EntityEvent), the cert version, and any per-flow options. A 'Start' button kicks off the run; a real-time log panel below the form shows the cert progress streaming as it runs. Upon completion, the dialog shows a per-scenario pass/fail summary and a 'View Full Report' button."
+> *Alt text:* "Screenshot of the Config Builder. A provider org picker at the top searches the RESO organization directory by name or UOI. Below, a recipient card with its own org picker, a provider system (USI) dropdown, server URL field, and auth section (Bearer Token or Client Credentials). Endorsement checkboxes (Data Dictionary, Web API Core, Web API Add/Edit, EntityEvent) toggle per-endorsement option panels. DD options include version, record limit, strict mode, batch $expand, and Originating System Name/ID fields. Core options include spec version, enum mode, and resources. A concurrency selector and Start button are at the bottom."
+
+The Config Builder supports:
+
+* **Provider org picker** – searches the RESO organization directory (public, no auth required) by name or UOI, auto-fills provider USI from the org's systems list
+* **Multi-recipient configs** – add multiple recipients in one batch, each with its own server URL, auth, and endorsement selection
+* **Per-endorsement options** – DD (version, strict mode, originating system), Core (version, enum mode, full coverage), Add/Edit (resource, payloads directory), EntityEvent (observe or full mode, poll timeout)
+* **JSON import/export** – compatible with the legacy `dd-config.json` format for existing cert-utils users
+* **Concurrency** – run jobs sequentially or concurrently (with memory warning at 3+ concurrent DD jobs)
+
+For the **embedded reference server**, leave the Server URL blank – it auto-resolves to the local server. Auth token is `admin-token`. EntityEvent is enabled by default on the embedded server.
+
+For **external servers**, enter the full OData service root URL (e.g., `https://api.example.com/odata`) and the appropriate auth credentials.
+
+> **[ Image placeholder: Jobs running with live step progress ]**
+>
+> *Alt text:* "Screenshot of the Certification Jobs page with two jobs: Data Dictionary 2.0 running (showing step progress – Health check passed, Resolve authentication passed, Generate metadata report running with '14 resources, 1196 fields' detail) and Web API Core 2.1.0 scheduled below it. The header shows filter pills for Running (1), Scheduled (1), and a search bar."
+
+### Certification Dashboard
+
+The Certification Dashboard shows a live overview of all testing activity:
+
+> **[ Image placeholder: Dashboard with summary tiles and recent jobs ]**
+>
+> *Alt text:* "Screenshot of the Certification Dashboard. Six summary tiles across the top: Total Runs, Recipients, Active, Queued, Passed (7d), Failed (7d). Below, Passing and Failing hero cards with recipient names. A Recent Jobs list and Results by Recipient section show test history. An Expiring Soon section lists endorsements certified over two years ago."
+
+* **Summary tiles** – total runs, unique recipients, active/queued counts, pass/fail over the last 7 days
+* **Status cards** – passing and failing counts with recipient names
+* **Recent jobs** – most recent runs with status, endorsement, and relative timestamp
+* **Results by recipient** – aggregated pass/fail counts per organization
+* **Expiring endorsements** – certifications older than two years from the cert API
+* **View Jobs** button links to the full Jobs page
+
+### Error Reports and Compliance Reports
+
+Every completed job has a **View Report** (passed) or **View Failure Report** (failed) button.
+
+**Passed jobs** open a Compliance Report modal showing each pipeline step with its status, duration, and detail. Steps with scenario data (Run Core scenarios, Run Add/Edit scenarios, Run EntityEvent scenarios) are expandable – click to see individual scenario results with pass/fail icons and durations.
+
+> **[ Image placeholder: Compliance Report modal – passed Add/Edit job ]**
+>
+> *Alt text:* "Screenshot of the Compliance Report modal for a passed Web API Add/Edit job. Seven steps listed vertically with green checkmarks: Health check, Resolve authentication, Fetch metadata (14 entity types), Sample records (2 Property records), Generate payloads (6 files), Run Add/Edit scenarios (8 passed, 0 failed), Write compliance reports (2 reports). The Run Add/Edit scenarios step has a down-chevron indicating it is expandable. A Download Report button is at the bottom left."
+
+**Failed jobs** open a Failure Report modal that picks the right renderer based on the failure type:
+
+* **DD schema validation errors** – grouped by error message (e.g., "MUST be equal to one of the allowed values"), each group expandable to show affected fields and their invalid lookup values in a scrollable pane with copy icons and a CSV key download
+* **DD variations** – real data from the variations checker showing suggested field/lookup mappings with cross-field badges, multi-suggestion options, and Fast Track/Ignore actions
+* **Core/Add/Edit/EntityEvent scenario failures** – per-scenario cards with humanized names, assertion-level details (expected vs. actual), expandable for deeper inspection
+* **Generic step failures** (auth, health check, metadata) – error message with contextual guidance
+
+> **[ Image placeholder: Failure Report – DD schema validation errors ]**
+>
+> *Alt text:* "Screenshot of the Failure Report modal for DD schema validation errors. Header shows '5 fields with errors, 2 error types' with a spec link to dd.reso.org. Two error groups: 'MUST be equal to one of the allowed values' (3 fields) and 'MUST be integer or null but found decimal' (2 fields). Each group is expandable. Inside the first group, field rows show Resource badge, field name, and values count. Expanding a field reveals lookup values in a scrollable pane with copy icons and occurrence counts. A 'Download keys' link downloads affected record keys as CSV."
+
+All failure reports include a **Download Results** button for the raw JSON and a link to the relevant specification (dd.reso.org, transport.reso.org/proposals/web-api-core, etc.).
 
 ### Local Job Management
 
-Cert runs are persisted as **jobs** in the desktop client's local store. Every run gets a job record with its status (queued, running, completed, failed), its target server, its endorsement, its start and end times, and a link to the full report.
+Cert runs are persisted on disk in the `.reso-cert/` directory, organized by endorsement, provider, and recipient. Previous runs are automatically archived when a new run starts for the same configuration.
 
-> **[ Image placeholder: Local job manager ]**
+> **[ Image placeholder: Jobs page with multiple results ]**
 >
-> *Alt text:* "Screenshot of the local job manager. A list of jobs shows the most recent runs at the top, each with a row showing the endorsement (icon + name), the target server, the status (with a colored badge), the duration, and a 'View Report' action. Filters at the top let users scope by status, endorsement, or date range. A 'Run New' button at the top opens the Run Cert dialog. Failed jobs have an 'Open Logs' link that opens the diagnostic log file in the platform's default text editor."
+> *Alt text:* "Screenshot of the Certification Jobs page showing five completed jobs: two DD failures, one Core failure, one Add/Edit passed, one EntityEvent passed. Running and scheduled jobs float to the top, followed by most recent results. Each job card shows the endorsement name and version, a Local badge, the recipient and provider names, the status (PASSED/FAILED) with timestamp, and a chevron to expand step details. Expanded cards show pipeline steps with status icons, durations, and detail text. Action buttons include View Report, View Failure Report, Compare, Submit to RESO, Re-run, and a trash icon for deletion."
 
-The job history persists across application launches, so you can come back to a run you started yesterday and review its full output without re-running it. This is the surface most provider users will spend the most time in – it is where the actual work of cert preparation happens.
+The job history persists across application launches – close the app and reopen to find all previous results intact. Jobs can be re-run, deleted individually (with confirmation), or cleared entirely via the Delete All popover. The **Submit to RESO** button on passed jobs opens an environment-aware submission dialog (QA, Staging, Production) for pushing results to the RESO Services API.
 
 ---
 

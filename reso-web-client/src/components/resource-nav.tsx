@@ -55,6 +55,19 @@ export const ResourceNav = () => {
           </svg>
         Certification
       </NavLink>
+      {activeSection === 'certification' && (
+        <div className="pl-5 space-y-1.5">
+          <NavLink to="/cert/dashboard" className={({ isActive }) => `block text-xs ${isActive ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'} cursor-pointer`}>
+            Dashboard
+          </NavLink>
+          <NavLink to="/cert/jobs" className={({ isActive }) => `block text-xs ${isActive ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'} cursor-pointer`}>
+            Jobs
+          </NavLink>
+          <NavLink to="/cert/endorsements" className={({ isActive }) => `block text-xs ${isActive ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'} cursor-pointer`}>
+            Endorsements
+          </NavLink>
+        </div>
+      )}
 
       {/* Data section — divider separates from main nav */}
       <div className="pt-2 border-t border-gray-200 dark:border-gray-700 space-y-2.5">

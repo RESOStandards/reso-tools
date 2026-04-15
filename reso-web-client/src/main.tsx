@@ -12,6 +12,9 @@ import { CertHomePage } from './pages/cert/cert-home-page';
 import { LoginPage } from './pages/cert/login-page';
 import { DetailReportPage } from './pages/cert/detail-report-page';
 import { OrgSummaryPage } from './pages/cert/org-summary-page';
+import { JobsPage } from './pages/cert/jobs-page';
+import { DashboardPage } from './pages/cert/dashboard-page';
+import { ComparePage } from './pages/cert/compare-page';
 import { DeletePage } from './pages/delete-page';
 import { ErrorPage } from './pages/error-page';
 import { DetailPage } from './pages/detail-page';
@@ -45,9 +48,13 @@ const router = createBrowserRouter([
       // Cert pages — now inside the Layout with the unified sidebar.
       // The cert-specific header chrome is removed; they inherit the
       // Layout header with the auth pill and theme toggle.
-      { path: 'cert', element: <CertHomePage /> },
+      { path: 'cert', element: <Navigate to="/cert/dashboard" replace /> },
+      { path: 'cert/endorsements', element: <CertHomePage /> },
       { path: 'cert/orgs/:uoi', element: <OrgSummaryPage /> },
       { path: 'cert/orgs/:uoi/detail/:endorsementId', element: <DetailReportPage /> },
+      { path: 'cert/jobs', element: <JobsPage /> },
+      { path: 'cert/dashboard', element: <DashboardPage /> },
+      { path: 'cert/compare/:jobId', element: <ComparePage /> },
       { path: 'metadata', element: <MetadataPage /> },
       { path: 'metadata/:resource', element: <MetadataPage /> },
       { path: ':resource', element: <SearchPage /> },

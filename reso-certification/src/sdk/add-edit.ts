@@ -13,7 +13,7 @@ import {
 import { runAllScenarios } from '../add-edit/index.js';
 import type { AddEditConfig, PipelineStep, StepOutput } from './types.js';
 import { createPipeline } from './pipeline.js';
-import { addEditReportGenerators, writeReports } from './reports.js';
+import { addEditReportGenerators, writeReports, buildOutputPath, archiveCurrentResults } from './reports.js';
 
 // ── Pipeline Context ──
 
@@ -57,7 +57,7 @@ const resolveAuth = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
   name: 'Resolve authentication',
   run: async (ctx) => {
     const authToken = await resolveAuthToken(config.server.auth);
-    return { context: { ...ctx, authToken }, summary: `Authenticated via ${config.server.auth.mode}` };
+    return { context: { ...ctx, authToken }, summary: `Auth credentials present` };
   },
 });
 
@@ -239,15 +239,26 @@ const runTests = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
 const writeComplianceReports = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
   name: 'Write compliance reports',
   run: async (ctx, onProgress) => {
-    const outputDir = config.options?.outputDir ?? join(process.cwd(), '.reso-cert');
+    const outputDir = buildOutputPath('web-api-add-edit', config.specVersion ?? '2.0.0', config);
+    await archiveCurrentResults(outputDir);
     const generators = addEditReportGenerators(config.specVersion ?? '2.0.0');
 
-    // Build a temporary pipeline result for the report generators
+    // Adapt testReport into resourceReports shape for the detailed report serializer
+    const testReport = ctx.testReport as { scenarios: ReadonlyArray<unknown>; summary: { total: number; passed: number; failed: number; skipped?: number } };
+    const contextWithReports = {
+      ...ctx,
+      resourceReports: [{
+        resource: ctx.resource,
+        summary: testReport.summary,
+        scenarios: testReport.scenarios,
+      }],
+    };
+
     const pipelineResult = {
-      status: (ctx.testReport as { summary: { failed: number } }).summary.failed > 0 ? 'failed' as const : 'passed' as const,
+      status: testReport.summary.failed > 0 ? 'failed' as const : 'passed' as const,
       endorsement: 'add-edit',
       steps: ctx.pipelineSteps as ReadonlyArray<import('./types.js').StepResult> ?? [],
-      context: ctx,
+      context: contextWithReports,
       duration: 0,
     };
 
@@ -301,7 +312,7 @@ export const runAddEditCompliance = async (
   return pipeline.run(
     initialContext,
     onProgress,
-    { failFast: config.options?.failFast ?? true },
+    { failFast: config.options?.failFast ?? false },
   );
 };
 

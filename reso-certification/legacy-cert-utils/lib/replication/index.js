@@ -83,7 +83,8 @@ const replicate = async ({
   originatingSystemId,
   REPLICATION_STATE_SERVICE = createReplicationStateServiceInstance(),
   shouldSaveResults = false,
-  batchExpand = false
+  batchExpand = false,
+  throwOnError = false
 }) => {
 
   const { LOG, LOG_ERROR } = getLoggers(fromCli);
@@ -220,6 +221,11 @@ const replicate = async ({
                   LOG_ERROR(`Schema validation errors found in the ${resourceName} payload!`);
                   if (strictMode) {
                     await writeSchemaValidationErrorReport({ outputPath, errorMap: schemaValidationResults });
+                    if (throwOnError) {
+                      const err = new Error(`Schema validation errors found in the ${resourceName} payload`);
+                      err.schemaValidationResults = schemaValidationResults;
+                      throw err;
+                    }
                     LOG_ERROR('Exiting!');
                     process.exit(NOT_OK);
                   }
@@ -278,6 +284,7 @@ const replicate = async ({
         }
       } catch (err) {
         LOG_ERROR(`Could not write report! ${err}`);
+        if (throwOnError) throw err;
         process.exit(NOT_OK);
       }
     }
@@ -291,6 +298,7 @@ const replicate = async ({
     }
   } catch (err) {
     LOG_ERROR(err);
+    if (throwOnError) throw err;
     process.exit(NOT_OK);
   }
 };

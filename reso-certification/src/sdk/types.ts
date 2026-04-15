@@ -89,6 +89,12 @@ export interface BaseComplianceConfig {
     readonly verbose?: boolean;
     readonly skipHealthCheck?: boolean;
   };
+  /** Provider Unique Organization Identifier — used for output directory structure. */
+  readonly providerUoi?: string;
+  /** Provider Unique System Identifier — used for output directory structure. */
+  readonly providerUsi?: string;
+  /** Recipient Unique Organization Identifier — used for output directory structure. */
+  readonly recipientUoi?: string;
 }
 
 /**

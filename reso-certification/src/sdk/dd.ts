@@ -95,7 +95,7 @@ const resolveAuth = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Resolve authentication',
   run: async (ctx) => {
     const authToken = await resolveAuthToken(config.server.auth);
-    return { context: { ...ctx, authToken }, summary: `Authenticated via ${config.server.auth.mode}` };
+    return { context: { ...ctx, authToken }, summary: 'Auth credentials present' };
   },
 });
 
@@ -202,6 +202,7 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
   jsonSchemaValidation: config.strictMode ?? true,
   batchExpand: config.batchExpand ?? false,
   outputPath: ctx.outputPath,
+  throwOnError: true,
 });
 
 const initReplicationState: PipelineStep<DDContext> = {

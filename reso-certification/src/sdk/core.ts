@@ -11,7 +11,7 @@ import { resolveTestParams, WELL_KNOWN_RESOURCES } from '../web-api-core/index.j
 import { runCoreResourceScenarios, type ResourceTestReport } from '../web-api-core/test-runner.js';
 import type { CoreConfig, PipelineStep, StepResult } from './types.js';
 import { createPipeline } from './pipeline.js';
-import { coreReportGenerators, writeReports } from './reports.js';
+import { coreReportGenerators, writeReports, buildOutputPath, archiveCurrentResults } from './reports.js';
 
 // ── Pipeline Context ──
 
@@ -51,7 +51,7 @@ const resolveAuth = (config: CoreConfig): PipelineStep<CoreContext> => ({
   name: 'Resolve authentication',
   run: async (ctx) => {
     const authToken = await resolveAuthToken(config.server.auth);
-    return { context: { ...ctx, authToken }, summary: `Authenticated via ${config.server.auth.mode}` };
+    return { context: { ...ctx, authToken }, summary: `Auth credentials present` };
   },
 });
 
@@ -169,7 +169,8 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
 const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> => ({
   name: 'Write compliance reports',
   run: async (ctx, onProgress) => {
-    const outputDir = config.options?.outputDir ?? `${process.cwd()}/.reso-cert`;
+    const outputDir = buildOutputPath('web-api-core', config.version ?? '2.0.0', config);
+    await archiveCurrentResults(outputDir);
     const generators = coreReportGenerators(config.version ?? '2.0.0');
 
     const resourceReports = ctx.resourceReports as ReadonlyArray<ResourceTestReport> ?? [];
@@ -225,6 +226,6 @@ export const runCoreCompliance = async (
   return pipeline.run(
     initialContext,
     onProgress,
-    { failFast: config.options?.failFast ?? true },
+    { failFast: config.options?.failFast ?? false },
   );
 };

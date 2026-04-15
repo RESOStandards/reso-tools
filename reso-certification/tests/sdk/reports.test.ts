@@ -163,6 +163,98 @@ describe('createDetailedReportGenerator', () => {
   });
 });
 
+describe('createDetailedReportGenerator — resourceReports', () => {
+  it('includes resourceReports from pipeline context when present', () => {
+    const generator = createDetailedReportGenerator('Web API Core', '2.1.0', () => 'remarks');
+    const result = makeResult({
+      context: {
+        resourceReports: [
+          {
+            resource: 'Property',
+            summary: { total: 54, passed: 45, failed: 2, skipped: 7 },
+            scenarios: [
+              {
+                name: 'Filter: eq integer',
+                tag: 'filter-eq-integer',
+                passed: true,
+                skipped: false,
+                duration: 120,
+                requestUrl: 'http://localhost/Property?$filter=BedroomsTotal eq 3',
+                assertions: [{ message: 'Status 200', passed: true }],
+              },
+              {
+                name: 'String enum collection: all()',
+                tag: 'string-enum-collection-all',
+                passed: false,
+                skipped: false,
+                duration: 85,
+                assertions: [{ message: '21 records failed validation', passed: false }],
+              },
+            ],
+          },
+        ],
+      },
+      steps: [makeStep({ name: 'Run Core scenarios' })],
+    });
+
+    const report = generator.generate(result);
+
+    expect(report.resourceReports).toBeDefined();
+    const rr = report.resourceReports as ReadonlyArray<Record<string, unknown>>;
+    expect(rr).toHaveLength(1);
+    expect(rr[0].resource).toBe('Property');
+    expect(rr[0].summary).toEqual({ total: 54, passed: 45, failed: 2, skipped: 7 });
+
+    const scenarios = rr[0].scenarios as ReadonlyArray<Record<string, unknown>>;
+    expect(scenarios).toHaveLength(2);
+    expect(scenarios[0].name).toBe('Filter: eq integer');
+    expect(scenarios[0].passed).toBe(true);
+    expect(scenarios[1].passed).toBe(false);
+  });
+
+  it('maps assertion message field to description in serialized output', () => {
+    const generator = createDetailedReportGenerator('Web API Core', '2.1.0', () => '');
+    const result = makeResult({
+      context: {
+        resourceReports: [
+          {
+            resource: 'Property',
+            summary: { total: 1, passed: 0, failed: 1, skipped: 0 },
+            scenarios: [
+              {
+                name: 'Test scenario',
+                tag: 'test',
+                passed: false,
+                skipped: false,
+                duration: 50,
+                assertions: [{ message: 'Expected 200 but got 400', passed: false }],
+              },
+            ],
+          },
+        ],
+      },
+      steps: [],
+    });
+
+    const report = generator.generate(result);
+    const rr = report.resourceReports as ReadonlyArray<Record<string, unknown>>;
+    const scenarios = rr[0].scenarios as ReadonlyArray<Record<string, unknown>>;
+    const assertions = scenarios[0].assertions as ReadonlyArray<Record<string, unknown>>;
+
+    expect(assertions[0].description).toBe('Expected 200 but got 400');
+    expect(assertions[0].passed).toBe(false);
+  });
+
+  it('omits resourceReports when not present in context', () => {
+    const generator = createDetailedReportGenerator('Web API Add/Edit', '2.0.0', () => '');
+    const result = makeResult({ steps: [] });
+
+    const report = generator.generate(result);
+
+    expect(report).not.toHaveProperty('resourceReports');
+  });
+});
+
 describe('pre-built report generator sets', () => {
   it('addEditReportGenerators produces 2 generators', () => {
     const generators = addEditReportGenerators('2.0.0');

@@ -53,7 +53,8 @@ const DEFAULT_DD_VERSION = '2.0',
  */
 const hashJsonData = (jsonData, useFullHashes = false) => {
   try {
-    const hash = createHash('sha3-256').update(JSON.stringify(jsonData)).digest('hex');
+    // Use sha256 instead of sha3-256 for compatibility with Electron's BoringSSL
+    const hash = createHash('sha256').update(JSON.stringify(jsonData)).digest('hex');
 
     //use shortened hashes by default
     return useFullHashes ? hash : hash.slice(0, NUM_SHORT_HASH_CHARACTERS - 1);

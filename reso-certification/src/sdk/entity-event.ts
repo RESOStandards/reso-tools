@@ -6,7 +6,7 @@ import { runAllEntityEventScenarios } from '../entity-event/test-runner.js';
 import type { EntityEventConfig as EERunnerConfig } from '../entity-event/types.js';
 import type { EntityEventConfig, PipelineStep, StepOutput } from './types.js';
 import { createPipeline } from './pipeline.js';
-import { entityEventReportGenerators, writeReports } from './reports.js';
+import { entityEventReportGenerators, writeReports, buildOutputPath, archiveCurrentResults } from './reports.js';
 import type { StepResult } from './types.js';
 
 // ── Pipeline Context ──
@@ -49,7 +49,7 @@ const resolveAuth = (config: EntityEventConfig): PipelineStep<EntityEventContext
   name: 'Resolve authentication',
   run: async (ctx) => {
     const authToken = await resolveAuthToken(config.server.auth);
-    return { context: { ...ctx, authToken }, summary: `Authenticated via ${config.server.auth.mode}` };
+    return { context: { ...ctx, authToken }, summary: `Auth credentials present` };
   },
 });
 
@@ -118,7 +118,7 @@ const generatePayloads = (config: EntityEventConfig): PipelineStep<EntityEventCo
 /** Run all EntityEvent compliance scenarios. */
 const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
   name: 'Run EntityEvent scenarios',
-  run: async (ctx) => {
+  run: async (ctx, onProgress) => {
     const runnerConfig: EERunnerConfig = {
       serverUrl: ctx.serverUrl,
       auth: config.server.auth,
@@ -132,14 +132,16 @@ const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> =
       strict: false,
     };
 
-    const testReport = await runAllEntityEventScenarios(runnerConfig);
+    const testReport = await runAllEntityEventScenarios(runnerConfig, (message) => {
+      onProgress({ step: 'Run EntityEvent scenarios', status: 'running', message });
+    });
     const { passed, failed } = testReport.summary;
     const status = failed > 0 ? 'failed' as const : 'passed' as const;
 
     return {
       context: { ...ctx, testReport },
       status,
-      summary: `${passed} passed, ${failed} failed (${testReport.scenarios.length} scenarios, ${testReport.mode} mode)`,
+      summary: `${passed} passed, ${failed} failed (${testReport.scenarios.length} scenarios, ${testReport.mode} mode). ${testReport.dataValidation.eventsValidated} events validated`,
       counts: {
         total: testReport.scenarios.length,
         passed,
@@ -154,15 +156,25 @@ const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> =
 const writeComplianceReports = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
   name: 'Write compliance reports',
   run: async (ctx, onProgress) => {
-    const outputDir = config.options?.outputDir ?? join(process.cwd(), '.reso-cert');
-    const generators = entityEventReportGenerators('RCP-027');
+    const outputDir = buildOutputPath('entity-event', '1.0.0', config);
+    await archiveCurrentResults(outputDir);
+    const generators = entityEventReportGenerators('1.0.0');
 
-    const testReport = ctx.testReport as { summary: { failed: number } };
+    const testReport = ctx.testReport as { scenarios: ReadonlyArray<unknown>; summary: { total: number; passed: number; failed: number; skipped?: number } };
+    const contextWithReports = {
+      ...ctx,
+      resourceReports: [{
+        resource: 'EntityEvent',
+        summary: testReport.summary,
+        scenarios: testReport.scenarios,
+      }],
+    };
+
     const pipelineResult = {
       status: testReport.summary.failed > 0 ? 'failed' as const : 'passed' as const,
       endorsement: 'entity-event',
       steps: ctx.pipelineSteps as ReadonlyArray<StepResult> ?? [],
-      context: ctx,
+      context: contextWithReports,
       duration: 0,
     };
 
@@ -204,6 +216,6 @@ export const runEntityEventCompliance = async (
   return pipeline.run(
     initialContext,
     onProgress,
-    { failFast: config.options?.failFast ?? true },
+    { failFast: config.options?.failFast ?? false },
   );
 };

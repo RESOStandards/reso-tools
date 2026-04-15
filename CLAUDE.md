@@ -35,8 +35,8 @@ docker compose --profile seed up seed
 # Desktop client (SQLite, no Docker)
 cd reso-desktop-client && npm run dev
 
-# DD documentation site
-cd .github/pages/dd-generator && node generate.mjs
+# DD documentation site (separate repo)
+# See https://github.com/RESOStandards/reso-data-dictionary-documentation
 ```
 
 ## Tech Stack
@@ -48,7 +48,7 @@ cd .github/pages/dd-generator && node generate.mjs
 - **UI**: React + Vite + Tailwind CSS
 - **Desktop**: Electron (CJS main process, ESM child process for server)
 - **Server**: Express + OData 4.01, supports PostgreSQL, MongoDB, SQLite
-- **DD docs site**: Static HTML generator (Node.js), Jekyll for GitHub Pages, Pagefind for search
+- **DD docs site**: Migrated to separate repo (`reso-data-dictionary-documentation`)
 
 ## Coding Standards
 
@@ -70,6 +70,9 @@ cd .github/pages/dd-generator && node generate.mjs
 
 - DO NOT use classes or `this`.
 - DO NOT use `any`. Use `unknown` and narrow with type guards.
+- Use named constants for repeated string literals (endorsement types, status values, environment URLs, step names). Define them in a shared constants file rather than duplicating across components.
+- Prefer interfaces over implementations — when multiple data sources produce similar shapes, define a normalized interface and map to it rather than handling each shape ad hoc.
+- Always remove dead code when disabling a feature. If removal effort is high, ask first and open a ticket instead of leaving dead code with comments.
 
 ## Style Conventions
 
@@ -84,7 +87,7 @@ cd .github/pages/dd-generator && node generate.mjs
 - Root `package.json` has convenience scripts for cross-package lint and test
 - `reso-web-client` is a standalone React app that talks to any OData server via proxy
 - `reso-desktop-client` spawns the reference server as a child process on a random port
-- DD documentation generator reads CSV data from `.github/pages/dd-data/` and outputs static HTML to `.github/pages/dd-output/` (symlinked from `.github/pages/dd/`)
+- DD documentation site lives in a separate repo (`RESOStandards/reso-data-dictionary-documentation`), not in this monorepo
 - Compliance testing requires a running server (Docker or desktop) with seeded data
 
 ## Release Workflow
@@ -92,6 +95,7 @@ cd .github/pages/dd-generator && node generate.mjs
 ### Version Branches
 - All work done in version branches named `vX.Y` (e.g., `v0.5`)
 - GitHub milestones match the branch version
+- **Release tags**: Use short-form tags (`v0.8`, `v0.9`) until real patch releases ship in production. Package.json versions use full SemVer (`0.8.0`), but Git tags and GitHub Releases use short form so `/releases/tag/v0.8` works.
 
 ### Release Checklist
 
@@ -122,4 +126,4 @@ cd .github/pages/dd-generator && node generate.mjs
 - The reference server uses a metadata-driven architecture: CSDL metadata defines the schema, and routes/queries are generated dynamically
 - The OData client handles URI building, CRUD, pagination, and metadata parsing – it is used by both the web UI and the certification runner
 - Validation rules are isomorphic (shared between client and server)
-- The DD docs generator embeds CSS and JS inside `getPageCSS()` and `getPageJS()` functions in `generate.mjs` – all styling changes happen there, not in separate files
+- The DD docs site is in a separate repo — see `RESOStandards/reso-data-dictionary-documentation` for styling and generator code

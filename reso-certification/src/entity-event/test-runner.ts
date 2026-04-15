@@ -364,7 +364,8 @@ const runIncrementalSync = async (
   serverUrl: string,
   authToken: string,
   highWaterMark: number,
-  config: EntityEventConfig
+  config: EntityEventConfig,
+  onProgress?: (message: string) => void,
 ): Promise<{ readonly result: ScenarioResult; readonly pollDurationMs: number; readonly newEvents: number }> => {
   const start = Date.now();
   const assertions: TestAssertion[] = [];
@@ -379,13 +380,20 @@ const runIncrementalSync = async (
     const deadline = Date.now() + config.pollTimeoutMs;
     let found = false;
 
+    let pollCount = 0;
     while (Date.now() < deadline) {
       await delay(config.pollIntervalMs);
+      pollCount++;
+
+      const elapsed = Math.round((Date.now() - start) / 1000);
+      const remaining = Math.round((deadline - Date.now()) / 1000);
+      onProgress?.(`Waiting for events... ${elapsed}s elapsed, ${remaining}s remaining (poll ${pollCount})`);
 
       const response = await odataRequest({ method: 'GET', url: queryUrl, authToken });
       if (response.status === 200) {
         const newEvents = parseEntityEvents(response.body);
         if (newEvents.length > 0) {
+          onProgress?.(`${newEvents.length} new event${newEvents.length === 1 ? '' : 's'} detected!`);
           newEventCount = newEvents.length;
           const allHigher = newEvents.every(e => e.EntityEventSequence > highWaterMark);
           assertions.push({
@@ -643,7 +651,10 @@ const runDeleteTriggersEvent = async (
  * 5. Performs batch data validation on collected EntityEvent records
  * 6. Returns structured test report
  */
-export const runAllEntityEventScenarios = async (config: EntityEventConfig): Promise<EntityEventTestReport> => {
+export const runAllEntityEventScenarios = async (
+  config: EntityEventConfig,
+  onProgress?: (message: string) => void,
+): Promise<EntityEventTestReport> => {
   const authToken = await resolveAuthToken(config.auth);
 
   const metadataXml = config.metadataPath
@@ -717,7 +728,7 @@ export const runAllEntityEventScenarios = async (config: EntityEventConfig): Pro
   }
 
   // 8/11. Incremental sync
-  const syncResult = await runIncrementalSync(config.serverUrl, authToken, highWaterMark, config);
+  const syncResult = await runIncrementalSync(config.serverUrl, authToken, highWaterMark, config, onProgress);
   scenarios.push(syncResult.result);
 
   // ── Data validation ──

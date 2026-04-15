@@ -1,6 +1,6 @@
 # RESO Tools
 
-![Tests](https://img.shields.io/badge/tests-1185%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1197%20passed-brightgreen)
 ![Compliance](https://img.shields.io/badge/RESO%20compliance-4%2F4%20suites-blue)
 [![Download](https://img.shields.io/github/v/release/RESOStandards/reso-tools?label=download&color=blue)](https://github.com/RESOStandards/reso-tools/releases/latest)
 
@@ -17,8 +17,8 @@ Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compl
 | [`reso-reference-server/`](reso-reference-server/) | Metadata-driven OData reference server (PostgreSQL, MongoDB, SQLite) | 254 |
 | [`reso-web-client/`](reso-web-client/) | React + Vite browser UI with cert analytics, server explorer and performance reports | 138 |
 | [`reso-web-api-proxy/`](reso-web-api-proxy/) | Lightweight CORS proxy and static file server for web client deployments | -- |
-| [`reso-desktop-client/`](reso-desktop-client/) | Electron desktop shell with certification workspace, secure storage and bundled reference server | -- |
-| [`reso-certification/`](reso-certification/) | RESO certification CLI + SDK – Add/Edit, EntityEvent, Web API Core, DD ([docs](reso-certification/README.md)) | 260 |
+| [`reso-desktop-client/`](reso-desktop-client/) | Electron desktop shell with end-to-end certification testing (DD, Core, Add/Edit, EntityEvent), secure storage and bundled reference server | -- |
+| [`reso-certification/`](reso-certification/) | RESO certification CLI + SDK – Add/Edit, EntityEvent, Web API Core, DD ([docs](reso-certification/README.md)) | 272 |
 | [`reso-mcp-server/`](reso-mcp-server/) | MCP server – exposes OData query, write, validation, certification tools for AI agents ([guide](reso-mcp-server/doc/GUIDE.md)) | 21 |
 
 ## Quick Start
