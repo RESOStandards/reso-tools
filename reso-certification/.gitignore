@@ -1,1 +1,2 @@
-schema-validation-settings.json
+# schema-validation-settings.json is a committee-approved reference file.
+# It is checked in and MUST NOT be modified. See CLAUDE.md.

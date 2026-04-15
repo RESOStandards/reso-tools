@@ -208,12 +208,18 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
 const initReplicationState: PipelineStep<DDContext> = {
   name: 'Initialize replication state',
   run: async (ctx) => {
-    // cert-utils reads schema-validation-settings.json from cwd — ensure it's there
+    // cert-utils reads schema-validation-settings.json from cwd.
+    // Copy from the package's reference file if not already present.
     const settingsFile = 'schema-validation-settings.json';
     if (!existsSync(settingsFile)) {
-      const legacyDir = join(dirname(new URL(import.meta.url).pathname), '..', '..', 'legacy-cert-utils');
-      const sourcePath = join(legacyDir, settingsFile);
-      if (existsSync(sourcePath)) {
+      // Try the package root first (checked-in reference file), then legacy-cert-utils
+      const packageRoot = join(dirname(new URL(import.meta.url).pathname), '..', '..');
+      const sourcePaths = [
+        join(packageRoot, settingsFile),
+        join(packageRoot, 'legacy-cert-utils', settingsFile),
+      ];
+      const sourcePath = sourcePaths.find(p => existsSync(p));
+      if (sourcePath) {
         await copyFile(sourcePath, settingsFile);
       }
     }
