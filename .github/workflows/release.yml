@@ -28,8 +28,6 @@ jobs:
           cd reso-client && npm install && npx tsc && cd ..
           cd reso-data-generator && npm install && npx tsc && cd ..
           cd reso-reference-server && npm install && npm run build && cd ..
-          git clone --depth 1 --branch v3.0.0 https://github.com/RESOStandards/reso-certification-utils.git /tmp/cert-utils && cd /tmp/cert-utils && npm pkg delete scripts.prepare && cd -
-          cd reso-certification && npm pkg set dependencies.@reso/reso-certification-utils="file:/tmp/cert-utils" && npm install && npx tsc && cd ..
           cd reso-web-api-proxy && npm install && npm run build && cd ..
           cd reso-web-client && npm install && npm run build && cd ..
 

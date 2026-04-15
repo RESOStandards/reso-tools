@@ -329,7 +329,11 @@ const registerCertRunnerHandlers = (): void => {
 
     try {
       // Dynamic import so we don't block app startup
-      const { runComplianceTests } = await import('@reso-standards/reso-certification');
+      // Dynamic import — reso-certification is not bundled with electron-builder,
+      // it's resolved from node_modules at runtime.
+      const certModule = await import('@reso-standards/reso-certification') as unknown as {
+        runComplianceTests: (config: Record<string, unknown>, onProgress?: (progress: Record<string, unknown>) => void) => Promise<{ status: string; steps: ReadonlyArray<Record<string, unknown>>; duration: number }>;
+      };
 
       // If the config targets the local server, inject the actual server URL
       const resolvedConfig = {
@@ -342,8 +346,8 @@ const registerCertRunnerHandlers = (): void => {
         },
       };
 
-      const result = await runComplianceTests(
-        resolvedConfig as Parameters<typeof runComplianceTests>[0],
+      const result = await certModule.runComplianceTests(
+        resolvedConfig,
         (progress) => {
           if (controller.signal.aborted) return;
           // Send progress to the renderer
