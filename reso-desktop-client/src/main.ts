@@ -328,8 +328,14 @@ const registerCertRunnerHandlers = (): void => {
     activeRuns.set(jobId, controller);
 
     try {
-      // Dynamic import so we don't block app startup
-      const { runComplianceTests } = await import('@reso-standards/reso-certification');
+      // Dynamic import — use a variable to prevent TypeScript from resolving
+      // the module at compile time. The package is available at runtime from
+      // the monorepo but not declared as a dependency.
+      const certPkg = '@reso-standards/reso-certification';
+      const certModule = await import(/* webpackIgnore: true */ certPkg) as unknown as {
+        runComplianceTests: (config: Record<string, unknown>, onProgress?: (progress: Record<string, unknown>) => void) => Promise<{ status: string; steps: ReadonlyArray<Record<string, unknown>>; duration: number }>;
+      };
+      const { runComplianceTests } = certModule;
 
       // If the config targets the local server, inject the actual server URL
       const resolvedConfig = {
@@ -343,8 +349,8 @@ const registerCertRunnerHandlers = (): void => {
       };
 
       const result = await runComplianceTests(
-        resolvedConfig as Parameters<typeof runComplianceTests>[0],
-        (progress) => {
+        resolvedConfig,
+        (progress: Record<string, unknown>) => {
           if (controller.signal.aborted) return;
           // Send progress to the renderer
           event.sender.send('cert:progress', jobId, {

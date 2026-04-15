@@ -31,6 +31,12 @@ jobs:
           cd reso-web-api-proxy && npm install && npm run build && cd ..
           cd reso-web-client && npm install && npm run build && cd ..
 
+      - name: Build reso-certification (for desktop client cert runner)
+        run: |
+          git clone --depth 1 --branch v3.0.0 https://github.com/RESOStandards/reso-certification-utils.git /tmp/cert-utils
+          cd /tmp/cert-utils && npm pkg delete scripts.prepare && cd -
+          cd reso-certification && npm install && npm install /tmp/cert-utils && npx tsc && cd ..
+
       - name: Install desktop client dependencies
         run: cd reso-desktop-client && npm install
 
