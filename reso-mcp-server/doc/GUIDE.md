@@ -1488,7 +1488,41 @@ To query a RESO server through the cloud MCP, your AI agent sends:
 
 The cloud server makes the OData request on your behalf and returns the results. Your agent never needs to know OData syntax, it just calls the tool.
 
-### 6.5 Cloud vs. Local
+### 6.5 Authentication: Bearer Token vs. Client Credentials
+
+About 40% of RESO servers support OAuth2 Client Credentials. The cloud MCP server handles both patterns:
+
+**Bearer token** — if you already have a token, pass it directly as `authToken` in any tool call:
+
+```json
+"arguments": {
+  "url": "https://api.example.com/odata",
+  "resource": "Property",
+  "authToken": "your-bearer-token"
+}
+```
+
+**Client Credentials** — if the server requires OAuth2, use the `authenticate` tool first to obtain a token:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "authenticate",
+    "arguments": {
+      "clientId": "your-client-id",
+      "clientSecret": "your-client-secret",
+      "tokenUrl": "https://auth.example.com/oauth2/token"
+    }
+  }
+}
+```
+
+The server returns a bearer token. Use that token as `authToken` in subsequent calls. You can also skip the `authenticate` step and pass `clientId`, `clientSecret`, and `tokenUrl` directly on any tool call — the cloud server will obtain the token automatically before making the request.
+
+### 6.6 Cloud vs. Local
 
 | | Cloud (`services.reso.org/mcp`) | Local (`reso-mcp`) |
 |---|---|---|
