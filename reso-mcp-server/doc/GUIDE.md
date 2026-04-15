@@ -10,11 +10,13 @@ The format is intentional – this is what working with a RESO OData server *sho
 
 AI agents never touch provider APIs directly. The MCP server sits between the AI and the data – the agent forms queries and interprets results, while RESO's certified OData client handles all API communication and authentication.
 
-<a href="https://raw.githubusercontent.com/RESOStandards/reso-tools/main/reso-mcp-server/doc/reso-mcp-architecture.svg" target="_blank">
-  <img src="https://raw.githubusercontent.com/RESOStandards/reso-tools/main/reso-mcp-server/doc/reso-mcp-architecture.svg" alt="RESO MCP Server Architecture – AI agents use RESO-certified tooling, never touching provider APIs directly" width="720" />
-</a>
-
-<sub>Click to expand full size</sub>
+<div align="center">
+  <a href="https://raw.githubusercontent.com/RESOStandards/reso-tools/main/reso-mcp-server/doc/reso-mcp-architecture.svg" target="_blank">
+    <img src="https://raw.githubusercontent.com/RESOStandards/reso-tools/main/reso-mcp-server/doc/reso-mcp-architecture.svg" alt="RESO MCP Server Architecture – AI agents use RESO-certified tooling, never touching provider APIs directly" width="720" />
+  </a>
+  <br/>
+  <sub>Click to expand full size</sub>
+</div>
 
 ---
 
