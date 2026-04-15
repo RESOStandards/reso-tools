@@ -12,7 +12,7 @@ AI agents never touch provider APIs directly. The MCP server sits between the AI
 
 <div align="center">
   <a href="https://raw.githubusercontent.com/RESOStandards/reso-tools/main/reso-mcp-server/doc/reso-mcp-architecture.svg" target="_blank">
-    <img src="https://raw.githubusercontent.com/RESOStandards/reso-tools/main/reso-mcp-server/doc/reso-mcp-architecture.svg" alt="RESO MCP Server Architecture – AI agents use RESO-certified tooling, never touching provider APIs directly" width="720" />
+    <img src="https://raw.githubusercontent.com/RESOStandards/reso-tools/main/reso-mcp-server/doc/reso-mcp-architecture.svg" alt="RESO MCP Server Architecture – AI agents use RESO-certified tooling, never touching provider APIs directly" style="max-width: 720px; width: 100%;" />
   </a>
   <br/>
   <sub>Click to expand full size</sub>
