@@ -271,7 +271,7 @@ const addCustomValidationForEnum = ajv => {
             params: {
               allowedValues: schema
             },
-            message: 'must be equal to one of the allowed values'
+            message: VALIDATION_ERROR_MESSAGES.NOT_ADVERTISED_IN_METADATA
           };
           if (isFlags) {
             // if the enum is an OData isFlags enumeration, we should be validating it against the spec
@@ -304,7 +304,8 @@ const addCustomValidationForEnum = ajv => {
 };
 
 const VALIDATION_ERROR_MESSAGES = Object.freeze({
-  NO_CONTEXT_PROPERTY: 'No properties were found in the payload that match "@reso.context"'
+  NO_CONTEXT_PROPERTY: 'No properties were found in the payload that match "@reso.context"',
+  NOT_ADVERTISED_IN_METADATA: 'MUST be advertised in the metadata'
 });
 
 const SCHEMA_ERROR_KEYWORDS = Object.freeze({

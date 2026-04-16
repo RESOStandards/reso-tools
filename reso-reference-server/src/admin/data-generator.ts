@@ -26,6 +26,7 @@ import type { RequestHandler } from 'express';
 import type { EnumMode } from '../config.js';
 import type { DataAccessLayer, ResourceContext } from '../db/data-access.js';
 import { getFieldsForResource, getKeyFieldForResource, getLookupsForType, isEnumType } from '../metadata/loader.js';
+import { reconcileLookups } from '../metadata/lookup-reconciler.js';
 import type { ResoMetadata } from '../metadata/types.js';
 import { TARGET_RESOURCES } from '../metadata/types.js';
 
@@ -88,7 +89,10 @@ const buildLookupMap = (
     const lookupKey = lookupNameAnnotation?.value ?? rawType;
 
     if (lookupKey && !lookupMap[lookupKey]) {
-      const lookups = getLookupsForType(metadata, lookupKey);
+      // Try the key as-is, then with the RESO enum namespace prefix
+      const lookups = getLookupsForType(metadata, lookupKey).length > 0
+        ? getLookupsForType(metadata, lookupKey)
+        : getLookupsForType(metadata, `org.reso.metadata.enums.${lookupKey}`);
       if (lookups.length > 0) {
         lookupMap[lookupKey] = [...lookups];
         // Also key by short name (without namespace) for generator convenience
@@ -147,12 +151,12 @@ export const createDataGeneratorHandler =
       let failed = 0;
       const errors: string[] = [];
       const relatedResults: Array<{ resource: string; created: number; failed: number }> = [];
+      const generatedRecords: Record<string, Array<Record<string, unknown>>> = {};
 
       if (body.resolveDependencies) {
         // Multi-resource generation with FK resolution
         const plan = buildMultiResourcePlan(body.resource, body.count, body.relatedRecords, fieldsByResource);
         const keyPool: Record<string, string[]> = {};
-        const generatedRecords: Record<string, Array<Record<string, unknown>>> = {};
         clearRecordPools();
 
         // Execute each phase in dependency order
@@ -285,7 +289,8 @@ export const createDataGeneratorHandler =
         const fields = fieldsByResource[body.resource];
         const lookups = buildLookupMap(metadata, fields, useHumanFriendly);
         const generator = getGenerator(body.resource);
-        const records = generator(fields, lookups, body.count);
+        const records = [...generator(fields, lookups, body.count)];
+        generatedRecords[body.resource] = records;
         const parentKeys: string[] = [];
 
         for (let i = 0; i < records.length; i++) {
@@ -343,6 +348,24 @@ export const createDataGeneratorHandler =
 
             relatedResults.push({ resource: relatedResource, created: relatedCreated, failed: relatedFailed });
           }
+        }
+      }
+
+      // Reconcile Lookup Resource — ensure all enum values used in generated
+      // records are advertised in the Lookup table (required for cert validation)
+      if (enumMode === 'string') {
+        try {
+          let totalReconciled = 0;
+          for (const [resName, recs] of Object.entries(generatedRecords)) {
+            const reconciled = await reconcileLookups(dal, metadata, resName, recs);
+            totalReconciled += reconciled;
+          }
+
+          if (totalReconciled > 0) {
+            errors.push(`Reconciled ${totalReconciled} Lookup Resource entries for generated enum values`);
+          }
+        } catch (err) {
+          errors.push(`Lookup reconciliation: ${err instanceof Error ? err.message : 'failed'}`);
         }
       }
 

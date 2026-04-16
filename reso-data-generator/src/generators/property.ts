@@ -271,7 +271,7 @@ export const generatePropertyRecords = (
     record.StreetSuffix = streetSuffixValues?.length ? randomChoice(streetSuffixValues).lookupValue : randomChoice(STREET_SUFFIXES);
     record.UnparsedAddress = `${record.StreetNumber} ${record.StreetName} ${record.StreetSuffix}`;
     // Use consistent city/state/zip/lat/lon from the selected location
-    const cityValues = lookups['City']?.filter(v => !isPlaceholderValue(v.lookupValue));
+    const cityValues = lookups['City'] ?? lookups['org.reso.metadata.enums.City'];
     record.City = cityValues?.length ? randomChoice(cityValues).lookupValue : location.city;
     record.StateOrProvince = location.state;
     record.PostalCode = location.zip;

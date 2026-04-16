@@ -42,7 +42,6 @@
     "fastest-levenshtein": "^1.0.16",
     "fs-extra": "^11.3.4",
     "humanize-duration": "^3.33.2",
-    "libxmljs2": "^0.37.0",
     "listr2": "^9.0.5",
     "xlsx": "^0.18.5",
     "yauzl": "^3.3.0"
