@@ -114,6 +114,10 @@ export interface DDConfig extends BaseComplianceConfig {
   readonly strictMode?: boolean;
   /** Batch all expansions for a resource into a single $expand request (default: false). */
   readonly batchExpand?: boolean;
+  /** Delay between replication requests in seconds (default: 1). Set to 0 for local testing. */
+  readonly requestDelay?: number;
+  /** Wait time in minutes after receiving HTTP 429 (default: 15). */
+  readonly rateLimitWait?: number;
   /** Provider Unique Organization Identifier. */
   readonly providerUoi?: string;
   /** Provider Unique System Identifier. */

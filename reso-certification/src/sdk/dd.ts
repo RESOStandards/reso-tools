@@ -15,7 +15,8 @@ import { generateMetadataReport } from '../metadata/serializer.js';
 import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
 import type { DDConfig, PipelineStep, StepResult } from './types.js';
 import { createPipeline } from './pipeline.js';
-import { coreReportGenerators, writeReports } from './reports.js';
+import { createGenericReportGenerator, createDetailedReportGenerator, writeReports } from './reports.js';
+import type { PipelineResult } from './types.js';
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
 
 // ── Cert-utils imports (local copy for modification) ──
@@ -36,7 +37,7 @@ const { REPLICATION_STRATEGIES } = certUtilsReplicationUtils;
 const DEFAULT_LIMIT = 100000;
 const DEFAULT_PAGE_SIZE_V17 = 100;
 const DEFAULT_PAGE_SIZE_V20 = 1000;
-const DEFAULT_YEARS_BACK = 2;
+const DEFAULT_YEARS_BACK = 3;
 const DEFAULT_RESULTS_PATH = '.reso-cert';
 
 /** Build the cert-utils compatible output directory path. */
@@ -110,7 +111,7 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
     const edmxXml = await fetchMetadata(ctx.serverUrl, ctx.authToken!);
 
     // XSD + semantic validation
-    const validation = validateMetadata(edmxXml);
+    const validation = await validateMetadata(edmxXml);
     const validationErrors = collectValidationErrors(validation);
 
     const baseReport = generateMetadataReport(edmxXml, ctx.version);
@@ -145,7 +146,7 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
     }
 
     const lookupMsg = lookupResourceAvailable
-      ? ` + ${lookupRecordCount} Lookup Resource records merged`
+      ? ` + ${lookupRecordCount.toLocaleString()} Lookup Resource records merged`
       : ' (no Lookup Resource)';
 
     const artifacts = [
@@ -155,7 +156,7 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
 
     return {
       context: { ...ctx, metadataReportPath, lookupResourceAvailable, lookupRecordCount },
-      summary: `${report.resources.length} resources, ${report.fields.length} fields, ${report.lookups.length} lookups${lookupMsg}. ${formatValidationSummary(validation)}`,
+      summary: `${report.resources.length} resources, ${report.fields.length.toLocaleString()} fields, ${report.lookups.length.toLocaleString()} lookups${lookupMsg}. ${formatValidationSummary(validation)}`,
       counts: { resources: report.resources.length, fields: report.fields.length, lookups: report.lookups.length },
       artifacts,
       ...(validationErrors.length > 0 ? { errors: validationErrors } : {}),
@@ -211,6 +212,8 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
   batchExpand: config.batchExpand ?? false,
   outputPath: ctx.outputPath,
   throwOnError: true,
+  secondsDelayBetweenRequests: config.requestDelay ?? 1,
+  rateLimitedWaitTimeMinutes: config.rateLimitWait ?? 15,
 });
 
 const initReplicationState: PipelineStep<DDContext> = {
@@ -220,7 +223,6 @@ const initReplicationState: PipelineStep<DDContext> = {
     // Copy from the package's reference file if not already present.
     const settingsFile = 'schema-validation-settings.json';
     if (!existsSync(settingsFile)) {
-      // Try the package root first (checked-in reference file), then legacy-cert-utils
       const packageRoot = join(dirname(new URL(import.meta.url).pathname), '..', '..');
       const sourcePaths = [
         join(packageRoot, settingsFile),
@@ -242,6 +244,23 @@ const initReplicationState: PipelineStep<DDContext> = {
 const replicateTimestampDesc = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Replicate: TIMESTAMP_DESC',
   run: async (ctx) => {
+    // Initialize replication state inline (not worth a separate user-visible step)
+    if (!ctx.replicationStateService) {
+      const settingsFile = 'schema-validation-settings.json';
+      if (!existsSync(settingsFile)) {
+        const packageRoot = join(dirname(new URL(import.meta.url).pathname), '..', '..');
+        const sourcePaths = [
+          join(packageRoot, settingsFile),
+          join(packageRoot, 'legacy-cert-utils', settingsFile),
+        ];
+        const sourcePath = sourcePaths.find(p => existsSync(p));
+        if (sourcePath) {
+          await copyFile(sourcePath, settingsFile);
+        }
+      }
+      ctx = { ...ctx, replicationStateService: createReplicationStateServiceInstance() };
+    }
+
     const pageSize = ctx.version === '1.7' ? DEFAULT_PAGE_SIZE_V17 : DEFAULT_PAGE_SIZE_V20;
     await replicate({
       ...buildReplicationSettings(ctx, config),
@@ -280,6 +299,43 @@ const replicateNextLinkFiltered = (config: DDConfig): PipelineStep<DDContext> =>
   },
 });
 
+/** Serialize DD pipeline results into a human-readable remarks string. */
+const serializeDDRemarks = (result: PipelineResult): string => {
+  const metaStep = result.steps.find(s => s.name === 'Generate metadata report');
+  const parts: string[] = [];
+  if (metaStep?.counts) {
+    parts.push(`${metaStep.counts.resources} resources, ${(metaStep.counts.fields ?? 0).toLocaleString()} fields, ${(metaStep.counts.lookups ?? 0).toLocaleString()} lookups`);
+  }
+  parts.push(`Data Dictionary compliance test ${result.status}`);
+  return `${parts.join('. ')}.`;
+};
+
+/** Create DD report generators. */
+const ddReportGenerators = (version: string) => [
+  createGenericReportGenerator('Data Dictionary', version, serializeDDRemarks),
+  createDetailedReportGenerator('Data Dictionary', version, serializeDDRemarks),
+];
+
+const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext> => ({
+  name: 'Write compliance reports',
+  run: async (ctx, onProgress) => {
+    const generators = ddReportGenerators(config.version);
+    const pipelineResult = {
+      status: 'passed' as const,
+      endorsement: 'dd',
+      steps: ctx.pipelineSteps as ReadonlyArray<StepResult> ?? [],
+      context: ctx,
+      duration: 0,
+    };
+    const written = await writeReports(pipelineResult, generators, ctx.outputPath, onProgress);
+    return {
+      context: { ...ctx, reports: written },
+      summary: `${written.length} reports written`,
+      artifacts: written.map(r => ({ label: r.name, path: r.path })),
+    };
+  },
+});
+
 // ── Pipeline Assembly ──
 
 /** Create the DD compliance test pipeline. */
@@ -288,13 +344,13 @@ export const createDDPipeline = (config: DDConfig) =>
     ...(config.options?.skipHealthCheck ? [] : [healthCheck]),
     resolveAuth(config),
     generateMetadata(config),
-    initReplicationState,
     ...(config.version !== '1.7' ? [runVariations(config)] : []),
     replicateTimestampDesc(config),
     ...(config.version !== '1.7' ? [
       replicateNextLink(config),
       replicateNextLinkFiltered(config),
     ] : []),
+    writeComplianceReports(config),
   ]);
 
 /** Run DD compliance tests with a single function call. */

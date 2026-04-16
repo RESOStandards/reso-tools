@@ -73,7 +73,7 @@ const fetchAndParseMetadata = (config: AddEditConfig): PipelineStep<AddEditConte
     const metadata = parseMetadataXml(metadataXml);
 
     // XSD + semantic validation
-    const validation = validateMetadata(metadataXml);
+    const validation = await validateMetadata(metadataXml);
     const validationErrors = collectValidationErrors(validation);
 
     const entityType = getEntityType(metadata, ctx.resource);

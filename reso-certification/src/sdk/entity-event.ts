@@ -65,7 +65,7 @@ const fetchAndParseMetadata = (config: EntityEventConfig): PipelineStep<EntityEv
     const metadata = parseMetadataXml(metadataXml);
 
     // XSD + semantic validation
-    const validation = validateMetadata(metadataXml);
+    const validation = await validateMetadata(metadataXml);
     const validationErrors = collectValidationErrors(validation);
 
     const entityEventType = metadata.entityTypes.find(et => et.name === 'EntityEvent');

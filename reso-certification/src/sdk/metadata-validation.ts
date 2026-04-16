@@ -25,14 +25,14 @@ export interface MetadataValidationResult {
  * @param odataVersion - Optional OData version override.
  * @returns Combined validation result.
  */
-export const validateMetadata = (
+export const validateMetadata = async (
   csdlXml: string,
   odataVersion?: ODataVersion,
-): MetadataValidationResult => {
+): Promise<MetadataValidationResult> => {
   const detectedVersion = odataVersion ?? detectODataVersion(csdlXml) ?? '4.0';
 
   // XSD structural validation
-  const xsdResult = validateCsdlXml(csdlXml, detectedVersion);
+  const xsdResult = await validateCsdlXml(csdlXml, detectedVersion);
 
   // Parse and run semantic CSDL validation
   const parsedSchema = parseCsdlXml(csdlXml);

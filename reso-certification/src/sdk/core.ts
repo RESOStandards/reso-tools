@@ -66,7 +66,7 @@ const fetchAndParseMetadata = (config: CoreConfig): PipelineStep<CoreContext> =>
     const metadata = parseMetadataXml(metadataXml);
 
     // XSD + semantic validation
-    const validation = validateMetadata(metadataXml);
+    const validation = await validateMetadata(metadataXml);
     const validationErrors = collectValidationErrors(validation);
 
     // Check which requested resources exist in metadata
