@@ -66,6 +66,20 @@ cd reso-desktop-client && npm run dev
 - Prefer `unknown` over `any`. Use type narrowing and type guards instead of type assertions.
 - Use `.js` extensions in import paths (required for Node16 module resolution with ESM).
 
+## New Dependencies
+
+Before adding any new dependency, run a security audit:
+- `npm audit` for known vulnerabilities
+- Check license (MIT or GPL-2.0 preferred)
+- Check weekly downloads and maintenance activity (last publish date)
+- Check dependency count (prefer zero or minimal transitive deps)
+- For native/WASM modules: verify cross-platform compatibility (macOS, Windows, Linux) and Electron ABI compatibility
+
+## Timing and Delays
+
+- NEVER use `setTimeout`, `setInterval`, or timing-based delays to fix race conditions or synchronization issues. These are hacks that mask the real problem.
+- If events arrive out of order, fix the ordering mechanism or make the consumer tolerant of any order — don't add delays.
+
 ## Prohibitions
 
 - DO NOT use classes or `this`.
