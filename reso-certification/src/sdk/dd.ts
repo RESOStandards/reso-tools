@@ -13,7 +13,7 @@ import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata } from '../test-runner/metadata.js';
 import { generateMetadataReport } from '../metadata/serializer.js';
 import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
-import type { DDConfig, PipelineStep, StepResult } from './types.js';
+import type { DDConfig, PipelineStep, StepResult, TestFunction } from './types.js';
 import { createPipeline } from './pipeline.js';
 import { createGenericReportGenerator, createDetailedReportGenerator, writeReports } from './reports.js';
 import type { PipelineResult } from './types.js';
@@ -216,11 +216,13 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
   rateLimitedWaitTimeMinutes: config.rateLimitWait ?? 15,
 });
 
-const initReplicationState: PipelineStep<DDContext> = {
-  name: 'Initialize replication state',
-  run: async (ctx) => {
-    // cert-utils reads schema-validation-settings.json from cwd.
-    // Copy from the package's reference file if not already present.
+// ── Replication test functions ──
+// These are individual async functions that can be composed into a step.
+// Run sequentially by default, or in parallel when concurrency > 1.
+
+/** Initialize replication state service and copy schema validation settings. */
+const initReplicationState: TestFunction<DDContext> = async (ctx) => {
+  if (!ctx.replicationStateService) {
     const settingsFile = 'schema-validation-settings.json';
     if (!existsSync(settingsFile)) {
       const packageRoot = join(dirname(new URL(import.meta.url).pathname), '..', '..');
@@ -233,34 +235,13 @@ const initReplicationState: PipelineStep<DDContext> = {
         await copyFile(sourcePath, settingsFile);
       }
     }
-
-    return {
-      context: { ...ctx, replicationStateService: createReplicationStateServiceInstance() },
-      summary: 'Replication state service initialized',
-    };
-  },
+    return { context: { ...ctx, replicationStateService: createReplicationStateServiceInstance() } };
+  }
+  return { context: ctx };
 };
 
-const replicateTimestampDesc = (config: DDConfig): PipelineStep<DDContext> => ({
-  name: 'Replicate: TIMESTAMP_DESC',
-  run: async (ctx) => {
-    // Initialize replication state inline (not worth a separate user-visible step)
-    if (!ctx.replicationStateService) {
-      const settingsFile = 'schema-validation-settings.json';
-      if (!existsSync(settingsFile)) {
-        const packageRoot = join(dirname(new URL(import.meta.url).pathname), '..', '..');
-        const sourcePaths = [
-          join(packageRoot, settingsFile),
-          join(packageRoot, 'legacy-cert-utils', settingsFile),
-        ];
-        const sourcePath = sourcePaths.find(p => existsSync(p));
-        if (sourcePath) {
-          await copyFile(sourcePath, settingsFile);
-        }
-      }
-      ctx = { ...ctx, replicationStateService: createReplicationStateServiceInstance() };
-    }
-
+const replicateTimestampDesc = (config: DDConfig): TestFunction<DDContext> =>
+  async (ctx) => {
     const pageSize = ctx.version === '1.7' ? DEFAULT_PAGE_SIZE_V17 : DEFAULT_PAGE_SIZE_V20;
     await replicate({
       ...buildReplicationSettings(ctx, config),
@@ -269,24 +250,20 @@ const replicateTimestampDesc = (config: DDConfig): PipelineStep<DDContext> => ({
       strategy: REPLICATION_STRATEGIES.TIMESTAMP_DESC,
     });
     return { context: ctx, summary: `TIMESTAMP_DESC with $top=${pageSize}` };
-  },
-});
+  };
 
-const replicateNextLink = (config: DDConfig): PipelineStep<DDContext> => ({
-  name: 'Replicate: NEXT_LINK',
-  run: async (ctx) => {
+const replicateNextLink = (config: DDConfig): TestFunction<DDContext> =>
+  async (ctx) => {
     await replicate({
       ...buildReplicationSettings(ctx, config),
       maxPageSize: DEFAULT_PAGE_SIZE_V20,
       strategy: REPLICATION_STRATEGIES.NEXT_LINK,
     });
     return { context: ctx, summary: `NEXT_LINK with maxPageSize=${DEFAULT_PAGE_SIZE_V20}` };
-  },
-});
+  };
 
-const replicateNextLinkFiltered = (config: DDConfig): PipelineStep<DDContext> => ({
-  name: 'Replicate: NEXT_LINK + filter',
-  run: async (ctx) => {
+const replicateNextLinkFiltered = (config: DDConfig): TestFunction<DDContext> =>
+  async (ctx) => {
     const cutoffDate = new Date(new Date().getFullYear() - DEFAULT_YEARS_BACK, 0).toISOString();
     await replicate({
       ...buildReplicationSettings(ctx, config),
@@ -296,7 +273,39 @@ const replicateNextLinkFiltered = (config: DDConfig): PipelineStep<DDContext> =>
       orderby: 'ModificationTimestamp asc',
     });
     return { context: ctx, summary: `NEXT_LINK + ModificationTimestamp filter (${DEFAULT_YEARS_BACK}yr lookback)` };
-  },
+  };
+
+/** Build the replication step with all strategies as test functions. */
+const replicateAndValidate = (config: DDConfig): PipelineStep<DDContext> => ({
+  name: 'Replicate and validate',
+  // Init must run first (sequential), then replication strategies can run
+  // in parallel if enabled. Default is sequential to avoid overloading servers.
+  mode: 'sequential',
+  functions: [
+    initReplicationState,
+    ...(config.parallelReplicate
+      ? [async (ctx: Readonly<DDContext>, onProgress: import('./types.js').ProgressCallback) => {
+          // Run all replication strategies in parallel
+          const fns = [
+            replicateTimestampDesc(config),
+            ...(config.version !== '1.7' ? [
+              replicateNextLink(config),
+              replicateNextLinkFiltered(config),
+            ] : []),
+          ];
+          const results = await Promise.all(fns.map(fn => fn(ctx, onProgress)));
+          const summaries = results.map(r => r.summary).filter(Boolean);
+          return { context: ctx, summary: summaries.join('; ') };
+        }]
+      : [
+          replicateTimestampDesc(config),
+          ...(config.version !== '1.7' ? [
+            replicateNextLink(config),
+            replicateNextLinkFiltered(config),
+          ] : []),
+        ]
+    ),
+  ],
 });
 
 /** Serialize DD pipeline results into a human-readable remarks string. */
@@ -345,11 +354,7 @@ export const createDDPipeline = (config: DDConfig) =>
     resolveAuth(config),
     generateMetadata(config),
     ...(config.version !== '1.7' ? [runVariations(config)] : []),
-    replicateTimestampDesc(config),
-    ...(config.version !== '1.7' ? [
-      replicateNextLink(config),
-      replicateNextLinkFiltered(config),
-    ] : []),
+    replicateAndValidate(config),
     writeComplianceReports(config),
   ]);
 

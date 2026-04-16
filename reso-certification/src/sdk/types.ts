@@ -38,12 +38,46 @@ export interface StepOutput<TContext extends PipelineContext = PipelineContext> 
   readonly errors?: ReadonlyArray<string>;
 }
 
-/** A single step in a compliance test pipeline. */
+/**
+ * A single test function within a step.
+ * Takes accumulated context and returns step output with updated context.
+ */
+export type TestFunction<TContext extends PipelineContext = PipelineContext> =
+  (context: Readonly<TContext>, onProgress: ProgressCallback) => Promise<StepOutput<TContext>>;
+
+/** Execution mode for test functions within a step. */
+export type StepMode = 'sequential' | 'parallel';
+
+/**
+ * A pipeline step — contains one or more test functions that execute
+ * either sequentially or in parallel.
+ *
+ * Every step is a sequence of at least one function. When mode is
+ * 'parallel', functions run concurrently (up to the configured
+ * concurrency limit). When 'sequential' (default), they run in order.
+ *
+ * Context flows through: each function receives the accumulated context
+ * from prior functions. In parallel mode, all functions receive the
+ * same input context and their outputs are merged.
+ */
 export interface PipelineStep<TContext extends PipelineContext = PipelineContext> {
   /** Human-readable step name (shown in CLI output). */
   readonly name: string;
-  /** Execute the step. Receives accumulated context and returns step output with updated context. */
-  readonly run: (context: Readonly<TContext>, onProgress: ProgressCallback) => Promise<StepOutput<TContext>>;
+  /** Execution mode: 'sequential' (default) or 'parallel'. */
+  readonly mode?: StepMode;
+  /** Max concurrency when mode is 'parallel'. Defaults to Infinity. */
+  // TODO: implement concurrency limit for parallel mode
+  readonly concurrency?: number;
+  /**
+   * Test functions to execute within this step.
+   * If omitted, `run` is used as the single function (backward compat).
+   */
+  readonly functions?: ReadonlyArray<TestFunction<TContext>>;
+  /**
+   * Single-function shorthand (backward compat).
+   * Equivalent to `functions: [run]` with mode 'sequential'.
+   */
+  readonly run?: TestFunction<TContext>;
 }
 
 /** Options for pipeline execution. */
@@ -118,6 +152,8 @@ export interface DDConfig extends BaseComplianceConfig {
   readonly requestDelay?: number;
   /** Wait time in minutes after receiving HTTP 429 (default: 15). */
   readonly rateLimitWait?: number;
+  /** Run replication strategies in parallel (default: false). Enable for faster local testing. */
+  readonly parallelReplicate?: boolean;
   /** Provider Unique Organization Identifier. */
   readonly providerUoi?: string;
   /** Provider Unique System Identifier. */

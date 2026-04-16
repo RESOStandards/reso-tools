@@ -90,9 +90,7 @@ export const DD_STEPS: ReadonlyArray<string> = [
   'Resolve authentication',
   'Generate metadata report',
   'Check variations',
-  'Replicate: TIMESTAMP_DESC',
-  'Replicate: NEXT_LINK',
-  'Replicate: NEXT_LINK + filter',
+  'Replicate and validate',
   'Write compliance reports',
 ];
 

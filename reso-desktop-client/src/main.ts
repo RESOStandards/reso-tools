@@ -324,129 +324,110 @@ const registerCertRunnerHandlers = (): void => {
    * Resolves with the PipelineResult when the run completes.
    */
   ipcMain.handle('cert:run', async (event, jobId: string, config: Record<string, unknown>) => {
-    const controller = new AbortController();
-    activeRuns.set(jobId, controller);
+    const { Worker } = await import('node:worker_threads');
 
-    try {
-      // Dynamic import so we don't block app startup.
-      // In dev mode, resolve from the monorepo sibling directory.
-      // In packaged mode, resolve from the bundled node_modules.
-      const certPkg = app.isPackaged
-        ? '@reso-standards/reso-certification'
-        : resolve(__dirname, '..', '..', 'reso-certification', 'dist', 'index.js');
-      const certModule = await import(/* webpackIgnore: true */ certPkg) as unknown as {
-        runComplianceTests: (config: Record<string, unknown>, onProgress?: (progress: Record<string, unknown>) => void) => Promise<{ status: string; steps: ReadonlyArray<Record<string, unknown>>; duration: number }>;
-      };
+    // Resolve cert package path
+    const certPath = app.isPackaged
+      ? '@reso-standards/reso-certification'
+      : resolve(__dirname, '..', '..', 'reso-certification', 'dist', 'index.js');
 
-      // If the config targets the local server, inject the actual server URL
-      const isLocal = (config.server as Record<string, unknown>)?.url === 'LOCAL_SERVER';
-      const serverAuth = (config.server as Record<string, unknown>)?.auth as Record<string, unknown> | undefined;
-      const resolvedConfig = {
-        ...config,
-        server: {
-          ...(config.server as Record<string, unknown>),
-          url: isLocal ? state.serverUrl : (config.server as Record<string, unknown>)?.url,
-          // Inject default auth for local server if none provided
-          auth: isLocal && (!serverAuth?.authToken && serverAuth?.mode === 'token')
-            ? { mode: 'token', authToken: 'admin-token' }
-            : serverAuth,
-        },
-      };
+    // Resolve server URL and auth for local runs
+    const isLocal = (config.server as Record<string, unknown>)?.url === 'LOCAL_SERVER';
+    const serverAuth = (config.server as Record<string, unknown>)?.auth as Record<string, unknown> | undefined;
+    const resolvedConfig = {
+      ...config,
+      server: {
+        ...(config.server as Record<string, unknown>),
+        url: isLocal ? state.serverUrl : (config.server as Record<string, unknown>)?.url,
+        auth: isLocal && (!serverAuth?.authToken && serverAuth?.mode === 'token')
+          ? { mode: 'token', authToken: 'admin-token' }
+          : serverAuth,
+      },
+    };
 
-      const result = await certModule.runComplianceTests(
-        resolvedConfig,
-        (progress) => {
-          if (controller.signal.aborted) return;
-          // Send progress to the renderer
+    // Run cert tests in a worker thread so the main process event loop
+    // stays free for IPC message delivery (progress updates).
+    const workerPath = resolve(__dirname, 'cert-worker.js');
+    const worker = new Worker(workerPath, { workerData: { certPath } });
+    activeRuns.set(jobId, { abort: () => worker.terminate() } as unknown as AbortController);
+
+    const result = await new Promise<{ status: string; steps: ReadonlyArray<Record<string, unknown>>; duration: number; error?: string }>((resolveWorker, rejectWorker) => {
+      worker.on('message', (msg: { type: string; jobId: string; progress?: Record<string, unknown>; result?: Record<string, unknown>; error?: string }) => {
+        if (msg.jobId !== jobId) return;
+
+        if (msg.type === 'progress' && msg.progress) {
           event.sender.send('cert:progress', jobId, {
-            step: progress.step,
-            status: progress.status,
-            message: progress.message,
-            duration: progress.duration,
+            step: msg.progress.step,
+            status: msg.progress.status,
+            message: msg.progress.message,
+            duration: msg.progress.duration,
           });
-        },
-      );
+        } else if (msg.type === 'result') {
+          worker.terminate();
+          resolveWorker(msg.result as { status: string; steps: ReadonlyArray<Record<string, unknown>>; duration: number });
+        } else if (msg.type === 'error') {
+          worker.terminate();
+          rejectWorker(new Error(msg.error ?? 'Worker error'));
+        }
+      });
 
-      activeRuns.delete(jobId);
+      worker.on('error', (err) => {
+        rejectWorker(err);
+      });
 
-      // Read any generated reports (available on both pass and fail)
-      let reports: Record<string, unknown> | undefined;
+      worker.on('exit', (code) => {
+        if (code !== 0) {
+          rejectWorker(new Error(`Worker exited with code ${code}`));
+        }
+      });
+
+      worker.postMessage({ type: 'run', config: resolvedConfig, jobId });
+    });
+
+    activeRuns.delete(jobId);
+
+    // Read any generated reports (available on both pass and fail)
+    const readReportsFromDisk = (cfg: Record<string, unknown>): Record<string, unknown> | undefined => {
       try {
-        const outputDir = resolveOutputPath(resolvedConfig);
-        if (outputDir) {
-          const reportFiles: Record<string, unknown> = {};
-          const filesToRead: Readonly<Record<string, string>> = {
-            schemaErrors: resolve(outputDir, 'data-availability-schema-validation-errors.json'),
-            variations: resolve(outputDir, 'data-dictionary-variations.json'),
-            metadata: resolve(outputDir, 'metadata-report.processed.json'),
-            report: resolve(outputDir, 'report.json'),
-            reportDetailed: resolve(outputDir, 'report-detailed.json'),
-          };
-          for (const [key, path] of Object.entries(filesToRead)) {
-            try {
-              const content = readFileSync(path, 'utf-8');
-              reportFiles[key] = JSON.parse(content);
-            } catch { /* file doesn't exist — skip */ }
-          }
-          if (Object.keys(reportFiles).length > 0) reports = reportFiles;
+        const outputDir = resolveOutputPath(cfg);
+        if (!outputDir) return undefined;
+        const reportFiles: Record<string, unknown> = {};
+        const filesToRead: Readonly<Record<string, string>> = {
+          schemaErrors: resolve(outputDir, 'data-availability-schema-validation-errors.json'),
+          variations: resolve(outputDir, 'data-dictionary-variations.json'),
+          metadata: resolve(outputDir, 'metadata-report.processed.json'),
+          report: resolve(outputDir, 'report.json'),
+          reportDetailed: resolve(outputDir, 'report-detailed.json'),
+        };
+        for (const [key, path] of Object.entries(filesToRead)) {
+          try {
+            const content = readFileSync(path, 'utf-8');
+            reportFiles[key] = JSON.parse(content);
+          } catch { /* file doesn't exist — skip */ }
+        }
+        if (Object.keys(reportFiles).length > 0) {
           log(`Cert run ${jobId}: found reports: ${Object.keys(reportFiles).join(', ')} in ${outputDir}`);
+          return reportFiles;
         }
       } catch (reportErr) {
         log(`Cert run ${jobId}: error reading reports: ${reportErr}`);
       }
+      return undefined;
+    };
 
-      // Cross-check: if schema validation errors exist on disk but the pipeline
-      // reported success, override to failed. This catches cases where throwOnError
-      // propagates through the pipeline but the overall status isn't set correctly
-      // (e.g., failFast=false or the error is caught within a sub-step).
-      const hasSchemaErrors = reports?.schemaErrors !== undefined;
-      const actualStatus = hasSchemaErrors && result.status === 'passed' ? 'failed' as const : result.status;
-      const error = hasSchemaErrors && result.status === 'passed'
-        ? 'Schema validation errors found. See the failure report for details.'
-        : undefined;
+    const reports = readReportsFromDisk(resolvedConfig);
 
-      log(`Cert run ${jobId} complete: pipeline=${result.status}, actual=${actualStatus}, steps=${result.steps.length}${hasSchemaErrors ? ', schemaErrors=true' : ''}`);
+    // Cross-check: if schema validation errors exist on disk but the pipeline
+    // reported success, override to failed.
+    const hasSchemaErrors = reports?.schemaErrors !== undefined;
+    const actualStatus = hasSchemaErrors && result.status === 'passed' ? 'failed' as const : result.status;
+    const error = hasSchemaErrors && result.status === 'passed'
+      ? 'Schema validation errors found. See the failure report for details.'
+      : result.error;
 
-      return { status: actualStatus, steps: result.steps, duration: result.duration, reports, error };
-    } catch (err) {
-      activeRuns.delete(jobId);
-      const message = err instanceof Error ? err.message : String(err);
-      log(`Cert run ${jobId} failed: ${message}`);
+    log(`Cert run ${jobId} complete: pipeline=${result.status}, actual=${actualStatus}, steps=${result.steps?.length ?? 0}${hasSchemaErrors ? ', schemaErrors=true' : ''}`);
 
-      // If exit was intercepted, the run produced reports before dying.
-      // Return failed status so the UI can show the error report.
-      // Try to read any generated reports from the output directory
-      let reports: Record<string, unknown> | undefined;
-      try {
-        const outputDir = resolveOutputPath(config);
-        if (outputDir) {
-          const reportFiles: Record<string, unknown> = {};
-          const errorFilesToRead: Readonly<Record<string, string>> = {
-            schemaErrors: resolve(outputDir, 'data-availability-schema-validation-errors.json'),
-            variations: resolve(outputDir, 'data-dictionary-variations.json'),
-            metadata: resolve(outputDir, 'metadata-report.processed.json'),
-            report: resolve(outputDir, 'report.json'),
-            reportDetailed: resolve(outputDir, 'report-detailed.json'),
-          };
-
-          for (const [key, path] of Object.entries(errorFilesToRead)) {
-            try {
-              const content = readFileSync(path, 'utf-8');
-              reportFiles[key] = JSON.parse(content);
-            } catch { /* file doesn't exist yet — skip */ }
-          }
-          if (Object.keys(reportFiles).length > 0) reports = reportFiles;
-        }
-      } catch { /* ignore report reading errors */ }
-
-      return {
-        status: 'failed' as const,
-        error: message,
-        steps: [],
-        duration: 0,
-        reports,
-      };
-    }
+    return { status: actualStatus, steps: result.steps ?? [], duration: result.duration ?? 0, reports, error };
   });
 
   /** Cancel a running cert job. */
