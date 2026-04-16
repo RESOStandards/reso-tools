@@ -232,9 +232,6 @@ const replicate = async ({
                 }
               }
 
-              // Yield to the event loop after validation so progress messages can be delivered
-              await new Promise(resolve => setImmediate(resolve));
-
               if (shouldGenerateReports) {
                 scorePayload({
                   ...request,
