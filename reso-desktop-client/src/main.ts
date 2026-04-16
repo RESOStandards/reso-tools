@@ -339,13 +339,17 @@ const registerCertRunnerHandlers = (): void => {
       };
 
       // If the config targets the local server, inject the actual server URL
+      const isLocal = (config.server as Record<string, unknown>)?.url === 'LOCAL_SERVER';
+      const serverAuth = (config.server as Record<string, unknown>)?.auth as Record<string, unknown> | undefined;
       const resolvedConfig = {
         ...config,
         server: {
           ...(config.server as Record<string, unknown>),
-          url: (config.server as Record<string, unknown>)?.url === 'LOCAL_SERVER'
-            ? state.serverUrl
-            : (config.server as Record<string, unknown>)?.url,
+          url: isLocal ? state.serverUrl : (config.server as Record<string, unknown>)?.url,
+          // Inject default auth for local server if none provided
+          auth: isLocal && (!serverAuth?.authToken && serverAuth?.mode === 'token')
+            ? { mode: 'token', authToken: 'admin-token' }
+            : serverAuth,
         },
       };
 
