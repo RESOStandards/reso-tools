@@ -351,40 +351,36 @@ const registerCertRunnerHandlers = (): void => {
     const worker = new Worker(workerPath, { workerData: { certPath } });
     activeRuns.set(jobId, { abort: () => worker.terminate() } as unknown as AbortController);
 
-    const result = await new Promise<{ status: string; steps: ReadonlyArray<Record<string, unknown>>; duration: number; error?: string }>((resolveWorker, rejectWorker) => {
-      worker.on('message', (msg: { type: string; jobId: string; progress?: Record<string, unknown>; result?: Record<string, unknown>; error?: string }) => {
-        if (msg.jobId !== jobId) return;
+    try {
+      const result = await new Promise<{ status: string; steps: ReadonlyArray<Record<string, unknown>>; duration: number }>((resolveWorker, rejectWorker) => {
+        worker.on('message', (msg: { type: string; jobId: string; progress?: Record<string, unknown>; result?: string; error?: string }) => {
+          if (msg.jobId !== jobId) return;
 
-        if (msg.type === 'progress' && msg.progress) {
-          event.sender.send('cert:progress', jobId, {
-            step: msg.progress.step,
-            status: msg.progress.status,
-            message: msg.progress.message,
-            duration: msg.progress.duration,
-          });
-        } else if (msg.type === 'result') {
-          worker.terminate();
-          resolveWorker(msg.result as { status: string; steps: ReadonlyArray<Record<string, unknown>>; duration: number });
-        } else if (msg.type === 'error') {
-          worker.terminate();
-          rejectWorker(new Error(msg.error ?? 'Worker error'));
-        }
+          if (msg.type === 'progress' && msg.progress) {
+            event.sender.send('cert:progress', jobId, {
+              step: msg.progress.step,
+              status: msg.progress.status,
+              message: msg.progress.message,
+              duration: msg.progress.duration,
+            });
+          } else if (msg.type === 'result' && msg.result) {
+            worker.terminate();
+            resolveWorker(JSON.parse(msg.result));
+          } else if (msg.type === 'error') {
+            worker.terminate();
+            rejectWorker(new Error(msg.error ?? 'Worker error'));
+          }
+        });
+
+        worker.on('error', rejectWorker);
+        worker.on('exit', (code) => {
+          if (code !== 0) rejectWorker(new Error(`Worker exited with code ${code}`));
+        });
+
+        worker.postMessage({ type: 'run', config: resolvedConfig, jobId });
       });
 
-      worker.on('error', (err) => {
-        rejectWorker(err);
-      });
-
-      worker.on('exit', (code) => {
-        if (code !== 0) {
-          rejectWorker(new Error(`Worker exited with code ${code}`));
-        }
-      });
-
-      worker.postMessage({ type: 'run', config: resolvedConfig, jobId });
-    });
-
-    activeRuns.delete(jobId);
+      activeRuns.delete(jobId);
 
     // Read any generated reports (available on both pass and fail)
     const readReportsFromDisk = (cfg: Record<string, unknown>): Record<string, unknown> | undefined => {
@@ -423,11 +419,17 @@ const registerCertRunnerHandlers = (): void => {
     const actualStatus = hasSchemaErrors && result.status === 'passed' ? 'failed' as const : result.status;
     const error = hasSchemaErrors && result.status === 'passed'
       ? 'Schema validation errors found. See the failure report for details.'
-      : result.error;
+      : (result as Record<string, unknown>).error as string | undefined;
 
     log(`Cert run ${jobId} complete: pipeline=${result.status}, actual=${actualStatus}, steps=${result.steps?.length ?? 0}${hasSchemaErrors ? ', schemaErrors=true' : ''}`);
 
     return { status: actualStatus, steps: result.steps ?? [], duration: result.duration ?? 0, reports, error };
+    } catch (err) {
+      activeRuns.delete(jobId);
+      const message = err instanceof Error ? err.message : String(err);
+      log(`Cert run ${jobId} failed: ${message}`);
+      return { status: 'failed' as const, error: message, steps: [], duration: 0 };
+    }
   });
 
   /** Cancel a running cert job. */

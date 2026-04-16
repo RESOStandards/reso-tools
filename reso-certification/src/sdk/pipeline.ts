@@ -65,15 +65,25 @@ const executeStepFunctions = async <TContext extends PipelineContext>(
     };
   }
 
-  // Sequential: thread context through each function
+  // Sequential: thread context through each function.
+  // Wrap each in an arrow function to ensure each is a separate async invocation.
   let currentContext = { ...context } as TContext;
   let lastOutput: StepOutput<TContext> = { context: currentContext };
   const allErrors: string[] = [];
   const allArtifacts: Array<{ readonly label: string; readonly path: string }> = [];
   const allSummaries: string[] = [];
 
-  for (const fn of functions) {
+  const wrappedFunctions = functions.map((fn) => async () => {
     const output = await fn(currentContext, onProgress);
+    // Emit sub-step completion with the function's summary as detail
+    if (output.summary) {
+      onProgress({ step: `sub:done`, status: output.status ?? 'passed', message: output.summary });
+    }
+    return output;
+  });
+
+  for (const wrappedFn of wrappedFunctions) {
+    const output = await wrappedFn();
     currentContext = { ...output.context } as TContext;
     lastOutput = output;
 

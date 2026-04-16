@@ -304,7 +304,21 @@ const runJobElectron = async (job: Job): Promise<void> => {
     if (jobId !== job.id) return;
 
     const stepStatus = progress.status as StepStatus;
-    console.log(`[cert:progress] ${progress.step} → ${progress.status} (${new Date().toISOString()})`);
+
+    // Sub-step events update the currently running parent step's detail text
+    if (progress.step.startsWith('sub:')) {
+      const current = state.jobs.get(jobId);
+      if (!current) return;
+      const runningParent = current.steps.find(s => s.status === 'running');
+      if (runningParent && progress.message) {
+        const updatedSteps = current.steps.map(s =>
+          s.name === runningParent.name ? { ...s, detail: progress.message } : s
+        );
+        updateJob(jobId, { steps: updatedSteps });
+      }
+      return;
+    }
+
     emit({ type: 'step-progress', jobId, step: progress.step, status: stepStatus, detail: progress.message, duration: progress.duration });
 
     // Update the step in our local state — add dynamically if not in the predefined list.
