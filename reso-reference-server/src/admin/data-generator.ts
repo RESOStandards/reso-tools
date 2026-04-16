@@ -419,7 +419,7 @@ export const createDataGeneratorStatusHandler =
  * Preserves schema — only removes records from entity tables.
  */
 export const createDataResetHandler =
-  (metadata: ResoMetadata, dal: DataAccessLayer): RequestHandler =>
+  (metadata: ResoMetadata, dal: DataAccessLayer, readOnlyResources: ReadonlySet<string> = new Set()): RequestHandler =>
   async (_req, res) => {
     if (!dal.truncateResource) {
       res.status(501).json({
@@ -435,10 +435,10 @@ export const createDataResetHandler =
       const childResources = TARGET_RESOURCES.filter(r =>
         ['Media', 'OpenHouse', 'Showing', 'PropertyRooms', 'PropertyGreenVerification',
          'PropertyPowerProduction', 'PropertyUnitTypes', 'TeamMembers'].includes(r)
-      );
+      ).filter(r => !readOnlyResources.has(r));
       const parentResources = TARGET_RESOURCES.filter(r =>
         !childResources.includes(r) && r !== 'Lookup'
-      );
+      ).filter(r => !readOnlyResources.has(r));
 
       for (const resource of [...childResources, ...parentResources]) {
         const ctx = buildResourceContext(metadata, resource);

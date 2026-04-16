@@ -14,7 +14,8 @@ export const createAdminRouter = (
   metadata: ResoMetadata,
   dal: DataAccessLayer,
   authConfig: AuthTokenConfig,
-  enumMode: EnumMode
+  enumMode: EnumMode,
+  readOnlyResources: ReadonlySet<string> = new Set()
 ): Router => {
   const router = Router();
   const adminAuth = requireAuth('admin', authConfig);
@@ -22,7 +23,7 @@ export const createAdminRouter = (
   // Data generator endpoints
   router.post('/admin/data-generator', adminAuth, createDataGeneratorHandler(metadata, dal, enumMode));
   router.get('/admin/data-generator/status', adminAuth, createDataGeneratorStatusHandler(metadata, dal));
-  router.delete('/admin/data-generator/reset', adminAuth, createDataResetHandler(metadata, dal));
+  router.delete('/admin/data-generator/reset', adminAuth, createDataResetHandler(metadata, dal, readOnlyResources));
 
   return router;
 };

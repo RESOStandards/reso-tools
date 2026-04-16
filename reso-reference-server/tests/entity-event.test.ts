@@ -1,9 +1,12 @@
+import type { Request, Response } from 'express';
 import { describe, expect, it, vi } from 'vitest';
+import { createDataResetHandler } from '../src/admin/data-generator.js';
 import type { CollectionResult, DataAccessLayer, EntityRecord, ResourceContext, SingleResult } from '../src/db/data-access.js';
 import type { CompactionRunner } from '../src/db/entity-event-compaction.js';
 import { startCompaction, stopCompaction } from '../src/db/entity-event-compaction.js';
 import type { EntityEventWriter } from '../src/db/entity-event-dal.js';
 import { createEntityEventDal } from '../src/db/entity-event-dal.js';
+import type { ResoMetadata } from '../src/metadata/types.js';
 
 // ---------------------------------------------------------------------------
 // Mock DAL
@@ -186,6 +189,28 @@ describe('createEntityEventDal', () => {
 
     expect(writer.events[0].resourceRecordUrl).toBe("http://localhost:8080/Property('key%20with%20spaces%20%26%20'quotes'')");
   });
+
+  it('forwards truncateResource from the inner DAL', async () => {
+    const inner = makeMockDal();
+    const truncateFn = vi.fn().mockResolvedValue(42);
+    (inner as Record<string, unknown>).truncateResource = truncateFn;
+    const writer = makeMockWriter();
+    const dal = createEntityEventDal(inner, writer, { baseUrl: 'http://localhost', includeResourceRecordUrl: false });
+
+    const ctx = makeResourceCtx('Property', 'ListingKey');
+    const deleted = await dal.truncateResource!(ctx);
+
+    expect(truncateFn).toHaveBeenCalledWith(ctx);
+    expect(deleted).toBe(42);
+  });
+
+  it('truncateResource is undefined when inner DAL does not have it', () => {
+    const inner = makeMockDal();
+    const writer = makeMockWriter();
+    const dal = createEntityEventDal(inner, writer, { baseUrl: 'http://localhost', includeResourceRecordUrl: false });
+
+    expect(dal.truncateResource).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -294,5 +319,75 @@ describe('EntityEvent schema generation', () => {
     ];
     const statements = generateSchema(specs);
     expect(statements.some(s => s.includes('idx_EntityEvent_resource'))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reset Handler – Readonly Resource Skipping
+// ---------------------------------------------------------------------------
+
+/** Minimal metadata with fields for Property and EntityEvent. */
+const makeTestMetadata = (): ResoMetadata => ({
+  fields: [
+    { resourceName: 'Property', fieldName: 'ListingKey', type: 'Edm.String', annotations: [] },
+    { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal', annotations: [] },
+    { resourceName: 'EntityEvent', fieldName: 'EntityEventSequence', type: 'Edm.Int64', annotations: [] },
+  ],
+  lookups: [],
+});
+
+const makeMockResponse = (): Response & { body: unknown; statusCode: number } => {
+  const res = {
+    body: undefined as unknown,
+    statusCode: 200,
+    status(code: number) { res.statusCode = code; return res; },
+    json(data: unknown) { res.body = data; return res; },
+  } as unknown as Response & { body: unknown; statusCode: number };
+  return res;
+};
+
+describe('createDataResetHandler', () => {
+  it('skips readonly resources during reset', async () => {
+    const truncatedResources: string[] = [];
+    const dal: DataAccessLayer = {
+      queryCollection: async (): Promise<CollectionResult> => ({ value: [] }),
+      readByKey: async (): Promise<SingleResult> => undefined,
+      insert: async (_ctx: ResourceContext, record: Readonly<Record<string, unknown>>): Promise<EntityRecord> => record,
+      update: async (): Promise<SingleResult> => undefined,
+      deleteByKey: async (): Promise<boolean> => false,
+      truncateResource: async (ctx: ResourceContext): Promise<number> => {
+        truncatedResources.push(ctx.resource);
+        return 10;
+      },
+    };
+
+    const readOnlyResources = new Set(['EntityEvent']);
+    const handler = createDataResetHandler(makeTestMetadata(), dal, readOnlyResources);
+
+    const req = {} as Request;
+    const res = makeMockResponse();
+    await handler(req, res, () => {});
+
+    expect(truncatedResources).not.toContain('EntityEvent');
+    expect(truncatedResources).toContain('Property');
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('returns 501 when DAL has no truncateResource', async () => {
+    const dal: DataAccessLayer = {
+      queryCollection: async (): Promise<CollectionResult> => ({ value: [] }),
+      readByKey: async (): Promise<SingleResult> => undefined,
+      insert: async (_ctx: ResourceContext, record: Readonly<Record<string, unknown>>): Promise<EntityRecord> => record,
+      update: async (): Promise<SingleResult> => undefined,
+      deleteByKey: async (): Promise<boolean> => false,
+    };
+
+    const handler = createDataResetHandler(makeTestMetadata(), dal);
+
+    const req = {} as Request;
+    const res = makeMockResponse();
+    await handler(req, res, () => {});
+
+    expect(res.statusCode).toBe(501);
   });
 });

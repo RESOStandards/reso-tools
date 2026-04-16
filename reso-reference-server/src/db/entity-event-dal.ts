@@ -65,6 +65,8 @@ export const createEntityEventDal = (inner: DataAccessLayer, writer: EntityEvent
         await maybeWriteEvent(ctx.resource, keyValue);
       }
       return deleted;
-    }
+    },
+
+    truncateResource: inner.truncateResource,
   };
 };
