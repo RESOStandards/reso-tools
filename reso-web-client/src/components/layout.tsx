@@ -7,6 +7,7 @@ import { useServer } from '../context/server-context';
 import { useDarkMode } from '../hooks/use-dark-mode';
 import { useUpdateCheck } from '../hooks/use-update-check';
 import { AuthPill } from './cert/auth-pill';
+import { NotificationBell } from './cert/notification-bell';
 import { ResourceNav } from './resource-nav';
 import { ServerSwitcher } from './server-switcher';
 
@@ -126,6 +127,29 @@ export const Layout = () => {
               <img src={LOGO_LIGHT} alt="RESO" className="h-8 dark:hidden" />
               <img src={LOGO_DARK} alt="RESO" className="h-8 hidden dark:block" />
             </NavLink>
+            {/* Back / Forward nav buttons */}
+            <div className="hidden sm:flex items-center gap-0.5 mr-1">
+              <button
+                type="button"
+                onClick={() => window.history.back()}
+                className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                title="Go back"
+                aria-label="Go back">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => window.history.forward()}
+                className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                title="Go forward"
+                aria-label="Go forward">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
             {/* Server switcher — aligns with main content area */}
             <ServerSwitcher />
             {pageIndicator && <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">/ {pageIndicator}</span>}
@@ -146,6 +170,10 @@ export const Layout = () => {
               Update
             </a>
           )}
+          {/* Notification bell — only shown when cert auth is available.
+              TODO: disable entire cert module (bell, nav items, pages) via build flag
+              for non-cert deployments of the web client. */}
+          <NotificationBell />
           {/* Dark mode toggle */}
           <button
             type="button"

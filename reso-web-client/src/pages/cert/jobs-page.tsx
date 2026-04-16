@@ -9,8 +9,8 @@
  * will be wired in when the reso-certification-backend SDK is ready.
  */
 
-import { useState, useMemo } from 'react';
-import { NavLink } from 'react-router';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { NavLink, useLocation } from 'react-router';
 import { StatusPill } from '../../components/cert/status-pill';
 import { SearchInput } from '../../components/metadata/shared';
 import { ConfigBuilder } from '../../components/cert/config-builder';
@@ -42,6 +42,7 @@ interface CertJob {
   readonly recipientUoi: string;
   readonly recipientName: string;
   readonly providerUoi: string;
+  readonly providerUsi?: string;
   readonly providerName: string;
   readonly status: JobStatus;
   readonly scheduledAt: string;
@@ -51,6 +52,7 @@ interface CertJob {
   readonly local: boolean;
   readonly reports?: Record<string, unknown>;
   readonly error?: string;
+  readonly sdkConfig?: Record<string, unknown>;
 }
 
 // ── Fixture data for layout review ──────────────────────────────────
@@ -442,16 +444,41 @@ const StepPipeline = ({ steps }: { readonly steps: ReadonlyArray<JobStep> }) => 
 
 // ── Job card ────────────────────────────────────────────────────────
 
-const JobCard = ({ job, onRerun, onDelete }: { readonly job: CertJob; readonly onRerun?: () => void; readonly onDelete?: () => void }) => {
-  const [expanded, setExpanded] = useState(job.status === 'running');
+const JobCard = ({ job, onRerun, onDelete, onClone, highlighted }: { readonly job: CertJob; readonly onRerun?: () => void; readonly onDelete?: () => void; readonly onClone?: () => void; readonly highlighted?: boolean }) => {
+  const [expanded, setExpanded] = useState(job.status === 'running' || !!highlighted);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (highlighted && cardRef.current) {
+      cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [highlighted]);
   const [showSubmit, setShowSubmit] = useState(false);
   const [showFailure, setShowFailure] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Close any open modal on Escape
+  useEffect(() => {
+    const anyOpen = showSubmit || showFailure || showReport || confirmDelete;
+    if (!anyOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowSubmit(false);
+        setShowFailure(false);
+        setShowReport(false);
+        setConfirmDelete(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [showSubmit, showFailure, showReport, confirmDelete]);
+
   return (
-    <div className={`bg-white dark:bg-gray-800/60 border rounded-xl overflow-hidden transition-colors ${
-      job.status === 'running'
+    <div ref={cardRef} id={`job-${job.id}`} className={`bg-white dark:bg-gray-800/60 border rounded-xl overflow-hidden transition-all ${
+      highlighted
+        ? 'border-blue-400 dark:border-blue-500 ring-2 ring-blue-300 dark:ring-blue-700'
+        : job.status === 'running'
         ? 'border-blue-300 dark:border-blue-700'
         : job.status === 'failed'
         ? 'border-red-200 dark:border-red-800'
@@ -554,6 +581,11 @@ const JobCard = ({ job, onRerun, onDelete }: { readonly job: CertJob; readonly o
                     Re-run
                   </button>
                 )}
+                {onClone && (
+                  <button type="button" onClick={onClone} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors" title="Edit config and re-run">
+                    Edit
+                  </button>
+                )}
               </>
             )}
 
@@ -637,9 +669,15 @@ const JobCard = ({ job, onRerun, onDelete }: { readonly job: CertJob; readonly o
                   );
                 })
               ) : (
-                <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                  No step details available.
-                </p>
+                <div className="text-sm text-gray-600 dark:text-gray-300 py-4 space-y-2">
+                  {(() => {
+                    const report = job.reports?.report as Record<string, unknown> | undefined;
+                    const remarks = (report?.remarks ?? (job.reports?.reportDetailed as Record<string, unknown>)?.remarks) as string | undefined;
+                    return remarks
+                      ? <p>{remarks}</p>
+                      : <p className="text-gray-400 dark:text-gray-500 text-center">No step details available. Run the test again to capture step-by-step results.</p>;
+                  })()}
+                </div>
               )}
             </div>
             <div className="flex items-center justify-between p-5 border-t border-gray-200 dark:border-gray-700 shrink-0">
@@ -783,7 +821,57 @@ export const JobsPage = () => {
   const { jobs: liveJobs, start, cancel, clear, rerun, remove, removeAll } = useJobs();
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const { lookup, lookupSystem } = useOrganizationNames();
+  const location = useLocation();
+  const [highlightedJobId, setHighlightedJobId] = useState<string | null>(location.hash?.replace('#job-', '') || null);
+
+  // Auto-clear highlight after scroll completes
+  useEffect(() => {
+    if (!highlightedJobId) return;
+    const timer = setTimeout(() => setHighlightedJobId(null), 2000);
+    return () => clearTimeout(timer);
+  }, [highlightedJobId]);
   const [showNewJob, setShowNewJob] = useState(false);
+  const [clonedConfig, setClonedConfig] = useState<BatchConfig | undefined>(undefined);
+
+  const handleClone = (job: CertJob) => {
+    const sdk = (job.sdkConfig ?? {}) as Record<string, unknown>;
+    const server = (sdk.server ?? {}) as Record<string, unknown>;
+    const endorsementKey = (sdk.endorsement as string) ?? 'dd';
+
+    const config: BatchConfig = {
+      providerUoi: (sdk.providerUoi as string) ?? job.providerUoi ?? '',
+      concurrency: 1,
+      recipients: [{
+        id: crypto.randomUUID(),
+        description: '',
+        serviceRootUri: (server.url as string) ?? '',
+        recipientUoi: job.recipientUoi,
+        providerUsi: job.providerUsi ?? '',
+        endorsements: [endorsementKey] as BatchConfig['recipients'][0]['endorsements'],
+        auth: (server.auth as BatchConfig['recipients'][0]['auth']) ?? { mode: 'token' as const, authToken: '' },
+        ddOptions: {
+          version: ((sdk.version as string) ?? '2.0') as '1.7' | '2.0' | '2.1',
+          strictMode: sdk.strictMode as boolean | undefined,
+          batchExpand: sdk.batchExpand as boolean | undefined,
+          requestDelay: sdk.requestDelay as number | undefined,
+          rateLimitWait: sdk.rateLimitWait as number | undefined,
+          limit: sdk.limit as number | undefined,
+        },
+        coreOptions: {
+          version: ((sdk.version as string) ?? '2.0.0') as '2.0.0' | '2.1.0',
+          enumMode: ((sdk.enumMode as string) ?? 'auto') as 'auto' | 'string' | 'isflags' | 'collections',
+        },
+        addEditOptions: { resource: (sdk.resource as string) ?? 'Property' },
+        entityEventOptions: {
+          mode: ((sdk.mode as string) ?? 'observe') as 'observe' | 'full',
+          writableResource: sdk.writableResource as string | undefined,
+        },
+      }],
+    };
+    setClonedConfig(config);
+    setShowNewJob(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const [filter, setFilter] = useState<'all' | JobStatus>('all');
   const [search, setSearch] = useState('');
   const [endorsementFilter, setEndorsementFilter] = useState<string>('all');
@@ -810,6 +898,8 @@ export const JobsPage = () => {
       local: j.local,
       reports: j.reports,
       error: j.error,
+      sdkConfig: j.sdkConfig,
+      providerUsi: j.providerUsi,
     })),
   [liveJobs]);
 
@@ -958,8 +1048,9 @@ export const JobsPage = () => {
         {showNewJob && (
           <div className="mb-6">
             <ConfigBuilder
-              onClose={() => setShowNewJob(false)}
-              onStart={(config) => { start(config); setShowNewJob(false); }}
+              onClose={() => { setShowNewJob(false); setClonedConfig(undefined); }}
+              onStart={(config) => { start(config); setShowNewJob(false); setClonedConfig(undefined); }}
+              initialConfig={clonedConfig}
             />
           </div>
         )}
@@ -967,7 +1058,7 @@ export const JobsPage = () => {
         {/* Job list */}
         <div className="space-y-3">
           {filteredJobs.map(job => (
-            <JobCard key={job.id} job={job} onRerun={job.local ? () => rerun(job.id) : undefined} onDelete={job.local ? () => remove(job.id) : undefined} />
+            <JobCard key={job.id} job={job} onRerun={job.local ? () => rerun(job.id) : undefined} onDelete={job.local ? () => remove(job.id) : undefined} onClone={() => handleClone(job)} highlighted={job.id === highlightedJobId} />
           ))}
           {filteredJobs.length === 0 && (
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center text-sm text-gray-500 dark:text-gray-400">

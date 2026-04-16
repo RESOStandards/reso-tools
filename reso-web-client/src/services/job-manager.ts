@@ -221,6 +221,8 @@ const buildSDKConfig = (recipient: RecipientConfig, endorsement: CertEndorsement
         limit: recipient.ddOptions.limit,
         strictMode: recipient.ddOptions.strictMode,
         batchExpand: recipient.ddOptions.batchExpand,
+        requestDelay: recipient.ddOptions.requestDelay,
+        rateLimitWait: recipient.ddOptions.rateLimitWait,
         providerUoi,
         providerUsi: recipient.providerUsi,
         recipientUoi: recipient.recipientUoi,
@@ -302,17 +304,31 @@ const runJobElectron = async (job: Job): Promise<void> => {
     if (jobId !== job.id) return;
 
     const stepStatus = progress.status as StepStatus;
+    console.log(`[cert:progress] ${progress.step} → ${progress.status} (${new Date().toISOString()})`);
     emit({ type: 'step-progress', jobId, step: progress.step, status: stepStatus, detail: progress.message, duration: progress.duration });
 
-    // Update the step in our local state — add dynamically if not in the predefined list
+    // Update the step in our local state — add dynamically if not in the predefined list.
+    // When a step transitions to "running", mark all preceding steps that are
+    // still "running" as "passed" to prevent the off-by-one lag from IPC batching.
     const current = state.jobs.get(jobId);
     if (!current) return;
     const exists = current.steps.some(s => s.name === progress.step);
-    const updatedSteps = exists
+    const baseSteps = exists
       ? current.steps.map(s =>
           s.name === progress.step ? { ...s, status: stepStatus, duration: progress.duration, detail: progress.message } : s
         )
       : [...current.steps, { name: progress.step, status: stepStatus, duration: progress.duration, detail: progress.message }];
+
+    // Auto-close preceding "running" steps when a new step starts running
+    const updatedSteps = stepStatus === 'running'
+      ? baseSteps.map(s => {
+          if (s.name !== progress.step && s.status === 'running') {
+            return { ...s, status: 'passed' as StepStatus };
+          }
+          return s;
+        })
+      : baseSteps;
+
     updateJob(jobId, { steps: updatedSteps });
   });
 

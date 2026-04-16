@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { deleteEntity } from '../api/client';
 import { useServer } from '../context/server-context';
 
@@ -13,6 +13,12 @@ interface DeleteDialogProps {
 export const DeleteDialog = ({ resource, record, onDeleted, onCancel }: DeleteDialogProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onCancel]);
   const { getKeyField } = useServer();
   const keyField = getKeyField(resource);
   const key = String(record[keyField] ?? '');

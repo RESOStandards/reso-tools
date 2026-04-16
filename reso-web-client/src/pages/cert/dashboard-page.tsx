@@ -224,7 +224,7 @@ export const DashboardPage = () => {
               </div>
               <div className="space-y-3">
                 {recentJobList.map(job => (
-                  <div key={job.id} className="flex items-center justify-between gap-4">
+                  <NavLink key={job.id} to={`/cert/jobs#job-${job.id}`} className="flex items-center justify-between gap-4 rounded-lg px-2 py-1 -mx-2 hover:bg-gray-50 dark:hover:bg-gray-700/40 cursor-pointer transition-colors">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
@@ -259,7 +259,7 @@ export const DashboardPage = () => {
                         {formatRelative(job.completedAt ?? job.startedAt ?? job.queuedAt)}
                       </span>
                     </div>
-                  </div>
+                  </NavLink>
                 ))}
                 {recentJobList.length === 0 && (
                   <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">No jobs match the current filter.</p>

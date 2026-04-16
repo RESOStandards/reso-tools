@@ -65,6 +65,12 @@ export const OpenHouseRush = ({ onClose }: { readonly onClose: () => void }) => 
   const [gameOver, setGameOver] = useState(false);
   const [lastPun, setLastPun] = useState('');
   const [missed, setMissed] = useState(0);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
   const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const spawnRef = useRef<ReturnType<typeof setInterval>>(undefined);
 

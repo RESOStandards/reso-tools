@@ -48,6 +48,8 @@ interface DDOptions {
   readonly limit?: number;
   readonly strictMode?: boolean;
   readonly batchExpand?: boolean;
+  readonly requestDelay?: number;
+  readonly rateLimitWait?: number;
 }
 
 interface CoreOptions {
@@ -219,7 +221,7 @@ const DDOptionsSection = ({
 }) => (
   <div className="space-y-3 pt-3 border-t border-gray-100 dark:border-gray-700/50">
     <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Data Dictionary Options</p>
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
       <div>
         <label className={LABEL}>DD Version</label>
         <select value={options.version} onChange={e => onChange({ ...options, version: e.target.value as DDOptions['version'] })} className={SELECT}>
@@ -235,6 +237,30 @@ const DDOptionsSection = ({
           value={options.limit ?? ''}
           onChange={e => onChange({ ...options, limit: e.target.value ? Number(e.target.value) : undefined })}
           placeholder="100000"
+          className={INPUT}
+        />
+      </div>
+      <div>
+        <label className={LABEL} title="Delay between replication requests. Set to 0 for local testing. Use 1s or higher for remote servers to avoid rate limiting.">Request Delay <span className="text-gray-400">(seconds)</span></label>
+        <input
+          type="number"
+          min="0"
+          step="0.1"
+          value={options.requestDelay ?? 1}
+          onChange={e => onChange({ ...options, requestDelay: Number(e.target.value) })}
+          title="Delay between replication requests. Set to 0 for local testing."
+          className={INPUT}
+        />
+      </div>
+      <div>
+        <label className={LABEL} title="How long to wait after receiving HTTP 429 Too Many Requests before retrying.">429 Wait <span className="text-gray-400">(minutes)</span></label>
+        <input
+          type="number"
+          min="1"
+          step="1"
+          value={options.rateLimitWait ?? 15}
+          onChange={e => onChange({ ...options, rateLimitWait: Number(e.target.value) })}
+          title="Wait time after HTTP 429 Too Many Requests. Default: 15 minutes."
           className={INPUT}
         />
       </div>
@@ -692,15 +718,19 @@ const RecipientCard = ({
 export const ConfigBuilder = ({
   onClose,
   onStart,
+  initialConfig,
 }: {
   readonly onClose: () => void;
   readonly onStart: (config: BatchConfig) => void;
+  readonly initialConfig?: BatchConfig;
 }) => {
-  const [providerUoi, setProviderUoi] = useState('');
+  const [providerUoi, setProviderUoi] = useState(initialConfig?.providerUoi ?? '');
   const [providerName, setProviderName] = useState('');
   const [providerSystems, setProviderSystems] = useState<ReadonlyArray<CertOrganizationSystem>>([]);
-  const [concurrency, setConcurrency] = useState(DEFAULT_CONCURRENCY);
-  const [recipients, setRecipients] = useState<ReadonlyArray<RecipientConfig>>([makeRecipient()]);
+  const [concurrency, setConcurrency] = useState(initialConfig?.concurrency ?? DEFAULT_CONCURRENCY);
+  const [recipients, setRecipients] = useState<ReadonlyArray<RecipientConfig>>(
+    initialConfig?.recipients ?? [makeRecipient()]
+  );
 
   // Org directory for provider/recipient pickers
   const [orgs, setOrgs] = useState<ReadonlyArray<CertOrganization>>([]);
