@@ -7,6 +7,7 @@ import type { EntityEventConfig as EERunnerConfig } from '../entity-event/types.
 import type { EntityEventConfig, PipelineStep, StepOutput } from './types.js';
 import { createPipeline } from './pipeline.js';
 import { entityEventReportGenerators, writeReports, buildOutputPath, archiveCurrentResults } from './reports.js';
+import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
 import type { StepResult } from './types.js';
 
 // ── Pipeline Context ──
@@ -62,14 +63,22 @@ const fetchAndParseMetadata = (config: EntityEventConfig): PipelineStep<EntityEv
       : await fetchMetadata(ctx.serverUrl, ctx.authToken!);
 
     const metadata = parseMetadataXml(metadataXml);
+
+    // XSD + semantic validation
+    const validation = validateMetadata(metadataXml);
+    const validationErrors = collectValidationErrors(validation);
+
     const entityEventType = metadata.entityTypes.find(et => et.name === 'EntityEvent');
+    const eeMsg = entityEventType
+      ? `EntityEvent found with ${entityEventType.properties.length} fields`
+      : 'EntityEvent not found (will be caught by test scenarios)';
 
     return {
       context: { ...ctx, metadataXml },
-      summary: entityEventType
-        ? `Metadata parsed: EntityEvent found with ${entityEventType.properties.length} fields`
-        : 'Metadata parsed: EntityEvent not found (will be caught by test scenarios)',
+      summary: `Metadata parsed: ${eeMsg}. ${formatValidationSummary(validation)}`,
       counts: { entityTypes: metadata.entityTypes.length },
+      ...(validationErrors.length > 0 ? { errors: validationErrors } : {}),
+      ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {}),
     };
   },
 });

@@ -7,6 +7,7 @@
 
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, getEntityType } from '../test-runner/metadata.js';
+import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
 import { resolveTestParams, WELL_KNOWN_RESOURCES } from '../web-api-core/index.js';
 import { runCoreResourceScenarios, type ResourceTestReport } from '../web-api-core/test-runner.js';
 import type { CoreConfig, PipelineStep, StepResult } from './types.js';
@@ -64,15 +65,25 @@ const fetchAndParseMetadata = (config: CoreConfig): PipelineStep<CoreContext> =>
 
     const metadata = parseMetadataXml(metadataXml);
 
+    // XSD + semantic validation
+    const validation = validateMetadata(metadataXml);
+    const validationErrors = collectValidationErrors(validation);
+
     // Check which requested resources exist in metadata
     const availableResources = ctx.resources.filter(r => getEntityType(metadata, r));
     const missingResources = ctx.resources.filter(r => !getEntityType(metadata, r));
 
+    const allErrors = [
+      ...validationErrors,
+      ...(missingResources.length > 0 ? [`Resources not found in metadata: ${missingResources.join(', ')}`] : []),
+    ];
+
     return {
       context: { ...ctx, metadataXml, resources: availableResources, metadata },
-      summary: `Parsed metadata: ${metadata.entityTypes.length} entity types, ${availableResources.length}/${ctx.resources.length} resources available`,
+      summary: `Parsed metadata: ${metadata.entityTypes.length} entity types, ${availableResources.length}/${ctx.resources.length} resources available. ${formatValidationSummary(validation)}`,
       counts: { entityTypes: metadata.entityTypes.length, resources: availableResources.length },
-      ...(missingResources.length > 0 ? { errors: [`Resources not found in metadata: ${missingResources.join(', ')}`] } : {}),
+      ...(allErrors.length > 0 ? { errors: allErrors } : {}),
+      ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {}),
     };
   },
 });

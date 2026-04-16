@@ -16,6 +16,7 @@ import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
 import type { DDConfig, PipelineStep, StepResult } from './types.js';
 import { createPipeline } from './pipeline.js';
 import { coreReportGenerators, writeReports } from './reports.js';
+import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
 
 // ── Cert-utils imports (local copy for modification) ──
 
@@ -104,9 +105,14 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
   run: async (ctx, onProgress) => {
     await mkdir(ctx.outputPath, { recursive: true });
 
-    // Fetch and serialize EDMX metadata
+    // Fetch and validate EDMX metadata
     onProgress({ step: 'Generate metadata report', status: 'running', message: 'Fetching $metadata...' });
     const edmxXml = await fetchMetadata(ctx.serverUrl, ctx.authToken!);
+
+    // XSD + semantic validation
+    const validation = validateMetadata(edmxXml);
+    const validationErrors = collectValidationErrors(validation);
+
     const baseReport = generateMetadataReport(edmxXml, ctx.version);
 
     // Write raw metadata XML
@@ -149,9 +155,11 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
 
     return {
       context: { ...ctx, metadataReportPath, lookupResourceAvailable, lookupRecordCount },
-      summary: `${report.resources.length} resources, ${report.fields.length} fields, ${report.lookups.length} lookups${lookupMsg}`,
+      summary: `${report.resources.length} resources, ${report.fields.length} fields, ${report.lookups.length} lookups${lookupMsg}. ${formatValidationSummary(validation)}`,
       counts: { resources: report.resources.length, fields: report.fields.length, lookups: report.lookups.length },
       artifacts,
+      ...(validationErrors.length > 0 ? { errors: validationErrors } : {}),
+      ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {}),
     };
   },
 });
