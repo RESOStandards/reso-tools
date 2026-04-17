@@ -209,6 +209,9 @@ export const SynonymSwatter = ({ onClose }: { readonly onClose: () => void }) =>
           </h2>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             Swat the nonstandard variations! Leave DD names alone.
+            <span className="ml-1 inline-block cursor-help" title="Field synonyms are disallowed in the DD — swat them all. Lookup variations must be mapped to the standard value. Standard DD names are safe — do not swat!">
+              💡
+            </span>
           </p>
         </div>
 
