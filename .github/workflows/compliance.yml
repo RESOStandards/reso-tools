@@ -44,6 +44,7 @@ jobs:
           git clone --depth 1 --branch v3.0.0 https://github.com/RESOStandards/reso-certification-utils.git /tmp/cert-utils
           cd /tmp/cert-utils && npm pkg delete scripts.prepare && cd -
           cd reso-certification && npm install /tmp/cert-utils && cd ..
+          cd reso-certification/xsd-validator && npm install && cd ../..
           cd reso-mcp-server && npm install && cd ..
 
       - name: Build shared libraries
