@@ -20,57 +20,60 @@ interface SwatterTerm {
   readonly swatted: boolean;
 }
 
-// ── Game content: real DD fields and their common variations ──
+// ── Game content: real DD 2.1 field and lookup synonyms ──
+// Source: RESODataDictionary-2.1.xlsx Synonyms column.
+// Field synonyms are ALWAYS disallowed — even if the standard field is present.
+// Lookup synonyms must be mapped to the standard value via the Lookup Resource.
 
 const FIELD_PAIRS: ReadonlyArray<{ readonly standard: string; readonly variation: string }> = [
-  { standard: 'ListPrice', variation: 'Lst_Price' },
-  { standard: 'ClosePrice', variation: 'Close_Price' },
-  { standard: 'StreetName', variation: 'St_Name' },
-  { standard: 'BathroomsTotalInteger', variation: 'Total_Baths' },
-  { standard: 'BedroomsTotal', variation: 'Num_Beds' },
-  { standard: 'LivingArea', variation: 'Sq_Ft' },
-  { standard: 'ModificationTimestamp', variation: 'Last_Modified' },
-  { standard: 'StandardStatus', variation: 'Listing_Status' },
-  { standard: 'PostalCode', variation: 'Zip_Code' },
-  { standard: 'City', variation: 'City_Name' },
-  { standard: 'CountyOrParish', variation: 'County' },
-  { standard: 'YearBuilt', variation: 'Year_Blt' },
-  { standard: 'LotSizeAcres', variation: 'Lot_Acres' },
-  { standard: 'GarageSpaces', variation: 'Garage_Cnt' },
-  { standard: 'PropertyType', variation: 'Prop_Type' },
-  { standard: 'PropertySubType', variation: 'Sub_Type' },
-  { standard: 'ListAgentFullName', variation: 'Agent_Name' },
-  { standard: 'BuyerAgentFullName', variation: 'Buyer_Agent' },
-  { standard: 'ListOfficeName', variation: 'Office_Name' },
-  { standard: 'OriginalListPrice', variation: 'Orig_Price' },
+  { standard: 'AccessCode', variation: 'GateCode' },
+  { standard: 'ArchitecturalStyle', variation: 'Style' },
+  { standard: 'AssociationFee', variation: 'HOAFee' },
+  { standard: 'AssociationName', variation: 'HOAName' },
+  { standard: 'AssociationYN', variation: 'HOAYN' },
+  { standard: 'BathroomsFull', variation: 'FullBaths' },
+  { standard: 'BathroomsHalf', variation: 'HalfBaths' },
+  { standard: 'BuyerAgentFullName', variation: 'BuyerMemberFullName' },
+  { standard: 'ClosePrice', variation: 'SellingPrice' },
   { standard: 'DaysOnMarket', variation: 'DOM' },
-  { standard: 'PublicRemarks', variation: 'Remarks' },
-  { standard: 'Directions', variation: 'Dir_Text' },
-  { standard: 'Latitude', variation: 'Lat' },
-  { standard: 'Longitude', variation: 'Lng' },
-  { standard: 'TaxAnnualAmount', variation: 'Annual_Tax' },
-  { standard: 'AssociationFee', variation: 'HOA_Fee' },
-  { standard: 'ListingContractDate', variation: 'Contract_Dt' },
-  { standard: 'ExpirationDate', variation: 'Expire_Dt' },
-  { standard: 'PhotosCount', variation: 'Num_Photos' },
+  { standard: 'DirectionFaces', variation: 'BuildingExposure' },
+  { standard: 'ListAgentFullName', variation: 'ListMemberFullName' },
+  { standard: 'ListingContractDate', variation: 'ListingDate' },
+  { standard: 'ListingId', variation: 'MLNumber' },
+  { standard: 'ListPrice', variation: 'AskingPrice' },
+  { standard: 'MLSAreaMajor', variation: 'MarketingArea' },
+  { standard: 'ModificationTimestamp', variation: 'ModificationDateTime' },
+  { standard: 'OriginalEntryTimestamp', variation: 'EntryDate' },
+  { standard: 'OriginalListPrice', variation: 'OriginalPrice' },
+  { standard: 'OriginatingSystemName', variation: 'ProviderName' },
+  { standard: 'PublicRemarks', variation: 'PropertyDescription' },
+  { standard: 'StandardStatus', variation: 'NormalizedListingStatus' },
+  { standard: 'ResourceRecordKey', variation: 'SystemUniqueID' },
+  { standard: 'MemberMlsId', variation: 'AgentMlsId' },
+  { standard: 'SourceSystemID', variation: 'MLSID' },
+  { standard: 'PriceChangeTimestamp', variation: 'PriceChange' },
+  { standard: 'TaxLegalDescription', variation: 'LegalDescription' },
+  { standard: 'ListingContractDate', variation: 'ContractDate' },
+  { standard: 'AssociationFee', variation: 'CAM Charge' },
+  { standard: 'GrossIncome', variation: 'Actual Income' },
 ];
 
 const LOOKUP_PAIRS: ReadonlyArray<{ readonly standard: string; readonly variation: string }> = [
-  { standard: 'Active', variation: 'ACT' },
-  { standard: 'Pending', variation: 'PEND' },
-  { standard: 'Closed', variation: 'CLS' },
-  { standard: 'Single Family Residence', variation: 'SFR' },
-  { standard: 'Exclusive Right To Sell', variation: 'ER' },
-  { standard: 'Exclusive Agency', variation: 'EA' },
-  { standard: 'Seller Reserve', variation: 'SR' },
-  { standard: 'Residential', variation: 'Res' },
-  { standard: 'Condominium', variation: 'Condo' },
-  { standard: 'Townhouse', variation: 'TwnHse' },
-  { standard: 'Mini Storage', variation: 'Mini-Storage' },
-  { standard: 'Central Air', variation: 'Cntrl Air' },
-  { standard: 'Forced Air', variation: 'FA' },
-  { standard: 'Public Sewer', variation: 'Pub Sewer' },
-  { standard: 'Well Water', variation: 'Wll Wtr' },
+  { standard: 'Townhouse', variation: 'Row House' },
+  { standard: 'Townhouse', variation: 'Brownstone' },
+  { standard: 'Exclusive Agency', variation: 'Exclusive Listing' },
+  { standard: 'Active Under Contract', variation: 'Accepting Backup Offers' },
+  { standard: 'Active Under Contract', variation: 'Contingent' },
+  { standard: 'Pending', variation: 'Under Contract' },
+  { standard: 'Condominium', variation: 'Unit' },
+  { standard: 'Basement', variation: 'Cellar' },
+  { standard: 'Inactive', variation: 'Terminated' },
+  { standard: 'Member', variation: 'Agent' },
+  { standard: 'Farm', variation: 'Farm/Ranch' },
+  { standard: 'Convection Oven', variation: 'Fan-Assisted' },
+  { standard: 'Call Listing Agent', variation: 'Call Listing Member' },
+  { standard: 'In-Law Floorplan', variation: 'Mother In-Law Floor Plan' },
+  { standard: 'Condominium', variation: 'Condo/Townhouse' },
 ];
 
 const ALL_PAIRS = [...FIELD_PAIRS, ...LOOKUP_PAIRS];
@@ -81,18 +84,18 @@ const TERM_WIDTH = 180;
 
 const SWAT_MESSAGES = [
   'Swatted! 🪰',
-  'Standardized! ✨',
-  'DD says no! 🚫',
+  'Synonym denied! 🚫',
+  'Use the standard name! ✨',
   'Variation eliminated! 💥',
   'Clean data! 🧹',
-  'RESO approved! ✅',
+  'Not in the DD! ✅',
 ];
 
 const MISS_MESSAGES = [
-  'That was standard! 😬',
+  'That IS the standard! 😬',
   'DD name! Penalty! ❌',
-  'Do not swat standards! 🛑',
-  'Read the spec! 📖',
+  'Check the DD first! 🛑',
+  'That one was correct! 📖',
 ];
 
 const randomFrom = <T,>(arr: ReadonlyArray<T>): T => arr[Math.floor(Math.random() * arr.length)];
@@ -208,8 +211,8 @@ export const SynonymSwatter = ({ onClose }: { readonly onClose: () => void }) =>
             🪰 DD Synonym Swatter
           </h2>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Swat the nonstandard variations! Leave DD names alone.
-            <span className="ml-1 inline-block cursor-help" title="Field synonyms are disallowed in the DD — swat them all. Lookup variations must be mapped to the standard value. Standard DD names are safe — do not swat!">
+            Swat the synonyms! Leave DD standard names alone.
+            <span className="ml-1 inline-block cursor-help" title="Field synonyms are NEVER allowed — even if the standard field is also present. Lookup synonyms must be mapped to the standard value via the Lookup Resource. All synonyms are from the DD 2.1 spreadsheet.">
               💡
             </span>
           </p>
