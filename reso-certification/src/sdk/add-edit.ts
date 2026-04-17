@@ -14,6 +14,7 @@ import { runAllScenarios } from '../add-edit/index.js';
 import type { AddEditConfig, PipelineStep, StepOutput } from './types.js';
 import { createPipeline } from './pipeline.js';
 import { addEditReportGenerators, writeReports, buildOutputPath, archiveCurrentResults } from './reports.js';
+import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
 
 // ── Pipeline Context ──
 
@@ -70,20 +71,30 @@ const fetchAndParseMetadata = (config: AddEditConfig): PipelineStep<AddEditConte
       : await fetchMetadata(ctx.serverUrl, ctx.authToken!);
 
     const metadata = parseMetadataXml(metadataXml);
+
+    // XSD + semantic validation
+    const validation = await validateMetadata(metadataXml);
+    const validationErrors = collectValidationErrors(validation);
+
     const entityType = getEntityType(metadata, ctx.resource);
 
     if (!entityType) {
       return {
         context: { ...ctx, metadataXml },
         status: 'failed',
-        errors: [`Entity type "${ctx.resource}" not found in metadata. Available: ${metadata.entityTypes.map(et => et.name).join(', ')}`],
+        errors: [
+          ...validationErrors,
+          `Entity type "${ctx.resource}" not found in metadata. Available: ${metadata.entityTypes.map(et => et.name).join(', ')}`,
+        ],
       };
     }
 
     return {
       context: { ...ctx, metadataXml, entityType },
-      summary: `Parsed metadata: ${metadata.entityTypes.length} entity types`,
+      summary: `Parsed metadata: ${metadata.entityTypes.length} entity types. ${formatValidationSummary(validation)}`,
       counts: { entityTypes: metadata.entityTypes.length, fields: entityType.properties.length },
+      ...(validationErrors.length > 0 ? { errors: validationErrors } : {}),
+      ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {}),
     };
   },
 });

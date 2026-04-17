@@ -324,131 +324,128 @@ const registerCertRunnerHandlers = (): void => {
    * Resolves with the PipelineResult when the run completes.
    */
   ipcMain.handle('cert:run', async (event, jobId: string, config: Record<string, unknown>) => {
-    const controller = new AbortController();
-    activeRuns.set(jobId, controller);
+    const { Worker } = await import('node:worker_threads');
+
+    // Resolve cert package path
+    const certPath = app.isPackaged
+      ? '@reso-standards/reso-certification'
+      : resolve(__dirname, '..', '..', 'reso-certification', 'dist', 'index.js');
+
+    // Resolve server URL and auth for local runs
+    const isLocal = (config.server as Record<string, unknown>)?.url === 'LOCAL_SERVER';
+    const serverAuth = (config.server as Record<string, unknown>)?.auth as Record<string, unknown> | undefined;
+    const resolvedConfig = {
+      ...config,
+      server: {
+        ...(config.server as Record<string, unknown>),
+        url: isLocal ? state.serverUrl : (config.server as Record<string, unknown>)?.url,
+        auth: isLocal && (!serverAuth?.authToken && serverAuth?.mode === 'token')
+          ? { mode: 'token', authToken: 'admin-token' }
+          : serverAuth,
+      },
+    };
+
+    // Run cert tests in a worker thread so the main process event loop
+    // stays free for IPC message delivery (progress updates).
+    const workerPath = resolve(__dirname, 'cert-worker.js');
+    const worker = new Worker(workerPath, { workerData: { certPath } });
+    activeRuns.set(jobId, { abort: () => worker.terminate() } as unknown as AbortController);
 
     try {
-      // Dynamic import so we don't block app startup
-      // Dynamic import — reso-certification is not bundled with electron-builder,
-      // it's resolved from node_modules at runtime.
-      // Use a variable to prevent TypeScript from resolving the module at compile time.
-      // The package is available at runtime from the monorepo but not declared as a dependency.
-      const certPkg = '@reso-standards/reso-certification';
-      const certModule = await import(/* webpackIgnore: true */ certPkg) as unknown as {
-        runComplianceTests: (config: Record<string, unknown>, onProgress?: (progress: Record<string, unknown>) => void) => Promise<{ status: string; steps: ReadonlyArray<Record<string, unknown>>; duration: number }>;
-      };
+      const result = await new Promise<{ status: string; steps: ReadonlyArray<Record<string, unknown>>; duration: number }>((resolveWorker, rejectWorker) => {
+        worker.on('message', (msg: { type: string; jobId: string; progress?: Record<string, unknown>; result?: string; error?: string }) => {
+          if (msg.jobId !== jobId) return;
+          log(`[main] received worker msg: ${msg.type} ${msg.type === 'progress' ? (msg.progress?.step as string) + ' → ' + (msg.progress?.status as string) : ''}`);
 
-      // If the config targets the local server, inject the actual server URL
-      const resolvedConfig = {
-        ...config,
-        server: {
-          ...(config.server as Record<string, unknown>),
-          url: (config.server as Record<string, unknown>)?.url === 'LOCAL_SERVER'
-            ? state.serverUrl
-            : (config.server as Record<string, unknown>)?.url,
-        },
-      };
+          if (msg.type === 'progress' && msg.progress) {
+            event.sender.send('cert:progress', jobId, {
+              step: msg.progress.step,
+              status: msg.progress.status,
+              message: msg.progress.message,
+              duration: msg.progress.duration,
+            });
+          } else if (msg.type === 'result' && msg.result) {
+            worker.terminate();
+            resolveWorker(JSON.parse(msg.result));
+          } else if (msg.type === 'error') {
+            worker.terminate();
+            rejectWorker(new Error(msg.error ?? 'Worker error'));
+          }
+        });
 
-      const result = await certModule.runComplianceTests(
-        resolvedConfig,
-        (progress) => {
-          if (controller.signal.aborted) return;
-          // Send progress to the renderer
-          event.sender.send('cert:progress', jobId, {
-            step: progress.step,
-            status: progress.status,
-            message: progress.message,
-            duration: progress.duration,
-          });
-        },
-      );
+        worker.on('error', rejectWorker);
+        worker.on('exit', (code) => {
+          if (code !== 0) rejectWorker(new Error(`Worker exited with code ${code}`));
+        });
+
+        worker.postMessage({ type: 'run', config: resolvedConfig, jobId });
+      });
 
       activeRuns.delete(jobId);
 
-      // Read any generated reports (available on both pass and fail)
-      let reports: Record<string, unknown> | undefined;
+    // Read any generated reports (available on both pass and fail)
+    const readReportsFromDisk = (cfg: Record<string, unknown>): Record<string, unknown> | undefined => {
       try {
-        const outputDir = resolveOutputPath(resolvedConfig);
-        if (outputDir) {
-          const reportFiles: Record<string, unknown> = {};
-          const filesToRead: Readonly<Record<string, string>> = {
-            schemaErrors: resolve(outputDir, 'data-availability-schema-validation-errors.json'),
-            variations: resolve(outputDir, 'data-dictionary-variations.json'),
-            metadata: resolve(outputDir, 'metadata-report.processed.json'),
-            report: resolve(outputDir, 'report.json'),
-            reportDetailed: resolve(outputDir, 'report-detailed.json'),
-          };
-          for (const [key, path] of Object.entries(filesToRead)) {
-            try {
-              const content = readFileSync(path, 'utf-8');
-              reportFiles[key] = JSON.parse(content);
-            } catch { /* file doesn't exist — skip */ }
-          }
-          if (Object.keys(reportFiles).length > 0) reports = reportFiles;
+        const outputDir = resolveOutputPath(cfg);
+        if (!outputDir) return undefined;
+        const reportFiles: Record<string, unknown> = {};
+        const filesToRead: Readonly<Record<string, string>> = {
+          schemaErrors: resolve(outputDir, 'data-availability-schema-validation-errors.json'),
+          variations: resolve(outputDir, 'data-dictionary-variations.json'),
+          metadata: resolve(outputDir, 'metadata-report.processed.json'),
+          report: resolve(outputDir, 'report.json'),
+          reportDetailed: resolve(outputDir, 'report-detailed.json'),
+        };
+        for (const [key, path] of Object.entries(filesToRead)) {
+          try {
+            const content = readFileSync(path, 'utf-8');
+            reportFiles[key] = JSON.parse(content);
+          } catch { /* file doesn't exist — skip */ }
+        }
+        if (Object.keys(reportFiles).length > 0) {
           log(`Cert run ${jobId}: found reports: ${Object.keys(reportFiles).join(', ')} in ${outputDir}`);
+          return reportFiles;
         }
       } catch (reportErr) {
         log(`Cert run ${jobId}: error reading reports: ${reportErr}`);
       }
+      return undefined;
+    };
 
-      // Cross-check: if schema validation errors exist on disk but the pipeline
-      // reported success, override to failed. This catches cases where throwOnError
-      // propagates through the pipeline but the overall status isn't set correctly
-      // (e.g., failFast=false or the error is caught within a sub-step).
-      const hasSchemaErrors = reports?.schemaErrors !== undefined;
-      const actualStatus = hasSchemaErrors && result.status === 'passed' ? 'failed' as const : result.status;
-      const error = hasSchemaErrors && result.status === 'passed'
-        ? 'Schema validation errors found. See the failure report for details.'
-        : undefined;
+    const reports = readReportsFromDisk(resolvedConfig);
 
-      log(`Cert run ${jobId} complete: pipeline=${result.status}, actual=${actualStatus}, steps=${result.steps.length}${hasSchemaErrors ? ', schemaErrors=true' : ''}`);
+    // Cross-check: if schema validation errors exist on disk but the pipeline
+    // reported success, override to failed.
+    const hasSchemaErrors = reports?.schemaErrors !== undefined;
+    const actualStatus = hasSchemaErrors && result.status === 'passed' ? 'failed' as const : result.status;
+    const error = hasSchemaErrors && result.status === 'passed'
+      ? 'Schema validation errors found. See the failure report for details.'
+      : (result as Record<string, unknown>).error as string | undefined;
 
-      return { status: actualStatus, steps: result.steps, duration: result.duration, reports, error };
+    log(`Cert run ${jobId} complete: pipeline=${result.status}, actual=${actualStatus}, steps=${result.steps?.length ?? 0}${hasSchemaErrors ? ', schemaErrors=true' : ''}`);
+
+    return { status: actualStatus, steps: result.steps ?? [], duration: result.duration ?? 0, reports, error };
     } catch (err) {
       activeRuns.delete(jobId);
+      if (cancelledJobs.has(jobId)) {
+        cancelledJobs.delete(jobId);
+        log(`Cert run ${jobId} cancelled`);
+        return { status: 'cancelled' as const, steps: [], duration: 0 };
+      }
       const message = err instanceof Error ? err.message : String(err);
       log(`Cert run ${jobId} failed: ${message}`);
-
-      // If exit was intercepted, the run produced reports before dying.
-      // Return failed status so the UI can show the error report.
-      // Try to read any generated reports from the output directory
-      let reports: Record<string, unknown> | undefined;
-      try {
-        const outputDir = resolveOutputPath(config);
-        if (outputDir) {
-          const reportFiles: Record<string, unknown> = {};
-          const errorFilesToRead: Readonly<Record<string, string>> = {
-            schemaErrors: resolve(outputDir, 'data-availability-schema-validation-errors.json'),
-            variations: resolve(outputDir, 'data-dictionary-variations.json'),
-            metadata: resolve(outputDir, 'metadata-report.processed.json'),
-            report: resolve(outputDir, 'report.json'),
-            reportDetailed: resolve(outputDir, 'report-detailed.json'),
-          };
-
-          for (const [key, path] of Object.entries(errorFilesToRead)) {
-            try {
-              const content = readFileSync(path, 'utf-8');
-              reportFiles[key] = JSON.parse(content);
-            } catch { /* file doesn't exist yet — skip */ }
-          }
-          if (Object.keys(reportFiles).length > 0) reports = reportFiles;
-        }
-      } catch { /* ignore report reading errors */ }
-
-      return {
-        status: 'failed' as const,
-        error: message,
-        steps: [],
-        duration: 0,
-        reports,
-      };
+      return { status: 'failed' as const, error: message, steps: [], duration: 0 };
     }
   });
 
   /** Cancel a running cert job. */
+  /** Track cancelled job IDs so we can distinguish cancellation from errors. */
+  const cancelledJobs = new Set<string>();
+
   ipcMain.handle('cert:cancel', (_event, jobId: string) => {
     const controller = activeRuns.get(jobId);
     if (controller) {
+      cancelledJobs.add(jobId);
       controller.abort();
       activeRuns.delete(jobId);
     }
@@ -1037,7 +1034,7 @@ app.whenReady().then(async () => {
   // Release name displayed in the About panel. Update this each release —
   // the version itself is read automatically from package.json via
   // app.getVersion() so it can never drift. See CLAUDE.md release checklist.
-  const RELEASE_NAME = 'Eight Days a Week';
+  const RELEASE_NAME = 'Ten Ichi';
   const appVersion = app.getVersion();
   app.setAboutPanelOptions({
     applicationName: 'RESO Desktop Client',

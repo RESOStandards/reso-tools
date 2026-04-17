@@ -217,6 +217,8 @@ export interface FieldInfo {
 export interface CsdlValidationError {
   readonly path: string;
   readonly message: string;
+  /** Link to the relevant section of the OData CSDL specification. */
+  readonly specUrl?: string;
 }
 
 /** Result of CSDL validation. */

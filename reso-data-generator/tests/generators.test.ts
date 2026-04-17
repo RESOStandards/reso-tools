@@ -534,8 +534,14 @@ describe('reflattenAgentFields', () => {
       // Each role should have the correct member's data
       expect(record.ListAgentFirstName).toBe(listMember.MemberFirstName);
       expect(record.BuyerAgentFirstName).toBe(buyerMember.MemberFirstName);
-      // They should be different people
-      expect(record.ListAgentFirstName).not.toBe(record.BuyerAgentFirstName);
+
+      // Different people: unique identifiers must differ, but human-readable
+      // fields (names, phones, emails) may randomly collide in generated data.
+      // Only assert on fields that are guaranteed unique by construction.
+      const MUST_DIFFER = ['Key', 'MlsId'] as const;
+      for (const suffix of MUST_DIFFER) {
+        expect(record[`ListAgent${suffix}`]).not.toBe(record[`BuyerAgent${suffix}`]);
+      }
     }
   });
 });

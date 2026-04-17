@@ -51,7 +51,7 @@ describe('validateCsdl', () => {
     expect(result.errors[0].message).toContain('namespace');
   });
 
-  it('detects missing key properties', () => {
+  it('detects missing key properties with spec URL', () => {
     const schema: CsdlSchema = {
       ...validSchema,
       entityTypes: [{ name: 'NoKey', key: [], properties: [], navigationProperties: [] }]
@@ -59,6 +59,7 @@ describe('validateCsdl', () => {
     const result = validateCsdl(schema);
     expect(result.valid).toBe(false);
     expect(result.errors[0].message).toContain('no key');
+    expect(result.errors[0].specUrl).toContain('oasis-open.org');
   });
 
   it('detects key property not in properties list', () => {
@@ -246,5 +247,311 @@ describe('validateCsdl', () => {
     const result = validateCsdl(schema);
     expect(result.valid).toBe(false);
     expect(result.errors.some(e => e.message.includes('UnknownType'))).toBe(true);
+  });
+
+  // --- Complex type base type validation ---
+
+  it('detects invalid complex type base type', () => {
+    const schema: CsdlSchema = {
+      ...validSchema,
+      complexTypes: [
+        {
+          name: 'Address',
+          baseType: 'NonExistent',
+          properties: [{ name: 'Street', type: 'Edm.String' }],
+          navigationProperties: []
+        }
+      ]
+    };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.message.includes('NonExistent'))).toBe(true);
+  });
+
+  it('accepts valid complex type base type', () => {
+    const schema: CsdlSchema = {
+      ...validSchema,
+      complexTypes: [
+        {
+          name: 'BaseAddress',
+          properties: [{ name: 'Country', type: 'Edm.String' }],
+          navigationProperties: []
+        },
+        {
+          name: 'FullAddress',
+          baseType: 'org.reso.metadata.BaseAddress',
+          properties: [{ name: 'Street', type: 'Edm.String' }],
+          navigationProperties: []
+        }
+      ]
+    };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(true);
+  });
+
+  // --- Navigation property binding path validation ---
+
+  it('detects binding path referencing nonexistent navigation property', () => {
+    const schema: CsdlSchema = {
+      ...validSchema,
+      entityTypes: [
+        {
+          name: 'Property',
+          key: ['ListingKey'],
+          properties: [{ name: 'ListingKey', type: 'Edm.String' }],
+          navigationProperties: []
+        }
+      ],
+      entityContainer: {
+        name: 'Default',
+        entitySets: [
+          {
+            name: 'Property',
+            entityType: 'org.reso.metadata.Property',
+            navigationPropertyBindings: [
+              { path: 'NonExistentNav', target: 'Property' }
+            ]
+          }
+        ],
+        singletons: [],
+        actionImports: [],
+        functionImports: []
+      }
+    };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.message.includes('NonExistentNav'))).toBe(true);
+  });
+
+  // --- Navigation property binding target validation ---
+
+  it('detects binding target referencing nonexistent entity set with spec URL', () => {
+    const schema: CsdlSchema = {
+      ...validSchema,
+      entityTypes: [
+        {
+          name: 'Property',
+          key: ['ListingKey'],
+          properties: [{ name: 'ListingKey', type: 'Edm.String' }],
+          navigationProperties: [
+            { name: 'Photos', type: 'Collection(org.reso.metadata.Media)', isCollection: true, entityTypeName: 'Media' }
+          ]
+        }
+      ],
+      entityContainer: {
+        name: 'Default',
+        entitySets: [
+          {
+            name: 'Property',
+            entityType: 'org.reso.metadata.Property',
+            navigationPropertyBindings: [
+              { path: 'Photos', target: 'Media' }
+            ]
+          }
+        ],
+        singletons: [],
+        actionImports: [],
+        functionImports: []
+      }
+    };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.message.includes('Media') && e.message.includes('entity set'))).toBe(true);
+  });
+
+  it('accepts valid binding path and target', () => {
+    const schema: CsdlSchema = {
+      ...validSchema,
+      entityTypes: [
+        {
+          name: 'Property',
+          key: ['ListingKey'],
+          properties: [{ name: 'ListingKey', type: 'Edm.String' }],
+          navigationProperties: [
+            { name: 'Photos', type: 'Collection(org.reso.metadata.Media)', isCollection: true, entityTypeName: 'Media' }
+          ]
+        },
+        {
+          name: 'Media',
+          key: ['MediaKey'],
+          properties: [{ name: 'MediaKey', type: 'Edm.String' }],
+          navigationProperties: []
+        }
+      ],
+      entityContainer: {
+        name: 'Default',
+        entitySets: [
+          {
+            name: 'Property',
+            entityType: 'org.reso.metadata.Property',
+            navigationPropertyBindings: [
+              { path: 'Photos', target: 'Media' }
+            ]
+          },
+          { name: 'Media', entityType: 'org.reso.metadata.Media' }
+        ],
+        singletons: [],
+        actionImports: [],
+        functionImports: []
+      }
+    };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(true);
+  });
+
+  // --- Navigation property type vs binding target type ---
+
+  it('detects nav property type mismatch with binding target entity type', () => {
+    const schema: CsdlSchema = {
+      ...validSchema,
+      entityTypes: [
+        {
+          name: 'Property',
+          key: ['ListingKey'],
+          properties: [{ name: 'ListingKey', type: 'Edm.String' }],
+          navigationProperties: [
+            { name: 'Photos', type: 'Collection(org.reso.metadata.Media)', isCollection: true, entityTypeName: 'Media' }
+          ]
+        },
+        {
+          name: 'Media',
+          key: ['MediaKey'],
+          properties: [{ name: 'MediaKey', type: 'Edm.String' }],
+          navigationProperties: []
+        },
+        {
+          name: 'Office',
+          key: ['OfficeKey'],
+          properties: [{ name: 'OfficeKey', type: 'Edm.String' }],
+          navigationProperties: []
+        }
+      ],
+      entityContainer: {
+        name: 'Default',
+        entitySets: [
+          {
+            name: 'Property',
+            entityType: 'org.reso.metadata.Property',
+            navigationPropertyBindings: [
+              { path: 'Photos', target: 'Office' }
+            ]
+          },
+          { name: 'Media', entityType: 'org.reso.metadata.Media' },
+          { name: 'Office', entityType: 'org.reso.metadata.Office' }
+        ],
+        singletons: [],
+        actionImports: [],
+        functionImports: []
+      }
+    };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.message.includes('does not match'))).toBe(true);
+  });
+
+  // --- Referential constraint validation ---
+
+  it('detects referential constraint with invalid source property', () => {
+    const schema: CsdlSchema = {
+      ...validSchema,
+      entityTypes: [
+        {
+          name: 'Property',
+          key: ['ListingKey'],
+          properties: [{ name: 'ListingKey', type: 'Edm.String' }],
+          navigationProperties: [
+            {
+              name: 'ListAgent',
+              type: 'org.reso.metadata.Member',
+              isCollection: false,
+              entityTypeName: 'Member',
+              referentialConstraints: [
+                { property: 'NonExistentFK', referencedProperty: 'MemberKey' }
+              ]
+            }
+          ]
+        },
+        {
+          name: 'Member',
+          key: ['MemberKey'],
+          properties: [{ name: 'MemberKey', type: 'Edm.String' }],
+          navigationProperties: []
+        }
+      ]
+    };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.message.includes('NonExistentFK'))).toBe(true);
+  });
+
+  it('detects referential constraint with invalid referenced property', () => {
+    const schema: CsdlSchema = {
+      ...validSchema,
+      entityTypes: [
+        {
+          name: 'Property',
+          key: ['ListingKey'],
+          properties: [
+            { name: 'ListingKey', type: 'Edm.String' },
+            { name: 'ListAgentKey', type: 'Edm.String' }
+          ],
+          navigationProperties: [
+            {
+              name: 'ListAgent',
+              type: 'org.reso.metadata.Member',
+              isCollection: false,
+              entityTypeName: 'Member',
+              referentialConstraints: [
+                { property: 'ListAgentKey', referencedProperty: 'BadProperty' }
+              ]
+            }
+          ]
+        },
+        {
+          name: 'Member',
+          key: ['MemberKey'],
+          properties: [{ name: 'MemberKey', type: 'Edm.String' }],
+          navigationProperties: []
+        }
+      ]
+    };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.message.includes('BadProperty'))).toBe(true);
+  });
+
+  it('accepts valid referential constraints', () => {
+    const schema: CsdlSchema = {
+      ...validSchema,
+      entityTypes: [
+        {
+          name: 'Property',
+          key: ['ListingKey'],
+          properties: [
+            { name: 'ListingKey', type: 'Edm.String' },
+            { name: 'ListAgentKey', type: 'Edm.String' }
+          ],
+          navigationProperties: [
+            {
+              name: 'ListAgent',
+              type: 'org.reso.metadata.Member',
+              isCollection: false,
+              entityTypeName: 'Member',
+              referentialConstraints: [
+                { property: 'ListAgentKey', referencedProperty: 'MemberKey' }
+              ]
+            }
+          ]
+        },
+        {
+          name: 'Member',
+          key: ['MemberKey'],
+          properties: [{ name: 'MemberKey', type: 'Edm.String' }],
+          navigationProperties: []
+        }
+      ]
+    };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(true);
   });
 });

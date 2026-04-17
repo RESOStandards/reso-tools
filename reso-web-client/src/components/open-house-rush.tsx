@@ -6,7 +6,9 @@
  * Pure CSS + React, no dependencies.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+
+const SynonymSwatter = lazy(() => import('./synonym-swatter').then(m => ({ default: m.SynonymSwatter })));
 
 const GRID_SIZE = 5;
 const GAME_DURATION_S = 30;
@@ -65,6 +67,13 @@ export const OpenHouseRush = ({ onClose }: { readonly onClose: () => void }) => 
   const [gameOver, setGameOver] = useState(false);
   const [lastPun, setLastPun] = useState('');
   const [missed, setMissed] = useState(0);
+  const [showSwatter, setShowSwatter] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
   const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const spawnRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
@@ -260,6 +269,15 @@ export const OpenHouseRush = ({ onClose }: { readonly onClose: () => void }) => 
               >
                 Play Again
               </button>
+              {score >= 5 && (
+                <button
+                  type="button"
+                  onClick={() => setShowSwatter(true)}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-amber-500 text-white hover:bg-amber-600 cursor-pointer animate-bounce-subtle"
+                >
+                  🪰 Synonym Swatter
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onClose}
@@ -271,6 +289,12 @@ export const OpenHouseRush = ({ onClose }: { readonly onClose: () => void }) => 
           </div>
         )}
       </div>
+
+      {showSwatter && (
+        <Suspense fallback={null}>
+          <SynonymSwatter onClose={() => setShowSwatter(false)} />
+        </Suspense>
+      )}
 
       <style>{`
         @keyframes bounce-subtle {

@@ -152,6 +152,9 @@ const state = {
   running: false,
 };
 
+/** Ephemeral state for sub-step debouncing and elapsed time tracking. */
+const subStepState: Record<string, unknown> = {};
+
 /** Subscribe to job events. Returns an unsubscribe function. */
 export const subscribe = (listener: JobEventListener): (() => void) => {
   state.listeners.add(listener);
@@ -221,6 +224,8 @@ const buildSDKConfig = (recipient: RecipientConfig, endorsement: CertEndorsement
         limit: recipient.ddOptions.limit,
         strictMode: recipient.ddOptions.strictMode,
         batchExpand: recipient.ddOptions.batchExpand,
+        requestDelay: recipient.ddOptions.requestDelay,
+        rateLimitWait: recipient.ddOptions.rateLimitWait,
         providerUoi,
         providerUsi: recipient.providerUsi,
         recipientUoi: recipient.recipientUoi,
@@ -302,17 +307,62 @@ const runJobElectron = async (job: Job): Promise<void> => {
     if (jobId !== job.id) return;
 
     const stepStatus = progress.status as StepStatus;
+
+    // Sub-step events update the currently running parent step's detail text
+    if (progress.step.startsWith('sub:')) {
+      const current = state.jobs.get(jobId);
+      if (!current) return;
+      const runningParent = current.steps.find(s => s.status === 'running');
+      if (runningParent && progress.message) {
+        // Compute elapsed time since step started running
+        const stepStartKey = `_stepStart:${jobId}:${runningParent.name}`;
+        if (!(stepStartKey in subStepState)) {
+          subStepState[stepStartKey] = Date.now();
+        }
+        const elapsed = Date.now() - (subStepState[stepStartKey] as number);
+
+        const updatedSteps = current.steps.map(s =>
+          s.name === runningParent.name ? { ...s, detail: progress.message, duration: elapsed } : s
+        );
+        updateJob(jobId, { steps: updatedSteps });
+
+        // Debounce UI updates at 50ms
+        const debounceKey = `${jobId}:${runningParent.name}`;
+        if (!subStepState[debounceKey]) {
+          subStepState[debounceKey] = true;
+          setTimeout(() => {
+            subStepState[debounceKey] = false;
+            emit({ type: 'step-progress', jobId, step: runningParent.name, status: 'running', detail: progress.message, duration: elapsed });
+          }, 50);
+        }
+      }
+      return;
+    }
+
     emit({ type: 'step-progress', jobId, step: progress.step, status: stepStatus, detail: progress.message, duration: progress.duration });
 
-    // Update the step in our local state — add dynamically if not in the predefined list
+    // Update the step in our local state — add dynamically if not in the predefined list.
+    // When a step transitions to "running", mark all preceding steps that are
+    // still "running" as "passed" to prevent the off-by-one lag from IPC batching.
     const current = state.jobs.get(jobId);
     if (!current) return;
     const exists = current.steps.some(s => s.name === progress.step);
-    const updatedSteps = exists
+    const baseSteps = exists
       ? current.steps.map(s =>
           s.name === progress.step ? { ...s, status: stepStatus, duration: progress.duration, detail: progress.message } : s
         )
       : [...current.steps, { name: progress.step, status: stepStatus, duration: progress.duration, detail: progress.message }];
+
+    // Auto-close preceding "running" steps when a new step starts running
+    const updatedSteps = stepStatus === 'running'
+      ? baseSteps.map(s => {
+          if (s.name !== progress.step && s.status === 'running') {
+            return { ...s, status: 'passed' as StepStatus };
+          }
+          return s;
+        })
+      : baseSteps;
+
     updateJob(jobId, { steps: updatedSteps });
   });
 

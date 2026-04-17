@@ -53,6 +53,8 @@ const REFRESH_LEAD_MS = 5 * 60 * 1000; // 5 minutes
 interface PersistedCredentials {
   readonly username: string;
   readonly password: string;
+  /** Cert API token — used as OAuth2 client_secret for provider token requests. */
+  readonly apiToken: string;
 }
 
 export interface AuthContextValue {
@@ -87,6 +89,7 @@ export const AuthContext = createContext<AuthContextValue | null>(null);
 interface CredentialsRef {
   username: string;
   password: string;
+  apiToken: string;
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -131,7 +134,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         'Cannot refresh provider token: credentials are not available. Please sign in again.'
       );
     }
-    const fresh = await requestProviderToken(creds.username, creds.password);
+    const fresh = await requestProviderToken(creds.username, creds.apiToken);
     setProviderToken(fresh);
     scheduleRefresh(fresh);
     return fresh.accessToken;
@@ -145,18 +148,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Step 1: Cert API login → API key + identity
         const loginResponse = await certApiLogin(username, password);
 
-        // Step 2: OAuth2 client_credentials → provider token. Done in the
-        // same call so the user sees one "Sign in" loading state and we
-        // never have to ask for the password twice.
-        const token = await requestProviderToken(username, password);
+        // Step 2: OAuth2 client_credentials → provider token.
+        // Use the server-normalized username (not what the user typed) as client_id.
+        const normalizedUsername = loginResponse.username ?? username;
+        const token = await requestProviderToken(normalizedUsername, loginResponse.token);
 
-        credentialsRef.current = { username, password };
+        credentialsRef.current = { username: normalizedUsername, password, apiToken: loginResponse.token };
         setUser(loginResponse);
         setProviderToken(token);
         await secureSetJson(USER_STORAGE_KEY, loginResponse);
         await secureSetJson<PersistedCredentials>(CREDS_STORAGE_KEY, {
           username,
-          password
+          password,
+          apiToken: loginResponse.token
         });
         scheduleRefresh(token);
       } catch (err) {
@@ -206,20 +210,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
           const token = await requestProviderToken(
             persistedCreds.username,
-            persistedCreds.password
+            persistedCreds.apiToken ?? persistedCreds.password
           );
           if (cancelled) return;
           setProviderToken(token);
           scheduleRefresh(token);
         } catch {
-          // Credentials are stale or the network is unreachable. Clear the
-          // user state so the app routes back to the login screen and the
-          // user can re-enter. Don't clear the persisted creds yet — they
-          // might still be valid once the network is back; the next manual
-          // sign-in will overwrite them anyway.
+          // Credentials are stale or invalid. Clear everything so the user
+          // gets a clean login prompt. Stale credentials (e.g., missing
+          // apiToken from a previous format) would keep 400'ing on every restart.
           if (!cancelled) {
             setUser(null);
             credentialsRef.current = null;
+            void secureRemove(USER_STORAGE_KEY);
+            void secureRemove(CREDS_STORAGE_KEY);
           }
         }
       }

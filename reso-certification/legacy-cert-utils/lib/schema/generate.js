@@ -10,7 +10,7 @@ const { writeFile } = require('./utils');
  * @param {Boolean} additionalProperties
  * @returns Definitions created from the fields ans lookups in the metadata
  */
-const createDefinitions = (resources, lookups, additionalProperties = false) => {
+const createDefinitions = async (resources, lookups, additionalProperties = false) => {
   const typeMappings = {
     'Edm.String': 'string',
     'Edm.Boolean': 'boolean',
@@ -51,6 +51,8 @@ const createDefinitions = (resources, lookups, additionalProperties = false) => 
   };
 
   for (const [resourceName, resourceFields] of Object.entries(resources)) {
+    // Yield to the event loop between resources so IPC messages can flush
+    await new Promise(resolve => setImmediate(resolve));
     const properties = {};
     resourceFields.forEach(field => {
       const customErrors = [];
@@ -216,8 +218,8 @@ const createDefinitions = (resources, lookups, additionalProperties = false) => 
  * to the properties inside `oneOf`. The validation tool can adjust this schema
  * according to the payload type.
  */
-const createSchema = (resources, lookups, additionalProperties) => {
-  const definitions = createDefinitions(resources, lookups, additionalProperties);
+const createSchema = async (resources, lookups, additionalProperties) => {
+  const definitions = await createDefinitions(resources, lookups, additionalProperties);
 
   const schema = {
     $schema: 'http://json-schema.org/draft-07/schema#',
@@ -270,10 +272,10 @@ const getResourcesFromMetadata = metadata => {
   return resources;
 };
 
-const generateSchema = (metadataJson, additionalProperties) => {
+const generateSchema = async (metadataJson, additionalProperties) => {
   try {
     const resources = getResourcesFromMetadata(metadataJson);
-    const schema = createSchema(resources, metadataJson?.lookups, additionalProperties);
+    const schema = await createSchema(resources, metadataJson?.lookups, additionalProperties);
     const { metadataMap = {} } = buildMetadataMap(metadataJson) || {};
     schema.definitions.MetadataMap = metadataMap;
     return schema;
@@ -288,7 +290,7 @@ const generateJsonSchema = async ({
   outputFilePath = '',
   additionalProperties = false
 } = {}) => {
-  const schema = generateSchema(metadataReportJson, additionalProperties);
+  const schema = await generateSchema(metadataReportJson, additionalProperties);
   if (schema && outputFilePath) {
     const success = await writeFile(outputFilePath, JSON.stringify(schema));
     if (!success) console.log(`Error writing schema to path ${outputFilePath}`);

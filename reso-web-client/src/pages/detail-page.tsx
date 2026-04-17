@@ -10,7 +10,7 @@ import { useMetadata } from '../hooks/use-metadata';
 import { useUiConfig } from '../hooks/use-ui-config';
 import { FriendlyError } from '../components/friendly-error';
 import { useServer } from '../context/server-context';
-import type { ResoField } from '../types';
+import { READ_ONLY_RESOURCES, type ResoField } from '../types';
 import { SensitiveValue } from '../components/sensitive-value';
 import { ADDRESS_FIELDS, formatAddress, formatFieldValue, getDisplayName, isSensitiveField, isUrlValue, isVideoMediaType } from '../utils/format';
 
@@ -340,7 +340,7 @@ export const DetailPage = () => {
             </button>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{resourceName} Detail</h2>
           </div>
-          {(permissions.canEdit || permissions.canDelete) && (
+          {!READ_ONLY_RESOURCES.has(resourceName) && (permissions.canEdit || permissions.canDelete) && (
             <div className="flex gap-2">
               {permissions.canEdit && (
                 <button
@@ -470,7 +470,7 @@ export const DetailPage = () => {
       </div>
 
       {/* Delete dialog (fixed overlay, outside scroll area) */}
-      {permissions.canDelete && showDelete && (
+      {!READ_ONLY_RESOURCES.has(resourceName) && permissions.canDelete && showDelete && (
         <DeleteDialog
           resource={resourceName}
           record={record}

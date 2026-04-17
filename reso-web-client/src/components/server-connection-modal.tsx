@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ServerPermissions } from '../context/server-context';
 
 const AUTH_MODE_TOKEN = 'token' as const;
@@ -61,6 +61,13 @@ export const ServerConnectionModal = ({
   const [canEdit, setCanEdit] = useState(initial?.permissions.canEdit ?? false);
   const [canDelete, setCanDelete] = useState(initial?.permissions.canDelete ?? false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, onClose]);
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {

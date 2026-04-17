@@ -810,6 +810,31 @@ const writeAnalyticsReports = async ({ outputPath, version, serviceRootUri, repl
 
     const resolvedPath = resolveFilePathSync({ outputPath, filename: AVAILABILITY_RESPONSES_FILENAME });
 
+    // Compute summary stats from the request trace (Welford's online algorithm)
+    const allResponses = REPLICATION_STATE_SERVICE.getResponses();
+    let wCount = 0, wMean = 0, wM2 = 0;
+    let totalBytes = 0, totalRecords = 0;
+    for (const r of allResponses) {
+      const rt = r.responseTimeMs ?? 0;
+      totalBytes += r.responseBytes ?? 0;
+      totalRecords += r.recordCount ?? 0;
+      if (rt <= 0) continue;
+      wCount++;
+      const delta = rt - wMean;
+      wMean += delta / wCount;
+      wM2 += delta * (rt - wMean);
+    }
+    const stddev = wCount >= 2 ? Math.sqrt(wM2 / wCount) : 0;
+    let anomalyCount = 0;
+    if (wCount >= 3) {
+      for (const r of allResponses) {
+        const rt = r.responseTimeMs ?? 0;
+        if (rt > 0 && Math.abs(rt - wMean) > 2 * stddev) {
+          anomalyCount++;
+        }
+      }
+    }
+
     // write responses report
     await writeFile(
       resolvedPath,
@@ -818,7 +843,15 @@ const writeAnalyticsReports = async ({ outputPath, version, serviceRootUri, repl
         version,
         generatedOn,
         serviceRootUri,
-        responses: REPLICATION_STATE_SERVICE.getResponses().map(({ requestUri, ...otherResponseInfo }) => {
+        stats: {
+          totalRequests: wCount,
+          totalRecords,
+          totalBytes,
+          meanResponseMs: Math.round(wMean),
+          stddevMs: Math.round(stddev),
+          anomalyCount,
+        },
+        responses: allResponses.map(({ requestUri, ...otherResponseInfo }) => {
           return {
             requestUri: requestUri.replace(serviceRootUri, ''),
             ...otherResponseInfo

@@ -42,6 +42,7 @@ import type {
 const xmlParserOptions = {
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
+  processEntities: false,
   isArray: (name: string) =>
     [
       'EntityType',

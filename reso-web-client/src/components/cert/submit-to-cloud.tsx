@@ -12,7 +12,7 @@
  *   4. Progress indicator → success/failure with cert API link
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Badge, FilterPill } from '../metadata/shared';
 import { CERT_ENV_LABELS, CERT_ENV_SHORT_LABELS, SERVICES_URLS } from '../../constants/cert';
 import type { CertEnvironment } from '../../constants/cert';
@@ -40,6 +40,12 @@ export const SubmitToCloud = ({
   const [state, setState] = useState<SubmissionState>('preview');
   const [env, setEnv] = useState<CertEnvironment>('certqa');
   const [result, setResult] = useState<SubmissionResult>({});
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
 
   const handleSubmit = async () => {
     setState('submitting');

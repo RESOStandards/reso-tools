@@ -94,15 +94,15 @@ export const isPlaceholderValue = (value: string): boolean =>
 
 const RESO_ENUM_NS = 'org.reso.metadata.enums.';
 
-/** Generates a random lookup value from available lookups for a given type or lookup name, skipping placeholder values.
+/** Generates a random lookup value from available lookups for a given type or lookup name.
+ *  Uses whatever the metadata provides — values must be advertised in metadata.
  *  Tries multiple key formats: full type, short name, and RESO-namespaced name. */
 export const randomLookupValue = (type: string, lookups: Readonly<Record<string, ReadonlyArray<ResoLookup>>>): string | undefined => {
   const shortName = type.includes('.') ? type.slice(type.lastIndexOf('.') + 1) : type;
-  const candidates = lookups[type]
+  const values = lookups[type]
     ?? lookups[shortName]
     ?? lookups[`${RESO_ENUM_NS}${shortName}`]
     ?? lookups[`${RESO_ENUM_NS}${type}`];
-  const values = candidates?.filter(v => !isPlaceholderValue(v.lookupValue));
   if (!values || values.length === 0) return undefined;
   const chosen = randomChoice(values);
   // Prefer the StandardName annotation (human-friendly, matches Lookup Resource LookupValue)

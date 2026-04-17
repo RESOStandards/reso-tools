@@ -2,6 +2,118 @@
 
 ---
 
+## v0.10 – "Ten Ichi"
+
+### XSD and Semantic Metadata Validation
+
+Added OData CSDL metadata validation to all certification pipelines (DD, Core, Add/Edit, EntityEvent). Metadata is validated after fetch, before any endorsement-specific testing.
+
+**XSD Structural Validation**
+- Validates XML metadata against the official OASIS OData EDM + EDMX schemas (4.0 and 4.01)
+- Uses **libxml2-wasm** (MIT, zero dependencies, WASM-based libxml2) for cross-platform compatibility — works identically in Node.js CLI and Electron desktop client with no native binary ABI issues
+
+**Semantic CSDL Validation**
+- Nine checks ported from Apache Olingo's CsdlTypeValidator: entity type keys, base type resolution, entity set references, navigation binding paths/targets, nav property type matching, referential constraints
+- Each error includes a link to the relevant section of the OASIS OData 4.0 or 4.01 CSDL specification
+- Commander test fixtures (16 files) included for regression parity
+
+**Dependency: libxml2-wasm replaces libxmljs2**
+
+| | libxmljs2 (old) | libxml2-wasm (new) |
+|---|---|---|
+| License | MIT | MIT |
+| Dependencies | 25+ (native build chain) | 0 |
+| Vulnerabilities | 0 | 0 |
+| Package size | ~15MB (with native build) | 1.4MB |
+| Native binary | Yes (requires ABI match) | No (WASM, cross-platform) |
+| Electron compatible | Requires electron-rebuild | Works out of the box |
+
+**Why:** libxmljs2's native binary must match the Node.js ABI version. Electron uses a different ABI than system Node, causing version mismatch errors. libxml2-wasm uses the same libxml2 engine compiled to WebAssembly, which runs identically in any JavaScript runtime.
+
+### Reference Server
+
+- **EntityEvent reset fix:** data reset now skips read-only resources (EntityEvent, Lookup) so their data is preserved
+- **Lookup Resource reconciliation:** after data generation, the server inserts any enum values used in generated data into the Lookup Resource so they are advertised in the metadata
+- **Data generator:** stopped filtering out placeholder enum values, added RESO enum namespace fallback
+- **Reference metadata:** removed 29 placeholder lookup values from DD 2.0 and 37 from DD 2.1
+
+### Desktop Client (v0.10.0)
+
+- Read-only resources show lock icon in nav with "Read-only resource" tooltip
+- Detail page hides Edit/Delete buttons for read-only resources
+- Dashboard recent jobs are clickable — navigates to Jobs page with highlight and auto-expand
+- Fixed cert runner import path for dev mode
+- v0.9 binaries rebuilt with correct version in filenames
+
+### DD Documentation Site
+
+- Open enumerations now generate proper lookup pages instead of dead links (37 new pages for DD 2.1)
+- Lookup index shows "Open" label for enumerations with no standard values
+
+### MCP Server Guide
+
+- Added architecture diagram showing the AI trust boundary
+- Responsive design, centered, clickable to expand
+
+### Transport Site
+
+- Fixed dark mode link colors inside card bodies and policy changes page
+
+### Policy
+
+- Added new dependency security audit requirement to CLAUDE.md
+
+### Real-Time Replication Progress (#126)
+
+RESO Analytics information during DD replication testing, including real-time progress and industry comparison data.
+
+- `onProgress` callback added to `replicate()` for real-time progress during replication
+- `data-availability-responses.json` now includes a `stats` summary section
+- Sub-step progress events now update the UI in real time
+
+### Login and Notifications
+
+- Case-sensitive username, apiToken for OAuth2, stale credential cleanup
+- Notification bell with services.reso.org polling
+- Services API client (notifications, jobs, variations)
+
+### Certification Pipeline
+
+- Pipeline refactor: steps support sub-function arrays (sequential/parallel mode)
+- Cert runner moved to Worker thread (main process event loop free for IPC)
+- DD pipeline: replication strategies as sub-functions with detailed report writing
+- Request delay and 429 wait time configurable on DD config
+- 3-year lookback (was 2)
+
+### UI
+
+- Escape key closes all modals
+- Back/forward navigation
+- Lock icon for read-only resources
+
+### Tickets
+- #123 XSD validation
+- #124 Reference metadata with annotated empty enumerations
+- #125 Monadic test container pattern
+- #126 Real-time step progress during DD replication
+- reso-certification#2543 Sample certification report fixtures
+
+### Package Versions
+
+| Package | Previous | New | Reason |
+|---|---|---|---|
+| reso-desktop-client | 0.9.0 | 0.10.0 | Cancel job, release name, worker progress |
+| reso-certification | 0.8.0 | 0.9.0 | onProgress callback, Welford's stats, sub-function pipeline |
+| reso-web-client | 0.3.0 | 0.4.0 | Progress bar chart, industry baseline, dashboard loading |
+
+Unchanged: reso-client (0.1.0), reso-data-generator (0.2.0), reso-reference-server (0.8.0), reso-mcp-server (0.8.0), reso-validation (0.1.0), odata-expression-parser (0.1.0), reso-web-api-proxy (0.1.0)
+
+### Tests
+
+1,237 tests across 8 packages (up from 1,197 in v0.9)
+
+---
+
 ## v0.9 – 2026-04-14
 
 ### To the Nines

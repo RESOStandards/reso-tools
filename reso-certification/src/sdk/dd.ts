@@ -13,9 +13,11 @@ import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata } from '../test-runner/metadata.js';
 import { generateMetadataReport } from '../metadata/serializer.js';
 import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
-import type { DDConfig, PipelineStep, StepResult } from './types.js';
+import type { DDConfig, PipelineStep, StepResult, TestFunction } from './types.js';
 import { createPipeline } from './pipeline.js';
-import { coreReportGenerators, writeReports } from './reports.js';
+import { createGenericReportGenerator, createDetailedReportGenerator, writeReports } from './reports.js';
+import type { PipelineResult } from './types.js';
+import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
 
 // ── Cert-utils imports (local copy for modification) ──
 
@@ -35,7 +37,7 @@ const { REPLICATION_STRATEGIES } = certUtilsReplicationUtils;
 const DEFAULT_LIMIT = 100000;
 const DEFAULT_PAGE_SIZE_V17 = 100;
 const DEFAULT_PAGE_SIZE_V20 = 1000;
-const DEFAULT_YEARS_BACK = 2;
+const DEFAULT_YEARS_BACK = 3;
 const DEFAULT_RESULTS_PATH = '.reso-cert';
 
 /** Build the cert-utils compatible output directory path. */
@@ -104,9 +106,14 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
   run: async (ctx, onProgress) => {
     await mkdir(ctx.outputPath, { recursive: true });
 
-    // Fetch and serialize EDMX metadata
+    // Fetch and validate EDMX metadata
     onProgress({ step: 'Generate metadata report', status: 'running', message: 'Fetching $metadata...' });
     const edmxXml = await fetchMetadata(ctx.serverUrl, ctx.authToken!);
+
+    // XSD + semantic validation
+    const validation = await validateMetadata(edmxXml);
+    const validationErrors = collectValidationErrors(validation);
+
     const baseReport = generateMetadataReport(edmxXml, ctx.version);
 
     // Write raw metadata XML
@@ -139,7 +146,7 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
     }
 
     const lookupMsg = lookupResourceAvailable
-      ? ` + ${lookupRecordCount} Lookup Resource records merged`
+      ? ` + ${lookupRecordCount.toLocaleString()} Lookup Resource records merged`
       : ' (no Lookup Resource)';
 
     const artifacts = [
@@ -149,16 +156,18 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
 
     return {
       context: { ...ctx, metadataReportPath, lookupResourceAvailable, lookupRecordCount },
-      summary: `${report.resources.length} resources, ${report.fields.length} fields, ${report.lookups.length} lookups${lookupMsg}`,
+      summary: `${report.resources.length} resources, ${report.fields.length.toLocaleString()} fields, ${report.lookups.length.toLocaleString()} lookups${lookupMsg}. ${formatValidationSummary(validation)}`,
       counts: { resources: report.resources.length, fields: report.fields.length, lookups: report.lookups.length },
       artifacts,
+      ...(validationErrors.length > 0 ? { errors: validationErrors } : {}),
+      ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {}),
     };
   },
 });
 
 const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Check variations',
-  run: async (ctx) => {
+  run: async (ctx, onProgress) => {
     if (ctx.version !== '2.0' && ctx.version !== '2.1') {
       return { context: ctx, status: 'skipped', summary: 'Variations only checked for DD 2.0' };
     }
@@ -203,16 +212,19 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
   batchExpand: config.batchExpand ?? false,
   outputPath: ctx.outputPath,
   throwOnError: true,
+  secondsDelayBetweenRequests: config.requestDelay ?? 1,
+  rateLimitedWaitTimeMinutes: config.rateLimitWait ?? 15,
 });
 
-const initReplicationState: PipelineStep<DDContext> = {
-  name: 'Initialize replication state',
-  run: async (ctx) => {
-    // cert-utils reads schema-validation-settings.json from cwd.
-    // Copy from the package's reference file if not already present.
+// ── Replication test functions ──
+// These are individual async functions that can be composed into a step.
+// Run sequentially by default, or in parallel when concurrency > 1.
+
+/** Initialize replication state service and copy schema validation settings. */
+const initReplicationState: TestFunction<DDContext> = async (ctx) => {
+  if (!ctx.replicationStateService) {
     const settingsFile = 'schema-validation-settings.json';
     if (!existsSync(settingsFile)) {
-      // Try the package root first (checked-in reference file), then legacy-cert-utils
       const packageRoot = join(dirname(new URL(import.meta.url).pathname), '..', '..');
       const sourcePaths = [
         join(packageRoot, settingsFile),
@@ -223,52 +235,187 @@ const initReplicationState: PipelineStep<DDContext> = {
         await copyFile(sourcePath, settingsFile);
       }
     }
-
-    return {
-      context: { ...ctx, replicationStateService: createReplicationStateServiceInstance() },
-      summary: 'Replication state service initialized',
-    };
-  },
+    return { context: { ...ctx, replicationStateService: createReplicationStateServiceInstance() } };
+  }
+  return { context: ctx };
 };
 
-const replicateTimestampDesc = (config: DDConfig): PipelineStep<DDContext> => ({
-  name: 'Replicate: TIMESTAMP_DESC',
-  run: async (ctx) => {
+/** Humanize a duration in ms to a short readable string. */
+const humanizeMs = (ms: number): string => {
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  const mins = Math.floor(ms / 60_000);
+  const secs = Math.round((ms % 60_000) / 1000);
+  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+};
+
+/** Humanize bytes to a short readable string. */
+const humanizeBytes = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+};
+
+/**
+ * Format replication progress as structured JSON for the UI bar chart.
+ * The UI detects JSON detail strings and renders them as a real-time chart.
+ * Falls back to a plain text summary for non-UI consumers.
+ */
+const formatReplicationProgress = (info: Record<string, unknown>): string => {
+  const resourceStats = info.resourceStats as ReadonlyArray<Record<string, unknown>> | undefined;
+  const totalFetched = Number(info.totalRecordsFetched ?? 0);
+  const throughput = info.throughput != null ? Number(info.throughput) : null;
+  const meanMs = info.meanResponseMs != null ? Number(info.meanResponseMs) : null;
+  const totalBytes = info.totalBytes != null ? Number(info.totalBytes) : null;
+  const anomalies = Number(info.anomalyCount ?? 0);
+
+  const resources = (resourceStats ?? []).map((r) => ({
+    name: String(r.resourceName ?? ''),
+    records: Number(r.recordCount ?? 0),
+    bytes: Number(r.bytes ?? 0),
+  }));
+
+  return JSON.stringify({
+    _type: 'replication-progress',
+    resources,
+    totalRecords: totalFetched,
+    totalBytes,
+    throughput,
+    meanResponseMs: meanMs,
+    anomalyCount: anomalies,
+  });
+};
+
+/** Build the onProgress adapter and a stats collector for a replication run. */
+const replicationProgressAdapter = (onProgress: import('./types.js').ProgressCallback) => {
+  let lastInfo: Record<string, unknown> = {};
+  return {
+    callback: (info: Record<string, unknown>) => {
+      lastInfo = info;
+      onProgress({ step: 'sub:replicate', status: 'running', message: formatReplicationProgress(info) });
+    },
+    getLastStats: () => ({
+      totalRecordsFetched: Number(lastInfo.totalRecordsFetched ?? 0),
+      meanResponseMs: Number(lastInfo.meanResponseMs ?? 0),
+      throughput: Number(lastInfo.throughput ?? 0),
+      anomalyCount: Number(lastInfo.anomalyCount ?? 0),
+      totalRequests: Number(lastInfo.totalRequests ?? 0),
+    }),
+  };
+};
+
+const replicateTimestampDesc = (config: DDConfig): TestFunction<DDContext> =>
+  async (ctx, onProgress) => {
     const pageSize = ctx.version === '1.7' ? DEFAULT_PAGE_SIZE_V17 : DEFAULT_PAGE_SIZE_V20;
+    const progress = replicationProgressAdapter(onProgress);
     await replicate({
       ...buildReplicationSettings(ctx, config),
       jsonSchemaValidation: ctx.version !== '1.7' ? (config.strictMode ?? true) : false,
       top: pageSize,
       strategy: REPLICATION_STRATEGIES.TIMESTAMP_DESC,
+      onProgress: progress.callback,
     });
-    return { context: ctx, summary: `TIMESTAMP_DESC with $top=${pageSize}` };
-  },
-});
+    const stats = progress.getLastStats();
+    return { context: ctx, summary: `TIMESTAMP_DESC with $top=${pageSize}`, counts: stats };
+  };
 
-const replicateNextLink = (config: DDConfig): PipelineStep<DDContext> => ({
-  name: 'Replicate: NEXT_LINK',
-  run: async (ctx) => {
+const replicateNextLink = (config: DDConfig): TestFunction<DDContext> =>
+  async (ctx, onProgress) => {
+    const progress = replicationProgressAdapter(onProgress);
     await replicate({
       ...buildReplicationSettings(ctx, config),
       maxPageSize: DEFAULT_PAGE_SIZE_V20,
       strategy: REPLICATION_STRATEGIES.NEXT_LINK,
+      onProgress: progress.callback,
     });
-    return { context: ctx, summary: `NEXT_LINK with maxPageSize=${DEFAULT_PAGE_SIZE_V20}` };
-  },
-});
+    const stats = progress.getLastStats();
+    return { context: ctx, summary: `NEXT_LINK with maxPageSize=${DEFAULT_PAGE_SIZE_V20}`, counts: stats };
+  };
 
-const replicateNextLinkFiltered = (config: DDConfig): PipelineStep<DDContext> => ({
-  name: 'Replicate: NEXT_LINK + filter',
-  run: async (ctx) => {
+const replicateNextLinkFiltered = (config: DDConfig): TestFunction<DDContext> =>
+  async (ctx, onProgress) => {
     const cutoffDate = new Date(new Date().getFullYear() - DEFAULT_YEARS_BACK, 0).toISOString();
+    const progress = replicationProgressAdapter(onProgress);
     await replicate({
       ...buildReplicationSettings(ctx, config),
       maxPageSize: DEFAULT_PAGE_SIZE_V20,
       strategy: REPLICATION_STRATEGIES.NEXT_LINK,
       filter: `ModificationTimestamp ge ${cutoffDate}`,
       orderby: 'ModificationTimestamp asc',
+      onProgress: progress.callback,
     });
-    return { context: ctx, summary: `NEXT_LINK + ModificationTimestamp filter (${DEFAULT_YEARS_BACK}yr lookback)` };
+    const stats = progress.getLastStats();
+    return { context: ctx, summary: `NEXT_LINK + ModificationTimestamp filter (${DEFAULT_YEARS_BACK}yr lookback)`, counts: stats };
+  };
+
+/** Build the replication step with all strategies as test functions. */
+const replicateAndValidate = (config: DDConfig): PipelineStep<DDContext> => ({
+  name: 'Replicate and validate',
+  // Init must run first (sequential), then replication strategies can run
+  // in parallel if enabled. Default is sequential to avoid overloading servers.
+  mode: 'sequential',
+  functions: [
+    initReplicationState,
+    ...(config.parallelReplicate
+      ? [async (ctx: Readonly<DDContext>, onProgress: import('./types.js').ProgressCallback) => {
+          // Run all replication strategies in parallel
+          const fns = [
+            replicateTimestampDesc(config),
+            ...(config.version !== '1.7' ? [
+              replicateNextLink(config),
+              replicateNextLinkFiltered(config),
+            ] : []),
+          ];
+          const results = await Promise.all(fns.map(fn => fn(ctx, onProgress)));
+          const summaries = results.map(r => r.summary).filter(Boolean);
+          return { context: ctx, summary: summaries.join('; ') };
+        }]
+      : [
+          replicateTimestampDesc(config),
+          ...(config.version !== '1.7' ? [
+            replicateNextLink(config),
+            replicateNextLinkFiltered(config),
+          ] : []),
+        ]
+    ),
+  ],
+});
+
+/** Serialize DD pipeline results into a human-readable remarks string. */
+const serializeDDRemarks = (result: PipelineResult): string => {
+  const metaStep = result.steps.find(s => s.name === 'Generate metadata report');
+  const parts: string[] = [];
+  if (metaStep?.counts) {
+    parts.push(`${metaStep.counts.resources} resources, ${(metaStep.counts.fields ?? 0).toLocaleString()} fields, ${(metaStep.counts.lookups ?? 0).toLocaleString()} lookups`);
+  }
+  parts.push(`Data Dictionary compliance test ${result.status}`);
+  return `${parts.join('. ')}.`;
+};
+
+/** Create DD report generators. */
+const ddReportGenerators = (version: string) => [
+  createGenericReportGenerator('Data Dictionary', version, serializeDDRemarks),
+  createDetailedReportGenerator('Data Dictionary', version, serializeDDRemarks),
+];
+
+const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext> => ({
+  name: 'Write compliance reports',
+  run: async (ctx, onProgress) => {
+    const generators = ddReportGenerators(config.version);
+    const pipelineResult = {
+      status: 'passed' as const,
+      endorsement: 'dd',
+      steps: ctx.pipelineSteps as ReadonlyArray<StepResult> ?? [],
+      context: ctx,
+      duration: 0,
+    };
+    const written = await writeReports(pipelineResult, generators, ctx.outputPath, onProgress);
+    return {
+      context: { ...ctx, reports: written },
+      summary: `${written.length} reports written`,
+      artifacts: written.map(r => ({ label: r.name, path: r.path })),
+    };
   },
 });
 
@@ -280,13 +427,9 @@ export const createDDPipeline = (config: DDConfig) =>
     ...(config.options?.skipHealthCheck ? [] : [healthCheck]),
     resolveAuth(config),
     generateMetadata(config),
-    initReplicationState,
     ...(config.version !== '1.7' ? [runVariations(config)] : []),
-    replicateTimestampDesc(config),
-    ...(config.version !== '1.7' ? [
-      replicateNextLink(config),
-      replicateNextLinkFiltered(config),
-    ] : []),
+    replicateAndValidate(config),
+    writeComplianceReports(config),
   ]);
 
 /** Run DD compliance tests with a single function call. */

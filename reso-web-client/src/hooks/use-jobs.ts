@@ -24,6 +24,7 @@ import type { BatchConfig } from '../components/cert/config-builder';
 
 export interface UseJobsResult {
   readonly jobs: ReadonlyArray<Job>;
+  readonly loading: boolean;
   readonly activeCount: number;
   readonly queuedCount: number;
   readonly start: (config: BatchConfig) => ReadonlyArray<Job>;
@@ -36,6 +37,7 @@ export interface UseJobsResult {
 
 export const useJobs = (): UseJobsResult => {
   const [jobs, setJobs] = useState<ReadonlyArray<Job>>(getJobs);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Subscribe to job events
@@ -44,7 +46,10 @@ export const useJobs = (): UseJobsResult => {
     });
 
     // Hydrate from local results on disk (Electron only, no-op in browser)
-    initLocalResults().then(() => setJobs(getJobs()));
+    initLocalResults().then(() => {
+      setJobs(getJobs());
+      setLoading(false);
+    });
 
     return unsubscribe;
   }, []);
@@ -80,5 +85,5 @@ export const useJobs = (): UseJobsResult => {
     deleteAllLocal().then(() => setJobs(getJobs()));
   }, []);
 
-  return { jobs, activeCount, queuedCount, start, cancel, clear, rerun, remove, removeAll };
+  return { jobs, loading, activeCount, queuedCount, start, cancel, clear, rerun, remove, removeAll };
 };

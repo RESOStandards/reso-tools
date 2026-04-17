@@ -13,7 +13,7 @@
  * Unify into a single component with a shared step card interface.
  */
 
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { SearchInput, FilterPill, Badge, AvailBar } from '../metadata/shared.js';
 import { humanizeScenarioName } from '../../constants/cert';
 
@@ -1016,6 +1016,12 @@ export const FailureReportModal = ({
   readonly onClose: () => void;
 }) => {
   const report = resolveReport(endorsement, failedStep, reports, steps);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
