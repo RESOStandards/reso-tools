@@ -183,10 +183,10 @@ export const ReplicationProgress = ({ data }: { readonly data: ReplicationProgre
           <span className="flex-1 text-gray-400 dark:text-gray-500">
             avg {humanizeMs(industry.avgResponseMs)}
             {data.meanResponseMs < industry.avgResponseMs
-              ? <span className="ml-2 text-emerald-500">{Math.round((1 - data.meanResponseMs / industry.avgResponseMs) * 100)}% faster</span>
+              ? <span className="ml-2 text-emerald-500 cursor-help" title={`Your avg response time (${humanizeMs(data.meanResponseMs)}) is ${Math.round((1 - data.meanResponseMs / industry.avgResponseMs) * 100)}% faster than the industry average (${humanizeMs(industry.avgResponseMs)})`}>{Math.round((1 - data.meanResponseMs / industry.avgResponseMs) * 100)}% faster</span>
               : data.meanResponseMs > industry.avgResponseMs
-                ? <span className="ml-2 text-amber-500">{Math.round((data.meanResponseMs / industry.avgResponseMs - 1) * 100)}% slower</span>
-                : <span className="ml-2 text-gray-400">at average</span>
+                ? <span className="ml-2 text-amber-500 cursor-help" title={`Your avg response time (${humanizeMs(data.meanResponseMs)}) is ${(data.meanResponseMs / industry.avgResponseMs).toFixed(1)}x the industry average (${humanizeMs(industry.avgResponseMs)})`}>{(data.meanResponseMs / industry.avgResponseMs).toFixed(1)}x slower</span>
+                : <span className="ml-2 text-gray-400 cursor-help" title={`Your avg response time matches the industry average (${humanizeMs(industry.avgResponseMs)})`}>at average</span>
             }
           </span>
         </div>

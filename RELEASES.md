@@ -98,6 +98,20 @@ RESO Analytics information during DD replication testing, including real-time pr
 - #126 Real-time step progress during DD replication
 - reso-certification#2543 Sample certification report fixtures
 
+### Package Versions
+
+| Package | Previous | New | Reason |
+|---|---|---|---|
+| reso-desktop-client | 0.9.0 | 0.10.0 | Cancel job, release name, worker progress |
+| reso-certification | 0.8.0 | 0.9.0 | onProgress callback, Welford's stats, sub-function pipeline |
+| reso-web-client | 0.3.0 | 0.4.0 | Progress bar chart, industry baseline, dashboard loading |
+
+Unchanged: reso-client (0.1.0), reso-data-generator (0.2.0), reso-reference-server (0.8.0), reso-mcp-server (0.8.0), reso-validation (0.1.0), odata-expression-parser (0.1.0), reso-web-api-proxy (0.1.0)
+
+### Tests
+
+1,237 tests across 8 packages (up from 1,197 in v0.9)
+
 ---
 
 ## v0.9 – 2026-04-14

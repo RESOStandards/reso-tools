@@ -449,7 +449,7 @@ const StepPipeline = ({ steps }: { readonly steps: ReadonlyArray<JobStep> }) => 
 
 // ── Job card ────────────────────────────────────────────────────────
 
-const JobCard = ({ job, onRerun, onDelete, onClone, highlighted }: { readonly job: CertJob; readonly onRerun?: () => void; readonly onDelete?: () => void; readonly onClone?: () => void; readonly highlighted?: boolean }) => {
+const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { readonly job: CertJob; readonly onRerun?: () => void; readonly onDelete?: () => void; readonly onClone?: () => void; readonly onCancel?: () => void; readonly highlighted?: boolean }) => {
   const [expanded, setExpanded] = useState(job.status === 'running' || !!highlighted);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -548,8 +548,8 @@ const JobCard = ({ job, onRerun, onDelete, onClone, highlighted }: { readonly jo
 
           {/* Actions */}
           <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700/50">
-            {job.status === 'running' && (
-              <button type="button" className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 cursor-pointer transition-colors">
+            {job.status === 'running' && onCancel && (
+              <button type="button" onClick={onCancel} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 cursor-pointer transition-colors">
                 Cancel Job
               </button>
             )}
@@ -1065,7 +1065,7 @@ export const JobsPage = () => {
         {/* Job list */}
         <div className="space-y-3">
           {filteredJobs.map(job => (
-            <JobCard key={job.id} job={job} onRerun={job.local ? () => rerun(job.id) : undefined} onDelete={job.local ? () => remove(job.id) : undefined} onClone={() => handleClone(job)} highlighted={job.id === highlightedJobId} />
+            <JobCard key={job.id} job={job} onRerun={job.local ? () => rerun(job.id) : undefined} onDelete={job.local ? () => remove(job.id) : undefined} onCancel={() => cancel(job.id)} onClone={() => handleClone(job)} highlighted={job.id === highlightedJobId} />
           ))}
           {filteredJobs.length === 0 && (
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center text-sm text-gray-500 dark:text-gray-400">

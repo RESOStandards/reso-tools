@@ -427,6 +427,11 @@ const registerCertRunnerHandlers = (): void => {
     return { status: actualStatus, steps: result.steps ?? [], duration: result.duration ?? 0, reports, error };
     } catch (err) {
       activeRuns.delete(jobId);
+      if (cancelledJobs.has(jobId)) {
+        cancelledJobs.delete(jobId);
+        log(`Cert run ${jobId} cancelled`);
+        return { status: 'cancelled' as const, steps: [], duration: 0 };
+      }
       const message = err instanceof Error ? err.message : String(err);
       log(`Cert run ${jobId} failed: ${message}`);
       return { status: 'failed' as const, error: message, steps: [], duration: 0 };
@@ -434,9 +439,13 @@ const registerCertRunnerHandlers = (): void => {
   });
 
   /** Cancel a running cert job. */
+  /** Track cancelled job IDs so we can distinguish cancellation from errors. */
+  const cancelledJobs = new Set<string>();
+
   ipcMain.handle('cert:cancel', (_event, jobId: string) => {
     const controller = activeRuns.get(jobId);
     if (controller) {
+      cancelledJobs.add(jobId);
       controller.abort();
       activeRuns.delete(jobId);
     }
@@ -1025,7 +1034,7 @@ app.whenReady().then(async () => {
   // Release name displayed in the About panel. Update this each release —
   // the version itself is read automatically from package.json via
   // app.getVersion() so it can never drift. See CLAUDE.md release checklist.
-  const RELEASE_NAME = 'Eight Days a Week';
+  const RELEASE_NAME = 'Ten Ichi';
   const appVersion = app.getVersion();
   app.setAboutPanelOptions({
     applicationName: 'RESO Desktop Client',
