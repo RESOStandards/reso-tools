@@ -65,6 +65,11 @@ cd reso-desktop-client && npm run dev
 - Use explicit return types on exported functions.
 - Prefer `unknown` over `any`. Use type narrowing and type guards instead of type assertions.
 - Use `.js` extensions in import paths (required for Node16 module resolution with ESM).
+- **State management (HIGH PRIORITY):**
+  1. **Inside closures** (reduce, map, flatMap) — local mutable state is fine. It is scoped and dies with the closure. Never leak it out.
+  2. **Function results** — bind to `const` on the RHS of an arrow function. No `let` unless absolutely necessary (justify it). No refs in the output.
+  3. **Return an interface** when the result will be reused — documents the contract and makes it promotable to DI later without changing consumers. Cheapest abstraction, never premature.
+  4. **DI service** — only when two or more callees need shared state with updates between them. Do not build the service until you actually have that need. Local to the package until reused across packages, then promote.
 
 ## New Dependencies
 
@@ -116,8 +121,9 @@ Before adding any new dependency, run a security audit:
 1. **Run full test suite**: `npm test` from root – all packages must pass
 2. **Security audit**: Review changes for injection, auth bypass, data leakage
 3. **Bump versions**: Update `version` in all package.json files and MCP server config. Use strict SemVer.
-4. **Update READMEs**: Test counts, new features, CLI examples, package table in root README
-5. **Update test badge**: `![Tests](https://img.shields.io/badge/tests-XXXX%20passed-brightgreen)` in root README
+4. **Update RELEASES.md**: Add all changes under the version heading. This is the canonical changelog – memory and READMEs reference it, not the other way around.
+5. **Update READMEs**: Test counts, new features, CLI examples, package table in root README. Cross-check against RELEASES.md.
+6. **Update test badge**: `![Tests](https://img.shields.io/badge/tests-XXXX%20passed-brightgreen)` in root README
 6. **Desktop client**:
    - Update `version` in `reso-desktop-client/package.json` (the About dialog reads it via `app.getVersion()` automatically – do not hardcode)
    - Pick a release name and update the `RELEASE_NAME` constant in `reso-desktop-client/src/main.ts` (search for the comment block above `setAboutPanelOptions`)

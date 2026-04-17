@@ -84,7 +84,8 @@ const replicate = async ({
   REPLICATION_STATE_SERVICE = createReplicationStateServiceInstance(),
   shouldSaveResults = false,
   batchExpand = false,
-  throwOnError = false
+  throwOnError = false,
+  onProgress = () => {}
 }) => {
 
   const { LOG, LOG_ERROR } = getLoggers(fromCli);
@@ -178,6 +179,12 @@ const replicate = async ({
           );
         }
 
+        // Welford's online algorithm — O(1) per update for running mean, variance, anomaly count
+        let wCount = 0, wMean = 0, wM2 = 0, wAnomalyCount = 0;
+        let lastProgressTime = 0;
+        const PROGRESS_INTERVAL_MS = 500;
+        const replicationStartTime = Date.now();
+
         for await (const {
           hasResults = false,
           hasError = false,
@@ -194,6 +201,68 @@ const replicate = async ({
             authService
           })) {
           try {
+            // Update running stats
+            const responseTimeMs = otherIteratorInfo.responseTimeMs ?? 0;
+            if (responseTimeMs > 0) {
+              wCount++;
+              const delta = responseTimeMs - wMean;
+              wMean += delta / wCount;
+              const delta2 = responseTimeMs - wMean;
+              wM2 += delta * delta2;
+
+              if (wCount >= 3) {
+                const stddev = Math.sqrt(wM2 / wCount);
+                if (Math.abs(responseTimeMs - wMean) > 2 * stddev) {
+                  wAnomalyCount++;
+                }
+              }
+            }
+
+            // Debounce progress updates
+            const now = Date.now();
+            if (now - lastProgressTime >= PROGRESS_INTERVAL_MS) {
+              lastProgressTime = now;
+              const topLevelCount = REPLICATION_STATE_SERVICE.checkIfTopLevelResourceCountExists(resourceName)
+                ? Number(REPLICATION_STATE_SERVICE.getTopLevelResourceCounts()[resourceName])
+                : null;
+              const hasCount = topLevelCount != null && !isNaN(topLevelCount);
+              const hasLimit = limit != null && !isNaN(Number(limit));
+              const target = hasCount && hasLimit
+                ? Math.min(topLevelCount, Number(limit))
+                : hasLimit ? Number(limit) : hasCount ? topLevelCount : null;
+              const elapsedSec = (now - replicationStartTime) / 1000;
+              const throughput = elapsedSec > 0 ? totalRecordsFetched / elapsedSec : 0;
+
+              // Aggregate stats across all strategies from the state service
+              const allResponses = REPLICATION_STATE_SERVICE.getResponses();
+              const globalRecordsFetched = allResponses.reduce((sum, r) => sum + (r.recordCount ?? 0), 0);
+              const globalBytes = allResponses.reduce((sum, r) => sum + (r.responseBytes ?? 0), 0);
+
+              // Per-resource breakdown
+              const byResource = {};
+              for (const r of allResponses) {
+                const rn = r.resourceName ?? 'unknown';
+                if (!byResource[rn]) byResource[rn] = { resourceName: rn, recordCount: 0, bytes: 0 };
+                byResource[rn].recordCount += r.recordCount ?? 0;
+                byResource[rn].bytes += r.responseBytes ?? 0;
+              }
+              const resourceStats = Object.values(byResource);
+
+              onProgress({
+                resourceName,
+                totalRecordsFetched: globalRecordsFetched,
+                totalBytes: globalBytes,
+                resourceStats,
+                pagesFetched: otherIteratorInfo.pagesFetched ?? 0,
+                strategy,
+                target,
+                meanResponseMs: Math.round(wMean),
+                throughput: Math.round(throughput),
+                anomalyCount: wAnomalyCount,
+                totalRequests: wCount,
+              });
+            }
+
             //handle errors
             if (hasError) {
               const { error } = otherIteratorInfo;

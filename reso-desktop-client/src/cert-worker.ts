@@ -33,7 +33,7 @@ parentPort?.on('message', async (msg: { type: string; config: Record<string, unk
       msg.config,
       (progress) => {
         // Send progress as plain object — only include cloneable fields
-        parentPort?.postMessage({
+        const progressMsg = {
           type: 'progress',
           jobId: msg.jobId,
           progress: {
@@ -42,7 +42,9 @@ parentPort?.on('message', async (msg: { type: string; config: Record<string, unk
             message: progress.message != null ? String(progress.message) : undefined,
             duration: typeof progress.duration === 'number' ? progress.duration : undefined,
           },
-        });
+        };
+        console.log(`[worker] sending progress: ${progressMsg.progress.step} → ${progressMsg.progress.status}`);
+        parentPort?.postMessage(progressMsg);
       },
     );
     // Send result as JSON string to avoid structured clone errors

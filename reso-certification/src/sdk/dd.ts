@@ -167,7 +167,7 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
 
 const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Check variations',
-  run: async (ctx) => {
+  run: async (ctx, onProgress) => {
     if (ctx.version !== '2.0' && ctx.version !== '2.1') {
       return { context: ctx, status: 'skipped', summary: 'Variations only checked for DD 2.0' };
     }
@@ -240,39 +240,113 @@ const initReplicationState: TestFunction<DDContext> = async (ctx) => {
   return { context: ctx };
 };
 
+/** Humanize a duration in ms to a short readable string. */
+const humanizeMs = (ms: number): string => {
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  const mins = Math.floor(ms / 60_000);
+  const secs = Math.round((ms % 60_000) / 1000);
+  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+};
+
+/** Humanize bytes to a short readable string. */
+const humanizeBytes = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+};
+
+/**
+ * Format replication progress as structured JSON for the UI bar chart.
+ * The UI detects JSON detail strings and renders them as a real-time chart.
+ * Falls back to a plain text summary for non-UI consumers.
+ */
+const formatReplicationProgress = (info: Record<string, unknown>): string => {
+  const resourceStats = info.resourceStats as ReadonlyArray<Record<string, unknown>> | undefined;
+  const totalFetched = Number(info.totalRecordsFetched ?? 0);
+  const throughput = info.throughput != null ? Number(info.throughput) : null;
+  const meanMs = info.meanResponseMs != null ? Number(info.meanResponseMs) : null;
+  const totalBytes = info.totalBytes != null ? Number(info.totalBytes) : null;
+  const anomalies = Number(info.anomalyCount ?? 0);
+
+  const resources = (resourceStats ?? []).map((r) => ({
+    name: String(r.resourceName ?? ''),
+    records: Number(r.recordCount ?? 0),
+    bytes: Number(r.bytes ?? 0),
+  }));
+
+  return JSON.stringify({
+    _type: 'replication-progress',
+    resources,
+    totalRecords: totalFetched,
+    totalBytes,
+    throughput,
+    meanResponseMs: meanMs,
+    anomalyCount: anomalies,
+  });
+};
+
+/** Build the onProgress adapter and a stats collector for a replication run. */
+const replicationProgressAdapter = (onProgress: import('./types.js').ProgressCallback) => {
+  let lastInfo: Record<string, unknown> = {};
+  return {
+    callback: (info: Record<string, unknown>) => {
+      lastInfo = info;
+      onProgress({ step: 'sub:replicate', status: 'running', message: formatReplicationProgress(info) });
+    },
+    getLastStats: () => ({
+      totalRecordsFetched: Number(lastInfo.totalRecordsFetched ?? 0),
+      meanResponseMs: Number(lastInfo.meanResponseMs ?? 0),
+      throughput: Number(lastInfo.throughput ?? 0),
+      anomalyCount: Number(lastInfo.anomalyCount ?? 0),
+      totalRequests: Number(lastInfo.totalRequests ?? 0),
+    }),
+  };
+};
+
 const replicateTimestampDesc = (config: DDConfig): TestFunction<DDContext> =>
-  async (ctx) => {
+  async (ctx, onProgress) => {
     const pageSize = ctx.version === '1.7' ? DEFAULT_PAGE_SIZE_V17 : DEFAULT_PAGE_SIZE_V20;
+    const progress = replicationProgressAdapter(onProgress);
     await replicate({
       ...buildReplicationSettings(ctx, config),
       jsonSchemaValidation: ctx.version !== '1.7' ? (config.strictMode ?? true) : false,
       top: pageSize,
       strategy: REPLICATION_STRATEGIES.TIMESTAMP_DESC,
+      onProgress: progress.callback,
     });
-    return { context: ctx, summary: `TIMESTAMP_DESC with $top=${pageSize}` };
+    const stats = progress.getLastStats();
+    return { context: ctx, summary: `TIMESTAMP_DESC with $top=${pageSize}`, counts: stats };
   };
 
 const replicateNextLink = (config: DDConfig): TestFunction<DDContext> =>
-  async (ctx) => {
+  async (ctx, onProgress) => {
+    const progress = replicationProgressAdapter(onProgress);
     await replicate({
       ...buildReplicationSettings(ctx, config),
       maxPageSize: DEFAULT_PAGE_SIZE_V20,
       strategy: REPLICATION_STRATEGIES.NEXT_LINK,
+      onProgress: progress.callback,
     });
-    return { context: ctx, summary: `NEXT_LINK with maxPageSize=${DEFAULT_PAGE_SIZE_V20}` };
+    const stats = progress.getLastStats();
+    return { context: ctx, summary: `NEXT_LINK with maxPageSize=${DEFAULT_PAGE_SIZE_V20}`, counts: stats };
   };
 
 const replicateNextLinkFiltered = (config: DDConfig): TestFunction<DDContext> =>
-  async (ctx) => {
+  async (ctx, onProgress) => {
     const cutoffDate = new Date(new Date().getFullYear() - DEFAULT_YEARS_BACK, 0).toISOString();
+    const progress = replicationProgressAdapter(onProgress);
     await replicate({
       ...buildReplicationSettings(ctx, config),
       maxPageSize: DEFAULT_PAGE_SIZE_V20,
       strategy: REPLICATION_STRATEGIES.NEXT_LINK,
       filter: `ModificationTimestamp ge ${cutoffDate}`,
       orderby: 'ModificationTimestamp asc',
+      onProgress: progress.callback,
     });
-    return { context: ctx, summary: `NEXT_LINK + ModificationTimestamp filter (${DEFAULT_YEARS_BACK}yr lookback)` };
+    const stats = progress.getLastStats();
+    return { context: ctx, summary: `NEXT_LINK + ModificationTimestamp filter (${DEFAULT_YEARS_BACK}yr lookback)`, counts: stats };
   };
 
 /** Build the replication step with all strategies as test functions. */

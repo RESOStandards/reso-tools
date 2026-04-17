@@ -6,12 +6,13 @@
  * any in-progress runs.
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { NavLink } from 'react-router';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
 import { useJobs } from '../../hooks/use-jobs';
 import { useOrganizationNames } from '../../hooks/use-organization-names';
 import { useEndorsements } from '../../hooks/use-endorsements';
+import { initIndustryBaseline } from '../../services/industry-baseline';
 
 const PAGE_CONTAINER = 'max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8';
 
@@ -40,10 +41,13 @@ const isWithinDays = (iso: string, days: number): boolean => {
 // ── Main page ───────────────────────────────────────────────────────
 
 export const DashboardPage = () => {
-  const { jobs, activeCount, queuedCount } = useJobs();
+  const { jobs, loading, activeCount, queuedCount } = useJobs();
   const { lookup, lookupSystem } = useOrganizationNames();
   const { endorsements } = useEndorsements({ statusFilter: ['certified'], sortByTimestamp: true });
   const [search, setSearch] = useState('');
+
+  // Fire-and-forget: warm the industry baseline cache
+  useEffect(() => { initIndustryBaseline(); }, []);
 
   /** Resolve a UOI to an org name, falling back to the UOI itself. */
   const orgName = (uoi: string): string => lookup(uoi) ?? uoi;
@@ -123,9 +127,11 @@ export const DashboardPage = () => {
                 Certification Dashboard
               </h1>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {hasJobs
-                  ? 'Overview of local testing activity and results.'
-                  : 'No test results yet. Start a new test run from the Jobs page.'}
+                {loading
+                  ? 'Loading results...'
+                  : hasJobs
+                    ? 'Overview of local testing activity and results.'
+                    : 'No test results yet. Start a new test run from the Jobs page.'}
               </p>
             </div>
             {hasJobs && (
@@ -146,8 +152,14 @@ export const DashboardPage = () => {
       </div>
 
       <div className={`${PAGE_CONTAINER} pb-20`}>
+        {loading && (
+          <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500 py-8">
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+            Loading results...
+          </div>
+        )}
         {/* Summary tiles */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        {!loading && <><div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
           <div className={TILE}>
             <p className={TILE_LABEL}>Total Runs</p>
             <p className={TILE_VALUE}>{jobs.length}</p>
@@ -369,6 +381,7 @@ export const DashboardPage = () => {
             </NavLink>
           </div>
         )}
+        </>}
       </div>
     </div>
   );

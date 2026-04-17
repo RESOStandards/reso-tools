@@ -12,6 +12,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router';
 import { StatusPill } from '../../components/cert/status-pill';
+import { ReplicationProgress, parseReplicationProgress } from '../../components/cert/replication-progress';
 import { SearchInput } from '../../components/metadata/shared';
 import { ConfigBuilder } from '../../components/cert/config-builder';
 import { SubmitToCloud } from '../../components/cert/submit-to-cloud';
@@ -431,11 +432,15 @@ const StepPipeline = ({ steps }: { readonly steps: ReadonlyArray<JobStep> }) => 
               </span>
             )}
           </div>
-          {step.detail && (
-            <p className={`text-xs mt-0.5 ${step.status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
-              {step.detail}
-            </p>
-          )}
+          {step.detail && (() => {
+            const replicationData = parseReplicationProgress(step.detail);
+            if (replicationData) return <ReplicationProgress data={replicationData} />;
+            return (
+              <p className={`text-xs mt-0.5 ${step.status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                {step.detail}
+              </p>
+            );
+          })()}
         </div>
       </div>
     ))}
@@ -770,9 +775,11 @@ const ReportStepCard = ({
               </svg>
             )}
           </div>
-          {step.detail && (
-            <p className="text-xs mt-0.5 ml-6 text-gray-500 dark:text-gray-400">{step.detail}</p>
-          )}
+          {step.detail && (() => {
+            const replicationData = parseReplicationProgress(step.detail);
+            if (replicationData) return <div className="ml-6"><ReplicationProgress data={replicationData} /></div>;
+            return <p className="text-xs mt-0.5 ml-6 text-gray-500 dark:text-gray-400">{step.detail}</p>;
+          })()}
         </div>
         {step.duration != null && step.duration > 0 && (
           <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums shrink-0">

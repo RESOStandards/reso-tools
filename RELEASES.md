@@ -2,7 +2,7 @@
 
 ---
 
-## v0.10 – Draft
+## v0.10 – "Ten Ichi"
 
 ### XSD and Semantic Metadata Validation
 
@@ -63,9 +63,39 @@ Added OData CSDL metadata validation to all certification pipelines (DD, Core, A
 
 - Added new dependency security audit requirement to CLAUDE.md
 
+### Real-Time Replication Progress (#126)
+
+RESO Analytics information during DD replication testing, including real-time progress and industry comparison data.
+
+- `onProgress` callback added to `replicate()` for real-time progress during replication
+- `data-availability-responses.json` now includes a `stats` summary section
+- Sub-step progress events now update the UI in real time
+
+### Login and Notifications
+
+- Case-sensitive username, apiToken for OAuth2, stale credential cleanup
+- Notification bell with services.reso.org polling
+- Services API client (notifications, jobs, variations)
+
+### Certification Pipeline
+
+- Pipeline refactor: steps support sub-function arrays (sequential/parallel mode)
+- Cert runner moved to Worker thread (main process event loop free for IPC)
+- DD pipeline: replication strategies as sub-functions with detailed report writing
+- Request delay and 429 wait time configurable on DD config
+- 3-year lookback (was 2)
+
+### UI
+
+- Escape key closes all modals
+- Back/forward navigation
+- Lock icon for read-only resources
+
 ### Tickets
-- #123 XSD validation (closed)
+- #123 XSD validation
 - #124 Reference metadata with annotated empty enumerations
+- #125 Monadic test container pattern
+- #126 Real-time step progress during DD replication
 - reso-certification#2543 Sample certification report fixtures
 
 ---

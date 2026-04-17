@@ -152,6 +152,9 @@ const state = {
   running: false,
 };
 
+/** Ephemeral state for sub-step debouncing and elapsed time tracking. */
+const subStepState: Record<string, unknown> = {};
+
 /** Subscribe to job events. Returns an unsubscribe function. */
 export const subscribe = (listener: JobEventListener): (() => void) => {
   state.listeners.add(listener);
@@ -311,10 +314,27 @@ const runJobElectron = async (job: Job): Promise<void> => {
       if (!current) return;
       const runningParent = current.steps.find(s => s.status === 'running');
       if (runningParent && progress.message) {
+        // Compute elapsed time since step started running
+        const stepStartKey = `_stepStart:${jobId}:${runningParent.name}`;
+        if (!(stepStartKey in subStepState)) {
+          subStepState[stepStartKey] = Date.now();
+        }
+        const elapsed = Date.now() - (subStepState[stepStartKey] as number);
+
         const updatedSteps = current.steps.map(s =>
-          s.name === runningParent.name ? { ...s, detail: progress.message } : s
+          s.name === runningParent.name ? { ...s, detail: progress.message, duration: elapsed } : s
         );
         updateJob(jobId, { steps: updatedSteps });
+
+        // Debounce UI updates at 50ms
+        const debounceKey = `${jobId}:${runningParent.name}`;
+        if (!subStepState[debounceKey]) {
+          subStepState[debounceKey] = true;
+          setTimeout(() => {
+            subStepState[debounceKey] = false;
+            emit({ type: 'step-progress', jobId, step: runningParent.name, status: 'running', detail: progress.message, duration: elapsed });
+          }, 50);
+        }
       }
       return;
     }
