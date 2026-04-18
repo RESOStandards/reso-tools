@@ -111,7 +111,7 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
     await mkdir(ctx.outputPath, { recursive: true });
 
     // Fetch and validate EDMX metadata
-    onProgress({ step: 'Generate metadata report', status: 'running', message: 'Fetching $metadata...' });
+    onProgress({ step: 'Generate metadata report', status: 'running', message: `Fetching ${ctx.serverUrl}/$metadata` });
     const edmxXml = await fetchMetadata(ctx.serverUrl, ctx.authToken!);
 
     // XSD + semantic validation

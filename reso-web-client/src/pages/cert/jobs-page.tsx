@@ -9,7 +9,7 @@
  * will be wired in when the reso-certification-backend SDK is ready.
  */
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { NavLink, useLocation, useBlocker } from 'react-router';
 import { StatusPill } from '../../components/cert/status-pill';
 import { ReplicationProgress, parseReplicationProgress } from '../../components/cert/replication-progress';
@@ -388,6 +388,57 @@ const formatDuration = (ms: number): string => {
   return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
 };
 
+/** Render text with URLs made copyable — inline copy icon next to each URL. */
+const URL_REGEX = /https?:\/\/[^\s,)]+/g;
+
+const DetailText = ({ text, className }: { readonly text: string; readonly className?: string }) => {
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const parts = text.split(URL_REGEX);
+  const urls = text.match(URL_REGEX) ?? [];
+
+  if (urls.length === 0) return <p className={className}>{text}</p>;
+
+  const handleCopy = (url: string) => {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(url);
+      setTimeout(() => setCopied(null), 1500);
+    });
+  };
+
+  return (
+    <p className={className}>
+      {parts.map((part, i) => (
+        <span key={i}>
+          {part}
+          {i < urls.length && (
+            <span className="inline-flex items-center gap-0.5 font-mono text-blue-500 dark:text-blue-400">
+              {urls[i]}
+              <button
+                type="button"
+                onClick={() => handleCopy(urls[i])}
+                className="inline-flex items-center ml-0.5 text-gray-400 hover:text-blue-500 cursor-pointer"
+                title="Copy URL"
+              >
+                {copied === urls[i] ? (
+                  <svg className="w-3 h-3 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z" />
+                    <path d="M3 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v6h-4.586l1.293-1.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L10.414 13H15v3a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
+                  </svg>
+                )}
+              </button>
+            </span>
+          )}
+        </span>
+      ))}
+    </p>
+  );
+};
+
 import {
   JOB_STATUS_COLORS,
   STEP_STATUS_ICONS,
@@ -436,9 +487,10 @@ const StepPipeline = ({ steps }: { readonly steps: ReadonlyArray<JobStep> }) => 
             const replicationData = parseReplicationProgress(step.detail);
             if (replicationData) return <ReplicationProgress data={replicationData} />;
             return (
-              <p className={`text-xs mt-0.5 ${step.status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                {step.detail}
-              </p>
+              <DetailText
+                text={step.detail}
+                className={`text-xs mt-0.5 ${step.status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}
+              />
             );
           })()}
         </div>
@@ -778,7 +830,7 @@ const ReportStepCard = ({
           {step.detail && (() => {
             const replicationData = parseReplicationProgress(step.detail);
             if (replicationData) return <div className="ml-6"><ReplicationProgress data={replicationData} /></div>;
-            return <p className="text-xs mt-0.5 ml-6 text-gray-500 dark:text-gray-400">{step.detail}</p>;
+            return <DetailText text={step.detail} className="text-xs mt-0.5 ml-6 text-gray-500 dark:text-gray-400" />;
           })()}
         </div>
         {step.duration != null && step.duration > 0 && (
