@@ -77,15 +77,19 @@ interface DDContext {
 const healthCheck: PipelineStep<DDContext> = {
   name: 'Health check',
   run: async (ctx, onProgress) => {
-    const url = `${ctx.serverUrl}/health`;
+    // Fetch the OData service document with auth credentials
+    const url = ctx.serverUrl;
+    const headers: Record<string, string> = ctx.authToken
+      ? { Authorization: `Bearer ${ctx.authToken}` }
+      : {};
     const maxAttempts = 30;
     for (let i = 0; i < maxAttempts; i++) {
       try {
-        const response = await fetch(url);
+        const response = await fetch(url, { headers });
         if (response.ok) {
           return { context: ctx, summary: `Server is ready at ${ctx.serverUrl}` };
         }
-      } catch { /* retry */ }
+      } catch { /* network error — retry */ }
       await new Promise(resolve => setTimeout(resolve, 2000));
       onProgress({ step: 'Health check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
     }
@@ -424,10 +428,8 @@ const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext> => ({
 /** Create the DD compliance test pipeline. */
 export const createDDPipeline = (config: DDConfig) =>
   createPipeline<DDContext>('dd', [
-    ...(config.options?.skipHealthCheck
-      ? [{ name: 'Health check', run: async (ctx: Readonly<DDContext>) => ({ context: ctx, status: 'skipped' as const, summary: 'Skipped' }) } as PipelineStep<DDContext>]
-      : [healthCheck]),
     resolveAuth(config),
+    ...(config.options?.skipHealthCheck ? [] : [healthCheck]),
     generateMetadata(config),
     ...(config.version !== '1.7' ? [runVariations(config)] : []),
     replicateAndValidate(config),
