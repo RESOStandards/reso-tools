@@ -29,22 +29,26 @@ interface CoreContext {
 
 // ── Pipeline Steps ──
 
-const healthCheck: PipelineStep<CoreContext> = {
-  name: 'Health check',
+/** OData service check — fetches the service document to confirm the server is reachable and speaks OData. */
+const serviceCheck: PipelineStep<CoreContext> = {
+  name: 'Service check',
   run: async (ctx, onProgress) => {
-    const url = `${ctx.serverUrl}/health`;
-    const maxAttempts = 30;
+    const url = ctx.serverUrl;
+    const headers: Record<string, string> = ctx.authToken
+      ? { Authorization: `Bearer ${ctx.authToken}` }
+      : {};
+    const maxAttempts = 10;
     for (let i = 0; i < maxAttempts; i++) {
       try {
-        const response = await fetch(url);
+        const response = await fetch(url, { headers });
         if (response.ok) {
-          return { context: ctx, summary: `Server is ready at ${ctx.serverUrl}` };
+          return { context: ctx, summary: `OData service is ready at ${url}` };
         }
-      } catch { /* retry */ }
+      } catch { /* network error — retry */ }
       await new Promise(resolve => setTimeout(resolve, 2000));
-      onProgress({ step: 'Health check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
+      onProgress({ step: 'Service check', status: 'running', message: `Waiting for ${url} (attempt ${i + 1})...` });
     }
-    return { context: ctx, status: 'failed', errors: [`Server at ${ctx.serverUrl} did not respond after ${maxAttempts} attempts`] };
+    return { context: ctx, status: 'failed', errors: [`OData service at ${url} did not respond after ${maxAttempts} attempts`] };
   },
 };
 
@@ -212,8 +216,8 @@ export const createCorePipeline = (config: CoreConfig) => {
   const resources = config.resources ?? WELL_KNOWN_RESOURCES.map(r => r.resource);
 
   return createPipeline<CoreContext>('core', [
-    ...(config.options?.skipHealthCheck ? [] : [healthCheck]),
     resolveAuth(config),
+    ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),
     fetchAndParseMetadata(config),
     sampleAndTest(config),
     writeComplianceReports(config),

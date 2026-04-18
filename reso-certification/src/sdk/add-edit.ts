@@ -33,23 +33,26 @@ interface AddEditContext {
 
 // ── Pipeline Steps ──
 
-/** Wait for the server to respond to a health check. */
-const healthCheck: PipelineStep<AddEditContext> = {
-  name: 'Health check',
+/** OData service check — fetches the service document to confirm the server is reachable and speaks OData. */
+const serviceCheck: PipelineStep<AddEditContext> = {
+  name: 'Service check',
   run: async (ctx, onProgress) => {
-    const url = `${ctx.serverUrl}/health`;
-    const maxAttempts = 30;
+    const url = ctx.serverUrl;
+    const headers: Record<string, string> = ctx.authToken
+      ? { Authorization: `Bearer ${ctx.authToken}` }
+      : {};
+    const maxAttempts = 10;
     for (let i = 0; i < maxAttempts; i++) {
       try {
-        const response = await fetch(url);
+        const response = await fetch(url, { headers });
         if (response.ok) {
-          return { context: ctx, summary: `Server is ready at ${ctx.serverUrl}` };
+          return { context: ctx, summary: `OData service is ready at ${url}` };
         }
-      } catch { /* retry */ }
+      } catch { /* network error — retry */ }
       await new Promise(resolve => setTimeout(resolve, 2000));
-      onProgress({ step: 'Health check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
+      onProgress({ step: 'Service check', status: 'running', message: `Waiting for ${url} (attempt ${i + 1})...` });
     }
-    return { context: ctx, status: 'failed', errors: [`Server at ${ctx.serverUrl} did not respond after ${maxAttempts} attempts`] };
+    return { context: ctx, status: 'failed', errors: [`OData service at ${url} did not respond after ${maxAttempts} attempts`] };
   },
 };
 
@@ -299,8 +302,8 @@ const inlinePayloadsNeedSampling = (payloads?: import('./types.js').InlinePayloa
 export const createAddEditPipeline = (config: AddEditConfig) => {
   const needsSampling = !config.payloadsDir && (!config.payloads || inlinePayloadsNeedSampling(config.payloads));
   return createPipeline<AddEditContext>('add-edit', [
-    ...(config.options?.skipHealthCheck ? [] : [healthCheck]),
     resolveAuth(config),
+    ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),
     fetchAndParseMetadata(config),
     ...(needsSampling ? [sampleRecords(config)] : []),
     generatePayloads(config),
