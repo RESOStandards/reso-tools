@@ -424,7 +424,9 @@ const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext> => ({
 /** Create the DD compliance test pipeline. */
 export const createDDPipeline = (config: DDConfig) =>
   createPipeline<DDContext>('dd', [
-    ...(config.options?.skipHealthCheck ? [] : [healthCheck]),
+    ...(config.options?.skipHealthCheck
+      ? [{ name: 'Health check', run: async (ctx: Readonly<DDContext>) => ({ context: ctx, status: 'skipped' as const, summary: 'Skipped' }) } as PipelineStep<DDContext>]
+      : [healthCheck]),
     resolveAuth(config),
     generateMetadata(config),
     ...(config.version !== '1.7' ? [runVariations(config)] : []),

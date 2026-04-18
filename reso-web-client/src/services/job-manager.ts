@@ -219,6 +219,7 @@ const buildSDKConfig = (recipient: RecipientConfig, endorsement: CertEndorsement
     case 'dd':
       return {
         ...base,
+        options: { ...base.options, skipHealthCheck: true },
         endorsement: 'dd',
         version: recipient.ddOptions.version,
         limit: recipient.ddOptions.limit,
