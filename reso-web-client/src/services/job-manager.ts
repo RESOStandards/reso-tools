@@ -199,7 +199,7 @@ export const cancelJob = (id: string): void => {
 const buildAuthConfig = (auth: AuthConfig): Record<string, unknown> =>
   auth.mode === 'token'
     ? { mode: 'token', authToken: auth.authToken }
-    : { mode: 'client_credentials', clientId: auth.clientId, clientSecret: auth.clientSecret, tokenUrl: auth.tokenUrl };
+    : { mode: 'client_credentials', clientId: auth.clientId, clientSecret: auth.clientSecret, tokenUrl: auth.tokenUrl, scope: auth.scope };
 
 const buildSDKConfig = (recipient: RecipientConfig, endorsement: CertEndorsement, providerUoi: string): Record<string, unknown> => {
   const base = {
