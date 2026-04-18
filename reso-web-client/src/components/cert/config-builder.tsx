@@ -8,6 +8,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { SavedConfigsPanel } from './saved-configs-panel';
 import { SearchInput, FilterPill, Badge } from '../metadata/shared';
 import { fetchOrganizations } from '../../api/cert-client';
 import type { CertOrganization, CertOrganizationSystem } from '../../api/cert-client';
@@ -731,6 +732,7 @@ export const ConfigBuilder = ({
   const [recipients, setRecipients] = useState<ReadonlyArray<RecipientConfig>>(
     initialConfig?.recipients ?? [makeRecipient()]
   );
+  const [showSavedConfigs, setShowSavedConfigs] = useState(false);
 
   // Org directory for provider/recipient pickers
   const [orgs, setOrgs] = useState<ReadonlyArray<CertOrganization>>([]);
@@ -958,14 +960,39 @@ export const ConfigBuilder = ({
         ))}
       </div>
 
+      {/* Saved Configs */}
+      {showSavedConfigs && (
+        <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50">
+          <SavedConfigsPanel
+            currentConfig={canStart ? { providerUoi, concurrency, recipients } : null}
+            onLoad={(imported) => {
+              if ('providerUoi' in imported && typeof imported.providerUoi === 'string') {
+                setProviderUoi(imported.providerUoi);
+              }
+              if ('concurrency' in imported && typeof imported.concurrency === 'number') {
+                setConcurrency(imported.concurrency);
+              }
+              if ('recipients' in imported && Array.isArray(imported.recipients)) {
+                setRecipients(imported.recipients as ReadonlyArray<RecipientConfig>);
+              }
+              setShowSavedConfigs(false);
+            }}
+          />
+        </div>
+      )}
+
       {/* Import / Export / Summary */}
       <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-700/50">
+        <button type="button" onClick={() => setShowSavedConfigs(!showSavedConfigs)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
+          {showSavedConfigs ? 'Hide Saved' : 'Saved Configs'}
+        </button>
+        <span className="text-gray-300 dark:text-gray-600">·</span>
         <button type="button" onClick={handleImport} className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
-          Import Config
+          Import
         </button>
         <span className="text-gray-300 dark:text-gray-600">·</span>
         <button type="button" onClick={handleExport} className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
-          Export Config
+          Export
         </button>
         <div className="ml-auto flex items-center gap-3">
           <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
