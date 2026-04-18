@@ -101,7 +101,10 @@ const resolveAuth = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Resolve authentication',
   run: async (ctx) => {
     const authToken = await resolveAuthToken(config.server.auth);
-    return { context: { ...ctx, authToken }, summary: 'Auth credentials present' };
+    const summary = config.server.auth.mode === 'client_credentials'
+      ? `Auth credentials present (token from ${config.server.auth.tokenUrl})`
+      : 'Auth credentials present';
+    return { context: { ...ctx, authToken }, summary };
   },
 });
 
@@ -111,7 +114,8 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
     await mkdir(ctx.outputPath, { recursive: true });
 
     // Fetch and validate EDMX metadata
-    onProgress({ step: 'Generate metadata report', status: 'running', message: 'Fetching $metadata...' });
+    const metadataUrl = `${ctx.serverUrl}/$metadata`;
+    onProgress({ step: 'Generate metadata report', status: 'running', message: `Fetching $metadata... ${metadataUrl}` });
     const edmxXml = await fetchMetadata(ctx.serverUrl, ctx.authToken!);
 
     // XSD + semantic validation
@@ -129,7 +133,8 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
     await writeFile(baseReportPath, JSON.stringify(baseReport, null, 2));
 
     // Fetch Lookup Resource and merge if available
-    onProgress({ step: 'Generate metadata report', status: 'running', message: 'Checking Lookup Resource...' });
+    const lookupUrl = `${ctx.serverUrl}/Lookup`;
+    onProgress({ step: 'Generate metadata report', status: 'running', message: `Checking Lookup Resource... ${lookupUrl}` });
     const { report, lookupResourceAvailable, lookupRecordCount, rawRecords } = await fetchAndMergeLookupResource(
       baseReport,
       ctx.serverUrl,

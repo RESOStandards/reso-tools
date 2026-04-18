@@ -68,7 +68,9 @@ const resolveAuth = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
 /** Fetch and parse OData $metadata from the server or a local file. */
 const fetchAndParseMetadata = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
   name: 'Fetch metadata',
-  run: async (ctx) => {
+  run: async (ctx, onProgress) => {
+    const metadataUrl = config.metadataPath ?? `${ctx.serverUrl}/$metadata`;
+    onProgress({ step: 'Fetch metadata', status: 'running', message: `Fetching $metadata... ${metadataUrl}` });
     const metadataXml = config.metadataPath
       ? await loadMetadataFromFile(config.metadataPath)
       : await fetchMetadata(ctx.serverUrl, ctx.authToken!);

@@ -60,7 +60,9 @@ const resolveAuth = (config: EntityEventConfig): PipelineStep<EntityEventContext
 /** Fetch and parse OData $metadata to verify EntityEvent exists. */
 const fetchAndParseMetadata = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
   name: 'Fetch metadata',
-  run: async (ctx) => {
+  run: async (ctx, onProgress) => {
+    const metadataUrl = config.payloadsDir ?? `${ctx.serverUrl}/$metadata`;
+    onProgress({ step: 'Fetch metadata', status: 'running', message: `Fetching $metadata... ${metadataUrl}` });
     const metadataXml = config.payloadsDir
       ? await loadMetadataFromFile(config.payloadsDir)
       : await fetchMetadata(ctx.serverUrl, ctx.authToken!);

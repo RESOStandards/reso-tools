@@ -62,7 +62,9 @@ const resolveAuth = (config: CoreConfig): PipelineStep<CoreContext> => ({
 
 const fetchAndParseMetadata = (config: CoreConfig): PipelineStep<CoreContext> => ({
   name: 'Fetch metadata',
-  run: async (ctx) => {
+  run: async (ctx, onProgress) => {
+    const metadataUrl = config.metadataPath ?? `${ctx.serverUrl}/$metadata`;
+    onProgress({ step: 'Fetch metadata', status: 'running', message: `Fetching $metadata... ${metadataUrl}` });
     const metadataXml = config.metadataPath
       ? await loadMetadataFromFile(config.metadataPath)
       : await fetchMetadata(ctx.serverUrl, ctx.authToken!);
