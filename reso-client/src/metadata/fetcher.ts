@@ -14,7 +14,7 @@ import type { CsdlSchema } from '../csdl/types.js';
  * @returns Raw XML metadata string
  */
 export const fetchRawMetadata = async (baseUrl: string, token: string): Promise<string> => {
-  const metadataUrl = `${baseUrl.replace(/\/$/, '')}/$metadata`;
+  const metadataUrl = `${baseUrl.replace(/\/$/, '')}/$metadata?$format=application/xml`;
   const response = await fetch(metadataUrl, {
     headers: {
       Authorization: `Bearer ${token}`,
