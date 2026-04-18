@@ -91,7 +91,7 @@ const healthCheck: PipelineStep<DDContext> = {
         }
       } catch { /* network error — retry */ }
       await new Promise(resolve => setTimeout(resolve, 2000));
-      onProgress({ step: 'Health check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
+      onProgress({ step: 'Health check', status: 'running', message: `Waiting for ${url} (attempt ${i + 1})...` });
     }
     return { context: ctx, status: 'failed', errors: [`Server at ${ctx.serverUrl} did not respond after ${maxAttempts} attempts`] };
   },
@@ -111,7 +111,7 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
     await mkdir(ctx.outputPath, { recursive: true });
 
     // Fetch and validate EDMX metadata
-    onProgress({ step: 'Generate metadata report', status: 'running', message: `Fetching ${ctx.serverUrl}/$metadata` });
+    onProgress({ step: 'Generate metadata report', status: 'running', message: 'Fetching $metadata...' });
     const edmxXml = await fetchMetadata(ctx.serverUrl, ctx.authToken!);
 
     // XSD + semantic validation
