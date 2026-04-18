@@ -10,7 +10,7 @@
  */
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { NavLink, useLocation } from 'react-router';
+import { NavLink, useLocation, useBlocker } from 'react-router';
 import { StatusPill } from '../../components/cert/status-pill';
 import { ReplicationProgress, parseReplicationProgress } from '../../components/cert/replication-progress';
 import { SearchInput } from '../../components/metadata/shared';
@@ -838,6 +838,29 @@ export const JobsPage = () => {
     return () => clearTimeout(timer);
   }, [highlightedJobId]);
   const [showNewJob, setShowNewJob] = useState(false);
+
+  // Prevent accidental navigation when config builder is open
+  const blocker = useBlocker(showNewJob);
+
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      const leave = window.confirm('You have an unsaved test configuration. Leave this page?');
+      if (leave) {
+        blocker.proceed();
+      } else {
+        blocker.reset();
+      }
+    }
+  }, [blocker]);
+
+  useEffect(() => {
+    if (!showNewJob) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [showNewJob]);
   const [clonedConfig, setClonedConfig] = useState<BatchConfig | undefined>(undefined);
 
   const handleClone = (job: CertJob) => {
