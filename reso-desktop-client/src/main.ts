@@ -614,7 +614,7 @@ const buildMenu = (): void => {
           accelerator: isMac ? 'Cmd+Left' : 'Alt+Left',
           click: () => {
             const win = BrowserWindow.getFocusedWindow();
-            if (win?.webContents.canGoBack()) win.webContents.goBack();
+            if (win?.webContents.navigationHistory.canGoBack()) win.webContents.navigationHistory.goBack();
           }
         },
         {
@@ -622,7 +622,7 @@ const buildMenu = (): void => {
           accelerator: isMac ? 'Cmd+Right' : 'Alt+Right',
           click: () => {
             const win = BrowserWindow.getFocusedWindow();
-            if (win?.webContents.canGoForward()) win.webContents.goForward();
+            if (win?.webContents.navigationHistory.canGoForward()) win.webContents.navigationHistory.goForward();
           }
         },
         { type: 'separator' },
@@ -905,7 +905,7 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
 
   // Navigation: two-finger trackpad swipe (scroll-based)
   // For SPAs using React Router, we call window.history directly since
-  // Electron's webContents.canGoBack() doesn't track pushState navigation.
+  // Electron's navigationHistory.canGoBack() doesn't track pushState navigation.
   win.webContents.on('did-finish-load', () => {
     win.webContents.executeJavaScript(`
       (() => {
