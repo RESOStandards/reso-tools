@@ -9,6 +9,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { NavLink } from 'react-router';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
+import { SavedConfigsPanel } from '../../components/cert/saved-configs-panel';
 import { useJobs } from '../../hooks/use-jobs';
 import { useOrganizationNames } from '../../hooks/use-organization-names';
 import { useEndorsements } from '../../hooks/use-endorsements';
@@ -45,6 +46,7 @@ export const DashboardPage = () => {
   const { lookup, lookupSystem } = useOrganizationNames();
   const { endorsements } = useEndorsements({ statusFilter: ['certified'], sortByTimestamp: true });
   const [search, setSearch] = useState('');
+  const [showSavedConfigs, setShowSavedConfigs] = useState(false);
 
   // Fire-and-forget: warm the industry baseline cache
   useEffect(() => { initIndustryBaseline(); }, []);
@@ -223,6 +225,38 @@ export const DashboardPage = () => {
             </div>
           </div>
         )}
+
+        {/* Saved Configs (collapsible) */}
+        <div className="mb-6">
+          <button
+            type="button"
+            onClick={() => setShowSavedConfigs(!showSavedConfigs)}
+            className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 cursor-pointer transition-colors"
+          >
+            <svg className={`w-4 h-4 transition-transform ${showSavedConfigs ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+            </svg>
+            Saved Configs
+          </button>
+          {showSavedConfigs && (
+            <div className="mt-3 bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+              <SavedConfigsPanel
+                currentConfig={null}
+                onLoad={(imported) => {
+                  // Navigate to jobs page with the loaded config
+                  // For now, just download as export — full load requires navigating to config builder
+                  const blob = new Blob([JSON.stringify(imported, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'cert-config.json';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              />
+            </div>
+          )}
+        </div>
 
         {hasJobs && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
