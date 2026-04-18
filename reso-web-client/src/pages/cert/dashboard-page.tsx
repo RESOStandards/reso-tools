@@ -7,7 +7,7 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
-import { NavLink } from 'react-router';
+import { NavLink, useNavigate } from 'react-router';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
 import { SavedConfigsPanel } from '../../components/cert/saved-configs-panel';
 import { useJobs } from '../../hooks/use-jobs';
@@ -47,6 +47,7 @@ export const DashboardPage = () => {
   const { endorsements } = useEndorsements({ statusFilter: ['certified'], sortByTimestamp: true });
   const [search, setSearch] = useState('');
   const [showSavedConfigs, setShowSavedConfigs] = useState(false);
+  const navigate = useNavigate();
 
   // Fire-and-forget: warm the industry baseline cache
   useEffect(() => { initIndustryBaseline(); }, []);
@@ -243,15 +244,8 @@ export const DashboardPage = () => {
               <SavedConfigsPanel
                 currentConfig={null}
                 onLoad={(imported) => {
-                  // Navigate to jobs page with the loaded config
-                  // For now, just download as export — full load requires navigating to config builder
-                  const blob = new Blob([JSON.stringify(imported, null, 2)], { type: 'application/json' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = 'cert-config.json';
-                  a.click();
-                  URL.revokeObjectURL(url);
+                  // Navigate to jobs page with the config — pass via state so the config builder can pick it up
+                  navigate('/cert/jobs', { state: { loadConfig: imported } });
                 }}
               />
             </div>

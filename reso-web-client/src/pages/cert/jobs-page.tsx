@@ -839,6 +839,17 @@ export const JobsPage = () => {
   }, [highlightedJobId]);
   const [showNewJob, setShowNewJob] = useState(false);
 
+  // Open config builder with a loaded config from dashboard navigation
+  useEffect(() => {
+    const loadConfig = (location.state as Record<string, unknown> | null)?.loadConfig as Record<string, unknown> | undefined;
+    if (loadConfig) {
+      setClonedConfig(loadConfig as unknown as BatchConfig);
+      setShowNewJob(true);
+      // Clear the state so refresh doesn't re-trigger
+      window.history.replaceState({}, '');
+    }
+  }, [location.state]);
+
   // Prevent accidental navigation when config builder is open
   const blocker = useBlocker(showNewJob);
 
