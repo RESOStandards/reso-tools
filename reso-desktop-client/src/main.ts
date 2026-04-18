@@ -855,6 +855,14 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
   win.once('ready-to-show', () => win.show());
   win.loadURL(buildSplashHtml(paths.logoPath));
 
+  // Prevent navigating away from the SPA (e.g., back to splash screen)
+  win.webContents.on('will-navigate', (event, navUrl) => {
+    // Allow navigation to the server URL (SPA root)
+    if (state.serverUrl && navUrl.startsWith(state.serverUrl)) return;
+    // Block everything else (splash screen, external URLs handled by setWindowOpenHandler)
+    event.preventDefault();
+  });
+
   // Open external links in the system browser
   win.webContents.setWindowOpenHandler(({ url: linkUrl }) => {
     if (linkUrl.startsWith('http')) {
@@ -863,25 +871,35 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
     return { action: 'deny' };
   });
 
+  // Safe SPA navigation helper — injected into renderer.
+  // Prevents navigating back past the SPA entry point (which would show the splash screen).
+  // Checks if a React Router blocker is active before navigating.
+  const safeNavScript = (direction: 'back' | 'forward') => `
+    (function() {
+      if ('${direction}' === 'back' && window.history.length <= 1) return;
+      if ('${direction}' === 'back' && window.location.pathname === '/') return;
+      window.history.${direction}();
+    })()
+  `;
+
   // Navigation: keyboard shortcuts (Cmd/Ctrl+[/] and Cmd/Ctrl+Arrow)
-  // Uses window.history for SPA (React Router) compatibility.
   win.webContents.on('before-input-event', (_event, input) => {
     const mod = process.platform === 'darwin' ? input.meta : input.control;
     if (!mod || input.type !== 'keyDown') return;
 
     if (input.key === '[' || input.key === 'ArrowLeft') {
-      win.webContents.executeJavaScript('window.history.back()').catch(() => {});
+      win.webContents.executeJavaScript(safeNavScript('back')).catch(() => {});
     } else if (input.key === ']' || input.key === 'ArrowRight') {
-      win.webContents.executeJavaScript('window.history.forward()').catch(() => {});
+      win.webContents.executeJavaScript(safeNavScript('forward')).catch(() => {});
     }
   });
 
   // Navigation: macOS swipe gestures (three-finger if configured)
   win.on('swipe', (_event, direction) => {
     if (direction === 'left') {
-      win.webContents.executeJavaScript('window.history.back()').catch(() => {});
+      win.webContents.executeJavaScript(safeNavScript('back')).catch(() => {});
     } else if (direction === 'right') {
-      win.webContents.executeJavaScript('window.history.forward()').catch(() => {});
+      win.webContents.executeJavaScript(safeNavScript('forward')).catch(() => {});
     }
   });
 
@@ -904,7 +922,7 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
           if (deltaX > 150) {
             tracking = false;
             deltaX = 0;
-            window.history.back();
+            if (window.history.length > 1 && window.location.pathname !== '/') window.history.back();
           } else if (deltaX < -150) {
             tracking = false;
             deltaX = 0;
