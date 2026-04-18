@@ -196,17 +196,28 @@ export const cancelJob = (id: string): void => {
 
 // ── Build SDK ComplianceConfig from UI config ────────────────────────
 
+/** Normalize a URL — removes trailing slashes, resolves path segments. */
+const normalizeUrl = (url: string): string => {
+  try {
+    const parsed = new URL(url);
+    parsed.pathname = parsed.pathname.replace(/\/+$/, '');
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+};
+
 const buildAuthConfig = (auth: AuthConfig): Record<string, unknown> =>
   auth.mode === 'token'
     ? { mode: 'token', authToken: auth.authToken }
-    : { mode: 'client_credentials', clientId: auth.clientId, clientSecret: auth.clientSecret, tokenUrl: auth.tokenUrl, scope: auth.scope };
+    : { mode: 'client_credentials', clientId: auth.clientId, clientSecret: auth.clientSecret, tokenUrl: normalizeUrl(auth.tokenUrl), scope: auth.scope };
 
 const buildSDKConfig = (recipient: RecipientConfig, endorsement: CertEndorsement, providerUoi: string): Record<string, unknown> => {
   const base = {
     server: {
       // 'LOCAL_SERVER' is a sentinel value — the Electron main process
       // will replace it with the actual local server URL at runtime.
-      url: recipient.serviceRootUri || 'LOCAL_SERVER',
+      url: normalizeUrl(recipient.serviceRootUri || 'LOCAL_SERVER'),
       auth: buildAuthConfig(recipient.auth),
     },
     options: { verbose: false },
