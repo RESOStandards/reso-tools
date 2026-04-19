@@ -162,6 +162,17 @@ export const SavedConfigsPanel = ({ currentConfig, onLoad }: SavedConfigsPanelPr
                 </button>
                 <button
                   type="button"
+                  onClick={() => onLoad(cfg.config as Record<string, unknown>)}
+                  title="Clone this config into the form"
+                  className="p-1 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
+                    <path d="M5.5 3.5A1.5 1.5 0 017 2h4.5A1.5 1.5 0 0113 3.5v7a1.5 1.5 0 01-1.5 1.5H7A1.5 1.5 0 015.5 10.5v-7zm1.5 0v7h4.5v-7H7z" />
+                    <path d="M3 5.5A1.5 1.5 0 014.5 4H5v1h-.5a.5.5 0 00-.5.5v7a.5.5 0 00.5.5h4.5a.5.5 0 00.5-.5V12h1v.5a1.5 1.5 0 01-1.5 1.5H4.5A1.5 1.5 0 013 12.5v-7z" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleExport(cfg)}
                   className="px-2 py-1 text-[10px] font-medium rounded bg-gray-50 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer transition-colors"
                 >
