@@ -946,8 +946,8 @@ const resolveReport = (
           // Add guidance for common DD failure modes
           const guidance = s.name.includes('metadata')
             ? 'Check that the server returns well-formed OData 4.0 CSDL XML at the $metadata endpoint.'
-            : s.name.includes('Health check')
-            ? 'Verify the server URL is correct and the server is running.'
+            : s.name.includes('Service check')
+            ? 'Verify the server URL is correct, the server is running, and authentication succeeded.'
             : s.name.includes('authentication') || s.name.includes('auth')
             ? 'Verify the auth token or client credentials are correct and not expired.'
             : undefined;

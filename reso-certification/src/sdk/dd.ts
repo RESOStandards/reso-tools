@@ -115,14 +115,17 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
 
     // Fetch and validate EDMX metadata
     const metadataUrl = `${ctx.serverUrl}/$metadata?$format=application/xml`;
-    onProgress({ step: 'Generate metadata report', status: 'running', message: 'Fetching $metadata...' });
+    onProgress({ step: 'sub:metadata', status: 'running', message: 'Fetching OData XML metadata...' });
     const edmxXml = await fetchMetadata(ctx.serverUrl, ctx.authToken!);
 
     // XSD + semantic validation
+    onProgress({ step: 'sub:metadata', status: 'running', message: 'Validating CSDL XML (XSD + semantic checks)...' });
     const validation = await validateMetadata(edmxXml);
     const validationErrors = collectValidationErrors(validation);
 
+    onProgress({ step: 'sub:metadata', status: 'running', message: 'Generating metadata report...' });
     const baseReport = generateMetadataReport(edmxXml, ctx.version);
+    onProgress({ step: 'sub:metadata', status: 'running', message: `Found ${baseReport.resources.length} resources, ${baseReport.fields.length.toLocaleString()} fields, ${baseReport.lookups.length.toLocaleString()} lookups` });
 
     // Write raw metadata XML
     const metadataXmlPath = join(ctx.outputPath, 'metadata.xml');
@@ -134,12 +137,18 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
 
     // Fetch Lookup Resource and merge if available
     const lookupUrl = `${ctx.serverUrl}/Lookup`;
-    onProgress({ step: 'Generate metadata report', status: 'running', message: 'Checking Lookup Resource...' });
+    onProgress({ step: 'sub:metadata', status: 'running', message: 'Fetching Lookup Resource...' });
     const { report, lookupResourceAvailable, lookupRecordCount, rawRecords } = await fetchAndMergeLookupResource(
       baseReport,
       ctx.serverUrl,
       ctx.authToken!,
     );
+
+    if (lookupResourceAvailable) {
+      onProgress({ step: 'sub:metadata', status: 'running', message: `Lookup Resource: ${lookupRecordCount.toLocaleString()} records found. Merging...` });
+    } else {
+      onProgress({ step: 'sub:metadata', status: 'running', message: 'Lookup Resource not available (HTTP 404)' });
+    }
 
     let metadataReportPath = baseReportPath;
 

@@ -500,9 +500,6 @@ const StepPipeline = ({ steps }: { readonly steps: ReadonlyArray<JobStep> }) => 
               </p>
             );
           })()}
-          {step.requestDetails && step.requestDetails.length > 0 && (
-            <RequestDetailsPanel details={step.requestDetails} />
-          )}
         </div>
       </div>
     ))}
