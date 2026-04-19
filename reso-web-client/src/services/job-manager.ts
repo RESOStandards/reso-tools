@@ -394,7 +394,7 @@ const runJobElectron = async (job: Job): Promise<void> => {
           name: s.name,
           status: s.status as StepStatus,
           duration: s.duration,
-          detail: s.summary ?? s.errors?.join('; '),
+          detail: [s.summary, s.errors?.join('; ')].filter(Boolean).join(' \u2014 '),
           requestDetails: s.requestDetails as JobStep['requestDetails'],
         }))
       : initialSteps.map(s => ({ ...s, status: result.status === 'passed' ? 'passed' as const : 'skipped' as const }));

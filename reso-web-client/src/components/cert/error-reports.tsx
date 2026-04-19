@@ -16,6 +16,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { SearchInput, FilterPill, Badge, AvailBar } from '../metadata/shared.js';
 import { humanizeScenarioName } from '../../constants/cert';
+import { RequestDetailsPanel } from './request-details';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -70,6 +71,13 @@ interface StepError {
   readonly message: string;
   readonly detail?: string;
   readonly httpStatus?: number;
+  readonly requestDetails?: ReadonlyArray<{
+    readonly method: string;
+    readonly url: string;
+    readonly status?: number;
+    readonly error?: string;
+    readonly responseBody?: string;
+  }>;
 }
 
 interface GenericFailureReport {
@@ -709,6 +717,11 @@ const GenericErrorCard = ({ err }: { readonly err: StepError }) => {
               </div>
             ))}
           </div>
+          {err.requestDetails && err.requestDetails.length > 0 && (
+            <div className="mt-3">
+              <RequestDetailsPanel details={err.requestDetails} />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -864,7 +877,7 @@ const resolveReport = (
   endorsement: string,
   failedStep?: string,
   reports?: Record<string, unknown>,
-  steps?: ReadonlyArray<{ name: string; status: string; detail?: string; summary?: string; errors?: ReadonlyArray<string> }>,
+  steps?: ReadonlyArray<{ name: string; status: string; detail?: string; summary?: string; errors?: ReadonlyArray<string>; requestDetails?: ReadonlyArray<{ method: string; url: string; status?: number; error?: string; responseBody?: string }> }>,
 ): ErrorReport => {
   // Use real report data when available
   if (reports) {
@@ -952,10 +965,17 @@ const resolveReport = (
             ? 'Verify the auth token or client credentials are correct and not expired.'
             : undefined;
 
+          // Include individual errors (e.g., semantic validation details)
+          const individualErrors = s.errors ?? [];
+          const errorDetails = individualErrors.length > 0
+            ? individualErrors.join('\n')
+            : undefined;
+
           return {
             stepName: s.name,
             message,
-            detail: [s.summary, guidance].filter(Boolean).join('\n'),
+            detail: [s.summary, errorDetails, guidance].filter(Boolean).join('\n'),
+            requestDetails: s.requestDetails,
           };
         }),
       };
@@ -1012,7 +1032,7 @@ export const FailureReportModal = ({
   readonly recipientName: string;
   readonly failedStep?: string;
   readonly reports?: Record<string, unknown>;
-  readonly steps?: ReadonlyArray<{ name: string; status: string; detail?: string; summary?: string; errors?: ReadonlyArray<string> }>;
+  readonly steps?: ReadonlyArray<{ name: string; status: string; detail?: string; summary?: string; errors?: ReadonlyArray<string>; requestDetails?: ReadonlyArray<{ method: string; url: string; status?: number; error?: string; responseBody?: string }> }>;
   readonly onClose: () => void;
 }) => {
   const report = resolveReport(endorsement, failedStep, reports, steps);
