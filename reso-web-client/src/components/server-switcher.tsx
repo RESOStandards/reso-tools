@@ -3,15 +3,18 @@ import { useServer } from '../context/server-context';
 import { clearAllCaches } from '../api/schema-cache';
 import { clearMetadataCache } from '../api/metadata';
 import { ServerConnectionModal } from './server-connection-modal';
+import { ConnectionManagerOverlay } from './connection-manager-overlay';
 import type { ServerFormData } from './server-connection-modal';
 import type { ServerConfig } from '../context/server-context';
 import type { SavedConnection } from '../services/config-storage';
+import type { SavedConnection as ManagedConnection, StoredCredentials } from '../services/connection-manager';
 
 /** Server switcher dropdown in the header — lets users switch between connections. */
 export const ServerSwitcher = () => {
   const { activeServer, servers, switchServer, addServer, removeServer, updateServer, isLoadingResources, hasProxy } = useServer();
   const [isOpen, setIsOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [showManager, setShowManager] = useState(false);
   const [editingServer, setEditingServer] = useState<ServerConfig | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [savedConfigs, setSavedConfigs] = useState<ReadonlyArray<SavedConnection>>([]);
@@ -53,6 +56,24 @@ export const ServerSwitcher = () => {
       switchServer(id);
       setIsOpen(false);
       setConfigSearch('');
+    },
+    [addServer, switchServer]
+  );
+
+  const handleSelectFromManager = useCallback(
+    (conn: ManagedConnection, creds: StoredCredentials | null) => {
+      const id = addServer({
+        name: conn.name,
+        baseUrl: conn.url,
+        authMode: conn.authMode,
+        token: creds?.authToken || undefined,
+        clientId: conn.clientId || undefined,
+        clientSecret: creds?.clientSecret || undefined,
+        tokenUrl: conn.tokenUrl || undefined,
+        scope: conn.scope || undefined,
+        permissions: { canAdd: false, canEdit: false, canDelete: false },
+      });
+      switchServer(id);
     },
     [addServer, switchServer]
   );
@@ -236,9 +257,13 @@ export const ServerSwitcher = () => {
                   </button>
                 ))}
                 {savedConfigs.length > 5 && !configSearch && (
-                  <div className="px-3 py-1 text-[10px] text-gray-400 dark:text-gray-500">
-                    +{savedConfigs.length - 5} more — type to search
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setShowManager(true); setIsOpen(false); }}
+                    className="w-full px-3 py-1.5 text-[11px] text-blue-500 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700 text-left cursor-pointer"
+                  >
+                    Manage Connections ({savedConfigs.length})
+                  </button>
                 )}
               </div>
             )}
@@ -280,6 +305,13 @@ export const ServerSwitcher = () => {
         onClose={() => setShowModal(false)}
         onSubmit={handleAddConnection}
         hasProxy={hasProxy}
+      />
+
+      {/* Connection manager overlay */}
+      <ConnectionManagerOverlay
+        isOpen={showManager}
+        onClose={() => setShowManager(false)}
+        onSelect={handleSelectFromManager}
       />
 
       {/* Edit existing connection modal */}
