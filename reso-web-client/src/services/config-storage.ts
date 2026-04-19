@@ -28,6 +28,10 @@ export interface SavedConnection {
   readonly tokenUrl?: string;
   /** OAuth2 scope (for client_credentials). */
   readonly scope?: string;
+  /** OriginatingSystemName — some servers require this filter for access. */
+  readonly originatingSystemName?: string;
+  /** OriginatingSystemID — alternative to OriginatingSystemName. */
+  readonly originatingSystemId?: string;
   /** Provider UOI (cert only). */
   readonly providerUoi?: string;
   /** Provider USI (cert only). */
