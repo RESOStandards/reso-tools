@@ -87,13 +87,13 @@ const serviceCheck: PipelineStep<DDContext> = {
       try {
         const response = await fetch(url, { headers });
         if (response.ok) {
-          return { context: ctx, summary: `OData service is ready at ${url}` };
+          return { context: ctx, summary: 'OData service is ready', requestDetails: [{ method: 'GET', url }] };
         }
       } catch { /* network error — retry */ }
       await new Promise(resolve => setTimeout(resolve, 2000));
-      onProgress({ step: 'Service check', status: 'running', message: `Waiting for ${url} (attempt ${i + 1})...` });
+      onProgress({ step: 'Service check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
     }
-    return { context: ctx, status: 'failed', errors: [`OData service at ${url} did not respond after ${maxAttempts} attempts`] };
+    return { context: ctx, status: 'failed', errors: ['OData service did not respond'], requestDetails: [{ method: 'GET', url, error: `No response after ${maxAttempts} attempts` }] };
   },
 };
 
@@ -101,10 +101,10 @@ const resolveAuth = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Resolve authentication',
   run: async (ctx) => {
     const authToken = await resolveAuthToken(config.server.auth);
-    const summary = config.server.auth.mode === 'client_credentials'
-      ? `Auth credentials present (token from ${config.server.auth.tokenUrl})`
-      : 'Auth credentials present';
-    return { context: { ...ctx, authToken }, summary };
+    const requestDetails = config.server.auth.mode === 'client_credentials'
+      ? [{ method: 'POST', url: config.server.auth.tokenUrl }]
+      : [];
+    return { context: { ...ctx, authToken }, summary: 'Auth credentials present', requestDetails };
   },
 });
 
@@ -114,8 +114,8 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
     await mkdir(ctx.outputPath, { recursive: true });
 
     // Fetch and validate EDMX metadata
-    const metadataUrl = `${ctx.serverUrl}/$metadata`;
-    onProgress({ step: 'Generate metadata report', status: 'running', message: `Fetching $metadata... ${metadataUrl}` });
+    const metadataUrl = `${ctx.serverUrl}/$metadata?$format=application/xml`;
+    onProgress({ step: 'Generate metadata report', status: 'running', message: 'Fetching $metadata...' });
     const edmxXml = await fetchMetadata(ctx.serverUrl, ctx.authToken!);
 
     // XSD + semantic validation
@@ -134,7 +134,7 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
 
     // Fetch Lookup Resource and merge if available
     const lookupUrl = `${ctx.serverUrl}/Lookup`;
-    onProgress({ step: 'Generate metadata report', status: 'running', message: `Checking Lookup Resource... ${lookupUrl}` });
+    onProgress({ step: 'Generate metadata report', status: 'running', message: 'Checking Lookup Resource...' });
     const { report, lookupResourceAvailable, lookupRecordCount, rawRecords } = await fetchAndMergeLookupResource(
       baseReport,
       ctx.serverUrl,
@@ -168,6 +168,10 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
       summary: `${report.resources.length} resources, ${report.fields.length.toLocaleString()} fields, ${report.lookups.length.toLocaleString()} lookups${lookupMsg}. ${formatValidationSummary(validation)}`,
       counts: { resources: report.resources.length, fields: report.fields.length, lookups: report.lookups.length },
       artifacts,
+      requestDetails: [
+        { method: 'GET', url: metadataUrl },
+        ...(lookupResourceAvailable ? [{ method: 'GET', url: lookupUrl }] : []),
+      ],
       ...(validationErrors.length > 0 ? { errors: validationErrors } : {}),
       ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {}),
     };

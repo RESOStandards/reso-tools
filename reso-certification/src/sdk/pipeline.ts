@@ -156,6 +156,7 @@ export const createPipeline = <TContext extends PipelineContext>(
           artifacts: output.artifacts,
           counts: output.counts,
           errors: output.errors,
+          requestDetails: output.requestDetails,
         };
 
         stepResults.push(result);
@@ -176,6 +177,8 @@ export const createPipeline = <TContext extends PipelineContext>(
       } catch (err) {
         const duration = Date.now() - stepStart;
         const errorMessage = err instanceof Error ? err.message : String(err);
+        const errDetail = (err as Record<string, unknown>)?.requestDetails as Record<string, unknown> | undefined;
+        const requestDetails = errDetail ? [errDetail as { method: string; url: string; status?: number; error?: string; responseBody?: string }] : undefined;
 
         stepResults.push({
           name: step.name,
@@ -183,6 +186,7 @@ export const createPipeline = <TContext extends PipelineContext>(
           status: 'failed',
           duration,
           errors: [errorMessage],
+          requestDetails,
         });
 
         onProgress({

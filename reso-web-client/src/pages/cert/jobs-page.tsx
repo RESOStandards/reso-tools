@@ -13,6 +13,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { NavLink, useLocation, useBlocker } from 'react-router';
 import { StatusPill } from '../../components/cert/status-pill';
 import { ReplicationProgress, parseReplicationProgress } from '../../components/cert/replication-progress';
+import { RequestDetailsPanel } from '../../components/cert/request-details';
 import { SearchInput } from '../../components/metadata/shared';
 import { ConfigBuilder } from '../../components/cert/config-builder';
 import { SubmitToCloud } from '../../components/cert/submit-to-cloud';
@@ -34,6 +35,13 @@ interface JobStep {
   readonly status: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
   readonly duration?: number;
   readonly detail?: string;
+  readonly requestDetails?: ReadonlyArray<{
+    readonly method: string;
+    readonly url: string;
+    readonly status?: number;
+    readonly error?: string;
+    readonly responseBody?: string;
+  }>;
 }
 
 interface CertJob {
@@ -487,12 +495,14 @@ const StepPipeline = ({ steps }: { readonly steps: ReadonlyArray<JobStep> }) => 
             const replicationData = parseReplicationProgress(step.detail);
             if (replicationData) return <ReplicationProgress data={replicationData} />;
             return (
-              <DetailText
-                text={step.detail}
-                className={`text-xs mt-0.5 ${step.status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}
-              />
+              <p className={`text-xs mt-0.5 ${step.status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                {step.detail}
+              </p>
             );
           })()}
+          {step.requestDetails && step.requestDetails.length > 0 && (
+            <RequestDetailsPanel details={step.requestDetails} />
+          )}
         </div>
       </div>
     ))}
@@ -797,7 +807,7 @@ const ReportStepCard = ({
   step,
   scenarios,
 }: {
-  readonly step: { name: string; status: string; detail?: string; duration?: number };
+  readonly step: { name: string; status: string; detail?: string; duration?: number; requestDetails?: ReadonlyArray<{ method: string; url: string; status?: number; error?: string; responseBody?: string }> };
   readonly scenarios?: ReadonlyArray<Record<string, unknown>>;
 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -830,8 +840,11 @@ const ReportStepCard = ({
           {step.detail && (() => {
             const replicationData = parseReplicationProgress(step.detail);
             if (replicationData) return <div className="ml-6"><ReplicationProgress data={replicationData} /></div>;
-            return <DetailText text={step.detail} className="text-xs mt-0.5 ml-6 text-gray-500 dark:text-gray-400" />;
+            return <p className="text-xs mt-0.5 ml-6 text-gray-500 dark:text-gray-400">{step.detail}</p>;
           })()}
+          {step.requestDetails && step.requestDetails.length > 0 && (
+            <div className="ml-6"><RequestDetailsPanel details={step.requestDetails} /></div>
+          )}
         </div>
         {step.duration != null && step.duration > 0 && (
           <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums shrink-0">
@@ -987,7 +1000,7 @@ export const JobsPage = () => {
       scheduledAt: j.queuedAt,
       startedAt: j.startedAt,
       completedAt: j.completedAt,
-      steps: j.steps.map(s => ({ name: s.name, status: s.status, duration: s.duration, detail: s.detail })),
+      steps: j.steps.map(s => ({ name: s.name, status: s.status, duration: s.duration, detail: s.detail, requestDetails: s.requestDetails })),
       local: j.local,
       reports: j.reports,
       error: j.error,

@@ -43,7 +43,7 @@ interface LocalResult {
 interface CertRunnerAPI {
   readonly run: (jobId: string, config: Record<string, unknown>) => Promise<{
     status: 'passed' | 'failed';
-    steps?: ReadonlyArray<{ name: string; status: string; duration?: number; summary?: string; errors?: ReadonlyArray<string> }>;
+    steps?: ReadonlyArray<{ name: string; status: string; duration?: number; summary?: string; errors?: ReadonlyArray<string>; requestDetails?: ReadonlyArray<{ method: string; url: string; status?: number; error?: string; responseBody?: string }> }>;
     duration: number;
     error?: string;
     reports?: Record<string, unknown>;
@@ -105,6 +105,13 @@ export interface JobStep {
   readonly status: StepStatus;
   readonly duration?: number;
   readonly detail?: string;
+  readonly requestDetails?: ReadonlyArray<{
+    readonly method: string;
+    readonly url: string;
+    readonly status?: number;
+    readonly error?: string;
+    readonly responseBody?: string;
+  }>;
 }
 
 export interface Job {
@@ -388,6 +395,7 @@ const runJobElectron = async (job: Job): Promise<void> => {
           status: s.status as StepStatus,
           duration: s.duration,
           detail: s.summary ?? s.errors?.join('; '),
+          requestDetails: s.requestDetails as JobStep['requestDetails'],
         }))
       : initialSteps.map(s => ({ ...s, status: result.status === 'passed' ? 'passed' as const : 'skipped' as const }));
 

@@ -36,6 +36,14 @@ export interface StepOutput<TContext extends PipelineContext = PipelineContext> 
   readonly counts?: Readonly<Record<string, number>>;
   /** Error messages (for failed or partially failed steps). */
   readonly errors?: ReadonlyArray<string>;
+  /** HTTP request details for debugging (shown in collapsible UI). */
+  readonly requestDetails?: ReadonlyArray<{
+    readonly method: string;
+    readonly url: string;
+    readonly status?: number;
+    readonly error?: string;
+    readonly responseBody?: string;
+  }>;
 }
 
 /**
@@ -98,6 +106,13 @@ export interface StepResult {
   readonly artifacts?: ReadonlyArray<{ readonly label: string; readonly path: string }>;
   readonly counts?: Readonly<Record<string, number>>;
   readonly errors?: ReadonlyArray<string>;
+  readonly requestDetails?: ReadonlyArray<{
+    readonly method: string;
+    readonly url: string;
+    readonly status?: number;
+    readonly error?: string;
+    readonly responseBody?: string;
+  }>;
 }
 
 /** Result of a completed pipeline execution. */

@@ -38,13 +38,13 @@ const serviceCheck: PipelineStep<EntityEventContext> = {
       try {
         const response = await fetch(url, { headers });
         if (response.ok) {
-          return { context: ctx, summary: `OData service is ready at ${url}` };
+          return { context: ctx, summary: 'OData service is ready', requestDetails: [{ method: 'GET', url }] };
         }
       } catch { /* network error — retry */ }
       await new Promise(resolve => setTimeout(resolve, 2000));
-      onProgress({ step: 'Service check', status: 'running', message: `Waiting for ${url} (attempt ${i + 1})...` });
+      onProgress({ step: 'Service check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
     }
-    return { context: ctx, status: 'failed', errors: [`OData service at ${url} did not respond after ${maxAttempts} attempts`] };
+    return { context: ctx, status: 'failed', errors: ['OData service did not respond'], requestDetails: [{ method: 'GET', url, error: `No response after ${maxAttempts} attempts` }] };
   },
 };
 
@@ -62,7 +62,7 @@ const fetchAndParseMetadata = (config: EntityEventConfig): PipelineStep<EntityEv
   name: 'Fetch metadata',
   run: async (ctx, onProgress) => {
     const metadataUrl = config.payloadsDir ?? `${ctx.serverUrl}/$metadata`;
-    onProgress({ step: 'Fetch metadata', status: 'running', message: `Fetching $metadata... ${metadataUrl}` });
+    onProgress({ step: 'Fetch metadata', status: 'running', message: 'Fetching $metadata...' });
     const metadataXml = config.payloadsDir
       ? await loadMetadataFromFile(config.payloadsDir)
       : await fetchMetadata(ctx.serverUrl, ctx.authToken!);

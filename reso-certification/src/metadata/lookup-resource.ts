@@ -59,7 +59,10 @@ export const fetchLookupResource = async (
 
     if (response.status === 404) return undefined;
     if (response.status !== 200) {
-      throw new Error(`Lookup Resource returned HTTP ${response.status} at ${url}`);
+      const errorBody = typeof response.body === 'object' ? JSON.stringify(response.body) : String(response.body ?? '');
+      const err = new Error(`Lookup Resource returned HTTP ${response.status}`);
+      (err as unknown as Record<string, unknown>).requestDetails = { method: 'GET', url, status: response.status, responseBody: errorBody.slice(0, 500) };
+      throw err;
     }
 
     const body = response.body as {
