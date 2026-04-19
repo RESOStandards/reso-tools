@@ -11,7 +11,6 @@ import {
   deleteConfig,
   exportConfig,
   importConfigFromFile,
-  CREDENTIALS_WARNING,
   type SavedConfig,
 } from '../../services/saved-configs';
 import type { BatchConfig } from './config-builder';
@@ -73,12 +72,6 @@ export const SavedConfigsPanel = ({ currentConfig, onLoad }: SavedConfigsPanelPr
 
   return (
     <div className="space-y-3">
-      {/* Warning banner */}
-      <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-800 dark:text-amber-300">
-        <span className="text-base leading-none mt-px">⚠️</span>
-        <p>{CREDENTIALS_WARNING}</p>
-      </div>
-
       {/* Actions bar */}
       <div className="flex items-center gap-2">
         <button

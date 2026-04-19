@@ -112,7 +112,3 @@ export const importConfigFromFile = (): Promise<Record<string, unknown> | null> 
 /** Check if secure encryption is available (app is signed). */
 export const isEncryptionAvailable = (): boolean => isElectron();
 // Note: we can't directly check safeStorage.isEncryptionAvailable() from the
-// renderer. The electronStorage API already handles encryption transparently.
-// When the app is unsigned, safeStorage falls back to plain JSON.
-// The warning should always show until we have confirmed signing.
-export const CREDENTIALS_WARNING = 'Saved credentials are stored on your local filesystem. For best security, use Import/Export instead \u2014 your config file stays under your control and is not persisted by the application.';

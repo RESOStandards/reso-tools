@@ -7,7 +7,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { SearchInput } from '../../components/metadata/shared';
 import {
   maskSecret,
-  CREDENTIALS_WARNING,
   type SavedConnection,
   type StoredCredentials,
   storeCredentials,
@@ -222,12 +221,6 @@ export const ConfigsPage = () => {
       </div>
 
       <div className={`${PAGE_CONTAINER} pb-20`}>
-        {/* Warning banner */}
-        <div className="flex items-start gap-2 p-3 mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-800 dark:text-amber-300">
-          <span className="text-base leading-none mt-px">⚠️</span>
-          <p>{CREDENTIALS_WARNING}</p>
-        </div>
-
         {loading && (
           <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500 py-8">
             <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />

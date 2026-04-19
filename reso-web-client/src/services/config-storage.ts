@@ -105,6 +105,3 @@ export const removeCredentials = async (connectionId: string): Promise<void> => 
 /** Mask a secret for display — show last 4 chars. */
 export const maskSecret = (secret: string): string =>
   secret.length > 4 ? `${'•'.repeat(Math.min(8, secret.length - 4))}${secret.slice(-4)}` : '••••';
-
-/** Security warning for unencrypted storage. */
-export const CREDENTIALS_WARNING = 'Credentials are stored on your local filesystem using OS-level encryption when available. For best security, use Import/Export to transfer configs between machines \u2014 credentials stay under your control.';

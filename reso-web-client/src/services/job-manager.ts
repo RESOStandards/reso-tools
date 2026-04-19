@@ -71,24 +71,6 @@ interface ElectronStorage {
 const getElectronStorage = (): ElectronStorage | undefined =>
   (window as unknown as Record<string, unknown>).electronStorage as ElectronStorage | undefined;
 
-const CONFIG_STORAGE_KEY = 'cert:lastBatchConfig';
-
-/** Save a batch config to secure storage (auth tokens encrypted by Electron). */
-const saveConfigToStorage = async (config: BatchConfig): Promise<void> => {
-  const storage = getElectronStorage();
-  if (!storage) return;
-  await storage.set(CONFIG_STORAGE_KEY, JSON.stringify(config));
-};
-
-/** Save an individual job's SDK config to secure storage keyed by provider+recipient. */
-const saveJobConfigToStorage = async (job: Job): Promise<void> => {
-  if (!job.sdkConfig) return;
-  const storage = getElectronStorage();
-  if (!storage) return;
-  const key = `cert:jobConfig:${job.providerUoi}:${job.recipientUoi}:${job.endorsementKey}`;
-  await storage.set(key, JSON.stringify(job.sdkConfig));
-};
-
 /** Load an individual job's SDK config from secure storage. */
 const loadJobConfigFromStorage = async (job: Job): Promise<Record<string, unknown> | null> => {
   const storage = getElectronStorage();
@@ -513,11 +495,7 @@ export const startBatch = (config: BatchConfig): ReadonlyArray<Job> => {
   for (const job of jobs) {
     state.jobs.set(job.id, job);
     emit({ type: 'job-queued', job });
-    // Persist config to secure storage for re-run
-    saveJobConfigToStorage(job);
   }
-  // Save full batch config for "Load from Saved"
-  saveConfigToStorage(config);
 
   // Start the queue (non-blocking)
   runQueue(config.concurrency);
