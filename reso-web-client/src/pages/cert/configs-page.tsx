@@ -115,8 +115,11 @@ export const ConfigsPage = () => {
           if (Array.isArray(parsed.recipients)) {
             // BatchConfig format — expand to individual configs
             for (const r of parsed.recipients) {
+              // Skip incomplete recipients (no UOI and no URL)
+              if (!r.recipientUoi && !r.serviceRootUri) continue;
+              const timestamp = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
               imported.push({
-                name: r.description || `${r.recipientUoi ?? 'Unknown'}`,
+                name: r.description || (r.recipientUoi ? `Recipient ${r.recipientUoi}` : `Imported ${timestamp}`),
                 url: r.serviceRootUri,
                 authMode: r.auth?.mode ?? 'token',
                 clientId: r.auth?.clientId,
@@ -141,7 +144,20 @@ export const ConfigsPage = () => {
                 });
               }
             }
+          } else if (parsed.configs && Array.isArray(parsed.configs)) {
+            // Export All format — unwrap the configs array
+            for (const c of parsed.configs) {
+              // Strip wrapper metadata that shouldn't be on individual configs
+              delete c.id;
+              if (!c.isCert && c.providerUoi && c.recipientUoi) c.isCert = true;
+              imported.push(c);
+            }
           } else {
+            // Single config — detect isCert from fields
+            delete parsed.id; // strip any stale ID so a fresh one is generated
+            if (!parsed.isCert && parsed.providerUoi && parsed.recipientUoi) {
+              parsed.isCert = true;
+            }
             imported.push(parsed);
           }
         } catch { /* skip bad files */ }
