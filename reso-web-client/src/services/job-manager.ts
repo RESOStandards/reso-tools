@@ -16,6 +16,14 @@
 
 import type { BatchConfig, RecipientConfig, AuthConfig } from '../components/cert/config-builder';
 import {
+  saveConnection,
+  storeCredentials,
+  getCredentials,
+  findConnectionByKey,
+  saveProfile,
+  type StoredCredentials,
+} from './connection-manager';
+import {
   CERT_ENDORSEMENT_LABELS,
   ENDORSEMENT_DEFAULT_VERSIONS,
   stepsForEndorsement,
@@ -487,14 +495,80 @@ const runQueue = async (concurrency: number): Promise<void> => {
   emit({ type: 'queue-complete' });
 };
 
+// ── Credential auto-save ─────────────────────────────────────────────
+
+/** Save connection + credentials from a batch config's recipients. */
+const autoSaveConnections = async (config: BatchConfig): Promise<void> => {
+  for (const recipient of config.recipients) {
+    if (!recipient.serviceRootUri) continue;
+
+    const url = normalizeUrl(recipient.serviceRootUri);
+    const authMode = recipient.auth.mode;
+    const clientId = authMode === 'client_credentials' ? recipient.auth.clientId : undefined;
+    const originatingSystemName = authMode === 'token' ? (recipient.description || undefined) : undefined;
+
+    const conn = await saveConnection({
+      name: recipient.description || url,
+      url,
+      authMode,
+      clientId,
+      tokenUrl: authMode === 'client_credentials' ? normalizeUrl(recipient.auth.tokenUrl) : undefined,
+      scope: authMode === 'client_credentials' ? recipient.auth.scope : undefined,
+      originatingSystemName,
+    });
+
+    const creds: StoredCredentials = authMode === 'token'
+      ? { authToken: recipient.auth.authToken }
+      : { clientSecret: recipient.auth.clientSecret };
+    if (creds.authToken || creds.clientSecret) {
+      await storeCredentials(conn.id, creds);
+    }
+  }
+};
+
+/** Check if credentials differ from what's saved for a recipient. */
+export const detectCredentialChanges = async (recipients: ReadonlyArray<RecipientConfig>): Promise<ReadonlyArray<{ recipientIndex: number; url: string }>> => {
+  const changes: { recipientIndex: number; url: string }[] = [];
+
+  for (let i = 0; i < recipients.length; i++) {
+    const r = recipients[i];
+    if (!r.serviceRootUri) continue;
+
+    const url = normalizeUrl(r.serviceRootUri);
+    const existing = await findConnectionByKey(
+      url,
+      r.auth.mode,
+      r.auth.mode === 'client_credentials' ? r.auth.clientId : undefined,
+      r.auth.mode === 'token' ? r.description : undefined
+    );
+    if (!existing) continue;
+
+    const creds = await getCredentials(existing.id);
+    if (!creds) continue;
+
+    const changed = r.auth.mode === 'token'
+      ? creds.authToken !== r.auth.authToken
+      : creds.clientSecret !== r.auth.clientSecret;
+
+    if (changed) changes.push({ recipientIndex: i, url });
+  }
+
+  return changes;
+};
+
 // ── Public API ───────────────────────────────────────────────────────
 
 /** Enqueue jobs from a BatchConfig and start processing. */
-export const startBatch = (config: BatchConfig): ReadonlyArray<Job> => {
+export const startBatch = (config: BatchConfig, skipAutoSave = false): ReadonlyArray<Job> => {
   const jobs = expandBatchConfig(config);
   for (const job of jobs) {
     state.jobs.set(job.id, job);
     emit({ type: 'job-queued', job });
+  }
+
+  // Auto-save connections (fire-and-forget, don't block job start)
+  if (!skipAutoSave) {
+    autoSaveConnections(config).catch(() => {});
   }
 
   // Start the queue (non-blocking)
