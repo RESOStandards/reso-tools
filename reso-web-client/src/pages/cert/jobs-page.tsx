@@ -396,6 +396,19 @@ const formatDuration = (ms: number): string => {
   return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
 };
 
+/** Live-ticking timer for running steps. */
+const LiveTimer = ({ startTime }: { readonly startTime: number }) => {
+  const [elapsed, setElapsed] = useState(Date.now() - startTime);
+  useEffect(() => {
+    const interval = setInterval(() => setElapsed(Date.now() - startTime), 100);
+    return () => clearInterval(interval);
+  }, [startTime]);
+  return <span className="text-xs text-blue-400 dark:text-blue-500 tabular-nums ml-2">{formatDuration(elapsed)}</span>;
+};
+
+/** Track when each step started running for the live timer. */
+const stepStartTimes = new Map<string, number>();
+
 /** Render text with URLs made copyable — inline copy icon next to each URL. */
 const URL_REGEX = /https?:\/\/[^\s,)]+/g;
 
@@ -485,10 +498,19 @@ const StepPipeline = ({ steps }: { readonly steps: ReadonlyArray<JobStep> }) => 
             >
               {step.name}
             </span>
-            {step.duration != null && step.duration > 0 && (
-              <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums ml-2">
-                {formatDuration(step.duration)}
-              </span>
+            {step.status === 'running' ? (
+              (() => {
+                const key = `${step.name}`;
+                if (!stepStartTimes.has(key)) stepStartTimes.set(key, Date.now());
+                return <LiveTimer startTime={stepStartTimes.get(key)!} />;
+              })()
+            ) : (
+              step.duration != null && step.duration > 0 && (
+                (() => { stepStartTimes.delete(step.name); return null; })(),
+                <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums ml-2">
+                  {formatDuration(step.duration)}
+                </span>
+              )
             )}
           </div>
           {step.detail && (() => {
@@ -1152,7 +1174,19 @@ export const JobsPage = () => {
           <div className="mb-6">
             <ConfigBuilder
               onClose={() => { setShowNewJob(false); setClonedConfig(undefined); }}
-              onStart={(config) => { start(config); setShowNewJob(false); setClonedConfig(undefined); }}
+              onStart={(config) => {
+                const created = start(config);
+                setShowNewJob(false);
+                setClonedConfig(undefined);
+                // Highlight the first new job and scroll to it
+                if (created.length > 0) {
+                  setHighlightedJobId(created[0].id);
+                  setTimeout(() => {
+                    const el = document.getElementById(`job-${created[0].id}`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }, 100);
+                }
+              }}
               initialConfig={clonedConfig}
             />
           </div>

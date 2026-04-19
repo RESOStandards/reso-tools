@@ -142,6 +142,7 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
       baseReport,
       ctx.serverUrl,
       ctx.authToken!,
+      (count) => onProgress({ step: 'sub:metadata', status: 'running', message: `Fetching Lookup Resource... ${count.toLocaleString()} records` }),
     );
 
     if (lookupResourceAvailable) {
