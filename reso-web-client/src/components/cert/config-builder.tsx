@@ -9,6 +9,7 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { SavedConfigsPanel } from './saved-configs-panel';
+import type { SavedConnection } from '../../services/config-storage';
 import { SearchInput, FilterPill, Badge } from '../metadata/shared';
 import { fetchOrganizations } from '../../api/cert-client';
 import type { CertOrganization, CertOrganizationSystem } from '../../api/cert-client';
@@ -451,10 +452,12 @@ const OrgDropdown = ({
   orgs,
   search,
   onSelect,
+  inline = false,
 }: {
   readonly orgs: ReadonlyArray<CertOrganization>;
   readonly search: string;
   readonly onSelect: (org: CertOrganization) => void;
+  readonly inline?: boolean;
 }) => {
   const filtered = useMemo(() => {
     if (!search.trim()) return orgs.slice(0, 20);
@@ -467,7 +470,7 @@ const OrgDropdown = ({
   if (filtered.length === 0) return null;
 
   return (
-    <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+    <div className={inline ? '' : 'absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto'}>
       {filtered.map(org => (
         <button
           key={org.id}
@@ -493,6 +496,7 @@ const RecipientCard = ({
   onDuplicate,
   orgs,
   providerSystems,
+  matchConfigs,
 }: {
   readonly recipient: RecipientConfig;
   readonly index: number;
@@ -500,6 +504,7 @@ const RecipientCard = ({
   readonly onRemove: () => void;
   readonly onDuplicate: () => void;
   readonly orgs: ReadonlyArray<CertOrganization>;
+  readonly matchConfigs: (query: string) => ReadonlyArray<SavedConnection>;
   readonly providerSystems: ReadonlyArray<CertOrganizationSystem>;
 }) => {
   const [expanded, setExpanded] = useState(true);
@@ -613,16 +618,56 @@ const RecipientCard = ({
                     className={INPUT}
                   />
                   {showRecipientDropdown && (
-                    <OrgDropdown
-                      orgs={orgs}
-                      search={recipientSearch}
-                      onSelect={org => {
-                        onChange({ ...recipient, recipientUoi: org.id, description: org.name });
-                        setRecipientName(org.name);
-                        setRecipientSearch('');
-                        setShowRecipientDropdown(false);
-                      }}
-                    />
+                    <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {matchConfigs(recipientSearch).length > 0 && (
+                        <>
+                          <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/80">
+                            Saved Configs
+                          </div>
+                          {matchConfigs(recipientSearch).map(config => (
+                            <button
+                              key={config.id}
+                              type="button"
+                              className="w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer"
+                              onMouseDown={e => {
+                                e.preventDefault();
+                                onChange({
+                                  ...recipient,
+                                  description: config.name ?? '',
+                                  serviceRootUri: config.url ?? '',
+                                  recipientUoi: config.recipientUoi ?? '',
+                                  providerUsi: config.providerUsi ?? '',
+                                  auth: config.authMode === 'client_credentials'
+                                    ? { mode: 'client_credentials' as const, clientId: config.clientId ?? '', clientSecret: '', tokenUrl: config.tokenUrl ?? '', scope: config.scope }
+                                    : { mode: 'token' as const, authToken: '' },
+                                  ...(config.certOptions as Record<string, unknown> ?? {}),
+                                });
+                                setRecipientName(config.recipientName ?? config.name ?? '');
+                                setRecipientSearch('');
+                                setShowRecipientDropdown(false);
+                              }}
+                            >
+                              <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{config.name || config.recipientName || config.recipientUoi}</div>
+                              <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{config.url}</div>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/80">
+                        Organizations
+                      </div>
+                      <OrgDropdown
+                        orgs={orgs}
+                        search={recipientSearch}
+                        onSelect={org => {
+                          onChange({ ...recipient, recipientUoi: org.id, description: org.name });
+                          setRecipientName(org.name);
+                          setRecipientSearch('');
+                          setShowRecipientDropdown(false);
+                        }}
+                        inline
+                      />
+                    </div>
                   )}
                 </>
               )}
@@ -740,13 +785,31 @@ export const ConfigBuilder = ({
   const [providerSearch, setProviderSearch] = useState('');
   const [showProviderDropdown, setShowProviderDropdown] = useState(false);
 
+  // Saved configs for autocomplete
+  const [savedConfigs, setSavedConfigs] = useState<ReadonlyArray<SavedConnection>>([]);
+
   useEffect(() => {
     setOrgsLoading(true);
     fetchOrganizations(null)
       .then(setOrgs)
       .catch(() => {})
       .finally(() => setOrgsLoading(false));
+
+    // Load saved configs for autocomplete
+    const mgr = (window as unknown as Record<string, unknown>).configManager as { list: () => Promise<ReadonlyArray<SavedConnection>> } | undefined;
+    if (mgr) mgr.list().then(setSavedConfigs).catch(() => {});
   }, []);
+
+  /** Filter saved configs by a search query across all relevant fields. */
+  const matchConfigs = useCallback((query: string): ReadonlyArray<SavedConnection> => {
+    if (!query || query.length < 2) return [];
+    const q = query.toLowerCase();
+    return savedConfigs.filter(c =>
+      [c.name, c.url, c.providerUoi, c.providerName, c.providerUsi, c.systemName, c.recipientUoi, c.recipientName]
+        .filter(Boolean)
+        .some(field => field!.toLowerCase().includes(q))
+    ).slice(0, 5);
+  }, [savedConfigs]);
 
   const selectProvider = useCallback((org: CertOrganization) => {
     setProviderUoi(org.id);
@@ -902,11 +965,59 @@ export const ConfigBuilder = ({
                 className={INPUT}
               />
               {showProviderDropdown && (
-                <OrgDropdown
-                  orgs={orgs}
-                  search={providerSearch}
-                  onSelect={selectProvider}
-                />
+                <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {/* Saved config matches */}
+                  {matchConfigs(providerSearch).length > 0 && (
+                    <>
+                      <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/80">
+                        Saved Configs
+                      </div>
+                      {matchConfigs(providerSearch).map(config => (
+                        <button
+                          key={config.id}
+                          type="button"
+                          className="w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer"
+                          onMouseDown={e => {
+                            e.preventDefault();
+                            // Fill provider from saved config
+                            if (config.providerUoi) {
+                              setProviderUoi(config.providerUoi);
+                              setProviderName(config.providerName ?? config.providerUoi);
+                            }
+                            // Fill recipient with full config
+                            setRecipients([{
+                              ...makeRecipient(),
+                              description: config.name ?? '',
+                              serviceRootUri: config.url ?? '',
+                              recipientUoi: config.recipientUoi ?? '',
+                              providerUsi: config.providerUsi ?? '',
+                              auth: config.authMode === 'client_credentials'
+                                ? { mode: 'client_credentials' as const, clientId: config.clientId ?? '', clientSecret: '', tokenUrl: config.tokenUrl ?? '', scope: config.scope }
+                                : { mode: 'token' as const, authToken: '' },
+                              ...(config.certOptions as Record<string, unknown> ?? {}),
+                            }]);
+                            setShowProviderDropdown(false);
+                            setProviderSearch('');
+                          }}
+                        >
+                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{config.name || config.recipientName || config.recipientUoi}</div>
+                          <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{config.url}</div>
+                          {config.recipientName && <div className="text-[10px] text-gray-400 dark:text-gray-500">Recipient: {config.recipientName}</div>}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  {/* Org directory results */}
+                  <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/80">
+                    Organizations
+                  </div>
+                  <OrgDropdown
+                    orgs={orgs}
+                    search={providerSearch}
+                    onSelect={selectProvider}
+                    inline
+                  />
+                </div>
               )}
             </>
           )}
@@ -956,6 +1067,7 @@ export const ConfigBuilder = ({
             onDuplicate={() => duplicateRecipient(i)}
             orgs={orgs}
             providerSystems={providerSystems}
+            matchConfigs={matchConfigs}
           />
         ))}
       </div>
