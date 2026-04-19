@@ -13,8 +13,14 @@ import type { CsdlSchema } from '../csdl/types.js';
  * @param token - Bearer authentication token
  * @returns Raw XML metadata string
  */
-export const fetchRawMetadata = async (baseUrl: string, token: string): Promise<string> => {
-  const metadataUrl = `${baseUrl.replace(/\/$/, '')}/$metadata?$format=application/xml`;
+export interface MetadataFetchOptions {
+  /** Add $format=application/xml query parameter. Default: false. Some servers require it, others reject it. */
+  readonly useFormatParam?: boolean;
+}
+
+export const fetchRawMetadata = async (baseUrl: string, token: string, options: MetadataFetchOptions = {}): Promise<string> => {
+  const formatParam = options.useFormatParam ? '?$format=application/xml' : '';
+  const metadataUrl = `${baseUrl.replace(/\/$/, '')}/$metadata${formatParam}`;
   const response = await fetch(metadataUrl, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -37,7 +43,7 @@ export const fetchRawMetadata = async (baseUrl: string, token: string): Promise<
  * @param token - Bearer authentication token
  * @returns Parsed CSDL schema
  */
-export const fetchAndParseMetadata = async (baseUrl: string, token: string): Promise<CsdlSchema> => {
-  const xml = await fetchRawMetadata(baseUrl, token);
+export const fetchAndParseMetadata = async (baseUrl: string, token: string, options?: MetadataFetchOptions): Promise<CsdlSchema> => {
+  const xml = await fetchRawMetadata(baseUrl, token, options);
   return parseCsdlXml(xml);
 };

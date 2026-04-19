@@ -67,8 +67,8 @@ export const toResoFields = (entityType: EntityType): ReadonlyArray<ResoField> =
  * Requires a bearer token for authorization.
  * Returns the raw XML string.
  */
-export const fetchMetadata = async (serverUrl: string, authToken: string): Promise<string> =>
-  fetchRawMetadata(serverUrl.replace(/\/$/, ''), authToken);
+export const fetchMetadata = async (serverUrl: string, authToken: string, useFormatParam = true): Promise<string> =>
+  fetchRawMetadata(serverUrl.replace(/\/$/, ''), authToken, { useFormatParam });
 
 /** Reads OData XML metadata from a local file. */
 export const loadMetadataFromFile = async (filePath: string): Promise<string> => readFile(filePath, 'utf-8');
