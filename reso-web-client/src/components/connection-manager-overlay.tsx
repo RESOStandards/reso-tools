@@ -8,6 +8,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { MaskedInput } from './masked-input';
+import { ExportDialog } from './cert/export-dialog';
+import { ImportDiffView } from './cert/import-diff-view';
+import { readImportFile, analyzeImport, type ImportAnalysis } from '../services/connection-io';
 import {
   loadConnectionsMRU,
   saveConnection,
@@ -66,6 +69,8 @@ export const ConnectionManagerOverlay = ({ isOpen, onClose, onSelect }: Connecti
   const [showNew, setShowNew] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [linkedProfiles, setLinkedProfiles] = useState<ReadonlyArray<string>>([]);
+  const [showExport, setShowExport] = useState(false);
+  const [importAnalysis, setImportAnalysis] = useState<ImportAnalysis | null>(null);
 
   const reload = useCallback(async () => {
     setConnections(await loadConnectionsMRU());
@@ -150,6 +155,18 @@ export const ConnectionManagerOverlay = ({ isOpen, onClose, onSelect }: Connecti
     setShowNew(true);
   }, []);
 
+  const handleImport = useCallback(async () => {
+    const payload = await readImportFile();
+    if (!payload) return;
+    const analysis = await analyzeImport(payload);
+    setImportAnalysis(analysis);
+  }, []);
+
+  const handleImportComplete = useCallback(async () => {
+    setImportAnalysis(null);
+    await reload();
+  }, [reload]);
+
   if (!isOpen) return null;
 
   return (
@@ -222,17 +239,33 @@ export const ConnectionManagerOverlay = ({ isOpen, onClose, onSelect }: Connecti
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={handleNew}
-            disabled={showNew}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors disabled:opacity-40"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
-              <path d="M8.75 3.75a.75.75 0 00-1.5 0v3.5h-3.5a.75.75 0 000 1.5h3.5v3.5a.75.75 0 001.5 0v-3.5h3.5a.75.75 0 000-1.5h-3.5v-3.5z" />
-            </svg>
-            Add Connection
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleNew}
+              disabled={showNew}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors disabled:opacity-40"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
+                <path d="M8.75 3.75a.75.75 0 00-1.5 0v3.5h-3.5a.75.75 0 000 1.5h3.5v3.5a.75.75 0 001.5 0v-3.5h3.5a.75.75 0 000-1.5h-3.5v-3.5z" />
+              </svg>
+              Add
+            </button>
+            <button
+              type="button"
+              onClick={handleImport}
+              className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              Import
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowExport(true)}
+              className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              Export
+            </button>
+          </div>
           <span className="text-xs text-gray-400 dark:text-gray-500">
             {connections.length} connection{connections.length !== 1 ? 's' : ''}
           </span>
@@ -273,6 +306,18 @@ export const ConnectionManagerOverlay = ({ isOpen, onClose, onSelect }: Connecti
             </div>
           </div>
         </div>
+      )}
+
+      {/* Export dialog */}
+      <ExportDialog isOpen={showExport} onClose={() => setShowExport(false)} />
+
+      {/* Import diff view */}
+      {importAnalysis && (
+        <ImportDiffView
+          analysis={importAnalysis}
+          onComplete={handleImportComplete}
+          onCancel={() => setImportAnalysis(null)}
+        />
       )}
     </div>
   );
