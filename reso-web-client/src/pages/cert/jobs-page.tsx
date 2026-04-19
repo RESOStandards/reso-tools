@@ -410,7 +410,23 @@ const LiveTimer = ({ startTime }: { readonly startTime: number }) => {
 /** Track when each step started running for the live timer. */
 const stepStartTimes = new Map<string, number>();
 
-/** Render text with URLs made copyable — inline copy icon next to each URL. */
+/** Derive a user-friendly label from a URL. */
+const friendlyUrlLabel = (url: string): string => {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/+$/, '');
+    const last = path.split('/').pop() ?? '';
+    if (last === '$metadata') return 'CSDL specification';
+    if (/^odata-v4/i.test(last) || url.includes('oasis-open.org')) return 'OData specification';
+    if (last === 'Lookup' || last === 'LookupResource') return 'Lookup Resource';
+    if (!last) return parsed.hostname;
+    return last;
+  } catch {
+    return url.length > 40 ? `${url.slice(0, 37)}...` : url;
+  }
+};
+
+/** Render text with URLs as clickable links with friendly labels and copy buttons. */
 const URL_REGEX = /https?:\/\/[^\s,)]+/g;
 
 const DetailText = ({ text, className }: { readonly text: string; readonly className?: string }) => {
@@ -434,8 +450,10 @@ const DetailText = ({ text, className }: { readonly text: string; readonly class
         <span key={i}>
           {part}
           {i < urls.length && (
-            <span className="inline-flex items-center gap-0.5 font-mono text-blue-500 dark:text-blue-400">
-              {urls[i]}
+            <span className="inline-flex items-center gap-0.5">
+              <a href={urls[i]} target="_blank" rel="noopener noreferrer" className="text-blue-500 dark:text-blue-400 hover:underline" title={urls[i]}>
+                {friendlyUrlLabel(urls[i])}
+              </a>
               <button
                 type="button"
                 onClick={() => handleCopy(urls[i])}
@@ -518,9 +536,7 @@ const StepPipeline = ({ steps }: { readonly steps: ReadonlyArray<JobStep> }) => 
             const replicationData = parseReplicationProgress(step.detail);
             if (replicationData) return <ReplicationProgress data={replicationData} />;
             return (
-              <p className={`text-xs mt-0.5 ${step.status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                {step.detail}
-              </p>
+              <DetailText text={step.detail} className={`text-xs mt-0.5 ${step.status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`} />
             );
           })()}
         </div>
@@ -860,7 +876,7 @@ const ReportStepCard = ({
           {step.detail && (() => {
             const replicationData = parseReplicationProgress(step.detail);
             if (replicationData) return <div className="ml-6"><ReplicationProgress data={replicationData} /></div>;
-            return <p className="text-xs mt-0.5 ml-6 text-gray-500 dark:text-gray-400">{step.detail}</p>;
+            return <DetailText text={step.detail} className="text-xs mt-0.5 ml-6 text-gray-500 dark:text-gray-400" />;
           })()}
           {step.requestDetails && step.requestDetails.length > 0 && (
             <div className="ml-6"><RequestDetailsPanel details={step.requestDetails} /></div>

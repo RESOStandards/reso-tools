@@ -47,6 +47,26 @@ const CopyButton = ({ text }: { readonly text: string }) => {
   );
 };
 
+/** Derive a user-friendly label from an OData URL. */
+const friendlyLabel = (url: string): string => {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/+$/, '');
+    const lastSegment = path.split('/').pop() ?? '';
+
+    if (lastSegment === '$metadata') return 'Metadata';
+    if (lastSegment === 'Lookup' || lastSegment === 'LookupResource') return 'Lookup Resource';
+    if (parsed.search.includes('$metadata')) return 'Metadata';
+
+    // For service root (empty or just a slash after origin)
+    if (!lastSegment || lastSegment === path) return 'Service Root';
+
+    return lastSegment;
+  } catch {
+    return url.length > 60 ? `${url.slice(0, 57)}...` : url;
+  }
+};
+
 const statusColor = (status?: number): string => {
   if (!status) return 'text-gray-400';
   if (status >= 200 && status < 300) return 'text-green-400';
@@ -70,7 +90,7 @@ export const RequestDetailsPanel = ({ details }: { readonly details: ReadonlyArr
     <div className="mt-1.5 space-y-1">
       {details.map((detail, i) => {
         const isOpen = expanded.has(i);
-        const label = `${detail.method} ${detail.url}`;
+        const label = `${detail.method} ${friendlyLabel(detail.url)}`;
         const hasBody = detail.responseBody || detail.error;
 
         return (
@@ -78,6 +98,7 @@ export const RequestDetailsPanel = ({ details }: { readonly details: ReadonlyArr
             <button
               type="button"
               onClick={() => toggle(i)}
+              title={`${detail.method} ${detail.url}`}
               className="flex items-center gap-1.5 text-[11px] font-mono text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer group"
             >
               <svg
@@ -87,7 +108,7 @@ export const RequestDetailsPanel = ({ details }: { readonly details: ReadonlyArr
               >
                 <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
               </svg>
-              <span className="truncate max-w-[400px]">{label}</span>
+              <span>{label}</span>
               {detail.status != null && (
                 <span className={`${statusColor(detail.status)} font-semibold`}>{detail.status}</span>
               )}
