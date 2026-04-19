@@ -1,4 +1,4 @@
-const { getLookupMap, getStandardMetadata, CATEGORIES } = require('./common');
+const { getLookupMap, getStandardMetadata, CATEGORIES } = require('./common.cjs');
 
 /**
  * Defines the bins template for stats.

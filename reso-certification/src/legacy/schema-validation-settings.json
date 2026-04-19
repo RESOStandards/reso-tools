@@ -1,0 +1,35 @@
+{
+  "2.0": {
+    "Property": {
+      "MLSAreaMinor": {
+        "ignoreEnumerations": true
+      },
+      "MLSAreaMajor": {
+        "ignoreEnumerations": true
+      },
+      "MiddleOrJuniorSchoolDistrict": {
+        "ignoreEnumerations": true
+      },
+      "ElementarySchool": {
+        "ignoreEnumerations": true
+      },
+      "HighSchoolDistrict": {
+        "ignoreEnumerations": true
+      },
+      "HighSchool": {
+        "ignoreEnumerations": true
+      },
+      "ElementarySchoolDistrict": {
+        "ignoreEnumerations": true
+      },
+      "MiddleOrJuniorSchool": {
+        "ignoreEnumerations": true
+      }
+    },
+    "Media": {
+      "ImageSizeDescription": {
+        "ignoreEnumerations": true
+      }
+    }
+  }
+}

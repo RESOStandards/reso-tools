@@ -38,7 +38,7 @@ RUN sed -i 's|file:../reso-client|file:/deps/reso-client|' package.json \
 
 COPY reso-certification/tsconfig.json ./
 COPY reso-certification/src/ ./src/
-COPY reso-certification/legacy-cert-utils/ ./legacy-cert-utils/
+COPY reso-certification/src/legacy/ ./src/legacy/
 COPY reso-certification/xsd-validator/ ./xsd-validator/
 COPY reso-certification/xsd/ ./xsd/
 RUN cd xsd-validator && npm install && cd ..
@@ -57,7 +57,7 @@ WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./
-COPY --from=build /app/legacy-cert-utils ./legacy-cert-utils
+COPY --from=build /app/src/legacy ./src/legacy
 COPY --from=build /app/xsd-validator ./xsd-validator
 COPY --from=build /app/xsd ./xsd
 COPY --from=build /app/sample-payloads ./sample-payloads

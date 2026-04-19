@@ -1,0 +1,610 @@
+{
+  "description": "RESO Data Availability Report",
+  "generatedOn": "2022-03-15T10:12:32.319Z",
+  "type": "data_availability",
+  "fields": [
+    {
+      "resourceName": "Office",
+      "fieldName": "OfficeStateOrProvince",
+      "frequency": 1000,
+      "availability": 1
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "AccessibilityFeatures",
+      "frequency": 2000,
+      "availability": 2
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "StandardStatus",
+      "frequency": 1000,
+      "availability": 1
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "ListPrice",
+      "frequency": 999,
+      "availability": 0.999
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "CustomLookupField123",
+      "frequency": 500,
+      "availability": 0.5
+    },
+    {
+      "resourceName": "Media",
+      "fieldName": "ListOfficeKey",
+      "frequency": 1000,
+      "parentResourceName": "Property",
+      "availability": 0.5
+    },
+    {
+      "resourceName": "Media",
+      "fieldName": "ResourceRecordKey",
+      "frequency": 500,
+      "parentResourceName": "Property",
+      "availability": 0.25
+    },
+    {
+      "resourceName": "Media",
+      "fieldName": "MediaModificationTimestamp",
+      "frequency": 2000,
+      "parentResourceName": "Property",
+      "availability": 1
+    }
+  ],
+  "lookups": [
+    {
+      "resourceName": "Office",
+      "fieldName": "OfficeStateOrProvince",
+      "numLookupsTotal": 1000
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "AccessibilityFeatures",
+      "numLookupsTotal": 1000
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "StandardStatus",
+      "numLookupsTotal": 1000
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "CustomLookupField123",
+      "numLookupsTotal": 1000
+    }
+  ],
+  "lookupValues": [
+    {
+      "resourceName": "Office",
+      "fieldName": "OfficeStateOrProvince",
+      "lookupValue": "CA",
+      "frequency": 900,
+      "availability": 0.9
+    },
+    {
+      "resourceName": "Office",
+      "fieldName": "OfficeStateOrProvince",
+      "lookupValue": "HI",
+      "frequency": 100,
+      "availability": 0.1
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "AccessibilityFeatures",
+      "lookupValue": "Accessible Approach with Ramp",
+      "frequency": 100,
+      "availability": 0.1
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "AccessibilityFeatures",
+      "lookupValue": "ReinforcedFloors",
+      "frequency": 100,
+      "availability": 0.1
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "StandardStatus",
+      "lookupValue": "Active Under Contract",
+      "frequency": 900,
+      "availability": 0.9
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "StandardStatus",
+      "lookupValue": "Pending",
+      "frequency": 100,
+      "availability": 0.1
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "CustomLookupField123",
+      "lookupValue": "PENDING",
+      "frequency": 10,
+      "availability": 0.01
+    },
+    {
+      "resourceName": "Media",
+      "fieldName": "ResourceRecordKey",
+      "frequency": 100,
+      "parentResourceName": "Property",
+      "availability": 0.05
+    }
+  ],
+  "resources": [
+    {
+      "resourceName": "Office",
+      "recordCount": 1000,
+      "numRecordsFetched": 1000,
+      "numUniqueRecordsFetched": 1000,
+      "numSamples": 10,
+      "pageSize": 100,
+      "averageResponseBytes": 100000,
+      "averageResponseTimeMillis": 1500,
+      "dateField": "ModificationTimestamp",
+      "dateLow": "2021-03-15T10:12:32.319Z",
+      "dateHigh": "2022-03-15T10:12:32.319Z",
+      "keyFields": [
+        "OfficeKey"
+      ]
+    },
+    {
+      "resourceName": "Property",
+      "recordCount": 1000,
+      "numRecordsFetched": 1000,
+      "numUniqueRecordsFetched": 1000,
+      "numSamples": 10,
+      "pageSize": 100,
+      "averageResponseBytes": 100000,
+      "averageResponseTimeMillis": 2000,
+      "dateField": "ModificationTimestamp",
+      "dateLow": "2021-03-15T10:12:32.319Z",
+      "dateHigh": "2022-03-15T10:12:32.319Z",
+      "keyFields": [
+        "ListingKey"
+      ],
+      "postalCodes": [
+        "12345",
+        "67890"
+      ],
+      "expansions": [
+        {
+          "resourceName": "Media",
+          "recordCount": 1000,
+          "numRecordsFetched": 1000,
+          "numSamples": 10,
+          "pageSize": 100,
+          "averageResponseBytes": 100000,
+          "averageResponseTimeMillis": 1500,
+          "dateField": "ModificationTimestamp",
+          "dateLow": "2021-03-15T10:12:32.319Z",
+          "dateHigh": "2022-03-15T10:12:32.319Z",
+          "keyFields": [
+            "MemberKey"
+          ],
+          "numExpandedRecordsFetched": 2000,
+          "numUniqueRecordsFetched": 2000
+        }
+      ]
+    }
+  ],
+  "availability": {
+    "fields": {
+      "total": {
+        "eqZero": 0,
+        "gtZero": 8,
+        "gte25": 8,
+        "gte50": 7,
+        "gte75": 5,
+        "eq100": 3
+      },
+      "reso": {
+        "eqZero": 0,
+        "gtZero": 6,
+        "gte25": 6,
+        "gte50": 5,
+        "gte75": 5,
+        "eq100": 3
+      },
+      "idx": {
+        "eqZero": 0,
+        "gtZero": 0,
+        "gte25": 0,
+        "gte50": 0,
+        "gte75": 0,
+        "eq100": 0
+      },
+      "local": {
+        "eqZero": 0,
+        "gtZero": 2,
+        "gte25": 2,
+        "gte50": 2,
+        "gte75": 0,
+        "eq100": 0
+      }
+    },
+    "lookups": {
+      "total": {
+        "eqZero": 0,
+        "gtZero": 8,
+        "gte25": 2,
+        "gte50": 2,
+        "gte75": 2,
+        "eq100": 0
+      },
+      "reso": {
+        "eqZero": 0,
+        "gtZero": 0,
+        "gte25": 0,
+        "gte50": 0,
+        "gte75": 0,
+        "eq100": 0
+      },
+      "idx": {
+        "eqZero": 0,
+        "gtZero": 0,
+        "gte25": 0,
+        "gte50": 0,
+        "gte75": 0,
+        "eq100": 0
+      },
+      "local": {
+        "eqZero": 0,
+        "gtZero": 8,
+        "gte25": 2,
+        "gte50": 2,
+        "gte75": 2,
+        "eq100": 0
+      }
+    },
+    "resources": {
+      "Office": {
+        "fields": {
+          "total": 1,
+          "reso": 1,
+          "idx": 0,
+          "local": 0
+        },
+        "lookups": {
+          "total": 0.5,
+          "reso": 0,
+          "idx": 0,
+          "local": 0.5
+        }
+      },
+      "Property": {
+        "fields": {
+          "total": 1.1247500000000001,
+          "reso": 1.333,
+          "idx": 0,
+          "local": 0.5
+        },
+        "lookups": {
+          "total": 0.24200000000000005,
+          "reso": 0,
+          "idx": 0,
+          "local": 0.24200000000000005
+        },
+        "expansions": {
+          "Media": {
+            "fields": {
+              "total": 0.5833333333333334,
+              "reso": 0.625,
+              "idx": 0,
+              "local": 0.5
+            },
+            "lookups": {
+              "total": 0.05,
+              "reso": 0,
+              "idx": 0,
+              "local": 0.05
+            }
+          }
+        }
+      },
+      "Media": {
+        "fields": {
+          "total": 0,
+          "reso": 0,
+          "idx": 0,
+          "local": 0
+        },
+        "lookups": {
+          "total": 0,
+          "reso": 0,
+          "idx": 0,
+          "local": 0
+        }
+      }
+    },
+    "resourcesBinary": {
+      "Office": {
+        "fields": {
+          "total": {
+            "eqZero": 0,
+            "gtZero": 1,
+            "gte25": 1,
+            "gte50": 1,
+            "gte75": 1,
+            "eq100": 1
+          },
+          "reso": {
+            "eqZero": 0,
+            "gtZero": 1,
+            "gte25": 1,
+            "gte50": 1,
+            "gte75": 1,
+            "eq100": 1
+          },
+          "idx": {
+            "eqZero": 0,
+            "gtZero": 0,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
+            "eq100": 0
+          },
+          "local": {
+            "eqZero": 0,
+            "gtZero": 0,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
+            "eq100": 0
+          }
+        },
+        "lookups": {
+          "total": {
+            "eqZero": 0,
+            "gtZero": 2,
+            "gte25": 1,
+            "gte50": 1,
+            "gte75": 1,
+            "eq100": 0
+          },
+          "reso": {
+            "eqZero": 0,
+            "gtZero": 0,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
+            "eq100": 0
+          },
+          "idx": {
+            "eqZero": 0,
+            "gtZero": 0,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
+            "eq100": 0
+          },
+          "local": {
+            "eqZero": 0,
+            "gtZero": 2,
+            "gte25": 1,
+            "gte50": 1,
+            "gte75": 1,
+            "eq100": 0
+          }
+        }
+      },
+      "Property": {
+        "fields": {
+          "total": {
+            "eqZero": 0,
+            "gtZero": 4,
+            "gte25": 4,
+            "gte50": 4,
+            "gte75": 3,
+            "eq100": 1
+          },
+          "reso": {
+            "eqZero": 0,
+            "gtZero": 3,
+            "gte25": 3,
+            "gte50": 3,
+            "gte75": 3,
+            "eq100": 1
+          },
+          "idx": {
+            "eqZero": 0,
+            "gtZero": 0,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
+            "eq100": 0
+          },
+          "local": {
+            "eqZero": 0,
+            "gtZero": 1,
+            "gte25": 1,
+            "gte50": 1,
+            "gte75": 0,
+            "eq100": 0
+          }
+        },
+        "lookups": {
+          "total": {
+            "eqZero": 0,
+            "gtZero": 5,
+            "gte25": 1,
+            "gte50": 1,
+            "gte75": 1,
+            "eq100": 0
+          },
+          "reso": {
+            "eqZero": 0,
+            "gtZero": 0,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
+            "eq100": 0
+          },
+          "idx": {
+            "eqZero": 0,
+            "gtZero": 0,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
+            "eq100": 0
+          },
+          "local": {
+            "eqZero": 0,
+            "gtZero": 5,
+            "gte25": 1,
+            "gte50": 1,
+            "gte75": 1,
+            "eq100": 0
+          }
+        },
+        "expansions": {
+          "Media": {
+            "fields": {
+              "total": {
+                "eqZero": 0,
+                "gtZero": 3,
+                "gte25": 3,
+                "gte50": 2,
+                "gte75": 1,
+                "eq100": 1
+              },
+              "reso": {
+                "eqZero": 0,
+                "gtZero": 2,
+                "gte25": 2,
+                "gte50": 1,
+                "gte75": 1,
+                "eq100": 1
+              },
+              "idx": {
+                "eqZero": 0,
+                "gtZero": 0,
+                "gte25": 0,
+                "gte50": 0,
+                "gte75": 0,
+                "eq100": 0
+              },
+              "local": {
+                "eqZero": 0,
+                "gtZero": 1,
+                "gte25": 1,
+                "gte50": 1,
+                "gte75": 0,
+                "eq100": 0
+              }
+            },
+            "lookups": {
+              "total": {
+                "eqZero": 0,
+                "gtZero": 1,
+                "gte25": 0,
+                "gte50": 0,
+                "gte75": 0,
+                "eq100": 0
+              },
+              "reso": {
+                "eqZero": 0,
+                "gtZero": 0,
+                "gte25": 0,
+                "gte50": 0,
+                "gte75": 0,
+                "eq100": 0
+              },
+              "idx": {
+                "eqZero": 0,
+                "gtZero": 0,
+                "gte25": 0,
+                "gte50": 0,
+                "gte75": 0,
+                "eq100": 0
+              },
+              "local": {
+                "eqZero": 0,
+                "gtZero": 1,
+                "gte25": 0,
+                "gte50": 0,
+                "gte75": 0,
+                "eq100": 0
+              }
+            }
+          }
+        }
+      },
+      "Media": {
+        "fields": {
+          "total": {
+            "eqZero": 0,
+            "gtZero": 0,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
+            "eq100": 0
+          },
+          "reso": {
+            "eqZero": 0,
+            "gtZero": 0,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
+            "eq100": 0
+          },
+          "idx": {
+            "eqZero": 0,
+            "gtZero": 0,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
+            "eq100": 0
+          },
+          "local": {
+            "eqZero": 0,
+            "gtZero": 0,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
+            "eq100": 0
+          }
+        },
+        "lookups": {
+          "total": {
+            "eqZero": 0,
+            "gtZero": 0,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
+            "eq100": 0
+          },
+          "reso": {
+            "eqZero": 0,
+            "gtZero": 0,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
+            "eq100": 0
+          },
+          "idx": {
+            "eqZero": 0,
+            "gtZero": 0,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
+            "eq100": 0
+          },
+          "local": {
+            "eqZero": 0,
+            "gtZero": 0,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
+            "eq100": 0
+          }
+        }
+      }
+    }
+  },
+  "version": "1.7"
+}

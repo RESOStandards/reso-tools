@@ -22,11 +22,11 @@ import { validateMetadata, formatValidationSummary, collectValidationErrors } fr
 // ── Cert-utils imports (local copy for modification) ──
 
 // @ts-expect-error — legacy CJS, no type declarations
-import certUtils from '../../legacy-cert-utils/index.js';
+import certUtils from '../legacy/index.js';
 // @ts-expect-error — legacy CJS
-import certUtilsCommon from '../../legacy-cert-utils/common.js';
+import certUtilsCommon from '../legacy/common.js';
 // @ts-expect-error — legacy CJS
-import certUtilsReplicationUtils from '../../legacy-cert-utils/lib/replication/utils.js';
+import certUtilsReplicationUtils from '../legacy/lib/replication/utils.js';
 
 const { replicate, findVariations } = certUtils;
 const { createReplicationStateServiceInstance } = certUtilsCommon;
@@ -251,7 +251,7 @@ const initReplicationState: TestFunction<DDContext> = async (ctx) => {
       const packageRoot = join(dirname(new URL(import.meta.url).pathname), '..', '..');
       const sourcePaths = [
         join(packageRoot, settingsFile),
-        join(packageRoot, 'legacy-cert-utils', settingsFile),
+        join(packageRoot, 'src', 'legacy', settingsFile),
       ];
       const sourcePath = sourcePaths.find(p => existsSync(p));
       if (sourcePath) {

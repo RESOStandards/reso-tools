@@ -1,4 +1,4 @@
-const { processLookupResourceMetadata, processLookupResourceMetadataFiles } = require('./process-lookup-resource-metadata');
+const { processLookupResourceMetadata, processLookupResourceMetadataFiles } = require('./process-lookup-resource-metadata.cjs');
 
 const getReferenceMetadata = (version = '2.1') => {
   try {
@@ -12,9 +12,8 @@ const getReferenceMetadata = (version = '2.1') => {
 module.exports = {
   processLookupResourceMetadata,
   processLookupResourceMetadataFiles,
-  processDataAvailability: require('./process-data-availability'),
-  processMetadata: require('./process-metadata'),
-  common: require('./common'),
-  processCucumberJson: require('./process-cucumber-json'),
+  processDataAvailability: require('./process-data-availability.cjs'),
+  processMetadata: require('./process-metadata.cjs'),
+  common: require('./common.cjs'),
   getReferenceMetadata
 };

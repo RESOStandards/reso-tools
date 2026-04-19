@@ -6,7 +6,7 @@ const {
   getAdvertisedCountPerResourcesByType,
   getMetadata,
   getStandardMetadata
-} = require('./common');
+} = require('./common.cjs');
 
 const ANNOTATION_TERM_STANDARD_NAME = 'RESO.OData.Metadata.StandardName';
 

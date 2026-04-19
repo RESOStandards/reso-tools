@@ -1,4 +1,4 @@
-const { readFile, writeFile } = require('./common');
+const { readFile, writeFile } = require('./common.cjs');
 
 const processLookupResourceMetadataFiles = async (
   pathToMetadataReportJson = '',
