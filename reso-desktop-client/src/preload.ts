@@ -62,4 +62,8 @@ contextBridge.exposeInMainWorld('certRunner', {
   deleteResult: (resultPath: string): Promise<boolean> =>
     ipcRenderer.invoke('cert:delete-result', resultPath),
 
+  /** Open a file in the system's default application or show in Finder/Explorer. */
+  openFile: (filePath: string): Promise<void> =>
+    ipcRenderer.invoke('cert:open-file', filePath),
+
 });

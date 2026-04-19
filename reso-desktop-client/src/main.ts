@@ -455,6 +455,11 @@ const registerCertRunnerHandlers = (): void => {
   /** Get the local server URL (for config builder auto-fill). */
   ipcMain.handle('cert:localServerUrl', () => state.serverUrl);
 
+  /** Open a file in the system default application. */
+  ipcMain.handle('cert:open-file', (_event, filePath: string) => {
+    shell.openPath(resolve(filePath));
+  });
+
   // ── Config manager IPC handlers ──
 
   const CONFIGS_DIR = resolve(certResultsRoot(), 'configs');

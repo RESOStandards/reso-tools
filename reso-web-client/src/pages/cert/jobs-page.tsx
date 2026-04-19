@@ -42,6 +42,7 @@ interface JobStep {
     readonly error?: string;
     readonly responseBody?: string;
   }>;
+  readonly artifacts?: ReadonlyArray<{ readonly label: string; readonly path: string }>;
 }
 
 interface CertJob {
@@ -826,7 +827,7 @@ const ReportStepCard = ({
   step,
   scenarios,
 }: {
-  readonly step: { name: string; status: string; detail?: string; duration?: number; requestDetails?: ReadonlyArray<{ method: string; url: string; status?: number; error?: string; responseBody?: string }> };
+  readonly step: { name: string; status: string; detail?: string; duration?: number; requestDetails?: ReadonlyArray<{ method: string; url: string; status?: number; error?: string; responseBody?: string }>; artifacts?: ReadonlyArray<{ label: string; path: string }> };
   readonly scenarios?: ReadonlyArray<Record<string, unknown>>;
 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -863,6 +864,35 @@ const ReportStepCard = ({
           })()}
           {step.requestDetails && step.requestDetails.length > 0 && (
             <div className="ml-6"><RequestDetailsPanel details={step.requestDetails} /></div>
+          )}
+          {step.artifacts && step.artifacts.length > 0 && (
+            <div className="ml-6 mt-1 flex items-center gap-2 flex-wrap">
+              {step.artifacts.map((a, ai) => (
+                <button
+                  key={ai}
+                  type="button"
+                  onClick={() => {
+                    // Read file via fetch through the proxy (local files served by the reference server)
+                    // or trigger a save dialog via IPC
+                    const el = (window as unknown as Record<string, unknown>).certRunner as Record<string, unknown> | undefined;
+                    if (el?.openFile) {
+                      (el.openFile as (path: string) => void)(a.path);
+                    } else {
+                      // Fallback: copy path to clipboard
+                      navigator.clipboard.writeText(a.path);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
+                  title={`Download ${a.label} (${a.path})`}
+                >
+                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
+                    <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+                  </svg>
+                  {a.label}
+                </button>
+              ))}
+            </div>
           )}
         </div>
         {step.duration != null && step.duration > 0 && (
@@ -1019,7 +1049,7 @@ export const JobsPage = () => {
       scheduledAt: j.queuedAt,
       startedAt: j.startedAt,
       completedAt: j.completedAt,
-      steps: j.steps.map(s => ({ name: s.name, status: s.status, duration: s.duration, detail: s.detail, requestDetails: s.requestDetails })),
+      steps: j.steps.map(s => ({ name: s.name, status: s.status, duration: s.duration, detail: s.detail, requestDetails: s.requestDetails, artifacts: s.artifacts })),
       local: j.local,
       reports: j.reports,
       error: j.error,
