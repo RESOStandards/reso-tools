@@ -66,6 +66,38 @@ export const ConfigsPage = () => {
     URL.revokeObjectURL(url);
   }, []);
 
+  const handleExportAll = useCallback(() => {
+    const blob = new Blob([JSON.stringify({ configs: [...configs] }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `reso-saved-configs-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [configs]);
+
+  // Inline editing
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+
+  const startEdit = useCallback((config: SavedConnection) => {
+    setEditingId(config.id);
+    setEditName(config.name ?? '');
+    setEditDescription(config.description ?? '');
+  }, []);
+
+  const saveEdit = useCallback(async () => {
+    if (!editingId) return;
+    const mgr = getConfigManager();
+    if (!mgr) return;
+    const config = configs.find(c => c.id === editingId);
+    if (!config) return;
+    await mgr.save({ ...config, name: editName.trim(), description: editDescription.trim() });
+    setEditingId(null);
+    refresh();
+  }, [editingId, editName, editDescription, configs, refresh]);
+
   const handleImport = useCallback(async () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -159,6 +191,15 @@ export const ConfigsPage = () => {
               >
                 Import
               </button>
+              {configs.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleExportAll()}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
+                >
+                  Export All
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -198,12 +239,41 @@ export const ConfigsPage = () => {
                 <div key={config.id} className={CARD}>
                   <div className="flex items-start justify-between">
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                        {config.name || config.recipientName || config.recipientUoi || 'Unnamed'}
-                      </h3>
-                      <p className="text-[11px] text-gray-400 dark:text-gray-500 font-mono truncate mt-0.5">
-                        {config.url}
-                      </p>
+                      {editingId === config.id ? (
+                        <div className="space-y-1.5">
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={e => setEditName(e.target.value)}
+                            placeholder="Config name"
+                            className="w-full px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none"
+                            onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }}
+                            autoFocus
+                          />
+                          <input
+                            type="text"
+                            value={editDescription}
+                            onChange={e => setEditDescription(e.target.value)}
+                            placeholder="Description (optional)"
+                            className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none"
+                            onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }}
+                          />
+                          <div className="flex gap-1">
+                            <button type="button" onClick={saveEdit} className="px-2 py-0.5 text-[10px] font-medium rounded bg-blue-600 text-white hover:bg-blue-700 cursor-pointer">Save</button>
+                            <button type="button" onClick={() => setEditingId(null)} className="px-2 py-0.5 text-[10px] font-medium rounded bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 cursor-pointer">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                            {config.name || config.recipientName || config.recipientUoi || 'Unnamed'}
+                          </h3>
+                          {config.description && <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{config.description}</p>}
+                          <p className="text-[11px] text-gray-400 dark:text-gray-500 font-mono truncate mt-0.5">
+                            {config.url}
+                          </p>
+                        </>
+                      )}
                     </div>
                     <span className={`shrink-0 ml-2 px-1.5 py-0.5 text-[10px] font-medium rounded ${
                       config.authMode === 'client_credentials'
@@ -226,38 +296,21 @@ export const ConfigsPage = () => {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-gray-100 dark:border-gray-700/50">
-                    <button
-                      type="button"
-                      onClick={() => handleExport(config)}
-                      className="px-2 py-1 text-[10px] font-medium rounded bg-gray-50 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer transition-colors"
-                    >
-                      Export
+                  <div className="flex items-center gap-1 mt-3 pt-2 border-t border-gray-100 dark:border-gray-700/50">
+                    <button type="button" onClick={() => startEdit(config)} className="p-1.5 text-gray-400 hover:text-blue-500 cursor-pointer" title="Edit">
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" /></svg>
+                    </button>
+                    <button type="button" onClick={() => handleExport(config)} className="p-1.5 text-gray-400 hover:text-blue-500 cursor-pointer" title="Download">
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" /><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" /></svg>
                     </button>
                     {confirmDelete === config.id ? (
                       <>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(config.id)}
-                          className="px-2 py-1 text-[10px] font-medium rounded bg-red-600 text-white hover:bg-red-700 cursor-pointer transition-colors"
-                        >
-                          Confirm Delete
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDelete(null)}
-                          className="px-2 py-1 text-[10px] font-medium rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 cursor-pointer transition-colors"
-                        >
-                          Cancel
-                        </button>
+                        <button type="button" onClick={() => handleDelete(config.id)} className="px-2 py-1 text-[10px] font-medium rounded bg-red-600 text-white hover:bg-red-700 cursor-pointer transition-colors">Confirm</button>
+                        <button type="button" onClick={() => setConfirmDelete(null)} className="px-2 py-1 text-[10px] font-medium rounded bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 cursor-pointer transition-colors">Cancel</button>
                       </>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDelete(config.id)}
-                        className="px-2 py-1 text-[10px] font-medium rounded bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 cursor-pointer transition-colors"
-                      >
-                        Delete
+                      <button type="button" onClick={() => setConfirmDelete(config.id)} className="p-1.5 text-gray-400 hover:text-red-500 cursor-pointer" title="Delete">
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.519.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5z" clipRule="evenodd" /></svg>
                       </button>
                     )}
                   </div>
