@@ -454,6 +454,114 @@ const registerCertRunnerHandlers = (): void => {
 
   /** Get the local server URL (for config builder auto-fill). */
   ipcMain.handle('cert:localServerUrl', () => state.serverUrl);
+
+  // ── Config manager IPC handlers ──
+
+  const CONFIGS_DIR = resolve(certResultsRoot(), 'configs');
+
+  const configPath = (config: Record<string, unknown>): string => {
+    const providerUoi = (config.providerUoi as string) ?? '';
+    const providerUsi = (config.providerUsi as string) ?? '';
+    const recipientUoi = (config.recipientUoi as string) ?? '';
+    if (providerUoi && recipientUoi) {
+      return resolve(CONFIGS_DIR, `${providerUoi}-${providerUsi}`, recipientUoi);
+    }
+    // Non-cert connection — use slugified name
+    const name = (config.name as string) ?? `connection-${Date.now()}`;
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    return resolve(CONFIGS_DIR, '_connections', slug);
+  };
+
+  /** List all saved configs by scanning the directory tree. */
+  ipcMain.handle('config:list', async () => {
+    try {
+      if (!existsSync(CONFIGS_DIR)) return [];
+      const configs: Array<Record<string, unknown>> = [];
+
+      const scanDir = (dir: string) => {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          if (entry.isDirectory()) {
+            scanDir(resolve(dir, entry.name));
+          } else if (entry.name === 'config.json') {
+            try {
+              const content = readFileSync(resolve(dir, entry.name), 'utf-8');
+              const parsed = JSON.parse(content);
+              // ID is the relative path from CONFIGS_DIR
+              parsed.id = relative(CONFIGS_DIR, dir);
+              configs.push(parsed);
+            } catch { /* skip corrupt files */ }
+          }
+        }
+      };
+
+      scanDir(CONFIGS_DIR);
+      return configs;
+    } catch {
+      return [];
+    }
+  });
+
+  /** Save a config to its directory. */
+  ipcMain.handle('config:save', async (_event, config: Record<string, unknown>) => {
+    const dir = configPath(config);
+    mkdirSync(dir, { recursive: true });
+    // Strip credentials before writing to disk
+    const onDisk = { ...config };
+    delete onDisk.authToken;
+    delete onDisk.clientSecret;
+    delete onDisk.id;
+    onDisk.updatedAt = new Date().toISOString();
+    if (!onDisk.createdAt) onDisk.createdAt = onDisk.updatedAt;
+    writeFileSync(resolve(dir, 'config.json'), JSON.stringify(onDisk, null, 2));
+    // Return with ID
+    return { ...onDisk, id: relative(CONFIGS_DIR, dir) };
+  });
+
+  /** Delete a config directory. */
+  ipcMain.handle('config:delete', async (_event, id: string) => {
+    const dir = resolve(CONFIGS_DIR, id);
+    // Safety: must be inside CONFIGS_DIR
+    if (!dir.startsWith(CONFIGS_DIR)) return false;
+    try {
+      const configFile = resolve(dir, 'config.json');
+      if (existsSync(configFile)) unlinkSync(configFile);
+      // Clean up empty parent directories
+      const cleanEmpty = (d: string) => {
+        if (d === CONFIGS_DIR || !d.startsWith(CONFIGS_DIR)) return;
+        try {
+          const entries = readdirSync(d);
+          if (entries.length === 0) {
+            readdirSync(d); // double-check
+            const { rmdirSync } = require('fs');
+            rmdirSync(d);
+            cleanEmpty(dirname(d));
+          }
+        } catch { /* ignore */ }
+      };
+      cleanEmpty(dir);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
+  /** Import configs from a JSON array. */
+  ipcMain.handle('config:import', async (_event, configs: ReadonlyArray<Record<string, unknown>>) => {
+    let count = 0;
+    for (const config of configs) {
+      const dir = configPath(config);
+      mkdirSync(dir, { recursive: true });
+      const onDisk = { ...config };
+      delete onDisk.authToken;
+      delete onDisk.clientSecret;
+      delete onDisk.id;
+      onDisk.updatedAt = new Date().toISOString();
+      if (!onDisk.createdAt) onDisk.createdAt = onDisk.updatedAt;
+      writeFileSync(resolve(dir, 'config.json'), JSON.stringify(onDisk, null, 2));
+      count++;
+    }
+    return count;
+  });
 };
 
 // ── DD version management ──

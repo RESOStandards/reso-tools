@@ -15,6 +15,7 @@ import { OrgSummaryPage } from './pages/cert/org-summary-page';
 import { JobsPage } from './pages/cert/jobs-page';
 import { DashboardPage } from './pages/cert/dashboard-page';
 import { ComparePage } from './pages/cert/compare-page';
+import { ConfigsPage } from './pages/cert/configs-page';
 import { DeletePage } from './pages/delete-page';
 import { ErrorPage } from './pages/error-page';
 import { DetailPage } from './pages/detail-page';
@@ -55,6 +56,7 @@ const router = createBrowserRouter([
       { path: 'cert/jobs', element: <JobsPage /> },
       { path: 'cert/dashboard', element: <DashboardPage /> },
       { path: 'cert/compare/:jobId', element: <ComparePage /> },
+      { path: 'cert/configs', element: <ConfigsPage /> },
       { path: 'metadata', element: <MetadataPage /> },
       { path: 'metadata/:resource', element: <MetadataPage /> },
       { path: ':resource', element: <SearchPage /> },

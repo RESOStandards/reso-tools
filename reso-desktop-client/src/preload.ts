@@ -18,6 +18,21 @@ contextBridge.exposeInMainWorld('electronUpdates', {
   }
 });
 
+contextBridge.exposeInMainWorld('configManager', {
+  /** List all saved configs. */
+  list: (): Promise<ReadonlyArray<unknown>> =>
+    ipcRenderer.invoke('config:list'),
+  /** Save a config (creates or updates). */
+  save: (config: Record<string, unknown>): Promise<unknown> =>
+    ipcRenderer.invoke('config:save', config),
+  /** Delete a config by ID. */
+  remove: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke('config:delete', id),
+  /** Import configs from a JSON array. Returns count imported. */
+  importConfigs: (configs: ReadonlyArray<Record<string, unknown>>): Promise<number> =>
+    ipcRenderer.invoke('config:import', configs),
+});
+
 contextBridge.exposeInMainWorld('certRunner', {
   /** Start a compliance test run. Returns the PipelineResult when done. */
   run: (jobId: string, config: Record<string, unknown>): Promise<unknown> =>
