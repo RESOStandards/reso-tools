@@ -58,7 +58,7 @@ const router = createBrowserRouter([
       { path: 'cert/dashboard', element: <DashboardPage /> },
       { path: 'cert/compare/:jobId', element: <ComparePage /> },
       { path: 'cert/configs', element: <ConfigsPage /> },
-      { path: 'cert/variations', element: <VariationsPage report={null} /> },
+      { path: 'cert/variations', element: <VariationsPage /> },
       { path: 'metadata', element: <MetadataPage /> },
       { path: 'metadata/:resource', element: <MetadataPage /> },
       { path: ':resource', element: <SearchPage /> },
