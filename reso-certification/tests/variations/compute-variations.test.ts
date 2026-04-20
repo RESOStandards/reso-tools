@@ -76,11 +76,7 @@ describe('computeVariations: reference metadata self-check', () => {
     expect(result.variations.lookups).toEqual([]);
   });
 
-  // Skip: computeVariations internally uses @reso/reso-certification-etl (npm)
-  // which doesn't have DD 2.1. The local ETL has it, but the legacy code
-  // fetches reference metadata through a different path.
-  // TODO: update computeVariations to use local ETL reference metadata.
-  it.skip('should have no variations when DD 2.1 metadata is checked against itself', async () => {
+  it('should have no variations when DD 2.1 metadata is checked against itself', async () => {
     const metadataReportJson = getReferenceMetadata(DD_2_1);
     const result = await computeVariations({
       metadataReportJson,

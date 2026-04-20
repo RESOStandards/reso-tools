@@ -2,7 +2,7 @@
 
 const { readFile, writeFile } = require('fs/promises');
 const { distance } = require('fastest-levenshtein');
-const { getReferenceMetadata } = require('@reso/reso-certification-etl');
+const { getReferenceMetadata } = require('../../../etl/index.cjs');
 const { buildMetadataMap, getLoggers, CERTIFICATION_FILES, NOT_OK } = require('../../common');
 const { DEFAULT_DD_VERSION } = require('../replication/utils');
 const humanizeDuration = require('humanize-duration');
