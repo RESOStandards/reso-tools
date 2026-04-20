@@ -1032,7 +1032,7 @@ export const FailureReportModal = ({
   readonly recipientName: string;
   readonly failedStep?: string;
   readonly reports?: Record<string, unknown>;
-  readonly steps?: ReadonlyArray<{ name: string; status: string; detail?: string; summary?: string; errors?: ReadonlyArray<string>; requestDetails?: ReadonlyArray<{ method: string; url: string; status?: number; error?: string; responseBody?: string }> }>;
+  readonly steps?: ReadonlyArray<{ name: string; status: string; detail?: string; summary?: string; errors?: ReadonlyArray<string>; requestDetails?: ReadonlyArray<{ method: string; url: string; status?: number; error?: string; responseBody?: string }>; artifacts?: ReadonlyArray<{ label: string; path: string }> }>;
   readonly onClose: () => void;
 }) => {
   const report = resolveReport(endorsement, failedStep, reports, steps);
@@ -1111,6 +1111,38 @@ export const FailureReportModal = ({
                 Download Results
               </button>
             )}
+            {steps?.flatMap(s => s.artifacts ?? []).map((artifact, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => {
+                  fetch(`/api/proxy?url=${encodeURIComponent(`file://${artifact.path}`)}`)
+                    .then(r => r.blob())
+                    .then(blob => {
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = artifact.path.split('/').pop() ?? artifact.label;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    })
+                    .catch(() => {
+                      // Fallback: open the file path directly (works in Electron)
+                      const a = document.createElement('a');
+                      a.href = `file://${artifact.path}`;
+                      a.download = artifact.label;
+                      a.click();
+                    });
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
+                  <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+                </svg>
+                {artifact.label}
+              </button>
+            ))}
           </div>
           <button
             type="button"
