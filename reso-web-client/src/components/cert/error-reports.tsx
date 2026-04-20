@@ -1089,7 +1089,7 @@ export const FailureReportModal = ({
 
         {/* Footer */}
         <div className="flex items-center justify-between p-5 border-t border-gray-200 dark:border-gray-700 shrink-0">
-          <div>
+          <div className="flex items-center gap-2 flex-wrap">
             {reports && (
               <button
                 type="button"

@@ -228,8 +228,6 @@ const DDOptionsSection = ({
         <label className={LABEL}>DD Version</label>
         <select value={options.version} onChange={e => onChange({ ...options, version: e.target.value as DDOptions['version'] })} className={SELECT}>
           <option value="2.1">2.1</option>
-          <option value="2.0">2.0</option>
-          <option value="1.7">1.7</option>
         </select>
       </div>
       <div>

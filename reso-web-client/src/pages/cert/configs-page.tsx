@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router';
 import { SearchInput } from '../../components/metadata/shared';
 import {
   maskSecret,
@@ -31,6 +32,7 @@ const authLabel = (mode: string): string =>
   mode === 'client_credentials' ? 'Client Credentials' : 'Bearer Token';
 
 export const ConfigsPage = () => {
+  const navigate = useNavigate();
   const [configs, setConfigs] = useState<ReadonlyArray<SavedConnection>>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -201,8 +203,15 @@ export const ConfigsPage = () => {
               </div>
               <button
                 type="button"
-                onClick={handleImport}
+                onClick={() => navigate('/cert/jobs', { state: { loadConfig: {} } })}
                 className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors"
+              >
+                New Config
+              </button>
+              <button
+                type="button"
+                onClick={handleImport}
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
               >
                 Import
               </button>
