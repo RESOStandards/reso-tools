@@ -667,6 +667,11 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                 <button type="button" onClick={() => setShowSubmit(true)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 cursor-pointer transition-colors">
                   Submit to RESO
                 </button>
+                {job.steps.some(s => s.name.includes('Variations')) && (
+                  <NavLink to="/cert/variations" state={{ job }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors">
+                    Review Variations
+                  </NavLink>
+                )}
                 {onRerun && (
                   <button type="button" onClick={onRerun} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
                     Re-run
@@ -679,6 +684,11 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                 <button type="button" onClick={() => setShowFailure(true)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors">
                   View Failure Report
                 </button>
+                {job.steps.some(s => s.name.includes('Variations')) && (
+                  <NavLink to="/cert/variations" state={{ job }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors">
+                    Review Variations
+                  </NavLink>
+                )}
                 {onRerun && (
                   <button type="button" onClick={onRerun} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
                     Re-run
