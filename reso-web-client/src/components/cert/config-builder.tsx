@@ -97,7 +97,7 @@ export interface BatchConfig {
 
 // ── Defaults ─────────────────────────────────────────────────────────
 
-const DEFAULT_DD: DDOptions = { version: '2.0', strictMode: true };
+const DEFAULT_DD: DDOptions = { version: '2.1', strictMode: true };
 const DEFAULT_CORE: CoreOptions = { version: '2.0.0', enumMode: 'auto' };
 const DEFAULT_ADD_EDIT: AddEditOptions = { resource: 'Property' };
 const DEFAULT_ENTITY_EVENT: EntityEventOptions = { mode: 'observe', maxEvents: 1000, pollInterval: 5000, pollTimeout: 30000 };
