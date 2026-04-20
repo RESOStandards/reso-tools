@@ -143,9 +143,34 @@ type JobEventListener = (event: JobEvent) => void;
 
 // ── Job Manager ──────────────────────────────────────────────────────
 
+// ── Job persistence ──────────────────────────────────────────────────
+
+const JOBS_STORAGE_KEY = 'cert-jobs';
+
+const loadPersistedJobs = (): Map<string, Job> => {
+  try {
+    const raw = localStorage.getItem(JOBS_STORAGE_KEY);
+    if (!raw) return new Map();
+    const entries = JSON.parse(raw) as ReadonlyArray<[string, Job]>;
+    return new Map(entries);
+  } catch {
+    return new Map();
+  }
+};
+
+const persistJobs = (jobs: Map<string, Job>): void => {
+  try {
+    // Only persist completed/failed/cancelled jobs to avoid stale running state
+    const durable = [...jobs.entries()].filter(([, j]) =>
+      j.status === 'passed' || j.status === 'failed' || j.status === 'cancelled'
+    );
+    localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(durable));
+  } catch { /* localStorage may be full or unavailable */ }
+};
+
 /** In-memory job store and event bus for the current session. */
 const state = {
-  jobs: new Map<string, Job>(),
+  jobs: loadPersistedJobs(),
   listeners: new Set<JobEventListener>(),
   running: false,
 };
@@ -170,6 +195,10 @@ const updateJob = (id: string, patch: Partial<Job>): void => {
   if (!existing) return;
   const updated = { ...existing, ...patch } as Job;
   state.jobs.set(id, updated);
+  // Persist completed jobs so they survive navigation
+  if (updated.status === 'passed' || updated.status === 'failed' || updated.status === 'cancelled') {
+    persistJobs(state.jobs);
+  }
 };
 
 /** Get a snapshot of all jobs (most recent first). */
@@ -643,6 +672,7 @@ export const deleteJob = async (id: string): Promise<boolean> => {
   }
 
   state.jobs.delete(id);
+  persistJobs(state.jobs);
   emit({ type: 'job-cancelled', jobId: id });
   return true;
 };
