@@ -1,7 +1,34 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../../hooks/use-auth';
 import { useDarkMode } from '../../hooks/use-dark-mode';
+
+// ── Credential persistence via Electron safeStorage ──────────────────
+
+const CERT_LOGIN_KEY = 'cert-login-credentials';
+
+interface ElectronStorage {
+  readonly get: (key: string) => Promise<string | null>;
+  readonly set: (key: string, value: string) => Promise<void>;
+}
+
+const getStorage = (): ElectronStorage | null =>
+  (window as unknown as Record<string, unknown>).electronStorage as ElectronStorage | null;
+
+const saveLoginCredentials = async (username: string, password: string): Promise<void> => {
+  const storage = getStorage();
+  if (!storage) return;
+  await storage.set(CERT_LOGIN_KEY, JSON.stringify({ username, password }));
+};
+
+const loadLoginCredentials = async (): Promise<{ username: string; password: string } | null> => {
+  const storage = getStorage();
+  if (!storage) return null;
+  const raw = await storage.get(CERT_LOGIN_KEY);
+  if (!raw) return null;
+  try { return JSON.parse(raw) as { username: string; password: string }; }
+  catch { return null; }
+};
 
 const LOGO_LIGHT =
   'https://www.reso.org/wp-content/uploads/2020/06/RESO-Logo_Horizontal_Blue.png';
@@ -28,12 +55,26 @@ export const LoginPage = () => {
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [loaded, setLoaded] = useState(false);
+
+  // Pre-fill from safeStorage on mount
+  useEffect(() => {
+    loadLoginCredentials().then(creds => {
+      if (creds) {
+        setUsername(creds.username);
+        setPassword(creds.password);
+      }
+      setLoaded(true);
+    });
+  }, []);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!username || !password || isSigningIn) return;
     try {
       await signIn(username, password);
+      // Save credentials on successful login
+      await saveLoginCredentials(username, password);
       const state = location.state as LocationState | null;
       const target = state?.from?.pathname ?? '/cert';
       navigate(target, { replace: true });
