@@ -69,6 +69,9 @@ export const ResourceNav = () => {
           <NavLink to="/cert/configs" className={({ isActive }) => `block text-xs ${isActive ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'} cursor-pointer`}>
             Saved Configs
           </NavLink>
+          <NavLink to="/cert/variations" className={({ isActive }) => `block text-xs ${isActive ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'} cursor-pointer`}>
+            Variations
+          </NavLink>
         </div>
       )}
 
