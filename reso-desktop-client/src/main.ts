@@ -19,7 +19,7 @@ const log = (msg: string): void => {
 };
 
 // Override default "Electron" name shown in macOS menu bar and dock
-app.setName('RESO Desktop Client');
+app.setName('RESO Desktop Client (Beta)');
 
 // ── Persistent storage (encrypted when safeStorage is available, plain JSON otherwise) ──
 
@@ -950,7 +950,7 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
     minHeight: 600,
     show: false,
     backgroundColor: isDark ? '#1a202c' : '#f9fafb',
-    title: `RESO Desktop Client — DD ${getDDVersion()}`,
+    title: `RESO Desktop Client (Beta) — DD ${getDDVersion()}`,
     icon,
     webPreferences: {
       nodeIntegration: false,
@@ -1141,7 +1141,7 @@ const checkForUpdatesInteractive = async (): Promise<void> => {
     const { response: button } = await dialog.showMessageBox({
       type: 'info',
       title: 'Update Available',
-      message: 'A new version of RESO Desktop Client is available.',
+      message: 'A new version of RESO Desktop Client (Beta) is available.',
       detail: `${release.name}\n\nYou are running v${app.getVersion()}. Would you like to download the latest version?`,
       buttons: ['Download', 'Later'],
       defaultId: 0,
@@ -1155,7 +1155,7 @@ const checkForUpdatesInteractive = async (): Promise<void> => {
       type: 'info',
       title: 'No Updates',
       message: 'You are running the latest version.',
-      detail: `RESO Desktop Client v${app.getVersion()}`
+      detail: `RESO Desktop Client (Beta) v${app.getVersion()}`
     });
   }
 };
@@ -1169,7 +1169,7 @@ app.whenReady().then(async () => {
   const RELEASE_NAME = 'Ten Ichi';
   const appVersion = app.getVersion();
   app.setAboutPanelOptions({
-    applicationName: 'RESO Desktop Client',
+    applicationName: 'RESO Desktop Client (Beta)',
     applicationVersion: appVersion,
     version: `v${appVersion} — ${RELEASE_NAME}`,
     copyright: '© 2026 Real Estate Standards Organization',

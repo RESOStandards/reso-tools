@@ -119,9 +119,10 @@ export const Layout = () => {
             </button>
             {/* RESO Logo — renders both variants; CSS dark: class toggles visibility
                 so the correct logo shows immediately without waiting for React state. */}
-            <NavLink to="/" className="shrink-0 hidden sm:flex sm:w-44 sm:items-center" onClick={handleLogoClick}>
+            <NavLink to="/" className="shrink-0 hidden sm:flex sm:items-center gap-2" onClick={handleLogoClick}>
               <img src={LOGO_LIGHT} alt="RESO" className="h-10 dark:hidden" />
               <img src={LOGO_DARK} alt="RESO" className="h-10 hidden dark:block" />
+              <span className="text-[9px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 border border-amber-300 dark:border-amber-600 rounded px-1.5 py-0.5 leading-none">Beta</span>
             </NavLink>
             <NavLink to="/" className="shrink-0 sm:hidden" onClick={handleLogoClick}>
               <img src={LOGO_LIGHT} alt="RESO" className="h-8 dark:hidden" />
