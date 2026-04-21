@@ -49,6 +49,7 @@ export const fetchLookupResource = async (
   serverUrl: string,
   authToken: string,
   onProgress?: (count: number) => void,
+  odataVersion?: string,
 ): Promise<ReadonlyArray<RawLookupRecord> | undefined> => {
   const allRecords: RawLookupRecord[] = [];
   let url: string | undefined = `${buildResourceUrl(serverUrl, 'Lookup')}?$top=${PAGE_SIZE}`;
@@ -56,7 +57,7 @@ export const fetchLookupResource = async (
   let skip = 0;
 
   while (url) {
-    const response = await odataRequest({ method: 'GET', url, authToken });
+    const response = await odataRequest({ method: 'GET', url, authToken, odataVersion });
 
     if (response.status === 404) return undefined;
     if (response.status !== 200) {
@@ -178,13 +179,14 @@ export const fetchAndMergeLookupResource = async (
   serverUrl: string,
   authToken: string,
   onProgress?: (count: number) => void,
+  odataVersion?: string,
 ): Promise<{
   readonly report: MetadataReport;
   readonly lookupResourceAvailable: boolean;
   readonly lookupRecordCount: number;
   readonly rawRecords?: ReadonlyArray<RawLookupRecord>;
 }> => {
-  const lookupRecords = await fetchLookupResource(serverUrl, authToken, onProgress);
+  const lookupRecords = await fetchLookupResource(serverUrl, authToken, onProgress, odataVersion);
 
   if (!lookupRecords) {
     return { report: baseReport, lookupResourceAvailable: false, lookupRecordCount: 0 };

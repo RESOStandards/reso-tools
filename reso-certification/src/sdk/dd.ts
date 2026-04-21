@@ -10,7 +10,7 @@ import { writeFile, mkdir, copyFile, rename } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { resolveAuthToken } from '../test-runner/auth.js';
-import { fetchMetadata } from '../test-runner/metadata.js';
+import { fetchMetadata, fetchMetadataWithVersion } from '../test-runner/metadata.js';
 import { generateMetadataReport } from '../metadata/serializer.js';
 import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
 import type { DDConfig, PipelineStep, StepResult, TestFunction } from './types.js';
@@ -113,10 +113,12 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
   run: async (ctx, onProgress) => {
     await mkdir(ctx.outputPath, { recursive: true });
 
-    // Fetch and validate EDMX metadata
-    const metadataUrl = `${ctx.serverUrl}/$metadata?$format=application/xml`;
+    // Fetch and validate EDMX metadata (also detects OData version)
     onProgress({ step: 'sub:metadata', status: 'running', message: 'Fetching OData XML metadata...' });
-    const edmxXml = await fetchMetadata(ctx.serverUrl, ctx.authToken!);
+    const { xml: edmxXml, odataVersion } = await fetchMetadataWithVersion(ctx.serverUrl, ctx.authToken!);
+    if (odataVersion) {
+      onProgress({ step: 'sub:metadata', status: 'running', message: `Detected OData version: ${odataVersion}` });
+    }
 
     // XSD + semantic validation
     onProgress({ step: 'sub:metadata', status: 'running', message: 'Validating CSDL XML (XSD + semantic checks)...' });
@@ -143,6 +145,7 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
       ctx.serverUrl,
       ctx.authToken!,
       (count) => onProgress({ step: 'sub:metadata', status: 'running', message: `Fetching Lookup Resource... ${count.toLocaleString()} records` }),
+      odataVersion,
     );
 
     if (lookupResourceAvailable) {
@@ -174,12 +177,12 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
     ];
 
     return {
-      context: { ...ctx, metadataReportPath, lookupResourceAvailable, lookupRecordCount },
+      context: { ...ctx, metadataReportPath, lookupResourceAvailable, lookupRecordCount, odataVersion },
       summary: `${report.resources.length} resources, ${report.fields.length.toLocaleString()} fields, ${report.lookups.length.toLocaleString()} lookups${lookupMsg}. ${formatValidationSummary(validation)}`,
       counts: { resources: report.resources.length, fields: report.fields.length, lookups: report.lookups.length },
       artifacts,
       requestDetails: [
-        { method: 'GET', url: metadataUrl },
+        { method: 'GET', url: `${ctx.serverUrl}/$metadata` },
         ...(lookupResourceAvailable ? [{ method: 'GET', url: lookupUrl }] : []),
       ],
       ...(validationErrors.length > 0 ? { errors: validationErrors } : {}),
