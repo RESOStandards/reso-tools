@@ -61,7 +61,6 @@ export const createClient = async (config: ClientConfig): Promise<ODataClient> =
     }
   ): Promise<Response> => {
     const headers: Record<string, string> = {
-      'OData-Version': '4.01',
       Accept: 'application/json',
       'Accept-Encoding': 'gzip, deflate',
       Authorization: `Bearer ${token}`,
@@ -69,17 +68,24 @@ export const createClient = async (config: ClientConfig): Promise<ODataClient> =
       ...options?.headers,
     };
 
+    // Only send OData-Version if configured — some servers (e.g., FBS/Spark)
+    // reject 4.01 but accept 4.0. The version can be detected from metadata
+    // and passed via config.defaultHeaders or options.headers.
+    // Not sent by default for maximum compatibility.
+
     // Only set Content-Type on requests that carry a body
     if (options?.body) {
       headers['Content-Type'] = 'application/json';
     }
 
-    // OData system query option encoding: the URI builder now produces %24-encoded
-    // parameter names. For URLs constructed outside the builder, encode $ in the
-    // query string to match the behavior servers expect.
-    const encodedUrl = url.includes('?')
-      ? url.replace(/\?(.*)$/, (_, qs) => '?' + qs.replace(/\$/g, '%24'))
-      : url;
+    // Pass the URL as-is — some servers (e.g., Spark API) reject %24-encoded
+    // OData system query options. The URI builder's encoding is decoded back
+    // to literal $ for maximum compatibility.
+    const encodedUrl = url.replace(/%24/g, '$');
+
+    // Debug: log the exact request being made (remove after debugging)
+    console.log(`[reso-client] ${method} ${encodedUrl}`);
+    console.log(`[reso-client] Headers: ${JSON.stringify(Object.fromEntries(Object.entries(headers).map(([k, v]) => [k, k === 'Authorization' ? v.slice(0, 15) + '...' : v])))}`);
 
     return fetch(encodedUrl, {
       method,
