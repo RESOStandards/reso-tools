@@ -762,11 +762,17 @@ const RecipientCard = ({
 export const ConfigBuilder = ({
   onClose,
   onStart,
+  onSave,
   initialConfig,
+  savedConfigId,
+  savedConfigName,
 }: {
   readonly onClose: () => void;
   readonly onStart: (config: BatchConfig) => void;
+  readonly onSave?: (config: BatchConfig, existingId?: string, name?: string) => void;
   readonly initialConfig?: BatchConfig;
+  readonly savedConfigId?: string | null;
+  readonly savedConfigName?: string | null;
 }) => {
   const [providerUoi, setProviderUoi] = useState(initialConfig?.providerUoi ?? '');
   const [providerName, setProviderName] = useState('');
@@ -1111,6 +1117,31 @@ export const ConfigBuilder = ({
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
             Cancel
           </button>
+          {onSave && (
+            <>
+              {savedConfigId && (
+                <button
+                  type="button"
+                  onClick={() => onSave({ providerUoi, concurrency, recipients }, savedConfigId, savedConfigName ?? undefined)}
+                  disabled={!canStart}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-40 cursor-pointer transition-colors"
+                >
+                  Save
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  const name = prompt('Config name:', savedConfigName ?? '');
+                  if (name?.trim()) onSave({ providerUoi, concurrency, recipients }, undefined, name.trim());
+                }}
+                disabled={!canStart}
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-40 cursor-pointer transition-colors"
+              >
+                {savedConfigId ? 'Save As' : 'Save'}
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={handleStart}

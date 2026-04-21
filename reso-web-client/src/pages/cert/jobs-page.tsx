@@ -912,11 +912,18 @@ export const JobsPage = () => {
   }, [highlightedJobId]);
   const [showNewJob, setShowNewJob] = useState(false);
 
-  // Open config builder with a loaded config from dashboard navigation
+  // Track loaded config identity for Save vs. Save As
+  const [loadedConfigId, setLoadedConfigId] = useState<string | null>(null);
+  const [loadedConfigName, setLoadedConfigName] = useState<string | null>(null);
+
+  // Open config builder with a loaded config from dashboard/configs page navigation
   useEffect(() => {
-    const loadConfig = (location.state as Record<string, unknown> | null)?.loadConfig as Record<string, unknown> | undefined;
+    const state = location.state as Record<string, unknown> | null;
+    const loadConfig = state?.loadConfig as Record<string, unknown> | undefined;
     if (loadConfig) {
       setClonedConfig(loadConfig as unknown as BatchConfig);
+      setLoadedConfigId((state?.configId as string) ?? null);
+      setLoadedConfigName((state?.configName as string) ?? null);
       setShowNewJob(true);
       // Clear the state so refresh doesn't re-trigger
       window.history.replaceState({}, '');
@@ -1162,12 +1169,13 @@ export const JobsPage = () => {
         {showNewJob && (
           <div className="mb-6">
             <ConfigBuilder
-              onClose={() => { setShowNewJob(false); setClonedConfig(undefined); }}
+              onClose={() => { setShowNewJob(false); setClonedConfig(undefined); setLoadedConfigId(null); setLoadedConfigName(null); }}
               onStart={(config) => {
                 const created = start(config);
                 setShowNewJob(false);
                 setClonedConfig(undefined);
-                // Highlight the first new job and scroll to it
+                setLoadedConfigId(null);
+                setLoadedConfigName(null);
                 if (created.length > 0) {
                   setHighlightedJobId(created[0].id);
                   setTimeout(() => {
@@ -1176,7 +1184,15 @@ export const JobsPage = () => {
                   }, 100);
                 }
               }}
+              onSave={async (config, existingId, name) => {
+                const { saveConfig } = await import('../../services/saved-configs');
+                const saved = await saveConfig(name ?? 'Unnamed Config', config as unknown as Record<string, unknown>, existingId);
+                setLoadedConfigId(saved.id);
+                setLoadedConfigName(saved.name);
+              }}
               initialConfig={clonedConfig}
+              savedConfigId={loadedConfigId}
+              savedConfigName={loadedConfigName}
             />
           </div>
         )}
