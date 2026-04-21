@@ -28,38 +28,39 @@ export interface UseNotificationsResult {
 
 export const useNotifications = (): UseNotificationsResult => {
   const auth = useAuth();
+  const authRef = useRef(auth);
+  authRef.current = auth;
+
   const [notifications, setNotifications] = useState<ReadonlyArray<ServiceNotification>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fetchingRef = useRef(false);
 
   const fetchNotifications = useCallback(async () => {
-    if (!auth?.isAuthenticated) return;
-    let token: string;
-    try {
-      token = await auth.ensureFreshProviderToken();
-    } catch {
-      return; // No provider token available yet
-    }
+    const currentAuth = authRef.current;
+    if (!currentAuth?.isAuthenticated || fetchingRef.current) return;
+    fetchingRef.current = true;
 
-    setIsLoading(true);
     try {
+      const token = await currentAuth.ensureFreshProviderToken();
+      setIsLoading(true);
       const results = await searchNotifications(token, EVENT_TYPES);
       setNotifications(results);
     } catch {
-      // Network error — keep stale data
+      // No token or network error — keep stale data
     } finally {
       setIsLoading(false);
+      fetchingRef.current = false;
     }
-  }, [auth]);
+  }, []);
 
-  // Initial fetch + polling
+  // Initial fetch + polling — only re-runs when isAuthenticated changes
   useEffect(() => {
     if (!auth?.isAuthenticated) {
       setNotifications([]);
       return;
     }
 
-    // Initial fetch + polling — both gated by ensureFreshProviderToken inside fetchNotifications
     fetchNotifications();
     timerRef.current = setInterval(fetchNotifications, POLL_INTERVAL_MS);
     return () => {
