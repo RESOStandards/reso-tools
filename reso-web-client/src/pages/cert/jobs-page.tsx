@@ -930,8 +930,19 @@ export const JobsPage = () => {
     }
   }, [location.state]);
 
-  // Prevent accidental navigation when config builder is open
-  const blocker = useBlocker(showNewJob);
+  useEffect(() => {
+    if (!showNewJob) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [showNewJob]);
+  const [clonedConfig, setClonedConfig] = useState<BatchConfig | undefined>(undefined);
+
+  // Prevent accidental navigation when config builder has loaded data
+  // Note: useBlocker(true) also blocks Electron quit — only block when there's real data to lose
+  const blocker = useBlocker(showNewJob && !!clonedConfig);
 
   useEffect(() => {
     if (blocker.state === 'blocked') {
@@ -943,16 +954,6 @@ export const JobsPage = () => {
       }
     }
   }, [blocker]);
-
-  useEffect(() => {
-    if (!showNewJob) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [showNewJob]);
-  const [clonedConfig, setClonedConfig] = useState<BatchConfig | undefined>(undefined);
 
   const handleClone = (job: CertJob) => {
     const sdk = (job.sdkConfig ?? {}) as Record<string, unknown>;
