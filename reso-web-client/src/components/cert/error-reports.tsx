@@ -17,6 +17,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { SearchInput, FilterPill, Badge, AvailBar } from '../metadata/shared.js';
 import { humanizeScenarioName } from '../../constants/cert';
 import { RequestDetailsPanel } from './request-details';
+import { DetailText } from './detail-text';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -702,13 +703,13 @@ const GenericErrorCard = ({ err }: { readonly err: StepError }) => {
 
       {!expanded && (
         <div className="px-4 pb-3">
-          <p className="text-xs text-red-600 dark:text-red-400">{err.message}</p>
+          <DetailText text={err.message} className="text-xs text-red-600 dark:text-red-400" />
         </div>
       )}
 
       {expanded && hasDetail && (
         <div className="px-4 pb-3 border-t border-gray-100 dark:border-gray-700/50 pt-3">
-          <p className="text-xs text-red-600 dark:text-red-400 mb-2">{err.message}</p>
+          <DetailText text={err.message} className="text-xs text-red-600 dark:text-red-400 mb-2" />
           <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
             {err.detail!.split('\n').map((line, i) => (
               <div key={i} className="flex items-start gap-2 text-xs">
