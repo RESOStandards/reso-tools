@@ -420,14 +420,21 @@ const runJobElectron = async (job: Job): Promise<void> => {
         }))
       : initialSteps.map(s => ({ ...s, status: result.status === 'passed' ? 'passed' as const : 'skipped' as const }));
 
+    // Cross-check: if any step failed, the job failed — don't trust the SDK status alone
+    const hasFailedStep = finalSteps.some(s => s.status === 'failed');
+    const finalStatus = hasFailedStep ? 'failed' : result.status;
+    const finalError = hasFailedStep && !result.error
+      ? `Failed at: ${finalSteps.find(s => s.status === 'failed')?.name}`
+      : result.error;
+
     updateJob(job.id, {
-      status: result.status,
+      status: finalStatus,
       completedAt: new Date().toISOString(),
       steps: finalSteps,
-      error: result.error,
+      error: finalError,
       reports: result.reports,
     });
-    emit({ type: 'job-completed', jobId: job.id, status: result.status, error: result.error });
+    emit({ type: 'job-completed', jobId: job.id, status: finalStatus, error: finalError });
   } catch (err) {
     updateJob(job.id, {
       status: 'failed',
