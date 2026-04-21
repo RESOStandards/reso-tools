@@ -788,6 +788,7 @@ export const ConfigBuilder = ({
   const [orgsLoading, setOrgsLoading] = useState(false);
   const [providerSearch, setProviderSearch] = useState('');
   const [showProviderDropdown, setShowProviderDropdown] = useState(false);
+  const [highlightedOrgIndex, setHighlightedOrgIndex] = useState(-1);
 
   // Saved configs for autocomplete
   const [savedConfigs, setSavedConfigs] = useState<ReadonlyArray<SavedConnection>>([]);
@@ -964,9 +965,29 @@ export const ConfigBuilder = ({
               <input
                 type="text"
                 value={providerSearch}
-                onChange={e => { setProviderSearch(e.target.value); setShowProviderDropdown(true); }}
+                onChange={e => { setProviderSearch(e.target.value); setShowProviderDropdown(true); setHighlightedOrgIndex(-1); }}
                 onFocus={() => setShowProviderDropdown(true)}
                 onBlur={() => setTimeout(() => setShowProviderDropdown(false), 200)}
+                onKeyDown={e => {
+                  if (!showProviderDropdown) return;
+                  const visibleOrgs = orgs.filter(o => {
+                    if (!providerSearch.trim()) return true;
+                    const q = providerSearch.toLowerCase();
+                    return o.name.toLowerCase().includes(q) || o.id.toLowerCase().includes(q);
+                  }).slice(0, 50);
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setHighlightedOrgIndex(i => Math.min(i + 1, visibleOrgs.length - 1));
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setHighlightedOrgIndex(i => Math.max(i - 1, 0));
+                  } else if (e.key === 'Enter' && highlightedOrgIndex >= 0 && highlightedOrgIndex < visibleOrgs.length) {
+                    e.preventDefault();
+                    selectProvider(visibleOrgs[highlightedOrgIndex]);
+                  } else if (e.key === 'Escape') {
+                    setShowProviderDropdown(false);
+                  }
+                }}
                 placeholder={orgsLoading ? 'Loading organizations...' : 'Search by name or UOI...'}
                 className={INPUT}
               />
