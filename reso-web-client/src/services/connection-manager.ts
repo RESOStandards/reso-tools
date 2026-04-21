@@ -319,3 +319,29 @@ export const connectionKey = (conn: Pick<SavedConnection, 'url' | 'authMode' | '
   conn.authMode === 'client_credentials'
     ? `${conn.url}::${conn.clientId ?? ''}`
     : `${conn.url}::${conn.originatingSystemName ?? ''}`;
+
+// ── Config Builder Draft ────────────────────────────────────────────
+
+const DRAFT_KEY = 'config-builder-draft';
+
+export interface ConfigDraft {
+  readonly config: unknown;
+  readonly configId: string | null;
+  readonly configName: string | null;
+  readonly savedAt: string;
+}
+
+/** Save config builder draft (one per user, overwrites previous). */
+export const saveDraft = async (draft: Omit<ConfigDraft, 'savedAt'>): Promise<void> => {
+  await writeJSON(DRAFT_KEY, { ...draft, savedAt: new Date().toISOString() });
+};
+
+/** Load config builder draft, if any. */
+export const loadDraft = async (): Promise<ConfigDraft | null> =>
+  readJSON<ConfigDraft>(DRAFT_KEY);
+
+/** Clear config builder draft. */
+export const clearDraft = async (): Promise<void> => {
+  const storage = getStorage();
+  if (storage) await storage.remove(DRAFT_KEY);
+};

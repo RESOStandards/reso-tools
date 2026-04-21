@@ -10,7 +10,7 @@
  */
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { NavLink, useLocation, useBlocker } from 'react-router';
+import { NavLink, useLocation } from 'react-router';
 import { StatusPill } from '../../components/cert/status-pill';
 import { ReplicationProgress, parseReplicationProgress } from '../../components/cert/replication-progress';
 import { RequestDetailsPanel } from '../../components/cert/request-details';
@@ -915,6 +915,7 @@ export const JobsPage = () => {
   // Track loaded config identity for Save vs. Save As
   const [loadedConfigId, setLoadedConfigId] = useState<string | null>(null);
   const [loadedConfigName, setLoadedConfigName] = useState<string | null>(null);
+  const [configRefreshKey, setConfigRefreshKey] = useState(0);
 
   // Open config builder with a loaded config from dashboard/configs page navigation
   useEffect(() => {
@@ -930,30 +931,19 @@ export const JobsPage = () => {
     }
   }, [location.state]);
 
-  useEffect(() => {
-    if (!showNewJob) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [showNewJob]);
   const [clonedConfig, setClonedConfig] = useState<BatchConfig | undefined>(undefined);
 
-  // Prevent accidental navigation when config builder has loaded data
-  // Note: useBlocker(true) also blocks Electron quit — only block when there's real data to lose
-  const blocker = useBlocker(showNewJob && !!clonedConfig);
-
+  // Check for autosaved draft on mount
+  const [draftBanner, setDraftBanner] = useState<{ config: BatchConfig; configId: string | null; configName: string | null; savedAt: string } | null>(null);
   useEffect(() => {
-    if (blocker.state === 'blocked') {
-      const leave = window.confirm('You have an unsaved test configuration. Leave this page?');
-      if (leave) {
-        blocker.proceed();
-      } else {
-        blocker.reset();
-      }
-    }
-  }, [blocker]);
+    // Don't check for draft if we already have a config loaded (from navigation state)
+    if (showNewJob) return;
+    import('../../services/connection-manager').then(({ loadDraft, clearDraft }) =>
+      loadDraft().then(draft => {
+        if (draft?.config) setDraftBanner({ config: draft.config as BatchConfig, configId: draft.configId, configName: draft.configName, savedAt: draft.savedAt });
+      })
+    ).catch(() => {});
+  }, []);
 
   const handleClone = (job: CertJob) => {
     const sdk = (job.sdkConfig ?? {}) as Record<string, unknown>;
@@ -1166,6 +1156,45 @@ export const JobsPage = () => {
 
       {/* Content below sticky header */}
       <div className={`${PAGE_CONTAINER} pb-20`}>
+        {/* Draft restore banner */}
+        {draftBanner && !showNewJob && (
+          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg flex items-center justify-between">
+            <div className="text-sm text-blue-800 dark:text-blue-300">
+              <span className="font-medium">Work in progress found</span>
+              {draftBanner.configName && <span> — {draftBanner.configName}</span>}
+              <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
+                {new Date(draftBanner.savedAt).toLocaleString()}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 ml-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setClonedConfig(draftBanner.config);
+                  setLoadedConfigId(draftBanner.configId);
+                  setLoadedConfigName(draftBanner.configName);
+                  setShowNewJob(true);
+                  setDraftBanner(null);
+                  import('../../services/connection-manager').then(({ clearDraft }) => clearDraft()).catch(() => {});
+                }}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
+              >
+                Restore
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftBanner(null);
+                  import('../../services/connection-manager').then(({ clearDraft }) => clearDraft()).catch(() => {});
+                }}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 cursor-pointer"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Config builder */}
         {showNewJob && (
           <div className="mb-6">
@@ -1241,10 +1270,12 @@ export const JobsPage = () => {
                 });
                 setLoadedConfigId(saved.id);
                 setLoadedConfigName(saved.name);
+                setConfigRefreshKey(k => k + 1);
               }}
               initialConfig={clonedConfig}
               savedConfigId={loadedConfigId}
               savedConfigName={loadedConfigName}
+              refreshKey={configRefreshKey}
             />
           </div>
         )}

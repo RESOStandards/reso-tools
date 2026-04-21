@@ -21,6 +21,7 @@ interface DirectoryCache {
 }
 
 let cache: DirectoryCache | null = null;
+let rawOrgs: ReadonlyArray<import('../api/cert-client').CertOrganization> | null = null;
 let inFlight: Promise<DirectoryCache> | null = null;
 
 const systemKey = (providerUoi: string, usi: string): string =>
@@ -31,6 +32,7 @@ const loadDirectory = async (apiKey: string | null): Promise<DirectoryCache> => 
   if (inFlight) return inFlight;
 
   inFlight = fetchOrganizations(apiKey).then((orgs) => {
+    rawOrgs = orgs;
     const names = new Map<string, string>();
     const systems = new Map<string, string>();
     for (const org of orgs) {
@@ -49,6 +51,17 @@ const loadDirectory = async (apiKey: string | null): Promise<DirectoryCache> => 
   });
 
   return inFlight;
+};
+
+/** Prefetch the org directory in the background (call early, e.g. on dashboard mount). */
+export const prefetchOrganizations = (apiKey: string | null): void => {
+  loadDirectory(apiKey).catch(() => {});
+};
+
+/** Get the raw orgs list from cache, or fetch if not yet loaded. */
+export const getOrganizations = async (apiKey: string | null): Promise<ReadonlyArray<import('../api/cert-client').CertOrganization>> => {
+  await loadDirectory(apiKey);
+  return rawOrgs ?? [];
 };
 
 export interface UseOrganizationNamesResult {

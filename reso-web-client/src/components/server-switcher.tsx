@@ -6,7 +6,6 @@ import { ServerConnectionModal } from './server-connection-modal';
 import { ConnectionManagerOverlay } from './connection-manager-overlay';
 import type { ServerFormData } from './server-connection-modal';
 import type { ServerConfig } from '../context/server-context';
-import type { SavedConnection } from '../services/config-storage';
 import type { SavedConnection as ManagedConnection, StoredCredentials } from '../services/connection-manager';
 
 /** Server switcher dropdown in the header — lets users switch between connections. */
@@ -17,33 +16,34 @@ export const ServerSwitcher = () => {
   const [showManager, setShowManager] = useState(false);
   const [editingServer, setEditingServer] = useState<ServerConfig | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [savedConfigs, setSavedConfigs] = useState<ReadonlyArray<SavedConnection>>([]);
+  const [savedConfigs, setSavedConfigs] = useState<ReadonlyArray<ManagedConnection>>([]);
   const [configSearch, setConfigSearch] = useState('');
 
-  // Load saved configs when dropdown opens
+  // Load saved connections when dropdown opens
   useEffect(() => {
     if (!isOpen) return;
-    const mgr = (window as unknown as Record<string, unknown>).configManager as { list: () => Promise<ReadonlyArray<SavedConnection>> } | undefined;
-    if (mgr) mgr.list().then(setSavedConfigs).catch(() => {});
+    import('../services/connection-manager').then(({ loadConnectionsMRU }) =>
+      loadConnectionsMRU().then(setSavedConfigs)
+    ).catch(() => {});
   }, [isOpen]);
 
   const filteredConfigs = configSearch.length >= 2
     ? savedConfigs.filter(c => {
         const q = configSearch.toLowerCase();
-        return [c.name, c.url, c.providerUoi, c.providerName, c.recipientUoi, c.recipientName, c.providerUsi, c.systemName]
+        return [c.name, c.url, c.originatingSystemName]
           .filter(Boolean)
           .some(f => f!.toLowerCase().includes(q));
       }).slice(0, 5)
     : savedConfigs.slice(0, 5);
 
   const handleSelectConfig = useCallback(
-    async (config: SavedConnection) => {
+    async (config: ManagedConnection) => {
       // Get credentials from safeStorage
-      const { getCredentials } = await import('../services/config-storage');
+      const { getCredentials, touchMRU } = await import('../services/connection-manager');
       const creds = await getCredentials(config.id);
 
       const id = addServer({
-        name: config.name || config.recipientName || config.url,
+        name: config.name || config.url,
         baseUrl: config.url,
         authMode: config.authMode === 'client_credentials' ? 'client_credentials' : 'token',
         token: creds?.authToken || undefined,
@@ -54,6 +54,7 @@ export const ServerSwitcher = () => {
         permissions: { canAdd: false, canEdit: false, canDelete: false },
       });
       switchServer(id);
+      await touchMRU(config.id);
       setIsOpen(false);
       setConfigSearch('');
     },
@@ -228,7 +229,7 @@ export const ServerSwitcher = () => {
               </button>
             ))}
 
-            {/* Saved configs section */}
+            {/* Saved connections section */}
             {savedConfigs.length > 0 && (
               <div className="border-t border-gray-200 dark:border-gray-700 mt-1 pt-1">
                 <div className="px-3 py-1">
@@ -236,7 +237,7 @@ export const ServerSwitcher = () => {
                     type="text"
                     value={configSearch}
                     onChange={e => setConfigSearch(e.target.value)}
-                    placeholder="Search saved configs..."
+                    placeholder="Search saved connections..."
                     className="w-full px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 outline-none"
                   />
                 </div>
@@ -250,7 +251,7 @@ export const ServerSwitcher = () => {
                     <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-amber-400" />
                     <div className="min-w-0">
                       <div className="truncate font-semibold text-sm text-gray-900 dark:text-gray-100">
-                        {config.name || config.recipientName || config.recipientUoi || 'Unnamed'}
+                        {config.name || 'Unnamed'}
                       </div>
                       <div className="truncate text-xs text-gray-500 dark:text-gray-400">{config.url}</div>
                     </div>
