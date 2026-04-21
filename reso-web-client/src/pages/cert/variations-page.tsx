@@ -18,8 +18,9 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useLocation, useBlocker } from 'react-router';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
-import { LockBanner } from '../../components/cert/lock-banner';
-import type { BlendedVariation, BlendedVariationsReport } from '../../services/variations-blender';
+import { blendVariations, type BlendedVariation, type BlendedVariationsReport } from '../../services/variations-blender';
+import { searchVariations } from '../../services/variations-service';
+import { useAuth } from '../../hooks/use-auth';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -113,24 +114,78 @@ const loadCachedReport = (): BlendedVariationsReport | null => {
 
 export const VariationsPage = () => {
   const location = useLocation();
+  const { ensureFreshProviderToken, isAuthenticated } = useAuth();
   const routeState = location.state as { job?: Record<string, unknown>; report?: BlendedVariationsReport } | null;
 
-  // Load report from route state, then cache, then localStorage
   const [report, setReport] = useState<BlendedVariationsReport | null>(() => {
     if (routeState?.report) return routeState.report;
     return loadCachedReport();
   });
-
+  const [loading, setLoading] = useState(false);
   const [view, setView] = useState<ViewMode>(report ? 'detail' : 'list');
 
-  // Cache report when it arrives via route state
+  // When a job arrives via route state, extract variations and blend with service suggestions
   useEffect(() => {
     if (routeState?.report) {
       setReport(routeState.report);
       cacheReport(routeState.report);
       setView('detail');
+      window.history.replaceState({}, '');
+      return;
     }
-  }, [routeState]);
+
+    const job = routeState?.job;
+    if (!job) return;
+
+    const variationsReport = (job.reports as Record<string, unknown>)?.variationsReport as Record<string, unknown> | undefined;
+    if (!variationsReport) return;
+
+    setLoading(true);
+
+    // Attempt to fetch service suggestions and blend
+    const fetchAndBlend = async () => {
+      try {
+        const localReport = variationsReport as unknown as Parameters<typeof blendVariations>[0];
+        let serviceSuggestions = {};
+
+        if (isAuthenticated) {
+          try {
+            const token = await ensureFreshProviderToken();
+            const metadataReport = (job.reports as Record<string, unknown>)?.metadataReport as { fields: unknown[]; lookups: unknown[] } | undefined;
+            if (metadataReport) {
+              const result = await searchVariations(metadataReport as Parameters<typeof searchVariations>[0], token);
+              serviceSuggestions = result.mappings ?? {};
+            }
+          } catch { /* Not authenticated or token expired — use local only */ }
+        }
+
+        const blended = blendVariations(localReport, serviceSuggestions);
+        setReport(blended);
+        cacheReport(blended);
+        setView('detail');
+      } catch {
+        // If service is unavailable, use local results only
+        const blended = blendVariations(variationsReport as unknown as Parameters<typeof blendVariations>[0]);
+        setReport(blended);
+        cacheReport(blended);
+        setView('detail');
+      } finally {
+        setLoading(false);
+        window.history.replaceState({}, '');
+      }
+    };
+
+    fetchAndBlend();
+  }, [routeState, isAuthenticated, ensureFreshProviderToken]);
+
+  if (loading) {
+    return (
+      <div className={`${PAGE_CONTAINER} py-12 text-center`}>
+        <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500 mr-2" />
+        <span className="text-sm text-gray-500 dark:text-gray-400">Loading variations and fetching suggestions...</span>
+      </div>
+    );
+  }
 
   if (view === 'list' || !report) {
     return <ReviewListView onSelectReport={(r) => { setReport(r); cacheReport(r); setView('detail'); }} />;
