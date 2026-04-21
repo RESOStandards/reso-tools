@@ -619,20 +619,13 @@ const rebuildSDKConfig = async (job: Job): Promise<Record<string, unknown>> => {
   const stored = await loadJobConfigFromStorage(job);
   if (stored) return stored;
 
-  // Fall back to reconstructing from job metadata
-  const runner = getCertRunner();
-  const serverUrl = runner ? (await runner.localServerUrl()) ?? 'LOCAL_SERVER' : 'LOCAL_SERVER';
-
-  return {
-    endorsement: job.endorsementKey || 'dd',
-    version: job.version,
-    server: { url: serverUrl, auth: { mode: 'token', authToken: 'admin-token' } },
-    providerUoi: job.providerUoi,
-    providerUsi: job.providerUsi,
-    recipientUoi: job.recipientUoi,
-    strictMode: true,
-    options: { verbose: false },
-  };
+  // Cannot rebuild without the original config — the server URL, auth, and
+  // test parameters are lost. Return a config that will fail clearly rather
+  // than silently running against the wrong server.
+  throw new Error(
+    'Cannot re-run this job — the original configuration was not saved. ' +
+    'Please create a new test run with the correct server URL and credentials.'
+  );
 };
 
 /** Re-run a completed job by creating a new job with the same config. */
