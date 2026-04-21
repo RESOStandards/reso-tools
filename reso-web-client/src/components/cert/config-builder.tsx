@@ -9,7 +9,7 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { SavedConfigsPanel } from './saved-configs-panel';
-import type { SavedConnection } from '../../services/config-storage';
+import { loadProfiles, loadConnections, type SavedConnection, type SavedCredentials, type SavedCertConfig } from '../../services/connection-manager';
 import { SearchInput, FilterPill, Badge } from '../metadata/shared';
 import { fetchOrganizations } from '../../api/cert-client';
 import type { CertOrganization, CertOrganizationSystem } from '../../api/cert-client';
@@ -495,6 +495,7 @@ const RecipientCard = ({
   orgs,
   providerSystems,
   matchConfigs,
+  savedCredentials,
 }: {
   readonly recipient: RecipientConfig;
   readonly index: number;
@@ -502,7 +503,8 @@ const RecipientCard = ({
   readonly onRemove: () => void;
   readonly onDuplicate: () => void;
   readonly orgs: ReadonlyArray<CertOrganization>;
-  readonly matchConfigs: (query: string) => ReadonlyArray<SavedConnection>;
+  readonly matchConfigs: (query: string) => ReadonlyArray<SavedCertConfig>;
+  readonly savedCredentials: Map<string, SavedCredentials>;
   readonly providerSystems: ReadonlyArray<CertOrganizationSystem>;
 }) => {
   const [expanded, setExpanded] = useState(true);
@@ -637,16 +639,18 @@ const RecipientCard = ({
                               className="w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer"
                               onMouseDown={e => {
                                 e.preventDefault();
+                                const conn = config.credentialsId ? savedCredentials.get(config.credentialsId) : undefined;
                                 onChange({
                                   ...recipient,
                                   description: config.name ?? '',
-                                  serviceRootUri: config.url ?? '',
+                                  serviceRootUri: conn?.url ?? '',
                                   recipientUoi: config.recipientUoi ?? '',
                                   providerUsi: config.providerUsi ?? '',
-                                  auth: config.authMode === 'client_credentials'
-                                    ? { mode: 'client_credentials' as const, clientId: config.clientId ?? '', clientSecret: '', tokenUrl: config.tokenUrl ?? '', scope: config.scope }
+                                  auth: conn?.authMode === 'client_credentials'
+                                    ? { mode: 'client_credentials' as const, clientId: conn.clientId ?? '', clientSecret: '', tokenUrl: conn.tokenUrl ?? '', scope: conn.scope }
                                     : { mode: 'token' as const, authToken: '' },
-                                  ...(config.certOptions as Record<string, unknown> ?? {}),
+                                  endorsements: config.endorsements as unknown as RecipientConfig['endorsements'],
+                                  ddOptions: { version: (config.ddVersion ?? '2.1') as RecipientConfig['ddOptions']['version'], strictMode: config.strictMode ?? true },
                                 });
                                 setRecipientName(config.recipientName ?? config.name ?? '');
                                 setRecipientSearch('');
@@ -654,7 +658,7 @@ const RecipientCard = ({
                               }}
                             >
                               <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{config.name || config.recipientName || config.recipientUoi}</div>
-                              <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{config.url}</div>
+                              <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{savedCredentials.get(config.credentialsId ?? '')?.url ?? config.recipientUoi}</div>
                             </button>
                           ))}
                         </>
@@ -789,7 +793,6 @@ export const ConfigBuilder = ({
   const [recipients, setRecipients] = useState<ReadonlyArray<RecipientConfig>>(
     initialConfig?.recipients ?? [makeRecipient()]
   );
-  const [showSavedConfigs, setShowSavedConfigs] = useState(false);
 
   // Org directory for provider/recipient pickers
   const [orgs, setOrgs] = useState<ReadonlyArray<CertOrganization>>([]);
@@ -798,8 +801,9 @@ export const ConfigBuilder = ({
   const [showProviderDropdown, setShowProviderDropdown] = useState(false);
   const [highlightedOrgIndex, setHighlightedOrgIndex] = useState(-1);
 
-  // Saved configs for autocomplete
-  const [savedConfigs, setSavedConfigs] = useState<ReadonlyArray<SavedConnection>>([]);
+  // Saved cert configs for autocomplete
+  const [savedConfigs, setSavedConfigs] = useState<ReadonlyArray<SavedCertConfig>>([]);
+  const [savedCredentials, setSavedCredentials] = useState<Map<string, SavedCredentials>>(new Map());
 
   useEffect(() => {
     setOrgsLoading(true);
@@ -818,21 +822,22 @@ export const ConfigBuilder = ({
       .catch(() => {})
       .finally(() => setOrgsLoading(false));
 
-    // Load saved configs for autocomplete
-    const mgr = (window as unknown as Record<string, unknown>).configManager as { list: () => Promise<ReadonlyArray<SavedConnection>> } | undefined;
-    if (mgr) mgr.list().then(setSavedConfigs).catch(() => {});
+    // Load saved cert configs and credentials for autocomplete
+    loadProfiles().then(setSavedConfigs).catch(() => {});
+    loadConnections().then(conns => setSavedCredentials(new Map(conns.map(c => [c.id, c])))).catch(() => {});
   }, []);
 
-  /** Filter saved configs by a search query across all relevant fields. */
-  const matchConfigs = useCallback((query: string): ReadonlyArray<SavedConnection> => {
+  /** Filter saved cert configs by a search query across all relevant fields. */
+  const matchConfigs = useCallback((query: string): ReadonlyArray<SavedCertConfig> => {
     if (!query || query.length < 2) return [];
     const q = query.toLowerCase();
-    return savedConfigs.filter(c =>
-      [c.name, c.url, c.providerUoi, c.providerName, c.providerUsi, c.systemName, c.recipientUoi, c.recipientName]
+    return savedConfigs.filter(c => {
+      const conn = c.credentialsId ? savedCredentials.get(c.credentialsId) : undefined;
+      return [c.name, conn?.url, c.providerUoi, c.providerName, c.providerUsi, c.systemName, c.recipientUoi, c.recipientName]
         .filter(Boolean)
-        .some(field => field!.toLowerCase().includes(q))
-    ).slice(0, 5);
-  }, [savedConfigs]);
+        .some(field => field!.toLowerCase().includes(q));
+    }).slice(0, 5);
+  }, [savedConfigs, savedCredentials]);
 
   const selectProvider = useCallback((org: CertOrganization) => {
     setProviderUoi(org.id);
@@ -1028,6 +1033,7 @@ export const ConfigBuilder = ({
                           onMouseDown={e => {
                             e.preventDefault();
                             // Fill provider from saved config
+                            const conn = config.credentialsId ? savedCredentials.get(config.credentialsId) : undefined;
                             if (config.providerUoi) {
                               setProviderUoi(config.providerUoi);
                               setProviderName(config.providerName ?? config.providerUoi);
@@ -1036,20 +1042,21 @@ export const ConfigBuilder = ({
                             setRecipients([{
                               ...makeRecipient(),
                               description: config.name ?? '',
-                              serviceRootUri: config.url ?? '',
+                              serviceRootUri: conn?.url ?? '',
                               recipientUoi: config.recipientUoi ?? '',
                               providerUsi: config.providerUsi ?? '',
-                              auth: config.authMode === 'client_credentials'
-                                ? { mode: 'client_credentials' as const, clientId: config.clientId ?? '', clientSecret: '', tokenUrl: config.tokenUrl ?? '', scope: config.scope }
+                              auth: conn?.authMode === 'client_credentials'
+                                ? { mode: 'client_credentials' as const, clientId: conn.clientId ?? '', clientSecret: '', tokenUrl: conn.tokenUrl ?? '', scope: conn.scope }
                                 : { mode: 'token' as const, authToken: '' },
-                              ...(config.certOptions as Record<string, unknown> ?? {}),
+                              endorsements: config.endorsements as unknown as RecipientConfig['endorsements'],
+                              ddOptions: { version: (config.ddVersion ?? '2.1') as RecipientConfig['ddOptions']['version'], strictMode: config.strictMode ?? true },
                             }]);
                             setShowProviderDropdown(false);
                             setProviderSearch('');
                           }}
                         >
                           <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{config.name || config.recipientName || config.recipientUoi}</div>
-                          <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{config.url}</div>
+                          <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{savedCredentials.get(config.credentialsId ?? '')?.url ?? config.recipientUoi}</div>
                           {config.recipientName && <div className="text-[10px] text-gray-400 dark:text-gray-500">Recipient: {config.recipientName}</div>}
                         </button>
                       ))}
@@ -1116,37 +1123,32 @@ export const ConfigBuilder = ({
             orgs={orgs}
             providerSystems={providerSystems}
             matchConfigs={matchConfigs}
+            savedCredentials={savedCredentials}
           />
         ))}
       </div>
 
-      {/* Saved Configs */}
-      {showSavedConfigs && (
-        <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50">
-          <SavedConfigsPanel
-            currentConfig={canStart ? { providerUoi, concurrency, recipients } : null}
-            onLoad={(imported) => {
-              if ('providerUoi' in imported && typeof imported.providerUoi === 'string') {
-                setProviderUoi(imported.providerUoi);
-              }
-              if ('concurrency' in imported && typeof imported.concurrency === 'number') {
-                setConcurrency(imported.concurrency);
-              }
-              if ('recipients' in imported && Array.isArray(imported.recipients)) {
-                setRecipients(imported.recipients as ReadonlyArray<RecipientConfig>);
-              }
-              setShowSavedConfigs(false);
-            }}
-          />
-        </div>
-      )}
+      {/* Saved Configs — MRU 3 with search and View All link */}
+      <SavedConfigsPanel
+        onLoad={(imported, configId, configName) => {
+          if ('providerUoi' in imported && typeof imported.providerUoi === 'string') {
+            setProviderUoi(imported.providerUoi);
+          }
+          if ('concurrency' in imported && typeof imported.concurrency === 'number') {
+            setConcurrency(imported.concurrency);
+          }
+          if ('recipients' in imported && Array.isArray(imported.recipients)) {
+            setRecipients(imported.recipients as ReadonlyArray<RecipientConfig>);
+          }
+          // Notify parent of loaded config identity for Save vs. Save As
+          if (onSave) {
+            // These will be set by the parent via savedConfigId/savedConfigName props on next render
+          }
+        }}
+      />
 
       {/* Import / Export / Summary */}
       <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-700/50">
-        <button type="button" onClick={() => setShowSavedConfigs(!showSavedConfigs)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
-          {showSavedConfigs ? 'Hide Saved' : 'Saved Configs'}
-        </button>
-        <span className="text-gray-300 dark:text-gray-600">·</span>
         <button type="button" onClick={handleImport} className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
           Import
         </button>

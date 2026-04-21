@@ -1,211 +1,136 @@
 /**
- * Saved Configs panel — load, save, delete, import/export cert job configs.
+ * Saved Configs panel — compact MRU list at the bottom of the config builder.
  *
- * Embedded in the config builder. Persists via Electron's secure storage.
+ * Shows the 3 most recently updated configs, a search box for finding
+ * others, and a "View All" link to the Saved Configs page.
+ *
+ * Uses connection-manager.ts (SavedCertConfig) as the storage backend.
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { NavLink } from 'react-router';
 import {
-  loadSavedConfigs,
-  saveConfig,
-  deleteConfig,
-  exportConfig,
-  importConfigFromFile,
-  type SavedConfig,
-} from '../../services/saved-configs';
-import type { BatchConfig } from './config-builder';
+  loadProfiles,
+  loadConnections,
+  type SavedCertConfig,
+  type SavedCredentials,
+} from '../../services/connection-manager';
 
 interface SavedConfigsPanelProps {
-  /** Current config from the form — used when saving. */
-  readonly currentConfig: BatchConfig | null;
-  /** Called when the user loads a saved config. */
-  readonly onLoad: (config: Record<string, unknown>) => void;
+  /** Called when the user loads a saved config into the form. */
+  readonly onLoad: (config: Record<string, unknown>, configId: string, configName: string) => void;
 }
 
-const hasCredentials = (config: Record<string, unknown>): boolean => {
-  const json = JSON.stringify(config);
-  return json.includes('clientSecret') || json.includes('authToken');
-};
+const endorsementLabel = (e: string): string =>
+  e === 'dd' ? 'DD' : e === 'core' ? 'Core' : e === 'add-edit' ? 'Add/Edit' : e === 'entity-event' ? 'EE' : e;
 
-export const SavedConfigsPanel = ({ currentConfig, onLoad }: SavedConfigsPanelProps) => {
-  const [configs, setConfigs] = useState<ReadonlyArray<SavedConfig>>([]);
-  const [saveName, setSaveName] = useState('');
-  const [showSave, setShowSave] = useState(false);
-  const [showWarning, setShowWarning] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+export const SavedConfigsPanel = ({ onLoad }: SavedConfigsPanelProps) => {
+  const [configs, setConfigs] = useState<ReadonlyArray<SavedCertConfig>>([]);
+  const [credentials, setCredentials] = useState<Map<string, SavedCredentials>>(new Map());
+  const [search, setSearch] = useState('');
 
-  // Load saved configs on mount
   useEffect(() => {
-    loadSavedConfigs().then(setConfigs);
+    Promise.all([loadProfiles(), loadConnections()]).then(([profiles, connections]) => {
+      setConfigs(profiles);
+      setCredentials(new Map(connections.map(c => [c.id, c])));
+    });
   }, []);
 
-  const handleSave = useCallback(async () => {
-    if (!currentConfig || !saveName.trim()) return;
-
-    // Check if credentials are present and show warning
-    if (hasCredentials(currentConfig as unknown as Record<string, unknown>) && !showWarning) {
-      setShowWarning(true);
-      return;
+  const handleLoad = useCallback(async (cfg: SavedCertConfig) => {
+    const { getCredentials } = await import('../../services/connection-manager');
+    let authToken = '';
+    let clientSecret = '';
+    if (cfg.credentialsId) {
+      const creds = await getCredentials(cfg.credentialsId);
+      if (creds) { authToken = creds.authToken ?? ''; clientSecret = creds.clientSecret ?? ''; }
     }
+    const conn = cfg.credentialsId ? credentials.get(cfg.credentialsId) : undefined;
 
-    await saveConfig(saveName.trim(), currentConfig as unknown as Record<string, unknown>);
-    setConfigs(await loadSavedConfigs());
-    setSaveName('');
-    setShowSave(false);
-    setShowWarning(false);
-  }, [currentConfig, saveName, showWarning]);
+    const loadConfig = {
+      providerUoi: cfg.providerUoi,
+      concurrency: 1,
+      recipients: [{
+        recipientUoi: cfg.recipientUoi,
+        providerUsi: cfg.providerUsi ?? '',
+        serviceRootUri: conn?.url ?? '',
+        description: cfg.recipientName ?? cfg.name,
+        auth: conn?.authMode === 'client_credentials'
+          ? { mode: 'client_credentials' as const, clientId: conn.clientId ?? '', clientSecret, tokenUrl: conn.tokenUrl ?? '', scope: conn.scope ?? '', authToken: '' }
+          : { mode: 'token' as const, authToken, clientId: '', clientSecret: '', tokenUrl: '', scope: '' },
+        endorsements: [...cfg.endorsements],
+        ddOptions: { version: cfg.ddVersion ?? '2.1', strictMode: cfg.strictMode ?? true, limit: cfg.limit, requestDelay: cfg.requestDelay, rateLimitWait: cfg.rateLimitWait, batchExpand: cfg.batchExpand },
+        coreOptions: { version: '2.0.0' },
+        addEditOptions: { resource: 'Property', specVersion: '2.0.0' },
+        entityEventOptions: { mode: 'full' as const, writableResource: 'Property' },
+      }],
+    };
 
-  const handleDelete = useCallback(async (id: string) => {
-    await deleteConfig(id);
-    setConfigs(await loadSavedConfigs());
-    setConfirmDelete(null);
-  }, []);
+    onLoad(loadConfig as unknown as Record<string, unknown>, cfg.id, cfg.name);
+  }, [credentials, onLoad]);
 
-  const handleImport = useCallback(async () => {
-    const imported = await importConfigFromFile();
-    if (imported) onLoad(imported);
-  }, [onLoad]);
+  // MRU 3 or search results
+  const sorted = [...configs].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
-  const handleExport = useCallback((config: SavedConfig) => {
-    exportConfig(config);
-  }, []);
+  const displayed = search.length >= 2
+    ? sorted.filter(c => {
+        const q = search.toLowerCase();
+        const conn = c.credentialsId ? credentials.get(c.credentialsId) : undefined;
+        return [c.name, c.providerUoi, c.providerName, c.recipientUoi, c.recipientName, conn?.url]
+          .filter(Boolean)
+          .some(f => f!.toLowerCase().includes(q));
+      }).slice(0, 5)
+    : sorted.slice(0, 3);
+
+  if (configs.length === 0) return null;
 
   return (
-    <div className="space-y-3">
-      {/* Actions bar */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setShowSave(!showSave)}
-          disabled={!currentConfig}
-          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 cursor-pointer transition-colors"
-        >
-          Save Current Config
-        </button>
-        <button
-          type="button"
-          onClick={handleImport}
-          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
-        >
-          Import JSON
-        </button>
-        <button
-          type="button"
-          onClick={() => onLoad({})}
-          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
-        >
-          New Config
-        </button>
+    <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          Saved Configs ({configs.length})
+        </p>
+        <NavLink to="/cert/configs" className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
+          View All
+        </NavLink>
       </div>
 
-      {/* Save dialog */}
-      {showSave && (
-        <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-          <input
-            type="text"
-            value={saveName}
-            onChange={e => setSaveName(e.target.value)}
-            placeholder="Config name (e.g., Trestle DD 2.0)"
-            className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none"
-            onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
-          />
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!saveName.trim()}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-40 cursor-pointer transition-colors"
-          >
-            {showWarning ? 'Save Anyway' : 'Save'}
-          </button>
-          <button
-            type="button"
-            onClick={() => { setShowSave(false); setShowWarning(false); }}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 cursor-pointer transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
+      {configs.length > 3 && (
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search saved configs..."
+          className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 outline-none"
+        />
       )}
 
-      {/* Credential warning confirmation */}
-      {showWarning && (
-        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-800 dark:text-red-300">
-          <p className="font-medium">This config contains credentials.</p>
-          <p className="mt-1">Credentials will be stored locally. For best security, export the config as a file instead. Click "Save Anyway" to proceed.</p>
-        </div>
-      )}
-
-      {/* Saved configs list */}
-      {configs.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            Saved Configs ({configs.length})
-          </p>
-          {configs.map(cfg => (
-            <div
+      <div className="space-y-1">
+        {displayed.map(cfg => {
+          const conn = cfg.credentialsId ? credentials.get(cfg.credentialsId) : undefined;
+          return (
+            <button
               key={cfg.id}
-              className="flex items-center justify-between p-2 bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-lg"
+              type="button"
+              onClick={() => handleLoad(cfg)}
+              className="w-full flex items-center justify-between p-2 bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer transition-colors text-left"
             >
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">{cfg.name}</p>
-                <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                  {new Date(cfg.updatedAt).toLocaleDateString()}
+                <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate">
+                  {conn?.url ?? cfg.recipientUoi}
                 </p>
               </div>
-              <div className="flex items-center gap-1.5 ml-2">
-                <button
-                  type="button"
-                  onClick={() => onLoad(cfg.config as Record<string, unknown>)}
-                  className="px-2 py-1 text-[10px] font-medium rounded bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 cursor-pointer transition-colors"
-                >
-                  Load
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onLoad(cfg.config as Record<string, unknown>)}
-                  title="Clone this config into the form"
-                  className="p-1 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
-                    <path d="M5.5 3.5A1.5 1.5 0 017 2h4.5A1.5 1.5 0 0113 3.5v7a1.5 1.5 0 01-1.5 1.5H7A1.5 1.5 0 015.5 10.5v-7zm1.5 0v7h4.5v-7H7z" />
-                    <path d="M3 5.5A1.5 1.5 0 014.5 4H5v1h-.5a.5.5 0 00-.5.5v7a.5.5 0 00.5.5h4.5a.5.5 0 00.5-.5V12h1v.5a1.5 1.5 0 01-1.5 1.5H4.5A1.5 1.5 0 013 12.5v-7z" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleExport(cfg)}
-                  className="px-2 py-1 text-[10px] font-medium rounded bg-gray-50 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer transition-colors"
-                >
-                  Export
-                </button>
-                {confirmDelete === cfg.id ? (
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(cfg.id)}
-                    className="px-2 py-1 text-[10px] font-medium rounded bg-red-600 text-white hover:bg-red-700 cursor-pointer transition-colors"
-                  >
-                    Confirm
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDelete(cfg.id)}
-                    className="px-2 py-1 text-[10px] font-medium rounded bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 cursor-pointer transition-colors"
-                  >
-                    Delete
-                  </button>
-                )}
+              <div className="flex items-center gap-1 ml-2 shrink-0">
+                {cfg.endorsements.slice(0, 2).map(e => (
+                  <span key={e} className="px-1 py-0.5 text-[8px] font-medium rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                    {endorsementLabel(e)}
+                  </span>
+                ))}
               </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {configs.length === 0 && !showSave && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">
-          No saved configs yet. Configure a test run and save it, or import a JSON config file.
-        </p>
-      )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 };

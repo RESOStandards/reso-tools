@@ -1186,8 +1186,59 @@ export const JobsPage = () => {
                 }
               }}
               onSave={async (config, existingId, name) => {
-                const { saveConfig } = await import('../../services/saved-configs');
-                const saved = await saveConfig(name ?? 'Unnamed Config', config as unknown as Record<string, unknown>, existingId);
+                const { saveConnection, saveProfile, storeCredentials, findConnectionByKey } = await import('../../services/connection-manager');
+                const recipient = config.recipients[0];
+                if (!recipient) return;
+
+                const configName = name ?? `${config.providerUoi} – ${recipient.recipientUoi} – ${recipient.endorsements.map(e => e === 'dd' ? 'DD' : e).join(', ')}`;
+
+                // Save or reuse credentials
+                let credentialsId: string | null = null;
+                if (recipient.serviceRootUri) {
+                  const existing = await findConnectionByKey(
+                    recipient.serviceRootUri,
+                    recipient.auth.mode,
+                    recipient.auth.mode === 'client_credentials' ? recipient.auth.clientId : undefined,
+                    recipient.auth.mode === 'token' ? recipient.description : undefined
+                  );
+                  if (existing) {
+                    credentialsId = existing.id;
+                  } else {
+                    const conn = await saveConnection({
+                      name: recipient.description || recipient.serviceRootUri,
+                      url: recipient.serviceRootUri,
+                      authMode: recipient.auth.mode,
+                      clientId: recipient.auth.mode === 'client_credentials' ? recipient.auth.clientId : undefined,
+                      tokenUrl: recipient.auth.mode === 'client_credentials' ? recipient.auth.tokenUrl : undefined,
+                      scope: recipient.auth.mode === 'client_credentials' ? recipient.auth.scope : undefined,
+                    });
+                    credentialsId = conn.id;
+                  }
+                  // Store credentials in safeStorage
+                  const creds = recipient.auth.mode === 'token'
+                    ? { authToken: recipient.auth.authToken }
+                    : { clientSecret: recipient.auth.clientSecret };
+                  if (credentialsId && (creds.authToken || creds.clientSecret)) {
+                    await storeCredentials(credentialsId, creds);
+                  }
+                }
+
+                // Save cert config
+                const saved = await saveProfile({
+                  id: existingId,
+                  name: configName,
+                  credentialsId,
+                  providerUoi: config.providerUoi,
+                  providerUsi: recipient.providerUsi,
+                  recipientUoi: recipient.recipientUoi,
+                  endorsements: [...recipient.endorsements],
+                  ddVersion: recipient.ddOptions?.version,
+                  strictMode: recipient.ddOptions?.strictMode,
+                  limit: recipient.ddOptions?.limit,
+                  requestDelay: recipient.ddOptions?.requestDelay,
+                  rateLimitWait: recipient.ddOptions?.rateLimitWait,
+                  batchExpand: recipient.ddOptions?.batchExpand,
+                });
                 setLoadedConfigId(saved.id);
                 setLoadedConfigName(saved.name);
               }}
