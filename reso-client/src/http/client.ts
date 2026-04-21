@@ -62,13 +62,17 @@ export const createClient = async (config: ClientConfig): Promise<ODataClient> =
   ): Promise<Response> => {
     const headers: Record<string, string> = {
       'OData-Version': '4.01',
-      'Content-Type': 'application/json',
       Accept: 'application/json',
       'Accept-Encoding': 'gzip, deflate',
       Authorization: `Bearer ${token}`,
       ...config.defaultHeaders,
       ...options?.headers,
     };
+
+    // Only set Content-Type on requests that carry a body
+    if (options?.body) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     return fetch(url, {
       method,

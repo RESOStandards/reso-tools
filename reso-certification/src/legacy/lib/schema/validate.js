@@ -2,7 +2,7 @@
 
 const Ajv = require('ajv');
 const addFormats = require('ajv-formats');
-const chalk = require('chalk');
+// chalk removed — ESM-only v5 doesn't work with require()
 const ajvErrors = require('ajv-errors');
 const { DEFAULT_DD_VERSION } = require('../../common');
 const {
@@ -119,7 +119,7 @@ const validate = ({
     const multiValueSchema = schema?.oneOf?.find(s => s.properties.value);
 
     if (!formattedResourceName) {
-      console.log(chalk.redBright(`Found invalid resource: ${formattedResourceName}`));
+      console.log(`Found invalid resource: ${formattedResourceName}`);
       addPayloadError(formattedResourceName, fileName, 'Invalid resource', payloadErrors);
       return errorMap;
     }
@@ -138,7 +138,7 @@ const validate = ({
     }
   } catch (error) {
     validPayload = false;
-    console.error(chalk.redBright.bold('ERROR: ' + error.message));
+    console.error('ERROR: ' + error.message);
     addPayloadError(resourceName, fileName, error.message, payloadErrors);
   }
 
