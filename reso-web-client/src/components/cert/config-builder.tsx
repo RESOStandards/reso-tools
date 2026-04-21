@@ -930,6 +930,9 @@ export const ConfigBuilder = ({
     input.click();
   };
 
+  const [showSaveAs, setShowSaveAs] = useState(false);
+  const [saveAsName, setSaveAsName] = useState('');
+
   const handleStart = () => {
     onStart({ providerUoi, concurrency, recipients });
   };
@@ -1170,17 +1173,33 @@ export const ConfigBuilder = ({
                   Save
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  const name = prompt('Config name:', savedConfigName ?? '');
-                  if (name?.trim()) onSave({ providerUoi, concurrency, recipients }, undefined, name.trim());
-                }}
-                disabled={!canStart}
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-40 cursor-pointer transition-colors"
-              >
-                {savedConfigId ? 'Save As' : 'Save'}
-              </button>
+              {showSaveAs ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={saveAsName}
+                    onChange={e => setSaveAsName(e.target.value)}
+                    placeholder="Config name..."
+                    className="px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none w-48"
+                    autoFocus
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && saveAsName.trim()) { onSave({ providerUoi, concurrency, recipients }, undefined, saveAsName.trim()); setShowSaveAs(false); setSaveAsName(''); }
+                      if (e.key === 'Escape') { setShowSaveAs(false); setSaveAsName(''); }
+                    }}
+                  />
+                  <button type="button" onClick={() => { if (saveAsName.trim()) { onSave({ providerUoi, concurrency, recipients }, undefined, saveAsName.trim()); setShowSaveAs(false); setSaveAsName(''); } }} disabled={!saveAsName.trim()} className="px-3 py-1.5 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-40 cursor-pointer transition-colors">Save</button>
+                  <button type="button" onClick={() => { setShowSaveAs(false); setSaveAsName(''); }} className="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 cursor-pointer transition-colors">Cancel</button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setShowSaveAs(true); setSaveAsName(savedConfigName ?? ''); }}
+                  disabled={!canStart}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-40 cursor-pointer transition-colors"
+                >
+                  {savedConfigId ? 'Save As' : 'Save'}
+                </button>
+              )}
             </>
           )}
           <button
