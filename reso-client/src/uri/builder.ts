@@ -107,37 +107,42 @@ const createBuilder = (state: UriBuilderState): UriBuilder => ({
       path += `('${encodeURIComponent(state.keyValue)}')`;
     }
 
+    // OData system query option prefix: some servers require %24 encoding
+    // of the $ character (e.g., Spark API returns 400 without it).
+    // This matches the behavior of the OData Commander (Java) and Postman.
+    const $ = '%24';
+
     const params: string[] = [];
 
     if (state.selectFields && state.selectFields.length > 0) {
-      params.push(`$select=${state.selectFields.join(',')}`);
+      params.push(`${$}select=${state.selectFields.join(',')}`);
     }
     if (state.filterExpr) {
-      params.push(`$filter=${encodeURIComponent(state.filterExpr)}`);
+      params.push(`${$}filter=${encodeURIComponent(state.filterExpr)}`);
     }
     if (state.orderbyExpr) {
-      params.push(`$orderby=${encodeURIComponent(state.orderbyExpr)}`);
+      params.push(`${$}orderby=${encodeURIComponent(state.orderbyExpr)}`);
     }
     if (state.expandExpr) {
-      params.push(`$expand=${encodeURIComponent(state.expandExpr)}`);
+      params.push(`${$}expand=${encodeURIComponent(state.expandExpr)}`);
     }
     if (state.searchExpr) {
-      params.push(`$search=${encodeURIComponent(state.searchExpr)}`);
+      params.push(`${$}search=${encodeURIComponent(state.searchExpr)}`);
     }
     if (state.computeExpr) {
-      params.push(`$compute=${encodeURIComponent(state.computeExpr)}`);
+      params.push(`${$}compute=${encodeURIComponent(state.computeExpr)}`);
     }
     if (state.topValue !== undefined) {
-      params.push(`$top=${state.topValue}`);
+      params.push(`${$}top=${state.topValue}`);
     }
     if (state.skipValue !== undefined) {
-      params.push(`$skip=${state.skipValue}`);
+      params.push(`${$}skip=${state.skipValue}`);
     }
     if (state.countValue !== undefined) {
-      params.push(`$count=${state.countValue}`);
+      params.push(`${$}count=${state.countValue}`);
     }
     if (state.formatValue) {
-      params.push(`$format=${encodeURIComponent(state.formatValue)}`);
+      params.push(`${$}format=${encodeURIComponent(state.formatValue)}`);
     }
 
     return params.length > 0 ? `${path}?${params.join('&')}` : path;

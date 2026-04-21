@@ -22,33 +22,33 @@ describe('buildUri', () => {
 
   it('adds $select', () => {
     const url = buildUri(base, 'Property').select('ListPrice', 'City').build();
-    expect(url).toBe('http://localhost:8080/Property?$select=ListPrice,City');
+    expect(url).toBe('http://localhost:8080/Property?%24select=ListPrice,City');
   });
 
   it('adds $filter', () => {
     const url = buildUri(base, 'Property').filter('ListPrice gt 200000').build();
-    expect(url).toContain('$filter=');
+    expect(url).toContain('%24filter=');
     expect(url).toContain('ListPrice');
   });
 
   it('adds $orderby', () => {
     const url = buildUri(base, 'Property').orderby('ListPrice desc').build();
-    expect(url).toContain('$orderby=');
+    expect(url).toContain('%24orderby=');
   });
 
   it('adds $top', () => {
     const url = buildUri(base, 'Property').top(10).build();
-    expect(url).toBe('http://localhost:8080/Property?$top=10');
+    expect(url).toBe('http://localhost:8080/Property?%24top=10');
   });
 
   it('adds $skip', () => {
     const url = buildUri(base, 'Property').skip(20).build();
-    expect(url).toBe('http://localhost:8080/Property?$skip=20');
+    expect(url).toBe('http://localhost:8080/Property?%24skip=20');
   });
 
   it('adds $count', () => {
     const url = buildUri(base, 'Property').count().build();
-    expect(url).toBe('http://localhost:8080/Property?$count=true');
+    expect(url).toBe('http://localhost:8080/Property?%24count=true');
   });
 
   it('combines multiple query options', () => {
@@ -60,25 +60,25 @@ describe('buildUri', () => {
       .skip(0)
       .count()
       .build();
-    expect(url).toContain('$select=ListPrice,City');
-    expect(url).toContain('$top=10');
-    expect(url).toContain('$skip=0');
-    expect(url).toContain('$count=true');
+    expect(url).toContain('%24select=ListPrice,City');
+    expect(url).toContain('%24top=10');
+    expect(url).toContain('%24skip=0');
+    expect(url).toContain('%24count=true');
   });
 
   it('combines key with query options', () => {
     const url = buildUri(base, 'Property').key('ABC').select('ListPrice').build();
-    expect(url).toBe("http://localhost:8080/Property('ABC')?$select=ListPrice");
+    expect(url).toBe("http://localhost:8080/Property('ABC')?%24select=ListPrice");
   });
 
   it('adds $expand', () => {
     const url = buildUri(base, 'Property').expand('Media').build();
-    expect(url).toBe('http://localhost:8080/Property?$expand=Media');
+    expect(url).toBe('http://localhost:8080/Property?%24expand=Media');
   });
 
   it('adds $expand with nested options', () => {
     const url = buildUri(base, 'Property').expand('Media($select=MediaURL,MimeType)').build();
-    expect(url).toContain('$expand=');
+    expect(url).toContain('%24expand=');
     expect(url).toContain('Media');
   });
 
@@ -89,18 +89,18 @@ describe('buildUri', () => {
 
   it('adds $search', () => {
     const url = buildUri(base, 'Property').search('luxury pool').build();
-    expect(url).toContain('$search=');
+    expect(url).toContain('%24search=');
     expect(url).toContain('luxury');
   });
 
   it('adds $compute', () => {
     const url = buildUri(base, 'Property').compute('ListPrice mul 1.1 as AdjustedPrice').build();
-    expect(url).toContain('$compute=');
+    expect(url).toContain('%24compute=');
   });
 
   it('adds $format', () => {
     const url = buildUri(base, 'Property').format('json').build();
-    expect(url).toContain('$format=json');
+    expect(url).toContain('%24format=json');
   });
 
   it('is immutable — chaining returns new builder', () => {
@@ -110,6 +110,14 @@ describe('buildUri', () => {
 
     expect(builder.build()).toBe('http://localhost:8080/Property');
     expect(withKey.build()).toBe("http://localhost:8080/Property('ABC')");
-    expect(withTop.build()).toBe('http://localhost:8080/Property?$top=10');
+    expect(withTop.build()).toBe('http://localhost:8080/Property?%24top=10');
+  });
+
+  it('encodes OData system query option $ prefix as %24', () => {
+    const url = buildUri(base, 'Lookup').top(1000).skip(0).build();
+    expect(url).toBe('http://localhost:8080/Lookup?%24top=1000&%24skip=0');
+    // Must not contain unencoded $ in query string
+    const qs = url.split('?')[1];
+    expect(qs).not.toContain('$');
   });
 });

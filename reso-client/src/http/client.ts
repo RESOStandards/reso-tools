@@ -74,7 +74,14 @@ export const createClient = async (config: ClientConfig): Promise<ODataClient> =
       headers['Content-Type'] = 'application/json';
     }
 
-    return fetch(url, {
+    // OData system query option encoding: the URI builder now produces %24-encoded
+    // parameter names. For URLs constructed outside the builder, encode $ in the
+    // query string to match the behavior servers expect.
+    const encodedUrl = url.includes('?')
+      ? url.replace(/\?(.*)$/, (_, qs) => '?' + qs.replace(/\$/g, '%24'))
+      : url;
+
+    return fetch(encodedUrl, {
       method,
       headers,
       body: options?.body ? JSON.stringify(options.body) : undefined,
