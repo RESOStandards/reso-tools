@@ -19,15 +19,20 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useLocation, useBlocker } from 'react-router';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
 import { blendVariations, type BlendedVariation, type BlendedVariationsReport } from '../../services/variations-blender';
-import { searchVariations } from '../../services/variations-service';
+import { searchVariations, getVariationsStats } from '../../services/variations-service';
 import { saveVariationsReview } from '../../services/variations-save';
 import { VariationComments, type VariationComment } from '../../components/cert/variation-comments';
 import { useAuth } from '../../hooks/use-auth';
 
+// ── Constants ────────────────────────────────────────────────────────
+
+/** Emails authorized for Fast Track management (must also be admin). */
+const FT_ADMIN_EMAILS = new Set(['josh@reso.org', 'jason@reso.org']);
+
 // ── Types ────────────────────────────────────────────────────────────
 
 type VariationFilter = 'all' | 'fields' | 'lookups' | 'resources' | 'expansions';
-type ActionStatus = 'pending' | 'ignored' | 'fast-track';
+type ActionStatus = 'pending' | 'ignored' | 'fast-track' | 'remove';
 type ViewMode = 'list' | 'detail';
 
 interface DraftAction {
@@ -116,7 +121,7 @@ const loadCachedReport = (): BlendedVariationsReport | null => {
 
 export const VariationsPage = () => {
   const location = useLocation();
-  const { ensureFreshProviderToken, isAuthenticated, user } = useAuth();
+  const { ensureFreshProviderToken, isAuthenticated, isAdmin, user } = useAuth();
   const routeState = location.state as { job?: Record<string, unknown>; report?: BlendedVariationsReport } | null;
 
   const [report, setReport] = useState<BlendedVariationsReport | null>(() => {
@@ -200,41 +205,163 @@ export const VariationsPage = () => {
   }
 
   if (view === 'list' || !report) {
-    return <ReviewListView onSelectReport={(r) => { setReport(r); cacheReport(r); setView('detail'); }} />;
+    return <ReviewListView
+      onSelectReport={(r) => { setReport(r); cacheReport(r); setView('detail'); }}
+      ensureFreshToken={ensureFreshProviderToken}
+      isAuthenticated={isAuthenticated}
+    />;
   }
 
-  return <ReviewDetailView report={report} onBack={() => setView('list')} ensureFreshToken={ensureFreshProviderToken} user={user} />;
+  return <ReviewDetailView report={report} onBack={() => setView('list')} ensureFreshToken={ensureFreshProviderToken} user={user} isAdmin={isAdmin} />;
 };
 
 // ── Review List View ─────────────────────────────────────────────────
 
-const ReviewListView = ({ onSelectReport }: { readonly onSelectReport: (report: BlendedVariationsReport) => void }) => (
-  <div className={`${PAGE_CONTAINER} py-6`}>
-    <div className="mb-6">
-      <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Variations Reviews</h1>
-      <p className="text-sm text-gray-500 dark:text-gray-400">
-        Active reviews and their status. Run a DD certification test to start a new review.
-      </p>
-    </div>
+interface VariationsStats {
+  readonly resources?: number;
+  readonly fields?: number;
+  readonly lookups?: number;
+  readonly suggestions?: number;
+  readonly ignored?: number;
+  readonly fastTrack?: number;
+  readonly adminReview?: number;
+  readonly inReview?: number;
+  readonly stale?: number;
+  readonly resolved?: number;
+  readonly byResource?: ReadonlyArray<{
+    readonly resourceName: string;
+    readonly fields: number;
+    readonly lookups: number;
+    readonly suggestions: number;
+    readonly inReview: number;
+    readonly ignored: number;
+    readonly fastTrack: number;
+  }>;
+}
 
-    <div className="text-center py-16">
-      <p className="text-gray-400 dark:text-gray-500">
-        No active reviews. Run a DD certification test with variations enabled to begin.
-      </p>
-      <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-        Reviews appear here automatically after a test detects variations in your metadata.
-      </p>
+const ReviewListView = ({ onSelectReport, ensureFreshToken, isAuthenticated }: {
+  readonly onSelectReport: (report: BlendedVariationsReport) => void;
+  readonly ensureFreshToken: () => Promise<string>;
+  readonly isAuthenticated: boolean;
+}) => {
+  const [stats, setStats] = useState<VariationsStats | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    setLoading(true);
+    ensureFreshToken()
+      .then(token => getVariationsStats(token))
+      .then(data => { if (data) setStats(data as VariationsStats); })
+      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load variations stats'))
+      .finally(() => setLoading(false));
+  }, [isAuthenticated, ensureFreshToken]);
+
+  const activeResources = stats?.byResource?.filter(r => r.inReview > 0 || r.suggestions > 0) ?? [];
+
+  return (
+    <div className={`${PAGE_CONTAINER} py-6`}>
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Variations Reviews</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Active reviews and their status. Run a DD certification test to start a new review.
+        </p>
+      </div>
+
+      {/* Summary tiles */}
+      {stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">In Review</p>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900 dark:text-gray-100">{stats.inReview ?? 0}</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Fast Track</p>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-green-600 dark:text-green-400">{stats.fastTrack ?? 0}</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Ignored</p>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-gray-500 dark:text-gray-400">{stats.ignored ?? 0}</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Resolved</p>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-blue-600 dark:text-blue-400">{stats.resolved ?? 0}</p>
+          </div>
+        </div>
+      )}
+
+      {loading && (
+        <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500 py-8">
+          <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+          Loading variations stats...
+        </div>
+      )}
+
+      {error && (
+        <p className="text-sm text-red-500 dark:text-red-400 py-4">{error}</p>
+      )}
+
+      {!loading && !isAuthenticated && (
+        <div className="text-center py-16">
+          <p className="text-gray-400 dark:text-gray-500">Sign in to view active variations reviews.</p>
+        </div>
+      )}
+
+      {!loading && isAuthenticated && activeResources.length === 0 && !error && (
+        <div className="text-center py-16">
+          <p className="text-gray-400 dark:text-gray-500">
+            No active reviews. Run a DD certification test with variations enabled to begin.
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+            Reviews appear here automatically after a test detects variations in your metadata.
+          </p>
+        </div>
+      )}
+
+      {activeResources.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {activeResources.map(resource => (
+            <div key={resource.resourceName} className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:border-blue-300 dark:hover:border-blue-600 transition-colors">
+              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">{resource.resourceName}</h3>
+              <div className="mt-2 flex items-center gap-3 text-[11px] text-gray-500 dark:text-gray-400">
+                <span>{resource.fields} fields</span>
+                <span>{resource.lookups} lookups</span>
+                <span>{resource.suggestions} suggestions</span>
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                {resource.inReview > 0 && (
+                  <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    {resource.inReview} in review
+                  </span>
+                )}
+                {resource.fastTrack > 0 && (
+                  <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    {resource.fastTrack} fast track
+                  </span>
+                )}
+                {resource.ignored > 0 && (
+                  <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                    {resource.ignored} ignored
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 // ── Review Detail View ───────────────────────────────────────────────
 
-const ReviewDetailView = ({ report, onBack, ensureFreshToken, user }: {
+const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin }: {
   readonly report: BlendedVariationsReport;
   readonly onBack: () => void;
   readonly ensureFreshToken: () => Promise<string>;
   readonly user: { readonly username: string; readonly email: string; readonly fullName: string } | null;
+  readonly isAdmin: boolean;
 }) => {
   const reportId = `${report.version}`;
 
@@ -404,6 +531,8 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user }: {
               action={actions.get(key)}
               onToggleAction={(status) => toggleAction(key, status)}
               isReadOnly={false}
+              isAdmin={isAdmin}
+              isFastTrackAdmin={isAdmin && FT_ADMIN_EMAILS.has(user?.email ?? '')}
               draftComments={draftComments.get(key) ?? []}
               onAddComment={(comment) => addComment(key, comment)}
               onRemoveComment={(index) => removeComment(key, index)}
@@ -420,12 +549,14 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user }: {
 // ── Variation Card ───────────────────────────────────────────────────
 
 const VariationCard = ({
-  variation, action, onToggleAction, isReadOnly, draftComments, onAddComment, onRemoveComment, userName, userUoi,
+  variation, action, onToggleAction, isReadOnly, isAdmin, isFastTrackAdmin, draftComments, onAddComment, onRemoveComment, userName, userUoi,
 }: {
   readonly variation: BlendedVariation;
   readonly action?: ActionStatus;
   readonly onToggleAction: (status: ActionStatus) => void;
   readonly isReadOnly: boolean;
+  readonly isAdmin: boolean;
+  readonly isFastTrackAdmin: boolean;
   readonly draftComments: ReadonlyArray<VariationComment>;
   readonly onAddComment: (comment: VariationComment) => void;
   readonly onRemoveComment: (index: number) => void;
@@ -446,15 +577,24 @@ const VariationCard = ({
         {!isReadOnly && (
           <div className="flex items-center gap-1 shrink-0">
             <button type="button" onClick={() => onToggleAction('ignored')}
-              className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${action === 'ignored' ? 'bg-gray-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+              className={`px-2 py-1 text-[10px] font-medium rounded transition-colors cursor-pointer ${action === 'ignored' ? 'bg-gray-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
               title="Mark as ignored — this local value is intentional">
               Ignore
             </button>
-            <button type="button" onClick={() => onToggleAction('fast-track')}
-              className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${action === 'fast-track' ? 'bg-green-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-              title="Request Fast Track — submit to RESO workgroup for expedited review">
-              Fast Track
-            </button>
+            {isFastTrackAdmin && (
+              <button type="button" onClick={() => onToggleAction('fast-track')}
+                className={`px-2 py-1 text-[10px] font-medium rounded transition-colors cursor-pointer ${action === 'fast-track' ? 'bg-green-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                title="Fast Track — add to DD workgroup agenda for expedited review">
+                Fast Track
+              </button>
+            )}
+            {isAdmin && (
+              <button type="button" onClick={() => onToggleAction('remove')}
+                className={`px-2 py-1 text-[10px] font-medium rounded transition-colors cursor-pointer ${action === 'remove' ? 'bg-red-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400'}`}
+                title="Remove — delete this mapping from the service (admin only)">
+                Remove
+              </button>
+            )}
           </div>
         )}
       </div>

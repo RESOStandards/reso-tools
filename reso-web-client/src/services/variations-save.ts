@@ -16,7 +16,7 @@ import {
 
 // ── Types ────────────────────────────────────────────────────────────
 
-type ActionStatus = 'pending' | 'ignored' | 'fast-track';
+type ActionStatus = 'pending' | 'ignored' | 'fast-track' | 'remove';
 
 interface DraftAction {
   readonly key: string;
@@ -92,6 +92,8 @@ const buildSavePayload = (input: SaveInput, existingReport: VariationsReportPayl
     } else if (action.status === 'fast-track') {
       change.flaggedForFastTrack = true;
       change.ignore = false;
+    } else if (action.status === 'remove') {
+      change.remove = true;
     }
 
     // Attach any comments for this variation
