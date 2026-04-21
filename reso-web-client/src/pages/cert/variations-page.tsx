@@ -21,6 +21,7 @@ import { SearchInput, FilterPill } from '../../components/metadata/shared';
 import { blendVariations, type BlendedVariation, type BlendedVariationsReport } from '../../services/variations-blender';
 import { searchVariations } from '../../services/variations-service';
 import { saveVariationsReview } from '../../services/variations-save';
+import { VariationComments, type VariationComment } from '../../components/cert/variation-comments';
 import { useAuth } from '../../hooks/use-auth';
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -240,11 +241,12 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user }: {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<VariationFilter>('all');
   const [actions, setActions] = useState<Map<string, ActionStatus>>(() => loadDraft(reportId));
+  const [draftComments, setDraftComments] = useState<Map<string, ReadonlyArray<VariationComment>>>(new Map());
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { saveDraft(reportId, actions); }, [actions, reportId]);
 
-  const isDirty = actions.size > 0;
+  const isDirty = actions.size > 0 || draftComments.size > 0;
   useBlocker(isDirty && !saving);
 
   const filtered = useMemo(() => {
@@ -276,6 +278,25 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user }: {
     expansions: report.counts.expansions,
   }), [report]);
 
+  const addComment = useCallback((key: string, comment: VariationComment) => {
+    setDraftComments(prev => {
+      const next = new Map(prev);
+      next.set(key, [...(prev.get(key) ?? []), comment]);
+      return next;
+    });
+  }, []);
+
+  const removeComment = useCallback((key: string, index: number) => {
+    setDraftComments(prev => {
+      const next = new Map(prev);
+      const comments = [...(prev.get(key) ?? [])];
+      comments.splice(index, 1);
+      if (comments.length === 0) next.delete(key);
+      else next.set(key, comments);
+      return next;
+    });
+  }, []);
+
   const toggleAction = useCallback((key: string, status: ActionStatus) => {
     setActions(prev => {
       const next = new Map(prev);
@@ -298,7 +319,9 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user }: {
         providerUsi: report.providerUsi,
         recipientUoi: report.recipientUoi,
         actions: [...actions.entries()].map(([key, status]) => ({ key, status })),
-        comments: [],
+        comments: [...draftComments.entries()].flatMap(([variationKey, comments]) =>
+          comments.map(c => ({ variationKey, ...c }))
+        ),
         userName: user?.fullName ?? user?.username ?? '',
         userEmail: user?.email ?? '',
         token,
@@ -307,6 +330,7 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user }: {
       if (success) {
         clearDraft(reportId);
         setActions(new Map());
+        setDraftComments(new Map());
       }
     } finally {
       setSaving(false);
@@ -374,7 +398,18 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user }: {
         {filtered.map(variation => {
           const key = variationKey(variation);
           return (
-            <VariationCard key={key} variation={variation} action={actions.get(key)} onToggleAction={(status) => toggleAction(key, status)} isReadOnly={false} />
+            <VariationCard
+              key={key}
+              variation={variation}
+              action={actions.get(key)}
+              onToggleAction={(status) => toggleAction(key, status)}
+              isReadOnly={false}
+              draftComments={draftComments.get(key) ?? []}
+              onAddComment={(comment) => addComment(key, comment)}
+              onRemoveComment={(index) => removeComment(key, index)}
+              userName={user?.fullName ?? user?.username ?? ''}
+              userUoi={report.providerUoi ?? ''}
+            />
           );
         })}
       </div>
@@ -385,12 +420,17 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user }: {
 // ── Variation Card ───────────────────────────────────────────────────
 
 const VariationCard = ({
-  variation, action, onToggleAction, isReadOnly,
+  variation, action, onToggleAction, isReadOnly, draftComments, onAddComment, onRemoveComment, userName, userUoi,
 }: {
   readonly variation: BlendedVariation;
   readonly action?: ActionStatus;
   readonly onToggleAction: (status: ActionStatus) => void;
   readonly isReadOnly: boolean;
+  readonly draftComments: ReadonlyArray<VariationComment>;
+  readonly onAddComment: (comment: VariationComment) => void;
+  readonly onRemoveComment: (index: number) => void;
+  readonly userName: string;
+  readonly userUoi: string;
 }) => {
   const isIgnored = variation.ignored || action === 'ignored';
 
@@ -451,6 +491,15 @@ const VariationCard = ({
           No suggestions available
         </div>
       )}
+      <VariationComments
+        existingComments={variation.conversations ?? []}
+        draftComments={draftComments}
+        onAddComment={onAddComment}
+        onRemoveComment={onRemoveComment}
+        userName={userName}
+        userUoi={userUoi}
+        isReadOnly={isReadOnly}
+      />
     </div>
   );
 };

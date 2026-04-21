@@ -45,6 +45,14 @@ export interface BlendedVariation {
   readonly ignored: boolean;
   readonly source: 'machine' | 'service' | 'blended';
   readonly type: 'resource' | 'field' | 'lookup' | 'expansion' | 'complexType';
+  /** Conversation threads from previous report saves (service data). */
+  readonly conversations?: ReadonlyArray<{
+    readonly timestamp: string;
+    readonly from: string;
+    readonly to: string;
+    readonly message: string;
+    readonly attachments?: ReadonlyArray<{ readonly displayText: string; readonly url: string }>;
+  }>;
 }
 
 /** The full blended variations report ready for UI display. */
