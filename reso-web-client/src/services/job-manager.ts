@@ -79,6 +79,28 @@ interface ElectronStorage {
 const getElectronStorage = (): ElectronStorage | undefined =>
   (window as unknown as Record<string, unknown>).electronStorage as ElectronStorage | undefined;
 
+// ── SQLite job store (Electron only, exposed via IPC) ─────────────
+
+interface JobStoreAPI {
+  readonly createJob: (job: Omit<Job, 'steps'>) => Promise<Job>;
+  readonly updateJobStatus: (id: string, patch: {
+    readonly status?: JobStatus;
+    readonly startedAt?: string;
+    readonly completedAt?: string;
+    readonly error?: string;
+    readonly reports?: Record<string, unknown>;
+    readonly resultPath?: string;
+  }) => Promise<Job | undefined>;
+  readonly upsertStep: (jobId: string, step: JobStep & { readonly sortOrder: number }) => Promise<unknown>;
+  readonly getJob: (id: string) => Promise<Job | undefined>;
+  readonly getJobs: (filter?: Record<string, unknown>) => Promise<ReadonlyArray<Job>>;
+  readonly deleteJob: (id: string) => Promise<boolean>;
+  readonly clearCompleted: () => Promise<number>;
+}
+
+const getJobStore = (): JobStoreAPI | undefined =>
+  (window as unknown as Record<string, unknown>).jobStore as JobStoreAPI | undefined;
+
 /** Load an individual job's SDK config from secure storage. */
 const loadJobConfigFromStorage = async (job: Job): Promise<Record<string, unknown> | null> => {
   const storage = getElectronStorage();
@@ -147,7 +169,8 @@ type JobEventListener = (event: JobEvent) => void;
 
 const JOBS_STORAGE_KEY = 'cert-jobs';
 
-const loadPersistedJobs = (): Map<string, Job> => {
+/** Load jobs from localStorage (fallback when SQLite is unavailable). */
+const loadPersistedJobsFromLocalStorage = (): Map<string, Job> => {
   try {
     const raw = localStorage.getItem(JOBS_STORAGE_KEY);
     if (!raw) return new Map();
@@ -158,9 +181,9 @@ const loadPersistedJobs = (): Map<string, Job> => {
   }
 };
 
-const persistJobs = (jobs: Map<string, Job>): void => {
+/** Persist to localStorage (fallback when SQLite is unavailable). */
+const persistJobsToLocalStorage = (jobs: Map<string, Job>): void => {
   try {
-    // Only persist completed/failed/cancelled jobs to avoid stale running state
     const durable = [...jobs.entries()].filter(([, j]) =>
       j.status === 'passed' || j.status === 'failed' || j.status === 'cancelled'
     );
@@ -168,9 +191,12 @@ const persistJobs = (jobs: Map<string, Job>): void => {
   } catch { /* localStorage may be full or unavailable */ }
 };
 
+/** Whether SQLite job store is available (detected once on load). */
+const hasSQLite = (): boolean => getJobStore() !== undefined;
+
 /** In-memory job store and event bus for the current session. */
 const state = {
-  jobs: loadPersistedJobs(),
+  jobs: loadPersistedJobsFromLocalStorage(),
   listeners: new Set<JobEventListener>(),
   running: false,
 };
@@ -195,9 +221,30 @@ const updateJob = (id: string, patch: Partial<Job>): void => {
   if (!existing) return;
   const updated = { ...existing, ...patch } as Job;
   state.jobs.set(id, updated);
-  // Persist completed jobs so they survive navigation
-  if (updated.status === 'passed' || updated.status === 'failed' || updated.status === 'cancelled') {
-    persistJobs(state.jobs);
+
+  // Write through to SQLite when available, localStorage as fallback
+  const store = getJobStore();
+  if (store) {
+    // Persist status changes to SQLite
+    if (patch.status || patch.startedAt || patch.completedAt || patch.error || patch.reports || patch.resultPath) {
+      store.updateJobStatus(id, {
+        status: patch.status,
+        startedAt: patch.startedAt,
+        completedAt: patch.completedAt,
+        error: patch.error,
+        reports: patch.reports,
+        resultPath: patch.resultPath,
+      }).catch(() => {});
+    }
+    // Persist step updates to SQLite
+    if (patch.steps) {
+      for (let i = 0; i < patch.steps.length; i++) {
+        const step = patch.steps[i];
+        store.upsertStep(id, { ...step, sortOrder: i }).catch(() => {});
+      }
+    }
+  } else if (updated.status === 'passed' || updated.status === 'failed' || updated.status === 'cancelled') {
+    persistJobsToLocalStorage(state.jobs);
   }
 };
 
@@ -597,8 +644,11 @@ export const detectCredentialChanges = async (recipients: ReadonlyArray<Recipien
 /** Enqueue jobs from a BatchConfig and start processing. */
 export const startBatch = (config: BatchConfig, skipAutoSave = false): ReadonlyArray<Job> => {
   const jobs = expandBatchConfig(config);
+  const store = getJobStore();
   for (const job of jobs) {
     state.jobs.set(job.id, job);
+    // Persist to SQLite immediately so the job survives crashes/restarts
+    if (store) store.createJob(job).catch(() => {});
     emit({ type: 'job-queued', job });
   }
 
@@ -649,6 +699,8 @@ export const rerunJob = async (id: string): Promise<Job | undefined> => {
   };
 
   state.jobs.set(newJob.id, newJob);
+  const store = getJobStore();
+  if (store) store.createJob(newJob).catch(() => {});
   emit({ type: 'job-queued', job: newJob });
 
   // Run immediately
@@ -672,7 +724,9 @@ export const deleteJob = async (id: string): Promise<boolean> => {
   }
 
   state.jobs.delete(id);
-  persistJobs(state.jobs);
+  const store = getJobStore();
+  if (store) store.deleteJob(id).catch(() => {});
+  else persistJobsToLocalStorage(state.jobs);
   emit({ type: 'job-cancelled', jobId: id });
   return true;
 };
@@ -793,7 +847,8 @@ const hydrateFromLocal = (results: ReadonlyArray<LocalResult>): void => {
 };
 
 /**
- * Initialize local results scanning and file watching.
+ * Initialize local results — loads from SQLite when available,
+ * with a one-time migration from localStorage and .reso-cert/ filesystem.
  * Called once on app startup from the useJobs hook.
  */
 let initialized = false;
@@ -802,13 +857,52 @@ export const initLocalResults = async (): Promise<void> => {
   if (initialized) return;
   initialized = true;
 
-  const runner = getCertRunner();
-  if (!runner) return;
+  const store = getJobStore();
 
-  // Scan existing results on startup only — no file watcher.
-  // CLI and RDC are separate contexts; RDC manages its own state
-  // through the IPC pipeline and startup scan.
-  const results = await runner.scanResults();
-  hydrateFromLocal(results);
+  if (store) {
+    // ── SQLite path (Electron) ────────────────────────────────────
+    const existing = await store.getJobs();
+
+    // One-time migration from localStorage → SQLite
+    const localStorageData = localStorage.getItem(JOBS_STORAGE_KEY);
+    if (localStorageData) {
+      try {
+        const entries = JSON.parse(localStorageData) as ReadonlyArray<[string, Job]>;
+        for (const [, job] of entries) {
+          // Skip if already in SQLite (by ID)
+          if (!existing.some(e => e.id === job.id)) {
+            await store.createJob(job);
+          }
+        }
+      } catch { /* corrupt localStorage data */ }
+      localStorage.removeItem(JOBS_STORAGE_KEY);
+    }
+
+    // One-time migration from .reso-cert/ filesystem → SQLite
+    if (existing.length === 0) {
+      const runner = getCertRunner();
+      if (runner) {
+        const results = await runner.scanResults();
+        for (const result of results) {
+          const job = localResultToJob(result);
+          await store.createJob(job);
+        }
+      }
+    }
+
+    // Load all jobs from SQLite into the in-memory cache
+    const allJobs = await store.getJobs();
+    for (const job of allJobs) {
+      state.jobs.set(job.id, job);
+    }
+  } else {
+    // ── localStorage fallback (browser mode) ──────────────────────
+    const runner = getCertRunner();
+    if (runner) {
+      const results = await runner.scanResults();
+      hydrateFromLocal(results);
+    }
+  }
+
   emit({ type: 'queue-complete' });
 };

@@ -84,6 +84,41 @@ const registerStorageHandlers = (): void => {
   });
 };
 
+// ── Job store (SQLite in main process, accessed via IPC) ──
+
+import { initJobsDb, createJobStore, type JobStore, type JobRecord, type StepRecord, type StatusPatch, type JobFilter } from './job-store.js';
+
+let jobStore: JobStore | null = null;
+
+const registerJobStoreHandlers = (): void => {
+  const dbPath = resolve(app.getPath('userData'), 'reso-jobs.db');
+  const db = initJobsDb(dbPath);
+  jobStore = createJobStore(db);
+  log(`Job store initialized: ${dbPath}`);
+
+  ipcMain.handle('jobs:create', (_event, job: Omit<JobRecord, 'steps'>) =>
+    jobStore!.createJob(job)
+  );
+  ipcMain.handle('jobs:update-status', (_event, id: string, patch: StatusPatch) =>
+    jobStore!.updateJobStatus(id, patch)
+  );
+  ipcMain.handle('jobs:upsert-step', (_event, jobId: string, step: StepRecord) =>
+    jobStore!.upsertStep(jobId, step)
+  );
+  ipcMain.handle('jobs:get', (_event, id: string) =>
+    jobStore!.getJob(id)
+  );
+  ipcMain.handle('jobs:get-all', (_event, filter?: JobFilter) =>
+    jobStore!.getJobs(filter)
+  );
+  ipcMain.handle('jobs:delete', (_event, id: string) =>
+    jobStore!.deleteJob(id)
+  );
+  ipcMain.handle('jobs:clear-completed', () =>
+    jobStore!.clearCompleted()
+  );
+};
+
 // ── Certification runner (SDK in main process, progress via IPC) ──
 
 /**
@@ -1061,6 +1096,10 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
 /** Graceful shutdown — kill server child process. */
 const shutdown = (): void => {
   log('Shutting down...');
+  if (jobStore) {
+    jobStore.close();
+    jobStore = null;
+  }
   if (state.serverProcess) {
     state.serverProcess.kill('SIGTERM');
     state.serverProcess = null;
@@ -1179,6 +1218,7 @@ app.whenReady().then(async () => {
   });
 
   registerStorageHandlers();
+  registerJobStoreHandlers();
   registerCertRunnerHandlers();
   buildMenu();
 

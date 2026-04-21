@@ -33,6 +33,23 @@ contextBridge.exposeInMainWorld('configManager', {
     ipcRenderer.invoke('config:import', configs),
 });
 
+contextBridge.exposeInMainWorld('jobStore', {
+  createJob: (job: Record<string, unknown>): Promise<unknown> =>
+    ipcRenderer.invoke('jobs:create', job),
+  updateJobStatus: (id: string, patch: Record<string, unknown>): Promise<unknown> =>
+    ipcRenderer.invoke('jobs:update-status', id, patch),
+  upsertStep: (jobId: string, step: Record<string, unknown>): Promise<unknown> =>
+    ipcRenderer.invoke('jobs:upsert-step', jobId, step),
+  getJob: (id: string): Promise<unknown> =>
+    ipcRenderer.invoke('jobs:get', id),
+  getJobs: (filter?: Record<string, unknown>): Promise<unknown> =>
+    ipcRenderer.invoke('jobs:get-all', filter),
+  deleteJob: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke('jobs:delete', id),
+  clearCompleted: (): Promise<number> =>
+    ipcRenderer.invoke('jobs:clear-completed'),
+});
+
 contextBridge.exposeInMainWorld('certRunner', {
   /** Start a compliance test run. Returns the PipelineResult when done. */
   run: (jobId: string, config: Record<string, unknown>): Promise<unknown> =>

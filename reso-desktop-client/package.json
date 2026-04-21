@@ -15,14 +15,17 @@
     "start": "env -u ELECTRON_RUN_AS_NODE electron dist/main.js",
     "dev": "tsc && cp src/server-entry.mjs dist/ && env -u ELECTRON_RUN_AS_NODE electron dist/main.js",
     "postinstall": "electron-rebuild -m ../reso-reference-server -o better-sqlite3 || true",
+    "test": "vitest run",
     "package": "npm run build && npm run build:server-bundle && electron-builder"
   },
   "dependencies": {
+    "@reso-standards/reso-reference-server": "file:../reso-reference-server",
     "@reso-standards/reso-web-api-proxy": "file:../reso-web-api-proxy",
-    "@reso-standards/reso-reference-server": "file:../reso-reference-server"
+    "better-sqlite3": "^12.9.0"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",
+    "@types/better-sqlite3": "^7.6.13",
     "electron": "^35.0.0",
     "electron-builder": "^26.0.0",
     "esbuild": "^0.27.3",
