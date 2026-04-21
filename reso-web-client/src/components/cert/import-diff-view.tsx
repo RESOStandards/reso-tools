@@ -53,7 +53,7 @@ export const ImportDiffView = ({ analysis, onComplete, onCancel }: ImportDiffVie
 
       // Add valid profiles
       for (const profile of analysis.validProfiles) {
-        await saveProfile({ name: profile.name, connectionId: profile.connectionId, providerUoi: profile.providerUoi, providerUsi: profile.providerUsi, recipientUoi: profile.recipientUoi, providerName: profile.providerName, recipientName: profile.recipientName, systemName: profile.systemName, endorsements: [...profile.endorsements], ddVersion: profile.ddVersion, limit: profile.limit, strictMode: profile.strictMode, requestDelay: profile.requestDelay, rateLimitWait: profile.rateLimitWait, batchExpand: profile.batchExpand, localPath: profile.localPath });
+        await saveProfile({ name: profile.name, credentialsId: profile.credentialsId, providerUoi: profile.providerUoi, providerUsi: profile.providerUsi, recipientUoi: profile.recipientUoi, providerName: profile.providerName, recipientName: profile.recipientName, systemName: profile.systemName, endorsements: [...profile.endorsements], ddVersion: profile.ddVersion, limit: profile.limit, strictMode: profile.strictMode, requestDelay: profile.requestDelay, rateLimitWait: profile.rateLimitWait, batchExpand: profile.batchExpand, localPath: profile.localPath });
       }
 
       onComplete();

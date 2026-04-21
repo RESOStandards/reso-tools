@@ -49,7 +49,7 @@ describe('Export', () => {
   });
 
   it('exports profiles only', async () => {
-    await saveProfile({ name: 'DD Test', connectionId: null, providerUoi: 'P1', recipientUoi: 'R1', endorsements: ['dd'] });
+    await saveProfile({ name: 'DD Test', credentialsId: null, providerUoi: 'P1', recipientUoi: 'R1', endorsements: ['dd'] });
 
     const payload = await buildExportPayload({ includeConnections: false, includeProfiles: true, includeCredentials: false });
     expect(payload.connections).toBeUndefined();
@@ -58,7 +58,7 @@ describe('Export', () => {
 
   it('exports both connections and profiles', async () => {
     const conn = await saveConnection({ name: 'MLS', url: 'https://api.test.com', authMode: 'token' });
-    await saveProfile({ name: 'DD', connectionId: conn.id, providerUoi: 'P1', recipientUoi: 'R1', endorsements: ['dd'] });
+    await saveProfile({ name: 'DD', credentialsId: conn.id, providerUoi: 'P1', recipientUoi: 'R1', endorsements: ['dd'] });
 
     const payload = await buildExportPayload({ includeConnections: true, includeProfiles: true, includeCredentials: false });
     expect(payload.connections).toHaveLength(1);
@@ -109,8 +109,8 @@ describe('Import analysis', () => {
     const payload: ExportPayload = {
       version: 1,
       profiles: [
-        { id: 'p1', name: 'Orphan', connectionId: 'nonexistent', providerUoi: 'P1', recipientUoi: 'R1', endorsements: ['dd'], createdAt: '', updatedAt: '' },
-        { id: 'p2', name: 'Local', connectionId: null, providerUoi: 'P2', recipientUoi: 'R2', endorsements: ['rcf'], createdAt: '', updatedAt: '' },
+        { id: 'p1', name: 'Orphan', credentialsId: 'nonexistent', providerUoi: 'P1', recipientUoi: 'R1', endorsements: ['dd'], createdAt: '', updatedAt: '' },
+        { id: 'p2', name: 'Local', credentialsId: null, providerUoi: 'P2', recipientUoi: 'R2', endorsements: ['rcf'], createdAt: '', updatedAt: '' },
       ],
     };
     const result = await analyzeImport(payload);
@@ -125,7 +125,7 @@ describe('Import analysis', () => {
     const payload: ExportPayload = {
       version: 1,
       profiles: [
-        { id: 'p1', name: 'Linked', connectionId: conn.id, providerUoi: 'P1', recipientUoi: 'R1', endorsements: ['dd'], createdAt: '', updatedAt: '' },
+        { id: 'p1', name: 'Linked', credentialsId: conn.id, providerUoi: 'P1', recipientUoi: 'R1', endorsements: ['dd'], createdAt: '', updatedAt: '' },
       ],
     };
     const result = await analyzeImport(payload);

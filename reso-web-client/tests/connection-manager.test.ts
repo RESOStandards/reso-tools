@@ -144,34 +144,34 @@ describe('Cert Profile CRUD', () => {
     const conn = await saveConnection({ name: 'MLS', url: 'https://api.test.com', authMode: 'token' });
     const profile = await saveProfile({
       name: 'DD 2.1 Test',
-      connectionId: conn.id,
+      credentialsId: conn.id,
       providerUoi: 'P001',
       recipientUoi: 'R001',
       endorsements: ['dd'],
       ddVersion: '2.1',
     });
     expect(profile.id).toMatch(/^prof-/);
-    expect(profile.connectionId).toBe(conn.id);
+    expect(profile.credentialsId).toBe(conn.id);
     expect(await loadProfiles()).toHaveLength(1);
   });
 
   it('saves a profile with no connection (local-only)', async () => {
     const profile = await saveProfile({
       name: 'RCF Local',
-      connectionId: null,
+      credentialsId: null,
       providerUoi: 'P001',
       recipientUoi: 'R001',
       endorsements: ['rcf'],
       localPath: '/path/to/data',
     });
-    expect(profile.connectionId).toBeNull();
+    expect(profile.credentialsId).toBeNull();
     expect(profile.localPath).toBe('/path/to/data');
   });
 
   it('deletes a profile', async () => {
     const profile = await saveProfile({
       name: 'Temp',
-      connectionId: null,
+      credentialsId: null,
       providerUoi: 'P001',
       recipientUoi: 'R001',
       endorsements: ['dd'],
@@ -182,9 +182,9 @@ describe('Cert Profile CRUD', () => {
 
   it('finds profiles for a connection', async () => {
     const conn = await saveConnection({ name: 'MLS', url: 'https://api.test.com', authMode: 'token' });
-    await saveProfile({ name: 'DD', connectionId: conn.id, providerUoi: 'P1', recipientUoi: 'R1', endorsements: ['dd'] });
-    await saveProfile({ name: 'Core', connectionId: conn.id, providerUoi: 'P1', recipientUoi: 'R1', endorsements: ['core'] });
-    await saveProfile({ name: 'Other', connectionId: null, providerUoi: 'P2', recipientUoi: 'R2', endorsements: ['dd'] });
+    await saveProfile({ name: 'DD', credentialsId: conn.id, providerUoi: 'P1', recipientUoi: 'R1', endorsements: ['dd'] });
+    await saveProfile({ name: 'Core', credentialsId: conn.id, providerUoi: 'P1', recipientUoi: 'R1', endorsements: ['core'] });
+    await saveProfile({ name: 'Other', credentialsId: null, providerUoi: 'P2', recipientUoi: 'R2', endorsements: ['dd'] });
 
     const linked = await profilesForConnection(conn.id);
     expect(linked).toHaveLength(2);
@@ -196,14 +196,14 @@ describe('Cert Profile CRUD', () => {
 describe('Orphan handling on connection delete', () => {
   it('orphans profiles when their connection is deleted', async () => {
     const conn = await saveConnection({ name: 'MLS', url: 'https://api.test.com', authMode: 'token' });
-    await saveProfile({ name: 'DD', connectionId: conn.id, providerUoi: 'P1', recipientUoi: 'R1', endorsements: ['dd'] });
+    await saveProfile({ name: 'DD', credentialsId: conn.id, providerUoi: 'P1', recipientUoi: 'R1', endorsements: ['dd'] });
 
     const orphanedIds = await deleteConnection(conn.id);
     expect(orphanedIds).toHaveLength(1);
 
     const orphans = await orphanedProfiles();
     expect(orphans).toHaveLength(1);
-    expect(orphans[0].connectionId).toBeNull();
+    expect(orphans[0].credentialsId).toBeNull();
     expect(orphans[0].name).toBe('DD');
   });
 });

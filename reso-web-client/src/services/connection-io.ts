@@ -103,9 +103,9 @@ export interface ImportAnalysis {
   readonly conflicts: ReadonlyArray<ImportConflict>;
   /** Connections that match exactly — no action needed. */
   readonly unchanged: ReadonlyArray<ExportedConnection>;
-  /** Profiles whose connectionId doesn't match any existing or imported connection. */
+  /** Profiles whose credentialsId doesn't match any existing or imported connection. */
   readonly orphanedProfiles: ReadonlyArray<CertProfile>;
-  /** Profiles that can be imported directly (connectionId matches or is null). */
+  /** Profiles that can be imported directly (credentialsId matches or is null). */
   readonly validProfiles: ReadonlyArray<CertProfile>;
 }
 
@@ -160,7 +160,7 @@ export const analyzeImport = async (payload: ExportPayload): Promise<ImportAnaly
 
   if (payload.profiles) {
     for (const profile of payload.profiles) {
-      if (profile.connectionId === null || allConnectionIds.has(profile.connectionId)) {
+      if (profile.credentialsId === null || allConnectionIds.has(profile.credentialsId)) {
         validProfiles.push(profile);
       } else {
         orphanedProfiles.push(profile);

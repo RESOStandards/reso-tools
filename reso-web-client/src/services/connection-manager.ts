@@ -18,8 +18,12 @@
 
 // ── Types ────────────────────────────────────────────────────────────
 
-/** Server connection — identity + auth config (secrets stored separately). */
-export interface SavedConnection {
+/**
+ * SavedCredentials — server connection identity + auth config.
+ * Credentials (tokens, secrets) are stored separately in safeStorage.
+ * Used by both cert and non-cert users.
+ */
+export interface SavedCredentials {
   readonly id: string;
   readonly name: string;
   readonly url: string;
@@ -34,17 +38,24 @@ export interface SavedConnection {
   readonly lastUsedAt?: string;
 }
 
-/** Credentials stored in safeStorage, keyed by connection ID. */
+/** Backward compatibility alias. */
+export type SavedConnection = SavedCredentials;
+
+/** Credentials stored in safeStorage, keyed by credentials ID. */
 export interface StoredCredentials {
   readonly authToken?: string;
   readonly clientSecret?: string;
 }
 
-/** Cert profile — endorsement test config, optionally linked to a connection. */
-export interface CertProfile {
+/**
+ * SavedCertConfig — endorsement test configuration for one recipient.
+ * Optionally linked to a SavedCredentials by ID.
+ * One config = one recipient. Importing a batch of N creates N configs.
+ */
+export interface SavedCertConfig {
   readonly id: string;
   readonly name: string;
-  readonly connectionId: string | null;
+  readonly credentialsId: string | null;
   readonly providerUoi: string;
   readonly providerUsi?: string;
   readonly recipientUoi: string;
@@ -61,7 +72,11 @@ export interface CertProfile {
   readonly localPath?: string;
   readonly createdAt: string;
   readonly updatedAt: string;
+  readonly lastRunAt?: string;
 }
+
+/** Backward compatibility alias. */
+export type CertProfile = SavedCertConfig;
 
 // ── Storage layer ────────────────────────────────────────────────────
 
@@ -135,9 +150,9 @@ export const deleteConnection = async (id: string): Promise<ReadonlyArray<string
   const profiles = [...await loadProfiles()];
   const orphanedIds: string[] = [];
   const updated = profiles.map(p => {
-    if (p.connectionId === id) {
+    if (p.credentialsId === id) {
       orphanedIds.push(p.id);
-      return { ...p, connectionId: null, updatedAt: new Date().toISOString() };
+      return { ...p, credentialsId: null, updatedAt: new Date().toISOString() };
     }
     return p;
   });
@@ -236,16 +251,16 @@ export const deleteProfile = async (id: string): Promise<void> => {
   await writeJSON(PROFILES_KEY, profiles.filter(p => p.id !== id));
 };
 
-/** Find profiles linked to a given connection. */
-export const profilesForConnection = async (connectionId: string): Promise<ReadonlyArray<CertProfile>> => {
+/** Find cert configs linked to a given credentials entry. */
+export const profilesForConnection = async (connectionId: string): Promise<ReadonlyArray<SavedCertConfig>> => {
   const profiles = await loadProfiles();
-  return profiles.filter(p => p.connectionId === connectionId);
+  return profiles.filter(p => p.credentialsId === connectionId);
 };
 
-/** Find orphaned profiles (connectionId is null). */
-export const orphanedProfiles = async (): Promise<ReadonlyArray<CertProfile>> => {
+/** Find orphaned cert configs (no linked credentials). */
+export const orphanedProfiles = async (): Promise<ReadonlyArray<SavedCertConfig>> => {
   const profiles = await loadProfiles();
-  return profiles.filter(p => p.connectionId === null);
+  return profiles.filter(p => p.credentialsId === null);
 };
 
 // ── MRU ──────────────────────────────────────────────────────────────
