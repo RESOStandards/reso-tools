@@ -924,9 +924,11 @@ export const ConfigBuilder = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Test Configuration</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {savedConfigName ? savedConfigName : 'Test Configuration'}
+          </h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Configure one or more recipients to test against.
+            {savedConfigName ? 'Editing saved configuration' : 'Configure one or more recipients to test against.'}
           </p>
         </div>
         <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer">
