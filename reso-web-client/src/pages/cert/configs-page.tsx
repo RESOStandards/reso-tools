@@ -68,8 +68,33 @@ export const ConfigsPage = () => {
 
   const handleImport = useCallback(async () => {
     const imported = await importConfigFromFile();
-    if (imported) {
-      // Navigate to Jobs page with the imported config loaded
+    if (!imported) return;
+
+    // Normalize legacy batch format: { providerUoi, configs: [{ serviceRootUri, token, ... }] }
+    // into BatchConfig: { providerUoi, recipients: [{ serviceRootUri, auth, ... }] }
+    const raw = imported as Record<string, unknown>;
+    if (raw.configs && Array.isArray(raw.configs) && !raw.recipients) {
+      const configs = raw.configs as ReadonlyArray<Record<string, unknown>>;
+      const normalized = {
+        providerUoi: raw.providerUoi as string ?? '',
+        concurrency: 1,
+        recipients: configs.map(c => ({
+          recipientUoi: (c.recipientUoi as string) ?? '',
+          providerUsi: (c.providerUsi as string) ?? '',
+          serviceRootUri: (c.serviceRootUri as string) ?? '',
+          description: '',
+          auth: c.token
+            ? { mode: 'token' as const, authToken: c.token as string, clientId: '', clientSecret: '', tokenUrl: '', scope: '' }
+            : { mode: 'token' as const, authToken: '', clientId: '', clientSecret: '', tokenUrl: '', scope: '' },
+          endorsements: ['dd'],
+          ddOptions: { version: '2.1', strictMode: true },
+          coreOptions: { version: '2.0.0' },
+          addEditOptions: { resource: 'Property', specVersion: '2.0.0' },
+          entityEventOptions: { mode: 'full' as const, writableResource: 'Property' },
+        })),
+      };
+      navigate('/cert/jobs', { state: { loadConfig: normalized } });
+    } else {
       navigate('/cert/jobs', { state: { loadConfig: imported } });
     }
   }, [navigate]);
