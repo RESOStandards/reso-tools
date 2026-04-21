@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useAuth } from '../../hooks/use-auth';
 import { useDarkMode } from '../../hooks/use-dark-mode';
+import { secureGetJson } from '../../api/secure-storage';
 
 const LOGO_LIGHT =
   'https://www.reso.org/wp-content/uploads/2020/06/RESO-Logo_Horizontal_Blue.png';
@@ -28,21 +29,25 @@ export const LoginModal = ({ open, onClose, onSuccess }: LoginModalProps) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  // Autofocus the username input when the modal opens
-  useEffect(() => {
-    if (open) {
-      // Defer to next tick so the input is mounted
-      const id = setTimeout(() => usernameRef.current?.focus(), 10);
-      return () => clearTimeout(id);
-    }
-  }, [open]);
-
-  // Reset form fields when the modal closes
+  // Pre-fill from persisted credentials when the modal opens
   useEffect(() => {
     if (!open) {
       setUsername('');
       setPassword('');
+      return;
     }
+    // Defer focus to next tick so the input is mounted
+    const focusTimer = setTimeout(() => usernameRef.current?.focus(), 10);
+
+    // Load saved credentials for autofill
+    secureGetJson<{ username: string; password: string }>('reso-cert-credentials-v1')
+      .then(creds => {
+        if (creds?.username) setUsername(creds.username);
+        if (creds?.password) setPassword(creds.password);
+      })
+      .catch(() => {});
+
+    return () => clearTimeout(focusTimer);
   }, [open]);
 
   // Escape to dismiss + lock body scroll while open

@@ -34,9 +34,12 @@ export const useNotifications = (): UseNotificationsResult => {
 
   const fetchNotifications = useCallback(async () => {
     if (!auth?.isAuthenticated) return;
-    const header = auth.getProviderHeader();
-    if (!header) return;
-    const token = header.Authorization.replace('Bearer ', '');
+    let token: string;
+    try {
+      token = await auth.ensureFreshProviderToken();
+    } catch {
+      return; // No provider token available yet
+    }
 
     setIsLoading(true);
     try {
@@ -56,6 +59,7 @@ export const useNotifications = (): UseNotificationsResult => {
       return;
     }
 
+    // Initial fetch + polling — both gated by ensureFreshProviderToken inside fetchNotifications
     fetchNotifications();
     timerRef.current = setInterval(fetchNotifications, POLL_INTERVAL_MS);
     return () => {
