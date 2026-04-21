@@ -920,6 +920,10 @@ const resolveReport = (
       return scenarios
         .filter(s => !s.passed && !s.skipped)
         .map(s => {
+          const raw = ((r.scenarios ?? []) as ReadonlyArray<Record<string, unknown>>).find(
+            rs => (rs.name ?? rs.scenario) === (s.name)
+          );
+          const requestUrl = (raw?.requestUrl as string) ?? undefined;
           const failedAssertions = s.assertions.filter(a => !a.passed);
           const message = failedAssertions.map(a => a.description).filter(Boolean).join('; ') || `Scenario "${s.name}" failed`;
           const detailLines = failedAssertions
@@ -930,6 +934,7 @@ const resolveReport = (
             message,
             detail: detailLines.length > 0 ? detailLines.join('\n') : undefined,
             httpStatus: undefined,
+            requestDetails: requestUrl ? [{ method: 'GET', url: requestUrl }] : undefined,
           };
         });
     });

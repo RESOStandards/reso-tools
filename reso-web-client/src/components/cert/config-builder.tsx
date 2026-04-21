@@ -796,7 +796,17 @@ export const ConfigBuilder = ({
   useEffect(() => {
     setOrgsLoading(true);
     fetchOrganizations(null)
-      .then(setOrgs)
+      .then(loaded => {
+        setOrgs(loaded);
+        // Resolve provider name from org directory if we have a UOI but no name
+        if (providerUoi && !providerName) {
+          const match = loaded.find(o => o.id === providerUoi);
+          if (match) {
+            setProviderName(match.name);
+            setProviderSystems(match.systems ?? []);
+          }
+        }
+      })
       .catch(() => {})
       .finally(() => setOrgsLoading(false));
 
