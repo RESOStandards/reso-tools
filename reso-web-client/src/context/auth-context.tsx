@@ -216,14 +216,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setProviderToken(token);
           scheduleRefresh(token);
         } catch {
-          // Credentials are stale or invalid. Clear everything so the user
-          // gets a clean login prompt. Stale credentials (e.g., missing
-          // apiToken from a previous format) would keep 400'ing on every restart.
+          // Provider token refresh failed — clear the user session but
+          // keep credentials in safeStorage so the login modal can autofill.
           if (!cancelled) {
             setUser(null);
             credentialsRef.current = null;
             void secureRemove(USER_STORAGE_KEY);
-            void secureRemove(CREDS_STORAGE_KEY);
+            // Keep CREDS_STORAGE_KEY for autofill on the login modal
           }
         }
       }

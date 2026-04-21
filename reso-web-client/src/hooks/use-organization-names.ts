@@ -31,7 +31,7 @@ const loadDirectory = async (apiKey: string | null): Promise<DirectoryCache> => 
   if (cache) return cache;
   if (inFlight) return inFlight;
 
-  inFlight = fetchOrganizations(apiKey).then((orgs) => {
+  inFlight = fetchOrganizations(null).then((orgs) => {
     rawOrgs = orgs;
     const names = new Map<string, string>();
     const systems = new Map<string, string>();
