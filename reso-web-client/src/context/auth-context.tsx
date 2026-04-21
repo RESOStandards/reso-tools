@@ -158,7 +158,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setProviderToken(token);
         await secureSetJson(USER_STORAGE_KEY, loginResponse);
         await secureSetJson<PersistedCredentials>(CREDS_STORAGE_KEY, {
-          username,
+          username: normalizedUsername,
           password,
           apiToken: loginResponse.token
         });
@@ -208,6 +208,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (persistedCreds) {
         credentialsRef.current = persistedCreds;
         try {
+          // Try refreshing with the saved API token first
           const token = await requestProviderToken(
             persistedCreds.username,
             persistedCreds.apiToken ?? persistedCreds.password
@@ -216,13 +217,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setProviderToken(token);
           scheduleRefresh(token);
         } catch {
-          // Provider token refresh failed — clear the user session but
-          // keep credentials in safeStorage so the login modal can autofill.
-          if (!cancelled) {
-            setUser(null);
-            credentialsRef.current = null;
-            void secureRemove(USER_STORAGE_KEY);
-            // Keep CREDS_STORAGE_KEY for autofill on the login modal
+          // API token may be stale — try a full re-login with the saved password
+          if (cancelled) return;
+          try {
+            const loginResponse = await certApiLogin(persistedCreds.username, persistedCreds.password);
+            if (cancelled) return;
+            const normalizedUsername = loginResponse.username ?? persistedCreds.username;
+            const token = await requestProviderToken(normalizedUsername, loginResponse.token);
+            if (cancelled) return;
+            credentialsRef.current = { username: normalizedUsername, password: persistedCreds.password, apiToken: loginResponse.token };
+            setUser(loginResponse);
+            setProviderToken(token);
+            scheduleRefresh(token);
+            // Update persisted credentials with fresh API token
+            await secureSetJson(USER_STORAGE_KEY, loginResponse);
+            await secureSetJson<PersistedCredentials>(CREDS_STORAGE_KEY, {
+              username: normalizedUsername,
+              password: persistedCreds.password,
+              apiToken: loginResponse.token
+            });
+          } catch {
+            // Full re-login also failed — keep credentials for autofill
+            if (!cancelled) {
+              setUser(null);
+              credentialsRef.current = null;
+              void secureRemove(USER_STORAGE_KEY);
+            }
           }
         }
       }
