@@ -20,6 +20,7 @@ import { useLocation, useBlocker } from 'react-router';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
 import { blendVariations, type BlendedVariation, type BlendedVariationsReport } from '../../services/variations-blender';
 import { searchVariations, getVariationsStats, searchLocks, createLock, deleteLock, variationsLockResourceId, type LockRecord } from '../../services/variations-service';
+import { useNotifications } from '../../hooks/use-notifications';
 import { saveVariationsReview } from '../../services/variations-save';
 import { VariationComments, type VariationComment } from '../../components/cert/variation-comments';
 import { useAuth } from '../../hooks/use-auth';
@@ -322,7 +323,7 @@ const ReviewListView = ({ onSelectReport, ensureFreshToken, isAuthenticated }: {
       {activeResources.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {activeResources.map(resource => (
-            <div key={resource.resourceName} className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:border-blue-300 dark:hover:border-blue-600 transition-colors">
+            <div key={resource.resourceName} className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
               <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">{resource.resourceName}</h3>
               <div className="mt-2 flex items-center gap-3 text-[11px] text-gray-500 dark:text-gray-400">
                 <span>{resource.fields} fields</span>
@@ -370,6 +371,16 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin }: {
   const [actions, setActions] = useState<Map<string, ActionStatus>>(() => loadDraft(reportId));
   const [draftComments, setDraftComments] = useState<Map<string, ReadonlyArray<VariationComment>>>(new Map());
   const [saving, setSaving] = useState(false);
+  const [staleNotification, setStaleNotification] = useState(false);
+
+  // Watch for VARIATIONS_REPORT notifications that indicate someone else updated this report
+  const { notifications } = useNotifications();
+  useEffect(() => {
+    const hasUpdate = notifications.some(n =>
+      n.notificationType === 'VARIATIONS_REPORT_SAVED' || n.notificationType === 'VARIATIONS_REPORT'
+    );
+    if (hasUpdate) setStaleNotification(true);
+  }, [notifications]);
 
   // Lock management — acquire on mount, release on unmount/save
   const [lockHolder, setLockHolder] = useState<LockRecord | null>(null);
@@ -535,6 +546,18 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin }: {
         <div className="mb-4 flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500">
           <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
           Checking lock status...
+        </div>
+      )}
+      {staleNotification && (
+        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg flex items-center justify-between text-sm text-blue-800 dark:text-blue-300">
+          <span>This report was updated by another reviewer. Reload to see the latest changes.</span>
+          <button
+            type="button"
+            onClick={() => { setStaleNotification(false); onBack(); }}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer shrink-0 ml-4"
+          >
+            Reload
+          </button>
         </div>
       )}
 
