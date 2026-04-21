@@ -53,6 +53,12 @@ export interface BlendedVariationsReport {
   readonly version: string;
   readonly generatedOn: string;
   readonly fuzziness: number;
+  /** Provider UOI — needed for save/lock operations. */
+  readonly providerUoi?: string;
+  /** Provider USI — needed for save/lock operations. */
+  readonly providerUsi?: string;
+  /** Recipient UOI — needed for save/lock operations. */
+  readonly recipientUoi?: string;
   readonly variations: ReadonlyArray<BlendedVariation>;
   readonly counts: {
     readonly resources: number;

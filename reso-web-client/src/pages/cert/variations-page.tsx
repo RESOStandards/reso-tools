@@ -20,6 +20,7 @@ import { useLocation, useBlocker } from 'react-router';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
 import { blendVariations, type BlendedVariation, type BlendedVariationsReport } from '../../services/variations-blender';
 import { searchVariations } from '../../services/variations-service';
+import { saveVariationsReview } from '../../services/variations-save';
 import { useAuth } from '../../hooks/use-auth';
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -114,7 +115,7 @@ const loadCachedReport = (): BlendedVariationsReport | null => {
 
 export const VariationsPage = () => {
   const location = useLocation();
-  const { ensureFreshProviderToken, isAuthenticated } = useAuth();
+  const { ensureFreshProviderToken, isAuthenticated, user } = useAuth();
   const routeState = location.state as { job?: Record<string, unknown>; report?: BlendedVariationsReport } | null;
 
   const [report, setReport] = useState<BlendedVariationsReport | null>(() => {
@@ -159,13 +160,23 @@ export const VariationsPage = () => {
           } catch { /* Not authenticated or token expired — use local only */ }
         }
 
-        const blended = blendVariations(localReport, serviceSuggestions);
+        const blended = {
+          ...blendVariations(localReport, serviceSuggestions),
+          providerUoi: job.providerUoi as string | undefined,
+          providerUsi: job.providerUsi as string | undefined,
+          recipientUoi: job.recipientUoi as string | undefined,
+        };
         setReport(blended);
         cacheReport(blended);
         setView('detail');
       } catch {
         // If service is unavailable, use local results only
-        const blended = blendVariations(variationsReport as unknown as Parameters<typeof blendVariations>[0]);
+        const blended = {
+          ...blendVariations(variationsReport as unknown as Parameters<typeof blendVariations>[0]),
+          providerUoi: job.providerUoi as string | undefined,
+          providerUsi: job.providerUsi as string | undefined,
+          recipientUoi: job.recipientUoi as string | undefined,
+        };
         setReport(blended);
         cacheReport(blended);
         setView('detail');
@@ -191,7 +202,7 @@ export const VariationsPage = () => {
     return <ReviewListView onSelectReport={(r) => { setReport(r); cacheReport(r); setView('detail'); }} />;
   }
 
-  return <ReviewDetailView report={report} onBack={() => setView('list')} />;
+  return <ReviewDetailView report={report} onBack={() => setView('list')} ensureFreshToken={ensureFreshProviderToken} user={user} />;
 };
 
 // ── Review List View ─────────────────────────────────────────────────
@@ -218,7 +229,12 @@ const ReviewListView = ({ onSelectReport }: { readonly onSelectReport: (report: 
 
 // ── Review Detail View ───────────────────────────────────────────────
 
-const ReviewDetailView = ({ report, onBack }: { readonly report: BlendedVariationsReport; readonly onBack: () => void }) => {
+const ReviewDetailView = ({ report, onBack, ensureFreshToken, user }: {
+  readonly report: BlendedVariationsReport;
+  readonly onBack: () => void;
+  readonly ensureFreshToken: () => Promise<string>;
+  readonly user: { readonly username: string; readonly email: string; readonly fullName: string } | null;
+}) => {
   const reportId = `${report.version}`;
 
   const [search, setSearch] = useState('');
@@ -271,15 +287,31 @@ const ReviewDetailView = ({ report, onBack }: { readonly report: BlendedVariatio
 
   const handleSave = useCallback(async () => {
     if (actions.size === 0) return;
+    if (!report.providerUoi || !report.providerUsi || !report.recipientUoi) return;
+
     setSaving(true);
     try {
-      // TODO: wire to saveVariationsReview()
-      clearDraft(reportId);
-      setActions(new Map());
+      const token = await ensureFreshToken();
+      const success = await saveVariationsReview({
+        version: report.version,
+        providerUoi: report.providerUoi,
+        providerUsi: report.providerUsi,
+        recipientUoi: report.recipientUoi,
+        actions: [...actions.entries()].map(([key, status]) => ({ key, status })),
+        comments: [],
+        userName: user?.fullName ?? user?.username ?? '',
+        userEmail: user?.email ?? '',
+        token,
+      });
+
+      if (success) {
+        clearDraft(reportId);
+        setActions(new Map());
+      }
     } finally {
       setSaving(false);
     }
-  }, [actions, reportId]);
+  }, [actions, reportId, report, ensureFreshToken]);
 
   return (
     <div className={`${PAGE_CONTAINER} py-6`}>

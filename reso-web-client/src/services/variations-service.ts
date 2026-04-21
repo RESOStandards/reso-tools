@@ -51,13 +51,24 @@ export const searchVariations = async (
   metadataReport: { readonly fields: ReadonlyArray<unknown>; readonly lookups: ReadonlyArray<unknown> },
   token: string
 ): Promise<VariationsSuggestionsMap> => {
-  const res = await fetch(proxiedUrl('/certification/variations/search'), {
+  const res = await fetch(proxiedUrl('/v2/certification/variations/search'), {
     method: 'POST',
     headers: bearerHeaders(token),
     body: JSON.stringify(metadataReport),
   });
   if (!res.ok) return {};
   return (await res.json()) as VariationsSuggestionsMap;
+};
+
+/** Fetch variations index stats (counts, resources, fields). */
+export const getVariationsStats = async (
+  token: string
+): Promise<Record<string, unknown> | null> => {
+  const res = await fetch(proxiedUrl('/v2/certification/variations/stats'), {
+    headers: bearerHeaders(token),
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as Record<string, unknown>;
 };
 
 // ── Variations Reports (S3) ──────────────────────────────────────────
@@ -122,7 +133,7 @@ const variationsReportPath = (
   recipientUoi: string,
   certRequestId: string
 ): string =>
-  `/certification/variations-reports/${encodeURIComponent(version)}/${encodeURIComponent(providerUoi)}/${encodeURIComponent(providerUsi)}/${encodeURIComponent(recipientUoi)}/${encodeURIComponent(certRequestId)}`;
+  `/v2/certification/variations-reports/${encodeURIComponent(version)}/${encodeURIComponent(providerUoi)}/${encodeURIComponent(providerUsi)}/${encodeURIComponent(recipientUoi)}/${encodeURIComponent(certRequestId)}`;
 
 /** Fetch an existing variations report from S3. */
 export const getVariationsReport = async (
@@ -199,7 +210,7 @@ export const searchLocks = async (
   providerUoi: string,
   token: string
 ): Promise<ReadonlyArray<LockRecord>> => {
-  const res = await fetch(proxiedUrl('/locks/search'), {
+  const res = await fetch(proxiedUrl('/v2/locks/search'), {
     method: 'POST',
     headers: bearerHeaders(token),
     body: JSON.stringify({ resourceId, providerUoi }),
@@ -214,7 +225,7 @@ export const createLock = async (
   payload: CreateLockPayload,
   token: string
 ): Promise<{ expirationTimestamp: string } | null> => {
-  const res = await fetch(proxiedUrl('/locks'), {
+  const res = await fetch(proxiedUrl('/v2/locks'), {
     method: 'POST',
     headers: bearerHeaders(token),
     body: JSON.stringify(payload),
@@ -229,7 +240,7 @@ export const deleteLock = async (
   providerUoi: string,
   token: string
 ): Promise<boolean> => {
-  const res = await fetch(proxiedUrl('/locks'), {
+  const res = await fetch(proxiedUrl('/v2/locks'), {
     method: 'DELETE',
     headers: bearerHeaders(token),
     body: JSON.stringify({ resourceId, providerUoi }),
