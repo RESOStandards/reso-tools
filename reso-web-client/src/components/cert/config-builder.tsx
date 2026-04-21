@@ -508,7 +508,15 @@ const RecipientCard = ({
   const [expanded, setExpanded] = useState(true);
   const [recipientSearch, setRecipientSearch] = useState('');
   const [showRecipientDropdown, setShowRecipientDropdown] = useState(false);
-  const [recipientName, setRecipientName] = useState(recipient.description || '');
+  const [recipientName, setRecipientName] = useState(() => {
+    if (recipient.description) return recipient.description;
+    // Resolve from org directory on initial load
+    if (recipient.recipientUoi) {
+      const match = orgs.find(o => o.id === recipient.recipientUoi);
+      if (match) return match.name;
+    }
+    return '';
+  });
 
   const [endorsementWarning, setEndorsementWarning] = useState('');
 
