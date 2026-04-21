@@ -19,7 +19,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useLocation, useBlocker } from 'react-router';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
 import { blendVariations, type BlendedVariation, type BlendedVariationsReport } from '../../services/variations-blender';
-import { searchVariations, getVariationsStats } from '../../services/variations-service';
+import { searchVariations, getVariationsStats, searchLocks, createLock, deleteLock, variationsLockResourceId, type LockRecord } from '../../services/variations-service';
 import { saveVariationsReview } from '../../services/variations-save';
 import { VariationComments, type VariationComment } from '../../components/cert/variation-comments';
 import { useAuth } from '../../hooks/use-auth';
@@ -371,6 +371,60 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin }: {
   const [draftComments, setDraftComments] = useState<Map<string, ReadonlyArray<VariationComment>>>(new Map());
   const [saving, setSaving] = useState(false);
 
+  // Lock management — acquire on mount, release on unmount/save
+  const [lockHolder, setLockHolder] = useState<LockRecord | null>(null);
+  const [lockAcquired, setLockAcquired] = useState(false);
+  const [lockLoading, setLockLoading] = useState(true);
+
+  const lockResourceId = report.providerUoi && report.providerUsi && report.recipientUoi
+    ? variationsLockResourceId(report.version, report.providerUoi, report.providerUsi, report.recipientUoi)
+    : null;
+
+  useEffect(() => {
+    if (!lockResourceId || !report.providerUoi || !user) { setLockLoading(false); return; }
+    let cancelled = false;
+
+    const acquireLock = async () => {
+      try {
+        const token = await ensureFreshToken();
+        const existing = await searchLocks(lockResourceId, report.providerUoi!, token);
+        const otherLock = existing.find(l => l.username !== user.username);
+
+        if (otherLock) {
+          if (!cancelled) { setLockHolder(otherLock); setLockLoading(false); }
+          return;
+        }
+
+        // No conflicting lock — acquire one
+        await createLock({
+          resourceId: lockResourceId,
+          providerUoi: report.providerUoi!,
+          username: user.username,
+          displayName: user.fullName,
+          email: user.email,
+        }, token);
+
+        if (!cancelled) { setLockAcquired(true); setLockLoading(false); }
+      } catch {
+        if (!cancelled) setLockLoading(false);
+      }
+    };
+
+    acquireLock();
+
+    // Release lock on unmount
+    return () => {
+      cancelled = true;
+      if (lockResourceId && report.providerUoi) {
+        ensureFreshToken()
+          .then(token => deleteLock(lockResourceId, report.providerUoi!, token))
+          .catch(() => {});
+      }
+    };
+  }, [lockResourceId, report.providerUoi, user, ensureFreshToken]);
+
+  const isReadOnly = lockLoading || (!!lockHolder && !lockAcquired);
+
   useEffect(() => { saveDraft(reportId, actions); }, [actions, reportId]);
 
   const isDirty = actions.size > 0 || draftComments.size > 0;
@@ -466,6 +520,24 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin }: {
 
   return (
     <div className={`${PAGE_CONTAINER} py-6`}>
+      {/* Lock banner */}
+      {lockHolder && !lockAcquired && (
+        <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg flex items-center gap-2 text-sm text-amber-800 dark:text-amber-300">
+          <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" />
+          </svg>
+          <span>
+            Locked by <span className="font-medium">{lockHolder.displayName}</span> — read-only mode.
+          </span>
+        </div>
+      )}
+      {lockLoading && (
+        <div className="mb-4 flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500">
+          <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+          Checking lock status...
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -484,7 +556,7 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin }: {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {isDirty && (
+          {isDirty && !isReadOnly && (
             <>
               <span className="text-xs text-amber-600 dark:text-amber-400">{actions.size} unsaved</span>
               <button type="button" onClick={() => { clearDraft(reportId); setActions(new Map()); }}
@@ -530,7 +602,7 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin }: {
               variation={variation}
               action={actions.get(key)}
               onToggleAction={(status) => toggleAction(key, status)}
-              isReadOnly={false}
+              isReadOnly={isReadOnly}
               isAdmin={isAdmin}
               isFastTrackAdmin={isAdmin && FT_ADMIN_EMAILS.has(user?.email ?? '')}
               draftComments={draftComments.get(key) ?? []}
