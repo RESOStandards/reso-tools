@@ -143,12 +143,6 @@ export const useEndorsements = (
         );
         if (controller.signal.aborted) return;
 
-        // eslint-disable-next-line no-console
-        console.log(
-          '[cert] /certification_reports/filter response:',
-          { from, append, response }
-        );
-
         const adapted = responseToEndorsements(response);
         const reportsByOrgsEmpty =
           !response.reportsByOrgs ||
