@@ -218,31 +218,46 @@ const getMetadataInfo = ({ numResources = 0, numFields = 0, numLookups = 0, numE
 };
 
 /**
- * Gets the DD Wiki URL for the given Data Dictionary element
- * @param {Object} options lookup options
- * @param {Object} options.standardMetadataMap the reference metadata map keyed by resource and field name
- * @param {string} [options.resourceName] the resource name to look up
- * @param {string} [options.fieldName] the field name to look up
- * @param {string} [options.lookupValue] the lookup value to look up
- * @param {string} [options.oDataLookupValue] the legacy OData lookup value to look up
- * @returns {string|null} DD Wiki URL for the element, or null if not found
+ * Constructs the DD docs URL for the given Data Dictionary element.
+ * Uses the convention from dd.reso.org:
+ *   Resource: /DD{version}/{ResourceName}/
+ *   Field:    /DD{version}/{ResourceName}/{FieldName}/
+ *   Lookup:   /DD{version}/lookups/{LookupName}/{LookupValue}/
+ *
+ * When a legacyODataValue is provided, the standardMetadataMap is used
+ * to resolve it to the standard lookup value for the URL.
+ *
+ * @param {Object} options
+ * @param {string} options.version DD version (e.g., '2.1')
+ * @param {Object} [options.standardMetadataMap] reference metadata map (for legacy OData value resolution)
+ * @param {string} [options.resourceName] the resource name
+ * @param {string} [options.fieldName] the field name
+ * @param {string} [options.lookupValue] the standard lookup value
+ * @param {string} [options.legacyODataValue] legacy OData lookup value (resolved via standardMetadataMap)
+ * @returns {string|null} DD docs URL for the element, or null if insufficient params
  */
-const getDDWikiUrl = ({ standardMetadataMap, resourceName, fieldName, lookupValue, oDataLookupValue }) => {
-  if (!standardMetadataMap || !Object.values(standardMetadataMap)?.length) {
-    return null;
+const getDDWikiUrl = ({ version = '2.1', standardMetadataMap, resourceName, fieldName, lookupValue, legacyODataValue }) => {
+  const base = `https://dd.reso.org/DD${version}`;
+
+  // Resolve legacy OData value to standard lookup value if needed
+  let resolvedLookupValue = lookupValue;
+  if (!resolvedLookupValue && legacyODataValue && standardMetadataMap && resourceName && fieldName) {
+    const legacyMap = standardMetadataMap?.[resourceName]?.[fieldName]?.legacyODataValues;
+    if (legacyMap?.[legacyODataValue]) {
+      resolvedLookupValue = legacyMap[legacyODataValue].lookupValue ?? legacyODataValue;
+    }
   }
 
-  if (resourceName && fieldName && lookupValue) {
-    return standardMetadataMap?.[resourceName]?.[fieldName]?.lookupValues?.[lookupValue]?.ddWikiUrl ?? null;
-  } else if (resourceName && fieldName && oDataLookupValue) {
-    return standardMetadataMap?.[resourceName]?.[fieldName]?.legacyODataValues?.[oDataLookupValue]?.ddWikiUrl ?? null;
-  } else if (resourceName && fieldName) {
-    return standardMetadataMap?.[resourceName]?.[fieldName]?.ddWikiUrl ?? null;
-  } else if (resourceName) {
-    return getReferenceMetadata()?.resources?.find(item => item?.resourceName === resourceName)?.wikiPageURL ?? null;
-  } else {
-    return null;
+  if (fieldName && resolvedLookupValue) {
+    return `${base}/lookups/${encodeURIComponent(fieldName)}/${encodeURIComponent(resolvedLookupValue)}/`;
   }
+  if (resourceName && fieldName) {
+    return `${base}/${encodeURIComponent(resourceName)}/${encodeURIComponent(fieldName)}/`;
+  }
+  if (resourceName) {
+    return `${base}/${encodeURIComponent(resourceName)}/`;
+  }
+  return null;
 };
 
 /**
@@ -359,7 +374,7 @@ const computeVariations = async ({
                       resourceName,
                       suggestedResourceName,
                       strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
-                      ddWikiUrl: getDDWikiUrl({ standardMetadataMap, resourceName: suggestedResourceName }),
+                      ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName }),
                       ...suggestion
                     }
                   ];
@@ -393,7 +408,7 @@ const computeVariations = async ({
                   resourceName,
                   suggestedResourceName: standardResourceName,
                   strategy: MATCHING_STRATEGIES.SUBSTRING,
-                  ddWikiUrl: getDDWikiUrl({ standardMetadataMap, resourceName: standardResourceName })
+                  ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: standardResourceName })
                 };
 
                 if (isExactMatch) {
@@ -412,7 +427,7 @@ const computeVariations = async ({
                     distance: d,
                     maxDistance,
                     strategy: MATCHING_STRATEGIES.EDIT_DISTANCE,
-                    ddWikiUrl: getDDWikiUrl({ standardMetadataMap, resourceName: standardResourceName })
+                    ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: standardResourceName })
                   };
 
                   if (d <= CLOSE_MATCH_DISTANCE) {
@@ -439,7 +454,7 @@ const computeVariations = async ({
                 fieldName,
                 strategy: MATCHING_STRATEGIES.SUBSTRING,
                 exactMatch: true,
-                ddWikiUrl: getDDWikiUrl({ standardMetadataMap, resourceName, fieldName }),
+                ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName, fieldName }),
                 message: `The '${fieldName}' field MUST be defined as an OData expansion.`
               });
             } else if (!ignoreFieldMapping) {
@@ -469,7 +484,7 @@ const computeVariations = async ({
                               suggestedFieldName,
                               strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
                               ddWikiUrl: getDDWikiUrl({
-                                standardMetadataMap,
+                                version, standardMetadataMap,
                                 resourceName: suggestedResourceName,
                                 fieldName: suggestedFieldName
                               }),
@@ -521,7 +536,7 @@ const computeVariations = async ({
                             fieldName,
                             suggestedFieldName: standardFieldName,
                             strategy: MATCHING_STRATEGIES.SUBSTRING,
-                            ddWikiUrl: getDDWikiUrl({ standardMetadataMap, resourceName, fieldName: standardFieldName })
+                            ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName, fieldName: standardFieldName })
                           };
 
                           if (isExactMatch) {
@@ -548,7 +563,7 @@ const computeVariations = async ({
                               distance: d,
                               maxDistance,
                               strategy: MATCHING_STRATEGIES.EDIT_DISTANCE,
-                              ddWikiUrl: getDDWikiUrl({ standardMetadataMap, resourceName, fieldName: standardFieldName })
+                              ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName, fieldName: standardFieldName })
                             };
 
                             if (d <= CLOSE_MATCH_DISTANCE) {
@@ -615,7 +630,7 @@ const computeVariations = async ({
                                   suggestedLookupValue,
                                   strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
                                   ddWikiUrl: getDDWikiUrl({
-                                    standardMetadataMap,
+                                    version, standardMetadataMap,
                                     resourceName: suggestedResourceName,
                                     fieldName: suggestedFieldName,
                                     lookupValue: suggestedLookupValue
@@ -657,7 +672,7 @@ const computeVariations = async ({
                               lookupValue,
                               suggestedLookupValue: standardLookupValue,
                               strategy: MATCHING_STRATEGIES.SUBSTRING,
-                              ddWikiUrl: getDDWikiUrl({ standardMetadataMap, resourceName, fieldName, lookupValue: standardLookupValue })
+                              ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName, fieldName, lookupValue: standardLookupValue })
                             };
 
                             if (isExactMatch) {
@@ -685,7 +700,7 @@ const computeVariations = async ({
                               if (lookupValue !== standardLookupValue) {
                                 suggestion.suggestedLookupValue = standardLookupValue;
                                 suggestion.ddWikiUrl = getDDWikiUrl({
-                                  standardMetadataMap,
+                                  version, standardMetadataMap,
                                   resourceName,
                                   fieldName,
                                   lookupValue: standardLookupValue
@@ -738,7 +753,7 @@ const computeVariations = async ({
                                   suggestedLegacyODataValue,
                                   strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
                                   ddWikiUrl: getDDWikiUrl({
-                                    standardMetadataMap,
+                                    version, standardMetadataMap,
                                     resourceName: suggestedResourceName,
                                     fieldName: suggestedFieldName,
                                     lookupValue: suggestedLegacyODataValue
@@ -783,7 +798,7 @@ const computeVariations = async ({
                               suggestedLegacyODataValue: standardODataLookupValue,
                               strategy: MATCHING_STRATEGIES.SUBSTRING,
                               ddWikiUrl: getDDWikiUrl({
-                                standardMetadataMap,
+                                version, standardMetadataMap,
                                 resourceName,
                                 fieldName,
                                 legacyODataValue: standardODataLookupValue
@@ -813,7 +828,7 @@ const computeVariations = async ({
                               if (legacyODataValue !== standardODataLookupValue) {
                                 suggestion.suggestedLegacyODataValue = standardODataLookupValue;
                                 suggestion.ddWikiUrl = getDDWikiUrl({
-                                  standardMetadataMap,
+                                  version, standardMetadataMap,
                                   resourceName,
                                   fieldName,
                                   legacyODataValue: standardODataLookupValue
