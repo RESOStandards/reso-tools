@@ -145,7 +145,7 @@ export const ConfigsPage = () => {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <div className="min-w-[250px]">
+              <div className="min-w-[350px]">
                 <SearchInput value={search} onChange={setSearch} placeholder="Search by name, provider, recipient..." />
               </div>
               <button
@@ -153,7 +153,7 @@ export const ConfigsPage = () => {
                 onClick={() => navigate('/cert/jobs', { state: { loadConfig: {} } })}
                 className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors"
               >
-                New Config
+                New Test Run
               </button>
               <button
                 type="button"
