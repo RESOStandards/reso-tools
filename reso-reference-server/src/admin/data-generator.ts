@@ -364,7 +364,7 @@ export const createDataGeneratorHandler =
           }
 
           if (totalReconciled > 0) {
-            info.push(`Reconciled ${totalReconciled} Lookup Resource entries for generated enum values`);
+            info.push(`Reconciled ${totalReconciled.toLocaleString()} Lookup Resource entries for generated enum values`);
           }
         } catch (err) {
           errors.push(`Lookup reconciliation: ${err instanceof Error ? err.message : 'failed'}`);
