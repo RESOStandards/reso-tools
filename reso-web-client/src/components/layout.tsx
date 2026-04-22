@@ -132,7 +132,7 @@ export const Layout = () => {
             <div className="hidden sm:flex items-center gap-0.5 mr-1">
               <button
                 type="button"
-                onClick={() => window.history.back()}
+                onClick={() => { if (window.location.pathname !== '/') window.history.back(); }}
                 className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                 title="Go back"
                 aria-label="Go back">

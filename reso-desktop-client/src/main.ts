@@ -1024,8 +1024,12 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
   // Checks if a React Router blocker is active before navigating.
   const safeNavScript = (direction: 'back' | 'forward') => `
     (function() {
-      if ('${direction}' === 'back' && window.history.length <= 1) return;
-      if ('${direction}' === 'back' && window.location.pathname === '/') return;
+      if ('${direction}' === 'back') {
+        if (window.history.length <= 1) return;
+        if (window.location.pathname === '/') return;
+        // Block if this is the first SPA page (next back would leave the app)
+        if (window.history.state && window.history.state.idx === 0) return;
+      }
       window.history.${direction}();
     })()
   `;
