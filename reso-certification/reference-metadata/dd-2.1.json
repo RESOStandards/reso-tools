@@ -1,7 +1,7 @@
 {
   "description": "RESO Data Dictionary 2.1 Reference Metadata",
   "version": "2.1",
-  "generatedOn": "2026-04-22T11:32:22.039Z",
+  "generatedOn": "2026-04-22T15:07:27.731Z",
   "resources": [
     "Association",
     "Building",
@@ -1321,7 +1321,7 @@
     {
       "resourceName": "Property",
       "fieldName": "BathroomsFull",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -1346,7 +1346,7 @@
     {
       "resourceName": "Property",
       "fieldName": "BathroomsHalf",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -1371,7 +1371,7 @@
     {
       "resourceName": "Property",
       "fieldName": "BathroomsOneQuarter",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -1396,7 +1396,7 @@
     {
       "resourceName": "Property",
       "fieldName": "BathroomsPartial",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -1420,7 +1420,7 @@
     {
       "resourceName": "Property",
       "fieldName": "BathroomsThreeQuarter",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -1445,7 +1445,7 @@
     {
       "resourceName": "Property",
       "fieldName": "BathroomsTotalInteger",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -1469,7 +1469,7 @@
     {
       "resourceName": "Property",
       "fieldName": "BedroomsPossible",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -1492,7 +1492,7 @@
     {
       "resourceName": "Property",
       "fieldName": "BedroomsTotal",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -5368,7 +5368,7 @@
     {
       "resourceName": "Property",
       "fieldName": "ConcessionsAmount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -5836,7 +5836,7 @@
     {
       "resourceName": "Property",
       "fieldName": "CumulativeDaysOnMarket",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -5932,7 +5932,7 @@
     {
       "resourceName": "Property",
       "fieldName": "DaysInMls",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -5955,7 +5955,7 @@
     {
       "resourceName": "Property",
       "fieldName": "DaysOnMarket",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -5979,7 +5979,7 @@
     {
       "resourceName": "Property",
       "fieldName": "DaysOnSite",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -6150,7 +6150,7 @@
     {
       "resourceName": "Property",
       "fieldName": "DistanceToBusNumeric",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -6220,7 +6220,7 @@
     {
       "resourceName": "Property",
       "fieldName": "DistanceToElectricNumeric",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -6290,7 +6290,7 @@
     {
       "resourceName": "Property",
       "fieldName": "DistanceToFreewayNumeric",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -6360,7 +6360,7 @@
     {
       "resourceName": "Property",
       "fieldName": "DistanceToGasNumeric",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -6430,7 +6430,7 @@
     {
       "resourceName": "Property",
       "fieldName": "DistanceToPhoneServiceNumeric",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -6500,7 +6500,7 @@
     {
       "resourceName": "Property",
       "fieldName": "DistanceToPlaceofWorshipNumeric",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -6570,7 +6570,7 @@
     {
       "resourceName": "Property",
       "fieldName": "DistanceToSchoolBusNumeric",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -6640,7 +6640,7 @@
     {
       "resourceName": "Property",
       "fieldName": "DistanceToSchoolsNumeric",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -6710,7 +6710,7 @@
     {
       "resourceName": "Property",
       "fieldName": "DistanceToSewerNumeric",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -6780,7 +6780,7 @@
     {
       "resourceName": "Property",
       "fieldName": "DistanceToShoppingNumeric",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -6850,7 +6850,7 @@
     {
       "resourceName": "Property",
       "fieldName": "DistanceToStreetNumeric",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -6920,7 +6920,7 @@
     {
       "resourceName": "Property",
       "fieldName": "DistanceToWaterNumeric",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -7017,7 +7017,7 @@
     {
       "resourceName": "Property",
       "fieldName": "DocumentsCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -7328,7 +7328,7 @@
     {
       "resourceName": "Property",
       "fieldName": "Elevation",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -7375,7 +7375,7 @@
     {
       "resourceName": "Property",
       "fieldName": "EntryLevel",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -7717,7 +7717,7 @@
     {
       "resourceName": "Property",
       "fieldName": "FireplacesTotal",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -9635,7 +9635,7 @@
     {
       "resourceName": "Property",
       "fieldName": "LeedCertificationYear",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -11481,7 +11481,7 @@
     {
       "resourceName": "Property",
       "fieldName": "MainLevelBathrooms",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -11504,7 +11504,7 @@
     {
       "resourceName": "Property",
       "fieldName": "MainLevelBedrooms",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -11815,7 +11815,7 @@
     {
       "resourceName": "Property",
       "fieldName": "MaximumNumberOfPets",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -11833,7 +11833,7 @@
     {
       "resourceName": "Property",
       "fieldName": "MaximumPetWeight",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12129,7 +12129,7 @@
     {
       "resourceName": "Property",
       "fieldName": "MobileLength",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12153,7 +12153,7 @@
     {
       "resourceName": "Property",
       "fieldName": "MobileWidth",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12318,7 +12318,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfBuildings",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12343,7 +12343,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfCranes",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12361,7 +12361,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfDockDoors",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12379,7 +12379,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfDriveInDoors",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12397,7 +12397,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfElevators",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12415,7 +12415,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfFreightElevators",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12433,7 +12433,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfFullTimeEmployees",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12456,7 +12456,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfLoadingDocks",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12474,7 +12474,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfLots",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12498,7 +12498,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfPads",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12522,7 +12522,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfPartTimeEmployees",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12545,7 +12545,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfRailDoors",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12563,7 +12563,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfSeparateElectricMeters",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12586,7 +12586,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfSeparateGasMeters",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12609,7 +12609,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfSeparateWaterMeters",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12632,7 +12632,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfUnitsInCommunity",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12655,7 +12655,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfUnitsLeased",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12679,7 +12679,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfUnitsMoMo",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12703,7 +12703,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfUnitsTotal",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -12727,7 +12727,7 @@
     {
       "resourceName": "Property",
       "fieldName": "NumberOfUnitsVacant",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -13887,7 +13887,7 @@
     {
       "resourceName": "Property",
       "fieldName": "PhotosCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -14440,7 +14440,7 @@
     {
       "resourceName": "Property",
       "fieldName": "PropertyPowerAmperage",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -14458,7 +14458,7 @@
     {
       "resourceName": "Property",
       "fieldName": "PropertyPowerVoltage",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -14568,7 +14568,7 @@
     {
       "resourceName": "Property",
       "fieldName": "PropertyTimeZoneStandardOffset",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -14953,7 +14953,7 @@
     {
       "resourceName": "Property",
       "fieldName": "RoomsTotal",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -15086,7 +15086,7 @@
     {
       "resourceName": "Property",
       "fieldName": "SeatingCapacity",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -15260,7 +15260,7 @@
     {
       "resourceName": "Property",
       "fieldName": "ShowingAdvanceNotice",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -15591,7 +15591,7 @@
     {
       "resourceName": "Property",
       "fieldName": "SimpleDaysOnMarket",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -16012,7 +16012,7 @@
     {
       "resourceName": "Property",
       "fieldName": "Stories",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -16037,7 +16037,7 @@
     {
       "resourceName": "Property",
       "fieldName": "StoriesTotal",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -16183,7 +16183,7 @@
     {
       "resourceName": "Property",
       "fieldName": "StreetNumberNumeric",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -16545,7 +16545,7 @@
     {
       "resourceName": "Property",
       "fieldName": "TaxAssessedValue",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -16792,7 +16792,7 @@
     {
       "resourceName": "Property",
       "fieldName": "TaxYear",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -17268,7 +17268,7 @@
     {
       "resourceName": "Property",
       "fieldName": "VacancyAllowance",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -17364,7 +17364,7 @@
     {
       "resourceName": "Property",
       "fieldName": "VideosCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -17483,7 +17483,7 @@
     {
       "resourceName": "Property",
       "fieldName": "WalkScore",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -17730,7 +17730,7 @@
     {
       "resourceName": "Property",
       "fieldName": "YearBuilt",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -17777,7 +17777,7 @@
     {
       "resourceName": "Property",
       "fieldName": "YearBuiltEffective",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -17824,7 +17824,7 @@
     {
       "resourceName": "Property",
       "fieldName": "YearEstablished",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -17847,7 +17847,7 @@
     {
       "resourceName": "Property",
       "fieldName": "YearRenovated",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -17865,7 +17865,7 @@
     {
       "resourceName": "Property",
       "fieldName": "YearsCurrentOwner",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -20049,7 +20049,7 @@
     {
       "resourceName": "Building",
       "fieldName": "CommercialAreaPercent",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -20463,7 +20463,7 @@
     {
       "resourceName": "Building",
       "fieldName": "DocumentsCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -20770,7 +20770,7 @@
     {
       "resourceName": "Building",
       "fieldName": "FireplacesTotal",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -21817,7 +21817,7 @@
     {
       "resourceName": "Building",
       "fieldName": "MaximumPetsAllowed",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -21835,7 +21835,7 @@
     {
       "resourceName": "Building",
       "fieldName": "MaximumPetWeight",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -21967,7 +21967,7 @@
     {
       "resourceName": "Building",
       "fieldName": "NumberOfBuildingsTotal",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -21985,7 +21985,7 @@
     {
       "resourceName": "Building",
       "fieldName": "NumberOfCommercialUnitsTotal",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -22003,7 +22003,7 @@
     {
       "resourceName": "Building",
       "fieldName": "NumberOfElevators",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -22021,7 +22021,7 @@
     {
       "resourceName": "Building",
       "fieldName": "NumberOfFullTimeEmployees",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -22039,7 +22039,7 @@
     {
       "resourceName": "Building",
       "fieldName": "NumberOfGarages",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -22057,7 +22057,7 @@
     {
       "resourceName": "Building",
       "fieldName": "NumberOfPartTimeEmployees",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -22075,7 +22075,7 @@
     {
       "resourceName": "Building",
       "fieldName": "NumberOfTenants",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -22093,7 +22093,7 @@
     {
       "resourceName": "Building",
       "fieldName": "NumberOfUnitsLeased",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -22111,7 +22111,7 @@
     {
       "resourceName": "Building",
       "fieldName": "NumberOfUnitsOccupied",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -22129,7 +22129,7 @@
     {
       "resourceName": "Building",
       "fieldName": "NumberOfUnitsTotal",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -22147,7 +22147,7 @@
     {
       "resourceName": "Building",
       "fieldName": "NumberOfUnitsVacant",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -22338,7 +22338,7 @@
     {
       "resourceName": "Building",
       "fieldName": "OwnerOccupiedUnitsPercent",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -22356,7 +22356,7 @@
     {
       "resourceName": "Building",
       "fieldName": "OwnerOccupiedUnitsTotal",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -22715,7 +22715,7 @@
     {
       "resourceName": "Building",
       "fieldName": "PhotosCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -23236,7 +23236,7 @@
     {
       "resourceName": "Building",
       "fieldName": "StoriesTotal",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -23346,7 +23346,7 @@
     {
       "resourceName": "Building",
       "fieldName": "StreetNumberNumeric",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -23513,7 +23513,7 @@
     {
       "resourceName": "Building",
       "fieldName": "TaxYear",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -23778,7 +23778,7 @@
     {
       "resourceName": "Building",
       "fieldName": "VideosCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -23931,7 +23931,7 @@
     {
       "resourceName": "Building",
       "fieldName": "YearBuilt",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -23967,7 +23967,7 @@
     {
       "resourceName": "Building",
       "fieldName": "YearBuiltEffective",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -25179,7 +25179,7 @@
     {
       "resourceName": "CaravanStop",
       "fieldName": "StopOrder",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -28651,7 +28651,7 @@
     {
       "resourceName": "Field",
       "fieldName": "Length",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -28769,7 +28769,7 @@
     {
       "resourceName": "Field",
       "fieldName": "Precision",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -28826,7 +28826,7 @@
     {
       "resourceName": "Field",
       "fieldName": "Scale",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -29961,7 +29961,7 @@
     {
       "resourceName": "InternetTracking",
       "fieldName": "ColorDepth",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -30743,7 +30743,7 @@
     {
       "resourceName": "InternetTracking",
       "fieldName": "ScreenHeight",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -30767,7 +30767,7 @@
     {
       "resourceName": "InternetTracking",
       "fieldName": "ScreenWidth",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -30887,7 +30887,7 @@
     {
       "resourceName": "InternetTracking",
       "fieldName": "TimeZoneOffset",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -30935,7 +30935,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "CmaCreatedCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -30959,7 +30959,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "CmaEmailedCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -30983,7 +30983,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "CmaRanCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -31006,7 +31006,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "CmaSharedCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -31053,7 +31053,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "FavoritedCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -31101,7 +31101,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "ImpressionCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -31125,7 +31125,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "InquiryCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -31195,7 +31195,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "ListingsEmailedCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -31219,7 +31219,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "MobileAppImpressionCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -31243,7 +31243,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "MobileAppViewCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -31266,7 +31266,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "MobileLogins",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -31361,7 +31361,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "SharedCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -31384,7 +31384,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "ShowingCompletedCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -31408,7 +31408,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "ShowingRequestedCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -31455,7 +31455,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "TotalLogins",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -31552,7 +31552,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "UniqueLogins",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -31576,7 +31576,7 @@
     {
       "resourceName": "InternetTrackingSummary",
       "fieldName": "ViewCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -32976,7 +32976,7 @@
     {
       "resourceName": "Media",
       "fieldName": "ImageHeight",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -33050,7 +33050,7 @@
     {
       "resourceName": "Media",
       "fieldName": "ImageWidth",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -33366,7 +33366,7 @@
     {
       "resourceName": "Media",
       "fieldName": "Order",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -34272,7 +34272,7 @@
     {
       "resourceName": "Member",
       "fieldName": "MemberCommitteeCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -37569,7 +37569,7 @@
     {
       "resourceName": "Office",
       "fieldName": "NumberOfBranches",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -37593,7 +37593,7 @@
     {
       "resourceName": "Office",
       "fieldName": "NumberOfNonMemberSalespersons",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -41730,7 +41730,7 @@
     {
       "resourceName": "OUID",
       "fieldName": "OrganizationMemberCount",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -42273,7 +42273,7 @@
     {
       "resourceName": "PropertyGreenVerification",
       "fieldName": "GreenVerificationMetric",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -42423,7 +42423,7 @@
     {
       "resourceName": "PropertyGreenVerification",
       "fieldName": "GreenVerificationYear",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -42715,7 +42715,7 @@
     {
       "resourceName": "PropertyPowerProduction",
       "fieldName": "PowerProductionAnnual",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -42858,7 +42858,7 @@
     {
       "resourceName": "PropertyPowerProduction",
       "fieldName": "PowerProductionYearInstall",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -43706,7 +43706,7 @@
     {
       "resourceName": "PropertyUnitTypes",
       "fieldName": "UnitTypeBathsTotal",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -43729,7 +43729,7 @@
     {
       "resourceName": "PropertyUnitTypes",
       "fieldName": "UnitTypeBedsTotal",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -43869,7 +43869,7 @@
     {
       "resourceName": "PropertyUnitTypes",
       "fieldName": "UnitTypeProForma",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -43941,7 +43941,7 @@
     {
       "resourceName": "PropertyUnitTypes",
       "fieldName": "UnitTypeUnitsTotal",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -45667,7 +45667,7 @@
     {
       "resourceName": "Rules",
       "fieldName": "RuleOrder",
-      "type": "Edm.Int64",
+      "type": "Edm.Decimal",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [

@@ -67,8 +67,8 @@ for (const row of fieldsRaw) {
   const isCollection = simpleType === 'String List, Multi' || simpleType === 'Collection';
   const isEnumeration = ENUM_TYPES.has(simpleType) || (!!row['LookupStatus'] && String(row['LookupStatus']).trim() !== '');
   const targetResource = isExpansion ? (sourceResource ?? fieldName) : undefined;
-  // Number without precision (or precision 0) = integer, with precision > 0 = decimal
-  const resolvedSimpleType = simpleType === 'Number' && (!sugMaxPrecision || Number(sugMaxPrecision) === 0) ? 'Integer' : simpleType;
+  // Only EntityEventSequence needs Int64; other Number fields stay Decimal
+  const resolvedSimpleType = simpleType === 'Number' && fieldName === 'EntityEventSequence' ? 'Integer' : simpleType;
   const edmType = isExpansion
     ? (isCollection ? `Collection(org.reso.metadata.${targetResource})` : `org.reso.metadata.${targetResource}`)
     : isEnumeration && lookupName
