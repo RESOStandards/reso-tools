@@ -134,7 +134,7 @@ const buildRecipientFromConfig = async (
     },
     coreOptions: { version: '2.0.0', enumMode: 'auto' },
     addEditOptions: { resource: 'Property' },
-    entityEventOptions: { mode: 'observe', maxEvents: 1000, pollInterval: 5000, pollTimeout: 30000 },
+    entityEventOptions: { mode: 'observe', maxEvents: 1000, pollInterval: 5000, pollTimeout: 60000 },
   };
 };
 
@@ -143,7 +143,7 @@ const buildRecipientFromConfig = async (
 const DEFAULT_DD: DDOptions = { version: '2.1', strictMode: true };
 const DEFAULT_CORE: CoreOptions = { version: '2.0.0', enumMode: 'auto' };
 const DEFAULT_ADD_EDIT: AddEditOptions = { resource: 'Property' };
-const DEFAULT_ENTITY_EVENT: EntityEventOptions = { mode: 'observe', maxEvents: 1000, pollInterval: 5000, pollTimeout: 30000 };
+const DEFAULT_ENTITY_EVENT: EntityEventOptions = { mode: 'observe', maxEvents: 1000, pollInterval: 5000, pollTimeout: 60000 };
 
 const DEFAULT_AUTH: AuthConfig = { mode: 'token', authToken: '' };
 
@@ -480,6 +480,18 @@ const EntityEventOptionsSection = ({
           value={options.maxEvents ?? ''}
           onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); onChange({ ...options, maxEvents: v ? Number(v) : undefined }); }}
           placeholder="1000"
+          className={INPUT}
+        />
+      </div>
+      <div>
+        <label className={LABEL}>Observe Timeout <span className="text-gray-400">(seconds)</span></label>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={options.pollTimeout ? options.pollTimeout / 1000 : ''}
+          onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); onChange({ ...options, pollTimeout: v ? Number(v) * 1000 : undefined }); }}
+          placeholder="60"
+          title="How long to observe for events before stopping. Default: 60 seconds."
           className={INPUT}
         />
       </div>
