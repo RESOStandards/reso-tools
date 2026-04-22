@@ -1231,8 +1231,9 @@ app.whenReady().then(async () => {
     const url = await startReferenceServer();
     // Navigate from splash to the real server UI
     win.loadURL(url);
-    // Clear navigation history so back can't reach the splash screen
-    win.webContents.on('did-finish-load', () => {
+    // Clear navigation history once after the server UI loads
+    // so back can't reach the splash screen
+    win.webContents.once('did-finish-load', () => {
       win.webContents.clearHistory();
     });
     checkForUpdatesSilent();
