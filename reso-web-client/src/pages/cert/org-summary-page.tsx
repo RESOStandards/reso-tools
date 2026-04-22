@@ -366,10 +366,9 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: 
         </div>
       </div>
 
-      {/* Provider switcher — sits above coverage and performance
-          because it controls which DD report drives those sections.
-          Only renders when there are 2+ providers for this org. */}
-      {hasMultipleProviders && (
+      {/* Provider badge — always visible so the user knows which provider
+          they're viewing. Acts as a switcher when there are 2+ providers. */}
+      {providerGroups.length > 0 && (
         <div className="mt-8 mb-2">
           <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
             Provider
