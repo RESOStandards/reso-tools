@@ -111,7 +111,7 @@ export interface MetadataReport {
   readonly version: string;
   readonly generatedOn: string;
   readonly resources: ReadonlyArray<MetadataReportResource>;
-  readonly models: ReadonlyArray<MetadataReportModel>;
+  readonly models?: ReadonlyArray<MetadataReportModel>;
   readonly fields: ReadonlyArray<MetadataReportField>;
   readonly lookups: ReadonlyArray<MetadataReportLookup>;
   readonly actions: ReadonlyArray<MetadataReportOperation>;
@@ -305,7 +305,6 @@ export const serializeMetadataReport = (
     version,
     generatedOn: new Date().toISOString(),
     resources,
-    models,
     fields,
     lookups,
     actions,
