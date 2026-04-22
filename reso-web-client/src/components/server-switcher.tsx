@@ -182,93 +182,103 @@ export const ServerSwitcher = () => {
         </button>
 
         {isOpen && (
-          <div className="absolute top-full left-0 mt-1 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 py-1">
-            {servers.map(server => (
-              <button
-                key={server.id}
-                type="button"
-                onClick={() => handleSelect(server.id)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 text-left cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 hover:brightness-125 ${
-                  server.id === activeServer.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                }`}>
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span
-                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                      server.type === 'local' ? 'bg-green-400' : 'bg-blue-400'
-                    }`}
-                  />
-                  <div className="min-w-0">
-                    <div className="truncate font-semibold text-sm text-gray-900 dark:text-gray-100">{server.name}</div>
-                    {server.baseUrl && (
-                      <div className="truncate text-xs text-gray-500 dark:text-gray-400">{server.baseUrl}</div>
-                    )}
-                  </div>
-                </div>
-                {server.id !== 'local' && (
-                  <div className="flex items-center gap-1 ml-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={e => handleEdit(e, server)}
-                      className="p-0.5 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400"
-                      title="Edit connection">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
-                        <path d="M13.488 2.513a1.75 1.75 0 00-2.475 0L3.22 10.303a.75.75 0 00-.178.31l-.893 3.125a.75.75 0 00.926.926l3.125-.893a.75.75 0 00.31-.178l7.79-7.793a1.75 1.75 0 000-2.475l-.812-.812zM11.72 3.22a.25.25 0 01.354 0l.812.812a.25.25 0 010 .354L12 5.272 10.728 4l.992-.78z" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={e => handleRemove(e, server.id)}
-                      className="p-0.5 text-gray-400 hover:text-red-500 dark:hover:text-red-400"
-                      title="Remove connection">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
-                        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
-              </button>
-            ))}
-
-            {/* Saved connections section */}
-            {savedConfigs.length > 0 && (
-              <div className="border-t border-gray-200 dark:border-gray-700 mt-1 pt-1">
-                <div className="px-3 py-1">
-                  <input
-                    type="text"
-                    value={configSearch}
-                    onChange={e => setConfigSearch(e.target.value)}
-                    placeholder="Search saved connections..."
-                    className="w-full px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 outline-none"
-                  />
-                </div>
-                {filteredConfigs.map(config => (
+          <div className={`absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 py-1 ${savedConfigs.length > 0 ? 'w-[560px]' : 'w-72'}`}>
+            <div className={savedConfigs.length > 0 ? 'flex' : ''}>
+              {/* Active connections — left column */}
+              <div className={savedConfigs.length > 0 ? 'w-1/2 border-r border-gray-200 dark:border-gray-700' : ''}>
+                <p className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Active</p>
+                {servers.map(server => (
                   <button
-                    key={config.id}
+                    key={server.id}
                     type="button"
-                    onClick={() => handleSelectConfig(config)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-left cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
-                  >
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-amber-400" />
-                    <div className="min-w-0">
-                      <div className="truncate font-semibold text-sm text-gray-900 dark:text-gray-100">
-                        {config.name || 'Unnamed'}
+                    onClick={() => handleSelect(server.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-left cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                      server.id === activeServer.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                    }`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className={`w-2 h-2 rounded-full shrink-0 ${
+                          server.type === 'local' ? 'bg-green-400' : 'bg-blue-400'
+                        }`}
+                      />
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold text-sm text-gray-900 dark:text-gray-100">{server.name}</div>
+                        {server.baseUrl && (
+                          <div className="truncate text-[11px] text-gray-500 dark:text-gray-400">{server.baseUrl}</div>
+                        )}
                       </div>
-                      <div className="truncate text-xs text-gray-500 dark:text-gray-400">{config.url}</div>
                     </div>
+                    {server.id !== 'local' && (
+                      <div className="flex items-center gap-1 ml-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={e => handleEdit(e, server)}
+                          className="p-0.5 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400"
+                          title="Edit connection">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
+                            <path d="M13.488 2.513a1.75 1.75 0 00-2.475 0L3.22 10.303a.75.75 0 00-.178.31l-.893 3.125a.75.75 0 00.926.926l3.125-.893a.75.75 0 00.31-.178l7.79-7.793a1.75 1.75 0 000-2.475l-.812-.812zM11.72 3.22a.25.25 0 01.354 0l.812.812a.25.25 0 010 .354L12 5.272 10.728 4l.992-.78z" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={e => handleRemove(e, server.id)}
+                          className="p-0.5 text-gray-400 hover:text-red-500 dark:hover:text-red-400"
+                          title="Remove connection">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
+                            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
                   </button>
                 ))}
-                {savedConfigs.length > 5 && !configSearch && (
-                  <button
-                    type="button"
-                    onClick={() => { setShowManager(true); setIsOpen(false); }}
-                    className="w-full px-3 py-1.5 text-[11px] text-blue-500 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700 text-left cursor-pointer"
-                  >
-                    Manage Connections ({savedConfigs.length})
-                  </button>
-                )}
               </div>
-            )}
 
+              {/* Saved connections — right column */}
+              {savedConfigs.length > 0 && (
+                <div className="w-1/2">
+                  <div className="px-3 py-1.5 flex items-center justify-between">
+                    <p className="text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Saved</p>
+                    {savedConfigs.length > 5 && (
+                      <button
+                        type="button"
+                        onClick={() => { setShowManager(true); setIsOpen(false); }}
+                        className="text-[10px] text-blue-500 dark:text-blue-400 hover:underline cursor-pointer"
+                      >
+                        All ({savedConfigs.length})
+                      </button>
+                    )}
+                  </div>
+                  <div className="px-3 pb-1">
+                    <input
+                      type="text"
+                      value={configSearch}
+                      onChange={e => setConfigSearch(e.target.value)}
+                      placeholder="Search..."
+                      className="w-full px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  {filteredConfigs.map(config => (
+                    <button
+                      key={config.id}
+                      type="button"
+                      onClick={() => handleSelectConfig(config)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      <span className="w-2 h-2 rounded-full shrink-0 bg-amber-400" />
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold text-sm text-gray-900 dark:text-gray-100">
+                          {config.name || 'Unnamed'}
+                        </div>
+                        <div className="truncate text-[11px] text-gray-500 dark:text-gray-400">{config.url}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Actions — full width */}
             <div className="border-t border-gray-200 dark:border-gray-700 mt-1 pt-1">
               <button
                 type="button"
