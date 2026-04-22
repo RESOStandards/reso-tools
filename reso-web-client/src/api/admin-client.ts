@@ -30,6 +30,7 @@ export interface GenerateResponse {
   readonly created: number;
   readonly failed: number;
   readonly errors: ReadonlyArray<string>;
+  readonly info?: ReadonlyArray<string>;
   readonly relatedResults: ReadonlyArray<RelatedResult>;
   readonly durationMs: number;
 }
