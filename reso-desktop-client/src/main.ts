@@ -1205,7 +1205,7 @@ app.whenReady().then(async () => {
   // Release name displayed in the About panel. Update this each release —
   // the version itself is read automatically from package.json via
   // app.getVersion() so it can never drift. See CLAUDE.md release checklist.
-  const RELEASE_NAME = 'Ten Ichi';
+  const RELEASE_NAME = 'Elevenses';
   const appVersion = app.getVersion();
   app.setAboutPanelOptions({
     applicationName: 'RESO Desktop Client (Beta)',
