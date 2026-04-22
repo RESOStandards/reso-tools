@@ -308,9 +308,11 @@ export const generateFieldValue = (
 
     case 'Edm.Int64': {
       const b64 = findBounds(fieldName);
+      // Respect maxLength as digit count bound (e.g., maxLength=10 → max 9999999999)
+      const lengthMax = maxLength ? 10 ** Math.min(maxLength, 15) - 1 : 100000;
       const min64 = Math.ceil(b64?.min ?? 0);
-      const max64 = Math.floor(b64?.max ?? 100000);
-      return randomInt(min64 <= max64 ? min64 : 0, min64 <= max64 ? max64 : 100000);
+      const max64 = Math.floor(b64?.max ?? lengthMax);
+      return randomInt(min64 <= max64 ? min64 : 0, min64 <= max64 ? max64 : lengthMax);
     }
 
     case 'Edm.Byte':
