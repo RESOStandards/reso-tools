@@ -23,10 +23,16 @@ export interface RequestOptions {
  * Uses @reso-standards/reso-client's createClient under the hood. Creates a lightweight
  * client per call since the auth token may vary between requests.
  */
-export const odataRequest = async (options: RequestOptions): Promise<ODataResponse> => {
+export const odataRequest = async (options: RequestOptions & { readonly odataVersion?: string }): Promise<ODataResponse> => {
+  const defaultHeaders: Record<string, string> = {};
+  if (options.odataVersion) {
+    defaultHeaders['OData-Version'] = options.odataVersion;
+  }
+
   const client = await createClient({
     baseUrl: '',
-    auth: { mode: 'token', authToken: options.authToken }
+    auth: { mode: 'token', authToken: options.authToken },
+    defaultHeaders,
   });
 
   return client.request(options.method, options.url, {

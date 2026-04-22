@@ -11,7 +11,7 @@ beforeAll(async () => {
   app.use(express.urlencoded({ extended: false }));
 
   app.post('/oauth/token', (req, res) => {
-    const { grant_type, client_id, client_secret } = req.body;
+    const { grant_type, client_id, client_secret, scope } = req.body;
 
     if (grant_type !== 'client_credentials') {
       res.status(400).json({ error: 'unsupported_grant_type' });
@@ -23,13 +23,18 @@ beforeAll(async () => {
       return;
     }
 
+    if (client_id === 'scope-required' && !scope) {
+      res.status(400).json({ error: 'invalid_scope', error_description: 'scope is required' });
+      return;
+    }
+
     if (!client_id || !client_secret) {
       res.status(400).json({ error: 'invalid_request' });
       return;
     }
 
     res.json({
-      access_token: `token-for-${client_id}`,
+      access_token: scope ? `token-for-${client_id}-scope-${scope}` : `token-for-${client_id}`,
       token_type: 'Bearer',
       expires_in: 3600
     });
@@ -98,5 +103,25 @@ describe('resolveAuthToken', () => {
       tokenUrl
     });
     expect(token).toBe('token-for-sdk-client');
+  });
+
+  it('passes scope to token endpoint when provided', async () => {
+    const token = await resolveAuthToken({
+      mode: 'client_credentials',
+      clientId: 'scope-required',
+      clientSecret: 'secret',
+      tokenUrl,
+      scope: 'api',
+    });
+    expect(token).toBe('token-for-scope-required-scope-api');
+  });
+
+  it('fails when scope is required but not provided', async () => {
+    await expect(resolveAuthToken({
+      mode: 'client_credentials',
+      clientId: 'scope-required',
+      clientSecret: 'secret',
+      tokenUrl,
+    })).rejects.toThrow();
   });
 });

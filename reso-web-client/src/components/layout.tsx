@@ -119,9 +119,10 @@ export const Layout = () => {
             </button>
             {/* RESO Logo — renders both variants; CSS dark: class toggles visibility
                 so the correct logo shows immediately without waiting for React state. */}
-            <NavLink to="/" className="shrink-0 hidden sm:flex sm:w-44 sm:items-center" onClick={handleLogoClick}>
+            <NavLink to="/" className="shrink-0 hidden sm:flex sm:items-center gap-2" onClick={handleLogoClick}>
               <img src={LOGO_LIGHT} alt="RESO" className="h-10 dark:hidden" />
               <img src={LOGO_DARK} alt="RESO" className="h-10 hidden dark:block" />
+              <span className="text-[9px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 border border-amber-300 dark:border-amber-600 rounded px-1.5 py-0.5 leading-none">Beta</span>
             </NavLink>
             <NavLink to="/" className="shrink-0 sm:hidden" onClick={handleLogoClick}>
               <img src={LOGO_LIGHT} alt="RESO" className="h-8 dark:hidden" />
@@ -131,7 +132,7 @@ export const Layout = () => {
             <div className="hidden sm:flex items-center gap-0.5 mr-1">
               <button
                 type="button"
-                onClick={() => window.history.back()}
+                onClick={() => { if (window.location.pathname !== '/') window.history.back(); }}
                 className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                 title="Go back"
                 aria-label="Go back">

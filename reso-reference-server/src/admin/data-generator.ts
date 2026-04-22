@@ -44,6 +44,7 @@ interface GenerateResponse {
   readonly created: number;
   readonly failed: number;
   readonly errors: ReadonlyArray<string>;
+  readonly info: ReadonlyArray<string>;
   readonly relatedResults: ReadonlyArray<{
     readonly resource: string;
     readonly created: number;
@@ -150,6 +151,7 @@ export const createDataGeneratorHandler =
       let created = 0;
       let failed = 0;
       const errors: string[] = [];
+      const info: string[] = [];
       const relatedResults: Array<{ resource: string; created: number; failed: number }> = [];
       const generatedRecords: Record<string, Array<Record<string, unknown>>> = {};
 
@@ -362,7 +364,7 @@ export const createDataGeneratorHandler =
           }
 
           if (totalReconciled > 0) {
-            errors.push(`Reconciled ${totalReconciled} Lookup Resource entries for generated enum values`);
+            info.push(`Reconciled ${totalReconciled.toLocaleString()} Lookup Resource entries for generated enum values`);
           }
         } catch (err) {
           errors.push(`Lookup reconciliation: ${err instanceof Error ? err.message : 'failed'}`);
@@ -374,6 +376,7 @@ export const createDataGeneratorHandler =
         created,
         failed,
         errors: errors.slice(0, 20),
+        info,
         relatedResults,
         durationMs: Date.now() - startTime
       };

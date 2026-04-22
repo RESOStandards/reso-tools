@@ -145,6 +145,7 @@ export const EndorsementList = ({
     () => searchParams.get('q') ?? ''
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [showMyResults, setShowMyResults] = useState(isSignedIn);
 
   const activeEndorsements = paramSet(searchParams.get('endorsement'));
   const activeStatuses = paramSet(searchParams.get('status')) as Set<EndorsementStatus>;
@@ -282,6 +283,7 @@ export const EndorsementList = ({
     statusFilter: apiStatusFilter,
     endorsementFilter,
     searchKey: query,
+    showMyResults,
     sortBy: sortOption.sortBy,
     sortByTimestamp: sortOption.sortByTimestamp
   });
@@ -647,6 +649,20 @@ export const EndorsementList = ({
               options={SORT_OPTIONS}
               onChange={setSort}
             />
+            {isSignedIn && (
+              <button
+                type="button"
+                onClick={() => setShowMyResults(prev => !prev)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
+                  showMyResults
+                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                }`}
+                title={showMyResults ? 'Showing only your results — click to show all' : 'Showing all results — click to show only yours'}
+              >
+                My Results
+              </button>
+            )}
           </div>
 
           {/* Filter drawer — flows horizontally, two columns on wide screens */}

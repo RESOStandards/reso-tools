@@ -76,6 +76,7 @@ export const useEndorsements = (
 ): UseEndorsementsResult => {
   const { user, isHydrating } = useAuth();
   const apiKey = user?.token ?? null;
+  const providerUoi = (user as Record<string, unknown> | null)?.providerUoi as string | null ?? null;
 
   const statusFilter = input.statusFilter ?? EMPTY_ARRAY;
   const endorsementFilter = input.endorsementFilter ?? EMPTY_ARRAY;
@@ -112,13 +113,13 @@ export const useEndorsements = (
       ...(statusFilter.length > 0 ? { statusFilter } : {}),
       ...(endorsementFilter.length > 0 ? { endorsementFilter } : {}),
       ...(searchKey ? { searchKey } : {}),
-      ...(showMyResults ? { showMyResults: true } : {})
+      ...(showMyResults ? { showMyResults: true, providerUoi } : {})
     }),
     // statusFilter / endorsementFilter intentionally excluded — we key
     // on the value-based string instead so reference-only changes don't
     // refire.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [statusKey, endorsementKey, searchKey, showMyResults, sortBy, sortByTimestamp]
+    [statusKey, endorsementKey, searchKey, showMyResults, providerUoi, sortBy, sortByTimestamp]
   );
 
   /** Internal: perform a single fetch at the given `from` cursor. */
@@ -142,12 +143,6 @@ export const useEndorsements = (
           { ...baseOptions, from }
         );
         if (controller.signal.aborted) return;
-
-        // eslint-disable-next-line no-console
-        console.log(
-          '[cert] /certification_reports/filter response:',
-          { from, append, response }
-        );
 
         const adapted = responseToEndorsements(response);
         const reportsByOrgsEmpty =

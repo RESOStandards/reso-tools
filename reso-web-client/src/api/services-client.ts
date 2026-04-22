@@ -51,7 +51,7 @@ export const searchNotifications = async (
   eventTypes: ReadonlyArray<NotificationEventType>,
   showUnreadOnly = true,
 ): Promise<ReadonlyArray<ServiceNotification>> => {
-  const res = await fetch(proxiedServicesUrl('/notifications/search'), {
+  const res = await fetch(proxiedServicesUrl('/v2/notifications/search'), {
     method: 'POST',
     headers: bearerHeaders(token),
     body: JSON.stringify({ eventTypes, showUnreadOnly }),
@@ -66,7 +66,7 @@ export const markAllNotificationsRead = async (
   token: string,
   eventTypes: ReadonlyArray<NotificationEventType>,
 ): Promise<void> => {
-  await fetch(proxiedServicesUrl('/notifications/mark-as-read'), {
+  await fetch(proxiedServicesUrl('/v2/notifications/mark-as-read'), {
     method: 'PATCH',
     headers: bearerHeaders(token),
     body: JSON.stringify({ markAllRead: true, eventTypes }),
@@ -79,7 +79,7 @@ export const markNotificationRead = async (
   notificationId: string,
   notificationTimestamp: string,
 ): Promise<void> => {
-  await fetch(proxiedServicesUrl('/notifications/mark-as-read'), {
+  await fetch(proxiedServicesUrl('/v2/notifications/mark-as-read'), {
     method: 'PATCH',
     headers: bearerHeaders(token),
     body: JSON.stringify({ notificationId, notificationTimestamp }),

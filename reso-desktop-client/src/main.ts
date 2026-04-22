@@ -19,7 +19,7 @@ const log = (msg: string): void => {
 };
 
 // Override default "Electron" name shown in macOS menu bar and dock
-app.setName('RESO Desktop Client');
+app.setName('RESO Desktop Client (Beta)');
 
 // ── Persistent storage (encrypted when safeStorage is available, plain JSON otherwise) ──
 
@@ -82,6 +82,41 @@ const registerStorageHandlers = (): void => {
     delete store[key];
     writeStore(store);
   });
+};
+
+// ── Job store (SQLite in main process, accessed via IPC) ──
+
+import { initJobsDb, createJobStore, type JobStore, type JobRecord, type StepRecord, type StatusPatch, type JobFilter } from './job-store.js';
+
+let jobStore: JobStore | null = null;
+
+const registerJobStoreHandlers = (): void => {
+  const dbPath = resolve(app.getPath('userData'), 'reso-jobs.db');
+  const db = initJobsDb(dbPath);
+  jobStore = createJobStore(db);
+  log(`Job store initialized: ${dbPath}`);
+
+  ipcMain.handle('jobs:create', (_event, job: Omit<JobRecord, 'steps'>) =>
+    jobStore!.createJob(job)
+  );
+  ipcMain.handle('jobs:update-status', (_event, id: string, patch: StatusPatch) =>
+    jobStore!.updateJobStatus(id, patch)
+  );
+  ipcMain.handle('jobs:upsert-step', (_event, jobId: string, step: StepRecord) =>
+    jobStore!.upsertStep(jobId, step)
+  );
+  ipcMain.handle('jobs:get', (_event, id: string) =>
+    jobStore!.getJob(id)
+  );
+  ipcMain.handle('jobs:get-all', (_event, filter?: JobFilter) =>
+    jobStore!.getJobs(filter)
+  );
+  ipcMain.handle('jobs:delete', (_event, id: string) =>
+    jobStore!.deleteJob(id)
+  );
+  ipcMain.handle('jobs:clear-completed', () =>
+    jobStore!.clearCompleted()
+  );
 };
 
 // ── Certification runner (SDK in main process, progress via IPC) ──
@@ -355,7 +390,8 @@ const registerCertRunnerHandlers = (): void => {
       const result = await new Promise<{ status: string; steps: ReadonlyArray<Record<string, unknown>>; duration: number }>((resolveWorker, rejectWorker) => {
         worker.on('message', (msg: { type: string; jobId: string; progress?: Record<string, unknown>; result?: string; error?: string }) => {
           if (msg.jobId !== jobId) return;
-          log(`[main] received worker msg: ${msg.type} ${msg.type === 'progress' ? (msg.progress?.step as string) + ' → ' + (msg.progress?.status as string) : ''}`);
+          // TODO: remove debug logging before production
+          // log(`[main] received worker msg: ${msg.type} ${msg.type === 'progress' ? (msg.progress?.step as string) + ' → ' + (msg.progress?.status as string) : ''}`);
 
           if (msg.type === 'progress' && msg.progress) {
             event.sender.send('cert:progress', jobId, {
@@ -391,7 +427,7 @@ const registerCertRunnerHandlers = (): void => {
         const reportFiles: Record<string, unknown> = {};
         const filesToRead: Readonly<Record<string, string>> = {
           schemaErrors: resolve(outputDir, 'data-availability-schema-validation-errors.json'),
-          variations: resolve(outputDir, 'data-dictionary-variations.json'),
+          variations: resolve(outputDir, 'variations-report.json'),
           metadata: resolve(outputDir, 'metadata-report.processed.json'),
           report: resolve(outputDir, 'report.json'),
           reportDetailed: resolve(outputDir, 'report-detailed.json'),
@@ -412,7 +448,10 @@ const registerCertRunnerHandlers = (): void => {
       return undefined;
     };
 
-    const reports = readReportsFromDisk(resolvedConfig);
+    // Merge reports from disk (file artifacts) and from the worker (pipeline context)
+    const diskReports = readReportsFromDisk(resolvedConfig);
+    const workerReports = (result as Record<string, unknown>).reports as Record<string, unknown> | undefined;
+    const reports = { ...diskReports, ...workerReports };
 
     // Cross-check: if schema validation errors exist on disk but the pipeline
     // reported success, override to failed.
@@ -453,6 +492,119 @@ const registerCertRunnerHandlers = (): void => {
 
   /** Get the local server URL (for config builder auto-fill). */
   ipcMain.handle('cert:localServerUrl', () => state.serverUrl);
+
+  /** Open a file in the system default application. */
+  ipcMain.handle('cert:open-file', (_event, filePath: string) => {
+    shell.openPath(resolve(filePath));
+  });
+
+  // ── Config manager IPC handlers ──
+
+  const CONFIGS_DIR = resolve(certResultsRoot(), 'configs');
+
+  const configPath = (config: Record<string, unknown>): string => {
+    const providerUoi = (config.providerUoi as string) ?? '';
+    const providerUsi = (config.providerUsi as string) ?? '';
+    const recipientUoi = (config.recipientUoi as string) ?? '';
+    if (providerUoi && recipientUoi) {
+      return resolve(CONFIGS_DIR, `${providerUoi}-${providerUsi}`, recipientUoi);
+    }
+    // Non-cert connection — use slugified name
+    const name = (config.name as string) ?? `connection-${Date.now()}`;
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    return resolve(CONFIGS_DIR, '_connections', slug);
+  };
+
+  /** List all saved configs by scanning the directory tree. */
+  ipcMain.handle('config:list', async () => {
+    try {
+      if (!existsSync(CONFIGS_DIR)) return [];
+      const configs: Array<Record<string, unknown>> = [];
+
+      const scanDir = (dir: string) => {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          if (entry.isDirectory()) {
+            scanDir(resolve(dir, entry.name));
+          } else if (entry.name === 'config.json') {
+            try {
+              const content = readFileSync(resolve(dir, entry.name), 'utf-8');
+              const parsed = JSON.parse(content);
+              // ID is the relative path from CONFIGS_DIR
+              parsed.id = relative(CONFIGS_DIR, dir);
+              configs.push(parsed);
+            } catch { /* skip corrupt files */ }
+          }
+        }
+      };
+
+      scanDir(CONFIGS_DIR);
+      return configs;
+    } catch {
+      return [];
+    }
+  });
+
+  /** Save a config to its directory. */
+  ipcMain.handle('config:save', async (_event, config: Record<string, unknown>) => {
+    const dir = configPath(config);
+    mkdirSync(dir, { recursive: true });
+    // Strip credentials before writing to disk
+    const onDisk = { ...config };
+    delete onDisk.authToken;
+    delete onDisk.clientSecret;
+    delete onDisk.id;
+    onDisk.updatedAt = new Date().toISOString();
+    if (!onDisk.createdAt) onDisk.createdAt = onDisk.updatedAt;
+    writeFileSync(resolve(dir, 'config.json'), JSON.stringify(onDisk, null, 2));
+    // Return with ID
+    return { ...onDisk, id: relative(CONFIGS_DIR, dir) };
+  });
+
+  /** Delete a config directory. */
+  ipcMain.handle('config:delete', async (_event, id: string) => {
+    const dir = resolve(CONFIGS_DIR, id);
+    // Safety: must be inside CONFIGS_DIR
+    if (!dir.startsWith(CONFIGS_DIR)) return false;
+    try {
+      const configFile = resolve(dir, 'config.json');
+      if (existsSync(configFile)) unlinkSync(configFile);
+      // Clean up empty parent directories
+      const cleanEmpty = (d: string) => {
+        if (d === CONFIGS_DIR || !d.startsWith(CONFIGS_DIR)) return;
+        try {
+          const entries = readdirSync(d);
+          if (entries.length === 0) {
+            readdirSync(d); // double-check
+            const { rmdirSync } = require('fs');
+            rmdirSync(d);
+            cleanEmpty(dirname(d));
+          }
+        } catch { /* ignore */ }
+      };
+      cleanEmpty(dir);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
+  /** Import configs from a JSON array. */
+  ipcMain.handle('config:import', async (_event, configs: ReadonlyArray<Record<string, unknown>>) => {
+    let count = 0;
+    for (const config of configs) {
+      const dir = configPath(config);
+      mkdirSync(dir, { recursive: true });
+      const onDisk = { ...config };
+      delete onDisk.authToken;
+      delete onDisk.clientSecret;
+      delete onDisk.id;
+      onDisk.updatedAt = new Date().toISOString();
+      if (!onDisk.createdAt) onDisk.createdAt = onDisk.updatedAt;
+      writeFileSync(resolve(dir, 'config.json'), JSON.stringify(onDisk, null, 2));
+      count++;
+    }
+    return count;
+  });
 };
 
 // ── DD version management ──
@@ -613,7 +765,7 @@ const buildMenu = (): void => {
           accelerator: isMac ? 'Cmd+Left' : 'Alt+Left',
           click: () => {
             const win = BrowserWindow.getFocusedWindow();
-            if (win?.webContents.canGoBack()) win.webContents.goBack();
+            if (win?.webContents.navigationHistory.canGoBack()) win.webContents.navigationHistory.goBack();
           }
         },
         {
@@ -621,7 +773,7 @@ const buildMenu = (): void => {
           accelerator: isMac ? 'Cmd+Right' : 'Alt+Right',
           click: () => {
             const win = BrowserWindow.getFocusedWindow();
-            if (win?.webContents.canGoForward()) win.webContents.goForward();
+            if (win?.webContents.navigationHistory.canGoForward()) win.webContents.navigationHistory.goForward();
           }
         },
         { type: 'separator' },
@@ -813,7 +965,12 @@ const buildSplashHtml = (logoPath: string): string => {
   const isDark = isDarkMode();
   const bg = isDark ? '#1a202c' : '#f9fafb';
   const spinnerColor = isDark ? '#63b3ed' : '#007e9e';
-  const logoSrc = `file://${logoPath}`;
+  // Inline the logo as base64 data URI — file:// URLs are blocked inside data: pages
+  let logoSrc = `file://${logoPath}`;
+  try {
+    const logoData = readFileSync(logoPath);
+    logoSrc = `data:image/png;base64,${logoData.toString('base64')}`;
+  } catch { /* fallback to file:// */ }
 
   return `data:text/html;charset=utf-8,${encodeURIComponent(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
@@ -836,7 +993,7 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
     minHeight: 600,
     show: false,
     backgroundColor: isDark ? '#1a202c' : '#f9fafb',
-    title: `RESO Desktop Client — DD ${getDDVersion()}`,
+    title: `RESO Desktop Client (Beta) — DD ${getDDVersion()}`,
     icon,
     webPreferences: {
       nodeIntegration: false,
@@ -854,6 +1011,14 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
   win.once('ready-to-show', () => win.show());
   win.loadURL(buildSplashHtml(paths.logoPath));
 
+  // Prevent navigating away from the SPA (e.g., back to splash screen)
+  win.webContents.on('will-navigate', (event, navUrl) => {
+    // Allow navigation to the server URL (SPA root)
+    if (state.serverUrl && navUrl.startsWith(state.serverUrl)) return;
+    // Block everything else (splash screen, external URLs handled by setWindowOpenHandler)
+    event.preventDefault();
+  });
+
   // Open external links in the system browser
   win.webContents.setWindowOpenHandler(({ url: linkUrl }) => {
     if (linkUrl.startsWith('http')) {
@@ -862,31 +1027,46 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
     return { action: 'deny' };
   });
 
+  // Safe SPA navigation helper — injected into renderer.
+  // Prevents navigating back past the SPA entry point (which would show the splash screen).
+  // Checks if a React Router blocker is active before navigating.
+  const safeNavScript = (direction: 'back' | 'forward') => `
+    (function() {
+      if ('${direction}' === 'back') {
+        if (window.history.length <= 1) return;
+        if (window.location.pathname === '/') return;
+      }
+      window.history.${direction}();
+    })()
+  `;
+
   // Navigation: keyboard shortcuts (Cmd/Ctrl+[/] and Cmd/Ctrl+Arrow)
-  // Uses window.history for SPA (React Router) compatibility.
-  win.webContents.on('before-input-event', (_event, input) => {
+  // preventDefault stops Electron's native back/forward so only our safe script runs
+  win.webContents.on('before-input-event', (event, input) => {
     const mod = process.platform === 'darwin' ? input.meta : input.control;
     if (!mod || input.type !== 'keyDown') return;
 
     if (input.key === '[' || input.key === 'ArrowLeft') {
-      win.webContents.executeJavaScript('window.history.back()').catch(() => {});
+      event.preventDefault();
+      win.webContents.executeJavaScript(safeNavScript('back')).catch(() => {});
     } else if (input.key === ']' || input.key === 'ArrowRight') {
-      win.webContents.executeJavaScript('window.history.forward()').catch(() => {});
+      event.preventDefault();
+      win.webContents.executeJavaScript(safeNavScript('forward')).catch(() => {});
     }
   });
 
   // Navigation: macOS swipe gestures (three-finger if configured)
   win.on('swipe', (_event, direction) => {
     if (direction === 'left') {
-      win.webContents.executeJavaScript('window.history.back()').catch(() => {});
+      win.webContents.executeJavaScript(safeNavScript('back')).catch(() => {});
     } else if (direction === 'right') {
-      win.webContents.executeJavaScript('window.history.forward()').catch(() => {});
+      win.webContents.executeJavaScript(safeNavScript('forward')).catch(() => {});
     }
   });
 
   // Navigation: two-finger trackpad swipe (scroll-based)
   // For SPAs using React Router, we call window.history directly since
-  // Electron's webContents.canGoBack() doesn't track pushState navigation.
+  // Electron's navigationHistory.canGoBack() doesn't track pushState navigation.
   win.webContents.on('did-finish-load', () => {
     win.webContents.executeJavaScript(`
       (() => {
@@ -903,7 +1083,7 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
           if (deltaX > 150) {
             tracking = false;
             deltaX = 0;
-            window.history.back();
+            if (window.history.length > 1 && window.location.pathname !== '/') window.history.back();
           } else if (deltaX < -150) {
             tracking = false;
             deltaX = 0;
@@ -929,6 +1109,10 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
 /** Graceful shutdown — kill server child process. */
 const shutdown = (): void => {
   log('Shutting down...');
+  if (jobStore) {
+    jobStore.close();
+    jobStore = null;
+  }
   if (state.serverProcess) {
     state.serverProcess.kill('SIGTERM');
     state.serverProcess = null;
@@ -1009,7 +1193,7 @@ const checkForUpdatesInteractive = async (): Promise<void> => {
     const { response: button } = await dialog.showMessageBox({
       type: 'info',
       title: 'Update Available',
-      message: 'A new version of RESO Desktop Client is available.',
+      message: 'A new version of RESO Desktop Client (Beta) is available.',
       detail: `${release.name}\n\nYou are running v${app.getVersion()}. Would you like to download the latest version?`,
       buttons: ['Download', 'Later'],
       defaultId: 0,
@@ -1023,7 +1207,7 @@ const checkForUpdatesInteractive = async (): Promise<void> => {
       type: 'info',
       title: 'No Updates',
       message: 'You are running the latest version.',
-      detail: `RESO Desktop Client v${app.getVersion()}`
+      detail: `RESO Desktop Client (Beta) v${app.getVersion()}`
     });
   }
 };
@@ -1034,10 +1218,10 @@ app.whenReady().then(async () => {
   // Release name displayed in the About panel. Update this each release —
   // the version itself is read automatically from package.json via
   // app.getVersion() so it can never drift. See CLAUDE.md release checklist.
-  const RELEASE_NAME = 'Ten Ichi';
+  const RELEASE_NAME = 'Elevenses';
   const appVersion = app.getVersion();
   app.setAboutPanelOptions({
-    applicationName: 'RESO Desktop Client',
+    applicationName: 'RESO Desktop Client (Beta)',
     applicationVersion: appVersion,
     version: `v${appVersion} — ${RELEASE_NAME}`,
     copyright: '© 2026 Real Estate Standards Organization',
@@ -1047,6 +1231,7 @@ app.whenReady().then(async () => {
   });
 
   registerStorageHandlers();
+  registerJobStoreHandlers();
   registerCertRunnerHandlers();
   buildMenu();
 

@@ -2,6 +2,88 @@
 
 ---
 
+## v0.11 – "Elevenses"
+
+### Saved Configs and Connection Manager
+
+Complete redesign of how server connections and certification test configurations are stored, searched, and managed.
+
+- **Separated data model:** `SavedCredentials` for server connections (URL, auth, tokens) and `SavedCertConfig` for certification test settings (endorsements, UOIs, DD options). Credentials stored in OS keychain via safeStorage.
+- **Connection Manager overlay:** search, MRU ordering, inline editing, masked credential display
+- **Import/export:** batch config import creates individual configs with auto-naming and collision detection. Export with toggleable content and conflict diff view.
+- **Config builder UX:** MRU 3 saved configs in provider/recipient dropdowns on focus, autosave draft on quit (replaces navigation blocker), dirty tracking with save prompt before Start Test
+- **Server switcher:** two-column layout with active connections on the left and saved connections on the right. Search-as-you-type across all saved connections.
+- **Credential auto-save:** connections saved automatically on job start with change detection
+
+### SQLite Job Store
+
+Replaced localStorage-based job persistence with a durable SQLite database in the Electron main process.
+
+- **Schema:** `jobs` and `job_steps` tables with indexes mirroring DynamoDB access patterns (status, provider, recipient queries)
+- **IPC bridge:** 7 handlers exposed to the renderer via preload, with localStorage fallback for browser mode
+- **First-startup migration:** imports existing jobs from localStorage and `.reso-cert/` filesystem scan
+- **19 unit tests:** CRUD, steps, filters, JSON round-trip, bulk operations, full lifecycle
+- Eliminates phantom "passed" jobs, data loss on restart, and stale running state
+
+### Variations Review
+
+End-to-end collaborative variations review workflow, replacing the manual CSV-based process.
+
+- **v2 endpoints:** all API paths updated to `services.reso.org/v2/certification/variations/*`
+- **Save flow:** wired to `saveVariationsReview()` with auth context, SHA-256 change integrity, editor provenance
+- **Inline comments:** conversation threads on every variation card (provider right-aligned, admin left-aligned)
+- **Admin actions:** Remove (admin-only) for deleting bad mappings. Fast Track gated to authorized FT admin emails.
+- **Review list:** live stats from `getVariationsStats()` with summary tiles (In Review, Fast Track, Ignored, Resolved) and per-resource cards
+- **Lock management:** report-level lock acquired on entering review, released on leave/save. Read-only banner when locked by another reviewer. 24h TTL in DynamoDB.
+- **Notification polling:** singleton poll loop shared across consumers via `useSyncExternalStore`. Stale report banner when updated by another reviewer.
+- **8 variations save tests:** payload building, key parsing, comments, changeId integrity
+
+### Authentication
+
+- **Cert API auth scheme:** admin accounts use Basic auth, provider accounts use ApiKey auth. Previously hardcoded ApiKey for all users, causing 401s for admin accounts.
+- **Auth hydration:** full `certApiLogin` on every startup instead of stale token refresh. User, provider token, and hydrating flag set in one React batch to prevent downstream hooks from firing with stale state.
+- **Login autofill:** credentials pre-filled from safeStorage when the login modal opens
+- **Notification dedup:** singleton poll loop prevents multiple hook consumers from firing duplicate requests
+
+### OData Compatibility
+
+- **Auto-detect OData version** from metadata response header or EDMX Version attribute — no longer sends OData-Version header by default (was causing 400s on some servers)
+- **$-encoding:** OData system query options use %24 encoding in URI builder for server compatibility
+- **Remove Content-Type on GET requests**
+
+### Certification Pipeline
+
+- **ETL migration:** moved to `src/etl/`, cucumber processing removed. 1,310 tests.
+- **DD 2.1 default:** version dropdown defaults to 2.1
+- **EntityEvent observe timeout:** default increased from 30s to 60s, user-configurable field added
+- **Step naming:** "Write compliance reports" renamed to "Write reports"
+- **Service check:** renamed from "Health check" across all 4 pipelines. Uses OData service document after auth.
+- **Failure reports:** improved summary messages (assertion count + first 2 failures), detail view shows request URLs and assertion expected/actual values. Removed redundant Generic/Detailed download buttons.
+- **My Results toggle:** endorsements list filter defaults to provider's own results when signed in
+- **Provider badge:** always visible on org summary page, even for single-provider orgs
+- **Review Variations button:** only shown on DD jobs that actually found variations
+
+### Desktop Client (v0.11.0)
+
+- **SQLite job store:** durable persistence in `userData/reso-jobs.db`
+- **Job store IPC bridge:** 7 handlers for CRUD, filtering, step upsert
+- **Autosave draft:** config builder saves draft on quit/navigation, restores on next visit
+- **Metadata refresh button:** matches orgs page styling (pill with text)
+- **better-sqlite3:** added as direct dependency, rebuilt for Electron ABI
+
+### DD Documentation Site
+
+- **DD 2.1 sheet fix:** removed 2 duplicate rows with URL as ResourceName (TransactionKey, TransactionType)
+- **DD generator:** ticket created to point generator at transport repo sheets directly (#7)
+
+### Dependencies and Security
+
+- **better-sqlite3** v12.9.0 added to desktop client
+- **@types/better-sqlite3** added as dev dependency
+- **chalk** removed from legacy schema validation (ESM-only v5 incompatible with CJS require)
+
+---
+
 ## v0.10 – "Ten Ichi"
 
 ### XSD and Semantic Metadata Validation

@@ -25,23 +25,26 @@ interface EntityEventContext {
 
 // ── Pipeline Steps ──
 
-/** Wait for the server to respond to a health check. */
-const healthCheck: PipelineStep<EntityEventContext> = {
-  name: 'Health check',
+/** OData service check — fetches the service document to confirm the server is reachable and speaks OData. */
+const serviceCheck: PipelineStep<EntityEventContext> = {
+  name: 'Service check',
   run: async (ctx, onProgress) => {
-    const url = `${ctx.serverUrl}/health`;
-    const maxAttempts = 30;
+    const url = ctx.serverUrl;
+    const headers: Record<string, string> = ctx.authToken
+      ? { Authorization: `Bearer ${ctx.authToken}` }
+      : {};
+    const maxAttempts = 10;
     for (let i = 0; i < maxAttempts; i++) {
       try {
-        const response = await fetch(url);
+        const response = await fetch(url, { headers });
         if (response.ok) {
-          return { context: ctx, summary: `Server is ready at ${ctx.serverUrl}` };
+          return { context: ctx, summary: 'OData service is ready', requestDetails: [{ method: 'GET', url }] };
         }
-      } catch { /* retry */ }
+      } catch { /* network error — retry */ }
       await new Promise(resolve => setTimeout(resolve, 2000));
-      onProgress({ step: 'Health check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
+      onProgress({ step: 'Service check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
     }
-    return { context: ctx, status: 'failed', errors: [`Server at ${ctx.serverUrl} did not respond after ${maxAttempts} attempts`] };
+    return { context: ctx, status: 'failed', errors: ['OData service did not respond'], requestDetails: [{ method: 'GET', url, error: `No response after ${maxAttempts} attempts` }] };
   },
 };
 
@@ -57,7 +60,9 @@ const resolveAuth = (config: EntityEventConfig): PipelineStep<EntityEventContext
 /** Fetch and parse OData $metadata to verify EntityEvent exists. */
 const fetchAndParseMetadata = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
   name: 'Fetch metadata',
-  run: async (ctx) => {
+  run: async (ctx, onProgress) => {
+    const metadataUrl = config.payloadsDir ?? `${ctx.serverUrl}/$metadata`;
+    onProgress({ step: 'Fetch metadata', status: 'running', message: 'Fetching $metadata...' });
     const metadataXml = config.payloadsDir
       ? await loadMetadataFromFile(config.payloadsDir)
       : await fetchMetadata(ctx.serverUrl, ctx.authToken!);
@@ -163,7 +168,7 @@ const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> =
 
 /** Write generic and detailed compliance reports. */
 const writeComplianceReports = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
-  name: 'Write compliance reports',
+  name: 'Write reports',
   run: async (ctx, onProgress) => {
     const outputDir = buildOutputPath('entity-event', '1.0.0', config);
     await archiveCurrentResults(outputDir);
@@ -202,8 +207,8 @@ const writeComplianceReports = (config: EntityEventConfig): PipelineStep<EntityE
 /** Create the EntityEvent compliance test pipeline. */
 export const createEntityEventPipeline = (config: EntityEventConfig) =>
   createPipeline<EntityEventContext>('entity-event', [
-    ...(config.options?.skipHealthCheck ? [] : [healthCheck]),
     resolveAuth(config),
+    ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),
     fetchAndParseMetadata(config),
     ...(config.mode === 'full' ? [generatePayloads(config)] : []),
     runTests(config),

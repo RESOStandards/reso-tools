@@ -338,6 +338,13 @@ export const DataGeneratorPage = () => {
               </div>
             );
           })()}
+          {(result.info?.length ?? 0) > 0 && (
+            <div className="mt-3 text-xs text-blue-600 dark:text-blue-400">
+              {result.info!.map(msg => (
+                <p key={msg} className="ml-2">{msg}</p>
+              ))}
+            </div>
+          )}
           {result.errors.length > 0 && (
             <div className="mt-3 text-xs text-red-600 dark:text-red-400">
               <p className="font-medium">Errors:</p>

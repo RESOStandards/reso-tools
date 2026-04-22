@@ -8,6 +8,7 @@ export type AuthConfig =
       readonly clientId: string;
       readonly clientSecret: string;
       readonly tokenUrl: string;
+      readonly scope?: string;
     };
 
 // ── Configuration ──

@@ -312,8 +312,16 @@ export const generateMetadataReportFromXlsx = async (
     version,
     generatedOn: new Date().toISOString(),
     resources,
+    models: resources.map(r => ({
+      modelName: r.resourceName,
+      modelType: 'EntityType' as const,
+      properties: [],
+      navigationProperties: [],
+    })),
     fields,
     lookups: [...lookups, ...placeholderLookups],
+    actions: [],
+    functions: [],
   };
 };
 

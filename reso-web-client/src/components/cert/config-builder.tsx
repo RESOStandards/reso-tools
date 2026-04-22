@@ -7,9 +7,11 @@
  * as JSON matching the legacy dd-config.json format.
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { SavedConfigsPanel } from './saved-configs-panel';
+import { loadProfiles, loadConnections, saveDraft, clearDraft, type SavedConnection, type SavedCredentials, type SavedCertConfig } from '../../services/connection-manager';
 import { SearchInput, FilterPill, Badge } from '../metadata/shared';
-import { fetchOrganizations } from '../../api/cert-client';
+import { getOrganizations } from '../../hooks/use-organization-names';
 import type { CertOrganization, CertOrganizationSystem } from '../../api/cert-client';
 import {
   CERT_ENDORSEMENT_LABELS,
@@ -93,12 +95,55 @@ export interface BatchConfig {
   readonly recipients: ReadonlyArray<RecipientConfig>;
 }
 
+// ── Helpers ─────────────────────────────────────────────────────────
+
+/** Build a RecipientConfig from a SavedCertConfig, fetching credentials from safeStorage. */
+const buildRecipientFromConfig = async (
+  config: SavedCertConfig,
+  credentials: Map<string, SavedCredentials>,
+): Promise<RecipientConfig> => {
+  const conn = config.credentialsId ? credentials.get(config.credentialsId) : undefined;
+  let authToken = '';
+  let clientSecret = '';
+  if (config.credentialsId) {
+    const { getCredentials } = await import('../../services/connection-manager');
+    const stored = await getCredentials(config.credentialsId);
+    if (stored) {
+      authToken = stored.authToken ?? '';
+      clientSecret = stored.clientSecret ?? '';
+    }
+  }
+
+  return {
+    id: crypto.randomUUID(),
+    description: config.name ?? '',
+    serviceRootUri: conn?.url ?? '',
+    recipientUoi: config.recipientUoi ?? '',
+    providerUsi: config.providerUsi ?? '',
+    auth: conn?.authMode === 'client_credentials'
+      ? { mode: 'client_credentials' as const, clientId: conn.clientId ?? '', clientSecret, tokenUrl: conn.tokenUrl ?? '', scope: conn.scope }
+      : { mode: 'token' as const, authToken },
+    endorsements: (config.endorsements ?? ['dd']) as unknown as RecipientConfig['endorsements'],
+    ddOptions: {
+      version: (config.ddVersion ?? '2.1') as RecipientConfig['ddOptions']['version'],
+      strictMode: config.strictMode ?? true,
+      limit: config.limit,
+      requestDelay: config.requestDelay,
+      rateLimitWait: config.rateLimitWait,
+      batchExpand: config.batchExpand,
+    },
+    coreOptions: { version: '2.0.0', enumMode: 'auto' },
+    addEditOptions: { resource: 'Property' },
+    entityEventOptions: { mode: 'observe', maxEvents: 1000, pollInterval: 5000, pollTimeout: 60000 },
+  };
+};
+
 // ── Defaults ─────────────────────────────────────────────────────────
 
-const DEFAULT_DD: DDOptions = { version: '2.0', strictMode: true };
+const DEFAULT_DD: DDOptions = { version: '2.1', strictMode: true };
 const DEFAULT_CORE: CoreOptions = { version: '2.0.0', enumMode: 'auto' };
 const DEFAULT_ADD_EDIT: AddEditOptions = { resource: 'Property' };
-const DEFAULT_ENTITY_EVENT: EntityEventOptions = { mode: 'observe', maxEvents: 1000, pollInterval: 5000, pollTimeout: 30000 };
+const DEFAULT_ENTITY_EVENT: EntityEventOptions = { mode: 'observe', maxEvents: 1000, pollInterval: 5000, pollTimeout: 60000 };
 
 const DEFAULT_AUTH: AuthConfig = { mode: 'token', authToken: '' };
 
@@ -226,16 +271,15 @@ const DDOptionsSection = ({
         <label className={LABEL}>DD Version</label>
         <select value={options.version} onChange={e => onChange({ ...options, version: e.target.value as DDOptions['version'] })} className={SELECT}>
           <option value="2.1">2.1</option>
-          <option value="2.0">2.0</option>
-          <option value="1.7">1.7</option>
         </select>
       </div>
       <div>
         <label className={LABEL}>Record Limit <span className="text-gray-400">(optional)</span></label>
         <input
-          type="number"
+          type="text"
+          inputMode="numeric"
           value={options.limit ?? ''}
-          onChange={e => onChange({ ...options, limit: e.target.value ? Number(e.target.value) : undefined })}
+          onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); onChange({ ...options, limit: v ? Number(v) : undefined }); }}
           placeholder="100000"
           className={INPUT}
         />
@@ -243,11 +287,10 @@ const DDOptionsSection = ({
       <div>
         <label className={LABEL} title="Delay between replication requests. Set to 0 for local testing. Use 1s or higher for remote servers to avoid rate limiting.">Request Delay <span className="text-gray-400">(seconds)</span></label>
         <input
-          type="number"
-          min="0"
-          step="0.1"
+          type="text"
+          inputMode="decimal"
           value={options.requestDelay ?? 1}
-          onChange={e => onChange({ ...options, requestDelay: Number(e.target.value) })}
+          onChange={e => { const v = e.target.value.replace(/[^0-9.]/g, ''); onChange({ ...options, requestDelay: v ? Number(v) : 0 }); }}
           title="Delay between replication requests. Set to 0 for local testing."
           className={INPUT}
         />
@@ -255,11 +298,10 @@ const DDOptionsSection = ({
       <div>
         <label className={LABEL} title="How long to wait after receiving HTTP 429 Too Many Requests before retrying.">429 Wait <span className="text-gray-400">(minutes)</span></label>
         <input
-          type="number"
-          min="1"
-          step="1"
+          type="text"
+          inputMode="numeric"
           value={options.rateLimitWait ?? 15}
-          onChange={e => onChange({ ...options, rateLimitWait: Number(e.target.value) })}
+          onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); onChange({ ...options, rateLimitWait: v ? Number(v) : undefined }); }}
           title="Wait time after HTTP 429 Too Many Requests. Default: 15 minutes."
           className={INPUT}
         />
@@ -433,10 +475,23 @@ const EntityEventOptionsSection = ({
       <div>
         <label className={LABEL}>Max Events</label>
         <input
-          type="number"
+          type="text"
+          inputMode="numeric"
           value={options.maxEvents ?? ''}
-          onChange={e => onChange({ ...options, maxEvents: e.target.value ? Number(e.target.value) : undefined })}
+          onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); onChange({ ...options, maxEvents: v ? Number(v) : undefined }); }}
           placeholder="1000"
+          className={INPUT}
+        />
+      </div>
+      <div>
+        <label className={LABEL}>Observe Timeout <span className="text-gray-400">(seconds)</span></label>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={options.pollTimeout ? options.pollTimeout / 1000 : ''}
+          onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); onChange({ ...options, pollTimeout: v ? Number(v) * 1000 : undefined }); }}
+          placeholder="60"
+          title="How long to observe for events before stopping. Default: 60 seconds."
           className={INPUT}
         />
       </div>
@@ -450,10 +505,12 @@ const OrgDropdown = ({
   orgs,
   search,
   onSelect,
+  inline = false,
 }: {
   readonly orgs: ReadonlyArray<CertOrganization>;
   readonly search: string;
   readonly onSelect: (org: CertOrganization) => void;
+  readonly inline?: boolean;
 }) => {
   const filtered = useMemo(() => {
     if (!search.trim()) return orgs.slice(0, 20);
@@ -466,7 +523,7 @@ const OrgDropdown = ({
   if (filtered.length === 0) return null;
 
   return (
-    <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+    <div className={inline ? '' : 'absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto'}>
       {filtered.map(org => (
         <button
           key={org.id}
@@ -492,6 +549,8 @@ const RecipientCard = ({
   onDuplicate,
   orgs,
   providerSystems,
+  matchConfigs,
+  savedCredentials,
 }: {
   readonly recipient: RecipientConfig;
   readonly index: number;
@@ -499,12 +558,28 @@ const RecipientCard = ({
   readonly onRemove: () => void;
   readonly onDuplicate: () => void;
   readonly orgs: ReadonlyArray<CertOrganization>;
+  readonly matchConfigs: (query: string) => ReadonlyArray<SavedCertConfig>;
+  readonly savedCredentials: Map<string, SavedCredentials>;
   readonly providerSystems: ReadonlyArray<CertOrganizationSystem>;
 }) => {
   const [expanded, setExpanded] = useState(true);
   const [recipientSearch, setRecipientSearch] = useState('');
   const [showRecipientDropdown, setShowRecipientDropdown] = useState(false);
-  const [recipientName, setRecipientName] = useState(recipient.description || '');
+  const [recipientName, setRecipientName] = useState(() => {
+    if (recipient.description) return recipient.description;
+    if (recipient.recipientUoi) {
+      const match = orgs.find(o => o.id === recipient.recipientUoi);
+      if (match) return match.name;
+    }
+    return '';
+  });
+
+  // Resolve recipient name when orgs load (they may arrive after initial render)
+  useEffect(() => {
+    if (recipientName || !recipient.recipientUoi || orgs.length === 0) return;
+    const match = orgs.find(o => o.id === recipient.recipientUoi);
+    if (match) setRecipientName(match.name);
+  }, [orgs, recipient.recipientUoi, recipientName]);
 
   const [endorsementWarning, setEndorsementWarning] = useState('');
 
@@ -612,16 +687,48 @@ const RecipientCard = ({
                     className={INPUT}
                   />
                   {showRecipientDropdown && (
-                    <OrgDropdown
-                      orgs={orgs}
-                      search={recipientSearch}
-                      onSelect={org => {
-                        onChange({ ...recipient, recipientUoi: org.id, description: org.name });
-                        setRecipientName(org.name);
-                        setRecipientSearch('');
-                        setShowRecipientDropdown(false);
-                      }}
-                    />
+                    <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {matchConfigs(recipientSearch).length > 0 && (
+                        <>
+                          <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/80">
+                            Saved Configs
+                          </div>
+                          {matchConfigs(recipientSearch).map(config => (
+                            <button
+                              key={config.id}
+                              type="button"
+                              className="w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer"
+                              onMouseDown={e => {
+                                e.preventDefault();
+                                buildRecipientFromConfig(config, savedCredentials).then(built => {
+                                  onChange({ ...built, id: recipient.id });
+                                  setRecipientName(config.recipientName ?? config.name ?? '');
+                                  setRecipientSearch('');
+                                  setShowRecipientDropdown(false);
+                                });
+                              }}
+                            >
+                              <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{config.name || config.recipientName || config.recipientUoi}</div>
+                              <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{savedCredentials.get(config.credentialsId ?? '')?.url ?? config.recipientUoi}</div>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/80">
+                        Organizations
+                      </div>
+                      <OrgDropdown
+                        orgs={orgs}
+                        search={recipientSearch}
+                        onSelect={org => {
+                          onChange({ ...recipient, recipientUoi: org.id, description: org.name });
+                          setRecipientName(org.name);
+                          setRecipientSearch('');
+                          setShowRecipientDropdown(false);
+                        }}
+                        inline
+                      />
+                    </div>
                   )}
                 </>
               )}
@@ -718,11 +825,19 @@ const RecipientCard = ({
 export const ConfigBuilder = ({
   onClose,
   onStart,
+  onSave,
   initialConfig,
+  savedConfigId,
+  savedConfigName,
+  refreshKey,
 }: {
   readonly onClose: () => void;
   readonly onStart: (config: BatchConfig) => void;
+  readonly onSave?: (config: BatchConfig, existingId?: string, name?: string) => void;
   readonly initialConfig?: BatchConfig;
+  readonly savedConfigId?: string | null;
+  readonly savedConfigName?: string | null;
+  readonly refreshKey?: number;
 }) => {
   const [providerUoi, setProviderUoi] = useState(initialConfig?.providerUoi ?? '');
   const [providerName, setProviderName] = useState('');
@@ -737,14 +852,68 @@ export const ConfigBuilder = ({
   const [orgsLoading, setOrgsLoading] = useState(false);
   const [providerSearch, setProviderSearch] = useState('');
   const [showProviderDropdown, setShowProviderDropdown] = useState(false);
+  const [highlightedOrgIndex, setHighlightedOrgIndex] = useState(-1);
+
+  // Saved cert configs for autocomplete
+  const [savedConfigs, setSavedConfigs] = useState<ReadonlyArray<SavedCertConfig>>([]);
+  const [savedCredentials, setSavedCredentials] = useState<Map<string, SavedCredentials>>(new Map());
 
   useEffect(() => {
     setOrgsLoading(true);
-    fetchOrganizations(null)
-      .then(setOrgs)
+    getOrganizations(null)
+      .then(loaded => {
+        setOrgs(loaded);
+        // Resolve provider name from org directory if we have a UOI but no name
+        if (providerUoi && !providerName) {
+          const match = loaded.find(o => o.id === providerUoi);
+          if (match) {
+            setProviderName(match.name);
+            setProviderSystems(match.systems ?? []);
+          }
+        }
+      })
       .catch(() => {})
       .finally(() => setOrgsLoading(false));
+
   }, []);
+
+  // Load saved cert configs and credentials for autocomplete (refreshes after save)
+  useEffect(() => {
+    loadProfiles().then(setSavedConfigs).catch(() => {});
+    loadConnections().then(conns => setSavedCredentials(new Map(conns.map(c => [c.id, c])))).catch(() => {});
+  }, [refreshKey]);
+
+  // Autosave draft on unmount / beforeunload (replaces blocker which breaks Electron quit)
+  const draftRef = useRef({ providerUoi, concurrency, recipients, savedConfigId, savedConfigName });
+  draftRef.current = { providerUoi, concurrency, recipients, savedConfigId, savedConfigName };
+
+  useEffect(() => {
+    const saveOnUnload = () => {
+      const { providerUoi: pUoi, concurrency: conc, recipients: recs, savedConfigId: cId, savedConfigName: cName } = draftRef.current;
+      // Only save if there's meaningful content
+      if (pUoi || recs.some(r => r.recipientUoi || r.serviceRootUri)) {
+        saveDraft({ config: { providerUoi: pUoi, concurrency: conc, recipients: recs }, configId: cId ?? null, configName: cName ?? null }).catch(() => {});
+      }
+    };
+    window.addEventListener('beforeunload', saveOnUnload);
+    return () => {
+      window.removeEventListener('beforeunload', saveOnUnload);
+      saveOnUnload(); // Also save on component unmount (navigation away)
+    };
+  }, []);
+
+  /** Filter saved cert configs by a search query, or return MRU 3 when empty. */
+  const matchConfigs = useCallback((query: string): ReadonlyArray<SavedCertConfig> => {
+    const sorted = [...savedConfigs].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    if (!query || query.length < 2) return sorted.slice(0, 3);
+    const q = query.toLowerCase();
+    return sorted.filter(c => {
+      const conn = c.credentialsId ? savedCredentials.get(c.credentialsId) : undefined;
+      return [c.name, conn?.url, c.providerUoi, c.providerName, c.providerUsi, c.systemName, c.recipientUoi, c.recipientName]
+        .filter(Boolean)
+        .some(field => field!.toLowerCase().includes(q));
+    }).slice(0, 8);
+  }, [savedConfigs, savedCredentials]);
 
   const selectProvider = useCallback((org: CertOrganization) => {
     setProviderUoi(org.id);
@@ -842,7 +1011,41 @@ export const ConfigBuilder = ({
     input.click();
   };
 
+  const [showSaveAs, setShowSaveAs] = useState(false);
+  const [saveAsName, setSaveAsName] = useState('');
+
+  // Dirty tracking: snapshot the initial config to detect unsaved changes
+  const [loadedSnapshot, setLoadedSnapshot] = useState<string | null>(() =>
+    initialConfig ? JSON.stringify({ providerUoi: initialConfig.providerUoi, concurrency: initialConfig.concurrency, recipients: initialConfig.recipients }) : null
+  );
+  const [showSavePrompt, setShowSavePrompt] = useState(false);
+  const [savePromptName, setSavePromptName] = useState('');
+
+  const currentSnapshot = JSON.stringify({ providerUoi, concurrency, recipients });
+  const isDirty = loadedSnapshot !== null && currentSnapshot !== loadedSnapshot;
+
   const handleStart = () => {
+    if (isDirty && onSave) {
+      setShowSavePrompt(true);
+      setSavePromptName(savedConfigName ?? `Config ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`);
+      return;
+    }
+    onStart({ providerUoi, concurrency, recipients });
+  };
+
+  const handleSaveAndStart = (existingId?: string, name?: string) => {
+    if (onSave) {
+      onSave({ providerUoi, concurrency, recipients }, existingId, name);
+      setLoadedSnapshot(currentSnapshot); // Reset dirty state after save
+    }
+    setShowSavePrompt(false);
+    clearDraft().catch(() => {});
+    onStart({ providerUoi, concurrency, recipients });
+  };
+
+  const handleSkipAndStart = () => {
+    setShowSavePrompt(false);
+    clearDraft().catch(() => {});
     onStart({ providerUoi, concurrency, recipients });
   };
 
@@ -855,9 +1058,11 @@ export const ConfigBuilder = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Test Configuration</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {savedConfigName ? savedConfigName : 'Test Configuration'}
+          </h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Configure one or more recipients to test against.
+            {savedConfigName ? 'Editing saved configuration' : 'Configure one or more recipients to test against.'}
           </p>
         </div>
         <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer">
@@ -893,18 +1098,76 @@ export const ConfigBuilder = ({
               <input
                 type="text"
                 value={providerSearch}
-                onChange={e => { setProviderSearch(e.target.value); setShowProviderDropdown(true); }}
+                onChange={e => { setProviderSearch(e.target.value); setShowProviderDropdown(true); setHighlightedOrgIndex(-1); }}
                 onFocus={() => setShowProviderDropdown(true)}
                 onBlur={() => setTimeout(() => setShowProviderDropdown(false), 200)}
+                onKeyDown={e => {
+                  if (!showProviderDropdown) return;
+                  const visibleOrgs = orgs.filter(o => {
+                    if (!providerSearch.trim()) return true;
+                    const q = providerSearch.toLowerCase();
+                    return o.name.toLowerCase().includes(q) || o.id.toLowerCase().includes(q);
+                  }).slice(0, 50);
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setHighlightedOrgIndex(i => Math.min(i + 1, visibleOrgs.length - 1));
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setHighlightedOrgIndex(i => Math.max(i - 1, 0));
+                  } else if (e.key === 'Enter' && highlightedOrgIndex >= 0 && highlightedOrgIndex < visibleOrgs.length) {
+                    e.preventDefault();
+                    selectProvider(visibleOrgs[highlightedOrgIndex]);
+                  } else if (e.key === 'Escape') {
+                    setShowProviderDropdown(false);
+                  }
+                }}
                 placeholder={orgsLoading ? 'Loading organizations...' : 'Search by name or UOI...'}
                 className={INPUT}
               />
               {showProviderDropdown && (
-                <OrgDropdown
-                  orgs={orgs}
-                  search={providerSearch}
-                  onSelect={selectProvider}
-                />
+                <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {/* Saved config matches */}
+                  {matchConfigs(providerSearch).length > 0 && (
+                    <>
+                      <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/80">
+                        Saved Configs
+                      </div>
+                      {matchConfigs(providerSearch).map(config => (
+                        <button
+                          key={config.id}
+                          type="button"
+                          className="w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer"
+                          onMouseDown={e => {
+                            e.preventDefault();
+                            if (config.providerUoi) {
+                              setProviderUoi(config.providerUoi);
+                              setProviderName(config.providerName ?? config.providerUoi);
+                            }
+                            buildRecipientFromConfig(config, savedCredentials).then(built => {
+                              setRecipients([built]);
+                              setShowProviderDropdown(false);
+                              setProviderSearch('');
+                            });
+                          }}
+                        >
+                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{config.name || config.recipientName || config.recipientUoi}</div>
+                          <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{savedCredentials.get(config.credentialsId ?? '')?.url ?? config.recipientUoi}</div>
+                          {config.recipientName && <div className="text-[10px] text-gray-400 dark:text-gray-500">Recipient: {config.recipientName}</div>}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  {/* Org directory results */}
+                  <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/80">
+                    Organizations
+                  </div>
+                  <OrgDropdown
+                    orgs={orgs}
+                    search={providerSearch}
+                    onSelect={selectProvider}
+                    inline
+                  />
+                </div>
               )}
             </>
           )}
@@ -954,20 +1217,89 @@ export const ConfigBuilder = ({
             onDuplicate={() => duplicateRecipient(i)}
             orgs={orgs}
             providerSystems={providerSystems}
+            matchConfigs={matchConfigs}
+            savedCredentials={savedCredentials}
           />
         ))}
       </div>
 
-      {/* Import / Export / Summary */}
-      <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-700/50">
-        <button type="button" onClick={handleImport} className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
-          Import Config
-        </button>
-        <span className="text-gray-300 dark:text-gray-600">·</span>
-        <button type="button" onClick={handleExport} className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
-          Export Config
-        </button>
-        <div className="ml-auto flex items-center gap-3">
+      {/* Saved Configs — MRU 3 with search and View All link */}
+      <SavedConfigsPanel
+        onLoad={(imported, configId, configName) => {
+          const pUoi = 'providerUoi' in imported && typeof imported.providerUoi === 'string' ? imported.providerUoi : providerUoi;
+          const conc = 'concurrency' in imported && typeof imported.concurrency === 'number' ? imported.concurrency : concurrency;
+          const recs = 'recipients' in imported && Array.isArray(imported.recipients) ? imported.recipients as ReadonlyArray<RecipientConfig> : recipients;
+          setProviderUoi(pUoi);
+          setConcurrency(conc);
+          setRecipients(recs);
+          // Snapshot loaded state for dirty tracking
+          setLoadedSnapshot(JSON.stringify({ providerUoi: pUoi, concurrency: conc, recipients: recs }));
+        }}
+      />
+
+      {/* Save prompt (shown when starting with unsaved changes) */}
+      {showSavePrompt && (
+        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg space-y-2">
+          <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+            You have unsaved changes. Save before starting?
+          </p>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {savedConfigId && savedConfigName && (
+              <button
+                type="button"
+                onClick={() => handleSaveAndStart(savedConfigId, savedConfigName)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 cursor-pointer"
+              >
+                Save "{savedConfigName}"
+              </button>
+            )}
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={savePromptName}
+                onChange={e => setSavePromptName(e.target.value)}
+                placeholder="Config name..."
+                className="px-2 py-1.5 text-xs rounded border border-amber-300 dark:border-amber-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-amber-500 outline-none w-48"
+                autoFocus
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && savePromptName.trim()) handleSaveAndStart(undefined, savePromptName.trim());
+                  if (e.key === 'Escape') handleSkipAndStart();
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => { if (savePromptName.trim()) handleSaveAndStart(undefined, savePromptName.trim()); }}
+                disabled={!savePromptName.trim()}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 cursor-pointer"
+              >
+                {savedConfigId ? 'Save As' : 'Save'}
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={handleSkipAndStart}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 cursor-pointer"
+            >
+              Skip
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Actions bar */}
+      <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700/50">
+        {/* Left side: Import · Export */}
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={handleImport} className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer py-2">
+            Import
+          </button>
+          <button type="button" onClick={handleExport} className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer py-2">
+            Export
+          </button>
+        </div>
+
+        {/* Right side: Summary + Cancel + Start */}
+        <div className="flex items-center gap-3">
           <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
             {recipients.length} {recipients.length === 1 ? 'recipient' : 'recipients'} · {totalJobs} {totalJobs === 1 ? 'job' : 'jobs'}
           </span>

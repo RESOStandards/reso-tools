@@ -16,6 +16,14 @@
 
 import type { BatchConfig, RecipientConfig, AuthConfig } from '../components/cert/config-builder';
 import {
+  saveConnection,
+  storeCredentials,
+  getCredentials,
+  findConnectionByKey,
+  saveProfile,
+  type StoredCredentials,
+} from './connection-manager';
+import {
   CERT_ENDORSEMENT_LABELS,
   ENDORSEMENT_DEFAULT_VERSIONS,
   stepsForEndorsement,
@@ -43,7 +51,7 @@ interface LocalResult {
 interface CertRunnerAPI {
   readonly run: (jobId: string, config: Record<string, unknown>) => Promise<{
     status: 'passed' | 'failed';
-    steps?: ReadonlyArray<{ name: string; status: string; duration?: number; summary?: string; errors?: ReadonlyArray<string> }>;
+    steps?: ReadonlyArray<{ name: string; status: string; duration?: number; summary?: string; errors?: ReadonlyArray<string>; requestDetails?: ReadonlyArray<{ method: string; url: string; status?: number; error?: string; responseBody?: string }>; artifacts?: ReadonlyArray<{ label: string; path: string }> }>;
     duration: number;
     error?: string;
     reports?: Record<string, unknown>;
@@ -71,23 +79,27 @@ interface ElectronStorage {
 const getElectronStorage = (): ElectronStorage | undefined =>
   (window as unknown as Record<string, unknown>).electronStorage as ElectronStorage | undefined;
 
-const CONFIG_STORAGE_KEY = 'cert:lastBatchConfig';
+// ── SQLite job store (Electron only, exposed via IPC) ─────────────
 
-/** Save a batch config to secure storage (auth tokens encrypted by Electron). */
-const saveConfigToStorage = async (config: BatchConfig): Promise<void> => {
-  const storage = getElectronStorage();
-  if (!storage) return;
-  await storage.set(CONFIG_STORAGE_KEY, JSON.stringify(config));
-};
+interface JobStoreAPI {
+  readonly createJob: (job: Omit<Job, 'steps'>) => Promise<Job>;
+  readonly updateJobStatus: (id: string, patch: {
+    readonly status?: JobStatus;
+    readonly startedAt?: string;
+    readonly completedAt?: string;
+    readonly error?: string;
+    readonly reports?: Record<string, unknown>;
+    readonly resultPath?: string;
+  }) => Promise<Job | undefined>;
+  readonly upsertStep: (jobId: string, step: JobStep & { readonly sortOrder: number }) => Promise<unknown>;
+  readonly getJob: (id: string) => Promise<Job | undefined>;
+  readonly getJobs: (filter?: Record<string, unknown>) => Promise<ReadonlyArray<Job>>;
+  readonly deleteJob: (id: string) => Promise<boolean>;
+  readonly clearCompleted: () => Promise<number>;
+}
 
-/** Save an individual job's SDK config to secure storage keyed by provider+recipient. */
-const saveJobConfigToStorage = async (job: Job): Promise<void> => {
-  if (!job.sdkConfig) return;
-  const storage = getElectronStorage();
-  if (!storage) return;
-  const key = `cert:jobConfig:${job.providerUoi}:${job.recipientUoi}:${job.endorsementKey}`;
-  await storage.set(key, JSON.stringify(job.sdkConfig));
-};
+const getJobStore = (): JobStoreAPI | undefined =>
+  (window as unknown as Record<string, unknown>).jobStore as JobStoreAPI | undefined;
 
 /** Load an individual job's SDK config from secure storage. */
 const loadJobConfigFromStorage = async (job: Job): Promise<Record<string, unknown> | null> => {
@@ -105,6 +117,14 @@ export interface JobStep {
   readonly status: StepStatus;
   readonly duration?: number;
   readonly detail?: string;
+  readonly requestDetails?: ReadonlyArray<{
+    readonly method: string;
+    readonly url: string;
+    readonly status?: number;
+    readonly error?: string;
+    readonly responseBody?: string;
+  }>;
+  readonly artifacts?: ReadonlyArray<{ readonly label: string; readonly path: string }>;
 }
 
 export interface Job {
@@ -145,9 +165,38 @@ type JobEventListener = (event: JobEvent) => void;
 
 // ── Job Manager ──────────────────────────────────────────────────────
 
+// ── Job persistence ──────────────────────────────────────────────────
+
+const JOBS_STORAGE_KEY = 'cert-jobs';
+
+/** Load jobs from localStorage (fallback when SQLite is unavailable). */
+const loadPersistedJobsFromLocalStorage = (): Map<string, Job> => {
+  try {
+    const raw = localStorage.getItem(JOBS_STORAGE_KEY);
+    if (!raw) return new Map();
+    const entries = JSON.parse(raw) as ReadonlyArray<[string, Job]>;
+    return new Map(entries);
+  } catch {
+    return new Map();
+  }
+};
+
+/** Persist to localStorage (fallback when SQLite is unavailable). */
+const persistJobsToLocalStorage = (jobs: Map<string, Job>): void => {
+  try {
+    const durable = [...jobs.entries()].filter(([, j]) =>
+      j.status === 'passed' || j.status === 'failed' || j.status === 'cancelled'
+    );
+    localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(durable));
+  } catch { /* localStorage may be full or unavailable */ }
+};
+
+/** Whether SQLite job store is available (detected once on load). */
+const hasSQLite = (): boolean => getJobStore() !== undefined;
+
 /** In-memory job store and event bus for the current session. */
 const state = {
-  jobs: new Map<string, Job>(),
+  jobs: loadPersistedJobsFromLocalStorage(),
   listeners: new Set<JobEventListener>(),
   running: false,
 };
@@ -172,6 +221,31 @@ const updateJob = (id: string, patch: Partial<Job>): void => {
   if (!existing) return;
   const updated = { ...existing, ...patch } as Job;
   state.jobs.set(id, updated);
+
+  // Write through to SQLite when available, localStorage as fallback
+  const store = getJobStore();
+  if (store) {
+    // Persist status changes to SQLite
+    if (patch.status || patch.startedAt || patch.completedAt || patch.error || patch.reports || patch.resultPath) {
+      store.updateJobStatus(id, {
+        status: patch.status,
+        startedAt: patch.startedAt,
+        completedAt: patch.completedAt,
+        error: patch.error,
+        reports: patch.reports,
+        resultPath: patch.resultPath,
+      }).catch(() => {});
+    }
+    // Persist step updates to SQLite
+    if (patch.steps) {
+      for (let i = 0; i < patch.steps.length; i++) {
+        const step = patch.steps[i];
+        store.upsertStep(id, { ...step, sortOrder: i }).catch(() => {});
+      }
+    }
+  } else if (updated.status === 'passed' || updated.status === 'failed' || updated.status === 'cancelled') {
+    persistJobsToLocalStorage(state.jobs);
+  }
 };
 
 /** Get a snapshot of all jobs (most recent first). */
@@ -196,17 +270,28 @@ export const cancelJob = (id: string): void => {
 
 // ── Build SDK ComplianceConfig from UI config ────────────────────────
 
+/** Normalize a URL — removes trailing slashes, resolves path segments. */
+const normalizeUrl = (url: string): string => {
+  try {
+    const parsed = new URL(url);
+    parsed.pathname = parsed.pathname.replace(/\/+$/, '');
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+};
+
 const buildAuthConfig = (auth: AuthConfig): Record<string, unknown> =>
   auth.mode === 'token'
     ? { mode: 'token', authToken: auth.authToken }
-    : { mode: 'client_credentials', clientId: auth.clientId, clientSecret: auth.clientSecret, tokenUrl: auth.tokenUrl };
+    : { mode: 'client_credentials', clientId: auth.clientId, clientSecret: auth.clientSecret, tokenUrl: normalizeUrl(auth.tokenUrl), scope: auth.scope };
 
 const buildSDKConfig = (recipient: RecipientConfig, endorsement: CertEndorsement, providerUoi: string): Record<string, unknown> => {
   const base = {
     server: {
       // 'LOCAL_SERVER' is a sentinel value — the Electron main process
       // will replace it with the actual local server URL at runtime.
-      url: recipient.serviceRootUri || 'LOCAL_SERVER',
+      url: normalizeUrl(recipient.serviceRootUri || 'LOCAL_SERVER'),
       auth: buildAuthConfig(recipient.auth),
     },
     options: { verbose: false },
@@ -219,6 +304,7 @@ const buildSDKConfig = (recipient: RecipientConfig, endorsement: CertEndorsement
     case 'dd':
       return {
         ...base,
+        options: { ...base.options },
         endorsement: 'dd',
         version: recipient.ddOptions.version,
         limit: recipient.ddOptions.limit,
@@ -375,18 +461,27 @@ const runJobElectron = async (job: Job): Promise<void> => {
           name: s.name,
           status: s.status as StepStatus,
           duration: s.duration,
-          detail: s.summary ?? s.errors?.join('; '),
+          detail: [s.summary, s.errors?.join('; ')].filter(Boolean).join(' \u2014 '),
+          requestDetails: s.requestDetails as JobStep['requestDetails'],
+          artifacts: s.artifacts as JobStep['artifacts'],
         }))
       : initialSteps.map(s => ({ ...s, status: result.status === 'passed' ? 'passed' as const : 'skipped' as const }));
 
+    // Cross-check: if any step failed, the job failed — don't trust the SDK status alone
+    const hasFailedStep = finalSteps.some(s => s.status === 'failed');
+    const finalStatus = hasFailedStep ? 'failed' : result.status;
+    const finalError = hasFailedStep && !result.error
+      ? `Failed at: ${finalSteps.find(s => s.status === 'failed')?.name}`
+      : result.error;
+
     updateJob(job.id, {
-      status: result.status,
+      status: finalStatus,
       completedAt: new Date().toISOString(),
       steps: finalSteps,
-      error: result.error,
+      error: finalError,
       reports: result.reports,
     });
-    emit({ type: 'job-completed', jobId: job.id, status: result.status, error: result.error });
+    emit({ type: 'job-completed', jobId: job.id, status: finalStatus, error: finalError });
   } catch (err) {
     updateJob(job.id, {
       status: 'failed',
@@ -483,19 +578,84 @@ const runQueue = async (concurrency: number): Promise<void> => {
   emit({ type: 'queue-complete' });
 };
 
+// ── Credential auto-save ─────────────────────────────────────────────
+
+/** Save connection + credentials from a batch config's recipients. */
+const autoSaveConnections = async (config: BatchConfig): Promise<void> => {
+  for (const recipient of config.recipients) {
+    if (!recipient.serviceRootUri) continue;
+
+    const url = normalizeUrl(recipient.serviceRootUri);
+    const authMode = recipient.auth.mode;
+    const clientId = authMode === 'client_credentials' ? recipient.auth.clientId : undefined;
+    const originatingSystemName = authMode === 'token' ? (recipient.description || undefined) : undefined;
+
+    const conn = await saveConnection({
+      name: recipient.description || url,
+      url,
+      authMode,
+      clientId,
+      tokenUrl: authMode === 'client_credentials' ? normalizeUrl(recipient.auth.tokenUrl) : undefined,
+      scope: authMode === 'client_credentials' ? recipient.auth.scope : undefined,
+      originatingSystemName,
+    });
+
+    const creds: StoredCredentials = authMode === 'token'
+      ? { authToken: recipient.auth.authToken }
+      : { clientSecret: recipient.auth.clientSecret };
+    if (creds.authToken || creds.clientSecret) {
+      await storeCredentials(conn.id, creds);
+    }
+  }
+};
+
+/** Check if credentials differ from what's saved for a recipient. */
+export const detectCredentialChanges = async (recipients: ReadonlyArray<RecipientConfig>): Promise<ReadonlyArray<{ recipientIndex: number; url: string }>> => {
+  const changes: { recipientIndex: number; url: string }[] = [];
+
+  for (let i = 0; i < recipients.length; i++) {
+    const r = recipients[i];
+    if (!r.serviceRootUri) continue;
+
+    const url = normalizeUrl(r.serviceRootUri);
+    const existing = await findConnectionByKey(
+      url,
+      r.auth.mode,
+      r.auth.mode === 'client_credentials' ? r.auth.clientId : undefined,
+      r.auth.mode === 'token' ? r.description : undefined
+    );
+    if (!existing) continue;
+
+    const creds = await getCredentials(existing.id);
+    if (!creds) continue;
+
+    const changed = r.auth.mode === 'token'
+      ? creds.authToken !== r.auth.authToken
+      : creds.clientSecret !== r.auth.clientSecret;
+
+    if (changed) changes.push({ recipientIndex: i, url });
+  }
+
+  return changes;
+};
+
 // ── Public API ───────────────────────────────────────────────────────
 
 /** Enqueue jobs from a BatchConfig and start processing. */
-export const startBatch = (config: BatchConfig): ReadonlyArray<Job> => {
+export const startBatch = (config: BatchConfig, skipAutoSave = false): ReadonlyArray<Job> => {
   const jobs = expandBatchConfig(config);
+  const store = getJobStore();
   for (const job of jobs) {
     state.jobs.set(job.id, job);
+    // Persist to SQLite immediately so the job survives crashes/restarts
+    if (store) store.createJob(job).catch(() => {});
     emit({ type: 'job-queued', job });
-    // Persist config to secure storage for re-run
-    saveJobConfigToStorage(job);
   }
-  // Save full batch config for "Load from Saved"
-  saveConfigToStorage(config);
+
+  // Auto-save connections (fire-and-forget, don't block job start)
+  if (!skipAutoSave) {
+    autoSaveConnections(config).catch(() => {});
+  }
 
   // Start the queue (non-blocking)
   runQueue(config.concurrency);
@@ -509,20 +669,13 @@ const rebuildSDKConfig = async (job: Job): Promise<Record<string, unknown>> => {
   const stored = await loadJobConfigFromStorage(job);
   if (stored) return stored;
 
-  // Fall back to reconstructing from job metadata
-  const runner = getCertRunner();
-  const serverUrl = runner ? (await runner.localServerUrl()) ?? 'LOCAL_SERVER' : 'LOCAL_SERVER';
-
-  return {
-    endorsement: job.endorsementKey || 'dd',
-    version: job.version,
-    server: { url: serverUrl, auth: { mode: 'token', authToken: 'admin-token' } },
-    providerUoi: job.providerUoi,
-    providerUsi: job.providerUsi,
-    recipientUoi: job.recipientUoi,
-    strictMode: true,
-    options: { verbose: false },
-  };
+  // Cannot rebuild without the original config — the server URL, auth, and
+  // test parameters are lost. Return a config that will fail clearly rather
+  // than silently running against the wrong server.
+  throw new Error(
+    'Cannot re-run this job — the original configuration was not saved. ' +
+    'Please create a new test run with the correct server URL and credentials.'
+  );
 };
 
 /** Re-run a completed job by creating a new job with the same config. */
@@ -546,6 +699,8 @@ export const rerunJob = async (id: string): Promise<Job | undefined> => {
   };
 
   state.jobs.set(newJob.id, newJob);
+  const store = getJobStore();
+  if (store) store.createJob(newJob).catch(() => {});
   emit({ type: 'job-queued', job: newJob });
 
   // Run immediately
@@ -569,6 +724,9 @@ export const deleteJob = async (id: string): Promise<boolean> => {
   }
 
   state.jobs.delete(id);
+  const store = getJobStore();
+  if (store) store.deleteJob(id).catch(() => {});
+  else persistJobsToLocalStorage(state.jobs);
   emit({ type: 'job-cancelled', jobId: id });
   return true;
 };
@@ -587,9 +745,13 @@ export const deleteAllLocal = async (): Promise<void> => {
     await runner.deleteResult('__ALL__');
   }
 
-  // Clear all local jobs from memory
+  // Clear all local jobs from memory and SQLite
+  const store = getJobStore();
   for (const [id, job] of state.jobs) {
-    if (job.local) state.jobs.delete(id);
+    if (job.local) {
+      state.jobs.delete(id);
+      if (store) store.deleteJob(id).catch(() => {});
+    }
   }
 
   emit({ type: 'queue-complete' });
@@ -597,9 +759,11 @@ export const deleteAllLocal = async (): Promise<void> => {
 
 /** Clear all completed/cancelled jobs from the store. */
 export const clearCompleted = (): void => {
+  const store = getJobStore();
   for (const [id, job] of state.jobs) {
     if (job.status === 'passed' || job.status === 'failed' || job.status === 'cancelled') {
       state.jobs.delete(id);
+      if (store) store.deleteJob(id).catch(() => {});
     }
   }
 };
@@ -689,7 +853,8 @@ const hydrateFromLocal = (results: ReadonlyArray<LocalResult>): void => {
 };
 
 /**
- * Initialize local results scanning and file watching.
+ * Initialize local results — loads from SQLite when available,
+ * with a one-time migration from localStorage and .reso-cert/ filesystem.
  * Called once on app startup from the useJobs hook.
  */
 let initialized = false;
@@ -698,13 +863,52 @@ export const initLocalResults = async (): Promise<void> => {
   if (initialized) return;
   initialized = true;
 
-  const runner = getCertRunner();
-  if (!runner) return;
+  const store = getJobStore();
 
-  // Scan existing results on startup only — no file watcher.
-  // CLI and RDC are separate contexts; RDC manages its own state
-  // through the IPC pipeline and startup scan.
-  const results = await runner.scanResults();
-  hydrateFromLocal(results);
+  if (store) {
+    // ── SQLite path (Electron) ────────────────────────────────────
+    const existing = await store.getJobs();
+
+    // One-time migration from localStorage → SQLite
+    const localStorageData = localStorage.getItem(JOBS_STORAGE_KEY);
+    if (localStorageData) {
+      try {
+        const entries = JSON.parse(localStorageData) as ReadonlyArray<[string, Job]>;
+        for (const [, job] of entries) {
+          // Skip if already in SQLite (by ID)
+          if (!existing.some(e => e.id === job.id)) {
+            await store.createJob(job);
+          }
+        }
+      } catch { /* corrupt localStorage data */ }
+      localStorage.removeItem(JOBS_STORAGE_KEY);
+    }
+
+    // One-time migration from .reso-cert/ filesystem → SQLite
+    if (existing.length === 0) {
+      const runner = getCertRunner();
+      if (runner) {
+        const results = await runner.scanResults();
+        for (const result of results) {
+          const job = localResultToJob(result);
+          await store.createJob(job);
+        }
+      }
+    }
+
+    // Load all jobs from SQLite into the in-memory cache
+    const allJobs = await store.getJobs();
+    for (const job of allJobs) {
+      state.jobs.set(job.id, job);
+    }
+  } else {
+    // ── localStorage fallback (browser mode) ──────────────────────
+    const runner = getCertRunner();
+    if (runner) {
+      const results = await runner.scanResults();
+      hydrateFromLocal(results);
+    }
+  }
+
   emit({ type: 'queue-complete' });
 };

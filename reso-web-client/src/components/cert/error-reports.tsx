@@ -16,6 +16,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { SearchInput, FilterPill, Badge, AvailBar } from '../metadata/shared.js';
 import { humanizeScenarioName } from '../../constants/cert';
+import { RequestDetailsPanel } from './request-details';
+import { DetailText } from './detail-text';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -40,7 +42,7 @@ interface VariationSuggestion {
   readonly suggestedFieldName?: string;
   readonly suggestedLookupValue?: string;
   readonly suggestedLegacyODataValue?: string;
-  readonly strategy: 'Fast Track' | 'Substring' | 'Edit Distance';
+  readonly strategy: 'Fast Track' | 'Substring' | 'Edit Distance' | 'Suggestion';
   readonly ddWikiUrl?: string;
 }
 
@@ -50,8 +52,8 @@ interface Variation {
   readonly lookupValue?: string;
   readonly legacyODataValue?: string;
   readonly suggestions: ReadonlyArray<VariationSuggestion>;
-  // UI state — maps to backend write-back: ignore=true or flaggedForFastTrack=true
   readonly status?: 'pending' | 'accepted' | 'ignored' | 'fast-track';
+  readonly message?: string;
 }
 
 interface VariationsReport {
@@ -63,6 +65,7 @@ interface VariationsReport {
   readonly fields: ReadonlyArray<Variation>;
   readonly lookups: ReadonlyArray<Variation>;
   readonly resources: ReadonlyArray<Variation>;
+  readonly expansions?: ReadonlyArray<Variation>;
 }
 
 interface StepError {
@@ -70,6 +73,13 @@ interface StepError {
   readonly message: string;
   readonly detail?: string;
   readonly httpStatus?: number;
+  readonly requestDetails?: ReadonlyArray<{
+    readonly method: string;
+    readonly url: string;
+    readonly status?: number;
+    readonly error?: string;
+    readonly responseBody?: string;
+  }>;
 }
 
 interface GenericFailureReport {
@@ -456,7 +466,7 @@ export const SchemaValidationErrorReport = ({ report }: { readonly report: Schem
 
 // ── Variations Report ────────────────────────────────────────────────
 
-type VariationTab = 'fields' | 'lookups' | 'resources';
+type VariationTab = 'fields' | 'lookups' | 'resources' | 'expansions';
 type VariationAction = 'pending' | 'accepted' | 'ignored' | 'fast-track';
 
 const ACTION_COLORS: Readonly<Record<VariationAction, string>> = {
@@ -468,13 +478,13 @@ const ACTION_COLORS: Readonly<Record<VariationAction, string>> = {
 
 export const VariationsReportView = ({ report }: { readonly report: VariationsReport }) => {
   const [activeTab, setActiveTab] = useState<VariationTab>(
-    report.fields.length > 0 ? 'fields' : report.lookups.length > 0 ? 'lookups' : 'resources'
+    report.fields.length > 0 ? 'fields' : report.lookups.length > 0 ? 'lookups' : (report.expansions?.length ?? 0) > 0 ? 'expansions' : 'resources'
   );
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | VariationAction>('all');
   const [fieldFilter, setFieldFilter] = useState<string>('all');
 
-  const items = activeTab === 'fields' ? report.fields : activeTab === 'lookups' ? report.lookups : report.resources;
+  const items = activeTab === 'fields' ? report.fields : activeTab === 'lookups' ? report.lookups : activeTab === 'expansions' ? (report.expansions ?? []) : report.resources;
 
   // Unique source fields for filtering
   const sourceFields = useMemo(() => {
@@ -499,6 +509,7 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
     fields: report.fields.length,
     lookups: report.lookups.length,
     resources: report.resources.length,
+    expansions: report.expansions?.length ?? 0,
   };
 
   const statusCounts = useMemo(() => ({
@@ -534,7 +545,7 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
 
       {/* Tabs */}
       <div className="flex items-center gap-1">
-        {(['fields', 'lookups', 'resources'] as const).map(tab => (
+        {(['fields', 'lookups', 'resources', 'expansions'] as const).filter(tab => counts[tab] > 0).map(tab => (
           <FilterPill
             key={tab}
             label={`${tab.charAt(0).toUpperCase() + tab.slice(1)} (${counts[tab]})`}
@@ -605,6 +616,11 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
                       </span>
                     )}
                   </div>
+
+                  {/* Message */}
+                  {v.message && (
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{v.message}</p>
+                  )}
 
                   {/* Suggestions */}
                   <div className="mt-2 space-y-1.5">
@@ -694,20 +710,36 @@ const GenericErrorCard = ({ err }: { readonly err: StepError }) => {
 
       {!expanded && (
         <div className="px-4 pb-3">
-          <p className="text-xs text-red-600 dark:text-red-400">{err.message}</p>
+          <DetailText text={err.message} className="text-xs text-red-600 dark:text-red-400" />
         </div>
       )}
 
       {expanded && hasDetail && (
-        <div className="px-4 pb-3 border-t border-gray-100 dark:border-gray-700/50 pt-3">
-          <p className="text-xs text-red-600 dark:text-red-400 mb-2">{err.message}</p>
-          <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
-            {err.detail!.split('\n').map((line, i) => (
-              <div key={i} className="flex items-start gap-2 text-xs">
-                <span className="text-gray-600 dark:text-gray-400">{line}</span>
-                <CopyButton text={line} title="Copy detail" />
-              </div>
-            ))}
+        <div className="px-4 pb-3 border-t border-gray-100 dark:border-gray-700/50 pt-3 space-y-3">
+          <DetailText text={err.message} className="text-xs text-red-600 dark:text-red-400" />
+
+          {/* Request details — show the query URL and response */}
+          {err.requestDetails && err.requestDetails.length > 0 && (
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Request</p>
+              <RequestDetailsPanel details={err.requestDetails} />
+            </div>
+          )}
+
+          {/* Assertion details */}
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Assertions</p>
+            <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+              {err.detail!.split('\n').map((line, i) => {
+                const isIndented = line.startsWith('  ');
+                return (
+                  <div key={i} className={`flex items-start gap-2 text-xs ${isIndented ? 'pl-4' : ''}`}>
+                    <span className={isIndented ? 'text-gray-500 dark:text-gray-400 font-mono text-[11px]' : 'text-gray-700 dark:text-gray-300'}>{line}</span>
+                    {!isIndented && <CopyButton text={line} title="Copy assertion" />}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
@@ -834,14 +866,25 @@ const parseRealVariations = (raw: Record<string, unknown>): VariationsReport => 
     resourceName: (v.resourceName as string) ?? '',
     fieldName: v.fieldName as string | undefined,
     legacyODataValue: v.legacyODataValue as string | undefined,
-    suggestions: ((v.suggestions ?? []) as ReadonlyArray<Record<string, unknown>>).map(s => ({
-      suggestedResourceName: s.suggestedResourceName as string | undefined,
-      suggestedFieldName: s.suggestedFieldName as string | undefined,
-      suggestedLookupValue: s.suggestedLookupValue as string | undefined,
-      strategy: (s.strategy as VariationSuggestion['strategy']) ?? 'Fast Track',
-      ddWikiUrl: s.ddWikiUrl as string | undefined,
-    })),
+    // The pipeline puts suggestion data at the top level of each variation,
+    // not nested in a suggestions array. Map it accordingly.
+    suggestions: v.suggestions
+      ? ((v.suggestions as ReadonlyArray<Record<string, unknown>>).map(s => ({
+          suggestedResourceName: s.suggestedResourceName as string | undefined,
+          suggestedFieldName: s.suggestedFieldName as string | undefined,
+          suggestedLookupValue: s.suggestedLookupValue as string | undefined,
+          strategy: (s.strategy as VariationSuggestion['strategy']) ?? 'Suggestion',
+          ddWikiUrl: s.ddWikiUrl as string | undefined,
+        })))
+      : [{
+          suggestedResourceName: v.suggestedResourceName as string | undefined,
+          suggestedFieldName: v.suggestedFieldName as string | undefined ?? v.fieldName as string | undefined,
+          suggestedLookupValue: v.suggestedLookupValue as string | undefined,
+          strategy: (v.strategy as VariationSuggestion['strategy']) ?? 'Suggestion',
+          ddWikiUrl: v.ddWikiUrl as string | undefined,
+        }],
     status: 'pending',
+    message: v.message as string | undefined,
   });
 
   return {
@@ -853,6 +896,7 @@ const parseRealVariations = (raw: Record<string, unknown>): VariationsReport => 
     fields: (variations.fields ?? []).map(mapVariation),
     lookups: (variations.lookups ?? []).map(mapVariation),
     resources: (variations.resources ?? []).map(mapVariation),
+    expansions: (variations.expansions ?? []).map(mapVariation),
   };
 };
 
@@ -864,7 +908,7 @@ const resolveReport = (
   endorsement: string,
   failedStep?: string,
   reports?: Record<string, unknown>,
-  steps?: ReadonlyArray<{ name: string; status: string; detail?: string; summary?: string; errors?: ReadonlyArray<string> }>,
+  steps?: ReadonlyArray<{ name: string; status: string; detail?: string; summary?: string; errors?: ReadonlyArray<string>; requestDetails?: ReadonlyArray<{ method: string; url: string; status?: number; error?: string; responseBody?: string }> }>,
 ): ErrorReport => {
   // Use real report data when available
   if (reports) {
@@ -906,16 +950,33 @@ const resolveReport = (
       return scenarios
         .filter(s => !s.passed && !s.skipped)
         .map(s => {
+          const raw = ((r.scenarios ?? []) as ReadonlyArray<Record<string, unknown>>).find(
+            rs => (rs.name ?? rs.scenario) === (s.name)
+          );
+          const requestUrl = (raw?.requestUrl as string) ?? undefined;
+          const responseBody = (raw?.responseBody as string) ?? undefined;
           const failedAssertions = s.assertions.filter(a => !a.passed);
-          const message = failedAssertions.map(a => a.description).filter(Boolean).join('; ') || `Scenario "${s.name}" failed`;
-          const detailLines = failedAssertions
-            .filter(a => a.expected || a.actual)
-            .map(a => `Expected: ${a.expected ?? '—'}, Actual: ${a.actual ?? '—'}`);
+          const failCount = failedAssertions.length;
+
+          // Human-friendly summary for collapsed view
+          const summary = failCount > 0
+            ? `${failCount} assertion${failCount !== 1 ? 's' : ''} failed — ${failedAssertions.slice(0, 2).map(a => a.description).filter(Boolean).join(', ')}${failCount > 2 ? ` and ${failCount - 2} more` : ''}`
+            : `Scenario "${s.name}" failed`;
+
+          // Detailed view: each assertion on its own line with expected/actual when available
+          const detailLines = failedAssertions.map(a => {
+            const parts = [a.description];
+            if (a.expected) parts.push(`  Expected: ${a.expected}`);
+            if (a.actual) parts.push(`  Actual: ${a.actual}`);
+            return parts.join('\n');
+          });
+
           return {
             stepName: `${resource}: ${humanizeScenarioName(s.name)}`,
-            message,
-            detail: detailLines.length > 0 ? detailLines.join('\n') : undefined,
+            message: summary,
+            detail: detailLines.length > 0 ? detailLines.join('\n\n') : undefined,
             httpStatus: undefined,
+            requestDetails: requestUrl ? [{ method: 'GET', url: requestUrl, responseBody }] : undefined,
           };
         });
     });
@@ -946,16 +1007,23 @@ const resolveReport = (
           // Add guidance for common DD failure modes
           const guidance = s.name.includes('metadata')
             ? 'Check that the server returns well-formed OData 4.0 CSDL XML at the $metadata endpoint.'
-            : s.name.includes('Health check')
-            ? 'Verify the server URL is correct and the server is running.'
+            : s.name.includes('Service check')
+            ? 'Verify the server URL is correct, the server is running, and authentication succeeded.'
             : s.name.includes('authentication') || s.name.includes('auth')
             ? 'Verify the auth token or client credentials are correct and not expired.'
+            : undefined;
+
+          // Include individual errors (e.g., semantic validation details)
+          const individualErrors = s.errors ?? [];
+          const errorDetails = individualErrors.length > 0
+            ? individualErrors.join('\n')
             : undefined;
 
           return {
             stepName: s.name,
             message,
-            detail: [s.summary, guidance].filter(Boolean).join('\n'),
+            detail: [s.summary, errorDetails, guidance].filter(Boolean).join('\n'),
+            requestDetails: s.requestDetails,
           };
         }),
       };
@@ -1012,7 +1080,7 @@ export const FailureReportModal = ({
   readonly recipientName: string;
   readonly failedStep?: string;
   readonly reports?: Record<string, unknown>;
-  readonly steps?: ReadonlyArray<{ name: string; status: string; detail?: string; summary?: string; errors?: ReadonlyArray<string> }>;
+  readonly steps?: ReadonlyArray<{ name: string; status: string; detail?: string; summary?: string; errors?: ReadonlyArray<string>; requestDetails?: ReadonlyArray<{ method: string; url: string; status?: number; error?: string; responseBody?: string }>; artifacts?: ReadonlyArray<{ label: string; path: string }> }>;
   readonly onClose: () => void;
 }) => {
   const report = resolveReport(endorsement, failedStep, reports, steps);
@@ -1069,7 +1137,7 @@ export const FailureReportModal = ({
 
         {/* Footer */}
         <div className="flex items-center justify-between p-5 border-t border-gray-200 dark:border-gray-700 shrink-0">
-          <div>
+          <div className="flex items-center gap-2 flex-wrap">
             {reports && (
               <button
                 type="button"

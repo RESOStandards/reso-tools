@@ -35,6 +35,7 @@ import {
   CertApiAuthError,
   login as certApiLogin,
   requestProviderToken,
+  setCertAuthScheme,
   type LoginResponse,
   type ProviderToken
 } from '../api/cert-client';
@@ -154,11 +155,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const token = await requestProviderToken(normalizedUsername, loginResponse.token);
 
         credentialsRef.current = { username: normalizedUsername, password, apiToken: loginResponse.token };
+        setCertAuthScheme(loginResponse.isAdmin);
         setUser(loginResponse);
         setProviderToken(token);
         await secureSetJson(USER_STORAGE_KEY, loginResponse);
         await secureSetJson<PersistedCredentials>(CREDS_STORAGE_KEY, {
-          username,
+          username: normalizedUsername,
           password,
           apiToken: loginResponse.token
         });
@@ -201,29 +203,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (cancelled) return;
 
-      if (persistedUser) {
-        setUser(persistedUser);
-      }
-
       if (persistedCreds) {
-        credentialsRef.current = persistedCreds;
         try {
-          const token = await requestProviderToken(
-            persistedCreds.username,
-            persistedCreds.apiToken ?? persistedCreds.password
-          );
+          // Full login — gets a fresh API key and provider token every time
+          const loginResponse = await certApiLogin(persistedCreds.username, persistedCreds.password);
           if (cancelled) return;
+          const normalizedUsername = loginResponse.username ?? persistedCreds.username;
+          const token = await requestProviderToken(normalizedUsername, loginResponse.token);
+          if (cancelled) return;
+          credentialsRef.current = { username: normalizedUsername, password: persistedCreds.password, apiToken: loginResponse.token };
+          setCertAuthScheme(loginResponse.isAdmin);
+          // Set all auth state in one batch — user, token, and hydrating together
+          // so downstream hooks see the complete state on their first render
+          setUser(loginResponse);
           setProviderToken(token);
+          setIsHydrating(false);
           scheduleRefresh(token);
+          // Persist in background — don't await (would break React batch)
+          secureSetJson(USER_STORAGE_KEY, loginResponse).catch(() => {});
+          secureSetJson<PersistedCredentials>(CREDS_STORAGE_KEY, {
+            username: normalizedUsername,
+            password: persistedCreds.password,
+            apiToken: loginResponse.token
+          }).catch(() => {});
+          return; // Skip the setIsHydrating below
         } catch {
-          // Credentials are stale or invalid. Clear everything so the user
-          // gets a clean login prompt. Stale credentials (e.g., missing
-          // apiToken from a previous format) would keep 400'ing on every restart.
+          // Login failed — keep credentials for autofill
           if (!cancelled) {
             setUser(null);
             credentialsRef.current = null;
             void secureRemove(USER_STORAGE_KEY);
-            void secureRemove(CREDS_STORAGE_KEY);
           }
         }
       }
@@ -253,7 +262,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       signIn,
       signOut,
       getCertApiHeader: () =>
-        user ? { Authorization: `ApiKey ${user.token}` } : null,
+        user ? { Authorization: `${user.isAdmin ? 'Basic' : 'ApiKey'} ${user.token}` } : null,
       getProviderHeader: () =>
         providerToken
           ? { Authorization: `Bearer ${providerToken.accessToken}` }

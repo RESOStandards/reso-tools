@@ -33,23 +33,26 @@ interface AddEditContext {
 
 // ── Pipeline Steps ──
 
-/** Wait for the server to respond to a health check. */
-const healthCheck: PipelineStep<AddEditContext> = {
-  name: 'Health check',
+/** OData service check — fetches the service document to confirm the server is reachable and speaks OData. */
+const serviceCheck: PipelineStep<AddEditContext> = {
+  name: 'Service check',
   run: async (ctx, onProgress) => {
-    const url = `${ctx.serverUrl}/health`;
-    const maxAttempts = 30;
+    const url = ctx.serverUrl;
+    const headers: Record<string, string> = ctx.authToken
+      ? { Authorization: `Bearer ${ctx.authToken}` }
+      : {};
+    const maxAttempts = 10;
     for (let i = 0; i < maxAttempts; i++) {
       try {
-        const response = await fetch(url);
+        const response = await fetch(url, { headers });
         if (response.ok) {
-          return { context: ctx, summary: `Server is ready at ${ctx.serverUrl}` };
+          return { context: ctx, summary: 'OData service is ready', requestDetails: [{ method: 'GET', url }] };
         }
-      } catch { /* retry */ }
+      } catch { /* network error — retry */ }
       await new Promise(resolve => setTimeout(resolve, 2000));
-      onProgress({ step: 'Health check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
+      onProgress({ step: 'Service check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
     }
-    return { context: ctx, status: 'failed', errors: [`Server at ${ctx.serverUrl} did not respond after ${maxAttempts} attempts`] };
+    return { context: ctx, status: 'failed', errors: ['OData service did not respond'], requestDetails: [{ method: 'GET', url, error: `No response after ${maxAttempts} attempts` }] };
   },
 };
 
@@ -65,7 +68,9 @@ const resolveAuth = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
 /** Fetch and parse OData $metadata from the server or a local file. */
 const fetchAndParseMetadata = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
   name: 'Fetch metadata',
-  run: async (ctx) => {
+  run: async (ctx, onProgress) => {
+    const metadataUrl = config.metadataPath ?? `${ctx.serverUrl}/$metadata`;
+    onProgress({ step: 'Fetch metadata', status: 'running', message: 'Fetching $metadata...' });
     const metadataXml = config.metadataPath
       ? await loadMetadataFromFile(config.metadataPath)
       : await fetchMetadata(ctx.serverUrl, ctx.authToken!);
@@ -248,7 +253,7 @@ const runTests = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
 
 /** Write generic and detailed compliance reports. */
 const writeComplianceReports = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
-  name: 'Write compliance reports',
+  name: 'Write reports',
   run: async (ctx, onProgress) => {
     const outputDir = buildOutputPath('web-api-add-edit', config.specVersion ?? '2.0.0', config);
     await archiveCurrentResults(outputDir);
@@ -299,8 +304,8 @@ const inlinePayloadsNeedSampling = (payloads?: import('./types.js').InlinePayloa
 export const createAddEditPipeline = (config: AddEditConfig) => {
   const needsSampling = !config.payloadsDir && (!config.payloads || inlinePayloadsNeedSampling(config.payloads));
   return createPipeline<AddEditContext>('add-edit', [
-    ...(config.options?.skipHealthCheck ? [] : [healthCheck]),
     resolveAuth(config),
+    ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),
     fetchAndParseMetadata(config),
     ...(needsSampling ? [sampleRecords(config)] : []),
     generatePayloads(config),

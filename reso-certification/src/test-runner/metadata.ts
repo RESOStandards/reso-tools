@@ -4,7 +4,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { fetchRawMetadata, parseCsdlXml } from '@reso-standards/reso-client';
+import { fetchRawMetadata, fetchRawMetadataWithVersion, parseCsdlXml } from '@reso-standards/reso-client';
 import type { CsdlEntityType, CsdlProperty, CsdlSchema } from '@reso-standards/reso-client';
 import { type ResoField, type ValidationFailure, validateRecord } from '@reso-standards/reso-validation';
 import type { EntityProperty, EntityType, ParsedMetadata } from './types.js';
@@ -67,8 +67,12 @@ export const toResoFields = (entityType: EntityType): ReadonlyArray<ResoField> =
  * Requires a bearer token for authorization.
  * Returns the raw XML string.
  */
-export const fetchMetadata = async (serverUrl: string, authToken: string): Promise<string> =>
-  fetchRawMetadata(serverUrl.replace(/\/$/, ''), authToken);
+export const fetchMetadata = async (serverUrl: string, authToken: string, useFormatParam = true): Promise<string> =>
+  fetchRawMetadata(serverUrl.replace(/\/$/, ''), authToken, { useFormatParam });
+
+/** Fetches metadata and detects the server's OData version. */
+export const fetchMetadataWithVersion = async (serverUrl: string, authToken: string, useFormatParam = true): Promise<{ xml: string; odataVersion: string | undefined }> =>
+  fetchRawMetadataWithVersion(serverUrl.replace(/\/$/, ''), authToken, { useFormatParam });
 
 /** Reads OData XML metadata from a local file. */
 export const loadMetadataFromFile = async (filePath: string): Promise<string> => readFile(filePath, 'utf-8');

@@ -12,6 +12,10 @@ import {
   type CsdlSchema,
   type CsdlEnumType,
   type CsdlEnumMember,
+  type CsdlComplexType,
+  type CsdlEntityType,
+  type CsdlAction,
+  type CsdlFunction,
   type FieldInfo,
   type FieldAnnotation,
 } from '@reso-standards/reso-client';
@@ -59,14 +63,59 @@ export interface MetadataReportResource {
   readonly [extra: string]: unknown;
 }
 
+/** A model entry (entity type or complex type) in the metadata report. */
+export interface MetadataReportModel {
+  readonly modelName: string;
+  readonly modelType: 'EntityType' | 'ComplexType';
+  readonly baseType?: string;
+  readonly abstract?: boolean;
+  readonly openType?: boolean;
+  readonly keyProperties?: ReadonlyArray<string>;
+  readonly properties: ReadonlyArray<{
+    readonly name: string;
+    readonly type: string;
+    readonly nullable?: boolean;
+    readonly maxLength?: number;
+    readonly precision?: number;
+    readonly scale?: number;
+  }>;
+  readonly navigationProperties: ReadonlyArray<{
+    readonly name: string;
+    readonly type: string;
+    readonly nullable?: boolean;
+    readonly partner?: string;
+    readonly containsTarget?: boolean;
+  }>;
+}
+
+/** An action or function in the metadata report. */
+export interface MetadataReportOperation {
+  readonly name: string;
+  readonly isBound?: boolean;
+  readonly entitySetPath?: string;
+  readonly isComposable?: boolean;
+  readonly parameters: ReadonlyArray<{
+    readonly name: string;
+    readonly type: string;
+    readonly nullable?: boolean;
+  }>;
+  readonly returnType?: {
+    readonly type: string;
+    readonly nullable?: boolean;
+  };
+}
+
 /** The complete metadata report. */
 export interface MetadataReport {
   readonly description: string;
   readonly version: string;
   readonly generatedOn: string;
   readonly resources: ReadonlyArray<MetadataReportResource>;
+  readonly models?: ReadonlyArray<MetadataReportModel>;
   readonly fields: ReadonlyArray<MetadataReportField>;
   readonly lookups: ReadonlyArray<MetadataReportLookup>;
+  readonly actions: ReadonlyArray<MetadataReportOperation>;
+  readonly functions: ReadonlyArray<MetadataReportOperation>;
 }
 
 // ── Helpers ──
@@ -75,18 +124,47 @@ export interface MetadataReport {
 const isEdmPrimitive = (type: string): boolean =>
   type.startsWith('Edm.') || type.startsWith('Collection(Edm.');
 
-/** Check if a field type represents an enumeration. */
-const isEnumerationType = (type: string): boolean => {
+/**
+ * Detect if a field is an enumeration from CSDL type info.
+ *
+ * Single enumerations:
+ *   - Edm.String with LookupName annotation (standard or local string enum)
+ *   - Edm.EnumType (underlying Edm.Int16/Int32/Int64)
+ *
+ * Multiple enumerations:
+ *   - Collection(Edm.String) with LookupName annotation
+ *   - Collection(Edm.EnumType) for OData enum collections
+ *   - Edm.EnumType with IsFlags = true
+ */
+const detectEnumeration = (
+  field: FieldInfo,
+  enumTypeNames: ReadonlySet<string>,
+  isFlagsTypeNames: ReadonlySet<string>,
+): boolean => {
+  if (field.isExpansion) return false;
+
+  const type = field.type;
   const unwrapped = type.startsWith('Collection(') ? type.slice('Collection('.length, -1) : type;
-  return !isEdmPrimitive(type) && !unwrapped.startsWith('Edm.');
+
+  // OData EnumType (single or collection)
+  if (enumTypeNames.has(unwrapped)) return true;
+
+  // IsFlags enum
+  if (isFlagsTypeNames.has(unwrapped)) return true;
+
+  // String enum: Edm.String or Collection(Edm.String) with LookupName annotation
+  if ((unwrapped === 'Edm.String') && field.lookupName) return true;
+
+  return false;
 };
 
 /** Convert FieldInfo to MetadataReportField with additional properties. */
-const fieldInfoToReportField = (field: FieldInfo, enumTypeNames: ReadonlySet<string>): MetadataReportField => {
-  // A field is an enumeration if its (unwrapped) type matches a defined EnumType,
-  // or if it has a LookupName annotation (string enum mode)
-  const unwrapped = field.type.startsWith('Collection(') ? field.type.slice('Collection('.length, -1) : field.type;
-  const isEnum = !field.isExpansion && (enumTypeNames.has(unwrapped) || !!field.lookupName);
+const fieldInfoToReportField = (
+  field: FieldInfo,
+  enumTypeNames: ReadonlySet<string>,
+  isFlagsTypeNames: ReadonlySet<string>,
+): MetadataReportField => {
+  const isEnum = detectEnumeration(field, enumTypeNames, isFlagsTypeNames);
 
   return {
     resourceName: field.resourceName,
@@ -147,21 +225,80 @@ export const serializeMetadataReport = (
   const resources: ReadonlyArray<MetadataReportResource> =
     schema.entityContainer.entitySets.map(es => ({ resourceName: es.name }));
 
-  // Build set of fully-qualified enum type names for isEnumeration detection
+  // Build sets for enumeration detection
   const enumTypeNames = new Set(
     schema.enumTypes.map(et => `${schema.namespace}.${et.name}`)
+  );
+  const isFlagsTypeNames = new Set(
+    schema.enumTypes.filter(et => et.isFlags).map(et => `${schema.namespace}.${et.name}`)
   );
 
   // Fields from all entity types (properties + navigation properties)
   const allFieldsByResource = getAllFields(schema);
   const fields: ReadonlyArray<MetadataReportField> = Object.values(allFieldsByResource)
     .flat()
-    .map(field => fieldInfoToReportField(field, enumTypeNames));
+    .map(field => fieldInfoToReportField(field, enumTypeNames, isFlagsTypeNames));
 
   // Lookups from enum type definitions
   const lookups: ReadonlyArray<MetadataReportLookup> = schema.enumTypes.flatMap(enumType =>
     enumType.members.map(member => enumMemberToLookup(enumType, member, schema.namespace))
   );
+
+  // Models: entity types + complex types with internal structure
+  const serializeModelProperties = (et: CsdlEntityType | CsdlComplexType) => ({
+    properties: et.properties.map(p => ({
+      name: p.name,
+      type: p.type,
+      ...(p.nullable != null ? { nullable: p.nullable } : {}),
+      ...(p.maxLength != null ? { maxLength: p.maxLength } : {}),
+      ...(p.precision != null ? { precision: p.precision } : {}),
+      ...(p.scale != null ? { scale: p.scale } : {}),
+    })),
+    navigationProperties: et.navigationProperties.map(np => ({
+      name: np.name,
+      type: np.type,
+      ...(np.nullable != null ? { nullable: np.nullable } : {}),
+      ...(np.partner ? { partner: np.partner } : {}),
+      ...(np.containsTarget ? { containsTarget: np.containsTarget } : {}),
+    })),
+  });
+
+  const models: ReadonlyArray<MetadataReportModel> = [
+    ...schema.entityTypes.map(et => ({
+      modelName: et.name,
+      modelType: 'EntityType' as const,
+      ...(et.baseType ? { baseType: et.baseType } : {}),
+      ...(et.abstract ? { abstract: et.abstract } : {}),
+      ...(et.openType ? { openType: et.openType } : {}),
+      ...(et.key.length > 0 ? { keyProperties: et.key } : {}),
+      ...serializeModelProperties(et),
+    })),
+    ...schema.complexTypes.map(ct => ({
+      modelName: ct.name,
+      modelType: 'ComplexType' as const,
+      ...(ct.baseType ? { baseType: ct.baseType } : {}),
+      ...(ct.abstract ? { abstract: ct.abstract } : {}),
+      ...(ct.openType ? { openType: ct.openType } : {}),
+      ...serializeModelProperties(ct),
+    })),
+  ];
+
+  // Actions and Functions
+  const serializeOperation = (op: CsdlAction | CsdlFunction): MetadataReportOperation => ({
+    name: op.name,
+    ...(op.isBound ? { isBound: op.isBound } : {}),
+    ...(op.entitySetPath ? { entitySetPath: op.entitySetPath } : {}),
+    ...('isComposable' in op && op.isComposable ? { isComposable: op.isComposable } : {}),
+    parameters: op.parameters.map(p => ({
+      name: p.name,
+      type: p.type,
+      ...(p.nullable != null ? { nullable: p.nullable } : {}),
+    })),
+    ...(op.returnType ? { returnType: { type: op.returnType.type, ...(op.returnType.nullable != null ? { nullable: op.returnType.nullable } : {}) } } : {}),
+  });
+
+  const actions = schema.actions.map(serializeOperation);
+  const functions = schema.functions.map(serializeOperation);
 
   return {
     description: 'RESO Data Dictionary Metadata Report',
@@ -170,6 +307,8 @@ export const serializeMetadataReport = (
     resources,
     fields,
     lookups,
+    actions,
+    functions,
   };
 };
 

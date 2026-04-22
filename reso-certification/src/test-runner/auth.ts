@@ -18,7 +18,8 @@ export const resolveAuthToken = async (auth: AuthConfig): Promise<string> => {
     mode: 'client_credentials',
     clientId: auth.clientId,
     clientSecret: auth.clientSecret,
-    tokenUrl: auth.tokenUrl
+    tokenUrl: auth.tokenUrl,
+    scope: auth.scope,
   });
 };
 

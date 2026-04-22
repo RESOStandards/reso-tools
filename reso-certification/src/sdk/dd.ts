@@ -10,7 +10,7 @@ import { writeFile, mkdir, copyFile, rename } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { resolveAuthToken } from '../test-runner/auth.js';
-import { fetchMetadata } from '../test-runner/metadata.js';
+import { fetchMetadata, fetchMetadataWithVersion } from '../test-runner/metadata.js';
 import { generateMetadataReport } from '../metadata/serializer.js';
 import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
 import type { DDConfig, PipelineStep, StepResult, TestFunction } from './types.js';
@@ -22,11 +22,11 @@ import { validateMetadata, formatValidationSummary, collectValidationErrors } fr
 // ── Cert-utils imports (local copy for modification) ──
 
 // @ts-expect-error — legacy CJS, no type declarations
-import certUtils from '../../legacy-cert-utils/index.js';
+import certUtils from '../legacy/index.js';
 // @ts-expect-error — legacy CJS
-import certUtilsCommon from '../../legacy-cert-utils/common.js';
+import certUtilsCommon from '../legacy/common.js';
 // @ts-expect-error — legacy CJS
-import certUtilsReplicationUtils from '../../legacy-cert-utils/lib/replication/utils.js';
+import certUtilsReplicationUtils from '../legacy/lib/replication/utils.js';
 
 const { replicate, findVariations } = certUtils;
 const { createReplicationStateServiceInstance } = certUtilsCommon;
@@ -74,22 +74,26 @@ interface DDContext {
 
 // ── Pipeline Steps ──
 
-const healthCheck: PipelineStep<DDContext> = {
-  name: 'Health check',
+/** OData service check — fetches the service document to confirm the server is reachable and speaks OData. */
+const serviceCheck: PipelineStep<DDContext> = {
+  name: 'Service check',
   run: async (ctx, onProgress) => {
-    const url = `${ctx.serverUrl}/health`;
-    const maxAttempts = 30;
+    const url = ctx.serverUrl;
+    const headers: Record<string, string> = ctx.authToken
+      ? { Authorization: `Bearer ${ctx.authToken}` }
+      : {};
+    const maxAttempts = 10;
     for (let i = 0; i < maxAttempts; i++) {
       try {
-        const response = await fetch(url);
+        const response = await fetch(url, { headers });
         if (response.ok) {
-          return { context: ctx, summary: `Server is ready at ${ctx.serverUrl}` };
+          return { context: ctx, summary: 'OData service is ready', requestDetails: [{ method: 'GET', url }] };
         }
-      } catch { /* retry */ }
+      } catch { /* network error — retry */ }
       await new Promise(resolve => setTimeout(resolve, 2000));
-      onProgress({ step: 'Health check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
+      onProgress({ step: 'Service check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
     }
-    return { context: ctx, status: 'failed', errors: [`Server at ${ctx.serverUrl} did not respond after ${maxAttempts} attempts`] };
+    return { context: ctx, status: 'failed', errors: ['OData service did not respond'], requestDetails: [{ method: 'GET', url, error: `No response after ${maxAttempts} attempts` }] };
   },
 };
 
@@ -97,7 +101,10 @@ const resolveAuth = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Resolve authentication',
   run: async (ctx) => {
     const authToken = await resolveAuthToken(config.server.auth);
-    return { context: { ...ctx, authToken }, summary: 'Auth credentials present' };
+    const requestDetails = config.server.auth.mode === 'client_credentials'
+      ? [{ method: 'POST', url: config.server.auth.tokenUrl }]
+      : [];
+    return { context: { ...ctx, authToken }, summary: 'Auth credentials present', requestDetails };
   },
 });
 
@@ -106,15 +113,21 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
   run: async (ctx, onProgress) => {
     await mkdir(ctx.outputPath, { recursive: true });
 
-    // Fetch and validate EDMX metadata
-    onProgress({ step: 'Generate metadata report', status: 'running', message: 'Fetching $metadata...' });
-    const edmxXml = await fetchMetadata(ctx.serverUrl, ctx.authToken!);
+    // Fetch and validate EDMX metadata (also detects OData version)
+    onProgress({ step: 'sub:metadata', status: 'running', message: 'Fetching OData XML metadata...' });
+    const { xml: edmxXml, odataVersion } = await fetchMetadataWithVersion(ctx.serverUrl, ctx.authToken!);
+    if (odataVersion) {
+      onProgress({ step: 'sub:metadata', status: 'running', message: `Detected OData version: ${odataVersion}` });
+    }
 
     // XSD + semantic validation
+    onProgress({ step: 'sub:metadata', status: 'running', message: 'Validating CSDL XML (XSD + semantic checks)...' });
     const validation = await validateMetadata(edmxXml);
     const validationErrors = collectValidationErrors(validation);
 
+    onProgress({ step: 'sub:metadata', status: 'running', message: 'Generating metadata report...' });
     const baseReport = generateMetadataReport(edmxXml, ctx.version);
+    onProgress({ step: 'sub:metadata', status: 'running', message: `Found ${baseReport.resources.length} resources, ${baseReport.fields.length.toLocaleString()} fields, ${baseReport.lookups.length.toLocaleString()} lookups` });
 
     // Write raw metadata XML
     const metadataXmlPath = join(ctx.outputPath, 'metadata.xml');
@@ -125,12 +138,21 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
     await writeFile(baseReportPath, JSON.stringify(baseReport, null, 2));
 
     // Fetch Lookup Resource and merge if available
-    onProgress({ step: 'Generate metadata report', status: 'running', message: 'Checking Lookup Resource...' });
+    const lookupUrl = `${ctx.serverUrl}/Lookup`;
+    onProgress({ step: 'sub:metadata', status: 'running', message: 'Fetching Lookup Resource...' });
     const { report, lookupResourceAvailable, lookupRecordCount, rawRecords } = await fetchAndMergeLookupResource(
       baseReport,
       ctx.serverUrl,
       ctx.authToken!,
+      (count) => onProgress({ step: 'sub:metadata', status: 'running', message: `Fetching Lookup Resource... ${count.toLocaleString()} records` }),
+      odataVersion,
     );
+
+    if (lookupResourceAvailable) {
+      onProgress({ step: 'sub:metadata', status: 'running', message: `Lookup Resource: ${lookupRecordCount.toLocaleString()} records found. Merging...` });
+    } else {
+      onProgress({ step: 'sub:metadata', status: 'running', message: 'Lookup Resource not available (HTTP 404)' });
+    }
 
     let metadataReportPath = baseReportPath;
 
@@ -155,10 +177,14 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
     ];
 
     return {
-      context: { ...ctx, metadataReportPath, lookupResourceAvailable, lookupRecordCount },
+      context: { ...ctx, metadataReportPath, lookupResourceAvailable, lookupRecordCount, odataVersion },
       summary: `${report.resources.length} resources, ${report.fields.length.toLocaleString()} fields, ${report.lookups.length.toLocaleString()} lookups${lookupMsg}. ${formatValidationSummary(validation)}`,
       counts: { resources: report.resources.length, fields: report.fields.length, lookups: report.lookups.length },
       artifacts,
+      requestDetails: [
+        { method: 'GET', url: `${ctx.serverUrl}/$metadata` },
+        ...(lookupResourceAvailable ? [{ method: 'GET', url: lookupUrl }] : []),
+      ],
       ...(validationErrors.length > 0 ? { errors: validationErrors } : {}),
       ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {}),
     };
@@ -178,21 +204,43 @@ const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
       strictMode: config.strictMode ?? false,
     });
 
-    const hasVariations = Object.values(variations as Record<string, unknown[]>).some(
-      (v: unknown[]) => v?.length > 0
-    );
+    const v = variations as Record<string, unknown[]>;
+    const counts = {
+      resources: v.resources?.length ?? 0,
+      fields: v.fields?.length ?? 0,
+      lookups: v.lookups?.length ?? 0,
+      expansions: v.expansions?.length ?? 0,
+      complexTypes: v.complexTypes?.length ?? 0,
+    };
+    const total = counts.resources + counts.fields + counts.lookups + counts.expansions + counts.complexTypes;
+    const hasVariations = total > 0;
 
-    if (config.strictMode && hasVariations) {
+    const parts = [
+      counts.resources > 0 && `${counts.resources} resource${counts.resources !== 1 ? 's' : ''}`,
+      counts.fields > 0 && `${counts.fields} field${counts.fields !== 1 ? 's' : ''}`,
+      counts.lookups > 0 && `${counts.lookups} lookup${counts.lookups !== 1 ? 's' : ''}`,
+      counts.expansions > 0 && `${counts.expansions} expansion${counts.expansions !== 1 ? 's' : ''}`,
+    ].filter(Boolean);
+    const summaryDetail = parts.length > 0 ? `: ${parts.join(', ')}` : '';
+
+    // Write variations report alongside other artifacts
+    if (hasVariations && ctx.outputPath) {
+      const variationsPath = join(ctx.outputPath, 'variations-report.json');
+      await writeFile(variationsPath, JSON.stringify(variations, null, 2));
+    }
+
+    if (hasVariations) {
       return {
-        context: { ...ctx, variationsFound: true },
+        context: { ...ctx, variationsFound: true, variationsReport: variations },
         status: 'failed',
-        errors: ['Found variations during testing'],
+        errors: [`Found ${total} variation${total !== 1 ? 's' : ''} during testing${summaryDetail}`],
+        counts: { total, ...counts },
       };
     }
 
     return {
-      context: { ...ctx, variationsFound: hasVariations },
-      summary: hasVariations ? 'Variations found (non-strict mode)' : 'No variations found',
+      context: { ...ctx, variationsFound: false },
+      summary: 'No variations found',
     };
   },
 });
@@ -228,7 +276,7 @@ const initReplicationState: TestFunction<DDContext> = async (ctx) => {
       const packageRoot = join(dirname(new URL(import.meta.url).pathname), '..', '..');
       const sourcePaths = [
         join(packageRoot, settingsFile),
-        join(packageRoot, 'legacy-cert-utils', settingsFile),
+        join(packageRoot, 'src', 'legacy', settingsFile),
       ];
       const sourcePath = sourcePaths.find(p => existsSync(p));
       if (sourcePath) {
@@ -400,7 +448,7 @@ const ddReportGenerators = (version: string) => [
 ];
 
 const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext> => ({
-  name: 'Write compliance reports',
+  name: 'Write reports',
   run: async (ctx, onProgress) => {
     const generators = ddReportGenerators(config.version);
     const pipelineResult = {
@@ -424,8 +472,8 @@ const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext> => ({
 /** Create the DD compliance test pipeline. */
 export const createDDPipeline = (config: DDConfig) =>
   createPipeline<DDContext>('dd', [
-    ...(config.options?.skipHealthCheck ? [] : [healthCheck]),
     resolveAuth(config),
+    ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),
     generateMetadata(config),
     ...(config.version !== '1.7' ? [runVariations(config)] : []),
     replicateAndValidate(config),

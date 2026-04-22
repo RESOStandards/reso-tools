@@ -211,9 +211,9 @@ export const ComparePage = () => {
         <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Key Metrics</h2>
-            <div className="flex items-center gap-4 text-[10px] text-gray-400 dark:text-gray-500">
-              <span>Previous</span>
-              <span className="font-semibold">Current</span>
+            <div className="flex items-center gap-6 text-[10px] text-gray-400 dark:text-gray-500 tabular-nums">
+              <span className="w-20 text-right">Previous</span>
+              <span className="w-24 text-right font-semibold">Current</span>
             </div>
           </div>
           <div className="divide-y divide-gray-100 dark:divide-gray-700/50">
@@ -241,9 +241,6 @@ export const ComparePage = () => {
         </button>
         <button type="button" className="px-4 py-2 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 cursor-pointer transition-colors">
           Submit to RESO
-        </button>
-        <button type="button" className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
-          Export Comparison
         </button>
       </div>
     </div>

@@ -26,6 +26,23 @@
 /** Cert API root that gets URL-encoded and passed to the proxy. */
 const CERT_API_ORIGIN = 'https://certqa.reso.org/api/v1';
 
+/**
+ * Build the Authorization header value for a Cert API request.
+ * Admin tokens use Basic auth, provider tokens use ApiKey auth.
+ * The token from the login response is already in the right format
+ * (base64-encoded credentials) — we just need the right scheme.
+ */
+let certAuthScheme: 'Basic' | 'ApiKey' = 'ApiKey';
+
+/** Set the auth scheme based on the logged-in user type. */
+export const setCertAuthScheme = (isAdmin: boolean): void => {
+  certAuthScheme = isAdmin ? 'Basic' : 'ApiKey';
+};
+
+/** Build the Authorization header for a Cert API key. */
+const certAuthHeader = (apiKey: string): string =>
+  `${certAuthScheme} ${apiKey}`;
+
 /** Build a /api/proxy?url=... URL pointing at a Cert API path. */
 const proxiedCertUrl = (path: string): string =>
   `/api/proxy?url=${encodeURIComponent(`${CERT_API_ORIGIN}${path}`)}`;
@@ -240,7 +257,7 @@ export const fetchEndorsements = async (
     Accept: 'application/json',
     'Content-Type': 'application/json'
   };
-  if (apiKey) headers.Authorization = `ApiKey ${apiKey}`;
+  if (apiKey) headers.Authorization = certAuthHeader(apiKey);
 
   // The Cert API's Joi schema requires every key present (not just
   // present-or-omitted). Build a full default shape and overlay the
@@ -312,7 +329,7 @@ export const fetchOrganizations = async (
   apiKey: string | null
 ): Promise<ReadonlyArray<CertOrganization>> => {
   const headers: Record<string, string> = { Accept: 'application/json' };
-  if (apiKey) headers.Authorization = `ApiKey ${apiKey}`;
+  if (apiKey) headers.Authorization = certAuthHeader(apiKey);
 
   const res = await fetch(proxiedCertUrl('/organization/all'), { headers });
   if (!res.ok) {
@@ -366,7 +383,7 @@ export const fetchOrganizationDetail = async (
   uoi: string
 ): Promise<CertOrganizationDetail> => {
   const headers: Record<string, string> = { Accept: 'application/json' };
-  if (apiKey) headers.Authorization = `ApiKey ${apiKey}`;
+  if (apiKey) headers.Authorization = certAuthHeader(apiKey);
 
   const res = await fetch(
     proxiedCertUrl(`/organization?uoi=${encodeURIComponent(uoi)}`),
@@ -445,7 +462,7 @@ export const fetchCertReportSummary = async (
   uoi: string
 ): Promise<ReadonlyArray<CertReportSummary>> => {
   const headers: Record<string, string> = { Accept: 'application/json' };
-  if (apiKey) headers.Authorization = `ApiKey ${apiKey}`;
+  if (apiKey) headers.Authorization = certAuthHeader(apiKey);
 
   const res = await fetch(
     proxiedCertUrl(`/certification_reports/summary/${encodeURIComponent(uoi)}`),
@@ -609,7 +626,7 @@ export const fetchCertificationCounts = async (
   apiKey: string | null
 ): Promise<CertificationCounts> => {
   const headers: Record<string, string> = { Accept: 'application/json' };
-  if (apiKey) headers.Authorization = `ApiKey ${apiKey}`;
+  if (apiKey) headers.Authorization = certAuthHeader(apiKey);
 
   // The endpoint takes `showMyResults` and `endorsements` as query params.
   // For the public list we want global counts (showMyResults=false) with

@@ -61,8 +61,6 @@ export const createClient = async (config: ClientConfig): Promise<ODataClient> =
     }
   ): Promise<Response> => {
     const headers: Record<string, string> = {
-      'OData-Version': '4.01',
-      'Content-Type': 'application/json',
       Accept: 'application/json',
       'Accept-Encoding': 'gzip, deflate',
       Authorization: `Bearer ${token}`,
@@ -70,7 +68,22 @@ export const createClient = async (config: ClientConfig): Promise<ODataClient> =
       ...options?.headers,
     };
 
-    return fetch(url, {
+    // Only send OData-Version if configured — some servers (e.g., FBS/Spark)
+    // reject 4.01 but accept 4.0. The version can be detected from metadata
+    // and passed via config.defaultHeaders or options.headers.
+    // Not sent by default for maximum compatibility.
+
+    // Only set Content-Type on requests that carry a body
+    if (options?.body) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    // Pass the URL as-is — some servers (e.g., Spark API) reject %24-encoded
+    // OData system query options. The URI builder's encoding is decoded back
+    // to literal $ for maximum compatibility.
+    const encodedUrl = url.replace(/%24/g, '$');
+
+    return fetch(encodedUrl, {
       method,
       headers,
       body: options?.body ? JSON.stringify(options.body) : undefined,

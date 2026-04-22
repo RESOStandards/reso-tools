@@ -30,7 +30,7 @@ export interface UseJobsResult {
   readonly start: (config: BatchConfig) => ReadonlyArray<Job>;
   readonly cancel: (jobId: string) => void;
   readonly clear: () => void;
-  readonly rerun: (jobId: string) => void;
+  readonly rerun: (jobId: string) => Promise<string | undefined>;
   readonly remove: (jobId: string) => void;
   readonly removeAll: () => void;
 }
@@ -70,8 +70,10 @@ export const useJobs = (): UseJobsResult => {
     setJobs(getJobs());
   }, []);
 
-  const rerun = useCallback((jobId: string) => {
-    rerunJob(jobId).then(() => setJobs(getJobs()));
+  const rerun = useCallback(async (jobId: string): Promise<string | undefined> => {
+    const newJob = await rerunJob(jobId);
+    setJobs(getJobs());
+    return newJob?.id;
   }, []);
 
   const activeCount = jobs.filter(j => j.status === 'running').length;

@@ -18,6 +18,38 @@ contextBridge.exposeInMainWorld('electronUpdates', {
   }
 });
 
+contextBridge.exposeInMainWorld('configManager', {
+  /** List all saved configs. */
+  list: (): Promise<ReadonlyArray<unknown>> =>
+    ipcRenderer.invoke('config:list'),
+  /** Save a config (creates or updates). */
+  save: (config: Record<string, unknown>): Promise<unknown> =>
+    ipcRenderer.invoke('config:save', config),
+  /** Delete a config by ID. */
+  remove: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke('config:delete', id),
+  /** Import configs from a JSON array. Returns count imported. */
+  importConfigs: (configs: ReadonlyArray<Record<string, unknown>>): Promise<number> =>
+    ipcRenderer.invoke('config:import', configs),
+});
+
+contextBridge.exposeInMainWorld('jobStore', {
+  createJob: (job: Record<string, unknown>): Promise<unknown> =>
+    ipcRenderer.invoke('jobs:create', job),
+  updateJobStatus: (id: string, patch: Record<string, unknown>): Promise<unknown> =>
+    ipcRenderer.invoke('jobs:update-status', id, patch),
+  upsertStep: (jobId: string, step: Record<string, unknown>): Promise<unknown> =>
+    ipcRenderer.invoke('jobs:upsert-step', jobId, step),
+  getJob: (id: string): Promise<unknown> =>
+    ipcRenderer.invoke('jobs:get', id),
+  getJobs: (filter?: Record<string, unknown>): Promise<unknown> =>
+    ipcRenderer.invoke('jobs:get-all', filter),
+  deleteJob: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke('jobs:delete', id),
+  clearCompleted: (): Promise<number> =>
+    ipcRenderer.invoke('jobs:clear-completed'),
+});
+
 contextBridge.exposeInMainWorld('certRunner', {
   /** Start a compliance test run. Returns the PipelineResult when done. */
   run: (jobId: string, config: Record<string, unknown>): Promise<unknown> =>
@@ -46,5 +78,9 @@ contextBridge.exposeInMainWorld('certRunner', {
   /** Delete a local result directory. Returns true on success. */
   deleteResult: (resultPath: string): Promise<boolean> =>
     ipcRenderer.invoke('cert:delete-result', resultPath),
+
+  /** Open a file in the system's default application or show in Finder/Explorer. */
+  openFile: (filePath: string): Promise<void> =>
+    ipcRenderer.invoke('cert:open-file', filePath),
 
 });

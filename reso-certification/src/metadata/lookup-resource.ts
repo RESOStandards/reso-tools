@@ -48,6 +48,8 @@ export interface LookupResourceDump {
 export const fetchLookupResource = async (
   serverUrl: string,
   authToken: string,
+  onProgress?: (count: number) => void,
+  odataVersion?: string,
 ): Promise<ReadonlyArray<RawLookupRecord> | undefined> => {
   const allRecords: RawLookupRecord[] = [];
   let url: string | undefined = `${buildResourceUrl(serverUrl, 'Lookup')}?$top=${PAGE_SIZE}`;
@@ -55,11 +57,14 @@ export const fetchLookupResource = async (
   let skip = 0;
 
   while (url) {
-    const response = await odataRequest({ method: 'GET', url, authToken });
+    const response = await odataRequest({ method: 'GET', url, authToken, odataVersion });
 
     if (response.status === 404) return undefined;
     if (response.status !== 200) {
-      throw new Error(`Lookup resource returned HTTP ${response.status}`);
+      const errorBody = typeof response.body === 'object' ? JSON.stringify(response.body) : String(response.body ?? '');
+      const err = new Error(`Lookup Resource returned HTTP ${response.status}`);
+      (err as unknown as Record<string, unknown>).requestDetails = { method: 'GET', url, status: response.status, responseBody: errorBody.slice(0, 500) };
+      throw err;
     }
 
     const body = response.body as {
@@ -70,6 +75,7 @@ export const fetchLookupResource = async (
     const records = body?.value ?? [];
     if (records.length === 0) break;
     allRecords.push(...records);
+    onProgress?.(allRecords.length);
 
     // Prefer @odata.nextLink for pagination
     const nextLink = body?.['@odata.nextLink'];
@@ -172,13 +178,15 @@ export const fetchAndMergeLookupResource = async (
   baseReport: MetadataReport,
   serverUrl: string,
   authToken: string,
+  onProgress?: (count: number) => void,
+  odataVersion?: string,
 ): Promise<{
   readonly report: MetadataReport;
   readonly lookupResourceAvailable: boolean;
   readonly lookupRecordCount: number;
   readonly rawRecords?: ReadonlyArray<RawLookupRecord>;
 }> => {
-  const lookupRecords = await fetchLookupResource(serverUrl, authToken);
+  const lookupRecords = await fetchLookupResource(serverUrl, authToken, onProgress, odataVersion);
 
   if (!lookupRecords) {
     return { report: baseReport, lookupResourceAvailable: false, lookupRecordCount: 0 };

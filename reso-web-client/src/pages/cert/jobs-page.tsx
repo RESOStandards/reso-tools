@@ -9,10 +9,11 @@
  * will be wired in when the reso-certification-backend SDK is ready.
  */
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router';
 import { StatusPill } from '../../components/cert/status-pill';
 import { ReplicationProgress, parseReplicationProgress } from '../../components/cert/replication-progress';
+import { RequestDetailsPanel } from '../../components/cert/request-details';
 import { SearchInput } from '../../components/metadata/shared';
 import { ConfigBuilder } from '../../components/cert/config-builder';
 import { SubmitToCloud } from '../../components/cert/submit-to-cloud';
@@ -34,6 +35,14 @@ interface JobStep {
   readonly status: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
   readonly duration?: number;
   readonly detail?: string;
+  readonly requestDetails?: ReadonlyArray<{
+    readonly method: string;
+    readonly url: string;
+    readonly status?: number;
+    readonly error?: string;
+    readonly responseBody?: string;
+  }>;
+  readonly artifacts?: ReadonlyArray<{ readonly label: string; readonly path: string }>;
 }
 
 interface CertJob {
@@ -388,6 +397,21 @@ const formatDuration = (ms: number): string => {
   return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
 };
 
+/** Live-ticking timer for running steps. */
+const LiveTimer = ({ startTime }: { readonly startTime: number }) => {
+  const [elapsed, setElapsed] = useState(Date.now() - startTime);
+  useEffect(() => {
+    const interval = setInterval(() => setElapsed(Date.now() - startTime), 100);
+    return () => clearInterval(interval);
+  }, [startTime]);
+  return <span className="text-xs text-blue-400 dark:text-blue-500 tabular-nums ml-2">{formatDuration(elapsed)}</span>;
+};
+
+/** Track when each step started running for the live timer. */
+const stepStartTimes = new Map<string, number>();
+
+import { DetailText } from '../../components/cert/detail-text';
+
 import {
   JOB_STATUS_COLORS,
   STEP_STATUS_ICONS,
@@ -426,19 +450,26 @@ const StepPipeline = ({ steps }: { readonly steps: ReadonlyArray<JobStep> }) => 
             >
               {step.name}
             </span>
-            {step.duration != null && step.duration > 0 && (
-              <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums ml-2">
-                {formatDuration(step.duration)}
-              </span>
+            {step.status === 'running' ? (
+              (() => {
+                const key = `${step.name}`;
+                if (!stepStartTimes.has(key)) stepStartTimes.set(key, Date.now());
+                return <LiveTimer startTime={stepStartTimes.get(key)!} />;
+              })()
+            ) : (
+              step.duration != null && step.duration > 0 && (
+                (() => { stepStartTimes.delete(step.name); return null; })(),
+                <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums ml-2">
+                  {formatDuration(step.duration)}
+                </span>
+              )
             )}
           </div>
           {step.detail && (() => {
             const replicationData = parseReplicationProgress(step.detail);
             if (replicationData) return <ReplicationProgress data={replicationData} />;
             return (
-              <p className={`text-xs mt-0.5 ${step.status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                {step.detail}
-              </p>
+              <DetailText text={step.detail} className={`text-xs mt-0.5 ${step.status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`} />
             );
           })()}
         </div>
@@ -569,9 +600,19 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                 <button type="button" onClick={() => setShowSubmit(true)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 cursor-pointer transition-colors">
                   Submit to RESO
                 </button>
+                {job.steps.some(s => s.name.toLowerCase().includes('variation') && s.status === 'failed') && (
+                  <NavLink to="/cert/variations" state={{ job }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors">
+                    Review Variations
+                  </NavLink>
+                )}
                 {onRerun && (
                   <button type="button" onClick={onRerun} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
                     Re-run
+                  </button>
+                )}
+                {onClone && (
+                  <button type="button" onClick={onClone} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors" title="Edit config and re-run">
+                    Edit
                   </button>
                 )}
               </>
@@ -581,6 +622,11 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                 <button type="button" onClick={() => setShowFailure(true)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors">
                   View Failure Report
                 </button>
+                {job.steps.some(s => s.name.toLowerCase().includes('variation') && s.status === 'failed') && (
+                  <NavLink to="/cert/variations" state={{ job }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors">
+                    Review Variations
+                  </NavLink>
+                )}
                 {onRerun && (
                   <button type="button" onClick={onRerun} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
                     Re-run
@@ -745,7 +791,7 @@ const ReportStepCard = ({
   step,
   scenarios,
 }: {
-  readonly step: { name: string; status: string; detail?: string; duration?: number };
+  readonly step: { name: string; status: string; detail?: string; duration?: number; requestDetails?: ReadonlyArray<{ method: string; url: string; status?: number; error?: string; responseBody?: string }>; artifacts?: ReadonlyArray<{ label: string; path: string }> };
   readonly scenarios?: ReadonlyArray<Record<string, unknown>>;
 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -778,8 +824,40 @@ const ReportStepCard = ({
           {step.detail && (() => {
             const replicationData = parseReplicationProgress(step.detail);
             if (replicationData) return <div className="ml-6"><ReplicationProgress data={replicationData} /></div>;
-            return <p className="text-xs mt-0.5 ml-6 text-gray-500 dark:text-gray-400">{step.detail}</p>;
+            return <DetailText text={step.detail} className="text-xs mt-0.5 ml-6 text-gray-500 dark:text-gray-400" />;
           })()}
+          {step.requestDetails && step.requestDetails.length > 0 && (
+            <div className="ml-6"><RequestDetailsPanel details={step.requestDetails} /></div>
+          )}
+          {step.artifacts && step.artifacts.length > 0 && (
+            <div className="ml-6 mt-1 flex items-center gap-2 flex-wrap">
+              {step.artifacts.map((a, ai) => (
+                <button
+                  key={ai}
+                  type="button"
+                  onClick={() => {
+                    // Read file via fetch through the proxy (local files served by the reference server)
+                    // or trigger a save dialog via IPC
+                    const el = (window as unknown as Record<string, unknown>).certRunner as Record<string, unknown> | undefined;
+                    if (el?.openFile) {
+                      (el.openFile as (path: string) => void)(a.path);
+                    } else {
+                      // Fallback: copy path to clipboard
+                      navigator.clipboard.writeText(a.path);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
+                  title={`Download ${a.label} (${a.path})`}
+                >
+                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
+                    <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+                  </svg>
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         {step.duration != null && step.duration > 0 && (
           <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums shrink-0">
@@ -838,7 +916,39 @@ export const JobsPage = () => {
     return () => clearTimeout(timer);
   }, [highlightedJobId]);
   const [showNewJob, setShowNewJob] = useState(false);
+
+  // Track loaded config identity for Save vs. Save As
+  const [loadedConfigId, setLoadedConfigId] = useState<string | null>(null);
+  const [loadedConfigName, setLoadedConfigName] = useState<string | null>(null);
+  const [configRefreshKey, setConfigRefreshKey] = useState(0);
+
+  // Open config builder with a loaded config from dashboard/configs page navigation
+  useEffect(() => {
+    const state = location.state as Record<string, unknown> | null;
+    const loadConfig = state?.loadConfig as Record<string, unknown> | undefined;
+    if (loadConfig) {
+      setClonedConfig(loadConfig as unknown as BatchConfig);
+      setLoadedConfigId((state?.configId as string) ?? null);
+      setLoadedConfigName((state?.configName as string) ?? null);
+      setShowNewJob(true);
+      // Clear the state so refresh doesn't re-trigger
+      window.history.replaceState({}, '');
+    }
+  }, [location.state]);
+
   const [clonedConfig, setClonedConfig] = useState<BatchConfig | undefined>(undefined);
+
+  // Check for autosaved draft on mount
+  const [draftBanner, setDraftBanner] = useState<{ config: BatchConfig; configId: string | null; configName: string | null; savedAt: string } | null>(null);
+  useEffect(() => {
+    // Don't check for draft if we already have a config loaded (from navigation state)
+    if (showNewJob) return;
+    import('../../services/connection-manager').then(({ loadDraft, clearDraft }) =>
+      loadDraft().then(draft => {
+        if (draft?.config) setDraftBanner({ config: draft.config as BatchConfig, configId: draft.configId, configName: draft.configName, savedAt: draft.savedAt });
+      })
+    ).catch(() => {});
+  }, []);
 
   const handleClone = (job: CertJob) => {
     const sdk = (job.sdkConfig ?? {}) as Record<string, unknown>;
@@ -901,7 +1011,7 @@ export const JobsPage = () => {
       scheduledAt: j.queuedAt,
       startedAt: j.startedAt,
       completedAt: j.completedAt,
-      steps: j.steps.map(s => ({ name: s.name, status: s.status, duration: s.duration, detail: s.detail })),
+      steps: j.steps.map(s => ({ name: s.name, status: s.status, duration: s.duration, detail: s.detail, requestDetails: s.requestDetails, artifacts: s.artifacts })),
       local: j.local,
       reports: j.reports,
       error: j.error,
@@ -1051,13 +1161,126 @@ export const JobsPage = () => {
 
       {/* Content below sticky header */}
       <div className={`${PAGE_CONTAINER} pb-20`}>
+        {/* Draft restore banner */}
+        {draftBanner && !showNewJob && (
+          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg flex items-center justify-between">
+            <div className="text-sm text-blue-800 dark:text-blue-300">
+              <span className="font-medium">Work in progress found</span>
+              {draftBanner.configName && <span> — {draftBanner.configName}</span>}
+              <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
+                {new Date(draftBanner.savedAt).toLocaleString()}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 ml-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setClonedConfig(draftBanner.config);
+                  setLoadedConfigId(draftBanner.configId);
+                  setLoadedConfigName(draftBanner.configName);
+                  setShowNewJob(true);
+                  setDraftBanner(null);
+                  import('../../services/connection-manager').then(({ clearDraft }) => clearDraft()).catch(() => {});
+                }}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
+              >
+                Restore
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftBanner(null);
+                  import('../../services/connection-manager').then(({ clearDraft }) => clearDraft()).catch(() => {});
+                }}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 cursor-pointer"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Config builder */}
         {showNewJob && (
           <div className="mb-6">
             <ConfigBuilder
-              onClose={() => { setShowNewJob(false); setClonedConfig(undefined); }}
-              onStart={(config) => { start(config); setShowNewJob(false); setClonedConfig(undefined); }}
+              onClose={() => { setShowNewJob(false); setClonedConfig(undefined); setLoadedConfigId(null); setLoadedConfigName(null); }}
+              onStart={(config) => {
+                const created = start(config);
+                setShowNewJob(false);
+                setClonedConfig(undefined);
+                setLoadedConfigId(null);
+                setLoadedConfigName(null);
+                if (created.length > 0) {
+                  setHighlightedJobId(created[0].id);
+                  setTimeout(() => {
+                    const el = document.getElementById(`job-${created[0].id}`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }, 100);
+                }
+              }}
+              onSave={async (config, existingId, name) => {
+                const { saveConnection, saveProfile, storeCredentials, findConnectionByKey } = await import('../../services/connection-manager');
+                const recipient = config.recipients[0];
+                if (!recipient) return;
+
+                const configName = name ?? `${config.providerUoi} – ${recipient.recipientUoi} – ${recipient.endorsements.map(e => e === 'dd' ? 'DD' : e).join(', ')}`;
+
+                // Save or reuse credentials
+                let credentialsId: string | null = null;
+                if (recipient.serviceRootUri) {
+                  const existing = await findConnectionByKey(
+                    recipient.serviceRootUri,
+                    recipient.auth.mode,
+                    recipient.auth.mode === 'client_credentials' ? recipient.auth.clientId : undefined,
+                    recipient.auth.mode === 'token' ? recipient.description : undefined
+                  );
+                  if (existing) {
+                    credentialsId = existing.id;
+                  } else {
+                    const conn = await saveConnection({
+                      name: recipient.description || recipient.serviceRootUri,
+                      url: recipient.serviceRootUri,
+                      authMode: recipient.auth.mode,
+                      clientId: recipient.auth.mode === 'client_credentials' ? recipient.auth.clientId : undefined,
+                      tokenUrl: recipient.auth.mode === 'client_credentials' ? recipient.auth.tokenUrl : undefined,
+                      scope: recipient.auth.mode === 'client_credentials' ? recipient.auth.scope : undefined,
+                    });
+                    credentialsId = conn.id;
+                  }
+                  // Store credentials in safeStorage
+                  const creds = recipient.auth.mode === 'token'
+                    ? { authToken: recipient.auth.authToken }
+                    : { clientSecret: recipient.auth.clientSecret };
+                  if (credentialsId && (creds.authToken || creds.clientSecret)) {
+                    await storeCredentials(credentialsId, creds);
+                  }
+                }
+
+                // Save cert config
+                const saved = await saveProfile({
+                  id: existingId,
+                  name: configName,
+                  credentialsId,
+                  providerUoi: config.providerUoi,
+                  providerUsi: recipient.providerUsi,
+                  recipientUoi: recipient.recipientUoi,
+                  endorsements: [...recipient.endorsements],
+                  ddVersion: recipient.ddOptions?.version,
+                  strictMode: recipient.ddOptions?.strictMode,
+                  limit: recipient.ddOptions?.limit,
+                  requestDelay: recipient.ddOptions?.requestDelay,
+                  rateLimitWait: recipient.ddOptions?.rateLimitWait,
+                  batchExpand: recipient.ddOptions?.batchExpand,
+                });
+                setLoadedConfigId(saved.id);
+                setLoadedConfigName(saved.name);
+                setConfigRefreshKey(k => k + 1);
+              }}
               initialConfig={clonedConfig}
+              savedConfigId={loadedConfigId}
+              savedConfigName={loadedConfigName}
+              refreshKey={configRefreshKey}
             />
           </div>
         )}
@@ -1065,7 +1288,17 @@ export const JobsPage = () => {
         {/* Job list */}
         <div className="space-y-3">
           {filteredJobs.map(job => (
-            <JobCard key={job.id} job={job} onRerun={job.local ? () => rerun(job.id) : undefined} onDelete={job.local ? () => remove(job.id) : undefined} onCancel={() => cancel(job.id)} onClone={() => handleClone(job)} highlighted={job.id === highlightedJobId} />
+            <JobCard key={job.id} job={job} onRerun={job.local ? () => {
+              rerun(job.id).then(newId => {
+                if (newId) {
+                  setHighlightedJobId(newId);
+                  setTimeout(() => {
+                    const el = document.getElementById(`job-${newId}`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }, 100);
+                }
+              });
+            } : undefined} onDelete={job.local ? () => remove(job.id) : undefined} onCancel={() => cancel(job.id)} onClone={() => handleClone(job)} highlighted={job.id === highlightedJobId} />
           ))}
           {filteredJobs.length === 0 && (
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center text-sm text-gray-500 dark:text-gray-400">

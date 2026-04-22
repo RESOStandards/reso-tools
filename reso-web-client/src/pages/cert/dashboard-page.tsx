@@ -7,7 +7,7 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
-import { NavLink } from 'react-router';
+import { NavLink, useNavigate } from 'react-router';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
 import { useJobs } from '../../hooks/use-jobs';
 import { useOrganizationNames } from '../../hooks/use-organization-names';
@@ -45,6 +45,7 @@ export const DashboardPage = () => {
   const { lookup, lookupSystem } = useOrganizationNames();
   const { endorsements } = useEndorsements({ statusFilter: ['certified'], sortByTimestamp: true });
   const [search, setSearch] = useState('');
+  const navigate = useNavigate();
 
   // Fire-and-forget: warm the industry baseline cache
   useEffect(() => { initIndustryBaseline(); }, []);

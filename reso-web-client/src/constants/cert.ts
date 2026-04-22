@@ -73,52 +73,54 @@ export const humanizeScenarioName = (name: string): string =>
 
 // ── Common step names ────────────────────────────────────────────────
 
-export const STEP_HEALTH_CHECK = 'Health check';
+export const STEP_SERVICE_CHECK = 'Service check';
 export const STEP_RESOLVE_AUTH = 'Resolve authentication';
 export const STEP_FETCH_METADATA = 'Fetch metadata';
 
 // ── Step tooltips ────────────────────────────────────────────────────
 
 export const STEP_TOOLTIPS: Readonly<Record<string, string>> = {
-  [STEP_RESOLVE_AUTH]: 'Validates that credentials are present in the config. No credentials are exchanged with the server at this step.',
+  [STEP_RESOLVE_AUTH]: 'Validates that credentials are present in the config. For client credentials, exchanges them for a bearer token.',
+  [STEP_SERVICE_CHECK]: 'Fetches the OData service document to confirm the server is reachable and authenticated.',
 };
 
 // ── Pipeline step definitions per endorsement ────────────────────────
+// Order must match the pipeline execution order in the SDK.
 
 export const DD_STEPS: ReadonlyArray<string> = [
-  'Health check',
   'Resolve authentication',
+  'Service check',
   'Generate metadata report',
   'Check variations',
   'Replicate and validate',
-  'Write compliance reports',
+  'Write reports',
 ];
 
 export const CORE_STEPS: ReadonlyArray<string> = [
-  'Health check',
   'Resolve authentication',
+  'Service check',
   'Fetch metadata',
   'Run Core scenarios',
-  'Write compliance reports',
+  'Write reports',
 ];
 
 export const ADD_EDIT_STEPS: ReadonlyArray<string> = [
-  'Health check',
   'Resolve authentication',
+  'Service check',
   'Fetch metadata',
   'Sample records',
   'Generate payloads',
   'Run Add/Edit scenarios',
-  'Write compliance reports',
+  'Write reports',
 ];
 
 export const ENTITY_EVENT_STEPS: ReadonlyArray<string> = [
-  'Health check',
   'Resolve authentication',
+  'Service check',
   'Fetch metadata',
   'Generate payloads',
   'Run EntityEvent scenarios',
-  'Write compliance reports',
+  'Write reports',
 ];
 
 export const STEPS_BY_ENDORSEMENT: Readonly<Record<string, ReadonlyArray<string>>> = {

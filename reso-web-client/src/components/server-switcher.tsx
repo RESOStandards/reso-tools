@@ -1,18 +1,83 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useServer } from '../context/server-context';
 import { clearAllCaches } from '../api/schema-cache';
 import { clearMetadataCache } from '../api/metadata';
 import { ServerConnectionModal } from './server-connection-modal';
+import { ConnectionManagerOverlay } from './connection-manager-overlay';
 import type { ServerFormData } from './server-connection-modal';
 import type { ServerConfig } from '../context/server-context';
+import type { SavedConnection as ManagedConnection, StoredCredentials } from '../services/connection-manager';
 
 /** Server switcher dropdown in the header — lets users switch between connections. */
 export const ServerSwitcher = () => {
   const { activeServer, servers, switchServer, addServer, removeServer, updateServer, isLoadingResources, hasProxy } = useServer();
   const [isOpen, setIsOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [showManager, setShowManager] = useState(false);
   const [editingServer, setEditingServer] = useState<ServerConfig | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [savedConfigs, setSavedConfigs] = useState<ReadonlyArray<ManagedConnection>>([]);
+  const [configSearch, setConfigSearch] = useState('');
+
+  // Load saved connections when dropdown opens
+  useEffect(() => {
+    if (!isOpen) return;
+    import('../services/connection-manager').then(({ loadConnectionsMRU }) =>
+      loadConnectionsMRU().then(setSavedConfigs)
+    ).catch(() => {});
+  }, [isOpen]);
+
+  const filteredConfigs = configSearch.length >= 2
+    ? savedConfigs.filter(c => {
+        const q = configSearch.toLowerCase();
+        return [c.name, c.url, c.originatingSystemName]
+          .filter(Boolean)
+          .some(f => f!.toLowerCase().includes(q));
+      }).slice(0, 5)
+    : savedConfigs.slice(0, 5);
+
+  const handleSelectConfig = useCallback(
+    async (config: ManagedConnection) => {
+      // Get credentials from safeStorage
+      const { getCredentials, touchMRU } = await import('../services/connection-manager');
+      const creds = await getCredentials(config.id);
+
+      const id = addServer({
+        name: config.name || config.url,
+        baseUrl: config.url,
+        authMode: config.authMode === 'client_credentials' ? 'client_credentials' : 'token',
+        token: creds?.authToken || undefined,
+        clientId: config.clientId || undefined,
+        clientSecret: creds?.clientSecret || undefined,
+        tokenUrl: config.tokenUrl || undefined,
+        scope: config.scope || undefined,
+        permissions: { canAdd: false, canEdit: false, canDelete: false },
+      });
+      switchServer(id);
+      await touchMRU(config.id);
+      setIsOpen(false);
+      setConfigSearch('');
+    },
+    [addServer, switchServer]
+  );
+
+  const handleSelectFromManager = useCallback(
+    (conn: ManagedConnection, creds: StoredCredentials | null) => {
+      const id = addServer({
+        name: conn.name,
+        baseUrl: conn.url,
+        authMode: conn.authMode,
+        token: creds?.authToken || undefined,
+        clientId: conn.clientId || undefined,
+        clientSecret: creds?.clientSecret || undefined,
+        tokenUrl: conn.tokenUrl || undefined,
+        scope: conn.scope || undefined,
+        permissions: { canAdd: false, canEdit: false, canDelete: false },
+      });
+      switchServer(id);
+    },
+    [addServer, switchServer]
+  );
 
   const handleToggle = useCallback(() => setIsOpen(prev => !prev), []);
 
@@ -123,7 +188,7 @@ export const ServerSwitcher = () => {
                 key={server.id}
                 type="button"
                 onClick={() => handleSelect(server.id)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 text-left cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 hover:brightness-125 ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 text-left cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 ${
                   server.id === activeServer.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                 }`}>
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -164,6 +229,8 @@ export const ServerSwitcher = () => {
               </button>
             ))}
 
+
+            {/* Actions — full width */}
             <div className="border-t border-gray-200 dark:border-gray-700 mt-1 pt-1">
               <button
                 type="button"
@@ -201,6 +268,13 @@ export const ServerSwitcher = () => {
         onClose={() => setShowModal(false)}
         onSubmit={handleAddConnection}
         hasProxy={hasProxy}
+      />
+
+      {/* Connection manager overlay */}
+      <ConnectionManagerOverlay
+        isOpen={showManager}
+        onClose={() => setShowManager(false)}
+        onSelect={handleSelectFromManager}
       />
 
       {/* Edit existing connection modal */}

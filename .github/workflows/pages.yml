@@ -43,7 +43,7 @@ jobs:
           # version of the leaf directory name.
           #
           # Skip patterns (any of these in the path → skip):
-          #   legacy-cert-utils/, node_modules/, dist/, build/, .next/,
+          #   legacy/, node_modules/, dist/, build/, .next/,
           #   _site/, tests/, test/, __tests__/, .github/, .vscode/,
           #   coverage/, sample-payloads/, sample-configs/, examples/
           #
@@ -83,7 +83,7 @@ jobs:
 
           # Path-segment patterns to exclude. A README is skipped if
           # *any* segment in its path matches one of these.
-          SKIP_SEGMENTS="legacy-cert-utils node_modules dist build .next _site tests test __tests__ .github .vscode coverage sample-payloads sample-configs examples"
+          SKIP_SEGMENTS="legacy node_modules dist build .next _site tests test __tests__ .github .vscode coverage sample-payloads sample-configs examples"
 
           # Returns 0 if any segment of the given path matches a skip
           # pattern, 1 otherwise.
