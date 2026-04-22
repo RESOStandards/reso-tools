@@ -745,9 +745,13 @@ export const deleteAllLocal = async (): Promise<void> => {
     await runner.deleteResult('__ALL__');
   }
 
-  // Clear all local jobs from memory
+  // Clear all local jobs from memory and SQLite
+  const store = getJobStore();
   for (const [id, job] of state.jobs) {
-    if (job.local) state.jobs.delete(id);
+    if (job.local) {
+      state.jobs.delete(id);
+      if (store) store.deleteJob(id).catch(() => {});
+    }
   }
 
   emit({ type: 'queue-complete' });
@@ -755,9 +759,11 @@ export const deleteAllLocal = async (): Promise<void> => {
 
 /** Clear all completed/cancelled jobs from the store. */
 export const clearCompleted = (): void => {
+  const store = getJobStore();
   for (const [id, job] of state.jobs) {
     if (job.status === 'passed' || job.status === 'failed' || job.status === 'cancelled') {
       state.jobs.delete(id);
+      if (store) store.deleteJob(id).catch(() => {});
     }
   }
 };

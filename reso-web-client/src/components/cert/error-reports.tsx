@@ -42,7 +42,7 @@ interface VariationSuggestion {
   readonly suggestedFieldName?: string;
   readonly suggestedLookupValue?: string;
   readonly suggestedLegacyODataValue?: string;
-  readonly strategy: 'Fast Track' | 'Substring' | 'Edit Distance';
+  readonly strategy: 'Fast Track' | 'Substring' | 'Edit Distance' | 'Suggestion';
   readonly ddWikiUrl?: string;
 }
 
@@ -52,8 +52,8 @@ interface Variation {
   readonly lookupValue?: string;
   readonly legacyODataValue?: string;
   readonly suggestions: ReadonlyArray<VariationSuggestion>;
-  // UI state — maps to backend write-back: ignore=true or flaggedForFastTrack=true
   readonly status?: 'pending' | 'accepted' | 'ignored' | 'fast-track';
+  readonly message?: string;
 }
 
 interface VariationsReport {
@@ -65,6 +65,7 @@ interface VariationsReport {
   readonly fields: ReadonlyArray<Variation>;
   readonly lookups: ReadonlyArray<Variation>;
   readonly resources: ReadonlyArray<Variation>;
+  readonly expansions?: ReadonlyArray<Variation>;
 }
 
 interface StepError {
@@ -465,7 +466,7 @@ export const SchemaValidationErrorReport = ({ report }: { readonly report: Schem
 
 // ── Variations Report ────────────────────────────────────────────────
 
-type VariationTab = 'fields' | 'lookups' | 'resources';
+type VariationTab = 'fields' | 'lookups' | 'resources' | 'expansions';
 type VariationAction = 'pending' | 'accepted' | 'ignored' | 'fast-track';
 
 const ACTION_COLORS: Readonly<Record<VariationAction, string>> = {
@@ -477,13 +478,13 @@ const ACTION_COLORS: Readonly<Record<VariationAction, string>> = {
 
 export const VariationsReportView = ({ report }: { readonly report: VariationsReport }) => {
   const [activeTab, setActiveTab] = useState<VariationTab>(
-    report.fields.length > 0 ? 'fields' : report.lookups.length > 0 ? 'lookups' : 'resources'
+    report.fields.length > 0 ? 'fields' : report.lookups.length > 0 ? 'lookups' : (report.expansions?.length ?? 0) > 0 ? 'expansions' : 'resources'
   );
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | VariationAction>('all');
   const [fieldFilter, setFieldFilter] = useState<string>('all');
 
-  const items = activeTab === 'fields' ? report.fields : activeTab === 'lookups' ? report.lookups : report.resources;
+  const items = activeTab === 'fields' ? report.fields : activeTab === 'lookups' ? report.lookups : activeTab === 'expansions' ? (report.expansions ?? []) : report.resources;
 
   // Unique source fields for filtering
   const sourceFields = useMemo(() => {
@@ -508,6 +509,7 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
     fields: report.fields.length,
     lookups: report.lookups.length,
     resources: report.resources.length,
+    expansions: report.expansions?.length ?? 0,
   };
 
   const statusCounts = useMemo(() => ({
@@ -543,7 +545,7 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
 
       {/* Tabs */}
       <div className="flex items-center gap-1">
-        {(['fields', 'lookups', 'resources'] as const).map(tab => (
+        {(['fields', 'lookups', 'resources', 'expansions'] as const).filter(tab => counts[tab] > 0).map(tab => (
           <FilterPill
             key={tab}
             label={`${tab.charAt(0).toUpperCase() + tab.slice(1)} (${counts[tab]})`}
@@ -614,6 +616,11 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
                       </span>
                     )}
                   </div>
+
+                  {/* Message */}
+                  {v.message && (
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{v.message}</p>
+                  )}
 
                   {/* Suggestions */}
                   <div className="mt-2 space-y-1.5">
@@ -859,14 +866,25 @@ const parseRealVariations = (raw: Record<string, unknown>): VariationsReport => 
     resourceName: (v.resourceName as string) ?? '',
     fieldName: v.fieldName as string | undefined,
     legacyODataValue: v.legacyODataValue as string | undefined,
-    suggestions: ((v.suggestions ?? []) as ReadonlyArray<Record<string, unknown>>).map(s => ({
-      suggestedResourceName: s.suggestedResourceName as string | undefined,
-      suggestedFieldName: s.suggestedFieldName as string | undefined,
-      suggestedLookupValue: s.suggestedLookupValue as string | undefined,
-      strategy: (s.strategy as VariationSuggestion['strategy']) ?? 'Fast Track',
-      ddWikiUrl: s.ddWikiUrl as string | undefined,
-    })),
+    // The pipeline puts suggestion data at the top level of each variation,
+    // not nested in a suggestions array. Map it accordingly.
+    suggestions: v.suggestions
+      ? ((v.suggestions as ReadonlyArray<Record<string, unknown>>).map(s => ({
+          suggestedResourceName: s.suggestedResourceName as string | undefined,
+          suggestedFieldName: s.suggestedFieldName as string | undefined,
+          suggestedLookupValue: s.suggestedLookupValue as string | undefined,
+          strategy: (s.strategy as VariationSuggestion['strategy']) ?? 'Suggestion',
+          ddWikiUrl: s.ddWikiUrl as string | undefined,
+        })))
+      : [{
+          suggestedResourceName: v.suggestedResourceName as string | undefined,
+          suggestedFieldName: v.suggestedFieldName as string | undefined ?? v.fieldName as string | undefined,
+          suggestedLookupValue: v.suggestedLookupValue as string | undefined,
+          strategy: (v.strategy as VariationSuggestion['strategy']) ?? 'Suggestion',
+          ddWikiUrl: v.ddWikiUrl as string | undefined,
+        }],
     status: 'pending',
+    message: v.message as string | undefined,
   });
 
   return {
@@ -878,6 +896,7 @@ const parseRealVariations = (raw: Record<string, unknown>): VariationsReport => 
     fields: (variations.fields ?? []).map(mapVariation),
     lookups: (variations.lookups ?? []).map(mapVariation),
     resources: (variations.resources ?? []).map(mapVariation),
+    expansions: (variations.expansions ?? []).map(mapVariation),
   };
 };
 
