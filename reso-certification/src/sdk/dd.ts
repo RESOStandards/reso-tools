@@ -204,21 +204,43 @@ const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
       strictMode: config.strictMode ?? false,
     });
 
-    const hasVariations = Object.values(variations as Record<string, unknown[]>).some(
-      (v: unknown[]) => v?.length > 0
-    );
+    const v = variations as Record<string, unknown[]>;
+    const counts = {
+      resources: v.resources?.length ?? 0,
+      fields: v.fields?.length ?? 0,
+      lookups: v.lookups?.length ?? 0,
+      expansions: v.expansions?.length ?? 0,
+      complexTypes: v.complexTypes?.length ?? 0,
+    };
+    const total = counts.resources + counts.fields + counts.lookups + counts.expansions + counts.complexTypes;
+    const hasVariations = total > 0;
 
-    if (config.strictMode && hasVariations) {
+    const parts = [
+      counts.resources > 0 && `${counts.resources} resource${counts.resources !== 1 ? 's' : ''}`,
+      counts.fields > 0 && `${counts.fields} field${counts.fields !== 1 ? 's' : ''}`,
+      counts.lookups > 0 && `${counts.lookups} lookup${counts.lookups !== 1 ? 's' : ''}`,
+      counts.expansions > 0 && `${counts.expansions} expansion${counts.expansions !== 1 ? 's' : ''}`,
+    ].filter(Boolean);
+    const summaryDetail = parts.length > 0 ? `: ${parts.join(', ')}` : '';
+
+    // Write variations report alongside other artifacts
+    if (hasVariations && ctx.outputPath) {
+      const variationsPath = join(ctx.outputPath, 'variations-report.json');
+      await writeFile(variationsPath, JSON.stringify(variations, null, 2));
+    }
+
+    if (hasVariations) {
       return {
-        context: { ...ctx, variationsFound: true },
+        context: { ...ctx, variationsFound: true, variationsReport: variations },
         status: 'failed',
-        errors: ['Found variations during testing'],
+        errors: [`Found ${total} variation${total !== 1 ? 's' : ''} during testing${summaryDetail}`],
+        counts: { total, ...counts },
       };
     }
 
     return {
-      context: { ...ctx, variationsFound: hasVariations },
-      summary: hasVariations ? 'Variations found (non-strict mode)' : 'No variations found',
+      context: { ...ctx, variationsFound: false },
+      summary: 'No variations found',
     };
   },
 });
