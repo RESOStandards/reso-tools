@@ -1027,8 +1027,6 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
       if ('${direction}' === 'back') {
         if (window.history.length <= 1) return;
         if (window.location.pathname === '/') return;
-        // Block if this is the first SPA page (next back would leave the app)
-        if (window.history.state && window.history.state.idx === 0) return;
       }
       window.history.${direction}();
     })()
@@ -1233,6 +1231,10 @@ app.whenReady().then(async () => {
     const url = await startReferenceServer();
     // Navigate from splash to the real server UI
     win.loadURL(url);
+    // Clear navigation history so back can't reach the splash screen
+    win.webContents.on('did-finish-load', () => {
+      win.webContents.clearHistory();
+    });
     checkForUpdatesSilent();
   } catch (err) {
     log(`Failed to start server: ${err instanceof Error ? err.message : String(err)}`);
