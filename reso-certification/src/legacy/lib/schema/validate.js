@@ -110,10 +110,6 @@ const validate = ({
   }
 
   try {
-    if (!isValidDataDictionaryVersion(ddVersion)) {
-      throw new Error(`Found invalid DD version ${ddVersion}. Supported versions: ${getValidDataDictionaryVersions()}`);
-    }
-
     const { definitions } = schema;
     const singleValueSchema = schema?.oneOf?.find(s => !s.properties.value);
     const multiValueSchema = schema?.oneOf?.find(s => s.properties.value);

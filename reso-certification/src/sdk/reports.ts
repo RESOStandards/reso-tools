@@ -191,11 +191,6 @@ export const writeReports = async (
     const reportPath = join(outputDir, generator.filename);
     await writeFile(reportPath, JSON.stringify(report, null, 2));
     written.push({ name: generator.name, path: reportPath });
-    onProgress?.({
-      step: `Write ${generator.name} report`,
-      status: 'passed',
-      artifacts: [{ label: generator.name, path: reportPath }],
-    });
   }
 
   return written;

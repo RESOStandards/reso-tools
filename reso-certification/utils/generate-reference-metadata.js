@@ -61,10 +61,19 @@ for (const row of fieldsRaw) {
 
   const simpleType = String(row['SimpleDataType'] ?? '');
   const sourceResource = row['SourceResource'] ? String(row['SourceResource']) : undefined;
-  const isExpansion = simpleType === 'Resource' || !!sourceResource;
-  const edmType = isExpansion ? (sourceResource ?? resourceName) : (SIMPLE_TYPE_TO_EDM[simpleType] ?? simpleType);
-  const isCollection = simpleType === 'String List, Multi';
+  const lookupName = row['LookupName'] ? String(row['LookupName']) : undefined;
+  const sugMaxPrecision = row['SugMaxPrecision'];
+  const isExpansion = simpleType === 'Resource' || simpleType === 'Collection' || !!sourceResource;
+  const isCollection = simpleType === 'String List, Multi' || simpleType === 'Collection';
   const isEnumeration = ENUM_TYPES.has(simpleType) || (!!row['LookupStatus'] && String(row['LookupStatus']).trim() !== '');
+  const targetResource = isExpansion ? (sourceResource ?? fieldName) : undefined;
+  // Number without precision (or precision 0) = integer, with precision > 0 = decimal
+  const resolvedSimpleType = simpleType === 'Number' && (!sugMaxPrecision || Number(sugMaxPrecision) === 0) ? 'Integer' : simpleType;
+  const edmType = isExpansion
+    ? (isCollection ? `Collection(org.reso.metadata.${targetResource})` : `org.reso.metadata.${targetResource}`)
+    : isEnumeration && lookupName
+      ? `org.reso.metadata.enums.${lookupName}`
+      : (SIMPLE_TYPE_TO_EDM[resolvedSimpleType] ?? resolvedSimpleType);
 
   // Annotations
   const annotations = [];
@@ -97,6 +106,7 @@ for (const row of fieldsRaw) {
   if (isCollection) field.isCollection = true;
   if (isExpansion) {
     field.isExpansion = true;
+    field.typeName = targetResource;
     if (sourceResource) field.sourceResource = sourceResource;
   }
 
@@ -123,11 +133,12 @@ const lookups = [];
 
 for (const row of lookupsRaw) {
   const lookupName = row['LookupName'];
-  const lookupValue = row['StandardLookupValue'] ?? row['LookupDisplayName'];
+  const standardLookupValue = row['StandardLookupValue'] ?? row['LookupDisplayName'];
+  const lookupValue = row['LegacyODataValue'] ?? standardLookupValue;
   if (!lookupName || !lookupValue) continue;
 
   const annotations = [];
-  annotations.push({ term: 'RESO.OData.Metadata.StandardName', value: String(lookupValue) });
+  annotations.push({ term: 'RESO.OData.Metadata.StandardName', value: String(standardLookupValue) });
   const wikiUrl = row['WikiPageUrl'];
   if (wikiUrl) annotations.push({ term: 'RESO.DDWikiUrl', value: String(wikiUrl) });
   const definition = row['Definition'];

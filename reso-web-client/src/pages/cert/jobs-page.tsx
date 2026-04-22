@@ -610,6 +610,11 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                     Re-run
                   </button>
                 )}
+                {onClone && (
+                  <button type="button" onClick={onClone} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors" title="Edit config and re-run">
+                    Edit
+                  </button>
+                )}
               </>
             )}
             {job.status === 'failed' && (
