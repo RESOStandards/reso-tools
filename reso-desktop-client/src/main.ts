@@ -962,7 +962,12 @@ const buildSplashHtml = (logoPath: string): string => {
   const isDark = isDarkMode();
   const bg = isDark ? '#1a202c' : '#f9fafb';
   const spinnerColor = isDark ? '#63b3ed' : '#007e9e';
-  const logoSrc = `file://${logoPath}`;
+  // Inline the logo as base64 data URI — file:// URLs are blocked inside data: pages
+  let logoSrc = `file://${logoPath}`;
+  try {
+    const logoData = readFileSync(logoPath);
+    logoSrc = `data:image/png;base64,${logoData.toString('base64')}`;
+  } catch { /* fallback to file:// */ }
 
   return `data:text/html;charset=utf-8,${encodeURIComponent(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
@@ -1033,13 +1038,16 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
   `;
 
   // Navigation: keyboard shortcuts (Cmd/Ctrl+[/] and Cmd/Ctrl+Arrow)
-  win.webContents.on('before-input-event', (_event, input) => {
+  // preventDefault stops Electron's native back/forward so only our safe script runs
+  win.webContents.on('before-input-event', (event, input) => {
     const mod = process.platform === 'darwin' ? input.meta : input.control;
     if (!mod || input.type !== 'keyDown') return;
 
     if (input.key === '[' || input.key === 'ArrowLeft') {
+      event.preventDefault();
       win.webContents.executeJavaScript(safeNavScript('back')).catch(() => {});
     } else if (input.key === ']' || input.key === 'ArrowRight') {
+      event.preventDefault();
       win.webContents.executeJavaScript(safeNavScript('forward')).catch(() => {});
     }
   });
@@ -1231,11 +1239,6 @@ app.whenReady().then(async () => {
     const url = await startReferenceServer();
     // Navigate from splash to the real server UI
     win.loadURL(url);
-    // Clear navigation history once after the server UI loads
-    // so back can't reach the splash screen
-    win.webContents.once('did-finish-load', () => {
-      win.webContents.clearHistory();
-    });
     checkForUpdatesSilent();
   } catch (err) {
     log(`Failed to start server: ${err instanceof Error ? err.message : String(err)}`);
