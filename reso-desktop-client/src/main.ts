@@ -427,7 +427,7 @@ const registerCertRunnerHandlers = (): void => {
         const reportFiles: Record<string, unknown> = {};
         const filesToRead: Readonly<Record<string, string>> = {
           schemaErrors: resolve(outputDir, 'data-availability-schema-validation-errors.json'),
-          variations: resolve(outputDir, 'data-dictionary-variations.json'),
+          variations: resolve(outputDir, 'variations-report.json'),
           metadata: resolve(outputDir, 'metadata-report.processed.json'),
           report: resolve(outputDir, 'report.json'),
           reportDetailed: resolve(outputDir, 'report-detailed.json'),
@@ -448,7 +448,10 @@ const registerCertRunnerHandlers = (): void => {
       return undefined;
     };
 
-    const reports = readReportsFromDisk(resolvedConfig);
+    // Merge reports from disk (file artifacts) and from the worker (pipeline context)
+    const diskReports = readReportsFromDisk(resolvedConfig);
+    const workerReports = (result as Record<string, unknown>).reports as Record<string, unknown> | undefined;
+    const reports = { ...diskReports, ...workerReports };
 
     // Cross-check: if schema validation errors exist on disk but the pipeline
     // reported success, override to failed.

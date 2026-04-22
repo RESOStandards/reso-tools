@@ -48,14 +48,14 @@ parentPort?.on('message', async (msg: { type: string; config: Record<string, unk
         parentPort?.postMessage(progressMsg);
       },
     );
-    // Send result as JSON string to avoid structured clone errors
-    // (pipeline context may contain non-cloneable objects like service instances)
     // Extract reports from the pipeline context for the UI
     const ctx = (result as Record<string, unknown>).context as Record<string, unknown> | undefined;
     const reports: Record<string, unknown> = {};
-    if (ctx?.variationsReport) reports.variationsReport = ctx.variationsReport;
-    if (ctx?.metadataReportPath) reports.metadataReportPath = ctx.metadataReportPath;
-    if (ctx?.schemaErrors) reports.schemaErrors = ctx.schemaErrors;
+    if (ctx) {
+      if (ctx.variationsReport) reports.variationsReport = ctx.variationsReport;
+      if (ctx.metadataReportPath) reports.metadataReportPath = ctx.metadataReportPath;
+      if (ctx.schemaErrors) reports.schemaErrors = ctx.schemaErrors;
+    }
 
     parentPort?.postMessage({
       type: 'result',
