@@ -1283,7 +1283,17 @@ export const JobsPage = () => {
         {/* Job list */}
         <div className="space-y-3">
           {filteredJobs.map(job => (
-            <JobCard key={job.id} job={job} onRerun={job.local ? () => rerun(job.id) : undefined} onDelete={job.local ? () => remove(job.id) : undefined} onCancel={() => cancel(job.id)} onClone={() => handleClone(job)} highlighted={job.id === highlightedJobId} />
+            <JobCard key={job.id} job={job} onRerun={job.local ? () => {
+              rerun(job.id).then(newId => {
+                if (newId) {
+                  setHighlightedJobId(newId);
+                  setTimeout(() => {
+                    const el = document.getElementById(`job-${newId}`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }, 100);
+                }
+              });
+            } : undefined} onDelete={job.local ? () => remove(job.id) : undefined} onCancel={() => cancel(job.id)} onClone={() => handleClone(job)} highlighted={job.id === highlightedJobId} />
           ))}
           {filteredJobs.length === 0 && (
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center text-sm text-gray-500 dark:text-gray-400">
