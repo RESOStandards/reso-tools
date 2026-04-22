@@ -54,7 +54,7 @@ jobs:
           cd reso-client && npx tsc && cd ..
           cd reso-data-generator && npx tsc && cd ..
           cd reso-reference-server && npx tsc && cd ..
-          cd reso-certification && npx tsc && cp -r src/legacy dist/legacy && cd ..
+          cd reso-certification && npx tsc && rm -rf dist/legacy && cp -r src/legacy dist/legacy && cd ..
           cd reso-mcp-server && npx tsc && cd ..
 
       - name: Run all tests

@@ -18,7 +18,7 @@
     "reso-cert": "./dist/cli/index.js"
   },
   "scripts": {
-    "build": "tsc && cp -r src/legacy dist/legacy",
+    "build": "tsc && rm -rf dist/legacy && cp -r src/legacy dist/legacy",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
