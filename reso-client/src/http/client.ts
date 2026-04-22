@@ -83,10 +83,6 @@ export const createClient = async (config: ClientConfig): Promise<ODataClient> =
     // to literal $ for maximum compatibility.
     const encodedUrl = url.replace(/%24/g, '$');
 
-    // Debug: log the exact request being made (remove after debugging)
-    console.log(`[reso-client] ${method} ${encodedUrl}`);
-    console.log(`[reso-client] Headers: ${JSON.stringify(Object.fromEntries(Object.entries(headers).map(([k, v]) => [k, k === 'Authorization' ? v.slice(0, 15) + '...' : v])))}`);
-
     return fetch(encodedUrl, {
       method,
       headers,
