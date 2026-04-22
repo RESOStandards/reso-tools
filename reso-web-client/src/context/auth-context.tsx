@@ -35,6 +35,7 @@ import {
   CertApiAuthError,
   login as certApiLogin,
   requestProviderToken,
+  setCertAuthScheme,
   type LoginResponse,
   type ProviderToken
 } from '../api/cert-client';
@@ -154,6 +155,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const token = await requestProviderToken(normalizedUsername, loginResponse.token);
 
         credentialsRef.current = { username: normalizedUsername, password, apiToken: loginResponse.token };
+        setCertAuthScheme(loginResponse.isAdmin);
         setUser(loginResponse);
         setProviderToken(token);
         await secureSetJson(USER_STORAGE_KEY, loginResponse);
@@ -210,6 +212,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const token = await requestProviderToken(normalizedUsername, loginResponse.token);
           if (cancelled) return;
           credentialsRef.current = { username: normalizedUsername, password: persistedCreds.password, apiToken: loginResponse.token };
+          setCertAuthScheme(loginResponse.isAdmin);
           // Set all auth state in one batch — user, token, and hydrating together
           // so downstream hooks see the complete state on their first render
           setUser(loginResponse);
@@ -259,7 +262,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       signIn,
       signOut,
       getCertApiHeader: () =>
-        user ? { Authorization: `ApiKey ${user.token}` } : null,
+        user ? { Authorization: `${user.isAdmin ? 'Basic' : 'ApiKey'} ${user.token}` } : null,
       getProviderHeader: () =>
         providerToken
           ? { Authorization: `Bearer ${providerToken.accessToken}` }
