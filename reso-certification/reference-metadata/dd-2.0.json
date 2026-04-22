@@ -1,7 +1,7 @@
 {
   "description": "RESO Data Dictionary 2.0 Reference Metadata",
   "version": "2.0",
-  "generatedOn": "2026-04-22T15:07:28.287Z",
+  "generatedOn": "2026-04-22T15:40:28.683Z",
   "resources": [
     "Association",
     "Caravan",
@@ -233,7 +233,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -306,7 +306,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -601,7 +601,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX,OM",
@@ -628,7 +628,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM",
@@ -1021,6 +1021,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX",
       "synonyms": "FullBaths"
@@ -1046,6 +1048,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX",
       "synonyms": "HalfBaths"
@@ -1071,6 +1075,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX",
       "synonyms": "QuarterBaths"
@@ -1096,6 +1102,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -1120,6 +1128,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX",
       "synonyms": "ThreeQuarterBaths"
@@ -1145,6 +1155,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -1169,6 +1181,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -1192,6 +1206,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -1216,7 +1232,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -1289,7 +1305,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -1458,7 +1474,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -2696,7 +2712,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -2744,7 +2760,7 @@
         }
       ],
       "maxLength": 5,
-      "precision": 2,
+      "precision": 5,
       "scale": 2,
       "elementStatus": "Active",
       "synonyms": "CapitalizationRate"
@@ -2770,7 +2786,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX"
@@ -2917,7 +2933,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX",
@@ -4972,6 +4988,8 @@
         }
       ],
       "maxLength": 11,
+      "precision": 11,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -5291,7 +5309,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -5361,7 +5379,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -5386,6 +5404,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "synonyms": "CDOM, PropertyDaysOnMarket, DOMP, PDOM"
     },
@@ -5462,6 +5482,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -5485,6 +5507,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "synonyms": "DOM, ListingDaysOnMarket, DOML, LDOM, ADOM, ActiveDaysOnMarket, AgentDaysOnMarket"
     },
@@ -5509,6 +5533,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -5680,6 +5706,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -5750,6 +5778,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -5820,6 +5850,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -5890,6 +5922,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -5960,6 +5994,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6030,6 +6066,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6100,6 +6138,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6170,6 +6210,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6240,6 +6282,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6310,6 +6354,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6380,6 +6426,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6450,6 +6498,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6547,6 +6597,8 @@
         }
       ],
       "maxLength": 2,
+      "precision": 2,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -6741,7 +6793,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -6838,6 +6890,8 @@
         }
       ],
       "maxLength": 5,
+      "precision": 5,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6885,6 +6939,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "synonyms": "Unit Floor Number"
     },
@@ -7207,6 +7263,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -7280,7 +7338,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -7379,7 +7437,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -7429,7 +7487,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -7454,7 +7512,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX"
@@ -7502,7 +7560,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -7823,7 +7881,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "synonyms": "Current Income, Actual Income"
@@ -7849,7 +7907,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -7874,7 +7932,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "synonyms": "Proforma Income"
@@ -8218,7 +8276,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -8386,8 +8444,8 @@
         }
       ],
       "maxLength": 16,
-      "precision": 4,
-      "scale": 2,
+      "precision": 16,
+      "scale": 4,
       "elementStatus": "Active"
     },
     {
@@ -8459,7 +8517,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM",
@@ -8560,8 +8618,8 @@
         }
       ],
       "maxLength": 12,
-      "precision": 8,
-      "scale": 2,
+      "precision": 12,
+      "scale": 8,
       "elementStatus": "Active"
     },
     {
@@ -8611,7 +8669,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM"
@@ -8662,7 +8720,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM"
@@ -8955,7 +9013,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -10147,7 +10205,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX,OM",
@@ -10174,7 +10232,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "synonyms": "LowPriceRange, LowRangePrice"
@@ -10274,7 +10332,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX"
@@ -10424,8 +10482,8 @@
         }
       ],
       "maxLength": 12,
-      "precision": 8,
-      "scale": 2,
+      "precision": 12,
+      "scale": 8,
       "elementStatus": "Active"
     },
     {
@@ -10499,8 +10557,8 @@
         }
       ],
       "maxLength": 16,
-      "precision": 4,
-      "scale": 2,
+      "precision": 16,
+      "scale": 4,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -10525,8 +10583,8 @@
         }
       ],
       "maxLength": 16,
-      "precision": 4,
-      "scale": 2,
+      "precision": 16,
+      "scale": 4,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -10600,7 +10658,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX"
@@ -10651,6 +10709,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -10674,6 +10734,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -10697,7 +10759,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -10792,7 +10854,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -11087,6 +11149,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -11111,6 +11175,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -11183,7 +11249,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -11231,7 +11297,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -11256,6 +11322,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM",
       "synonyms": "NumberOfUnitsBuildings"
@@ -11281,6 +11349,8 @@
         }
       ],
       "maxLength": 10,
+      "precision": 10,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -11304,6 +11374,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -11328,6 +11400,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -11352,6 +11426,8 @@
         }
       ],
       "maxLength": 10,
+      "precision": 10,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -11375,6 +11451,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -11398,6 +11476,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -11421,6 +11501,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -11444,6 +11526,8 @@
         }
       ],
       "maxLength": 5,
+      "precision": 5,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -11467,6 +11551,8 @@
         }
       ],
       "maxLength": 5,
+      "precision": 5,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -11491,6 +11577,8 @@
         }
       ],
       "maxLength": 5,
+      "precision": 5,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -11515,6 +11603,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX,OM"
     },
@@ -11539,6 +11629,8 @@
         }
       ],
       "maxLength": 5,
+      "precision": 5,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -11778,7 +11870,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "synonyms": "UncoveredParking"
@@ -11826,7 +11918,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -11901,7 +11993,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM",
@@ -12055,7 +12147,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -12301,7 +12393,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM"
@@ -12397,7 +12489,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -12471,7 +12563,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -12546,6 +12638,8 @@
         }
       ],
       "maxLength": 2,
+      "precision": 2,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX",
       "synonyms": "PhotoCount"
@@ -12571,7 +12665,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -12846,7 +12940,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM",
@@ -12947,7 +13041,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "synonyms": "ManagementCompanyExpense"
@@ -13096,6 +13190,8 @@
         }
       ],
       "maxLength": 10,
+      "precision": 10,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -13263,7 +13359,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -13464,6 +13560,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -13537,6 +13635,8 @@
         }
       ],
       "maxLength": 10,
+      "precision": 10,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -13711,6 +13811,8 @@
         }
       ],
       "maxLength": 2,
+      "precision": 2,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -14042,6 +14144,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -14443,6 +14547,8 @@
         }
       ],
       "maxLength": 2,
+      "precision": 2,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX",
       "synonyms": "Floors"
@@ -14468,6 +14574,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX",
       "synonyms": "StoriesBuildingTotal"
@@ -14614,6 +14722,8 @@
         }
       ],
       "maxLength": 10,
+      "precision": 10,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX,OM"
     },
@@ -14791,7 +14901,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -14865,7 +14975,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX,OM"
@@ -14891,7 +15001,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -14916,7 +15026,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -14941,6 +15051,8 @@
         }
       ],
       "maxLength": 14,
+      "precision": 14,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -15087,7 +15199,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM"
@@ -15188,6 +15300,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -15262,7 +15376,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM"
@@ -15362,7 +15476,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -15590,6 +15704,8 @@
         }
       ],
       "maxLength": 9,
+      "precision": 9,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -15613,7 +15729,7 @@
         }
       ],
       "maxLength": 5,
-      "precision": 2,
+      "precision": 5,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -15686,6 +15802,8 @@
         }
       ],
       "maxLength": 2,
+      "precision": 2,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -15805,6 +15923,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -15902,7 +16022,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -16002,7 +16122,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -16027,7 +16147,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -16052,6 +16172,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX,OM"
     },
@@ -16099,6 +16221,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -16146,6 +16270,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -16169,6 +16295,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -18477,6 +18605,8 @@
         }
       ],
       "maxLength": 2,
+      "precision": 2,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -22506,8 +22636,8 @@
         }
       ],
       "maxLength": 12,
-      "precision": 8,
-      "scale": 2,
+      "precision": 12,
+      "scale": 8,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -22532,8 +22662,8 @@
         }
       ],
       "maxLength": 12,
-      "precision": 8,
-      "scale": 2,
+      "precision": 12,
+      "scale": 8,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -22876,6 +23006,8 @@
         }
       ],
       "maxLength": 255,
+      "precision": 255,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -23634,6 +23766,8 @@
         }
       ],
       "maxLength": 255,
+      "precision": 255,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -23658,6 +23792,8 @@
         }
       ],
       "maxLength": 255,
+      "precision": 255,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -23778,6 +23914,8 @@
         }
       ],
       "maxLength": 255,
+      "precision": 255,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -23895,6 +24033,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -24013,6 +24153,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -24037,6 +24179,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -24061,6 +24205,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -24084,6 +24230,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -24108,6 +24256,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -24132,6 +24282,8 @@
         }
       ],
       "maxLength": 255,
+      "precision": 255,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -24156,6 +24308,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -24180,6 +24334,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -24204,6 +24360,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -24228,6 +24386,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -24251,6 +24411,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -24274,6 +24436,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -24297,6 +24461,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -24321,6 +24487,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -24345,6 +24513,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -24442,6 +24612,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -24680,8 +24852,8 @@
         }
       ],
       "maxLength": 12,
-      "precision": 8,
-      "scale": 2,
+      "precision": 12,
+      "scale": 8,
       "elementStatus": "Active"
     },
     {
@@ -24705,8 +24877,8 @@
         }
       ],
       "maxLength": 12,
-      "precision": 8,
-      "scale": 2,
+      "precision": 12,
+      "scale": 8,
       "elementStatus": "Active"
     },
     {
@@ -25766,6 +25938,8 @@
         }
       ],
       "maxLength": 8,
+      "precision": 8,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -25840,6 +26014,8 @@
         }
       ],
       "maxLength": 8,
+      "precision": 8,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -26134,6 +26310,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -27016,6 +27194,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS"
     },
@@ -30025,6 +30205,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS"
     },
@@ -30049,6 +30231,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS"
     },
@@ -34066,6 +34250,8 @@
         }
       ],
       "maxLength": 14,
+      "precision": 14,
+      "scale": 0,
       "elementStatus": "Active",
       "synonyms": "OrganizationAgentCount"
     },
@@ -34582,7 +34768,7 @@
         }
       ],
       "maxLength": 3,
-      "precision": 2,
+      "precision": 3,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX"
@@ -34732,6 +34918,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX",
       "synonyms": "GreenCertificationMetric, GreenRatingMetric"
@@ -34882,6 +35070,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "synonyms": "GreenYearCertified, GreenRatingYear"
     },
@@ -35150,6 +35340,8 @@
         }
       ],
       "maxLength": 6,
+      "precision": 6,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -35244,7 +35436,7 @@
         }
       ],
       "maxLength": 5,
-      "precision": 2,
+      "precision": 5,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -35293,6 +35485,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -35462,7 +35656,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -35629,7 +35823,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -35750,7 +35944,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -35897,7 +36091,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -35922,6 +36116,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -35945,6 +36141,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -36037,7 +36235,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -36085,6 +36283,8 @@
         }
       ],
       "maxLength": 6,
+      "precision": 6,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -36108,7 +36308,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -36157,6 +36357,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -37745,6 +37947,8 @@
         }
       ],
       "maxLength": 64,
+      "precision": 64,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {

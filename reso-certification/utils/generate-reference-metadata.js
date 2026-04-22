@@ -97,10 +97,14 @@ for (const row of fieldsRaw) {
   const maxLength = row['SugMaxLength'];
   if (maxLength && !isNaN(Number(maxLength))) field.maxLength = Number(maxLength);
 
-  const precision = row['SugMaxPrecision'];
-  if (precision && !isNaN(Number(precision))) {
-    field.precision = Number(precision);
-    field.scale = 2;
+  // For decimals: DD SugMaxLength = OData precision (total digits),
+  // DD SugMaxPrecision = OData scale (decimal places)
+  if (resolvedSimpleType === 'Number' && maxLength && !isNaN(Number(maxLength))) {
+    field.precision = Number(maxLength);
+    field.scale = sugMaxPrecision && !isNaN(Number(sugMaxPrecision)) ? Number(sugMaxPrecision) : 0;
+  } else if (resolvedSimpleType === 'Decimal' && maxLength && !isNaN(Number(maxLength))) {
+    field.precision = Number(maxLength);
+    field.scale = sugMaxPrecision && !isNaN(Number(sugMaxPrecision)) ? Number(sugMaxPrecision) : 2;
   }
 
   if (isCollection) field.isCollection = true;

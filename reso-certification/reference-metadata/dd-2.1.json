@@ -1,7 +1,7 @@
 {
   "description": "RESO Data Dictionary 2.1 Reference Metadata",
   "version": "2.1",
-  "generatedOn": "2026-04-22T15:07:27.731Z",
+  "generatedOn": "2026-04-22T16:15:52.037Z",
   "resources": [
     "Association",
     "Building",
@@ -248,7 +248,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -321,7 +321,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -509,7 +509,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -548,7 +548,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -714,7 +714,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX,OM",
@@ -741,7 +741,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM",
@@ -1045,7 +1045,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -1161,7 +1161,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -1226,7 +1226,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -1339,6 +1339,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX",
       "synonyms": "FullBaths"
@@ -1364,6 +1366,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX",
       "synonyms": "HalfBaths"
@@ -1389,6 +1393,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX",
       "synonyms": "QuarterBaths"
@@ -1414,6 +1420,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -1438,6 +1446,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX",
       "synonyms": "ThreeQuarterBaths"
@@ -1463,6 +1473,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -1487,6 +1499,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -1510,6 +1524,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -1534,7 +1550,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -1607,7 +1623,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -1776,7 +1792,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -1887,7 +1903,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -3070,7 +3086,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -3118,7 +3134,7 @@
         }
       ],
       "maxLength": 5,
-      "precision": 2,
+      "precision": 5,
       "scale": 2,
       "elementStatus": "Active",
       "synonyms": "CapitalizationRate"
@@ -3144,7 +3160,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX"
@@ -3213,7 +3229,7 @@
         }
       ],
       "maxLength": 3,
-      "precision": 2,
+      "precision": 3,
       "scale": 2
     },
     {
@@ -3282,7 +3298,7 @@
         }
       ],
       "maxLength": 3,
-      "precision": 2,
+      "precision": 3,
       "scale": 2
     },
     {
@@ -3331,7 +3347,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX",
@@ -5386,6 +5402,8 @@
         }
       ],
       "maxLength": 11,
+      "precision": 11,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -5724,7 +5742,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -5829,7 +5847,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -5854,6 +5872,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "synonyms": "CDOM, PropertyDaysOnMarket, DOMP, PDOM"
     },
@@ -5900,7 +5920,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -5950,6 +5970,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -5973,6 +5995,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "synonyms": "DOM, ListingDaysOnMarket, DOML, LDOM, ADOM, ActiveDaysOnMarket, AgentDaysOnMarket"
     },
@@ -5997,6 +6021,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6168,6 +6194,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6238,6 +6266,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6308,6 +6338,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6378,6 +6410,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6448,6 +6482,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6518,6 +6554,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6588,6 +6626,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6658,6 +6698,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6728,6 +6770,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6798,6 +6842,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6868,6 +6914,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -6938,6 +6986,8 @@
         }
       ],
       "maxLength": 16,
+      "precision": 16,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -7035,6 +7085,8 @@
         }
       ],
       "maxLength": 2,
+      "precision": 2,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -7176,7 +7228,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -7249,7 +7301,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -7346,6 +7398,8 @@
         }
       ],
       "maxLength": 5,
+      "precision": 5,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -7393,6 +7447,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "synonyms": "Unit Floor Number"
     },
@@ -7735,6 +7791,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -7825,7 +7883,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -7895,7 +7953,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -7981,7 +8039,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -8031,7 +8089,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -8056,7 +8114,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX"
@@ -8104,7 +8162,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -8425,7 +8483,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "synonyms": "Current Income, Actual Income"
@@ -8451,7 +8509,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -8476,7 +8534,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "synonyms": "Proforma Income"
@@ -8857,7 +8915,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -9025,8 +9083,8 @@
         }
       ],
       "maxLength": 16,
-      "precision": 4,
-      "scale": 2,
+      "precision": 16,
+      "scale": 4,
       "elementStatus": "Active"
     },
     {
@@ -9098,7 +9156,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM",
@@ -9199,8 +9257,8 @@
         }
       ],
       "maxLength": 12,
-      "precision": 8,
-      "scale": 2,
+      "precision": 12,
+      "scale": 8,
       "elementStatus": "Active"
     },
     {
@@ -9250,7 +9308,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM"
@@ -9297,7 +9355,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -9321,7 +9379,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM"
@@ -9438,7 +9496,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -9458,7 +9516,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -9478,7 +9536,7 @@
         }
       ],
       "maxLength": 5,
-      "precision": 2,
+      "precision": 5,
       "scale": 2
     },
     {
@@ -9648,7 +9706,9 @@
           "value": "The year that the current LEED certification was issued for the property."
         }
       ],
-      "maxLength": 4
+      "maxLength": 4,
+      "precision": 4,
+      "scale": 0
     },
     {
       "resourceName": "Property",
@@ -9786,7 +9846,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -10978,7 +11038,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX,OM",
@@ -11005,7 +11065,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "synonyms": "LowPriceRange, LowRangePrice"
@@ -11105,7 +11165,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX"
@@ -11272,8 +11332,8 @@
         }
       ],
       "maxLength": 12,
-      "precision": 8,
-      "scale": 2,
+      "precision": 12,
+      "scale": 8,
       "elementStatus": "Active"
     },
     {
@@ -11347,8 +11407,8 @@
         }
       ],
       "maxLength": 16,
-      "precision": 4,
-      "scale": 2,
+      "precision": 16,
+      "scale": 4,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -11373,8 +11433,8 @@
         }
       ],
       "maxLength": 16,
-      "precision": 4,
-      "scale": 2,
+      "precision": 16,
+      "scale": 4,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -11448,7 +11508,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX"
@@ -11499,6 +11559,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -11522,6 +11584,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -11545,7 +11609,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -11640,7 +11704,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -11750,7 +11814,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -11789,7 +11853,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -11809,7 +11873,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -11828,7 +11892,9 @@
           "value": "The maximum number of pets allowed in the property being leased."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Property",
@@ -11846,7 +11912,9 @@
           "value": "The maximum weight allowed for pets in the property being leased."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Property",
@@ -11941,7 +12009,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -11980,7 +12048,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -12000,7 +12068,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -12147,6 +12215,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -12171,6 +12241,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -12263,7 +12335,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -12311,7 +12383,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -12336,6 +12408,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM",
       "synonyms": "NumberOfUnitsBuildings"
@@ -12356,7 +12430,9 @@
           "value": "Indicated the number of cranes available at the commercial property."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Property",
@@ -12374,7 +12450,9 @@
           "value": "The number of dock doors included with the commercial property."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Property",
@@ -12392,7 +12470,9 @@
           "value": "The number of drive-in doors included with the commercial property."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Property",
@@ -12410,7 +12490,9 @@
           "value": "The number of elevators available at the property."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Property",
@@ -12428,7 +12510,9 @@
           "value": "The number of freight elevators at the property."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Property",
@@ -12451,6 +12535,8 @@
         }
       ],
       "maxLength": 10,
+      "precision": 10,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -12469,7 +12555,9 @@
           "value": "The number of loading docks included with the commercial property."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Property",
@@ -12492,6 +12580,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -12516,6 +12606,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -12540,6 +12632,8 @@
         }
       ],
       "maxLength": 10,
+      "precision": 10,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -12558,7 +12652,9 @@
           "value": "The number of rail doors included with the commercial property."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Property",
@@ -12581,6 +12677,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -12604,6 +12702,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -12627,6 +12727,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -12650,6 +12752,8 @@
         }
       ],
       "maxLength": 5,
+      "precision": 5,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -12673,6 +12777,8 @@
         }
       ],
       "maxLength": 5,
+      "precision": 5,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -12697,6 +12803,8 @@
         }
       ],
       "maxLength": 5,
+      "precision": 5,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -12721,6 +12829,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX,OM"
     },
@@ -12745,6 +12855,8 @@
         }
       ],
       "maxLength": 5,
+      "precision": 5,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -12764,7 +12876,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -13024,7 +13136,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "synonyms": "UncoveredParking"
@@ -13072,7 +13184,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -13147,7 +13259,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM",
@@ -13301,7 +13413,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -13322,7 +13434,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -13582,7 +13694,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -13625,7 +13737,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM"
@@ -13721,7 +13833,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -13795,7 +13907,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -13905,6 +14017,8 @@
         }
       ],
       "maxLength": 2,
+      "precision": 2,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX",
       "synonyms": "PhotoCount"
@@ -13930,7 +14044,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -14205,7 +14319,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM",
@@ -14325,7 +14439,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "synonyms": "ManagementCompanyExpense"
@@ -14347,7 +14461,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -14453,7 +14567,9 @@
           "value": "The electrical amperage available at the property."
         }
       ],
-      "maxLength": 5
+      "maxLength": 5,
+      "precision": 5,
+      "scale": 0
     },
     {
       "resourceName": "Property",
@@ -14471,7 +14587,9 @@
           "value": "The electrical voltage available at the property."
         }
       ],
-      "maxLength": 5
+      "maxLength": 5,
+      "precision": 5,
+      "scale": 0
     },
     {
       "resourceName": "Property",
@@ -14586,6 +14704,8 @@
         }
       ],
       "maxLength": 10,
+      "precision": 10,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -14770,7 +14890,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -14971,6 +15091,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -15040,7 +15162,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -15060,7 +15182,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -15080,7 +15202,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -15104,6 +15226,8 @@
         }
       ],
       "maxLength": 10,
+      "precision": 10,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -15278,6 +15402,8 @@
         }
       ],
       "maxLength": 2,
+      "precision": 2,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -15609,6 +15735,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -16030,6 +16158,8 @@
         }
       ],
       "maxLength": 2,
+      "precision": 2,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX",
       "synonyms": "Floors"
@@ -16055,6 +16185,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX",
       "synonyms": "StoriesBuildingTotal"
@@ -16201,6 +16333,8 @@
         }
       ],
       "maxLength": 10,
+      "precision": 10,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX,OM"
     },
@@ -16413,7 +16547,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -16487,7 +16621,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX,OM"
@@ -16513,7 +16647,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -16538,7 +16672,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -16563,6 +16697,8 @@
         }
       ],
       "maxLength": 14,
+      "precision": 14,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -16709,7 +16845,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM"
@@ -16810,6 +16946,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "OM"
     },
@@ -16921,7 +17059,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "OM"
@@ -17021,7 +17159,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -17286,6 +17424,8 @@
         }
       ],
       "maxLength": 9,
+      "precision": 9,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -17309,7 +17449,7 @@
         }
       ],
       "maxLength": 5,
-      "precision": 2,
+      "precision": 5,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -17382,6 +17522,8 @@
         }
       ],
       "maxLength": 2,
+      "precision": 2,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -17501,6 +17643,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -17598,7 +17742,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -17698,7 +17842,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -17723,7 +17867,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -17748,6 +17892,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX,OM"
     },
@@ -17795,6 +17941,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -17842,6 +17990,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -17860,7 +18010,9 @@
           "value": "The year of the most recent major rebuild or renovation of the structure."
         }
       ],
-      "maxLength": 4
+      "maxLength": 4,
+      "precision": 4,
+      "scale": 0
     },
     {
       "resourceName": "Property",
@@ -17883,6 +18035,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -19108,7 +19262,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -19148,7 +19302,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -19187,7 +19341,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -19263,7 +19417,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -19448,7 +19602,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -19503,7 +19657,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -19969,7 +20123,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -20043,7 +20197,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -20062,7 +20216,9 @@
           "value": "The percentage of the commercial area as related to the total building area."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -20342,7 +20498,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -20476,7 +20632,9 @@
           "value": "The total number of documents or supplements included with the listing."
         }
       ],
-      "maxLength": 2
+      "maxLength": 2,
+      "precision": 2,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -20554,7 +20712,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -20783,7 +20941,9 @@
           "value": "The total number of fireplaces included in the common spaces of the building."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -20861,7 +21021,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -20919,7 +21079,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -20939,7 +21099,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -21155,7 +21315,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -21175,7 +21335,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -21215,7 +21375,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -21325,7 +21485,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -21417,8 +21577,8 @@
         }
       ],
       "maxLength": 12,
-      "precision": 8,
-      "scale": 2
+      "precision": 12,
+      "scale": 8
     },
     {
       "resourceName": "Building",
@@ -21511,8 +21671,8 @@
         }
       ],
       "maxLength": 12,
-      "precision": 8,
-      "scale": 2
+      "precision": 12,
+      "scale": 8
     },
     {
       "resourceName": "Building",
@@ -21531,8 +21691,8 @@
         }
       ],
       "maxLength": 16,
-      "precision": 4,
-      "scale": 2
+      "precision": 16,
+      "scale": 4
     },
     {
       "resourceName": "Building",
@@ -21607,7 +21767,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -21773,7 +21933,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -21811,7 +21971,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -21830,7 +21990,9 @@
           "value": "The maximum number of pets allowed to be kept by residents of the building."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -21848,7 +22010,9 @@
           "value": "The maximum weight of pets allowed in the building."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -21944,7 +22108,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -21980,7 +22144,9 @@
           "value": "The total number of separate buildings associated with the complex or property."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -21998,7 +22164,9 @@
           "value": "Indicates the number of commercial units in the building"
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -22016,7 +22184,9 @@
           "value": "Indicates the total number of elevators for the residential building, including service elevators."
         }
       ],
-      "maxLength": 2
+      "maxLength": 2,
+      "precision": 2,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -22034,7 +22204,9 @@
           "value": "Indicates the current number of individuals employed by the building on a full-time basis at the building."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -22052,7 +22224,9 @@
           "value": "Indicates the number of parking garages included with the building."
         }
       ],
-      "maxLength": 2
+      "maxLength": 2,
+      "precision": 2,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -22070,7 +22244,9 @@
           "value": "Indicates the current number of individuals employed by the building on a part-time basis at the building."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -22088,7 +22264,9 @@
           "value": "The total number of tenants in the building."
         }
       ],
-      "maxLength": 4
+      "maxLength": 4,
+      "precision": 4,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -22106,7 +22284,9 @@
           "value": "Indicates the total number of residential units rented."
         }
       ],
-      "maxLength": 4
+      "maxLength": 4,
+      "precision": 4,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -22124,7 +22304,9 @@
           "value": "Indicates the total number of residential units currently occupied."
         }
       ],
-      "maxLength": 4
+      "maxLength": 4,
+      "precision": 4,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -22142,7 +22324,9 @@
           "value": "The total number of residential units included in the building."
         }
       ],
-      "maxLength": 4
+      "maxLength": 4,
+      "precision": 4,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -22160,7 +22344,9 @@
           "value": "Indicates the total number of residential units currently vacant."
         }
       ],
-      "maxLength": 4
+      "maxLength": 4,
+      "precision": 4,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -22196,7 +22382,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -22216,7 +22402,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -22292,7 +22478,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -22332,7 +22518,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -22351,7 +22537,9 @@
           "value": "The percentage based on the total OwnerOccupiedUnitsTotal and NumberOfUnitsTotal."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -22369,7 +22557,9 @@
           "value": "The number of units occupied by building owners."
         }
       ],
-      "maxLength": 4
+      "maxLength": 4,
+      "precision": 4,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -22479,7 +22669,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -22538,7 +22728,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -22578,7 +22768,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -22598,7 +22788,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -22728,7 +22918,9 @@
           "value": "The total number of pictures or photos included with the listing."
         }
       ],
-      "maxLength": 2
+      "maxLength": 2,
+      "precision": 2,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -22897,7 +23089,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -23139,7 +23331,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -23249,7 +23441,9 @@
           "value": "The total number of floors in the building. In the case of multi-dwelling structures, this is the entire structure and not the individual dwelling being sold."
         }
       ],
-      "maxLength": 3
+      "maxLength": 3,
+      "precision": 3,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -23359,7 +23553,9 @@
           "value": "The integer portion of the street number."
         }
       ],
-      "maxLength": 10
+      "maxLength": 10,
+      "precision": 10,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -23415,7 +23611,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -23507,7 +23703,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -23526,7 +23722,9 @@
           "value": "The year in with the last assessment of the property value/tax was made."
         }
       ],
-      "maxLength": 4
+      "maxLength": 4,
+      "precision": 4,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -23562,7 +23760,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -23582,7 +23780,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -23621,7 +23819,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -23660,7 +23858,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -23680,7 +23878,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -23791,7 +23989,9 @@
           "value": "The total number of videos or virtual tours included with the listing."
         }
       ],
-      "maxLength": 2
+      "maxLength": 2,
+      "precision": 2,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -23885,7 +24085,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2
     },
     {
@@ -23944,7 +24144,9 @@
           "value": "The year that an occupancy permit was first granted for the building or some other local measure of initial habitability. An empty value is permitted with an attribute noting that it is an unknown date or that the building is new construction. While constraints have not been applied, convention is a four-digit year value."
         }
       ],
-      "maxLength": 4
+      "maxLength": 4,
+      "precision": 4,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -23980,7 +24182,9 @@
           "value": "The year a major rebuild/renovation of the building occurred."
         }
       ],
-      "maxLength": 4
+      "maxLength": 4,
+      "precision": 4,
+      "scale": 0
     },
     {
       "resourceName": "Building",
@@ -25197,6 +25401,8 @@
         }
       ],
       "maxLength": 2,
+      "precision": 2,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -29609,8 +29815,8 @@
         }
       ],
       "maxLength": 12,
-      "precision": 8,
-      "scale": 2,
+      "precision": 12,
+      "scale": 8,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -29635,8 +29841,8 @@
         }
       ],
       "maxLength": 12,
-      "precision": 8,
-      "scale": 2,
+      "precision": 12,
+      "scale": 8,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -29979,6 +30185,8 @@
         }
       ],
       "maxLength": 255,
+      "precision": 255,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -30761,6 +30969,8 @@
         }
       ],
       "maxLength": 255,
+      "precision": 255,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -30785,6 +30995,8 @@
         }
       ],
       "maxLength": 255,
+      "precision": 255,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -30905,6 +31117,8 @@
         }
       ],
       "maxLength": 255,
+      "precision": 255,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -30953,6 +31167,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -30977,6 +31193,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -31001,6 +31219,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -31024,6 +31244,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -31071,6 +31293,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -31119,6 +31343,8 @@
         }
       ],
       "maxLength": 255,
+      "precision": 255,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -31143,6 +31369,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -31213,6 +31441,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -31237,6 +31467,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -31261,6 +31493,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -31284,6 +31518,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -31379,6 +31615,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -31402,6 +31640,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -31426,6 +31666,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -31473,6 +31715,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -31570,6 +31814,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS,OM"
     },
@@ -31594,6 +31840,8 @@
         }
       ],
       "maxLength": 100,
+      "precision": 100,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -31855,8 +32103,8 @@
         }
       ],
       "maxLength": 12,
-      "precision": 8,
-      "scale": 2,
+      "precision": 12,
+      "scale": 8,
       "elementStatus": "Active"
     },
     {
@@ -31880,8 +32128,8 @@
         }
       ],
       "maxLength": 12,
-      "precision": 8,
-      "scale": 2,
+      "precision": 12,
+      "scale": 8,
       "elementStatus": "Active"
     },
     {
@@ -32994,6 +33242,8 @@
         }
       ],
       "maxLength": 8,
+      "precision": 8,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -33068,6 +33318,8 @@
         }
       ],
       "maxLength": 8,
+      "precision": 8,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -33384,6 +33636,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX"
     },
@@ -34290,6 +34544,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS"
     },
@@ -37587,6 +37843,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS"
     },
@@ -37611,6 +37869,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "AMS"
     },
@@ -41748,6 +42008,8 @@
         }
       ],
       "maxLength": 14,
+      "precision": 14,
+      "scale": 0,
       "elementStatus": "Active",
       "synonyms": "OrganizationAgentCount"
     },
@@ -42291,6 +42553,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active",
       "payloads": "IDX",
       "synonyms": "GreenCertificationMetric, GreenRatingMetric"
@@ -42441,6 +42705,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active",
       "synonyms": "GreenYearCertified, GreenRatingYear"
     },
@@ -42733,6 +42999,8 @@
         }
       ],
       "maxLength": 6,
+      "precision": 6,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -42827,7 +43095,7 @@
         }
       ],
       "maxLength": 5,
-      "precision": 2,
+      "precision": 5,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -42876,6 +43144,8 @@
         }
       ],
       "maxLength": 4,
+      "precision": 4,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -42995,7 +43265,7 @@
         }
       ],
       "maxLength": 3,
-      "precision": 2,
+      "precision": 3,
       "scale": 2,
       "elementStatus": "Active",
       "payloads": "IDX"
@@ -43240,7 +43510,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -43407,7 +43677,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -43528,7 +43798,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -43699,7 +43969,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -43724,6 +43994,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -43747,6 +44019,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -43839,7 +44113,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -43887,6 +44161,8 @@
         }
       ],
       "maxLength": 6,
+      "precision": 6,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -43910,7 +44186,7 @@
         }
       ],
       "maxLength": 14,
-      "precision": 2,
+      "precision": 14,
       "scale": 2,
       "elementStatus": "Active"
     },
@@ -43959,6 +44235,8 @@
         }
       ],
       "maxLength": 3,
+      "precision": 3,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
@@ -45685,6 +45963,8 @@
         }
       ],
       "maxLength": 64,
+      "precision": 64,
+      "scale": 0,
       "elementStatus": "Active"
     },
     {
