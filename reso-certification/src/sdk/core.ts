@@ -184,7 +184,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
 });
 
 const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> => ({
-  name: 'Write compliance reports',
+  name: 'Write reports',
   run: async (ctx, onProgress) => {
     const outputDir = buildOutputPath('web-api-core', config.version ?? '2.0.0', config);
     await archiveCurrentResults(outputDir);

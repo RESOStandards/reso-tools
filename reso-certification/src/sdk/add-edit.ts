@@ -253,7 +253,7 @@ const runTests = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
 
 /** Write generic and detailed compliance reports. */
 const writeComplianceReports = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
-  name: 'Write compliance reports',
+  name: 'Write reports',
   run: async (ctx, onProgress) => {
     const outputDir = buildOutputPath('web-api-add-edit', config.specVersion ?? '2.0.0', config);
     await archiveCurrentResults(outputDir);

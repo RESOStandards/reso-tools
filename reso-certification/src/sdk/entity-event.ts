@@ -168,7 +168,7 @@ const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> =
 
 /** Write generic and detailed compliance reports. */
 const writeComplianceReports = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
-  name: 'Write compliance reports',
+  name: 'Write reports',
   run: async (ctx, onProgress) => {
     const outputDir = buildOutputPath('entity-event', '1.0.0', config);
     await archiveCurrentResults(outputDir);

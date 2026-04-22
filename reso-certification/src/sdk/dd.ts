@@ -426,7 +426,7 @@ const ddReportGenerators = (version: string) => [
 ];
 
 const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext> => ({
-  name: 'Write compliance reports',
+  name: 'Write reports',
   run: async (ctx, onProgress) => {
     const generators = ddReportGenerators(config.version);
     const pipelineResult = {

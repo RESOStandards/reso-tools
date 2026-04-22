@@ -93,7 +93,7 @@ export const DD_STEPS: ReadonlyArray<string> = [
   'Generate metadata report',
   'Check variations',
   'Replicate and validate',
-  'Write compliance reports',
+  'Write reports',
 ];
 
 export const CORE_STEPS: ReadonlyArray<string> = [
@@ -101,7 +101,7 @@ export const CORE_STEPS: ReadonlyArray<string> = [
   'Service check',
   'Fetch metadata',
   'Run Core scenarios',
-  'Write compliance reports',
+  'Write reports',
 ];
 
 export const ADD_EDIT_STEPS: ReadonlyArray<string> = [
@@ -111,7 +111,7 @@ export const ADD_EDIT_STEPS: ReadonlyArray<string> = [
   'Sample records',
   'Generate payloads',
   'Run Add/Edit scenarios',
-  'Write compliance reports',
+  'Write reports',
 ];
 
 export const ENTITY_EVENT_STEPS: ReadonlyArray<string> = [
@@ -120,7 +120,7 @@ export const ENTITY_EVENT_STEPS: ReadonlyArray<string> = [
   'Fetch metadata',
   'Generate payloads',
   'Run EntityEvent scenarios',
-  'Write compliance reports',
+  'Write reports',
 ];
 
 export const STEPS_BY_ENDORSEMENT: Readonly<Record<string, ReadonlyArray<string>>> = {
