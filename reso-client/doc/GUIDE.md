@@ -163,28 +163,31 @@ const url = buildUri('http://localhost:8080', 'OrderItem')
 
 ### Page Through a Large Result Set
 
-Server-side paging in OData uses `@odata.nextLink`. The straightforward way is to read it yourself and build a loop. The SDK has a helper that does it for you:
+Server-side paging in OData uses `@odata.nextLink`. The server controls the page size — the client does not set `$top` to control paging. Instead, the client issues a request and follows the `@odata.nextLink` chain until the server stops providing one.
+
+The SDK has a helper that does this for you:
 
 ```typescript
 import { queryEntities, followAllPages } from '@reso-standards/reso-client';
 
 const firstPage = await queryEntities(client, 'Property', {
-  $filter: "City eq 'Austin'",
-  $top: 100
+  $filter: "City eq 'Austin'"
 });
 
 const allProperties = await followAllPages(client, firstPage);
 console.log(`Fetched ${allProperties.length} properties across all pages`);
 ```
 
-`followAllPages` walks the `@odata.nextLink` chain until there is not one, performs no deduplication (the server is responsible for that) and returns a flat array. **Use it carefully** – for resources with millions of records, you almost certainly want streaming or batching instead. A 100,000-row listing dump is not the right use of this helper.
+`followAllPages` walks the `@odata.nextLink` chain until there is not one, performs no deduplication (the server is responsible for that) and returns a flat array. **Use it carefully** – for resources with millions of records, you almost certainly want streaming or batching instead.
 
 For incremental pulls, fetch one page at a time and check `getNextLink` yourself:
 
 ```typescript
 import { getNextLink } from '@reso-standards/reso-client';
 
-let response = await queryEntities(client, 'Property', { $top: 100 });
+let response = await queryEntities(client, 'Property', {
+  $filter: "City eq 'Austin'"
+});
 while (response.status === 200 && isODataCollection(response.body)) {
   for (const property of response.body.value) {
     await processProperty(property);
@@ -194,6 +197,8 @@ while (response.status === 200 && isODataCollection(response.body)) {
   response = await client.request({ method: 'GET', url: next });
 }
 ```
+
+> **Note:** `$top` limits the *total* number of records the server will return, not the page size. If you set `$top=100` and the server's page size is 100, you will get exactly one page. Use `$top` only when you want a specific number of records (e.g., "show me the 10 most expensive listings"), not for paging.
 
 ---
 
@@ -394,8 +399,7 @@ const main = async () => {
   const firstPage = await queryEntities(client, 'Property', {
     $filter: "City eq 'Austin' and ListPrice gt 200000",
     $select: 'ListPrice,City,BedroomsTotal,ListingKey',
-    $orderby: 'ListPrice desc',
-    $top: 100
+    $orderby: 'ListPrice desc'
   });
 
   if (isODataError(firstPage.body)) {
