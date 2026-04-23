@@ -16,9 +16,11 @@
     "dev": "tsc && cp src/server-entry.mjs dist/ && env -u ELECTRON_RUN_AS_NODE electron dist/main.js",
     "postinstall": "electron-rebuild -m ../reso-reference-server -o better-sqlite3 || true",
     "test": "vitest run",
-    "package": "npm run build && npm run build:server-bundle && electron-builder"
+    "build:cert-worker": "node scripts/bundle-cert-worker.mjs",
+    "package": "npm run build && npm run build:server-bundle && npm run build:cert-worker && electron-builder"
   },
   "dependencies": {
+    "@reso-standards/reso-certification": "file:../reso-certification",
     "@reso-standards/reso-reference-server": "file:../reso-reference-server",
     "@reso-standards/reso-web-api-proxy": "file:../reso-web-api-proxy",
     "better-sqlite3": "^12.9.0"
@@ -38,6 +40,9 @@
     "files": [
       "dist/main.js",
       "dist/preload.js",
+      "dist/job-store.js",
+      "dist/cert-worker.js",
+      "dist/cert-worker-bundle.mjs",
       "node_modules/**/*"
     ],
     "extraResources": [

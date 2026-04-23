@@ -6,6 +6,8 @@
     "node": ">=22"
   },
   "scripts": {
+    "bootstrap": "bash scripts/bootstrap.sh",
+    "bootstrap:force": "bash scripts/bootstrap.sh --force",
     "lint": "biome check .",
     "lint:fix": "biome check --fix .",
     "test": "npm run test:validation && npm run test:filter-parser && npm run test:client && npm run test:data-generator && npm run test:server && npm run test:web-client && npm run test:certification && npm run test:mcp",
