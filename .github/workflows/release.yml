@@ -21,11 +21,10 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Configure git and npm for CI
+      - name: Configure git for CI
         run: |
           git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
           git config --global url."https://github.com/".insteadOf "git@github.com:"
-          npm config set ignore-scripts true
 
       - name: Bootstrap all packages
         run: npm run bootstrap:force

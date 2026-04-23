@@ -29,8 +29,8 @@
   "dependencies": {
     "@reso-standards/reso-client": "file:../reso-client",
     "@reso-standards/reso-validation": "file:../reso-validation",
-    "@reso/reso-certification-etl": "git+https://github.com/RESOStandards/reso-certification-etl.git",
-    "@reso/reso-certification-utils": "git+https://github.com/RESOStandards/reso-certification-utils.git#v3.0.0",
+    "@reso/reso-certification-etl": "https://github.com/RESOStandards/reso-certification-etl/archive/refs/heads/main.tar.gz",
+    "@reso/reso-certification-utils": "https://github.com/RESOStandards/reso-certification-utils/archive/refs/tags/v3.0.0.tar.gz",
     "ajv": "^8.18.0",
     "ajv-errors": "^3.0.0",
     "ajv-formats": "^3.0.1",
