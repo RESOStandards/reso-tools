@@ -10,6 +10,13 @@ process.on('uncaughtException', (err) => {
   throw err;
 });
 
+// In packaged apps, cwd defaults to / (macOS) or the system root. Change it
+// to the resources directory so relative file lookups (schema-validation-settings.json,
+// reference metadata, etc.) resolve against the bundled extraResources.
+if (app.isPackaged) {
+  process.chdir(process.resourcesPath);
+}
+
 /** Write diagnostic messages to a log file in the user data directory. */
 const logFile = (): string => resolve(app.getPath('userData'), 'reso-desktop.log');
 const log = (msg: string): void => {

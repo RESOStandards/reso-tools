@@ -96,6 +96,10 @@
         ]
       },
       {
+        "from": "../reso-certification/schema-validation-settings.json",
+        "to": "schema-validation-settings.json"
+      },
+      {
         "from": "../reso-web-client/dist",
         "to": "ui"
       },
