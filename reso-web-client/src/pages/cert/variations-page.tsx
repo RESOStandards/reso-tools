@@ -15,10 +15,11 @@
  * - Persisted in localStorage for refresh survival
  */
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useLocation, useBlocker } from 'react-router';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
-import { blendVariations, type BlendedVariation, type BlendedVariationsReport } from '../../services/variations-blender';
+import { blendVariations, type BlendedVariation, type BlendedSuggestion, type BlendedVariationsReport } from '../../services/variations-blender';
 import { searchVariations, getVariationsStats, searchLocks, createLock, deleteLock, variationsLockResourceId, type LockRecord } from '../../services/variations-service';
 import { useNotifications } from '../../hooks/use-notifications';
 import { saveVariationsReview } from '../../services/variations-save';
@@ -72,6 +73,32 @@ const FILTER_TABS: ReadonlyArray<{ key: VariationFilter; label: string }> = [
 
 const variationKey = (v: BlendedVariation): string =>
   `${v.resourceName}:${v.fieldName ?? ''}:${v.lookupValue ?? ''}`;
+
+/** Segments that make up a variation path: resource, field, lookup. Undefined slots are skipped. */
+interface PathPart {
+  readonly text: string;
+  readonly changed: boolean;
+}
+
+const sourceSegments = (v: BlendedVariation): ReadonlyArray<string | undefined> =>
+  [v.resourceName, v.fieldName, v.lookupValue];
+
+const targetSegments = (s: BlendedSuggestion): ReadonlyArray<string | undefined> =>
+  [s.suggestedResourceName, s.suggestedFieldName, s.suggestedLookupValue];
+
+/** Compare segment-by-segment and mark which ones differ. */
+const diffSegments = (src: ReadonlyArray<string | undefined>, tgt: ReadonlyArray<string | undefined>): { source: ReadonlyArray<PathPart>; target: ReadonlyArray<PathPart> } => {
+  const source: PathPart[] = [];
+  const target: PathPart[] = [];
+  const max = Math.max(src.length, tgt.length);
+  for (let i = 0; i < max; i++) {
+    const s = src[i];
+    const t = tgt[i];
+    if (s != null) source.push({ text: s, changed: s !== t });
+    if (t != null) target.push({ text: t, changed: s !== t });
+  }
+  return { source, target };
+};
 
 const STRATEGY_LABELS: Readonly<Record<string, { label: string; color: string }>> = {
   'Substring': { label: 'Substring Match', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
@@ -372,6 +399,7 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin }: {
   const [draftComments, setDraftComments] = useState<Map<string, ReadonlyArray<VariationComment>>>(new Map());
   const [saving, setSaving] = useState(false);
   const [staleNotification, setStaleNotification] = useState(false);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   // Watch for VARIATIONS_REPORT notifications that indicate someone else updated this report
   const { notifications } = useNotifications();
@@ -610,38 +638,356 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin }: {
         </div>
       </div>
 
-      {/* Variations list */}
-      <div className="space-y-2">
-        {filtered.length === 0 && (
-          <p className="text-center py-8 text-sm text-gray-400 dark:text-gray-500">
-            {search ? 'No matching variations.' : 'No variations to review.'}
-          </p>
+      {/* Variations table */}
+      {filtered.length === 0 ? (
+        <p className="text-center py-8 text-sm text-gray-400 dark:text-gray-500">
+          {search ? 'No matching variations.' : 'No variations to review.'}
+        </p>
+      ) : (
+        <VariationsTable
+          variations={filtered}
+          actions={actions}
+          selectedKey={selectedKey}
+          draftComments={draftComments}
+          isReadOnly={isReadOnly}
+          isAdmin={isAdmin}
+          isFastTrackAdmin={isAdmin && FT_ADMIN_EMAILS.has(user?.email ?? '')}
+          onSelect={(variation) => setSelectedKey(variationKey(variation))}
+          onToggleAction={toggleAction}
+        />
+      )}
+
+      <VariationDrawer
+        variation={selectedKey ? (filtered.find(v => variationKey(v) === selectedKey) ?? null) : null}
+        action={selectedKey ? actions.get(selectedKey) : undefined}
+        draftComments={selectedKey ? (draftComments.get(selectedKey) ?? []) : []}
+        isReadOnly={isReadOnly}
+        isAdmin={isAdmin}
+        isFastTrackAdmin={isAdmin && FT_ADMIN_EMAILS.has(user?.email ?? '')}
+        userName={user?.fullName ?? user?.username ?? ''}
+        userUoi={report.providerUoi ?? ''}
+        onClose={() => setSelectedKey(null)}
+        onToggleAction={(status) => selectedKey && toggleAction(selectedKey, status)}
+        onAddComment={(comment) => selectedKey && addComment(selectedKey, comment)}
+        onRemoveComment={(index) => selectedKey && removeComment(selectedKey, index)}
+      />
+    </div>
+  );
+};
+
+// ── Path rendering with diff highlighting ────────────────────────────
+
+const PathDisplay = ({ parts, tone }: { readonly parts: ReadonlyArray<PathPart>; readonly tone: 'source' | 'target' }) => {
+  const mutedClass = 'text-gray-400 dark:text-gray-500';
+  const changedClass = tone === 'source'
+    ? 'text-red-600 dark:text-red-400 font-semibold'
+    : 'text-green-700 dark:text-green-400 font-semibold';
+  return (
+    <span className="inline-flex items-baseline gap-0.5 whitespace-nowrap">
+      {parts.map((part, i) => (
+        <span key={i} className="inline-flex items-baseline">
+          {i > 0 && <span className={mutedClass}>.</span>}
+          <span className={part.changed ? changedClass : mutedClass}>{part.text}</span>
+        </span>
+      ))}
+    </span>
+  );
+};
+
+// ── Variations table row ─────────────────────────────────────────────
+
+interface VariationRowProps {
+  readonly variation: BlendedVariation;
+  readonly action?: ActionStatus;
+  readonly isSelected: boolean;
+  readonly isReadOnly: boolean;
+  readonly isAdmin: boolean;
+  readonly isFastTrackAdmin: boolean;
+  readonly hasDraftComments: boolean;
+  readonly onSelect: () => void;
+  readonly onToggleAction: (status: ActionStatus) => void;
+}
+
+const VariationRow = ({ variation, action, isSelected, isReadOnly, isAdmin, isFastTrackAdmin, hasDraftComments, onSelect, onToggleAction }: VariationRowProps) => {
+  const primary = variation.suggestions[0];
+  const diff = primary
+    ? diffSegments(sourceSegments(variation), targetSegments(primary))
+    : { source: sourceSegments(variation).filter((s): s is string => s != null).map(text => ({ text, changed: false })), target: [] };
+  const extraCount = variation.suggestions.length > 1 ? variation.suggestions.length - 1 : 0;
+  const strategyInfo = primary ? (STRATEGY_LABELS[primary.strategy] ?? { label: primary.strategy, color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' }) : null;
+  const commentCount = (variation.conversations?.length ?? 0) + (hasDraftComments ? 1 : 0);
+  const isIgnored = variation.ignored || action === 'ignored';
+
+  return (
+    <div
+      className={`grid grid-cols-[80px_minmax(0,1fr)_minmax(0,1fr)_140px_80px_180px] items-center gap-3 px-4 py-2 text-sm cursor-pointer transition-colors ${
+        isSelected
+          ? 'bg-blue-50 dark:bg-blue-900/20'
+          : isIgnored
+            ? 'opacity-60 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+            : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
+      }`}
+      onClick={onSelect}
+      onKeyDown={e => { if (e.key === 'Enter') onSelect(); }}
+      role="button"
+      tabIndex={0}
+    >
+      <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">{variation.type}</div>
+      <div className="truncate"><PathDisplay parts={diff.source} tone="source" /></div>
+      <div className="truncate">
+        {primary
+          ? <PathDisplay parts={diff.target} tone="target" />
+          : <span className="text-xs text-gray-400 dark:text-gray-500">No suggestion</span>}
+        {extraCount > 0 && <span className="ml-2 text-[10px] text-gray-400 dark:text-gray-500">+{extraCount} more</span>}
+      </div>
+      <div>
+        {strategyInfo && (
+          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${strategyInfo.color}`}>{strategyInfo.label}</span>
         )}
-        {filtered.map(variation => {
-          const key = variationKey(variation);
-          return (
-            <VariationCard
-              key={key}
-              variation={variation}
-              action={actions.get(key)}
-              onToggleAction={(status) => toggleAction(key, status)}
-              isReadOnly={isReadOnly}
-              isAdmin={isAdmin}
-              isFastTrackAdmin={isAdmin && FT_ADMIN_EMAILS.has(user?.email ?? '')}
-              draftComments={draftComments.get(key) ?? []}
-              onAddComment={(comment) => addComment(key, comment)}
-              onRemoveComment={(index) => removeComment(key, index)}
-              userName={user?.fullName ?? user?.username ?? ''}
-              userUoi={report.providerUoi ?? ''}
-            />
-          );
-        })}
+      </div>
+      <div className="text-center text-xs text-gray-500 dark:text-gray-400">
+        {commentCount > 0 ? `${commentCount}` : '—'}
+      </div>
+      <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+        {!isReadOnly ? (
+          <>
+            <button type="button" onClick={() => onToggleAction('ignored')}
+              className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors cursor-pointer ${action === 'ignored' ? 'bg-gray-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+              title="Mark as ignored">
+              Ignore
+            </button>
+            {isFastTrackAdmin && (
+              <button type="button" onClick={() => onToggleAction('fast-track')}
+                className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors cursor-pointer ${action === 'fast-track' ? 'bg-green-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                title="Fast Track">
+                FT
+              </button>
+            )}
+            {isAdmin && (
+              <button type="button" onClick={() => onToggleAction('remove')}
+                className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors cursor-pointer ${action === 'remove' ? 'bg-red-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400'}`}
+                title="Remove (admin)">
+                Remove
+              </button>
+            )}
+          </>
+        ) : <span className="text-xs text-gray-400 dark:text-gray-500">Read-only</span>}
       </div>
     </div>
   );
 };
 
-// ── Variation Card ───────────────────────────────────────────────────
+// ── Variations virtualized table ─────────────────────────────────────
+
+interface VariationsTableProps {
+  readonly variations: ReadonlyArray<BlendedVariation>;
+  readonly actions: Map<string, ActionStatus>;
+  readonly selectedKey: string | null;
+  readonly draftComments: Map<string, ReadonlyArray<VariationComment>>;
+  readonly isReadOnly: boolean;
+  readonly isAdmin: boolean;
+  readonly isFastTrackAdmin: boolean;
+  readonly onSelect: (variation: BlendedVariation) => void;
+  readonly onToggleAction: (key: string, status: ActionStatus) => void;
+}
+
+const VariationsTable = ({ variations, actions, selectedKey, draftComments, isReadOnly, isAdmin, isFastTrackAdmin, onSelect, onToggleAction }: VariationsTableProps) => {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: variations.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 44,
+    overscan: 10,
+  });
+
+  return (
+    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+      <div className="grid grid-cols-[80px_minmax(0,1fr)_minmax(0,1fr)_140px_80px_180px] gap-3 px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+        <div>Type</div>
+        <div>Source</div>
+        <div>Suggested</div>
+        <div>Strategy</div>
+        <div className="text-center">Comments</div>
+        <div className="text-right">Actions</div>
+      </div>
+      <div ref={parentRef} className="max-h-[calc(100vh-320px)] overflow-auto">
+        <div style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
+          {virtualizer.getVirtualItems().map(vRow => {
+            const variation = variations[vRow.index];
+            const key = variationKey(variation);
+            return (
+              <div
+                key={key}
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vRow.start}px)` }}
+                className="border-b border-gray-100 dark:border-gray-700/50 last:border-b-0"
+              >
+                <VariationRow
+                  variation={variation}
+                  action={actions.get(key)}
+                  isSelected={selectedKey === key}
+                  isReadOnly={isReadOnly}
+                  isAdmin={isAdmin}
+                  isFastTrackAdmin={isFastTrackAdmin}
+                  hasDraftComments={(draftComments.get(key)?.length ?? 0) > 0}
+                  onSelect={() => onSelect(variation)}
+                  onToggleAction={(status) => onToggleAction(key, status)}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Variation drawer (slide-out detail panel) ────────────────────────
+
+interface VariationDrawerProps {
+  readonly variation: BlendedVariation | null;
+  readonly action?: ActionStatus;
+  readonly draftComments: ReadonlyArray<VariationComment>;
+  readonly isReadOnly: boolean;
+  readonly isAdmin: boolean;
+  readonly isFastTrackAdmin: boolean;
+  readonly userName: string;
+  readonly userUoi: string;
+  readonly onClose: () => void;
+  readonly onToggleAction: (status: ActionStatus) => void;
+  readonly onAddComment: (comment: VariationComment) => void;
+  readonly onRemoveComment: (index: number) => void;
+}
+
+const VariationDrawer = ({ variation, action, draftComments, isReadOnly, isAdmin, isFastTrackAdmin, userName, userUoi, onClose, onToggleAction, onAddComment, onRemoveComment }: VariationDrawerProps) => {
+  // Close on Escape
+  useEffect(() => {
+    if (!variation) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [variation, onClose]);
+
+  if (!variation) return null;
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 bg-black/10 z-30"
+        onClick={onClose}
+        onKeyDown={e => e.key === 'Escape' && onClose()}
+        role="button"
+        tabIndex={-1}
+        aria-label="Close drawer"
+      />
+      <div className="fixed top-0 right-0 h-full w-[480px] bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 shadow-xl z-40 flex flex-col">
+        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-5 py-4 flex items-center justify-between shrink-0">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-0.5 capitalize">{variation.type} variation</div>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Variation Detail</h2>
+          </div>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none cursor-pointer" aria-label="Close">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Source */}
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Local value</div>
+            <div className="text-base">
+              <PathDisplay parts={sourceSegments(variation).filter((s): s is string => s != null).map(text => ({ text, changed: true }))} tone="source" />
+            </div>
+          </div>
+
+          {/* Suggestions */}
+          {variation.suggestions.length > 0 ? (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                Suggested mapping{variation.suggestions.length > 1 ? `s (${variation.suggestions.length})` : ''}
+              </div>
+              <div className="space-y-2">
+                {variation.suggestions.map((suggestion, i) => {
+                  const diff = diffSegments(sourceSegments(variation), targetSegments(suggestion));
+                  const strategyInfo = STRATEGY_LABELS[suggestion.strategy] ?? { label: suggestion.strategy, color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' };
+                  return (
+                    <div key={i} className="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="min-w-0 flex-1">
+                          <PathDisplay parts={diff.target} tone="target" />
+                        </div>
+                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${strategyInfo.color}`}>{strategyInfo.label}</span>
+                      </div>
+                      {suggestion.suggestedRelatedFieldName && (
+                        <div className="text-xs text-purple-600 dark:text-purple-400 mb-2">
+                          + Related: {suggestion.suggestedRelatedResourceName ?? variation.resourceName}.{suggestion.suggestedRelatedFieldName}
+                          {suggestion.suggestedRelatedLookupValue && `.${suggestion.suggestedRelatedLookupValue}`}
+                        </div>
+                      )}
+                      {suggestion.ddWikiUrl && (
+                        <a
+                          href={suggestion.ddWikiUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          DD reference
+                          <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clipRule="evenodd" />
+                            <path fillRule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clipRule="evenodd" />
+                          </svg>
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs text-gray-400 dark:text-gray-500">No suggestions available</div>
+          )}
+
+          {/* Actions */}
+          {!isReadOnly && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Actions</div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => onToggleAction('ignored')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${action === 'ignored' ? 'bg-gray-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
+                  Ignore
+                </button>
+                {isFastTrackAdmin && (
+                  <button type="button" onClick={() => onToggleAction('fast-track')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${action === 'fast-track' ? 'bg-green-600 text-white' : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/50'}`}>
+                    Fast Track
+                  </button>
+                )}
+                {isAdmin && (
+                  <button type="button" onClick={() => onToggleAction('remove')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${action === 'remove' ? 'bg-red-600 text-white' : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50'}`}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Comments */}
+          <div>
+            <VariationComments
+              existingComments={variation.conversations ?? []}
+              draftComments={draftComments}
+              onAddComment={onAddComment}
+              onRemoveComment={onRemoveComment}
+              userName={userName}
+              userUoi={userUoi}
+              isReadOnly={isReadOnly}
+            />
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// ── Variation Card (legacy — retained for reference during migration) ────
 
 const VariationCard = ({
   variation, action, onToggleAction, isReadOnly, isAdmin, isFastTrackAdmin, draftComments, onAddComment, onRemoveComment, userName, userUoi,

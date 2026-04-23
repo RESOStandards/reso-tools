@@ -13,6 +13,7 @@
     "@reso-standards/odata-expression-parser": "file:../odata-expression-parser",
     "@reso-standards/reso-client": "file:../reso-client",
     "@reso-standards/reso-validation": "file:../reso-validation",
+    "@tanstack/react-virtual": "^3.13.24",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router": "^7.0.0"
