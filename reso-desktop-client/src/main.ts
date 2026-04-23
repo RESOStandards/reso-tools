@@ -412,8 +412,6 @@ const registerCertRunnerHandlers = (): void => {
       const result = await new Promise<{ status: string; steps: ReadonlyArray<Record<string, unknown>>; duration: number }>((resolveWorker, rejectWorker) => {
         worker.on('message', (msg: { type: string; jobId: string; progress?: Record<string, unknown>; result?: string; error?: string }) => {
           if (msg.jobId !== jobId) return;
-          // TODO: remove debug logging before production
-          // log(`[main] received worker msg: ${msg.type} ${msg.type === 'progress' ? (msg.progress?.step as string) + ' → ' + (msg.progress?.status as string) : ''}`);
 
           if (msg.type === 'progress' && msg.progress) {
             event.sender.send('cert:progress', jobId, {

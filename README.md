@@ -23,6 +23,17 @@ Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compl
 
 ## Quick Start
 
+### Bootstrap (Full Build)
+
+Build everything from a fresh clone with a single command:
+
+```bash
+npm run bootstrap        # builds only packages that need it
+npm run bootstrap:force  # rebuilds everything from scratch
+```
+
+This installs dependencies and builds all 10 packages in the correct order. Takes about 30 seconds on a warm cache.
+
 ### Reference Server (Docker)
 
 ```bash
@@ -35,12 +46,12 @@ docker compose --profile seed up seed
 ### Desktop Client (SQLite, No Docker)
 
 ```bash
-cd reso-reference-server && npm install && npm run build
-cd ../reso-web-client && npm install && npm run build
-cd ../reso-desktop-client && npm install && npm run dev
+npm run bootstrap       # build all packages
+cd reso-desktop-client
+npm run dev             # launches Electron with bundled reference server
 ```
 
-The desktop client connects to external OData servers out of the box. The reference server starts in the background for local test data.
+The desktop client connects to external OData servers out of the box. A bundled reference server starts in the background for local test data.
 
 ### Web Client with Proxy (No Reference Server)
 
@@ -56,6 +67,18 @@ cd reso-web-client
 docker compose --profile proxy up -d
 # UI + Proxy: http://localhost:8888
 ```
+
+### Building Individual Packages
+
+Each package can be built independently once its dependencies are in place:
+
+```bash
+cd reso-client && npm install && npm run build
+cd reso-mcp-server && npm install && npm run build
+cd reso-web-client && npm install && npm run build
+```
+
+Shared libraries (`odata-expression-parser`, `reso-validation`, `reso-client`, `reso-data-generator`) have no internal dependencies and can be built in any order. Packages that depend on them (`reso-reference-server`, `reso-certification`, `reso-web-client`, `reso-desktop-client`) require the shared libs to be built first. See [scripts/bootstrap.sh](scripts/bootstrap.sh) for the full dependency order.
 
 ## Development
 

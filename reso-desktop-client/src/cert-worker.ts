@@ -43,8 +43,6 @@ parentPort?.on('message', async (msg: { type: string; config: Record<string, unk
             duration: typeof progress.duration === 'number' ? progress.duration : undefined,
           },
         };
-        // TODO: remove debug logging before production
-        // console.log(`[worker] sending progress: ${progressMsg.progress.step} → ${progressMsg.progress.status}`);
         parentPort?.postMessage(progressMsg);
       },
     );
