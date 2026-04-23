@@ -369,8 +369,19 @@ const registerCertRunnerHandlers = (): void => {
     // Resolve server URL and auth for local runs
     const isLocal = (config.server as Record<string, unknown>)?.url === 'LOCAL_SERVER';
     const serverAuth = (config.server as Record<string, unknown>)?.auth as Record<string, unknown> | undefined;
+    // Ensure outputDir is an absolute path under userData (process.cwd() is / in packaged apps)
+    const existingOptions = (config.options as Record<string, unknown>) ?? {};
+    const outputDir = existingOptions.outputDir as string | undefined;
+    const resolvedOutputDir = outputDir && resolve(outputDir) !== outputDir
+      ? resolve(app.getPath('userData'), outputDir)
+      : outputDir ?? resolve(app.getPath('userData'), '.reso-cert');
+
     const resolvedConfig = {
       ...config,
+      options: {
+        ...existingOptions,
+        outputDir: resolvedOutputDir,
+      },
       server: {
         ...(config.server as Record<string, unknown>),
         url: isLocal ? state.serverUrl : (config.server as Record<string, unknown>)?.url,
