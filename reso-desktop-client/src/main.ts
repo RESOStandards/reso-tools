@@ -382,7 +382,11 @@ const registerCertRunnerHandlers = (): void => {
 
     // Run cert tests in a worker thread so the main process event loop
     // stays free for IPC message delivery (progress updates).
-    const workerPath = resolve(__dirname, 'cert-worker.js');
+    // In the packaged app, use the pre-bundled worker that has all deps
+    // statically included (asar can't resolve dynamic imports).
+    // In dev mode, use the TypeScript-compiled worker with dynamic imports.
+    const workerFile = app.isPackaged ? 'cert-worker-bundle.mjs' : 'cert-worker.js';
+    const workerPath = resolve(__dirname, workerFile);
     const worker = new Worker(workerPath, { workerData: { certPath } });
     activeRuns.set(jobId, { abort: () => worker.terminate() } as unknown as AbortController);
 
