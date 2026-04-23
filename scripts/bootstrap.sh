@@ -31,7 +31,7 @@ build_pkg() {
   if needs_build "$pkg" "$check_dir"; then
     echo "Building $pkg..."
     cd "$ROOT/$pkg"
-    npm install --ignore-scripts 2>/dev/null || npm install
+    npm install --ignore-scripts
     npm run build
     cd "$ROOT"
     echo "  ✓ $pkg"
@@ -68,7 +68,9 @@ build_pkg reso-web-client
 echo ""
 echo "── Desktop Client ──"
 cd "$ROOT/reso-desktop-client"
-npm install 2>/dev/null || true
+npm install --ignore-scripts
+# electron-rebuild is needed locally but may fail in CI — non-fatal
+npm run postinstall 2>/dev/null || true
 npm run build
 npm run build:server-bundle
 npm run build:cert-worker
