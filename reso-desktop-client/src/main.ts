@@ -152,7 +152,7 @@ const resolveOutputPath = (config: Record<string, unknown>): string | null => {
     const providerUsi = (config.providerUsi as string) ?? 'LOCAL-SYSTEM';
     const recipientUoi = (config.recipientUoi as string) ?? 'LOCAL-RECIPIENT';
     const outputDir = (config.options as Record<string, unknown>)?.outputDir as string | undefined;
-    const resultsPath = outputDir ?? resolve(process.cwd(), '.reso-cert');
+    const resultsPath = outputDir ?? resolve(app.getPath('userData'), '.reso-cert');
 
     return resolve(resultsPath, `${slug}-${version}`, `${providerUoi}-${providerUsi}`, recipientUoi, 'current');
   } catch {
@@ -165,7 +165,7 @@ const resolveOutputPath = (config: Record<string, unknown>): string | null => {
 const CERT_RESULTS_DIR = '.reso-cert';
 
 /** Get the root results directory. */
-const certResultsRoot = (): string => resolve(process.cwd(), CERT_RESULTS_DIR);
+const certResultsRoot = (): string => resolve(app.getPath('userData'), CERT_RESULTS_DIR);
 
 /**
  * Shape of a scanned local result — one per current/ or archived/ directory.

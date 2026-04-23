@@ -59,6 +59,12 @@ build_pkg reso-reference-server
 build_pkg reso-web-api-proxy
 build_pkg reso-certification
 
+# xsd-validator is a sub-package with WASM deps — install separately
+echo "  Installing xsd-validator..."
+cd "$ROOT/reso-certification/xsd-validator"
+npm install --ignore-scripts 2>/dev/null || npm install
+cd "$ROOT"
+
 # Layer 3: web client (standalone build)
 echo ""
 echo "── Web Client ──"
