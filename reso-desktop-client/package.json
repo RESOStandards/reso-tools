@@ -74,8 +74,16 @@
         "to": "field-groups.json"
       },
       {
-        "from": "../reso-certification/xsd-validator",
-        "to": "xsd-validator",
+        "from": "../reso-certification/xsd-validator/index.js",
+        "to": "xsd-validator/index.js"
+      },
+      {
+        "from": "../reso-certification/xsd-validator/package.json",
+        "to": "xsd-validator/package.json"
+      },
+      {
+        "from": "../reso-certification/xsd-validator/node_modules",
+        "to": "xsd-validator/node_modules",
         "filter": [
           "**/*"
         ]
