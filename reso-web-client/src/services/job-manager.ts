@@ -116,6 +116,8 @@ export interface JobStep {
   readonly name: string;
   readonly status: StepStatus;
   readonly duration?: number;
+  /** Epoch ms when this step first transitioned to "running". Monotonic source of truth for the live timer. */
+  readonly startedAt?: number;
   readonly detail?: string;
   readonly requestDetails?: ReadonlyArray<{
     readonly method: string;
@@ -394,21 +396,15 @@ const runJobElectron = async (job: Job): Promise<void> => {
 
     const stepStatus = progress.status as StepStatus;
 
-    // Sub-step events update the currently running parent step's detail text
+    // Sub-step events update the currently running parent step's detail text.
+    // Duration is not derived here — the UI's live timer reads step.startedAt directly.
     if (progress.step.startsWith('sub:')) {
       const current = state.jobs.get(jobId);
       if (!current) return;
       const runningParent = current.steps.find(s => s.status === 'running');
       if (runningParent && progress.message) {
-        // Compute elapsed time since step started running
-        const stepStartKey = `_stepStart:${jobId}:${runningParent.name}`;
-        if (!(stepStartKey in subStepState)) {
-          subStepState[stepStartKey] = Date.now();
-        }
-        const elapsed = Date.now() - (subStepState[stepStartKey] as number);
-
         const updatedSteps = current.steps.map(s =>
-          s.name === runningParent.name ? { ...s, detail: progress.message, duration: elapsed } : s
+          s.name === runningParent.name ? { ...s, detail: progress.message } : s
         );
         updateJob(jobId, { steps: updatedSteps });
 
@@ -418,7 +414,7 @@ const runJobElectron = async (job: Job): Promise<void> => {
           subStepState[debounceKey] = true;
           setTimeout(() => {
             subStepState[debounceKey] = false;
-            emit({ type: 'step-progress', jobId, step: runningParent.name, status: 'running', detail: progress.message, duration: elapsed });
+            emit({ type: 'step-progress', jobId, step: runningParent.name, status: 'running', detail: progress.message });
           }, 50);
         }
       }
@@ -428,24 +424,36 @@ const runJobElectron = async (job: Job): Promise<void> => {
     emit({ type: 'step-progress', jobId, step: progress.step, status: stepStatus, detail: progress.message, duration: progress.duration });
 
     // Update the step in our local state — add dynamically if not in the predefined list.
-    // When a step transitions to "running", mark all preceding steps that are
-    // still "running" as "passed" to prevent the off-by-one lag from IPC batching.
     const current = state.jobs.get(jobId);
     if (!current) return;
+    const now = Date.now();
     const exists = current.steps.some(s => s.name === progress.step);
     const baseSteps = exists
-      ? current.steps.map(s =>
-          s.name === progress.step ? { ...s, status: stepStatus, duration: progress.duration, detail: progress.message } : s
-        )
-      : [...current.steps, { name: progress.step, status: stepStatus, duration: progress.duration, detail: progress.message }];
+      ? current.steps.map(s => {
+          if (s.name !== progress.step) return s;
+          // Capture startedAt the first time a step enters "running" — authoritative for live timer.
+          const startedAt = stepStatus === 'running' && s.startedAt == null ? now : s.startedAt;
+          // On terminal transitions, prefer the pipeline's reported duration, otherwise derive from startedAt.
+          const resolvedDuration = stepStatus === 'running'
+            ? s.duration
+            : (progress.duration ?? (startedAt != null ? now - startedAt : undefined));
+          return { ...s, status: stepStatus, duration: resolvedDuration, startedAt, detail: progress.message };
+        })
+      : [...current.steps, {
+          name: progress.step,
+          status: stepStatus,
+          duration: progress.duration,
+          startedAt: stepStatus === 'running' ? now : undefined,
+          detail: progress.message,
+        }];
 
-    // Auto-close preceding "running" steps when a new step starts running
+    // Auto-close straggling "running" steps when a new one starts (IPC reordering guard).
+    // Duration is derived from each step's own startedAt so it stays monotonic — no bounce.
     const updatedSteps = stepStatus === 'running'
       ? baseSteps.map(s => {
-          if (s.name !== progress.step && s.status === 'running') {
-            return { ...s, status: 'passed' as StepStatus };
-          }
-          return s;
+          if (s.name === progress.step || s.status !== 'running') return s;
+          const derivedDuration = s.startedAt != null ? now - s.startedAt : s.duration;
+          return { ...s, status: 'passed' as StepStatus, duration: derivedDuration };
         })
       : baseSteps;
 

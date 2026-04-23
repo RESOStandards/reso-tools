@@ -34,6 +34,7 @@ interface JobStep {
   readonly name: string;
   readonly status: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
   readonly duration?: number;
+  readonly startedAt?: number;
   readonly detail?: string;
   readonly requestDetails?: ReadonlyArray<{
     readonly method: string;
@@ -407,9 +408,6 @@ const LiveTimer = ({ startTime }: { readonly startTime: number }) => {
   return <span className="text-xs text-blue-400 dark:text-blue-500 tabular-nums ml-2">{formatDuration(elapsed)}</span>;
 };
 
-/** Track when each step started running for the live timer. */
-const stepStartTimes = new Map<string, number>();
-
 import { DetailText } from '../../components/cert/detail-text';
 
 import {
@@ -450,15 +448,10 @@ const StepPipeline = ({ steps }: { readonly steps: ReadonlyArray<JobStep> }) => 
             >
               {step.name}
             </span>
-            {step.status === 'running' ? (
-              (() => {
-                const key = `${step.name}`;
-                if (!stepStartTimes.has(key)) stepStartTimes.set(key, Date.now());
-                return <LiveTimer startTime={stepStartTimes.get(key)!} />;
-              })()
+            {step.status === 'running' && step.startedAt != null ? (
+              <LiveTimer startTime={step.startedAt} />
             ) : (
               step.duration != null && step.duration > 0 && (
-                (() => { stepStartTimes.delete(step.name); return null; })(),
                 <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums ml-2">
                   {formatDuration(step.duration)}
                 </span>
