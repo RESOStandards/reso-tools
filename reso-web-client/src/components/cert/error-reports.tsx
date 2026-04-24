@@ -526,11 +526,6 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
         <span className="font-semibold text-amber-600 dark:text-amber-400">
           {counts.fields + counts.lookups + counts.resources} variations found
         </span>
-        {statusCounts.pending > 0 && (
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {statusCounts.pending} pending review
-          </span>
-        )}
         {statusCounts['fast-track'] > 0 && (
           <span className="text-xs text-amber-600 dark:text-amber-400">
             {statusCounts['fast-track']} fast-tracked
@@ -541,6 +536,9 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
             {statusCounts.ignored} ignored
           </span>
         )}
+        <span className="text-xs text-gray-400 dark:text-gray-500 italic">
+          Read-only preview · open Variations Review to triage
+        </span>
       </div>
 
       {/* Tabs */}
@@ -650,21 +648,13 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
                   </div>
                 </div>
 
-                {/* Action buttons — maps to backend: ignore=true or flaggedForFastTrack=true */}
+                {/* Read-only status badge. Triage happens on the Variations Review page. */}
                 <div className="flex items-center gap-1 shrink-0">
-                  {(['fast-track', 'ignored'] as const).map(action => (
-                    <button
-                      key={action}
-                      type="button"
-                      className={`px-2 py-1 rounded text-[11px] font-medium cursor-pointer transition-colors ${
-                        v.status === action
-                          ? ACTION_COLORS[action]
-                          : 'bg-gray-50 text-gray-400 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      {action === 'fast-track' ? 'Fast Track' : 'Ignore'}
-                    </button>
-                  ))}
+                  {v.status && v.status !== 'pending' && (
+                    <span className={`px-2 py-1 rounded text-[11px] font-medium ${ACTION_COLORS[v.status]}`}>
+                      {v.status === 'fast-track' ? 'Fast Track' : v.status.charAt(0).toUpperCase() + v.status.slice(1)}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1074,6 +1064,7 @@ export const FailureReportModal = ({
   reports,
   steps,
   onClose,
+  onReviewVariations,
 }: {
   readonly endorsement: string;
   readonly version: string;
@@ -1082,6 +1073,8 @@ export const FailureReportModal = ({
   readonly reports?: Record<string, unknown>;
   readonly steps?: ReadonlyArray<{ name: string; status: string; detail?: string; summary?: string; errors?: ReadonlyArray<string>; requestDetails?: ReadonlyArray<{ method: string; url: string; status?: number; error?: string; responseBody?: string }>; artifacts?: ReadonlyArray<{ label: string; path: string }> }>;
   readonly onClose: () => void;
+  /** Optional handler to jump to the full Variations Review page. When provided and the report is a variations report, a button appears in the footer. */
+  readonly onReviewVariations?: () => void;
 }) => {
   const report = resolveReport(endorsement, failedStep, reports, steps);
 
@@ -1160,13 +1153,27 @@ export const FailureReportModal = ({
               </button>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            {onReviewVariations && report.type === 'variations' && (
+              <button
+                type="button"
+                onClick={() => { onClose(); onReviewVariations(); }}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors"
+              >
+                Open in Variations Review
+                <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638l-3.96-4.158a.75.75 0 011.08-1.04l5.25 5.5a.75.75 0 010 1.04l-5.25 5.5a.75.75 0 11-1.08-1.04l3.96-4.158H3.75A.75.75 0 013 10z" clipRule="evenodd" />
+                </svg>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>

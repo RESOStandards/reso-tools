@@ -10,7 +10,7 @@
  */
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { NavLink, useLocation } from 'react-router';
+import { NavLink, useLocation, useNavigate } from 'react-router';
 import { StatusPill } from '../../components/cert/status-pill';
 import { ReplicationProgress, parseReplicationProgress } from '../../components/cert/replication-progress';
 import { RequestDetailsPanel } from '../../components/cert/request-details';
@@ -486,6 +486,7 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
   const [showFailure, setShowFailure] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const navigate = useNavigate();
 
   // Close any open modal on Escape
   useEffect(() => {
@@ -672,6 +673,7 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
           reports={job.reports}
           steps={job.steps}
           onClose={() => setShowFailure(false)}
+          onReviewVariations={() => navigate('/cert/variations', { state: { job } })}
         />
       )}
 
