@@ -21,6 +21,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
 import { blendVariations, type BlendedVariation, type BlendedSuggestion, type BlendedVariationsReport } from '../../services/variations-blender';
 import { searchVariations, getVariationsStats, searchLocks, createLock, deleteLock, variationsLockResourceId, type LockRecord } from '../../services/variations-service';
+import { resolveReportRef, ReportMissingError } from '../../services/report-ref';
 import { useNotifications } from '../../hooks/use-notifications';
 import { saveVariationsReview } from '../../services/variations-save';
 import { VariationComments, type VariationComment } from '../../components/cert/variation-comments';
@@ -174,12 +175,14 @@ export const VariationsPage = () => {
     const job = routeState?.job;
     if (!job) return;
 
-    // Reports may be keyed `variationsReport` (worker-provided) or `variations` (disk-read); accept either.
-    const jobReports = job.reports as Record<string, unknown> | undefined;
-    const variationsReport = (jobReports?.variationsReport ?? jobReports?.variations) as Record<string, unknown> | undefined;
-    if (!variationsReport) {
-      const hasReports = !!jobReports;
-      const reportKeys = hasReports ? Object.keys(jobReports as Record<string, unknown>).join(', ') : '(none)';
+    // Report values are refs (paths or URLs). Resolved to parsed JSON on demand.
+    const jobReports = job.reports as Record<string, string> | undefined;
+    const variationsRef = jobReports?.variations ?? jobReports?.variationsReport;
+    const metadataRef = jobReports?.metadata ?? jobReports?.metadataReport;
+
+    if (!variationsRef) {
+      const hasReports = !!jobReports && Object.keys(jobReports).length > 0;
+      const reportKeys = hasReports ? Object.keys(jobReports).join(', ') : '(none)';
       setLoadError(
         `This job does not contain a variations report. ` +
         (hasReports
@@ -192,21 +195,18 @@ export const VariationsPage = () => {
 
     setLoading(true);
 
-    // Attempt to fetch service suggestions and blend
     const fetchAndBlend = async () => {
       try {
-        const localReport = variationsReport as unknown as Parameters<typeof blendVariations>[0];
+        const localReport = (await resolveReportRef(variationsRef)) as Parameters<typeof blendVariations>[0];
         let serviceSuggestions = {};
 
-        if (isAuthenticated) {
+        if (isAuthenticated && metadataRef) {
           try {
             const token = await ensureFreshProviderToken();
-            const metadataReport = ((jobReports?.metadataReport ?? jobReports?.metadata) as { fields: unknown[]; lookups: unknown[] } | undefined);
-            if (metadataReport) {
-              const result = await searchVariations(metadataReport as Parameters<typeof searchVariations>[0], token);
-              serviceSuggestions = result.mappings ?? {};
-            }
-          } catch { /* Not authenticated or token expired — use local only */ }
+            const metadataReport = await resolveReportRef(metadataRef) as { fields: unknown[]; lookups: unknown[] };
+            const result = await searchVariations(metadataReport as Parameters<typeof searchVariations>[0], token);
+            serviceSuggestions = result.mappings ?? {};
+          } catch { /* Not authenticated / service unavailable — use local only */ }
         }
 
         const blended = {
@@ -218,17 +218,17 @@ export const VariationsPage = () => {
         setReport(blended);
         cacheReport(blended);
         setView('detail');
-      } catch {
-        // If service is unavailable, use local results only
-        const blended = {
-          ...blendVariations(variationsReport as unknown as Parameters<typeof blendVariations>[0]),
-          providerUoi: job.providerUoi as string | undefined,
-          providerUsi: job.providerUsi as string | undefined,
-          recipientUoi: job.recipientUoi as string | undefined,
-        };
-        setReport(blended);
-        cacheReport(blended);
-        setView('detail');
+      } catch (err) {
+        if (err instanceof ReportMissingError) {
+          setLoadError(
+            `The variations report file is missing: ${err.ref}. It may have been deleted outside the app. ` +
+            `Re-run the job to regenerate it, or remove this job from history.`
+          );
+          setView('detail');
+        } else {
+          setLoadError(err instanceof Error ? err.message : String(err));
+          setView('detail');
+        }
       } finally {
         setLoading(false);
         window.history.replaceState({}, '');

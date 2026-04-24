@@ -175,8 +175,43 @@ const CERT_RESULTS_DIR = '.reso-cert';
 const certResultsRoot = (): string => resolve(app.getPath('userData'), CERT_RESULTS_DIR);
 
 /**
+ * Canonical filenames for each report type, in priority order.
+ * First existing file wins — accommodates both new runs and legacy layouts.
+ */
+const REPORT_FILENAMES: Readonly<Record<string, ReadonlyArray<string>>> = {
+  schemaErrors: ['data-availability-schema-validation-errors.json'],
+  variations: ['variations-report.json', 'data-dictionary-variations.json'],
+  metadata: ['metadata-report.processed.json'],
+  ddReport: ['data-dictionary-2.0.json'],
+  report: ['report.json'],
+  reportDetailed: ['report-detailed.json'],
+};
+
+/** Build a map of `{ reportKey → absolute path }` for the files in `dir`, whether they exist yet or not. Callers filter by existence as needed. */
+const KNOWN_REPORT_FILES = (dir: string): Readonly<Record<string, string>> => {
+  const paths: Record<string, string> = {};
+  for (const [key, filenames] of Object.entries(REPORT_FILENAMES)) {
+    // Pick the first filename that exists; fall back to the first canonical name if none exists
+    // (so callers who care about "what path would a file take" get a stable answer).
+    const hit = filenames.find(f => existsSync(resolve(dir, f)));
+    paths[key] = resolve(dir, hit ?? filenames[0]);
+  }
+  return paths;
+};
+
+/** Return a map of reportKey → absolute path for files that currently exist in the given dir. */
+const listReportRefs = (dir: string): Record<string, string> => {
+  const refs: Record<string, string> = {};
+  for (const [key, path] of Object.entries(KNOWN_REPORT_FILES(dir))) {
+    if (existsSync(path)) refs[key] = path;
+  }
+  return refs;
+};
+
+/**
  * Shape of a scanned local result — one per current/ or archived/ directory.
  * Returned to the renderer to hydrate the jobs list on startup.
+ * `reports` values are absolute paths — renderer reads content via IPC on demand.
  */
 interface LocalResult {
   readonly endorsement: string;
@@ -187,28 +222,8 @@ interface LocalResult {
   readonly path: string;
   readonly isCurrent: boolean;
   readonly timestamp: string;
-  readonly reports: Record<string, unknown>;
+  readonly reports: Record<string, string>;
 }
-
-/** Read report files from a results directory. */
-const readReports = (dir: string): Record<string, unknown> => {
-  const reports: Record<string, unknown> = {};
-  const filesToRead: Readonly<Record<string, string>> = {
-    schemaErrors: join(dir, 'data-availability-schema-validation-errors.json'),
-    variations: join(dir, 'data-dictionary-variations.json'),
-    metadata: join(dir, 'metadata-report.processed.json'),
-    ddReport: join(dir, 'data-dictionary-2.0.json'),
-    report: join(dir, 'report.json'),
-    reportDetailed: join(dir, 'report-detailed.json'),
-  };
-  for (const [key, path] of Object.entries(filesToRead)) {
-    try {
-      const content = readFileSync(path, 'utf-8');
-      reports[key] = JSON.parse(content);
-    } catch { /* file doesn't exist — skip */ }
-  }
-  return reports;
-};
 
 /**
  * Scan the .reso-cert/ directory tree and return all local results.
@@ -266,7 +281,7 @@ const scanLocalResults = (): ReadonlyArray<LocalResult> => {
             results.push({
               endorsement, version, providerUoi, providerUsi, recipientUoi,
               path: currentPath, isCurrent: true, timestamp: mtime,
-              reports: readReports(currentPath),
+              reports: listReportRefs(currentPath),
             });
           }
 
@@ -288,7 +303,7 @@ const scanLocalResults = (): ReadonlyArray<LocalResult> => {
               results.push({
                 endorsement, version, providerUoi, providerUsi, recipientUoi,
                 path: archivePath, isCurrent: false, timestamp,
-                reports: readReports(archivePath),
+                reports: listReportRefs(archivePath),
               });
             }
           }
@@ -306,6 +321,40 @@ const registerCertRunnerHandlers = (): void => {
 
   /** Scan local results directory and return all found results. */
   ipcMain.handle('cert:scan-results', () => scanLocalResults());
+
+  /**
+   * Read a report file's content by absolute path.
+   * Safety: path must be inside the results root — rejects anything else.
+   * Throws { code: 'MISSING' } if the file no longer exists so the renderer
+   * can surface a "remove from history" prompt.
+   */
+  ipcMain.handle('reports:read-file', (_event, absPath: string): unknown => {
+    const root = certResultsRoot();
+    const normalized = resolve(absPath);
+    if (!normalized.startsWith(root + '/') && normalized !== root) {
+      throw new Error(`Refusing to read outside results root: ${normalized}`);
+    }
+    if (!existsSync(normalized)) {
+      const err = new Error(`Report file not found: ${normalized}`) as Error & { code?: string };
+      err.code = 'MISSING';
+      throw err;
+    }
+    return JSON.parse(readFileSync(normalized, 'utf-8'));
+  });
+
+  /**
+   * List which known report files currently exist in a given results directory.
+   * Used for polling while a job is running to discover new reports as the pipeline writes them.
+   * Returns the same { reportKey → absolute path } shape as the `reports` column in SQLite.
+   */
+  ipcMain.handle('reports:list-files', (_event, outputDir: string): Record<string, string> => {
+    const root = certResultsRoot();
+    const normalized = resolve(outputDir);
+    if (!normalized.startsWith(root + '/') && normalized !== root) {
+      throw new Error(`Refusing to list outside results root: ${normalized}`);
+    }
+    return listReportRefs(normalized);
+  });
 
   /** Delete a local result directory, or all results if '__ALL__' is passed. */
   ipcMain.handle('cert:delete-result', async (_event, resultPath: string) => {
@@ -439,39 +488,14 @@ const registerCertRunnerHandlers = (): void => {
 
       activeRuns.delete(jobId);
 
-    // Read any generated reports (available on both pass and fail)
-    const readReportsFromDisk = (cfg: Record<string, unknown>): Record<string, unknown> | undefined => {
-      try {
-        const outputDir = resolveOutputPath(cfg);
-        if (!outputDir) return undefined;
-        const reportFiles: Record<string, unknown> = {};
-        const filesToRead: Readonly<Record<string, string>> = {
-          schemaErrors: resolve(outputDir, 'data-availability-schema-validation-errors.json'),
-          variations: resolve(outputDir, 'variations-report.json'),
-          metadata: resolve(outputDir, 'metadata-report.processed.json'),
-          report: resolve(outputDir, 'report.json'),
-          reportDetailed: resolve(outputDir, 'report-detailed.json'),
-        };
-        for (const [key, path] of Object.entries(filesToRead)) {
-          try {
-            const content = readFileSync(path, 'utf-8');
-            reportFiles[key] = JSON.parse(content);
-          } catch { /* file doesn't exist — skip */ }
-        }
-        if (Object.keys(reportFiles).length > 0) {
-          log(`Cert run ${jobId}: found reports: ${Object.keys(reportFiles).join(', ')} in ${outputDir}`);
-          return reportFiles;
-        }
-      } catch (reportErr) {
-        log(`Cert run ${jobId}: error reading reports: ${reportErr}`);
-      }
-      return undefined;
-    };
-
-    // Merge reports from disk (file artifacts) and from the worker (pipeline context)
-    const diskReports = readReportsFromDisk(resolvedConfig);
-    const workerReports = (result as Record<string, unknown>).reports as Record<string, unknown> | undefined;
-    const reports = { ...diskReports, ...workerReports };
+    // List which report files exist on disk and return a map of refs (absolute paths).
+    // The renderer reads content on demand via the reports:read-file IPC, matching the
+    // cloud schema where refs are URLs to the cert API.
+    const outputDir = resolveOutputPath(resolvedConfig);
+    const reports = outputDir ? listReportRefs(outputDir) : undefined;
+    if (reports && Object.keys(reports).length > 0) {
+      log(`Cert run ${jobId}: found report refs: ${Object.keys(reports).join(', ')} in ${outputDir}`);
+    }
 
     // Cross-check: if schema validation errors exist on disk but the pipeline
     // reported success, override to failed.

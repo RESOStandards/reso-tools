@@ -19,6 +19,7 @@ import { ConfigBuilder } from '../../components/cert/config-builder';
 import { SubmitToCloud } from '../../components/cert/submit-to-cloud';
 import { FailureReportModal } from '../../components/cert/error-reports';
 import { useJobs } from '../../hooks/use-jobs';
+import { useReportRef } from '../../hooks/use-report-ref';
 import { useOrganizationNames } from '../../hooks/use-organization-names';
 import type { BatchConfig } from '../../components/cert/config-builder';
 import type { Job } from '../../services/job-manager';
@@ -61,7 +62,7 @@ interface CertJob {
   readonly completedAt?: string;
   readonly steps: ReadonlyArray<JobStep>;
   readonly local: boolean;
-  readonly reports?: Record<string, unknown>;
+  readonly reports?: Record<string, string>;
   readonly error?: string;
   readonly sdkConfig?: Record<string, unknown>;
 }
@@ -488,6 +489,11 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
   const [confirmDelete, setConfirmDelete] = useState(false);
   const navigate = useNavigate();
 
+  // Resolve report refs lazily when the compliance modal opens.
+  const jobReports = job.reports as Record<string, string> | undefined;
+  const reportDetailedRef = useReportRef<Record<string, unknown>>(showReport ? jobReports?.reportDetailed : undefined);
+  const reportRef = useReportRef<Record<string, unknown>>(showReport ? jobReports?.report : undefined);
+
   // Close any open modal on Escape
   useEffect(() => {
     const anyOpen = showSubmit || showFailure || showReport || confirmDelete;
@@ -698,40 +704,53 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
               </button>
             </div>
             <div className="p-5 overflow-y-auto space-y-2">
-              {job.steps.length > 0 ? (
-                job.steps.map((step, i) => {
-                  // Check if this step has scenario data in the detailed report
-                  const detailed = job.reports?.reportDetailed as Record<string, unknown> | undefined;
-                  const resourceReports = (detailed?.resourceReports ?? []) as ReadonlyArray<Record<string, unknown>>;
-                  const isScenarioStep = step.name.includes('Run ') && step.name.includes('scenarios');
-                  const hasScenarios = isScenarioStep && resourceReports.length > 0;
-
-                  return (
-                    <ReportStepCard
-                      key={i}
-                      step={step}
-                      scenarios={hasScenarios ? resourceReports : undefined}
-                    />
-                  );
-                })
-              ) : (
-                <div className="text-sm text-gray-600 dark:text-gray-300 py-4 space-y-2">
-                  {(() => {
-                    const report = job.reports?.report as Record<string, unknown> | undefined;
-                    const remarks = (report?.remarks ?? (job.reports?.reportDetailed as Record<string, unknown>)?.remarks) as string | undefined;
-                    return remarks
-                      ? <p>{remarks}</p>
-                      : <p className="text-gray-400 dark:text-gray-500 text-center">No step details available. Run the test again to capture step-by-step results.</p>;
-                  })()}
+              {(reportDetailedRef.loading || reportRef.loading) && (
+                <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500 py-4">
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+                  Loading report data...
                 </div>
+              )}
+              {(reportDetailedRef.missing || reportRef.missing) && !(reportDetailedRef.loading || reportRef.loading) && (
+                <div className="p-3 rounded-lg border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-sm text-amber-800 dark:text-amber-300">
+                  One or more report files are missing from disk. They may have been deleted outside the app. Re-run the job to regenerate them.
+                </div>
+              )}
+              {!(reportDetailedRef.loading || reportRef.loading) && !(reportDetailedRef.missing || reportRef.missing) && (
+                job.steps.length > 0 ? (
+                  job.steps.map((step, i) => {
+                    const detailed = reportDetailedRef.data;
+                    const resourceReports = (detailed?.resourceReports ?? []) as ReadonlyArray<Record<string, unknown>>;
+                    const isScenarioStep = step.name.includes('Run ') && step.name.includes('scenarios');
+                    const hasScenarios = isScenarioStep && resourceReports.length > 0;
+
+                    return (
+                      <ReportStepCard
+                        key={i}
+                        step={step}
+                        scenarios={hasScenarios ? resourceReports : undefined}
+                      />
+                    );
+                  })
+                ) : (
+                  <div className="text-sm text-gray-600 dark:text-gray-300 py-4 space-y-2">
+                    {(() => {
+                      const remarks = (reportRef.data?.remarks ?? reportDetailedRef.data?.remarks) as string | undefined;
+                      return remarks
+                        ? <p>{remarks}</p>
+                        : <p className="text-gray-400 dark:text-gray-500 text-center">No step details available. Run the test again to capture step-by-step results.</p>;
+                    })()}
+                  </div>
+                )
               )}
             </div>
             <div className="flex items-center justify-between p-5 border-t border-gray-200 dark:border-gray-700 shrink-0">
-              {job.reports && (
+              {(reportDetailedRef.data || reportRef.data) && (
                 <button
                   type="button"
                   onClick={() => {
-                    const blob = new Blob([JSON.stringify(job.reports, null, 2)], { type: 'application/json' });
+                    // Prefer the detailed report; fall back to the summary report.
+                    const payload = reportDetailedRef.data ?? reportRef.data;
+                    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;

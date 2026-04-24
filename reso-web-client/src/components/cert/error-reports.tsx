@@ -18,6 +18,7 @@ import { SearchInput, FilterPill, Badge, AvailBar } from '../metadata/shared.js'
 import { humanizeScenarioName } from '../../constants/cert';
 import { RequestDetailsPanel } from './request-details';
 import { DetailText } from './detail-text';
+import { useReportRef } from '../../hooks/use-report-ref';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -1070,13 +1071,34 @@ export const FailureReportModal = ({
   readonly version: string;
   readonly recipientName: string;
   readonly failedStep?: string;
-  readonly reports?: Record<string, unknown>;
+  /** Map of reportKey → reference (absolute filesystem path or HTTPS URL). */
+  readonly reports?: Record<string, string>;
   readonly steps?: ReadonlyArray<{ name: string; status: string; detail?: string; summary?: string; errors?: ReadonlyArray<string>; requestDetails?: ReadonlyArray<{ method: string; url: string; status?: number; error?: string; responseBody?: string }>; artifacts?: ReadonlyArray<{ label: string; path: string }> }>;
   readonly onClose: () => void;
   /** Optional handler to jump to the full Variations Review page. When provided and the report is a variations report, a button appears in the footer. */
   readonly onReviewVariations?: () => void;
 }) => {
-  const report = resolveReport(endorsement, failedStep, reports, steps);
+  // Resolve each ref the resolver might consume. Hooks run unconditionally per the rules;
+  // undefined refs are no-ops in useReportRef.
+  const schemaErrors = useReportRef<Record<string, unknown>>(reports?.schemaErrors);
+  const variations = useReportRef<Record<string, unknown>>(reports?.variations);
+  const reportDetailed = useReportRef<Record<string, unknown>>(reports?.reportDetailed);
+
+  const anyLoading = schemaErrors.loading || variations.loading || reportDetailed.loading;
+  const anyMissing = schemaErrors.missing || variations.missing || reportDetailed.missing;
+  const anyError = (!schemaErrors.missing && schemaErrors.error)
+                || (!variations.missing && variations.error)
+                || (!reportDetailed.missing && reportDetailed.error);
+
+  const resolvedReports = useMemo(() => {
+    const out: Record<string, unknown> = {};
+    if (schemaErrors.data) out.schemaErrors = schemaErrors.data;
+    if (variations.data) out.variations = variations.data;
+    if (reportDetailed.data) out.reportDetailed = reportDetailed.data;
+    return out;
+  }, [schemaErrors.data, variations.data, reportDetailed.data]);
+
+  const report = resolveReport(endorsement, failedStep, resolvedReports, steps);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -1123,19 +1145,39 @@ export const FailureReportModal = ({
 
         {/* Body — scrollable */}
         <div className="p-5 overflow-y-auto">
-          {report.type === 'schema-validation' && <SchemaValidationErrorReport report={report} />}
-          {report.type === 'variations' && <VariationsReportView report={report} />}
-          {report.type === 'generic' && <GenericErrorReport report={report} />}
+          {anyLoading && (
+            <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500 py-6">
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+              Loading report data...
+            </div>
+          )}
+          {anyMissing && !anyLoading && (
+            <div className="p-4 rounded-lg border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-sm text-amber-800 dark:text-amber-300">
+              One or more report files are missing from disk. They may have been deleted outside the app. Re-run the job to regenerate them.
+            </div>
+          )}
+          {anyError && !anyLoading && !anyMissing && (
+            <div className="p-4 rounded-lg border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-sm text-red-700 dark:text-red-300">
+              Failed to load report data: {anyError.message}
+            </div>
+          )}
+          {!anyLoading && !anyMissing && !anyError && (
+            <>
+              {report.type === 'schema-validation' && <SchemaValidationErrorReport report={report} />}
+              {report.type === 'variations' && <VariationsReportView report={report} />}
+              {report.type === 'generic' && <GenericErrorReport report={report} />}
+            </>
+          )}
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between p-5 border-t border-gray-200 dark:border-gray-700 shrink-0">
           <div className="flex items-center gap-2 flex-wrap">
-            {reports && (
+            {Object.keys(resolvedReports).length > 0 && (
               <button
                 type="button"
                 onClick={() => {
-                  const blob = new Blob([JSON.stringify(reports, null, 2)], { type: 'application/json' });
+                  const blob = new Blob([JSON.stringify(resolvedReports, null, 2)], { type: 'application/json' });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = url;

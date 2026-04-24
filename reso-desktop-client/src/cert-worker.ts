@@ -46,15 +46,9 @@ parentPort?.on('message', async (msg: { type: string; config: Record<string, unk
         parentPort?.postMessage(progressMsg);
       },
     );
-    // Extract reports from the pipeline context for the UI
-    const ctx = (result as Record<string, unknown>).context as Record<string, unknown> | undefined;
-    const reports: Record<string, unknown> = {};
-    if (ctx) {
-      if (ctx.variationsReport) reports.variationsReport = ctx.variationsReport;
-      if (ctx.metadataReportPath) reports.metadataReportPath = ctx.metadataReportPath;
-      if (ctx.schemaErrors) reports.schemaErrors = ctx.schemaErrors;
-    }
-
+    // Reports are read from disk by the main process after the worker completes,
+    // keyed by absolute path. Full report content stays on disk; the renderer
+    // fetches it on demand via the reports:read-file IPC.
     parentPort?.postMessage({
       type: 'result',
       jobId: msg.jobId,
@@ -62,7 +56,6 @@ parentPort?.on('message', async (msg: { type: string; config: Record<string, unk
         status: result.status,
         steps: result.steps,
         duration: result.duration,
-        reports: Object.keys(reports).length > 0 ? reports : undefined,
       }),
     });
   } catch (err) {

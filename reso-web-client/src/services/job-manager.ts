@@ -29,6 +29,7 @@ import {
   stepsForEndorsement,
 } from '../constants/cert';
 import type { CertEndorsement, JobStatus, StepStatus } from '../constants/cert';
+import { resolveReportRef } from './report-ref';
 
 // ── Re-export status types from shared constants ─────────────────────
 
@@ -45,7 +46,8 @@ interface LocalResult {
   readonly path: string;
   readonly isCurrent: boolean;
   readonly timestamp: string;
-  readonly reports: Record<string, unknown>;
+  /** Map of reportKey → absolute path (local) or URL (cloud). Renderer resolves on demand via report-ref service. */
+  readonly reports: Record<string, string>;
 }
 
 interface CertRunnerAPI {
@@ -54,7 +56,7 @@ interface CertRunnerAPI {
     steps?: ReadonlyArray<{ name: string; status: string; duration?: number; summary?: string; errors?: ReadonlyArray<string>; requestDetails?: ReadonlyArray<{ method: string; url: string; status?: number; error?: string; responseBody?: string }>; artifacts?: ReadonlyArray<{ label: string; path: string }> }>;
     duration: number;
     error?: string;
-    reports?: Record<string, unknown>;
+    reports?: Record<string, string>;
   }>;
   readonly cancel: (jobId: string) => Promise<void>;
   readonly onProgress: (callback: (jobId: string, progress: { step: string; status: string; message?: string; duration?: number }) => void) => () => void;
@@ -88,7 +90,7 @@ interface JobStoreAPI {
     readonly startedAt?: string;
     readonly completedAt?: string;
     readonly error?: string;
-    readonly reports?: Record<string, unknown>;
+    readonly reports?: Record<string, string>;
     readonly resultPath?: string;
   }) => Promise<Job | undefined>;
   readonly upsertStep: (jobId: string, step: JobStep & { readonly sortOrder: number }) => Promise<unknown>;
@@ -148,7 +150,7 @@ export interface Job {
   /** SDK config for this job — used by the Electron cert runner. */
   readonly sdkConfig?: Record<string, unknown>;
   /** Report data returned from a completed run (schema errors, variations, metadata). */
-  readonly reports?: Record<string, unknown>;
+  readonly reports?: Record<string, string>;
   /** Local filesystem path for disk-hydrated jobs. Used for deletion. */
   readonly resultPath?: string;
 }
@@ -778,11 +780,18 @@ export const clearCompleted = (): void => {
 
 // ── Local results hydration (Electron only) ──────────────────────────
 
-/** Convert a scanned LocalResult into a Job for the UI. */
-const localResultToJob = (result: LocalResult): Job => {
+/** Convert a scanned LocalResult into a Job for the UI. Resolves reportDetailed ref to hydrate steps. */
+const localResultToJob = async (result: LocalResult): Promise<Job> => {
   const hasSchemaErrors = result.reports.schemaErrors !== undefined;
   // Check detailed report outcome for non-DD endorsements (Core, Add/Edit, EntityEvent)
-  const detailedReport = result.reports.reportDetailed as Record<string, unknown> | undefined;
+  let detailedReport: Record<string, unknown> | undefined;
+  if (result.reports.reportDetailed) {
+    try {
+      detailedReport = await resolveReportRef(result.reports.reportDetailed) as Record<string, unknown>;
+    } catch {
+      // File missing or unreadable — proceed without detailed info.
+    }
+  }
   const detailedOutcome = detailedReport?.outcome as string | undefined;
   const failed = hasSchemaErrors || detailedOutcome === 'failed';
 
@@ -835,7 +844,7 @@ const localResultToJob = (result: LocalResult): Job => {
 const MAX_ARCHIVED_PER_RECIPIENT = 5;
 
 /** Hydrate the job list from local results on disk. */
-const hydrateFromLocal = (results: ReadonlyArray<LocalResult>): void => {
+const hydrateFromLocal = async (results: ReadonlyArray<LocalResult>): Promise<void> => {
   // Sort: current first, then archived by most recent
   const sorted = [...results].sort((a, b) => {
     if (a.isCurrent && !b.isCurrent) return -1;
@@ -853,7 +862,7 @@ const hydrateFromLocal = (results: ReadonlyArray<LocalResult>): void => {
       archivedCounts.set(archiveKey, count + 1);
     }
 
-    const job = localResultToJob(result);
+    const job = await localResultToJob(result);
     if (!state.jobs.has(job.id)) {
       state.jobs.set(job.id, job);
     }
@@ -898,7 +907,7 @@ export const initLocalResults = async (): Promise<void> => {
       if (runner) {
         const results = await runner.scanResults();
         for (const result of results) {
-          const job = localResultToJob(result);
+          const job = await localResultToJob(result);
           await store.createJob(job);
         }
       }
@@ -914,7 +923,7 @@ export const initLocalResults = async (): Promise<void> => {
     const runner = getCertRunner();
     if (runner) {
       const results = await runner.scanResults();
-      hydrateFromLocal(results);
+      await hydrateFromLocal(results);
     }
   }
 

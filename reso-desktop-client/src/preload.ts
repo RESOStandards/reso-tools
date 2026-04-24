@@ -83,4 +83,15 @@ contextBridge.exposeInMainWorld('certRunner', {
   openFile: (filePath: string): Promise<void> =>
     ipcRenderer.invoke('cert:open-file', filePath),
 
+  /**
+   * Read a report file's parsed JSON by absolute path.
+   * Rejects with an Error whose `code` is `'MISSING'` if the file no longer exists.
+   */
+  readReportFile: (absolutePath: string): Promise<unknown> =>
+    ipcRenderer.invoke('reports:read-file', absolutePath),
+
+  /** List known report files present in a results directory as `{ reportKey → absolute path }`. */
+  listReportFiles: (outputDir: string): Promise<Record<string, string>> =>
+    ipcRenderer.invoke('reports:list-files', outputDir),
+
 });
