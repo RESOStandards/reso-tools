@@ -2,7 +2,7 @@ import { NavLink } from 'react-router';
 import { useServer } from '../context/server-context';
 
 /** Card wrapper for landing page sections. */
-const Card = ({ title, description, to, href, icon, disabled }: {
+const Card = ({ title, description, to, href, icon, disabled, disabledReason }: {
   readonly title: string;
   readonly description: string;
   /** Client-side route (NavLink). */
@@ -11,10 +11,13 @@ const Card = ({ title, description, to, href, icon, disabled }: {
   readonly href?: string;
   readonly icon: React.ReactNode;
   readonly disabled?: boolean;
+  /** Optional reason shown in the badge + tooltip when disabled. Defaults to "Coming Soon". */
+  readonly disabledReason?: string;
 }) => {
   const baseClass = 'group block p-6 rounded-xl border transition-all';
   const enabledClass = `${baseClass} bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md`;
   const disabledClass = `${baseClass} bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 opacity-60 cursor-not-allowed`;
+  const badgeText = disabledReason ?? 'Coming Soon';
 
   const content = (
     <>
@@ -25,12 +28,12 @@ const Card = ({ title, description, to, href, icon, disabled }: {
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
       </div>
       <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{description}</p>
-      {disabled && <span className="inline-block mt-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">Coming Soon</span>}
+      {disabled && <span className="inline-block mt-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">{badgeText}</span>}
     </>
   );
 
   if (disabled) {
-    return <div className={disabledClass}>{content}</div>;
+    return <div className={disabledClass} title={disabledReason}>{content}</div>;
   }
 
   if (href) {
@@ -59,7 +62,7 @@ const ServerStatus = () => {
 
 /** Landing page with navigation cards for the main app sections. */
 export const HomePage = () => {
-  const { resources } = useServer();
+  const { resources, isLocal } = useServer();
   const firstResource = resources?.[0]?.name ?? 'Property';
 
   return (
@@ -140,7 +143,9 @@ export const HomePage = () => {
           <Card
             title="API Documentation"
             description="Interactive Swagger UI for exploring the OData REST API endpoints."
-            href="/api-docs"
+            href={isLocal ? '/api-docs' : undefined}
+            disabled={!isLocal}
+            disabledReason={!isLocal ? 'Available on the bundled RESO Reference Server' : undefined}
             icon={
               <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                 <title>API Docs</title>
