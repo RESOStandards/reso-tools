@@ -157,6 +157,7 @@ export const VariationsPage = () => {
     return loadCachedReport();
   });
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>(report ? 'detail' : 'list');
 
   // When a job arrives via route state, extract variations and blend with service suggestions
@@ -165,6 +166,7 @@ export const VariationsPage = () => {
       setReport(routeState.report);
       cacheReport(routeState.report);
       setView('detail');
+      setLoadError(null);
       window.history.replaceState({}, '');
       return;
     }
@@ -172,8 +174,21 @@ export const VariationsPage = () => {
     const job = routeState?.job;
     if (!job) return;
 
-    const variationsReport = (job.reports as Record<string, unknown>)?.variationsReport as Record<string, unknown> | undefined;
-    if (!variationsReport) return;
+    // Reports may be keyed `variationsReport` (worker-provided) or `variations` (disk-read); accept either.
+    const jobReports = job.reports as Record<string, unknown> | undefined;
+    const variationsReport = (jobReports?.variationsReport ?? jobReports?.variations) as Record<string, unknown> | undefined;
+    if (!variationsReport) {
+      const hasReports = !!jobReports;
+      const reportKeys = hasReports ? Object.keys(jobReports as Record<string, unknown>).join(', ') : '(none)';
+      setLoadError(
+        `This job does not contain a variations report. ` +
+        (hasReports
+          ? `Reports found: ${reportKeys}. If the variations step failed before producing output, re-run the job.`
+          : `No reports attached to the job. Re-run the job to produce one.`)
+      );
+      setView('detail');
+      return;
+    }
 
     setLoading(true);
 
@@ -186,7 +201,7 @@ export const VariationsPage = () => {
         if (isAuthenticated) {
           try {
             const token = await ensureFreshProviderToken();
-            const metadataReport = (job.reports as Record<string, unknown>)?.metadataReport as { fields: unknown[]; lookups: unknown[] } | undefined;
+            const metadataReport = ((jobReports?.metadataReport ?? jobReports?.metadata) as { fields: unknown[]; lookups: unknown[] } | undefined);
             if (metadataReport) {
               const result = await searchVariations(metadataReport as Parameters<typeof searchVariations>[0], token);
               serviceSuggestions = result.mappings ?? {};
@@ -228,6 +243,23 @@ export const VariationsPage = () => {
       <div className={`${PAGE_CONTAINER} py-12 text-center`}>
         <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500 mr-2" />
         <span className="text-sm text-gray-500 dark:text-gray-400">Loading variations and fetching suggestions...</span>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className={`${PAGE_CONTAINER} py-6`}>
+        <div className="p-4 rounded-lg border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20">
+          <h2 className="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-1">No variations report available</h2>
+          <p className="text-sm text-amber-800 dark:text-amber-300">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => { setLoadError(null); setView('list'); }}
+            className="mt-3 px-3 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-gray-800 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/40 cursor-pointer">
+            Back to reviews
+          </button>
+        </div>
       </div>
     );
   }
