@@ -57,7 +57,8 @@ export interface JobRecord {
   readonly local: boolean;
   readonly resultPath?: string;
   readonly sdkConfig?: Record<string, unknown>;
-  readonly reports?: Record<string, unknown>;
+  /** Map of reportKey → absolute path (local) or URL (cloud). Resolved lazily by the renderer. */
+  readonly reports?: Record<string, string>;
   readonly steps: ReadonlyArray<StepRecord>;
 }
 
@@ -66,7 +67,8 @@ export interface StatusPatch {
   readonly startedAt?: string;
   readonly completedAt?: string;
   readonly error?: string;
-  readonly reports?: Record<string, unknown>;
+  /** Map of reportKey → absolute path (local) or URL (cloud). Resolved lazily by the renderer. */
+  readonly reports?: Record<string, string>;
   readonly resultPath?: string;
 }
 
@@ -177,7 +179,7 @@ const rowToJob = (row: Record<string, unknown>, steps: ReadonlyArray<StepRecord>
   local: (row.local as number) === 1,
   resultPath: row.result_path as string | undefined,
   sdkConfig: fromJSON<Record<string, unknown>>(row.sdk_config),
-  reports: fromJSON<Record<string, unknown>>(row.reports),
+  reports: fromJSON<Record<string, string>>(row.reports),
   steps,
 });
 

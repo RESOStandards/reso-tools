@@ -913,6 +913,28 @@ export const initLocalResults = async (): Promise<void> => {
       }
     }
 
+    // Normalize legacy blob-shaped reports to refs. Pre-refactor rows stored parsed JSON
+    // in the `reports` column; the new schema stores absolute paths (or URLs). Convert
+    // in place so the rest of the app sees a single shape.
+    const allJobsPreMigration = await store.getJobs();
+    const runner = getCertRunner();
+    for (const job of allJobsPreMigration) {
+      if (!job.reports) continue;
+      const hasBlobs = Object.values(job.reports).some(v => typeof v !== 'string');
+      if (!hasBlobs) continue;
+
+      // Try to rebuild refs from the on-disk result directory. If the directory exists,
+      // listReportFiles returns the canonical refs. If not, clear reports.
+      let rebuilt: Record<string, string> | null = null;
+      if (runner && job.resultPath) {
+        try {
+          rebuilt = await (runner as unknown as { listReportFiles?: (dir: string) => Promise<Record<string, string>> })
+            .listReportFiles?.(job.resultPath) ?? null;
+        } catch { rebuilt = null; }
+      }
+      await store.updateJobStatus(job.id, { reports: rebuilt ?? {} });
+    }
+
     // Load all jobs from SQLite into the in-memory cache
     const allJobs = await store.getJobs();
     for (const job of allJobs) {
