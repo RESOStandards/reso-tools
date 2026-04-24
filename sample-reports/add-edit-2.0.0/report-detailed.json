@@ -1,0 +1,207 @@
+{
+  "description": "Web API Add/Edit",
+  "version": "2.0.0",
+  "generatedOn": "2026-04-14T19:30:00.000Z",
+  "remarks": "8 of 8 scenarios passed. 7 fields and 2 enumerations tested against Property resource.",
+  "outcome": "passed",
+  "endorsement": "add-edit",
+  "duration": 5432,
+  "steps": [
+    {
+      "name": "Health check",
+      "status": "passed",
+      "duration": 72,
+      "summary": "Server is ready at http://localhost:8080"
+    },
+    {
+      "name": "Resolve authentication",
+      "status": "passed",
+      "duration": 95,
+      "summary": "Auth credentials present"
+    },
+    {
+      "name": "Fetch metadata",
+      "status": "passed",
+      "duration": 260,
+      "summary": "3 resources, 632 fields, 1,847 lookups",
+      "counts": {
+        "resources": 3,
+        "fields": 632,
+        "lookups": 1847
+      }
+    },
+    {
+      "name": "Run Add/Edit scenarios",
+      "status": "passed",
+      "duration": 4900,
+      "summary": "8 passed, 0 failed (8 scenarios)",
+      "counts": {
+        "total": 8,
+        "passed": 8,
+        "failed": 0
+      }
+    },
+    {
+      "name": "Write compliance reports",
+      "status": "passed",
+      "duration": 105,
+      "summary": "Reports written to .reso-cert/web-api-add-edit-2.0.0/"
+    }
+  ],
+  "resourceReports": [
+    {
+      "resource": "Property",
+      "summary": {
+        "total": 8,
+        "passed": 8,
+        "failed": 0,
+        "skipped": 0
+      },
+      "scenarios": [
+        {
+          "scenario": "create-succeeds-representation",
+          "tag": "create-succeeds-representation",
+          "passed": true,
+          "skipped": false,
+          "duration": 450,
+          "requestUrl": "http://localhost:8080/Property",
+          "assertions": [
+            {
+              "description": "Response status is 201 Created",
+              "status": "passed"
+            },
+            {
+              "description": "Response body contains ListingKey",
+              "status": "passed"
+            },
+            {
+              "description": "ListPrice matches submitted value of 450000",
+              "status": "passed"
+            },
+            {
+              "description": "StandardStatus matches submitted value of 'Active'",
+              "status": "passed"
+            },
+            {
+              "description": "All 7 submitted fields are present in response",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "scenario": "create-succeeds-minimal",
+          "tag": "create-succeeds-minimal",
+          "passed": true,
+          "skipped": false,
+          "duration": 320,
+          "requestUrl": "http://localhost:8080/Property",
+          "assertions": [
+            {
+              "description": "Response status is 204 No Content",
+              "status": "passed"
+            },
+            {
+              "description": "Location header is present and contains valid URL",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "scenario": "create-fails-validation",
+          "tag": "create-fails-validation",
+          "passed": true,
+          "skipped": false,
+          "duration": 180,
+          "requestUrl": "http://localhost:8080/Property",
+          "assertions": [
+            {
+              "description": "Response status is 400 or 422",
+              "status": "passed"
+            },
+            {
+              "description": "Error response contains OData error body",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "scenario": "update-succeeds-representation",
+          "tag": "update-succeeds-representation",
+          "passed": true,
+          "skipped": false,
+          "duration": 410,
+          "assertions": [
+            {
+              "description": "Response status is 200 OK",
+              "status": "passed"
+            },
+            {
+              "description": "ListPrice updated to 475000",
+              "status": "passed"
+            },
+            {
+              "description": "Unchanged fields are preserved",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "scenario": "update-succeeds-minimal",
+          "tag": "update-succeeds-minimal",
+          "passed": true,
+          "skipped": false,
+          "duration": 290,
+          "assertions": [
+            {
+              "description": "Response status is 204 No Content",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "scenario": "update-fails-not-found",
+          "tag": "update-fails-not-found",
+          "passed": true,
+          "skipped": false,
+          "duration": 150,
+          "assertions": [
+            {
+              "description": "Response status is 404 Not Found",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "scenario": "delete-succeeds",
+          "tag": "delete-succeeds",
+          "passed": true,
+          "skipped": false,
+          "duration": 220,
+          "assertions": [
+            {
+              "description": "Response status is 204 No Content",
+              "status": "passed"
+            },
+            {
+              "description": "Subsequent GET returns 404",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "scenario": "delete-fails-not-found",
+          "tag": "delete-fails-not-found",
+          "passed": true,
+          "skipped": false,
+          "duration": 130,
+          "assertions": [
+            {
+              "description": "Response status is 404 Not Found",
+              "status": "passed"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

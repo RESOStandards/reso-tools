@@ -1,0 +1,6 @@
+{
+  "description": "EntityEvent",
+  "version": "1.0.0",
+  "generatedOn": "2026-04-14T20:00:00.000Z",
+  "remarks": "Tested EntityEvent in observe mode. 50 events observed across Property and Member. 45 records validated. 5 not found (likely deleted). Sequence range 1 to 50."
+}

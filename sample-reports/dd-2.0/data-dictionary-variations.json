@@ -1,0 +1,175 @@
+{
+  "description": "Data Dictionary Variations Report",
+  "version": "2.0",
+  "generatedOn": "2026-04-14T18:30:00.000Z",
+  "fuzziness": 0.25,
+  "fields": [
+    {
+      "resourceName": "Property",
+      "fieldName": "Lst_Price",
+      "suggestions": [
+        {
+          "suggestedResourceName": "Property",
+          "suggestedFieldName": "ListPrice",
+          "strategy": "Edit Distance",
+          "ddWikiUrl": "https://ddwiki.reso.org/display/DDW20/ListPrice+Field"
+        }
+      ],
+      "status": "pending"
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "BathsTotal",
+      "suggestions": [
+        {
+          "suggestedResourceName": "Property",
+          "suggestedFieldName": "BathroomsTotalInteger",
+          "strategy": "Substring",
+          "ddWikiUrl": "https://ddwiki.reso.org/display/DDW20/BathroomsTotalInteger+Field"
+        }
+      ],
+      "status": "pending"
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "ListAgentMLSID",
+      "suggestions": [
+        {
+          "suggestedResourceName": "Property",
+          "suggestedFieldName": "ListAgentMlsId",
+          "strategy": "Edit Distance",
+          "ddWikiUrl": "https://ddwiki.reso.org/display/DDW20/ListAgentMlsId+Field"
+        }
+      ],
+      "status": "pending"
+    },
+    {
+      "resourceName": "Member",
+      "fieldName": "AgentFirstName",
+      "suggestions": [
+        {
+          "suggestedResourceName": "Member",
+          "suggestedFieldName": "MemberFirstName",
+          "strategy": "Substring",
+          "ddWikiUrl": "https://ddwiki.reso.org/display/DDW20/MemberFirstName+Field"
+        }
+      ],
+      "status": "pending"
+    },
+    {
+      "resourceName": "Member",
+      "fieldName": "AgentLastName",
+      "suggestions": [
+        {
+          "suggestedResourceName": "Member",
+          "suggestedFieldName": "MemberLastName",
+          "strategy": "Substring",
+          "ddWikiUrl": "https://ddwiki.reso.org/display/DDW20/MemberLastName+Field"
+        }
+      ],
+      "status": "pending"
+    },
+    {
+      "resourceName": "Office",
+      "fieldName": "OfficeBrokerMLSID",
+      "suggestions": [
+        {
+          "suggestedResourceName": "Office",
+          "suggestedFieldName": "OfficeBrokerMlsId",
+          "strategy": "Edit Distance",
+          "ddWikiUrl": "https://ddwiki.reso.org/display/DDW20/OfficeBrokerMlsId+Field"
+        }
+      ],
+      "status": "pending"
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "PhotoCount",
+      "suggestions": [
+        {
+          "suggestedResourceName": "Property",
+          "suggestedFieldName": "PhotosCount",
+          "strategy": "Edit Distance",
+          "ddWikiUrl": "https://ddwiki.reso.org/display/DDW20/PhotosCount+Field"
+        }
+      ],
+      "status": "pending"
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "VirtualTourURL",
+      "suggestions": [
+        {
+          "suggestedResourceName": "Property",
+          "suggestedFieldName": "VirtualTourURLUnbranded",
+          "strategy": "Substring",
+          "ddWikiUrl": "https://ddwiki.reso.org/display/DDW20/VirtualTourURLUnbranded+Field"
+        }
+      ],
+      "status": "pending"
+    }
+  ],
+  "lookups": [
+    {
+      "resourceName": "Property",
+      "fieldName": "Appliances",
+      "legacyODataValue": "EnergyStarQualifiedAppliances",
+      "suggestions": [
+        {
+          "suggestedResourceName": "Property",
+          "suggestedFieldName": "Appliances",
+          "suggestedLookupValue": "ENERGY STAR Qualified Appliances",
+          "strategy": "Fast Track",
+          "ddWikiUrl": "https://ddwiki.reso.org/display/DDW20/Appliances+Field"
+        }
+      ],
+      "status": "pending"
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "PropertyType",
+      "legacyODataValue": "Single Family",
+      "suggestions": [
+        {
+          "suggestedResourceName": "Property",
+          "suggestedFieldName": "PropertyType",
+          "suggestedLookupValue": "Residential",
+          "strategy": "Fast Track",
+          "ddWikiUrl": "https://ddwiki.reso.org/display/DDW20/PropertyType+Field"
+        }
+      ],
+      "status": "pending"
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "Heating",
+      "legacyODataValue": "Forced Air Gas",
+      "suggestions": [
+        {
+          "suggestedResourceName": "Property",
+          "suggestedFieldName": "Heating",
+          "suggestedLookupValue": "Forced Air",
+          "strategy": "Substring",
+          "ddWikiUrl": "https://ddwiki.reso.org/display/DDW20/Heating+Field"
+        }
+      ],
+      "status": "pending"
+    },
+    {
+      "resourceName": "Member",
+      "fieldName": "MemberStatus",
+      "legacyODataValue": "Inactive-Hold",
+      "suggestions": [
+        {
+          "suggestedResourceName": "Member",
+          "suggestedFieldName": "MemberStatus",
+          "suggestedLookupValue": "Inactive",
+          "strategy": "Substring",
+          "ddWikiUrl": "https://ddwiki.reso.org/display/DDW20/MemberStatus+Field"
+        }
+      ],
+      "status": "pending"
+    }
+  ],
+  "resources": []
+}

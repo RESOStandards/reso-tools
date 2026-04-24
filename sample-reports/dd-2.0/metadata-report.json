@@ -1,0 +1,252 @@
+{
+  "description": "RESO Data Dictionary Metadata Report",
+  "version": "2.0",
+  "generatedOn": "2026-04-14T18:30:00.000Z",
+  "resources": [
+    {
+      "resourceName": "Property"
+    },
+    {
+      "resourceName": "Member"
+    },
+    {
+      "resourceName": "Office"
+    }
+  ],
+  "fields": [
+    {
+      "resourceName": "Property",
+      "fieldName": "ListingKey",
+      "type": "Edm.String",
+      "nullable": false,
+      "maxLength": 255,
+      "isCollection": false,
+      "isExpansion": false,
+      "isEnumeration": false,
+      "isComplexType": false,
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.DisplayName",
+          "value": "Listing Key"
+        }
+      ]
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "ListPrice",
+      "type": "Edm.Decimal",
+      "nullable": true,
+      "precision": 14,
+      "scale": 2,
+      "isCollection": false,
+      "isExpansion": false,
+      "isEnumeration": false,
+      "isComplexType": false,
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.DisplayName",
+          "value": "List Price"
+        }
+      ]
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "StandardStatus",
+      "type": "org.reso.metadata.enums.StandardStatus",
+      "nullable": true,
+      "isCollection": false,
+      "isExpansion": false,
+      "isEnumeration": true,
+      "isComplexType": false,
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.LookupName",
+          "value": "StandardStatus"
+        },
+        {
+          "term": "RESO.OData.Metadata.DisplayName",
+          "value": "Standard Status"
+        }
+      ]
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "Appliances",
+      "type": "org.reso.metadata.enums.Appliances",
+      "nullable": true,
+      "isCollection": true,
+      "isExpansion": false,
+      "isEnumeration": true,
+      "isComplexType": false,
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.LookupName",
+          "value": "Appliances"
+        },
+        {
+          "term": "RESO.OData.Metadata.DisplayName",
+          "value": "Appliances"
+        }
+      ]
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "BedroomsTotal",
+      "type": "Edm.Int64",
+      "nullable": true,
+      "isCollection": false,
+      "isExpansion": false,
+      "isEnumeration": false,
+      "isComplexType": false,
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.DisplayName",
+          "value": "Bedrooms Total"
+        }
+      ]
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "BathroomsTotalInteger",
+      "type": "Edm.Int64",
+      "nullable": true,
+      "isCollection": false,
+      "isExpansion": false,
+      "isEnumeration": false,
+      "isComplexType": false,
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.DisplayName",
+          "value": "Bathrooms Total Integer"
+        }
+      ]
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "City",
+      "type": "Edm.String",
+      "nullable": true,
+      "maxLength": 50,
+      "isCollection": false,
+      "isExpansion": false,
+      "isEnumeration": false,
+      "isComplexType": false,
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.DisplayName",
+          "value": "City"
+        }
+      ]
+    },
+    {
+      "resourceName": "Member",
+      "fieldName": "MemberKey",
+      "type": "Edm.String",
+      "nullable": false,
+      "maxLength": 255,
+      "isCollection": false,
+      "isExpansion": false,
+      "isEnumeration": false,
+      "isComplexType": false,
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.DisplayName",
+          "value": "Member Key"
+        }
+      ]
+    },
+    {
+      "resourceName": "Member",
+      "fieldName": "MemberFirstName",
+      "type": "Edm.String",
+      "nullable": true,
+      "maxLength": 50,
+      "isCollection": false,
+      "isExpansion": false,
+      "isEnumeration": false,
+      "isComplexType": false,
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.DisplayName",
+          "value": "Member First Name"
+        }
+      ]
+    },
+    {
+      "resourceName": "Office",
+      "fieldName": "OfficeKey",
+      "type": "Edm.String",
+      "nullable": false,
+      "maxLength": 255,
+      "isCollection": false,
+      "isExpansion": false,
+      "isEnumeration": false,
+      "isComplexType": false,
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.DisplayName",
+          "value": "Office Key"
+        }
+      ]
+    }
+  ],
+  "lookups": [
+    {
+      "lookupName": "org.reso.metadata.enums.StandardStatus",
+      "lookupValue": "Active",
+      "type": "Edm.String",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.DisplayName",
+          "value": "Active"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.StandardStatus",
+      "lookupValue": "Pending",
+      "type": "Edm.String",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.DisplayName",
+          "value": "Pending"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.StandardStatus",
+      "lookupValue": "Closed",
+      "type": "Edm.String",
+      "annotations": [
+        {
+          "term": "RESO.OData.Metadata.DisplayName",
+          "value": "Closed"
+        }
+      ]
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.Appliances",
+      "lookupValue": "Dishwasher",
+      "type": "Edm.String",
+      "annotations": []
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.Appliances",
+      "lookupValue": "Dryer",
+      "type": "Edm.String",
+      "annotations": []
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.Appliances",
+      "lookupValue": "ENERGY STAR Qualified Appliances",
+      "type": "Edm.String",
+      "annotations": []
+    },
+    {
+      "lookupName": "org.reso.metadata.enums.Appliances",
+      "lookupValue": "Refrigerator",
+      "type": "Edm.String",
+      "annotations": []
+    }
+  ]
+}

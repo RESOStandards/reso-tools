@@ -1,0 +1,131 @@
+{
+  "description": "Web API Core",
+  "version": "2.0.0",
+  "generatedOn": "2026-04-14T19:15:00.000Z",
+  "remarks": "54 scenarios tested across Property resource. 45 passed, 2 failed, 7 skipped.",
+  "outcome": "failed",
+  "endorsement": "web-api-core",
+  "duration": 14200,
+  "steps": [
+    {
+      "name": "Health check",
+      "status": "passed",
+      "duration": 65,
+      "summary": "Server is ready at http://localhost:8080"
+    },
+    {
+      "name": "Resolve authentication",
+      "status": "passed",
+      "duration": 110,
+      "summary": "Auth credentials present"
+    },
+    {
+      "name": "Fetch metadata",
+      "status": "passed",
+      "duration": 280,
+      "summary": "3 resources, 632 fields, 1,847 lookups",
+      "counts": {
+        "resources": 3,
+        "fields": 632,
+        "lookups": 1847
+      }
+    },
+    {
+      "name": "Run Core scenarios",
+      "status": "failed",
+      "duration": 13700,
+      "summary": "45 passed, 2 failed, 7 skipped (54 scenarios)",
+      "counts": {
+        "total": 54,
+        "passed": 45,
+        "failed": 2,
+        "skipped": 7
+      }
+    },
+    {
+      "name": "Write compliance reports",
+      "status": "passed",
+      "duration": 45,
+      "summary": "Reports written to .reso-cert/web-api-core-2.0.0/"
+    }
+  ],
+  "resourceReports": [
+    {
+      "resource": "Property",
+      "summary": {
+        "total": 54,
+        "passed": 45,
+        "failed": 2,
+        "skipped": 7
+      },
+      "scenarios": [
+        {
+          "name": "Filter: eq integer",
+          "tag": "filter-eq-integer",
+          "passed": true,
+          "skipped": false,
+          "duration": 145,
+          "requestLatency": 85,
+          "requestUrl": "http://localhost:8080/Property?$filter=BedroomsTotal eq 3",
+          "assertions": [
+            {
+              "passed": true,
+              "message": "Response status is 200"
+            },
+            {
+              "passed": true,
+              "message": "All 21 records satisfy BedroomsTotal eq 3"
+            }
+          ]
+        },
+        {
+          "name": "Filter: multi-value enum all()",
+          "tag": "filter-multi-enum-all",
+          "passed": false,
+          "skipped": false,
+          "duration": 95,
+          "requestLatency": 60,
+          "requestUrl": "http://localhost:8080/Property?$filter=Appliances/all(a: a eq 'Dishwasher')",
+          "assertions": [
+            {
+              "passed": true,
+              "message": "Response status is 200"
+            },
+            {
+              "passed": false,
+              "message": "Expected all records to have only 'Dishwasher' in Appliances, but 3 of 21 records contained additional values"
+            }
+          ]
+        },
+        {
+          "name": "Filter: not contains",
+          "tag": "filter-not-contains",
+          "passed": false,
+          "skipped": false,
+          "duration": 88,
+          "requestLatency": 55,
+          "requestUrl": "http://localhost:8080/Property?$filter=not contains(City,'Fargo')",
+          "assertions": [
+            {
+              "passed": false,
+              "message": "Server returned 400 Bad Request. The 'not' operator with 'contains' may not be supported."
+            }
+          ]
+        },
+        {
+          "name": "Expand: single-valued navigation",
+          "tag": "expand-single-nav",
+          "passed": false,
+          "skipped": true,
+          "duration": 0,
+          "assertions": [
+            {
+              "passed": false,
+              "message": "No single-valued navigation properties found in metadata. Skipping."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "Property": {
+    "totalErrors": 35,
+    "totalWarnings": 0,
+    "fields": {
+      "BuyerAgentAOR": {
+        "type": "lookup",
+        "message": "MUST be equal to one of the allowed values",
+        "lookups": {
+          "AOR-7158": 12,
+          "AOR-3028": 8,
+          "NE-Metro": 5
+        }
+      },
+      "ListAgentCity": {
+        "type": "field",
+        "message": "Fields MUST be advertised in the metadata"
+      },
+      "LotSizeArea": {
+        "type": "precision",
+        "message": "Numeric precision exceeds declared scale of 2",
+        "keyField": "ListingKey",
+        "keys": [
+          "prop-001",
+          "prop-042",
+          "prop-117",
+          "prop-233",
+          "prop-501"
+        ]
+      },
+      "ListPrice": {
+        "type": "precision",
+        "message": "Numeric precision exceeds declared scale of 2",
+        "keyField": "ListingKey",
+        "keys": [
+          "prop-089"
+        ]
+      },
+      "Appliances": {
+        "type": "lookup",
+        "message": "MUST be equal to one of the allowed values",
+        "lookups": {
+          "Energy Star Appliances": 22,
+          "Trash Compactor": 3
+        }
+      }
+    }
+  },
+  "Member": {
+    "totalErrors": 8,
+    "totalWarnings": 0,
+    "fields": {
+      "MemberStatus": {
+        "type": "lookup",
+        "message": "MUST be equal to one of the allowed values",
+        "lookups": {
+          "Inactive-Hold": 4,
+          "SuspendedTemp": 2
+        }
+      },
+      "MemberMlsId": {
+        "type": "format",
+        "message": "String length exceeds maxLength of 25",
+        "keyField": "MemberKey",
+        "keys": [
+          "mem-442",
+          "mem-780"
+        ]
+      }
+    }
+  },
+  "Office": {
+    "totalErrors": 4,
+    "totalWarnings": 0,
+    "fields": {
+      "OfficeBrokerKey": {
+        "type": "field",
+        "message": "Fields MUST be advertised in the metadata"
+      },
+      "OfficeStatus": {
+        "type": "lookup",
+        "message": "MUST be equal to one of the allowed values",
+        "lookups": {
+          "Suspended": 3
+        }
+      }
+    }
+  }
+}

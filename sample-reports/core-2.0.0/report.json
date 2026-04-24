@@ -1,0 +1,6 @@
+{
+  "description": "Web API Core",
+  "version": "2.0.0",
+  "generatedOn": "2026-04-14T19:00:00.000Z",
+  "remarks": "54 scenarios tested across Property resource. 45 passed, 2 failed, 7 skipped."
+}

@@ -28,3 +28,6 @@ schema-validation-report.json
 reso-variations.json
 upi-validation-report.json
 *.resoscript
+
+# Sample fixtures are intentional — exempt them from the patterns above
+!sample-reports/**

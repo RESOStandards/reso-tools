@@ -1,0 +1,78 @@
+{
+  "description": "Data Dictionary",
+  "version": "2.0",
+  "generatedOn": "2026-04-14T18:30:00.000Z",
+  "remarks": "3 resources, 632 fields, 1,847 lookups validated. 47 schema errors found, 12 variations detected.",
+  "outcome": "failed",
+  "endorsement": "data-dictionary",
+  "duration": 24500,
+  "steps": [
+    {
+      "name": "Health check",
+      "status": "passed",
+      "duration": 85,
+      "summary": "Server is ready at http://localhost:8080"
+    },
+    {
+      "name": "Resolve authentication",
+      "status": "passed",
+      "duration": 120,
+      "summary": "Auth credentials present"
+    },
+    {
+      "name": "Fetch metadata",
+      "status": "passed",
+      "duration": 340,
+      "summary": "3 resources, 632 fields, 1,847 lookups",
+      "counts": {
+        "resources": 3,
+        "fields": 632,
+        "lookups": 1847
+      }
+    },
+    {
+      "name": "Replicate data",
+      "status": "passed",
+      "duration": 18200,
+      "summary": "Replicated 1,000 records per resource",
+      "counts": {
+        "Property": 1000,
+        "Member": 1000,
+        "Office": 1000
+      }
+    },
+    {
+      "name": "Schema validation",
+      "status": "failed",
+      "duration": 3100,
+      "summary": "47 errors found across 3 resources",
+      "counts": {
+        "errors": 47,
+        "warnings": 0
+      },
+      "artifacts": [
+        {
+          "label": "Schema Validation Errors",
+          "path": "data-availability-schema-validation-errors.json"
+        }
+      ]
+    },
+    {
+      "name": "Variations",
+      "status": "passed",
+      "duration": 2600,
+      "summary": "12 variations detected (8 fields, 4 lookups)",
+      "counts": {
+        "fields": 8,
+        "lookups": 4,
+        "resources": 0
+      },
+      "artifacts": [
+        {
+          "label": "Variations Report",
+          "path": "data-dictionary-variations.json"
+        }
+      ]
+    }
+  ]
+}

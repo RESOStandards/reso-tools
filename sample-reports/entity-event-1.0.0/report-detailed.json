@@ -1,0 +1,261 @@
+{
+  "description": "EntityEvent",
+  "version": "1.0.0",
+  "generatedOn": "2026-04-14T20:00:00.000Z",
+  "remarks": "Tested EntityEvent in observe mode. 50 events observed across Property and Member. 45 records validated. 5 not found (likely deleted). Sequence range 1 to 50.",
+  "outcome": "passed",
+  "endorsement": "entity-event",
+  "duration": 38500,
+  "steps": [
+    {
+      "name": "Health check",
+      "status": "passed",
+      "duration": 70,
+      "summary": "Server is ready at http://localhost:8080"
+    },
+    {
+      "name": "Resolve authentication",
+      "status": "passed",
+      "duration": 105,
+      "summary": "Auth credentials present"
+    },
+    {
+      "name": "Fetch metadata",
+      "status": "passed",
+      "duration": 290,
+      "summary": "EntityEvent resource found with 4 fields",
+      "counts": {
+        "resources": 1,
+        "fields": 4
+      }
+    },
+    {
+      "name": "Run EntityEvent scenarios",
+      "status": "passed",
+      "duration": 37900,
+      "summary": "6 passed, 0 failed, 2 skipped (8 scenarios)",
+      "counts": {
+        "total": 8,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 2
+      }
+    },
+    {
+      "name": "Write compliance reports",
+      "status": "passed",
+      "duration": 135,
+      "summary": "Reports written to .reso-cert/entity-event-1.0.0/"
+    }
+  ],
+  "resourceReports": [
+    {
+      "resource": "EntityEvent",
+      "summary": {
+        "total": 8,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 2
+      },
+      "scenarios": [
+        {
+          "scenario": "metadata-valid",
+          "tag": "metadata-valid",
+          "passed": true,
+          "skipped": false,
+          "duration": 45,
+          "assertions": [
+            {
+              "description": "EntityEvent resource is advertised in metadata",
+              "status": "passed"
+            },
+            {
+              "description": "EntityEventSequence field is Edm.Int64",
+              "status": "passed"
+            },
+            {
+              "description": "ResourceName field is Edm.String",
+              "status": "passed"
+            },
+            {
+              "description": "ResourceRecordKey field is Edm.String",
+              "status": "passed"
+            },
+            {
+              "description": "ResourceRecordUrl field is Edm.String",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "scenario": "read-only-enforced",
+          "tag": "read-only-enforced",
+          "passed": true,
+          "skipped": false,
+          "duration": 180,
+          "assertions": [
+            {
+              "description": "POST to EntityEvent returns 405 Method Not Allowed",
+              "status": "passed"
+            },
+            {
+              "description": "PATCH to EntityEvent returns 405 Method Not Allowed",
+              "status": "passed"
+            },
+            {
+              "description": "DELETE to EntityEvent returns 405 Method Not Allowed",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "scenario": "filter-by-sequence",
+          "tag": "filter-by-sequence",
+          "passed": true,
+          "skipped": false,
+          "duration": 220,
+          "requestUrl": "http://localhost:8080/EntityEvent?$filter=EntityEventSequence gt 0",
+          "assertions": [
+            {
+              "description": "Response status is 200",
+              "status": "passed"
+            },
+            {
+              "description": "All records have EntityEventSequence greater than 0",
+              "status": "passed"
+            },
+            {
+              "description": "Results are ordered by EntityEventSequence ascending",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "scenario": "observe-incremental-sync",
+          "tag": "observe-incremental-sync",
+          "passed": true,
+          "skipped": false,
+          "duration": 30200,
+          "assertions": [
+            {
+              "description": "Initial fetch returned 50 events",
+              "status": "passed"
+            },
+            {
+              "description": "Events span 2 unique resources: Property, Member",
+              "status": "passed"
+            },
+            {
+              "description": "Sequence range: 1 to 50 (monotonically increasing)",
+              "status": "passed"
+            },
+            {
+              "description": "Polling detected 3 new events over 30s window",
+              "status": "passed"
+            },
+            {
+              "description": "45 of 50 referenced records validated against server",
+              "status": "passed"
+            },
+            {
+              "description": "5 records not found (ResourceRecordKey references deleted records)",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "scenario": "select-fields",
+          "tag": "select-fields",
+          "passed": true,
+          "skipped": false,
+          "duration": 95,
+          "requestUrl": "http://localhost:8080/EntityEvent?$select=EntityEventSequence,ResourceName",
+          "assertions": [
+            {
+              "description": "Response contains only selected fields",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "scenario": "count-supported",
+          "tag": "count-supported",
+          "passed": true,
+          "skipped": false,
+          "duration": 80,
+          "requestUrl": "http://localhost:8080/EntityEvent?$count=true",
+          "assertions": [
+            {
+              "description": "@odata.count is present and matches result set",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "scenario": "create-triggers-event",
+          "tag": "create-triggers-event",
+          "passed": false,
+          "skipped": true,
+          "duration": 0,
+          "assertions": [
+            {
+              "description": "Skipped: observe mode does not test write-triggered events",
+              "status": "skipped"
+            }
+          ]
+        },
+        {
+          "scenario": "update-triggers-event",
+          "tag": "update-triggers-event",
+          "passed": false,
+          "skipped": true,
+          "duration": 0,
+          "assertions": [
+            {
+              "description": "Skipped: observe mode does not test write-triggered events",
+              "status": "skipped"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "dataValidation": {
+    "totalEvents": 50,
+    "uniqueResources": [
+      "Property",
+      "Member"
+    ],
+    "sequenceRange": {
+      "min": 1,
+      "max": 50
+    },
+    "eventsValidated": 45,
+    "notFoundCount": 5,
+    "notFoundKeys": [
+      {
+        "resource": "Property",
+        "key": "prop-deleted-001"
+      },
+      {
+        "resource": "Property",
+        "key": "prop-deleted-002"
+      },
+      {
+        "resource": "Property",
+        "key": "prop-deleted-003"
+      },
+      {
+        "resource": "Member",
+        "key": "mem-deleted-001"
+      },
+      {
+        "resource": "Member",
+        "key": "mem-deleted-002"
+      }
+    ],
+    "pollDurationMs": 30000,
+    "newEventsDuringPoll": 3,
+    "warnings": []
+  }
+}
