@@ -165,6 +165,8 @@ export const summaryToCoverageReport = (
       providerCount: localFields,
       industryAvgCount: Math.round(avgLocalFields),
       isCount: true as const,
+      // Fewer local (non-standard) fields is a positive signal — more data lives in standard fields.
+      lowerIsBetter: true,
     },
   ];
 

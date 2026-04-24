@@ -625,12 +625,12 @@ const FieldCutTile = ({ cut }: { readonly cut: FieldCut }) => {
   if (cut.isCount) {
     const above = cut.providerCount >= cut.industryAvgCount;
     const hasIndustry = cut.industryAvgCount > 0;
-    const numberColor = hasIndustry && above
+    // When lowerIsBetter, "good" = below industry; otherwise "good" = above industry.
+    const isGood = cut.lowerIsBetter ? !above : above;
+    const numberColor = hasIndustry && isGood
       ? 'text-emerald-700 dark:text-emerald-400'
-      : hasIndustry
-        ? 'text-gray-900 dark:text-gray-50'
-        : 'text-gray-900 dark:text-gray-50';
-    const ringClass = hasIndustry && above
+      : 'text-gray-900 dark:text-gray-50';
+    const ringClass = hasIndustry && isGood
       ? 'ring-1 ring-emerald-200 dark:ring-emerald-900/50'
       : '';
     return (
@@ -642,7 +642,11 @@ const FieldCutTile = ({ cut }: { readonly cut: FieldCut }) => {
           <span className={`text-4xl font-bold tabular-nums ${numberColor}`}>
             {cut.providerCount.toLocaleString()}
           </span>
-          {hasIndustry && (above ? <AboveIndustryPill /> : <BelowIndustryPill />)}
+          {hasIndustry && (
+            above
+              ? <AboveIndustryPill positive={!cut.lowerIsBetter} />
+              : <BelowIndustryPill positive={cut.lowerIsBetter} />
+          )}
         </p>
         {cut.subtitle && (
           <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{cut.subtitle}</p>
@@ -654,7 +658,7 @@ const FieldCutTile = ({ cut }: { readonly cut: FieldCut }) => {
             <ComparisonBar
               providerPercent={Math.round((cut.providerCount / maxVal) * 100)}
               industryPercent={Math.round((cut.industryAvgCount / maxVal) * 100)}
-              above={above}
+              above={isGood}
             />
             <p className="mt-2 text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
               Industry avg: {cut.industryAvgCount.toLocaleString()}
@@ -1061,24 +1065,39 @@ const ComparisonBar = ({
   );
 };
 
-const AboveIndustryPill = () => (
-  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-    <svg className="w-2.5 h-2.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-      <path
-        fillRule="evenodd"
-        d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 011.42-1.42L8.5 12.08l6.79-6.79a1 1 0 011.414 0z"
-        clipRule="evenodd"
-      />
-    </svg>
-    Above industry
-  </span>
-);
+/** Pill shown when the provider's value is at or above industry average. `positive` controls color treatment: true = green (celebratory), false = neutral/amber. */
+const AboveIndustryPill = ({ positive = true }: { readonly positive?: boolean }) => {
+  const classes = positive
+    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+    : 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider ${classes}`}>
+      {positive && (
+        <svg className="w-2.5 h-2.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fillRule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 011.42-1.42L8.5 12.08l6.79-6.79a1 1 0 011.414 0z" clipRule="evenodd" />
+        </svg>
+      )}
+      Above industry
+    </span>
+  );
+};
 
-const BelowIndustryPill = () => (
-  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-    Below industry
-  </span>
-);
+/** Pill shown when the provider's value is below industry average. `positive` controls color treatment: true = green (e.g., fewer local fields), false = amber/caution (default). */
+const BelowIndustryPill = ({ positive = false }: { readonly positive?: boolean }) => {
+  const classes = positive
+    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+    : 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider ${classes}`}>
+      {positive && (
+        <svg className="w-2.5 h-2.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fillRule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 011.42-1.42L8.5 12.08l6.79-6.79a1 1 0 011.414 0z" clipRule="evenodd" />
+        </svg>
+      )}
+      Below industry
+    </span>
+  );
+};
 
 const CopyableUoi = ({ uoi }: { readonly uoi: string }) => {
   const [copied, setCopied] = useState(false);

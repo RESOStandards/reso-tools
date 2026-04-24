@@ -33,6 +33,8 @@ export interface FieldCutCount {
   readonly isCount: true;
   /** Optional subtitle shown below the hero count (e.g., "out of 811 advertised"). */
   readonly subtitle?: string;
+  /** When true, a lower count is the good outcome (e.g., Local Fields — fewer means more standardization). */
+  readonly lowerIsBetter?: boolean;
 }
 
 export type FieldCut = FieldCutPercent | FieldCutCount;
