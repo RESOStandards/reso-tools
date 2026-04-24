@@ -92,18 +92,26 @@ interface LocalVariationItem {
   readonly message?: string;
 }
 
-interface LocalVariationsReport {
-  readonly description: string;
-  readonly version: string;
-  readonly generatedOn: string;
-  readonly fuzziness: number;
-  readonly variations: {
-    readonly resources: ReadonlyArray<LocalVariationItem>;
-    readonly fields: ReadonlyArray<LocalVariationItem>;
-    readonly lookups: ReadonlyArray<LocalVariationItem>;
-    readonly expansions: ReadonlyArray<LocalVariationItem>;
-    readonly complexTypes: ReadonlyArray<LocalVariationItem>;
-  };
+/**
+ * Shape of the buckets carried inside a variations report.
+ * The DD pipeline writes these directly as the file body; older callers wrap them in `{ variations: {...} }`.
+ * The blender accepts either shape — see `extractCategories` below.
+ */
+interface VariationsBuckets {
+  readonly resources?: ReadonlyArray<LocalVariationItem>;
+  readonly fields?: ReadonlyArray<LocalVariationItem>;
+  readonly lookups?: ReadonlyArray<LocalVariationItem>;
+  readonly expansions?: ReadonlyArray<LocalVariationItem>;
+  readonly complexTypes?: ReadonlyArray<LocalVariationItem>;
+}
+
+interface LocalVariationsReport extends VariationsBuckets {
+  readonly description?: string;
+  readonly version?: string;
+  readonly generatedOn?: string;
+  readonly fuzziness?: number;
+  /** Optional wrapper shape some legacy writers used. The blender prefers top-level buckets when present. */
+  readonly variations?: VariationsBuckets;
 }
 
 /** Service suggestions map shape (from searchVariations API). */
@@ -234,13 +242,21 @@ export const blendVariations = (
 ): BlendedVariationsReport => {
   const variations: BlendedVariation[] = [];
 
+  // Accept either shape: top-level buckets (what the DD pipeline writes today) or
+  // a `{ variations: {...} }` wrapper (older convention). Prefer top-level when present.
+  const buckets: VariationsBuckets = (
+    localReport.fields || localReport.lookups || localReport.resources || localReport.expansions || localReport.complexTypes
+      ? localReport
+      : (localReport.variations ?? {})
+  );
+
   // Process each category
   const categories: ReadonlyArray<{ items: ReadonlyArray<LocalVariationItem>; type: BlendedVariation['type'] }> = [
-    { items: localReport.variations.resources, type: 'resource' },
-    { items: localReport.variations.fields, type: 'field' },
-    { items: localReport.variations.lookups, type: 'lookup' },
-    { items: localReport.variations.expansions, type: 'expansion' },
-    { items: localReport.variations.complexTypes, type: 'complexType' },
+    { items: buckets.resources ?? [], type: 'resource' },
+    { items: buckets.fields ?? [], type: 'field' },
+    { items: buckets.lookups ?? [], type: 'lookup' },
+    { items: buckets.expansions ?? [], type: 'expansion' },
+    { items: buckets.complexTypes ?? [], type: 'complexType' },
   ];
 
   for (const { items, type } of categories) {
@@ -263,10 +279,10 @@ export const blendVariations = (
   };
 
   return {
-    description: localReport.description,
-    version: localReport.version,
-    generatedOn: localReport.generatedOn,
-    fuzziness: localReport.fuzziness,
+    description: localReport.description ?? 'Data Dictionary Variations Report',
+    version: localReport.version ?? '',
+    generatedOn: localReport.generatedOn ?? new Date().toISOString(),
+    fuzziness: localReport.fuzziness ?? 0,
     variations,
     counts,
   };
