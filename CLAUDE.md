@@ -92,6 +92,7 @@ Before adding any new dependency, run a security audit:
 - Use named constants for repeated string literals (endorsement types, status values, environment URLs, step names). Define them in a shared constants file rather than duplicating across components.
 - Prefer interfaces over implementations — when multiple data sources produce similar shapes, define a normalized interface and map to it rather than handling each shape ad hoc.
 - Always remove dead code when disabling a feature. If removal effort is high, ask first and open a ticket instead of leaving dead code with comments.
+- For new code, do not ignore compiler, linter, or bundler warnings. Fix them. If a build produces many warnings, summarize the classes at a high level and prompt before proceeding — don't silently accept them. Legacy code paths (e.g. `src/legacy/`) are the exception: flag them, leave them, and capture in a cleanup ticket if worth tracking.
 
 ## Style Conventions
 
