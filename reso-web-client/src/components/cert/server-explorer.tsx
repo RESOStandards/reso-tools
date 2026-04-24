@@ -44,19 +44,25 @@ export const isFieldEnum = (field: {
 }): boolean =>
   !field.type.startsWith('Edm.') && !field.isExpansion && !field.isComplexType;
 
-/** Build a dd.reso.org wiki URL for a field or lookup field. */
-const fieldWikiUrl = (version: string, fieldName: string, lookupName?: string | null): string =>
+// dd.reso.org URL conventions (see CLAUDE.md "DD Docs URL Conventions"):
+//   Resource:     /DD{version}/{Resource}/
+//   Field:        /DD{version}/{Resource}/{Field}/
+//   Lookup enum:  /DD{version}/lookups/{LookupName}/
+//   Lookup value: /DD{version}/lookups/{LookupName}/{LookupValue}/
+
+/** Build a dd.reso.org URL for a field, or the lookup enum page when the field is an enum. */
+const fieldWikiUrl = (version: string, resourceName: string, fieldName: string, lookupName?: string | null): string =>
   lookupName
-    ? `https://dd.reso.org/DD${version}/lookups/${encodeURIComponent(lookupName)}`
-    : `https://dd.reso.org/DD${version}/${encodeURIComponent(fieldName)}`;
+    ? `https://dd.reso.org/DD${version}/lookups/${encodeURIComponent(lookupName)}/`
+    : `https://dd.reso.org/DD${version}/${encodeURIComponent(resourceName)}/${encodeURIComponent(fieldName)}/`;
 
-/** Build a dd.reso.org wiki URL for a lookup value. */
+/** Build a dd.reso.org URL for a specific lookup value. */
 const lookupWikiUrl = (version: string, lookupName: string, lookupValue: string): string =>
-  `https://dd.reso.org/DD${version}/lookups/${encodeURIComponent(lookupName)}/${encodeURIComponent(lookupValue)}`;
+  `https://dd.reso.org/DD${version}/lookups/${encodeURIComponent(lookupName)}/${encodeURIComponent(lookupValue)}/`;
 
-/** Build a dd.reso.org wiki URL for a resource. */
+/** Build a dd.reso.org URL for a resource. */
 const resourceWikiUrl = (version: string, resourceName: string): string =>
-  `https://dd.reso.org/DD${version}/${encodeURIComponent(resourceName)}`;
+  `https://dd.reso.org/DD${version}/${encodeURIComponent(resourceName)}/`;
 
 /** Normalize an OData type name by stripping namespace prefixes.
  *  e.g., "org.reso.metadata.enums.Appliances" → "Appliances",
@@ -254,7 +260,7 @@ const FieldDetailPanel = ({
           {field.standardRESO && (
             <div className="col-span-2 sm:col-span-3">
               <a
-                href={fieldWikiUrl(version, field.fieldName, field.lookupName)}
+                href={fieldWikiUrl(version, field.resourceName, field.fieldName, field.lookupName)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"

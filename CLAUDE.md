@@ -148,3 +148,30 @@ Before adding any new dependency, run a security audit:
 - The OData client handles URI building, CRUD, pagination, and metadata parsing – it is used by both the web UI and the certification runner
 - Validation rules are isomorphic (shared between client and server)
 - The DD docs site is in a separate repo — see `RESOStandards/reso-data-dictionary-documentation` for styling and generator code
+
+## DD Docs URL Conventions
+
+Documentation site: https://dd.reso.org/
+
+### Four canonical element URLs
+
+- **Resource** — `/DD{version}/{ResourceName}/`
+- **Field** — `/DD{version}/{ResourceName}/{FieldName}/`
+- **Lookup (enum)** — `/DD{version}/lookups/{LookupName}/`
+- **Lookup Value** — `/DD{version}/lookups/{LookupName}/{LookupValue}/`
+
+Rules:
+- URL-encode path segments containing spaces or special characters (e.g. `Public Sewer` → `Public%20Sewer`).
+- `{LookupName}` in lookup paths is the enum/lookup name (typically the field name, but not always — some lookups are shared across fields).
+- `{version}` is the DD version short form, e.g. `2.0`, `2.1`.
+
+### Other pages
+
+- Version landing pages (`/DD{version}/`)
+- Payload pages
+
+For these or anything else, consult the current dd.reso.org structure directly rather than inventing a pattern.
+
+### In code
+
+The legacy URL builder is [`getDDWikiUrl`](reso-certification/src/legacy/lib/variations/index.js) (`src/legacy/lib/variations/index.js`). When generating DD URLs in new code, match the four canonical shapes above exactly — do not invent alternate layouts like `/{Resource}/{Field}/{LookupValue}/`.
