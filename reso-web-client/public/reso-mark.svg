@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true">
+  <!--
+    Light RESO X mark for use as an inline UI separator. Inspired by the
+    brand mark but simplified for legibility at small sizes. Inherits
+    the surrounding text colour via currentColor.
+  -->
+  <g fill="currentColor">
+    <path d="M32 32 C 24 22, 16 14, 6 6 C 14 16, 22 24, 32 32 Z" />
+    <path d="M32 32 C 40 22, 48 14, 58 6 C 50 16, 42 24, 32 32 Z" />
+    <path d="M32 32 C 24 42, 16 50, 6 58 C 14 48, 22 40, 32 32 Z" />
+    <path d="M32 32 C 40 42, 48 50, 58 58 C 50 48, 42 40, 32 32 Z" />
+  </g>
+</svg>

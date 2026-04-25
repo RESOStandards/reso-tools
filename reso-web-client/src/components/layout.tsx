@@ -246,7 +246,7 @@ export const Layout = () => {
               className="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
               Report Issue
             </a>
-            <img src="/favicon.ico" alt="" aria-hidden="true" className="w-3 h-3 opacity-60" />
+            <img src="/reso-mark.svg" alt="" aria-hidden="true" className="w-3 h-3 opacity-50" />
             <a
               href="https://www.reso.org/eula/"
               target="_blank"
