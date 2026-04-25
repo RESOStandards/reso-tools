@@ -41,7 +41,6 @@ interface SaveInput {
   readonly comments: ReadonlyArray<DraftComment>;
   readonly userName: string;
   readonly userEmail: string;
-  readonly token: string;
 }
 
 // ── Key parsing ──────────────────────────────────────────────────────
@@ -157,7 +156,7 @@ export const saveVariationsReview = async (input: SaveInput): Promise<boolean> =
   const certRequestId = await generateCertRequestId(input.version, input.providerUoi, input.providerUsi, input.recipientUoi);
 
   // Fetch existing report
-  const existingReport = await getVariationsReport(input.version, input.providerUoi, input.providerUsi, input.recipientUoi, certRequestId, input.token);
+  const existingReport = await getVariationsReport(input.version, input.providerUoi, input.providerUsi, input.recipientUoi, certRequestId);
 
   // Build new changes
   const { changes: newChanges, editorInfo } = buildSavePayload(input, existingReport, certRequestId);
@@ -186,5 +185,5 @@ export const saveVariationsReview = async (input: SaveInput): Promise<boolean> =
     editorInfo: [taggedEditor, ...existingEditors],
   };
 
-  return saveVariationsReport(input.version, input.providerUoi, input.providerUsi, input.recipientUoi, certRequestId, payload, input.token);
+  return saveVariationsReport(input.version, input.providerUoi, input.providerUsi, input.recipientUoi, certRequestId, payload);
 };

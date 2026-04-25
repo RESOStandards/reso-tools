@@ -40,6 +40,10 @@ import {
   type ProviderToken
 } from '../api/cert-client';
 import {
+  setCredentials as authServiceSetCredentials,
+  clearProvider as authServiceClearProvider,
+} from '../services/auth-service';
+import {
   isSecure,
   secureGetJson,
   secureRemove,
@@ -158,6 +162,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setCertAuthScheme(loginResponse.isAdmin);
         setUser(loginResponse);
         setProviderToken(token);
+        // Mirror credentials into the auth-service so domain code (variations,
+        // locks, etc.) can call authedFetch without going through this context.
+        // The service's own lazy-refresh + single-flight handle subsequent
+        // token refreshes from this point on.
+        await authServiceSetCredentials({ username: normalizedUsername, apiToken: loginResponse.token });
         await secureSetJson(USER_STORAGE_KEY, loginResponse);
         await secureSetJson<PersistedCredentials>(CREDS_STORAGE_KEY, {
           username: normalizedUsername,
@@ -189,6 +198,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     void secureRemove(USER_STORAGE_KEY);
     void secureRemove(CREDS_STORAGE_KEY);
+    void authServiceClearProvider();
   }, [clearRefreshTimer]);
 
   // Hydrate from secure storage on mount. If we find credentials, we also
@@ -219,6 +229,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setProviderToken(token);
           setIsHydrating(false);
           scheduleRefresh(token);
+          // Mirror credentials into the auth-service so domain calls (variations,
+          // locks) can use authedFetch from now on.
+          authServiceSetCredentials({ username: normalizedUsername, apiToken: loginResponse.token }).catch(() => {});
           // Persist in background — don't await (would break React batch)
           secureSetJson(USER_STORAGE_KEY, loginResponse).catch(() => {});
           secureSetJson<PersistedCredentials>(CREDS_STORAGE_KEY, {

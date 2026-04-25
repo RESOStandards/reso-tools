@@ -16,13 +16,33 @@ vi.stubGlobal('electronStorage', {
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-beforeEach(() => {
+// Mock requestProviderToken so the auth-service has something to refresh with.
+// Tests that exercise the network path get a "valid" token via this stub.
+vi.mock('../src/api/cert-client', () => ({
+  requestProviderToken: vi.fn(async () => ({
+    accessToken: 'test-token',
+    tokenType: 'Bearer',
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  })),
+}));
+
+const { saveVariationsReview } = await import('../src/services/variations-save');
+const authService = await import('../src/services/auth-service');
+
+beforeEach(async () => {
   mockStore.clear();
   vi.clearAllMocks();
   mockFetch.mockResolvedValue({ ok: true, json: async () => null });
+  // Each test starts with a clean auth-service seeded with credentials so
+  // the inner authedFetch can produce a bearer token.
+  authService.__resetForTesting();
+  authService.__setStorageForTesting({
+    get: async (k) => mockStore.get(k) ?? null,
+    set: async (k, v) => { mockStore.set(k, v); },
+    remove: async (k) => { mockStore.delete(k); },
+  });
+  await authService.setCredentials({ username: 'tester', apiToken: 'cert-api-token' });
 });
-
-const { saveVariationsReview } = await import('../src/services/variations-save');
 
 describe('saveVariationsReview', () => {
   it('returns false when there are no actions or comments', async () => {
@@ -35,7 +55,6 @@ describe('saveVariationsReview', () => {
       comments: [],
       userName: 'Josh',
       userEmail: 'josh@reso.org',
-      token: 'test-token',
     });
     expect(result).toBe(false);
   });
@@ -55,7 +74,6 @@ describe('saveVariationsReview', () => {
       comments: [],
       userName: 'Josh',
       userEmail: 'josh@reso.org',
-      token: 'test-token',
     });
 
     expect(result).toBe(true);
@@ -85,7 +103,6 @@ describe('saveVariationsReview', () => {
       comments: [],
       userName: 'Josh',
       userEmail: 'josh@reso.org',
-      token: 'test-token',
     });
 
     const body = JSON.parse(mockFetch.mock.calls[1][1].body);
@@ -107,7 +124,6 @@ describe('saveVariationsReview', () => {
       comments: [],
       userName: 'Josh',
       userEmail: 'josh@reso.org',
-      token: 'test-token',
     });
 
     const body = JSON.parse(mockFetch.mock.calls[1][1].body);
@@ -128,7 +144,6 @@ describe('saveVariationsReview', () => {
       comments: [],
       userName: 'Josh',
       userEmail: 'josh@reso.org',
-      token: 'test-token',
     });
 
     const body = JSON.parse(mockFetch.mock.calls[1][1].body);
@@ -157,7 +172,6 @@ describe('saveVariationsReview', () => {
       }],
       userName: 'Josh',
       userEmail: 'josh@reso.org',
-      token: 'test-token',
     });
 
     const body = JSON.parse(mockFetch.mock.calls[1][1].body);
@@ -185,7 +199,6 @@ describe('saveVariationsReview', () => {
       }],
       userName: 'Josh',
       userEmail: 'josh@reso.org',
-      token: 'test-token',
     });
 
     const body = JSON.parse(mockFetch.mock.calls[1][1].body);
@@ -209,7 +222,6 @@ describe('saveVariationsReview', () => {
       comments: [],
       userName: 'Josh',
       userEmail: 'josh@reso.org',
-      token: 'test-token',
     });
 
     const body = JSON.parse(mockFetch.mock.calls[1][1].body);

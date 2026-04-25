@@ -34,19 +34,23 @@ const subscribe = (listener: () => void): (() => void) => {
 };
 const getSnapshot = (): ReadonlyArray<ServiceNotification> => singletonNotifications;
 
-/** Fetch notifications using the provided token getter. */
-const doFetch = async (getToken: () => Promise<string>): Promise<void> => {
+/**
+ * Fetch notifications. Auth is handled inside `searchNotifications` via
+ * `authedFetch`, so no token plumbing is needed here. Re-entrancy guard
+ * (`singletonFetching`) prevents overlapping fetches when the timer
+ * fires while a previous fetch is still in flight.
+ */
+const doFetch = async (): Promise<void> => {
   if (singletonFetching) return;
   singletonFetching = true;
   singletonLoading = true;
   notify();
 
   try {
-    const token = await getToken();
-    const results = await searchNotifications(token, EVENT_TYPES);
+    const results = await searchNotifications(EVENT_TYPES);
     singletonNotifications = results;
   } catch {
-    // No token or network error — keep stale data
+    // No credentials, no auth, or network error — keep stale data.
   } finally {
     singletonLoading = false;
     singletonFetching = false;
@@ -54,10 +58,10 @@ const doFetch = async (getToken: () => Promise<string>): Promise<void> => {
   }
 };
 
-const startPolling = (getToken: () => Promise<string>): void => {
+const startPolling = (): void => {
   if (singletonTimer) return; // Already polling
-  doFetch(getToken);
-  singletonTimer = setInterval(() => doFetch(getToken), POLL_INTERVAL_MS);
+  doFetch();
+  singletonTimer = setInterval(doFetch, POLL_INTERVAL_MS);
 };
 
 const stopPolling = (): void => {
@@ -87,37 +91,33 @@ export const useNotifications = (): UseNotificationsResult => {
   const auth = useAuth();
   const notifications = useSyncExternalStore(subscribe, getSnapshot);
 
-  // Start/stop polling based on auth state
+  // Start/stop polling based on auth state. Auth is handled inside the
+  // services-client functions via authedFetch — no token plumbing here.
   useEffect(() => {
     if (!auth?.isAuthenticated) {
       stopPolling();
       return;
     }
-    const getToken = () => auth.ensureFreshProviderToken();
-    startPolling(getToken);
+    startPolling();
     return () => {}; // Don't stop on unmount — other consumers may still need it
   }, [auth?.isAuthenticated]);
 
   const markRead = useCallback((notificationId: string, timestamp: string) => {
     singletonNotifications = singletonNotifications.filter(n => n.notificationId !== notificationId);
     notify();
-    auth?.ensureFreshProviderToken()
-      .then(token => markNotificationRead(token, notificationId, timestamp))
-      .catch(() => {});
-  }, [auth]);
+    markNotificationRead(notificationId, timestamp).catch(() => {});
+  }, []);
 
   const markAllRead = useCallback(() => {
     singletonNotifications = [];
     notify();
-    auth?.ensureFreshProviderToken()
-      .then(token => markAllNotificationsRead(token, EVENT_TYPES))
-      .catch(() => {});
-  }, [auth]);
+    markAllNotificationsRead(EVENT_TYPES).catch(() => {});
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!auth?.isAuthenticated) return;
-    await doFetch(() => auth.ensureFreshProviderToken());
-  }, [auth]);
+    await doFetch();
+  }, [auth?.isAuthenticated]);
 
   return {
     notifications,

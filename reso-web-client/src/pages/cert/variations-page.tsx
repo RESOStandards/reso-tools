@@ -151,7 +151,7 @@ const loadCachedReport = (): BlendedVariationsReport | null => {
 
 export const VariationsPage = () => {
   const location = useLocation();
-  const { ensureFreshProviderToken, isAuthenticated, isAdmin, user } = useAuth();
+  const { isAuthenticated, isAdmin, user } = useAuth();
   const routeState = location.state as { job?: Record<string, unknown>; report?: BlendedVariationsReport } | null;
 
   const [report, setReport] = useState<BlendedVariationsReport | null>(() => {
@@ -203,9 +203,11 @@ export const VariationsPage = () => {
 
         if (isAuthenticated && metadataRef) {
           try {
-            const token = await ensureFreshProviderToken();
+            // Auth is handled inside searchVariations via authedFetch.
+            // No token plumbing here — that path was the source of the
+            // useEffect-redep loop that piled up pending requests.
             const metadataReport = await resolveReportRef(metadataRef) as { fields: unknown[]; lookups: unknown[] };
-            const result = await searchVariations(metadataReport as Parameters<typeof searchVariations>[0], token);
+            const result = await searchVariations(metadataReport as Parameters<typeof searchVariations>[0]);
             serviceSuggestions = result.mappings ?? {};
           } catch { /* Not authenticated / service unavailable — use local only */ }
         }
@@ -247,7 +249,13 @@ export const VariationsPage = () => {
     };
 
     fetchAndBlend();
-  }, [routeState, isAuthenticated, ensureFreshProviderToken]);
+    // ensureFreshProviderToken was previously a dep here; its identity
+    // flipped on every token refresh which retriggered this effect, kicked
+    // off another searchVariations request, refreshed again, and so on.
+    // Auth-service handles refresh internally now — the function reference
+    // is stable (module export), so this effect runs exactly once per
+    // route change.
+  }, [routeState, isAuthenticated]);
 
   if (loading) {
     return (
@@ -278,12 +286,11 @@ export const VariationsPage = () => {
   if (view === 'list' || !report) {
     return <ReviewListView
       onSelectReport={(r) => { setReport(r); cacheReport(r); setView('detail'); }}
-      ensureFreshToken={ensureFreshProviderToken}
       isAuthenticated={isAuthenticated}
     />;
   }
 
-  return <ReviewDetailView report={report} onBack={() => setView('list')} ensureFreshToken={ensureFreshProviderToken} user={user} isAdmin={isAdmin} jobId={(routeState?.job as { id?: string } | undefined)?.id} />;
+  return <ReviewDetailView report={report} onBack={() => setView('list')} user={user} isAdmin={isAdmin} jobId={(routeState?.job as { id?: string } | undefined)?.id} />;
 };
 
 // ── Review List View ─────────────────────────────────────────────────
@@ -310,9 +317,8 @@ interface VariationsStats {
   }>;
 }
 
-const ReviewListView = ({ onSelectReport, ensureFreshToken, isAuthenticated }: {
+const ReviewListView = ({ onSelectReport, isAuthenticated }: {
   readonly onSelectReport: (report: BlendedVariationsReport) => void;
-  readonly ensureFreshToken: () => Promise<string>;
   readonly isAuthenticated: boolean;
 }) => {
   const [stats, setStats] = useState<VariationsStats | null>(null);
@@ -322,12 +328,12 @@ const ReviewListView = ({ onSelectReport, ensureFreshToken, isAuthenticated }: {
   useEffect(() => {
     if (!isAuthenticated) return;
     setLoading(true);
-    ensureFreshToken()
-      .then(token => getVariationsStats(token))
+    // Auth handled inside getVariationsStats via authedFetch.
+    getVariationsStats()
       .then(data => { if (data) setStats(data as VariationsStats); })
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load variations stats'))
       .finally(() => setLoading(false));
-  }, [isAuthenticated, ensureFreshToken]);
+  }, [isAuthenticated]);
 
   const activeResources = stats?.byResource?.filter(r => r.inReview > 0 || r.suggestions > 0) ?? [];
 
@@ -427,10 +433,9 @@ const ReviewListView = ({ onSelectReport, ensureFreshToken, isAuthenticated }: {
 
 // ── Review Detail View ───────────────────────────────────────────────
 
-const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin, jobId }: {
+const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
   readonly report: BlendedVariationsReport;
   readonly onBack: () => void;
-  readonly ensureFreshToken: () => Promise<string>;
   readonly user: { readonly username: string; readonly email: string; readonly fullName: string } | null;
   readonly isAdmin: boolean;
   /** Local job ID — set by VariationsPage when navigating from a job card. Used to mark the job as having submitted variations after a successful save. */
@@ -470,8 +475,7 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin, job
 
     const acquireLock = async () => {
       try {
-        const token = await ensureFreshToken();
-        const existing = await searchLocks(lockResourceId, report.providerUoi!, token);
+        const existing = await searchLocks(lockResourceId, report.providerUoi!);
         const otherLock = existing.find(l => l.username !== user.username);
 
         if (otherLock) {
@@ -486,7 +490,7 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin, job
           username: user.username,
           displayName: user.fullName,
           email: user.email,
-        }, token);
+        });
 
         if (!cancelled) { setLockAcquired(true); setLockLoading(false); }
       } catch {
@@ -496,16 +500,15 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin, job
 
     acquireLock();
 
-    // Release lock on unmount
+    // Release lock on unmount. Auth is handled inside deleteLock via
+    // authedFetch — no token plumbing.
     return () => {
       cancelled = true;
       if (lockResourceId && report.providerUoi) {
-        ensureFreshToken()
-          .then(token => deleteLock(lockResourceId, report.providerUoi!, token))
-          .catch(() => {});
+        deleteLock(lockResourceId, report.providerUoi!).catch(() => {});
       }
     };
-  }, [lockResourceId, report.providerUoi, user, ensureFreshToken]);
+  }, [lockResourceId, report.providerUoi, user]);
 
   const isReadOnly = lockLoading || (!!lockHolder && !lockAcquired);
 
@@ -577,7 +580,7 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin, job
 
     setSaving(true);
     try {
-      const token = await ensureFreshToken();
+      // Auth handled inside saveVariationsReview via authedFetch.
       const success = await saveVariationsReview({
         version: report.version,
         providerUoi: report.providerUoi,
@@ -589,7 +592,6 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin, job
         ),
         userName: user?.fullName ?? user?.username ?? '',
         userEmail: user?.email ?? '',
-        token,
       });
 
       if (success) {
@@ -606,7 +608,7 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin, job
     } finally {
       setSaving(false);
     }
-  }, [actions, reportId, report, ensureFreshToken]);
+  }, [actions, reportId, report, user, draftComments, jobId]);
 
   return (
     <div className={`${PAGE_CONTAINER} py-6`}>

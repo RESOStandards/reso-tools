@@ -26,7 +26,6 @@ interface LockBannerProps {
   readonly providerUoi: string;
   readonly providerUsi: string;
   readonly recipientUoi: string;
-  readonly token: string;
   readonly userName: string;
   readonly userEmail: string;
   readonly onLockStateChange: (isReadOnly: boolean) => void;
@@ -42,7 +41,6 @@ export const LockBanner = ({
   providerUoi,
   providerUsi,
   recipientUoi,
-  token,
   userName,
   userEmail,
   onLockStateChange,
@@ -74,9 +72,9 @@ export const LockBanner = ({
   }, [myLock]);
 
   const fetchLocks = useCallback(async () => {
-    const results = await searchLocks(resourceId, providerUoi, token);
+    const results = await searchLocks(resourceId, providerUoi);
     setLocks(results);
-  }, [resourceId, providerUoi, token]);
+  }, [resourceId, providerUoi]);
 
   // Initial fetch + polling
   useEffect(() => {
@@ -94,21 +92,21 @@ export const LockBanner = ({
       displayName: userName,
       email: userEmail,
     };
-    await createLock(payload, token);
+    await createLock(payload);
     await fetchLocks();
     setLoading(false);
-  }, [resourceId, providerUoi, userName, userEmail, token, fetchLocks]);
+  }, [resourceId, providerUoi, userName, userEmail, fetchLocks]);
 
   const handleReleaseLock = useCallback(async () => {
     setLoading(true);
-    await deleteLock(resourceId, providerUoi, token);
+    await deleteLock(resourceId, providerUoi);
     await fetchLocks();
     setLoading(false);
-  }, [resourceId, providerUoi, token, fetchLocks]);
+  }, [resourceId, providerUoi, fetchLocks]);
 
   const handleReissue = useCallback(async () => {
     setLoading(true);
-    await deleteLock(resourceId, providerUoi, token);
+    await deleteLock(resourceId, providerUoi);
     const payload: CreateLockPayload = {
       resourceId,
       providerUoi,
@@ -116,11 +114,11 @@ export const LockBanner = ({
       displayName: userName,
       email: userEmail,
     };
-    await createLock(payload, token);
+    await createLock(payload);
     await fetchLocks();
     setExpiryWarning(false);
     setLoading(false);
-  }, [resourceId, providerUoi, userName, userEmail, token, fetchLocks]);
+  }, [resourceId, providerUoi, userName, userEmail, fetchLocks]);
 
   // No lock
   if (!isLockedByMe && !isLockedByOther) {

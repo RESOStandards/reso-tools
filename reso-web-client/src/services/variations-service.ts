@@ -2,12 +2,14 @@
  * Variations Service — API client for services.reso.org variations,
  * locks, and variations report endpoints.
  *
- * Auth: Bearer token from the provider token obtained via Cert QA login.
- * All requests go through the web API proxy to avoid CORS issues.
- *
- * Only authenticated endpoints use the token — never send tokens to
- * public endpoints.
+ * Auth: handled by `authedFetch` from `auth-service.ts`. Functions in this
+ * module never see or accept tokens — they call `authedFetch` and the
+ * service handles attach-header / lazy-refresh / 401-retry. This is the
+ * "components shouldn't handle auth logic" pattern — extended to API
+ * clients too. All requests go through the web API proxy to avoid CORS.
  */
+
+import { authedFetch } from './auth-service';
 
 const SERVICES_ORIGIN = 'https://services.reso.org';
 
@@ -15,12 +17,14 @@ const SERVICES_ORIGIN = 'https://services.reso.org';
 const proxiedUrl = (path: string): string =>
   `/api/proxy?url=${encodeURIComponent(`${SERVICES_ORIGIN}${path}`)}`;
 
-/** Build Bearer auth headers. */
-const bearerHeaders = (token: string, contentType = 'application/json'): Record<string, string> => ({
-  Authorization: `Bearer ${token}`,
+/**
+ * Standard headers for JSON-bearing requests. Authorization is injected
+ * by `authedFetch` itself — callers never construct it here.
+ */
+const jsonHeaders: Readonly<Record<string, string>> = {
   Accept: 'application/json',
-  'Content-Type': contentType,
-});
+  'Content-Type': 'application/json',
+};
 
 // ── Variations Search ────────────────────────────────────────────────
 
@@ -48,12 +52,11 @@ export interface VariationSuggestion {
 
 /** Search the variations service for suggestions matching a metadata report. */
 export const searchVariations = async (
-  metadataReport: { readonly fields: ReadonlyArray<unknown>; readonly lookups: ReadonlyArray<unknown> },
-  token: string
+  metadataReport: { readonly fields: ReadonlyArray<unknown>; readonly lookups: ReadonlyArray<unknown> }
 ): Promise<VariationsSuggestionsMap> => {
-  const res = await fetch(proxiedUrl('/v2/certification/variations/search'), {
+  const res = await authedFetch(proxiedUrl('/v2/certification/variations/search'), {
     method: 'POST',
-    headers: bearerHeaders(token),
+    headers: jsonHeaders,
     body: JSON.stringify(metadataReport),
   });
   if (!res.ok) return {};
@@ -61,11 +64,9 @@ export const searchVariations = async (
 };
 
 /** Fetch variations index stats (counts, resources, fields). */
-export const getVariationsStats = async (
-  token: string
-): Promise<Record<string, unknown> | null> => {
-  const res = await fetch(proxiedUrl('/v2/certification/variations/stats'), {
-    headers: bearerHeaders(token),
+export const getVariationsStats = async (): Promise<Record<string, unknown> | null> => {
+  const res = await authedFetch(proxiedUrl('/v2/certification/variations/stats'), {
+    headers: jsonHeaders,
   });
   if (!res.ok) return null;
   return (await res.json()) as Record<string, unknown>;
@@ -141,12 +142,11 @@ export const getVariationsReport = async (
   providerUoi: string,
   providerUsi: string,
   recipientUoi: string,
-  certRequestId: string,
-  token: string
+  certRequestId: string
 ): Promise<VariationsReportPayload | null> => {
-  const res = await fetch(
+  const res = await authedFetch(
     proxiedUrl(variationsReportPath(version, providerUoi, providerUsi, recipientUoi, certRequestId)),
-    { headers: bearerHeaders(token) }
+    { headers: jsonHeaders }
   );
   if (!res.ok) return null;
   return (await res.json()) as VariationsReportPayload;
@@ -159,14 +159,13 @@ export const saveVariationsReport = async (
   providerUsi: string,
   recipientUoi: string,
   certRequestId: string,
-  payload: VariationsReportPayload,
-  token: string
+  payload: VariationsReportPayload
 ): Promise<boolean> => {
-  const res = await fetch(
+  const res = await authedFetch(
     proxiedUrl(variationsReportPath(version, providerUoi, providerUsi, recipientUoi, certRequestId)),
     {
       method: 'POST',
-      headers: bearerHeaders(token),
+      headers: jsonHeaders,
       body: JSON.stringify(payload),
     }
   );
@@ -207,12 +206,11 @@ export const variationsLockResourceId = (
 /** Search for existing locks on a resource. */
 export const searchLocks = async (
   resourceId: string,
-  providerUoi: string,
-  token: string
+  providerUoi: string
 ): Promise<ReadonlyArray<LockRecord>> => {
-  const res = await fetch(proxiedUrl('/v2/locks/search'), {
+  const res = await authedFetch(proxiedUrl('/v2/locks/search'), {
     method: 'POST',
-    headers: bearerHeaders(token),
+    headers: jsonHeaders,
     body: JSON.stringify({ resourceId, providerUoi }),
   });
   if (!res.ok) return [];
@@ -222,12 +220,11 @@ export const searchLocks = async (
 
 /** Create a lock on a resource. Returns the expiration timestamp. */
 export const createLock = async (
-  payload: CreateLockPayload,
-  token: string
+  payload: CreateLockPayload
 ): Promise<{ expirationTimestamp: string } | null> => {
-  const res = await fetch(proxiedUrl('/v2/locks'), {
+  const res = await authedFetch(proxiedUrl('/v2/locks'), {
     method: 'POST',
-    headers: bearerHeaders(token),
+    headers: jsonHeaders,
     body: JSON.stringify(payload),
   });
   if (!res.ok) return null;
@@ -237,12 +234,11 @@ export const createLock = async (
 /** Delete a lock on a resource. */
 export const deleteLock = async (
   resourceId: string,
-  providerUoi: string,
-  token: string
+  providerUoi: string
 ): Promise<boolean> => {
-  const res = await fetch(proxiedUrl('/v2/locks'), {
+  const res = await authedFetch(proxiedUrl('/v2/locks'), {
     method: 'DELETE',
-    headers: bearerHeaders(token),
+    headers: jsonHeaders,
     body: JSON.stringify({ resourceId, providerUoi }),
   });
   return res.ok;
