@@ -246,7 +246,16 @@ export const Layout = () => {
               className="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">
               Report Issue
             </a>
-            <img src="/reso-mark.svg" alt="" aria-hidden="true" className="w-4 h-4 opacity-80" />
+            <svg
+              viewBox="0 0 64 64"
+              aria-hidden="true"
+              className="w-4 h-4 text-gray-500 dark:text-gray-400 opacity-80"
+              fill="currentColor">
+              <path d="M32 32 C 26 20, 18 12, 6 6 C 12 18, 20 26, 32 32 Z" />
+              <path d="M32 32 C 40 20, 48 12, 58 6 C 52 16, 44 24, 32 32 Z" />
+              <path d="M32 32 C 24 44, 16 52, 6 58 C 12 48, 20 40, 32 32 Z" />
+              <path d="M32 32 C 38 44, 46 52, 58 58 C 52 46, 44 38, 32 32 Z" />
+            </svg>
             <a
               href="https://www.reso.org/eula/"
               target="_blank"
