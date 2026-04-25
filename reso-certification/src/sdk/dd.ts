@@ -449,6 +449,13 @@ const ddReportGenerators = (version: string) => [
 
 const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Write reports',
+  // DD runs with failFast: true, so an earlier step failure (e.g.,
+  // variations detected) breaks the pipeline. Without alwaysRun, Write
+  // reports would never run and the failure-mode reports would never
+  // hit disk. With it, Write reports always emits — capturing whatever
+  // partial state exists for the failed run — and steps in between
+  // remain marked 'skipped' to reflect what actually happened.
+  alwaysRun: true,
   run: async (ctx, onProgress) => {
     const generators = ddReportGenerators(config.version);
     const pipelineResult = {

@@ -59,6 +59,82 @@ describe('createPipeline', () => {
     expect(result.steps[2].status).toBe('skipped');
   });
 
+  it('runs alwaysRun finalizer steps after a failFast break, leaves intermediates skipped', async () => {
+    // Pipeline: step-1 (passes) → step-2 (fails) → step-3 (would normally
+    // be skipped) → write-reports (alwaysRun, must still run). After the
+    // break, write-reports executes and gets 'passed'; step-3 stays
+    // 'skipped' because it really did not run. Result order matches
+    // the original step declaration order.
+    const writeReports: PipelineStep = {
+      name: 'write-reports',
+      alwaysRun: true,
+      run: async (ctx) => ({ context: { ...ctx, reports_written: true } }),
+    };
+
+    const pipeline = createPipeline('test', [
+      makeStep('step-1'),
+      makeStep('step-2', { status: 'failed', errors: ['boom'] }),
+      makeStep('step-3'),
+      writeReports,
+    ]);
+
+    const result = await pipeline.run({}, undefined, { failFast: true });
+
+    expect(result.status).toBe('failed');
+    expect(result.steps).toHaveLength(4);
+    expect(result.steps[0].status).toBe('passed');
+    expect(result.steps[1].status).toBe('failed');
+    expect(result.steps[2].status).toBe('skipped');
+    expect(result.steps[3].name).toBe('write-reports');
+    expect(result.steps[3].status).toBe('passed');
+    expect(result.context.reports_written).toBe(true);
+  });
+
+  it('records alwaysRun step failure without changing the original failure narrative', async () => {
+    // If write-reports itself fails, the pipeline is still 'failed'
+    // (it already was) and the alwaysRun step's status reflects what
+    // happened — it does not silently swallow its own error.
+    const writeReports: PipelineStep = {
+      name: 'write-reports',
+      alwaysRun: true,
+      run: async () => { throw new Error('disk full'); },
+    };
+
+    const pipeline = createPipeline('test', [
+      makeStep('step-1', { status: 'failed' }),
+      writeReports,
+    ]);
+
+    const result = await pipeline.run({}, undefined, { failFast: true });
+
+    expect(result.status).toBe('failed');
+    expect(result.steps[0].status).toBe('failed');
+    expect(result.steps[1].status).toBe('failed');
+    expect(result.steps[1].errors).toEqual(['disk full']);
+  });
+
+  it('does not invoke alwaysRun finalizer if it already ran in the main loop', async () => {
+    // When all main-loop steps succeed, write-reports runs in the main
+    // loop normally. The post-break alwaysRun pass should not run it
+    // again.
+    const runCount = vi.fn();
+    const writeReports: PipelineStep = {
+      name: 'write-reports',
+      alwaysRun: true,
+      run: async (ctx) => {
+        runCount();
+        return { context: ctx };
+      },
+    };
+
+    const pipeline = createPipeline('test', [makeStep('step-1'), writeReports]);
+    const result = await pipeline.run({});
+
+    expect(result.status).toBe('passed');
+    expect(runCount).toHaveBeenCalledTimes(1);
+    expect(result.steps).toHaveLength(2);
+  });
+
   it('continues after failure when failFast is false', async () => {
     const pipeline = createPipeline('test', [
       makeStep('step-1'),

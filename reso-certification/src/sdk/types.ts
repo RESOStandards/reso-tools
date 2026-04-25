@@ -86,6 +86,15 @@ export interface PipelineStep<TContext extends PipelineContext = PipelineContext
    * Equivalent to `functions: [run]` with mode 'sequential'.
    */
   readonly run?: TestFunction<TContext>;
+  /**
+   * If true, this step always runs even when an earlier step fails and
+   * `failFast: true` short-circuited the main loop. Used for finalizer
+   * steps that emit reports / artifacts no matter what — without this
+   * flag, such steps get marked `'skipped'` and the failure goes
+   * undocumented on disk. Skipped steps between the failure and an
+   * `alwaysRun` step stay marked `'skipped'` (they did not run).
+   */
+  readonly alwaysRun?: boolean;
 }
 
 /** Options for pipeline execution. */

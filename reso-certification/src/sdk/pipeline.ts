@@ -201,10 +201,68 @@ export const createPipeline = <TContext extends PipelineContext>(
       }
     }
 
-    // Mark remaining steps as skipped if we exited early
+    // After a fail-fast break, run any remaining `alwaysRun` steps
+    // (e.g., a `Write reports` finalizer) so failure-mode artifacts
+    // still land on disk. Steps in between the failure and the
+    // alwaysRun finalizer stay marked `'skipped'` — they really did
+    // not run. The alwaysRun step's own status reflects what happened
+    // when it ran (typically `'passed'`, but can be `'failed'` if the
+    // finalizer itself errors).
     const completedNames = new Set(stepResults.map(r => r.name));
+    const remaining = steps.filter(s => !completedNames.has(s.name));
+    for (const step of remaining) {
+      if (!step.alwaysRun) continue;
+      const stepStart = Date.now();
+      onProgress({ step: step.name, status: 'running' });
+      try {
+        const functions: ReadonlyArray<TestFunction<TContext>> =
+          step.functions ?? (step.run ? [step.run] : []);
+        const mode = step.mode ?? 'sequential';
+        const output = await executeStepFunctions(functions, mode, context as Readonly<TContext>, onProgress);
+        const duration = Date.now() - stepStart;
+        const status = output.status ?? 'passed';
+        const result: StepResult = {
+          name: step.name,
+          endorsement,
+          status,
+          duration,
+          summary: output.summary,
+          params: output.params,
+          artifacts: output.artifacts,
+          counts: output.counts,
+          errors: output.errors,
+          requestDetails: output.requestDetails,
+        };
+        stepResults.push(result);
+        context = { ...output.context, pipelineSteps: [...stepResults] };
+        onProgress({
+          step: step.name,
+          status,
+          duration,
+          message: output.summary,
+          artifacts: output.artifacts,
+        });
+      } catch (err) {
+        const duration = Date.now() - stepStart;
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        // Finalizer-step failure does not change pipelineStatus — the
+        // pipeline is already 'failed' if we got here, and the original
+        // failure is the load-bearing one for the user. Just record it.
+        stepResults.push({
+          name: step.name,
+          endorsement,
+          status: 'failed',
+          duration,
+          errors: [errorMessage],
+        });
+        onProgress({ step: step.name, status: 'failed', duration, message: errorMessage });
+      }
+    }
+
+    // Anything still uncompleted (non-alwaysRun) is genuinely skipped.
+    const finalCompletedNames = new Set(stepResults.map(r => r.name));
     for (const step of steps) {
-      if (!completedNames.has(step.name)) {
+      if (!finalCompletedNames.has(step.name)) {
         stepResults.push({
           name: step.name,
           endorsement,
@@ -215,10 +273,21 @@ export const createPipeline = <TContext extends PipelineContext>(
       }
     }
 
+    // Re-sort to match the original pipeline declaration order. Without
+    // this, alwaysRun finalizers (executed after the fail-fast break)
+    // would appear in stepResults BEFORE the skipped intermediates, but
+    // for display they need to follow original sequence.
+    const orderIndex = new Map(steps.map((s, i) => [s.name, i]));
+    const orderedStepResults = [...stepResults].sort((a, b) => {
+      const ai = orderIndex.get(a.name) ?? Number.MAX_SAFE_INTEGER;
+      const bi = orderIndex.get(b.name) ?? Number.MAX_SAFE_INTEGER;
+      return ai - bi;
+    });
+
     return {
       status: pipelineStatus,
       endorsement,
-      steps: stepResults,
+      steps: orderedStepResults,
       context,
       duration: Date.now() - startTime,
     };
