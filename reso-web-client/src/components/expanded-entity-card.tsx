@@ -4,6 +4,7 @@ import { useServer } from '../context/server-context';
 import { isSensitiveField } from '../utils/format';
 import { MediaCarousel } from './media-carousel';
 import { SensitiveValue } from './sensitive-value';
+import { InlineCopy, isCopyableIdField } from './inline-copy';
 
 interface ExpandedEntityCardProps {
   /** Navigation property name (e.g., "ListAgent", "Media"). */
@@ -106,11 +107,12 @@ const RecordSummary = ({
       <div className="flex-1 min-w-0">
         {/* Key */}
         {keyField && entityKey != null && (
-          <div className="flex items-baseline gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1">
             <span className="text-xs text-gray-500 dark:text-gray-400">{keyField}:</span>
             <span className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate" title={String(entityKey)}>
               {String(entityKey)}
             </span>
+            <InlineCopy value={String(entityKey)} title={`Copy ${keyField}`} />
           </div>
         )}
 
@@ -119,16 +121,20 @@ const RecordSummary = ({
           {displayFields.slice(0, MAX_SUMMARY_FIELDS).map(([key, value], idx) => {
             const stripe = idx % 2 === 1 ? 'bg-gray-100 dark:bg-gray-700/40' : '';
             const sensitive = isSensitiveField(key);
+            const copyable = !sensitive && isCopyableIdField(key) && value;
             return (
               <div
                 key={key}
-                className={`flex items-baseline gap-1 text-xs truncate px-1.5 py-0.5 rounded ${stripe}`}
+                className={`flex items-center gap-1 text-xs truncate px-1.5 py-0.5 rounded ${stripe}`}
                 title={sensitive ? key : `${key}: ${value}`}>
                 <span className="text-gray-500 dark:text-gray-400 shrink-0">{key}:</span>
                 {sensitive ? (
                   <SensitiveValue value={value} className="text-gray-800 dark:text-gray-200 truncate" />
                 ) : (
-                  <span className="text-gray-800 dark:text-gray-200 truncate">{value}</span>
+                  <>
+                    <span className="text-gray-800 dark:text-gray-200 truncate">{value}</span>
+                    {copyable && <InlineCopy value={value} title={`Copy ${key}`} />}
+                  </>
                 )}
               </div>
             );

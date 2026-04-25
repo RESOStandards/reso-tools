@@ -240,18 +240,18 @@ export const Layout = () => {
           <div className="flex-1 overflow-y-auto p-4">
             <ResourceNav />
           </div>
-          <div className="shrink-0 border-t border-gray-200 dark:border-gray-700 px-4 py-2.5 flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
+          <div className="shrink-0 border-t border-gray-200 dark:border-gray-700 px-4 py-2.5 flex items-center justify-center gap-2.5 text-[11px] text-gray-600 dark:text-gray-400">
             <a
               href="mailto:dev@reso.org?subject=RESO%20Desktop%20Client%20Issue"
-              className="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
+              className="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">
               Report Issue
             </a>
-            <img src="/reso-mark.svg" alt="" aria-hidden="true" className="w-3 h-3 opacity-50" />
+            <img src="/reso-mark.svg" alt="" aria-hidden="true" className="w-4 h-4 opacity-80" />
             <a
               href="https://www.reso.org/eula/"
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
+              className="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">
               Terms of Use
             </a>
           </div>
