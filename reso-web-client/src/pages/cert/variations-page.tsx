@@ -428,57 +428,78 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
     if (hasUpdate) setStaleNotification(true);
   }, [notifications]);
 
-  // Lock management — acquire on mount, release on unmount/save
+  // Lock management — claim on first mutation, hold until submit.
+  //
+  // Model:
+  //   - Default state is read-only viewing. No lock is created on mount.
+  //   - The first action (toggle / comment) attempts createLock. Success
+  //     promotes us to editor; 409 means someone else is already editing.
+  //   - Lock holds until handleSave completes (or Discard clears it).
+  //   - Server-side TTL handles abandoned sessions; we never release on
+  //     unmount, matching the legacy "until they submit" behavior.
+  //   - Polling every 30s detects when another user takes the lock (we
+  //     transition to read-only) or releases it (we become claimable
+  //     again on next action). Replace with sockets when available.
   const [lockHolder, setLockHolder] = useState<LockRecord | null>(null);
-  const [lockAcquired, setLockAcquired] = useState(false);
   const [lockLoading, setLockLoading] = useState(true);
+  const lockHolderRef = useRef<LockRecord | null>(null);
 
   const lockResourceId = report.providerUoi && report.providerUsi && report.recipientUoi
     ? variationsLockResourceId(report.version, report.providerUoi, report.providerUsi, report.recipientUoi)
     : null;
 
+  const refetchLocks = useCallback(async () => {
+    if (!lockResourceId || !report.providerUoi) return;
+    const existing = await searchLocks(lockResourceId, report.providerUoi);
+    const active = existing
+      .filter(l => l.lockUnixTimestampTTL * 1000 > Date.now())
+      .sort((a, b) => b.lockUnixTimestamp - a.lockUnixTimestamp)[0]
+      ?? null;
+    lockHolderRef.current = active;
+    setLockHolder(active);
+  }, [lockResourceId, report.providerUoi]);
+
   useEffect(() => {
-    if (!lockResourceId || !report.providerUoi || !user) { setLockLoading(false); return; }
+    if (!lockResourceId) { setLockLoading(false); return; }
     let cancelled = false;
+    refetchLocks().finally(() => { if (!cancelled) setLockLoading(false); });
+    const id = setInterval(refetchLocks, 30_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [lockResourceId, refetchLocks]);
 
-    const acquireLock = async () => {
-      try {
-        const existing = await searchLocks(lockResourceId, report.providerUoi!);
-        const otherLock = existing.find(l => l.username !== user.username);
+  const isLockedByMe = !!lockHolder && !!user && lockHolder.username === user.username;
+  const isLockedByOther = !!lockHolder && !isLockedByMe;
+  const isReadOnly = isLockedByOther;
 
-        if (otherLock) {
-          if (!cancelled) { setLockHolder(otherLock); setLockLoading(false); }
-          return;
-        }
+  /**
+   * Claim the lock if we don't already hold it. Returns true if the caller
+   * may proceed with a mutation, false if blocked. Reads the current lock
+   * via ref so the closure is not stale across polls.
+   */
+  const ensureMyLock = useCallback(async (): Promise<boolean> => {
+    if (!lockResourceId || !report.providerUoi || !user) return false;
+    const current = lockHolderRef.current;
+    if (current && current.username === user.username) return true;
+    if (current && current.username !== user.username) return false;
+    const result = await createLock({
+      resourceId: lockResourceId,
+      providerUoi: report.providerUoi,
+      username: user.username,
+      displayName: user.fullName,
+      email: user.email,
+    });
+    // Refetch regardless: on success this confirms our hold; on 409 it
+    // surfaces who beat us so the UI flips to read-only.
+    await refetchLocks();
+    return !!result;
+  }, [lockResourceId, report.providerUoi, user, refetchLocks]);
 
-        // No conflicting lock — acquire one
-        await createLock({
-          resourceId: lockResourceId,
-          providerUoi: report.providerUoi!,
-          username: user.username,
-          displayName: user.fullName,
-          email: user.email,
-        });
-
-        if (!cancelled) { setLockAcquired(true); setLockLoading(false); }
-      } catch {
-        if (!cancelled) setLockLoading(false);
-      }
-    };
-
-    acquireLock();
-
-    // Release lock on unmount. Auth is handled inside deleteLock via
-    // authedFetch — no token plumbing.
-    return () => {
-      cancelled = true;
-      if (lockResourceId && report.providerUoi) {
-        deleteLock(lockResourceId, report.providerUoi!).catch(() => {});
-      }
-    };
-  }, [lockResourceId, report.providerUoi, user]);
-
-  const isReadOnly = lockLoading || (!!lockHolder && !lockAcquired);
+  const releaseMyLock = useCallback(async () => {
+    if (!lockResourceId || !report.providerUoi) return;
+    if (!isLockedByMe) return;
+    await deleteLock(lockResourceId, report.providerUoi);
+    await refetchLocks();
+  }, [lockResourceId, report.providerUoi, isLockedByMe, refetchLocks]);
 
   useEffect(() => { saveDraft(reportId, actions); }, [actions, reportId]);
 
@@ -514,13 +535,15 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
     expansions: report.counts.expansions,
   }), [report]);
 
-  const addComment = useCallback((key: string, comment: VariationComment) => {
+  const addComment = useCallback(async (key: string, comment: VariationComment) => {
+    const ok = await ensureMyLock();
+    if (!ok) return;
     setDraftComments(prev => {
       const next = new Map(prev);
       next.set(key, [...(prev.get(key) ?? []), comment]);
       return next;
     });
-  }, []);
+  }, [ensureMyLock]);
 
   const removeComment = useCallback((key: string, index: number) => {
     setDraftComments(prev => {
@@ -533,14 +556,16 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
     });
   }, []);
 
-  const toggleAction = useCallback((key: string, status: ActionStatus) => {
+  const toggleAction = useCallback(async (key: string, status: ActionStatus) => {
+    const ok = await ensureMyLock();
+    if (!ok) return;
     setActions(prev => {
       const next = new Map(prev);
       if (next.get(key) === status) next.delete(key);
       else next.set(key, status);
       return next;
     });
-  }, []);
+  }, [ensureMyLock]);
 
   const handleSave = useCallback(async () => {
     if (actions.size === 0) return;
@@ -572,29 +597,46 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
         // provider knows the submission landed. Idempotent: subsequent
         // saves are edits and don't change the original timestamp.
         if (jobId) markVariationsReviewSubmitted(jobId);
+        // Release the lock so other reviewers (and the next poll on
+        // open viewers) can become the editor.
+        await releaseMyLock();
       }
     } finally {
       setSaving(false);
     }
-  }, [actions, reportId, report, user, draftComments, jobId]);
+  }, [actions, reportId, report, user, draftComments, jobId, releaseMyLock]);
 
   return (
     <div className={`${PAGE_CONTAINER} py-6`}>
-      {/* Lock banner */}
-      {lockHolder && !lockAcquired && (
-        <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg flex items-center gap-2 text-sm text-amber-800 dark:text-amber-300">
-          <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" />
-          </svg>
-          <span>
-            Locked by <span className="font-medium">{lockHolder.displayName}</span> — read-only mode.
-          </span>
+      {/* Lock banner — only renders when someone else is reviewing. The
+          pulsing roundel is a deliberate affordance carried over from the
+          legacy app: it draws the eye to the contact card so the viewer
+          knows who to reach out to. */}
+      {isLockedByOther && lockHolder && (
+        <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg flex items-center gap-3">
+          <UserRoundel name={lockHolder.displayName || lockHolder.username} pulse />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-amber-900 dark:text-amber-200 truncate">
+              {lockHolder.displayName || lockHolder.username} is reviewing this report
+            </p>
+            <p className="text-xs text-amber-700/80 dark:text-amber-300/80">
+              Your view is read-only until they submit.
+            </p>
+          </div>
+          {lockHolder.email && (
+            <a
+              href={`mailto:${lockHolder.email}?subject=${encodeURIComponent('Variations Review')}`}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900/60 transition-colors shrink-0"
+            >
+              Contact
+            </a>
+          )}
         </div>
       )}
       {lockLoading && (
         <div className="mb-4 flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500">
           <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
-          Checking lock status...
+          Checking review status...
         </div>
       )}
       {staleNotification && (
@@ -631,7 +673,14 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
           {isDirty && !isReadOnly && (
             <>
               <span className="text-xs text-amber-600 dark:text-amber-400">{actions.size} unsaved</span>
-              <button type="button" onClick={() => { clearDraft(reportId); setActions(new Map()); }}
+              <button type="button" onClick={() => {
+                clearDraft(reportId);
+                setActions(new Map());
+                setDraftComments(new Map());
+                // Discarding drafts means giving up the editing claim,
+                // so release the lock for other reviewers.
+                void releaseMyLock();
+              }}
                 className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
                 Discard
               </button>
@@ -692,6 +741,30 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
         onAddComment={(comment) => selectedKey && addComment(selectedKey, comment)}
         onRemoveComment={(index) => selectedKey && removeComment(selectedKey, index)}
       />
+    </div>
+  );
+};
+
+// ── User roundel ─────────────────────────────────────────────────────
+
+/** Initials avatar with an optional pulse ring — used in the lock banner
+ *  to draw the eye to the contact card for the holder. */
+const UserRoundel = ({ name, pulse }: { readonly name: string; readonly pulse?: boolean }) => {
+  const initials = name
+    .split(/\s+/)
+    .map(p => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+  return (
+    <div className="relative shrink-0">
+      {pulse && (
+        <span className="absolute inset-0 rounded-full bg-amber-400/40 dark:bg-amber-300/30 animate-ping" />
+      )}
+      <div className="relative w-9 h-9 rounded-full bg-amber-500 dark:bg-amber-600 text-white text-xs font-semibold flex items-center justify-center">
+        {initials || '?'}
+      </div>
     </div>
   );
 };
