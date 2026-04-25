@@ -16,6 +16,42 @@ const OpenHouseRush = lazy(() => import('./open-house-rush').then((m) => ({ defa
 const LOGO_LIGHT = '/reso-logo-blue.png';
 const LOGO_DARK = '/reso-logo-white.png';
 
+const REPORT_ISSUE_SUBJECT = 'Issue to report from Desktop Client';
+const REPORT_ISSUE_TO = 'dev+support@reso.org';
+
+/**
+ * Builds a mailto: URL for the Report Issue link with a prompt template
+ * plus useful context (current page, active server) auto-filled. No
+ * credentials or tokens — just route + server name/URL/type.
+ */
+const buildReportIssueHref = (
+  pathname: string,
+  serverName: string,
+  serverBaseUrl: string,
+  serverType: string
+): string => {
+  const body = [
+    'Briefly describe the issue:',
+    '',
+    '',
+    'Steps to reproduce:',
+    '1.',
+    '2.',
+    '',
+    'Expected:',
+    'Actual:',
+    '',
+    '---',
+    `Page: ${pathname}`,
+    `Server: ${serverName} (${serverType})`,
+    `Server URL: ${serverBaseUrl}`,
+    `User agent: ${typeof navigator !== 'undefined' ? navigator.userAgent : ''}`,
+    'App version:',
+    ''
+  ].join('\n');
+  return `mailto:${REPORT_ISSUE_TO}?subject=${encodeURIComponent(REPORT_ISSUE_SUBJECT)}&body=${encodeURIComponent(body)}`;
+};
+
 /** Derives the current page indicator from the URL path. */
 const getPageIndicator = (pathname: string, resource?: string): string | null => {
   if (pathname === '/') return 'Dashboard';
@@ -40,6 +76,12 @@ export const Layout = () => {
   const navigate = useNavigate();
   const { activeServer, resources, currentToken } = useServer();
   const prevServerIdRef = useRef(activeServer.id);
+  const reportIssueHref = buildReportIssueHref(
+    location.pathname,
+    activeServer.name,
+    activeServer.baseUrl,
+    activeServer.type
+  );
 
   // Easter egg: 5 rapid clicks on the logo triggers Open House Rush
   const [showGame, setShowGame] = useState(false);
@@ -242,7 +284,7 @@ export const Layout = () => {
           </div>
           <div className="shrink-0 border-t border-gray-200 dark:border-gray-700 px-4 py-2.5 flex items-center justify-center gap-2.5 text-[11px] text-gray-600 dark:text-gray-400">
             <a
-              href="mailto:dev@reso.org?subject=RESO%20Desktop%20Client%20Issue"
+              href={reportIssueHref}
               className="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">
               Report Issue
             </a>
