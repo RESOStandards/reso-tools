@@ -54,7 +54,9 @@ export const isSensitiveField = (fieldName: string): boolean => fieldName.toLowe
 export const formatFieldValue = (value: unknown, field: ResoField | undefined): string => {
   if (value === null || value === undefined) return '\u2014';
   if (Array.isArray(value)) return value.join(', ');
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  // Show raw boolean literals — this is a testing tool, not a consumer app.
+  // YN field names are a DD naming convention; the wire values are real booleans.
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
 
   // Format numeric values (handles both number and string representations from OData)
   if (field && isNumericType(field.type)) {

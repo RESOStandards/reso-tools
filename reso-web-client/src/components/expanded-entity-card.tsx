@@ -25,7 +25,7 @@ const MAX_SUMMARY_FIELDS = 6;
 /** Formats a value for display without full metadata. */
 const formatValue = (value: unknown): string => {
   if (value === null || value === undefined) return '\u2014';
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
   if (Array.isArray(value)) return value.map(String).join(', ');
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
