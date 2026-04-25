@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useServer } from '../../context/server-context';
 
 const LOCAL_BEARER_TOKEN = 'admin-token';
@@ -123,7 +124,10 @@ export const ConnectionInfoModal = ({ onClose }: { readonly onClose: () => void 
   const showBearerSection = isLocal || activeServer.authMode === 'token' || !!bearerToken;
   const showOauthSection = isLocal || activeServer.authMode === 'client_credentials' || !!clientId || !!oauthTokenUrl;
 
-  return (
+  // Render via portal so the modal always overlays the full viewport regardless of
+  // where it's mounted in the React tree. Without this, transformed ancestors
+  // (e.g. the sidebar's translate-x transition) trap `position: fixed` children.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
       onClick={onClose}
@@ -211,6 +215,7 @@ export const ConnectionInfoModal = ({ onClose }: { readonly onClose: () => void 
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
