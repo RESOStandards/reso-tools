@@ -1055,17 +1055,27 @@ const createWindow = (paths: ReturnType<typeof resolvePaths>): BrowserWindow => 
   win.once('ready-to-show', () => win.show());
   win.loadURL(buildSplashHtml(paths.logoPath));
 
+  // External schemes that should be handed off to the OS default handler
+  // instead of being treated as in-app navigation. mailto: is the case the
+  // Report Issue link relies on.
+  const isExternalScheme = (url: string): boolean =>
+    /^(https?|mailto|tel|sms):/i.test(url);
+
   // Prevent navigating away from the SPA (e.g., back to splash screen)
   win.webContents.on('will-navigate', (event, navUrl) => {
     // Allow navigation to the server URL (SPA root)
     if (state.serverUrl && navUrl.startsWith(state.serverUrl)) return;
-    // Block everything else (splash screen, external URLs handled by setWindowOpenHandler)
     event.preventDefault();
+    // Hand external links (mailto:, https:, etc.) to the OS so the user's
+    // email client / browser opens. Without this, they fail silently.
+    if (isExternalScheme(navUrl)) {
+      shell.openExternal(navUrl);
+    }
   });
 
-  // Open external links in the system browser
+  // Open external links in the system browser / email client
   win.webContents.setWindowOpenHandler(({ url: linkUrl }) => {
-    if (linkUrl.startsWith('http')) {
+    if (isExternalScheme(linkUrl)) {
       shell.openExternal(linkUrl);
     }
     return { action: 'deny' };
