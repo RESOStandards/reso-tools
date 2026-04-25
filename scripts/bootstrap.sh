@@ -20,8 +20,23 @@ cd "$ROOT"
 needs_build() {
   local pkg=$1
   local check_dir=$2
+  # Force flag overrides everything — always rebuild.
   if [ "$FORCE" = true ]; then return 0; fi
+  # No dist directory yet — first build.
   if [ ! -d "$pkg/$check_dir" ]; then return 0; fi
+  # Source newer than dist — rebuild. Looks at files under src/, package.json,
+  # and tsconfig.json (skipping node_modules).
+  local newest_src
+  newest_src=$(find "$pkg/src" "$pkg/package.json" "$pkg/tsconfig.json" 2>/dev/null \
+    -type f -not -path '*/node_modules/*' -print0 \
+    | xargs -0 stat -f '%m' 2>/dev/null | sort -rn | head -1)
+  local newest_dist
+  newest_dist=$(find "$pkg/$check_dir" 2>/dev/null \
+    -type f -print0 \
+    | xargs -0 stat -f '%m' 2>/dev/null | sort -rn | head -1)
+  if [ -n "$newest_src" ] && [ -n "$newest_dist" ] && [ "$newest_src" -gt "$newest_dist" ]; then
+    return 0
+  fi
   return 1
 }
 
