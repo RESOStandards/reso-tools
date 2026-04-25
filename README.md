@@ -86,6 +86,9 @@ Shared libraries (`odata-expression-parser`, `reso-validation`, `reso-client`, `
 # Lint (Biome)
 npm run lint
 
+# Typecheck every package
+npm run typecheck
+
 # Run all tests
 npm test
 
@@ -97,18 +100,12 @@ npm run test:filter-parser
 npm run test:data-generator
 npm run test:certification
 npm run test:mcp
+
+# Lint + typecheck + tests — run before every commit
+npm run precommit
 ```
 
-The root `package.json` provides convenience scripts for linting and testing. Each package manages its own dependencies and build.
-
-### Pre-commit Hooks
-
-[Lefthook](https://github.com/evilmartians/lefthook) runs Biome lint, type checking and tests on every commit.
-
-```bash
-npm install           # installs Biome + Lefthook
-npx lefthook install  # activates git hooks
-```
+The root `package.json` provides convenience scripts for linting, typechecking and testing. Each package manages its own dependencies and build.
 
 ### Certification Testing
 

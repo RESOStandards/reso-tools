@@ -27,6 +27,8 @@ npm run test:server         # Run server tests only
 npm run test:validation     # Run validation tests only
 npm run lint                # Biome lint check
 npm run lint:fix            # Biome lint autofix
+npm run typecheck           # tsc --noEmit across all packages
+npm run precommit           # Lint + typecheck + tests — REQUIRED before every commit
 
 # Reference server with Docker
 cd reso-reference-server && docker compose up -d
@@ -44,7 +46,6 @@ cd reso-desktop-client && npm run dev
 - **Runtime**: Node.js >= 22, ESM throughout
 - **Test framework**: Vitest (all packages)
 - **Linter**: Biome
-- **Pre-commit hooks**: Lefthook (runs lint, typecheck, tests)
 - **UI**: React + Vite + Tailwind CSS
 - **Desktop**: Electron (CJS main process, ESM child process for server)
 - **Server**: Express + OData 4.01, supports PostgreSQL, MongoDB, SQLite
