@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router';
 import { useServer } from '../context/server-context';
+import { ConnectionInfoModal } from '../components/admin/connection-info-modal';
 
 /** Card wrapper for landing page sections. */
 const Card = ({ title, description, to, href, icon, disabled, disabledReason }: {
@@ -43,26 +45,31 @@ const Card = ({ title, description, to, href, icon, disabled, disabledReason }: 
   return <NavLink to={to ?? '/'} className={enabledClass}>{content}</NavLink>;
 };
 
-/** Server status badge shown on the landing page. */
-const ServerStatus = () => {
+/** Server status badge shown on the landing page. Click to open Connection Info. */
+const ServerStatus = ({ onShowInfo }: { readonly onShowInfo: () => void }) => {
   const { activeServer, resources, isLoadingResources } = useServer();
 
   return (
-    <div className="flex items-center gap-2 text-sm">
+    <button
+      type="button"
+      onClick={onShowInfo}
+      className="flex items-center gap-2 text-sm group cursor-pointer rounded-md -mx-1 px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+      title="Show connection info">
       <span className={`w-2 h-2 rounded-full ${isLoadingResources ? 'bg-yellow-400 animate-pulse' : 'bg-green-500'}`} />
       <span className="text-gray-600 dark:text-gray-400">
-        Connected to <span className="font-medium text-gray-900 dark:text-white">{activeServer.name}</span>
+        Connected to <span className="font-medium text-gray-900 dark:text-white group-hover:underline">{activeServer.name}</span>
         {resources && !isLoadingResources && (
           <span className="text-gray-400 dark:text-gray-500"> &middot; {resources.length} resources</span>
         )}
       </span>
-    </div>
+    </button>
   );
 };
 
 /** Landing page with navigation cards for the main app sections. */
 export const HomePage = () => {
   const { resources, isLocal } = useServer();
+  const [showConnectionInfo, setShowConnectionInfo] = useState(false);
   const firstResource = resources?.[0]?.name ?? 'Property';
 
   return (
@@ -74,8 +81,10 @@ export const HomePage = () => {
           <p className="text-gray-600 dark:text-gray-400 text-lg mb-4">
             Browse, query, and manage real estate data using the RESO Data Dictionary standard.
           </p>
-          <ServerStatus />
+          <ServerStatus onShowInfo={() => setShowConnectionInfo(true)} />
         </div>
+
+        {showConnectionInfo && <ConnectionInfoModal onClose={() => setShowConnectionInfo(false)} />}
 
         {/* Navigation cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

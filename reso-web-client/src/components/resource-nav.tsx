@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { NavLink, useLocation, useParams } from 'react-router';
 import { useServer } from '../context/server-context';
 import { READ_ONLY_RESOURCES } from '../types';
+import { ConnectionInfoModal } from './admin/connection-info-modal';
 
 type Section = 'home' | 'organizations' | 'certification' | 'resources' | 'metadata';
 
@@ -10,6 +11,7 @@ export const ResourceNav = () => {
   const { resource: activeResource } = useParams<{ resource: string }>();
   const location = useLocation();
   const { resources, isLocal, isLoadingResources, loadingStatus, permissions } = useServer();
+  const [showConnectionInfo, setShowConnectionInfo] = useState(false);
 
   const resourceNames = useMemo(
     () => resources?.map(r => r.name) ?? [],
@@ -224,8 +226,19 @@ export const ResourceNav = () => {
             </svg>
             Data Generator
           </NavLink>
+          <button
+            type="button"
+            onClick={() => setShowConnectionInfo(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm whitespace-nowrap text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-left">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+              <title>Connection Info</title>
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            Connection Info
+          </button>
         </div>
       )}
+      {showConnectionInfo && <ConnectionInfoModal onClose={() => setShowConnectionInfo(false)} />}
     </div>
   );
 };
