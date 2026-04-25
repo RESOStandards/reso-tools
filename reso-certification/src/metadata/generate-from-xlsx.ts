@@ -9,7 +9,7 @@
  *   npx tsx src/metadata/generate-from-xlsx.ts <path-to-xlsx> [version]
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { resolve, basename } from 'node:path';
 import type { MetadataReport, MetadataReportField, MetadataReportLookup, MetadataReportResource } from './serializer.js';
 

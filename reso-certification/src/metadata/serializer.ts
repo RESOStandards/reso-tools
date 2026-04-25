@@ -12,12 +12,9 @@ import {
   type CsdlSchema,
   type CsdlEnumType,
   type CsdlEnumMember,
-  type CsdlComplexType,
-  type CsdlEntityType,
   type CsdlAction,
   type CsdlFunction,
   type FieldInfo,
-  type FieldAnnotation,
 } from '@reso-standards/reso-client';
 
 // ── Output Types ──
@@ -119,10 +116,6 @@ export interface MetadataReport {
 }
 
 // ── Helpers ──
-
-/** Check if a type is an OData primitive (starts with "Edm."). */
-const isEdmPrimitive = (type: string): boolean =>
-  type.startsWith('Edm.') || type.startsWith('Collection(Edm.');
 
 /**
  * Detect if a field is an enumeration from CSDL type info.
@@ -243,45 +236,6 @@ export const serializeMetadataReport = (
   const lookups: ReadonlyArray<MetadataReportLookup> = schema.enumTypes.flatMap(enumType =>
     enumType.members.map(member => enumMemberToLookup(enumType, member, schema.namespace))
   );
-
-  // Models: entity types + complex types with internal structure
-  const serializeModelProperties = (et: CsdlEntityType | CsdlComplexType) => ({
-    properties: et.properties.map(p => ({
-      name: p.name,
-      type: p.type,
-      ...(p.nullable != null ? { nullable: p.nullable } : {}),
-      ...(p.maxLength != null ? { maxLength: p.maxLength } : {}),
-      ...(p.precision != null ? { precision: p.precision } : {}),
-      ...(p.scale != null ? { scale: p.scale } : {}),
-    })),
-    navigationProperties: et.navigationProperties.map(np => ({
-      name: np.name,
-      type: np.type,
-      ...(np.nullable != null ? { nullable: np.nullable } : {}),
-      ...(np.partner ? { partner: np.partner } : {}),
-      ...(np.containsTarget ? { containsTarget: np.containsTarget } : {}),
-    })),
-  });
-
-  const models: ReadonlyArray<MetadataReportModel> = [
-    ...schema.entityTypes.map(et => ({
-      modelName: et.name,
-      modelType: 'EntityType' as const,
-      ...(et.baseType ? { baseType: et.baseType } : {}),
-      ...(et.abstract ? { abstract: et.abstract } : {}),
-      ...(et.openType ? { openType: et.openType } : {}),
-      ...(et.key.length > 0 ? { keyProperties: et.key } : {}),
-      ...serializeModelProperties(et),
-    })),
-    ...schema.complexTypes.map(ct => ({
-      modelName: ct.name,
-      modelType: 'ComplexType' as const,
-      ...(ct.baseType ? { baseType: ct.baseType } : {}),
-      ...(ct.abstract ? { abstract: ct.abstract } : {}),
-      ...(ct.openType ? { openType: ct.openType } : {}),
-      ...serializeModelProperties(ct),
-    })),
-  ];
 
   // Actions and Functions
   const serializeOperation = (op: CsdlAction | CsdlFunction): MetadataReportOperation => ({

@@ -8,7 +8,7 @@
  */
 
 import { parseFilter } from '@reso-standards/odata-expression-parser';
-import type { FilterExpression, LambdaExpr } from '@reso-standards/odata-expression-parser';
+import type { FilterExpression } from '@reso-standards/odata-expression-parser';
 import type { ResoField } from '../metadata/types.js';
 
 /** Result of translating a $filter expression to SQL. */

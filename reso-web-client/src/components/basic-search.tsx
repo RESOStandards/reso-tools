@@ -112,7 +112,6 @@ const buildBasicFilter = (
     if (!raw) continue;
 
     const field = fieldMap.get(sf.fieldName);
-    const isString = field ? (field.type === 'Edm.String' || isEnumType(field.type)) : true;
     const isNumeric = field ? isNumericEdmType(field.type) : false;
     const isDate = field ? (field.type === 'Edm.DateTimeOffset' || field.type === 'Edm.Date') : false;
 

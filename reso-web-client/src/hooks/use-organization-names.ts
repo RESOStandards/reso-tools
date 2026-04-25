@@ -27,7 +27,7 @@ let inFlight: Promise<DirectoryCache> | null = null;
 const systemKey = (providerUoi: string, usi: string): string =>
   `${providerUoi}:${usi}`;
 
-const loadDirectory = async (apiKey: string | null): Promise<DirectoryCache> => {
+const loadDirectory = async (_apiKey: string | null): Promise<DirectoryCache> => {
   if (cache) return cache;
   if (inFlight) return inFlight;
 

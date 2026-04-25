@@ -136,7 +136,7 @@ export const ReplicationProgress = ({ data }: { readonly data: ReplicationProgre
             : <>Top {Math.min(TOP_N, visible.length)} resources by record count</>
         }
       </div>
-      {visible.map((resource, i) => {
+      {visible.map(resource => {
         const pct = (resource.records / maxRecords) * 100;
         const isOther = resource.name.startsWith('+');
         return (

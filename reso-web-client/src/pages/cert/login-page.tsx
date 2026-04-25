@@ -55,7 +55,6 @@ export const LoginPage = () => {
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [loaded, setLoaded] = useState(false);
 
   // Pre-fill from safeStorage on mount
   useEffect(() => {
@@ -64,7 +63,6 @@ export const LoginPage = () => {
         setUsername(creds.username);
         setPassword(creds.password);
       }
-      setLoaded(true);
     });
   }, []);
 

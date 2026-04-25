@@ -278,8 +278,8 @@ const assertData = (
 
 /** Run structural scenarios (metadata, service-document, fetch-by-key, select, top, skip, count). */
 const runStructuralScenario = async (
-  serverUrl: string,
-  resource: string,
+  _serverUrl: string,
+  _resource: string,
   assertion: string,
   query: { readonly url: string; readonly selectFields: ReadonlyArray<string> },
   params: TestParams,

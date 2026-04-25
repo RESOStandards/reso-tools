@@ -56,11 +56,6 @@ export const serializeAddEditRemarks = (result: PipelineResult): string => {
   if (!testStep?.counts) return `Add/Edit compliance test ${result.status}.`;
 
   const { total = 0, passed = 0, failed = 0 } = testStep.counts;
-  const scenarioDetails = result.steps
-    .filter(s => s.name === 'Run Add/Edit scenarios')
-    .map(s => s.summary)
-    .filter(Boolean)
-    .join('. ');
 
   const metadataStep = result.steps.find(s => s.name === 'Fetch metadata');
   const fieldCount = metadataStep?.counts?.fields ?? 0;
@@ -180,7 +175,7 @@ export const writeReports = async (
   result: PipelineResult,
   generators: ReadonlyArray<ReportGenerator>,
   outputDir: string,
-  onProgress?: ProgressCallback,
+  _onProgress?: ProgressCallback,
 ): Promise<ReadonlyArray<{ readonly name: string; readonly path: string }>> => {
   await mkdir(outputDir, { recursive: true });
 

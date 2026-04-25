@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useState, useMemo } from 'react';
-import { SearchInput, FilterPill, Badge, AvailBar } from '../metadata/shared.js';
+import { SearchInput, FilterPill, Badge } from '../metadata/shared.js';
 import { humanizeScenarioName } from '../../constants/cert';
 import { RequestDetailsPanel } from './request-details';
 import { DetailText } from './detail-text';

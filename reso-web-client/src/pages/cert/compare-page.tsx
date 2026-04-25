@@ -8,8 +8,6 @@
  * This is a stub with placeholder UI for layout review.
  */
 
-import { useState } from 'react';
-
 const PAGE_CONTAINER = 'max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8';
 
 // ── Types ────────────────────────────────────────────────────────────

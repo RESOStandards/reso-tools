@@ -10,7 +10,7 @@ import { writeFile, mkdir, copyFile, rename } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { resolveAuthToken } from '../test-runner/auth.js';
-import { fetchMetadata, fetchMetadataWithVersion } from '../test-runner/metadata.js';
+import { fetchMetadataWithVersion } from '../test-runner/metadata.js';
 import { generateMetadataReport } from '../metadata/serializer.js';
 import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
 import type { DDConfig, PipelineStep, StepResult, TestFunction } from './types.js';
@@ -108,7 +108,7 @@ const resolveAuth = (config: DDConfig): PipelineStep<DDContext> => ({
   },
 });
 
-const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
+const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Generate metadata report',
   run: async (ctx, onProgress) => {
     await mkdir(ctx.outputPath, { recursive: true });
@@ -193,7 +193,7 @@ const generateMetadata = (config: DDConfig): PipelineStep<DDContext> => ({
 
 const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Check variations',
-  run: async (ctx, onProgress) => {
+  run: async (ctx, _onProgress) => {
     if (ctx.version !== '2.0' && ctx.version !== '2.1') {
       return { context: ctx, status: 'skipped', summary: 'Variations only checked for DD 2.0' };
     }
@@ -300,23 +300,6 @@ const initReplicationState: TestFunction<DDContext> = async (ctx) => {
     return { context: { ...ctx, replicationStateService: createReplicationStateServiceInstance() } };
   }
   return { context: ctx };
-};
-
-/** Humanize a duration in ms to a short readable string. */
-const humanizeMs = (ms: number): string => {
-  if (ms < 1000) return `${Math.round(ms)}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  const mins = Math.floor(ms / 60_000);
-  const secs = Math.round((ms % 60_000) / 1000);
-  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
-};
-
-/** Humanize bytes to a short readable string. */
-const humanizeBytes = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 };
 
 /**

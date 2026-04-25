@@ -196,7 +196,7 @@ export const topologicalSort = (
   for (const resource of resources) {
     inDegree.set(resource, 0);
   }
-  for (const [source, targets] of adj) {
+  for (const [, targets] of adj) {
     for (const target of targets) {
       inDegree.set(target, (inDegree.get(target) ?? 0) + 1);
     }
@@ -280,7 +280,6 @@ export const buildMultiResourcePlan = (
 
   // Find transitive dependencies of the requested resource
   const needed = new Set<string>([requestedResource]);
-  const depsForResource = new Map<string, ReadonlyArray<ForeignKeyBinding>>();
 
   // Build a lookup: resource → its FK dependencies
   const depsBySource = new Map<string, ResourceDependency[]>();

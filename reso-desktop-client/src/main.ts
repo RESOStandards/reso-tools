@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, shell } from 'electron';
-import { resolve, join, basename, dirname, relative } from 'node:path';
+import { resolve, join, dirname, relative } from 'node:path';
 import { fork, type ChildProcess } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync, readdirSync, statSync } from 'node:fs';
 

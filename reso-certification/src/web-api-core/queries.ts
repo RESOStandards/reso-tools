@@ -15,7 +15,6 @@ import type {
   StringEnumScenario,
   StringFunctionScenario,
   ExpandScenario,
-  ComparisonOp,
 } from './scenarios.js';
 
 /** Result of building a query: the URL and the select fields. */

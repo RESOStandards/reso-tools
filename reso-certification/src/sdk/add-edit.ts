@@ -1,6 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { StepResult } from './types.js';
 import {
   buildResourceUrl,
   fetchMetadata,
@@ -11,7 +10,7 @@ import {
   resolveAuthToken,
 } from '../test-runner/index.js';
 import { runAllScenarios } from '../add-edit/index.js';
-import type { AddEditConfig, PipelineStep, StepOutput } from './types.js';
+import type { AddEditConfig, PipelineStep } from './types.js';
 import { createPipeline } from './pipeline.js';
 import { addEditReportGenerators, writeReports, buildOutputPath, archiveCurrentResults } from './reports.js';
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
@@ -69,7 +68,6 @@ const resolveAuth = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
 const fetchAndParseMetadata = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
   name: 'Fetch metadata',
   run: async (ctx, onProgress) => {
-    const metadataUrl = config.metadataPath ?? `${ctx.serverUrl}/$metadata`;
     onProgress({ step: 'Fetch metadata', status: 'running', message: 'Fetching $metadata...' });
     const metadataXml = config.metadataPath
       ? await loadMetadataFromFile(config.metadataPath)
@@ -105,7 +103,7 @@ const fetchAndParseMetadata = (config: AddEditConfig): PipelineStep<AddEditConte
 });
 
 /** Sample real records from the server to extract keys for update/delete payloads. */
-const sampleRecords = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
+const sampleRecords = (_config: AddEditConfig): PipelineStep<AddEditContext> => ({
   name: 'Sample records',
   run: async (ctx) => {
     const url = buildResourceUrl(ctx.serverUrl, ctx.resource);
@@ -230,7 +228,7 @@ const generatePayloads = (config: AddEditConfig): PipelineStep<AddEditContext> =
 /** Run all 8 Add/Edit certification scenarios. */
 const runTests = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
   name: 'Run Add/Edit scenarios',
-  run: async (ctx, onProgress) => {
+  run: async (ctx, _onProgress) => {
     const testReport = await runAllScenarios({
       serverUrl: ctx.serverUrl,
       resource: ctx.resource,

@@ -39,28 +39,6 @@ type VariationFilter = 'all' | 'fields' | 'lookups' | 'resources' | 'expansions'
 type ActionStatus = 'pending' | 'ignored' | 'fast-track' | 'remove';
 type ViewMode = 'list' | 'detail';
 
-interface DraftAction {
-  readonly key: string;
-  readonly status: ActionStatus;
-}
-
-interface ReviewSummary {
-  readonly version: string;
-  readonly providerUoi: string;
-  readonly providerUsi: string;
-  readonly recipientUoi: string;
-  readonly recipientName?: string;
-  readonly providerName?: string;
-  readonly totalVariations: number;
-  readonly resolved: number;
-  readonly inReview: number;
-  readonly ignored: number;
-  readonly fastTrack: number;
-  readonly reviewStartedAt?: string;
-  readonly lastActivityAt?: string;
-  readonly status: 'active' | 'stale' | 'resolved';
-}
-
 // ── Constants ────────────────────────────────────────────────────────
 
 const PAGE_CONTAINER = 'max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8';
@@ -109,12 +87,6 @@ const STRATEGY_LABELS: Readonly<Record<string, { label: string; color: string }>
   'Admin Review': { label: 'Admin Review', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
   'Suggestion': { label: 'Suggestion', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
   'Policy': { label: 'Policy', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
-};
-
-const STATUS_COLORS: Readonly<Record<string, string>> = {
-  active: 'bg-green-400',
-  stale: 'bg-amber-400',
-  resolved: 'bg-gray-300 dark:bg-gray-600',
 };
 
 // ── Draft localStorage ───────────────────────────────────────────────
@@ -284,10 +256,7 @@ export const VariationsPage = () => {
   }
 
   if (view === 'list' || !report) {
-    return <ReviewListView
-      onSelectReport={(r) => { setReport(r); cacheReport(r); setView('detail'); }}
-      isAuthenticated={isAuthenticated}
-    />;
+    return <ReviewListView isAuthenticated={isAuthenticated} />;
   }
 
   return <ReviewDetailView report={report} onBack={() => setView('list')} user={user} isAdmin={isAdmin} jobId={(routeState?.job as { id?: string } | undefined)?.id} />;
@@ -317,8 +286,7 @@ interface VariationsStats {
   }>;
 }
 
-const ReviewListView = ({ onSelectReport, isAuthenticated }: {
-  readonly onSelectReport: (report: BlendedVariationsReport) => void;
+const ReviewListView = ({ isAuthenticated }: {
   readonly isAuthenticated: boolean;
 }) => {
   const [stats, setStats] = useState<VariationsStats | null>(null);
@@ -1076,100 +1044,3 @@ const VariationDrawer = ({ variation, action, draftComments, isReadOnly, isAdmin
   );
 };
 
-// ── Variation Card (legacy — retained for reference during migration) ────
-
-const VariationCard = ({
-  variation, action, onToggleAction, isReadOnly, isAdmin, isFastTrackAdmin, draftComments, onAddComment, onRemoveComment, userName, userUoi,
-}: {
-  readonly variation: BlendedVariation;
-  readonly action?: ActionStatus;
-  readonly onToggleAction: (status: ActionStatus) => void;
-  readonly isReadOnly: boolean;
-  readonly isAdmin: boolean;
-  readonly isFastTrackAdmin: boolean;
-  readonly draftComments: ReadonlyArray<VariationComment>;
-  readonly onAddComment: (comment: VariationComment) => void;
-  readonly onRemoveComment: (index: number) => void;
-  readonly userName: string;
-  readonly userUoi: string;
-}) => {
-  const isIgnored = variation.ignored || action === 'ignored';
-
-  return (
-    <div className={`rounded-lg border overflow-hidden ${isIgnored ? 'border-gray-200 dark:border-gray-700 opacity-60' : 'border-red-200 dark:border-red-800'}`}>
-      <div className={`px-4 py-2.5 flex items-center justify-between ${isIgnored ? 'bg-gray-50 dark:bg-gray-800/50' : 'bg-red-50 dark:bg-red-900/20'}`}>
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 shrink-0">{variation.type}</span>
-          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{variation.resourceName}</span>
-          {variation.fieldName && (<><span className="text-gray-400">.</span><span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{variation.fieldName}</span></>)}
-          {variation.lookupValue && (<><span className="text-gray-400">.</span><span className="text-sm font-medium text-red-700 dark:text-red-400">{variation.lookupValue}</span></>)}
-        </div>
-        {!isReadOnly && (
-          <div className="flex items-center gap-1 shrink-0">
-            <button type="button" onClick={() => onToggleAction('ignored')}
-              className={`px-2 py-1 text-[10px] font-medium rounded transition-colors cursor-pointer ${action === 'ignored' ? 'bg-gray-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-              title="Mark as ignored — this local value is intentional">
-              Ignore
-            </button>
-            {isFastTrackAdmin && (
-              <button type="button" onClick={() => onToggleAction('fast-track')}
-                className={`px-2 py-1 text-[10px] font-medium rounded transition-colors cursor-pointer ${action === 'fast-track' ? 'bg-green-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                title="Fast Track — add to DD workgroup agenda for expedited review">
-                Fast Track
-              </button>
-            )}
-            {isAdmin && (
-              <button type="button" onClick={() => onToggleAction('remove')}
-                className={`px-2 py-1 text-[10px] font-medium rounded transition-colors cursor-pointer ${action === 'remove' ? 'bg-red-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400'}`}
-                title="Remove — delete this mapping from the service (admin only)">
-                Remove
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-      {!isIgnored && variation.suggestions.length > 0 && (
-        <div className="divide-y divide-gray-100 dark:divide-gray-700/50">
-          {variation.suggestions.map((suggestion, i) => {
-            const strategyInfo = STRATEGY_LABELS[suggestion.strategy] ?? STRATEGY_LABELS['Suggestion'];
-            return (
-              <div key={i} className="px-4 py-2 flex items-center justify-between bg-white dark:bg-gray-800/30">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-gray-300 dark:text-gray-600">→</span>
-                  <span className="text-sm text-green-700 dark:text-green-400">
-                    {suggestion.suggestedResourceName}
-                    {suggestion.suggestedFieldName && `.${suggestion.suggestedFieldName}`}
-                    {suggestion.suggestedLookupValue && `.${suggestion.suggestedLookupValue}`}
-                  </span>
-                  {suggestion.suggestedRelatedFieldName && (
-                    <span className="text-xs text-purple-600 dark:text-purple-400">
-                      + {suggestion.suggestedRelatedFieldName}
-                      {suggestion.suggestedRelatedLookupValue && `.${suggestion.suggestedRelatedLookupValue}`}
-                    </span>
-                  )}
-                </div>
-                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${strategyInfo.color}`}>
-                  {strategyInfo.label}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {!isIgnored && variation.suggestions.length === 0 && (
-        <div className="px-4 py-2 text-xs text-gray-400 dark:text-gray-500 bg-white dark:bg-gray-800/30">
-          No suggestions available
-        </div>
-      )}
-      <VariationComments
-        existingComments={variation.conversations ?? []}
-        draftComments={draftComments}
-        onAddComment={onAddComment}
-        onRemoveComment={onRemoveComment}
-        userName={userName}
-        userUoi={userUoi}
-        isReadOnly={isReadOnly}
-      />
-    </div>
-  );
-};

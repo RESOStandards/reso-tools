@@ -1,4 +1,4 @@
-import { generateRecord, randomChoice, randomDecimal, randomInt, isPlaceholderValue } from './field-generator.js';
+import { generateRecord, randomChoice, randomDecimal, randomInt } from './field-generator.js';
 import { randomLocation, jitterCoords } from './geo-data.js';
 import type { ResoField, ResoLookup } from './types.js';
 
@@ -243,9 +243,6 @@ export const generatePropertyRecords = (
   memberPool?: ReadonlyArray<Record<string, unknown>>,
   officePool?: ReadonlyArray<Record<string, unknown>>
 ): ReadonlyArray<Record<string, unknown>> => {
-  // Build a set of declared non-expansion field names so flattening only writes fields in the metadata
-  const declaredFields = new Set(fields.filter(f => !f.isExpansion).map(f => f.fieldName));
-
   return Array.from({ length: count }, (_, i) => {
     const record = generateRecord(fields, lookups, i);
 

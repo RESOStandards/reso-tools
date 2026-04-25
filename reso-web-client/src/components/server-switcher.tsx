@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useServer } from '../context/server-context';
 import { clearAllCaches } from '../api/schema-cache';
 import { clearMetadataCache } from '../api/metadata';
@@ -16,50 +16,6 @@ export const ServerSwitcher = () => {
   const [showManager, setShowManager] = useState(false);
   const [editingServer, setEditingServer] = useState<ServerConfig | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [savedConfigs, setSavedConfigs] = useState<ReadonlyArray<ManagedConnection>>([]);
-  const [configSearch, setConfigSearch] = useState('');
-
-  // Load saved connections when dropdown opens
-  useEffect(() => {
-    if (!isOpen) return;
-    import('../services/connection-manager').then(({ loadConnectionsMRU }) =>
-      loadConnectionsMRU().then(setSavedConfigs)
-    ).catch(() => {});
-  }, [isOpen]);
-
-  const filteredConfigs = configSearch.length >= 2
-    ? savedConfigs.filter(c => {
-        const q = configSearch.toLowerCase();
-        return [c.name, c.url, c.originatingSystemName]
-          .filter(Boolean)
-          .some(f => f!.toLowerCase().includes(q));
-      }).slice(0, 5)
-    : savedConfigs.slice(0, 5);
-
-  const handleSelectConfig = useCallback(
-    async (config: ManagedConnection) => {
-      // Get credentials from safeStorage
-      const { getCredentials, touchMRU } = await import('../services/connection-manager');
-      const creds = await getCredentials(config.id);
-
-      const id = addServer({
-        name: config.name || config.url,
-        baseUrl: config.url,
-        authMode: config.authMode === 'client_credentials' ? 'client_credentials' : 'token',
-        token: creds?.authToken || undefined,
-        clientId: config.clientId || undefined,
-        clientSecret: creds?.clientSecret || undefined,
-        tokenUrl: config.tokenUrl || undefined,
-        scope: config.scope || undefined,
-        permissions: { canAdd: false, canEdit: false, canDelete: false },
-      });
-      switchServer(id);
-      await touchMRU(config.id);
-      setIsOpen(false);
-      setConfigSearch('');
-    },
-    [addServer, switchServer]
-  );
 
   const handleSelectFromManager = useCallback(
     (conn: ManagedConnection, creds: StoredCredentials | null) => {

@@ -71,7 +71,7 @@ const computeChangeId = async (changes: ReadonlyArray<unknown>, editorInfo: Reco
 // ── Build payload ────────────────────────────────────────────────────
 
 /** Build the save payload from draft actions and comments. */
-const buildSavePayload = (input: SaveInput, existingReport: VariationsReportPayload | null, certRequestId: string): {
+const buildSavePayload = (input: SaveInput, _existingReport: VariationsReportPayload | null, _certRequestId: string): {
   changes: ReadonlyArray<VariationsChange>;
   editorInfo: VariationsEditorInfo;
 } => {

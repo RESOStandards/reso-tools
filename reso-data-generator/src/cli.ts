@@ -3,7 +3,7 @@ import { parseArgs } from 'node:util';
 import { checkbox, confirm, input, number, select } from '@inquirer/prompts';
 import type { OutputOptions } from './client.js';
 import { buildMultiResourcePlan } from './fk-resolver.js';
-import type { ResoField, ResoLookup, SeedOptions } from './generators/types.js';
+import type { ResoField, ResoLookup } from './generators/types.js';
 import { generateSeedData } from './index.js';
 import { getDefaultRelatedCount, getRelatedResources } from './plan.js';
 

@@ -18,7 +18,7 @@ import { synthesizeResourcesFromFields } from '../metadata/index.js';
 import type { MetadataReport } from '../metadata/index.js';
 import { startMockServer, stopMockServer } from '../add-edit/mock/server.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
-import { loadConfigFile, configEntryToAddEdit, configEntryToEntityEvent, configEntryToCore } from '../sdk/config.js';
+import { loadConfigFile, configEntryToAddEdit, configEntryToEntityEvent } from '../sdk/config.js';
 import type { AddEditConfig, EntityEventConfig, CoreConfig, DDConfig, PipelineResult } from '../sdk/types.js';
 import { loadDotEnv, resolveCliAuth } from './auth.js';
 import { resolveRenderMode, runWithProgress, runConfigEntries } from './render.js';

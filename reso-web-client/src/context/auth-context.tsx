@@ -207,7 +207,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const persistedUser = await secureGetJson<LoginResponse>(USER_STORAGE_KEY);
       const persistedCreds =
         await secureGetJson<PersistedCredentials>(CREDS_STORAGE_KEY);
 

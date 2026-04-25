@@ -13,7 +13,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type {
-  DDDetailField,
   DDDetailReport,
   DataAvailabilityField,
   DataAvailabilityLookup,
@@ -21,11 +20,9 @@ import type {
 } from '../../api/cert-client.js';
 import {
   AvailBar,
-  AvailabilityThresholdPills,
   Badge,
   FieldRow,
   FilterPill,
-  ResourceButton,
   SearchInput,
   availColorClass,
 } from '../metadata/shared.js';
@@ -59,10 +56,6 @@ const fieldWikiUrl = (version: string, resourceName: string, fieldName: string, 
 /** Build a dd.reso.org URL for a specific lookup value. */
 const lookupWikiUrl = (version: string, lookupName: string, lookupValue: string): string =>
   `https://dd.reso.org/DD${version}/lookups/${encodeURIComponent(lookupName)}/${encodeURIComponent(lookupValue)}/`;
-
-/** Build a dd.reso.org URL for a resource. */
-const resourceWikiUrl = (version: string, resourceName: string): string =>
-  `https://dd.reso.org/DD${version}/${encodeURIComponent(resourceName)}/`;
 
 /** Normalize an OData type name by stripping namespace prefixes.
  *  e.g., "org.reso.metadata.enums.Appliances" → "Appliances",
@@ -146,7 +139,6 @@ const FieldDetailPanel = ({
     local: lookupValues.filter((l) => !l.standardRESO).length,
   }), [lookupValues]);
 
-  const isCollection = field.type.startsWith('Collection(') || field.isEnum;
   const underlyingType = lookupValues.length > 0 ? lookupValues[0].type : null;
 
   const tabs = [
@@ -327,18 +319,12 @@ export const ServerExplorer = ({
   initialCategory,
   initialResource,
   availThreshold,
-  onAvailThresholdChange,
-  customAvailEditing,
-  onCustomAvailEditingChange,
 }: {
   readonly detail: DDDetailReport;
   readonly availability: DataAvailabilityReport | null;
   readonly initialCategory?: CategoryFilter;
   readonly initialResource?: string | null;
   readonly availThreshold: number;
-  readonly onAvailThresholdChange: (v: number) => void;
-  readonly customAvailEditing: boolean;
-  readonly onCustomAvailEditingChange: (editing: boolean) => void;
 }) => {
   const [selectedResource, setSelectedResource] = useState<string | null>(initialResource ?? null);
 
@@ -375,9 +361,6 @@ export const ServerExplorer = ({
     }
   };
   const [searchQuery, setSearchQuery] = useState('');
-  // Availability threshold is controlled by the parent (DD renderer)
-  const setAvailThreshold = onAvailThresholdChange;
-  const setCustomAvailEditing = onCustomAvailEditingChange;
   const [elementTypeFilter, setElementTypeFilter] = useState<ElementTypeFilter>('all');
 
   // Build availability lookup maps

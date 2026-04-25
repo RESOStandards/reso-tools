@@ -16,7 +16,6 @@ const SPAWN_INTERVAL_MS = 1200;
 
 const HOUSES = ['🏠', '🏡', '🏘️', '🏚️', '🏗️'];
 const SOLD = '🏠';
-const EMPTY = '';
 const LOT = '🌳';
 
 const PUNS = [
@@ -168,8 +167,6 @@ export const OpenHouseRush = ({ onClose }: { readonly onClose: () => void }) => 
     setLastPun('');
     setMissed(0);
   };
-
-  const soldCount = grid.flat().filter((c) => c.sold).length;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">

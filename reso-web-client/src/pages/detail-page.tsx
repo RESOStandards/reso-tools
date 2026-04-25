@@ -32,7 +32,7 @@ const MediaPreview = ({ url, mediaType }: { readonly url: string; readonly media
 export const DetailPage = () => {
   const { resource, key } = useParams<{ resource: string; key: string }>();
   const navigate = useNavigate();
-  const { isLocal, resources, isLoadingResources, resourceError, getKeyField, permissions } = useServer();
+  const { isLocal, resources, isLoadingResources, getKeyField, permissions } = useServer();
   const resourceName = resource ?? '';
 
   const [record, setRecord] = useState<Record<string, unknown> | null>(null);

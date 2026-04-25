@@ -63,7 +63,6 @@ const resolveAuth = (config: CoreConfig): PipelineStep<CoreContext> => ({
 const fetchAndParseMetadata = (config: CoreConfig): PipelineStep<CoreContext> => ({
   name: 'Fetch metadata',
   run: async (ctx, onProgress) => {
-    const metadataUrl = config.metadataPath ?? `${ctx.serverUrl}/$metadata`;
     onProgress({ step: 'Fetch metadata', status: 'running', message: 'Fetching $metadata...' });
     const metadataXml = config.metadataPath
       ? await loadMetadataFromFile(config.metadataPath)
@@ -215,8 +214,6 @@ const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> =
 
 /** Create the Web API Core compliance test pipeline. */
 export const createCorePipeline = (config: CoreConfig) => {
-  const resources = config.resources ?? WELL_KNOWN_RESOURCES.map(r => r.resource);
-
   return createPipeline<CoreContext>('core', [
     resolveAuth(config),
     ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),

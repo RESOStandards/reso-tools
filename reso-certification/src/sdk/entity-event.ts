@@ -4,7 +4,7 @@ import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata, loadMetadataFromFile, parseMetadataXml } from '../test-runner/metadata.js';
 import { runAllEntityEventScenarios } from '../entity-event/test-runner.js';
 import type { EntityEventConfig as EERunnerConfig } from '../entity-event/types.js';
-import type { EntityEventConfig, PipelineStep, StepOutput } from './types.js';
+import type { EntityEventConfig, PipelineStep } from './types.js';
 import { createPipeline } from './pipeline.js';
 import { entityEventReportGenerators, writeReports, buildOutputPath, archiveCurrentResults } from './reports.js';
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
@@ -61,7 +61,6 @@ const resolveAuth = (config: EntityEventConfig): PipelineStep<EntityEventContext
 const fetchAndParseMetadata = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
   name: 'Fetch metadata',
   run: async (ctx, onProgress) => {
-    const metadataUrl = config.payloadsDir ?? `${ctx.serverUrl}/$metadata`;
     onProgress({ step: 'Fetch metadata', status: 'running', message: 'Fetching $metadata...' });
     const metadataXml = config.payloadsDir
       ? await loadMetadataFromFile(config.payloadsDir)

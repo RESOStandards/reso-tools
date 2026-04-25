@@ -2,7 +2,6 @@ import { useCallback, useRef, useState } from 'react';
 import { fetchLookupsByName } from '../api/metadata';
 import { useServer } from '../context/server-context';
 import type { ResoField, ResoLookup } from '../types';
-import { isEnumType } from '../types';
 
 /**
  * Get the lookup/enum name for a field. Exported for use by pages that

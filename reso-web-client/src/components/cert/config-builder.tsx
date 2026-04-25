@@ -9,19 +9,18 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { SavedConfigsPanel } from './saved-configs-panel';
-import { loadProfiles, loadConnections, saveDraft, clearDraft, type SavedConnection, type SavedCredentials, type SavedCertConfig } from '../../services/connection-manager';
-import { SearchInput, FilterPill, Badge } from '../metadata/shared';
+import { loadProfiles, loadConnections, saveDraft, clearDraft, type SavedCredentials, type SavedCertConfig } from '../../services/connection-manager';
+import { FilterPill, Badge } from '../metadata/shared';
 import { getOrganizations } from '../../hooks/use-organization-names';
 import type { CertOrganization, CertOrganizationSystem } from '../../api/cert-client';
 import {
   CERT_ENDORSEMENT_LABELS,
   CERT_ENDORSEMENT_COLORS,
-  ENDORSEMENT_DEFAULT_VERSIONS,
   MEMORY_WARNING_THRESHOLD,
   MAX_LOCAL_CONCURRENCY,
   DEFAULT_CONCURRENCY,
 } from '../../constants/cert';
-import type { CertEndorsement, DDVersion, CoreVersion, EnumMode } from '../../constants/cert';
+import type { CertEndorsement } from '../../constants/cert';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -1011,9 +1010,6 @@ export const ConfigBuilder = ({
     input.click();
   };
 
-  const [showSaveAs, setShowSaveAs] = useState(false);
-  const [saveAsName, setSaveAsName] = useState('');
-
   // Dirty tracking: snapshot the initial config to detect unsaved changes
   const [loadedSnapshot, setLoadedSnapshot] = useState<string | null>(() =>
     initialConfig ? JSON.stringify({ providerUoi: initialConfig.providerUoi, concurrency: initialConfig.concurrency, recipients: initialConfig.recipients }) : null
@@ -1225,7 +1221,7 @@ export const ConfigBuilder = ({
 
       {/* Saved Configs — MRU 3 with search and View All link */}
       <SavedConfigsPanel
-        onLoad={(imported, configId, configName) => {
+        onLoad={(imported, _configId, _configName) => {
           const pUoi = 'providerUoi' in imported && typeof imported.providerUoi === 'string' ? imported.providerUoi : providerUoi;
           const conc = 'concurrency' in imported && typeof imported.concurrency === 'number' ? imported.concurrency : concurrency;
           const recs = 'recipients' in imported && Array.isArray(imported.recipients) ? imported.recipients as ReadonlyArray<RecipientConfig> : recipients;

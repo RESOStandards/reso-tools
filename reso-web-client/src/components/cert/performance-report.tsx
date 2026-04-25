@@ -14,8 +14,6 @@ import type {
   PerformanceMetricsReport,
   ResourcePerformanceStats,
 } from '../../api/cert-client.js';
-import { availColorClass } from '../metadata/shared.js';
-
 // ── Formatting helpers ──────────────────────────────────────────────
 
 const formatMs = (ms: number): string => {
@@ -47,13 +45,6 @@ const formatDateRange = (low: string, high: string): string => {
 /** Delta percentage: positive = provider is faster/better. */
 const deltaPercent = (provider: number, industry: number): number =>
   industry > 0 ? Math.round(((industry - provider) / industry) * 100) : 0;
-
-// ── Tile styling ────────────────────────────────────────────────────
-
-const TILE = 'bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-5';
-const TILE_LABEL = 'text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400';
-const TILE_VALUE = 'mt-1 text-2xl font-bold tabular-nums text-gray-900 dark:text-gray-100';
-const TILE_SUB = 'text-xs text-gray-500 dark:text-gray-400 mt-1';
 
 // ── Comparison bar ──────────────────────────────────────────────────
 

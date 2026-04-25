@@ -91,7 +91,6 @@ export const RequestDetailsPanel = ({ details }: { readonly details: ReadonlyArr
       {details.map((detail, i) => {
         const isOpen = expanded.has(i);
         const label = `${detail.method} ${friendlyLabel(detail.url)}`;
-        const hasBody = detail.responseBody || detail.error;
 
         return (
           <div key={i}>

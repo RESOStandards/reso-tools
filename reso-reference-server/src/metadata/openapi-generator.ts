@@ -50,7 +50,7 @@ const buildSchemaProperties = (fields: ReadonlyArray<ResoField>): Record<string,
   );
 
 /** Generates CRUD path operations for a resource. */
-const buildResourcePaths = (resource: string, keyField: string, fields: ReadonlyArray<ResoField>): Record<string, unknown> => {
+const buildResourcePaths = (resource: string, keyField: string): Record<string, unknown> => {
   const schemaRef = `#/components/schemas/${resource}`;
 
   const collectionSchema = {
@@ -253,7 +253,7 @@ export const generateOpenApiSpec = (
     const keyField = getKeyFieldForResource(resource);
     if (!keyField || fields.length === 0) continue;
 
-    const resourcePaths = buildResourcePaths(resource, keyField, fields);
+    const resourcePaths = buildResourcePaths(resource, keyField);
     Object.assign(paths, resourcePaths);
 
     schemas[resource] = {

@@ -25,7 +25,6 @@ import { NavLink, useParams } from 'react-router';
 import {
   type CoverageReport,
   type FieldCut,
-  type OrgSummaryData,
   type PayloadCoverage,
   type PerformanceReport,
   type ResourceCoverage
@@ -36,45 +35,16 @@ import { useMarketAverages } from '../../hooks/use-market-averages';
 import { useDAMarketAverage } from '../../hooks/use-da-market-average';
 import type { CertReportSummary, MarketAverages, PerformanceMetricsReport, ResourcePerformanceStats } from '../../api/cert-client';
 import { usePerformanceMetrics } from '../../hooks/use-performance-metrics';
-import type { Endorsement, EndorsementStatus, EndorsementType } from '../../api/cert-fixtures';
+import type { Endorsement } from '../../api/cert-fixtures';
 import { EndorsementSubRow } from '../../components/cert/endorsement-sub-row';
 import { useCertOrgDetail } from '../../hooks/use-cert-org-detail';
 import { useEndorsements } from '../../hooks/use-endorsements';
 import { useOrganizationNames } from '../../hooks/use-organization-names';
-import type { ResoEndorsement, ResoOrganization } from '../../types';
+import type { ResoOrganization } from '../../types';
 
 const PAGE_CONTAINER = 'max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8';
 
 // ── Adapters ─────────────────────────────────────────────────────────────
-
-/** Map the services.reso.org endorsement type label to our enum. */
-const TYPE_KEY: Record<string, EndorsementType> = {
-  'Data Dictionary': 'data_dictionary',
-  'Web API Server Core': 'web_api_server_core',
-  'Web API Core': 'web_api_server_core',
-  'Add/Edit': 'add_edit',
-  'Entity Event': 'entity_event',
-  'RESO Common Format': 'reso_common_format',
-  Webhooks: 'webhooks'
-};
-
-/** Map the services.reso.org status label to our enum. Falls back to
- *  'certified' for the common case where Status is "Certified Current" or
- *  similar — we treat any unmatched-but-non-empty value as certified to
- *  avoid showing rows as broken. */
-const STATUS_KEY: Record<string, EndorsementStatus> = {
-  'Certified Current': 'certified',
-  Certified: 'certified',
-  'In Progress': 'in_progress',
-  'In Review': 'in_review',
-  'Recipient Notified': 'recipient_notified',
-  Passed: 'passed',
-  Failed: 'failed',
-  Canceled: 'canceled',
-  Withdrawn: 'withdrawn',
-  Revoked: 'revoked',
-  Legacy: 'legacy'
-};
 
 /** Known resource keys to skip when extracting per-resource perf stats. */
 const PERF_META_KEYS = new Set([
@@ -128,23 +98,6 @@ export const perfMetricsToSummary = (
     optedOut: !optedIn,
   };
 };
-
-const adaptEndorsement = (
-  e: ResoEndorsement,
-  org: ResoOrganization
-): Endorsement => ({
-  id: `${org.OrganizationUniqueId}-${e.Endorsement}-${e.Version}-${e.ProviderUoi}`,
-  type: TYPE_KEY[e.Endorsement] ?? 'data_dictionary',
-  typeLabel: e.Endorsement,
-  version: e.Version,
-  status: STATUS_KEY[e.Status] ?? 'certified',
-  providerUoi: e.ProviderUoi,
-  providerName: e.ProviderUoi,
-  recipientUoi: org.OrganizationUniqueId,
-  recipientName: org.OrganizationName,
-  statusTimestamp: e.StatusUpdatedAt,
-  local: false
-});
 
 // ── Page ─────────────────────────────────────────────────────────────────
 
@@ -248,8 +201,6 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: 
     return Array.from(groups.values());
   }, [endorsements]);
 
-  const hasMultipleProviders = providerGroups.length > 1;
-
   const [selectedProviderKey, setSelectedProviderKey] = useState<string | null>(null);
 
   // Auto-select the first provider when data loads
@@ -292,7 +243,7 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: 
   );
 
   // Fetch performance metrics for the active DD report
-  const { data: perfMetrics, isLoading: isLoadingPerf } = usePerformanceMetrics(activeDdSummary?.id);
+  const { data: perfMetrics } = usePerformanceMetrics(activeDdSummary?.id);
 
   const activePerformance = useMemo<PerformanceReport | null>(() => {
     if (!perfMetrics) return null;
@@ -516,38 +467,6 @@ const OrgSummaryBody = ({ org, certReports, isLoadingReports, marketAverages }: 
   );
 };
 
-// ── Synthesis line ───────────────────────────────────────────────────────
-
-const SynthesisLine = ({ summary }: { readonly summary: OrgSummaryData }) => (
-  <p className="mt-7 text-lg sm:text-xl leading-snug text-gray-700 dark:text-gray-300 max-w-4xl">
-    <span className="inline-flex items-center gap-1.5 align-middle">
-      <svg
-        className="w-5 h-5 text-emerald-600 dark:text-emerald-400 inline"
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <path
-          fillRule="evenodd"
-          d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 011.42-1.42L8.5 12.08l6.79-6.79a1 1 0 011.414 0z"
-          clipRule="evenodd"
-        />
-      </svg>
-      <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-        {summary.synthesisLabel}
-      </span>
-    </span>{' '}
-    in{' '}
-    <span className="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
-      {summary.certifiedActive} of {summary.totalActive}
-    </span>{' '}
-    active endorsements · most recent run{' '}
-    <span className="font-semibold text-gray-900 dark:text-gray-100">
-      {summary.lastRunLabel}
-    </span>
-    .
-  </p>
-);
 
 // ── Coverage section ─────────────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
 import { validateBusinessRules } from '../business-rules/index.js';
-import { isEnumType, isIntegerEdmType, isNumericEdmType } from './helpers.js';
+import { isEnumType, isNumericEdmType } from './helpers.js';
 import type { ResoField, ValidationFailure } from './types.js';
 
 /** Fields that legitimately hold negative numeric values (e.g., coordinates). */

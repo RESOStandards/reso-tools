@@ -24,7 +24,7 @@ import {
   validateStatusCodeRange
 } from '../test-runner/index.js';
 import type { EntityType, ScenarioResult, TestAssertion, TestConfig, TestReport } from '../test-runner/types.js';
-import type { DeletePayload, PayloadSet, ScenarioName } from './types.js';
+import type { DeletePayload, PayloadSet } from './types.js';
 
 /**
  * Rewrites a server-returned URL to use the configured service root.
@@ -418,7 +418,7 @@ const runDeleteSucceeds = async (
   config: TestConfig,
   authToken: string,
   deletePayload: DeletePayload,
-  entityType: EntityType
+  _entityType: EntityType
 ): Promise<ScenarioResult> => {
   const start = Date.now();
   const assertions: TestAssertion[] = [];

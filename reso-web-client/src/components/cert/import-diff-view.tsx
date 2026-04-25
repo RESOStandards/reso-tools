@@ -4,9 +4,8 @@
  */
 
 import { useState, useCallback } from 'react';
-import type { ImportConflict, ImportAnalysis, ExportedConnection } from '../../services/connection-io';
+import type { ImportConflict, ImportAnalysis } from '../../services/connection-io';
 import { saveConnection, storeCredentials, saveProfile } from '../../services/connection-manager';
-import type { CertProfile } from '../../services/connection-manager';
 
 /** Resolution choice per conflict. */
 type Resolution = 'keep' | 'import';

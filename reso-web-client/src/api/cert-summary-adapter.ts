@@ -12,7 +12,6 @@
  */
 
 import type {
-  CertAdvertisedResource,
   CertReportSummary,
   DAMarketAverageResponse,
   MarketAverages,
@@ -48,7 +47,6 @@ export const summaryToCoverageReport = (
   const localFields = report.localFieldsCount ?? 0;
   const allLookups = report.totalLookupsCount ?? 0;
   const resoLookups = report.standardLookupsCount ?? 0;
-  const localLookups = report.localLookupsCount ?? 0;
   const idxFields = report.iDXFieldsCount ?? 0;
 
   // ── Available counts from DA report (fields/lookups with data) ─
@@ -90,14 +88,6 @@ export const summaryToCoverageReport = (
   const avgLocalFields = marketAvg ? Math.round(marketAvg.fields.local) : 0;
   const avgIdxFields = marketAvg ? Math.round(marketAvg.fields.idx) : 0;
   const avgAllLookups = marketAvg ? Math.round(marketAvg.lookups.total) : 0;
-
-  // Industry available averages from DA market average
-  const indAvailFields = daMarketAvg
-    ? Math.round(daMarketAvg.marketAverage?.fields?.total?.gtZero ?? 0)
-    : 0;
-  const indAvailLookups = daMarketAvg
-    ? Math.round(daMarketAvg.marketAverage?.lookups?.total?.gtZero ?? 0)
-    : 0;
 
   // Available counts from DA report (aggregated from resourcesBinary)
   const resoAvailFields = providerAgg.fields.reso.gtZero ?? 0;

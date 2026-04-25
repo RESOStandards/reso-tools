@@ -8,7 +8,6 @@ interface ResultsListProps {
   readonly rows: ReadonlyArray<Record<string, unknown>>;
   readonly summaryFields: ReadonlyArray<string>;
   readonly fields: ReadonlyArray<ResoField>;
-  readonly count: number | undefined;
   readonly isLoading: boolean;
   readonly hasMore: boolean;
   readonly error: string | null;
@@ -25,7 +24,6 @@ export const ResultsList = ({
   rows,
   summaryFields,
   fields,
-  count,
   isLoading,
   hasMore,
   error,

@@ -6,7 +6,7 @@
  * consumers share one timer and one network request.
  */
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { useAuth } from './use-auth';
 import {
   searchNotifications,

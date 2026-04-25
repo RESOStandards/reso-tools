@@ -22,7 +22,6 @@ import {
   searchConnections,
   touchMRU,
   profilesForConnection,
-  maskSecret,
   type SavedConnection,
   type StoredCredentials,
 } from '../services/connection-manager';

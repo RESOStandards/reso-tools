@@ -20,7 +20,6 @@ import {
   storeCredentials,
   getCredentials,
   findConnectionByKey,
-  saveProfile,
   type StoredCredentials,
 } from './connection-manager';
 import {
@@ -202,9 +201,6 @@ const persistJobsToLocalStorage = (jobs: Map<string, Job>): void => {
     localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(durable));
   } catch { /* localStorage may be full or unavailable */ }
 };
-
-/** Whether SQLite job store is available (detected once on load). */
-const hasSQLite = (): boolean => getJobStore() !== undefined;
 
 /** In-memory job store and event bus for the current session. */
 const state = {

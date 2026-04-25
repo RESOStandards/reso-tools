@@ -22,7 +22,7 @@ import {
   validateStatusCodeRange
 } from '../test-runner/validators.js';
 import { validateEventData } from './data-validator.js';
-import type { DataValidationResult, EntityEventConfig, EntityEventRecord, EntityEventTestReport } from './types.js';
+import type { EntityEventConfig, EntityEventRecord, EntityEventTestReport } from './types.js';
 
 // ── Helpers ──
 

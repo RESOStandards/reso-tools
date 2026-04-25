@@ -5,7 +5,6 @@ import { AdvancedSearch } from '../components/advanced-search';
 import { BasicSearch } from '../components/basic-search';
 import { LoadingSpinner } from '../components/loading-spinner';
 import { ResultsList } from '../components/results-list';
-import { SearchBar } from '../components/search-bar';
 import { useCollection } from '../hooks/use-collection';
 import { useMetadata } from '../hooks/use-metadata';
 import { useUiConfig } from '../hooks/use-ui-config';
@@ -14,6 +13,40 @@ import { FriendlyError } from '../components/friendly-error';
 import { READ_ONLY_RESOURCES } from '../types';
 import { NotFoundPage } from './not-found-page';
 import { getDisplayNameFromMap } from '../utils/format';
+
+/** Map raw parser/lexer errors to a friendly explanation a non-technical user can act on. */
+const humanizeFilterError = (err: ParseError | LexerError, filter: string): string => {
+  const pos = err.position;
+  const near = filter.slice(Math.max(0, pos - 12), Math.min(filter.length, pos + 12));
+  const context = near ? ` near "…${near}…"` : '';
+  const msg = err.message;
+
+  if (err instanceof LexerError && msg.startsWith('Unterminated string')) {
+    return `Looks like an unclosed quote${context}. Wrap text values in single quotes — for example, City eq 'Atlanta'.`;
+  }
+  if (err instanceof LexerError && msg.startsWith('Unterminated enum')) {
+    return `Looks like an unclosed enum literal${context}. Enums use single quotes — for example, StandardStatus eq 'Active'.`;
+  }
+  if (err instanceof LexerError && msg.startsWith('Unexpected character')) {
+    return `Unexpected character${context}. Check for typos, stray symbols, or characters that need to be quoted.`;
+  }
+  if (msg.startsWith('Empty filter')) {
+    return 'The filter is empty. Try something like StandardStatus eq \'Active\'.';
+  }
+  if (msg.startsWith('Unexpected end of expression')) {
+    return `The filter looks incomplete${context}. It may be missing a value, a closing quote, or a closing parenthesis.`;
+  }
+  if (msg.startsWith('Unexpected token') && msg.includes('after end of expression')) {
+    return `Extra content${context} after the filter ended. You may have a stray symbol or be missing an operator like "and"/"or".`;
+  }
+  if (msg.startsWith('Unexpected token')) {
+    return `I couldn't make sense of this part${context}. Common causes: a missing operator (eq, ne, gt, and, or), an unquoted text value, or unmatched parentheses.`;
+  }
+  if (msg.startsWith('Expected')) {
+    return `Filter is malformed${context}. ${msg.replace(/ at position \d+$/, '.')} Check operators and matching parentheses.`;
+  }
+  return `Filter couldn't be parsed${context}. Make sure quotes and parens are closed, and operators are spelled correctly.`;
+};
 
 /** Search page with basic search, OData filter editor, optional advanced search, and infinite scroll results. */
 export const SearchPage = () => {
@@ -28,9 +61,6 @@ export const SearchPage = () => {
   const orderby = searchParams.get('$orderby') ?? '';
   const mode = searchParams.get('mode') ?? 'simple';
   const isAdvanced = mode === 'advanced';
-
-  // Whether the raw OData editor is visible (toggled by pencil icon / close button)
-  const [showODataEditor, setShowODataEditor] = useState(false);
 
   // Draft filter state — tracks what the user is composing before submitting
   const [draftFilter, setDraftFilter] = useState(filter);
@@ -100,9 +130,9 @@ export const SearchPage = () => {
       handleSearch(trimmed);
     } catch (err) {
       if (err instanceof ParseError || err instanceof LexerError) {
-        setValidationError(err.message);
+        setValidationError(humanizeFilterError(err, trimmed));
       } else {
-        setValidationError('Invalid filter expression');
+        setValidationError('That filter doesn\'t look right. Check quotes, parens, and operators.');
       }
     }
   }, [draftFilter, handleSearch]);
@@ -137,15 +167,6 @@ export const SearchPage = () => {
     },
     [navigate, resourceName]
   );
-
-  const handleShowOData = useCallback(() => {
-    setShowODataEditor(true);
-  }, []);
-
-  const handleCloseOData = useCallback(() => {
-    setShowODataEditor(false);
-    setValidationError(null);
-  }, []);
 
   // Validate resource exists in discovered metadata
   const isValidResource = resources?.some(r => r.name === resourceName) ?? null;
@@ -210,6 +231,21 @@ export const SearchPage = () => {
           onShowOData={handleToggleAdvanced}
         />
 
+        {validationError && (
+          <p
+            role="alert"
+            className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 rounded px-3 py-2">
+            {validationError}
+          </p>
+        )}
+
+        {metaError && (
+          <p
+            role="alert"
+            className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 rounded px-3 py-2">
+            Couldn't load metadata for this resource: {metaError}
+          </p>
+        )}
 
         {/* Sortable column headers */}
         {rows.length > 0 && (
@@ -269,7 +305,6 @@ export const SearchPage = () => {
           rows={rows}
           summaryFields={summaryFields}
           fields={fields}
-          count={count}
           isLoading={isLoading}
           hasMore={hasMore}
           error={error}

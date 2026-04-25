@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { AuthConfig } from '../test-runner/types.js';
-import type { AddEditConfig, EntityEventConfig, CoreConfig, DDConfig, ComplianceConfig } from './types.js';
+import type { AddEditConfig, EntityEventConfig, CoreConfig, DDConfig } from './types.js';
 
 // ── Config File Types ──
 
@@ -165,7 +165,6 @@ export const resolvePayloadKeys = (
 
   const updateSucceeds = { ...payloads.updateSucceeds };
   const updateFails = { ...payloads.updateFails };
-  const deleteSucceeds = { ...payloads.deleteFails };
   const deleteFails = payloads.deleteFails ?? { id: '00000000-0000-0000-0000-000000000000' };
 
   let keyChained = false;
