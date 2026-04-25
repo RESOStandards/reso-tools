@@ -92,6 +92,7 @@ interface JobStoreAPI {
     readonly error?: string;
     readonly reports?: Record<string, string>;
     readonly resultPath?: string;
+    readonly variationsReviewSubmittedAt?: string;
   }) => Promise<Job | undefined>;
   readonly upsertStep: (jobId: string, step: JobStep & { readonly sortOrder: number }) => Promise<unknown>;
   readonly getJob: (id: string) => Promise<Job | undefined>;
@@ -153,6 +154,13 @@ export interface Job {
   readonly reports?: Record<string, string>;
   /** Local filesystem path for disk-hydrated jobs. Used for deletion. */
   readonly resultPath?: string;
+  /**
+   * ISO timestamp when the provider explicitly submitted variations from
+   * this job for review. Undefined while variations are still local-only.
+   * Drives the "Start Variations Review" vs "Review Variations" button
+   * label so the provider can iterate before going public.
+   */
+  readonly variationsReviewSubmittedAt?: string;
 }
 
 export type JobEvent =
@@ -230,7 +238,7 @@ const updateJob = (id: string, patch: Partial<Job>): void => {
   const store = getJobStore();
   if (store) {
     // Persist status changes to SQLite
-    if (patch.status || patch.startedAt || patch.completedAt || patch.error || patch.reports || patch.resultPath) {
+    if (patch.status || patch.startedAt || patch.completedAt || patch.error || patch.reports || patch.resultPath || patch.variationsReviewSubmittedAt) {
       store.updateJobStatus(id, {
         status: patch.status,
         startedAt: patch.startedAt,
@@ -238,6 +246,7 @@ const updateJob = (id: string, patch: Partial<Job>): void => {
         error: patch.error,
         reports: patch.reports,
         resultPath: patch.resultPath,
+        variationsReviewSubmittedAt: patch.variationsReviewSubmittedAt,
       }).catch(() => {});
     }
     // Persist step updates to SQLite
@@ -260,6 +269,24 @@ export const getJobs = (): ReadonlyArray<Job> =>
 
 /** Get a single job by ID. */
 export const getJob = (id: string): Job | undefined => state.jobs.get(id);
+
+/**
+ * Mark a job's variations as submitted for review. Called after a
+ * successful saveVariationsReview() so the "Start Variations Review"
+ * button on the job card flips to "Review Variations" and the
+ * provider knows the submission landed. Stores an ISO timestamp; the
+ * presence of the field is the gate, the timestamp is for audit.
+ *
+ * Idempotent — calling twice keeps the original timestamp (we record
+ * the FIRST submission, not the most recent re-save). Subsequent
+ * saves are edits, not new submissions.
+ */
+export const markVariationsReviewSubmitted = (id: string): void => {
+  const job = state.jobs.get(id);
+  if (!job) return;
+  if (job.variationsReviewSubmittedAt) return;
+  updateJob(id, { variationsReviewSubmittedAt: new Date().toISOString() });
+};
 
 /** Cancel a queued or running job. */
 export const cancelJob = (id: string): void => {

@@ -59,6 +59,14 @@ export interface JobRecord {
   readonly sdkConfig?: Record<string, unknown>;
   /** Map of reportKey → absolute path (local) or URL (cloud). Resolved lazily by the renderer. */
   readonly reports?: Record<string, string>;
+  /**
+   * ISO timestamp when the provider explicitly submitted variations from
+   * this job for review. Undefined while variations are still local-only.
+   * Drives the "Start Variations Review" vs "Review Variations" button
+   * label so the provider can iterate (retest, fix data) before going
+   * public with their findings.
+   */
+  readonly variationsReviewSubmittedAt?: string;
   readonly steps: ReadonlyArray<StepRecord>;
 }
 
@@ -70,6 +78,8 @@ export interface StatusPatch {
   /** Map of reportKey → absolute path (local) or URL (cloud). Resolved lazily by the renderer. */
   readonly reports?: Record<string, string>;
   readonly resultPath?: string;
+  /** Set when the provider submits variations for review. */
+  readonly variationsReviewSubmittedAt?: string;
 }
 
 export interface JobFilter {
@@ -113,6 +123,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   result_path      TEXT,
   sdk_config       TEXT,
   reports          TEXT,
+  variations_review_submitted_at TEXT,
   created_at       TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -180,6 +191,7 @@ const rowToJob = (row: Record<string, unknown>, steps: ReadonlyArray<StepRecord>
   resultPath: row.result_path as string | undefined,
   sdkConfig: fromJSON<Record<string, unknown>>(row.sdk_config),
   reports: fromJSON<Record<string, string>>(row.reports),
+  variationsReviewSubmittedAt: row.variations_review_submitted_at as string | undefined,
   steps,
 });
 
@@ -191,6 +203,17 @@ export const initJobsDb = (dbPath: string): Database.Database => {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.exec(SCHEMA);
+  // Idempotent additive migrations for columns that didn't exist in
+  // earlier SCHEMA versions. CREATE TABLE IF NOT EXISTS won't add
+  // columns to an existing table, so each new column needs an explicit
+  // ALTER TABLE wrapped in a "is it already there?" guard.
+  const ensureColumn = (table: string, name: string, definition: string): void => {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all() as ReadonlyArray<{ name: string }>;
+    if (!cols.some((c) => c.name === name)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+    }
+  };
+  ensureColumn('jobs', 'variations_review_submitted_at', 'TEXT');
   return db;
 };
 
@@ -202,10 +225,12 @@ export const createJobStore = (db: Database.Database): JobStore => {
   const insertJob = db.prepare(`
     INSERT INTO jobs (id, provider_uoi, provider_usi, recipient_uoi, recipient_name,
       endorsement, endorsement_key, version, status, error, queued_at, started_at,
-      completed_at, local, result_path, sdk_config, reports)
+      completed_at, local, result_path, sdk_config, reports,
+      variations_review_submitted_at)
     VALUES (@id, @provider_uoi, @provider_usi, @recipient_uoi, @recipient_name,
       @endorsement, @endorsement_key, @version, @status, @error, @queued_at, @started_at,
-      @completed_at, @local, @result_path, @sdk_config, @reports)
+      @completed_at, @local, @result_path, @sdk_config, @reports,
+      @variations_review_submitted_at)
   `);
 
   const selectJob = db.prepare('SELECT * FROM jobs WHERE id = ?');
@@ -219,6 +244,7 @@ export const createJobStore = (db: Database.Database): JobStore => {
       error = COALESCE(@error, error),
       reports = COALESCE(@reports, reports),
       result_path = COALESCE(@result_path, result_path),
+      variations_review_submitted_at = COALESCE(@variations_review_submitted_at, variations_review_submitted_at),
       updated_at = datetime('now')
     WHERE id = @id
   `);
@@ -266,6 +292,7 @@ export const createJobStore = (db: Database.Database): JobStore => {
       result_path: job.resultPath ?? null,
       sdk_config: toJSON(job.sdkConfig),
       reports: toJSON(job.reports),
+      variations_review_submitted_at: job.variationsReviewSubmittedAt ?? null,
     });
     return readJob(job.id)!;
   };
@@ -279,6 +306,7 @@ export const createJobStore = (db: Database.Database): JobStore => {
       error: patch.error ?? null,
       reports: patch.reports != null ? toJSON(patch.reports) : null,
       result_path: patch.resultPath ?? null,
+      variations_review_submitted_at: patch.variationsReviewSubmittedAt ?? null,
     });
     return readJob(id);
   };

@@ -35,8 +35,25 @@ export interface BlendedSuggestion {
   readonly maxDistance?: number;
 }
 
+/**
+ * Provenance fields attached to every variation so admins can tell
+ * which provider:recipient combination produced it. Carried through
+ * the blend layer from the parent report context. Optional so older
+ * reports (and pre-provenance fixtures) still parse cleanly.
+ */
+export interface VariationProvenance {
+  /** Provider's Organization Unique Identifier. */
+  readonly providerUoi?: string;
+  /** Provider's Unique System Identifier (which system they ran from). */
+  readonly providerUsi?: string;
+  /** Recipient's Organization Unique Identifier. */
+  readonly recipientUoi?: string;
+  /** DD version that produced the variation (e.g., '2.0', '2.1'). */
+  readonly version?: string;
+}
+
 /** A single blended variation — one non-standard item with its suggestions. */
-export interface BlendedVariation {
+export interface BlendedVariation extends VariationProvenance {
   readonly resourceName: string;
   readonly fieldName?: string;
   readonly lookupValue?: string;
@@ -110,6 +127,12 @@ interface LocalVariationsReport extends VariationsBuckets {
   readonly version?: string;
   readonly generatedOn?: string;
   readonly fuzziness?: number;
+  /** Provider UOI captured at variation-detection time (DD pipeline writes this). */
+  readonly providerUoi?: string;
+  /** Provider USI captured at variation-detection time. */
+  readonly providerUsi?: string;
+  /** Recipient UOI captured at variation-detection time. */
+  readonly recipientUoi?: string;
   /** Optional wrapper shape some legacy writers used. The blender prefers top-level buckets when present. */
   readonly variations?: VariationsBuckets;
 }
@@ -185,12 +208,14 @@ const getServiceData = (
 const blendItem = (
   item: LocalVariationItem,
   type: BlendedVariation['type'],
-  serviceSuggestions: ServiceSuggestionsMap
+  serviceSuggestions: ServiceSuggestionsMap,
+  provenance: VariationProvenance
 ): BlendedVariation => {
   const serviceData = getServiceData(serviceSuggestions, item.resourceName, item.fieldName, item.lookupValue);
 
   if (serviceData?.ignored) {
     return {
+      ...provenance,
       resourceName: item.resourceName,
       fieldName: item.fieldName,
       lookupValue: item.lookupValue,
@@ -205,6 +230,7 @@ const blendItem = (
   if (serviceData && serviceData.suggestions.length > 0) {
     // Service suggestions override machine suggestions
     return {
+      ...provenance,
       resourceName: item.resourceName,
       fieldName: item.fieldName,
       lookupValue: item.lookupValue,
@@ -218,6 +244,7 @@ const blendItem = (
 
   // Machine suggestions only
   return {
+    ...provenance,
     resourceName: item.resourceName,
     fieldName: item.fieldName,
     lookupValue: item.lookupValue,
@@ -234,12 +261,27 @@ const blendItem = (
  *
  * @param localReport - output from computeVariations()
  * @param serviceSuggestions - output from searchVariations API (the mappings field)
+ * @param provenance - provider/recipient/version metadata to stamp on every emitted variation.
+ *   Optional; if omitted the variations carry no provenance fields. The DD version on
+ *   `provenance.version` overrides whatever `localReport.version` says, since the caller
+ *   knows the canonical job-time version while the report file may be older.
  * @returns unified report ready for UI display
  */
 export const blendVariations = (
   localReport: LocalVariationsReport,
-  serviceSuggestions: ServiceSuggestionsMap = {}
+  serviceSuggestions: ServiceSuggestionsMap = {},
+  provenance: VariationProvenance = {}
 ): BlendedVariationsReport => {
+  // Caller-supplied provenance wins, but fall back to fields embedded
+  // in the report file itself. The DD pipeline writes these top-level
+  // so a standalone file (without surrounding job state) still carries
+  // who-produced-it information.
+  const effectiveProvenance: VariationProvenance = {
+    providerUoi: provenance.providerUoi ?? localReport.providerUoi,
+    providerUsi: provenance.providerUsi ?? localReport.providerUsi,
+    recipientUoi: provenance.recipientUoi ?? localReport.recipientUoi,
+    version: provenance.version ?? localReport.version,
+  };
   const variations: BlendedVariation[] = [];
 
   // Accept either shape: top-level buckets (what the DD pipeline writes today) or
@@ -261,7 +303,7 @@ export const blendVariations = (
 
   for (const { items, type } of categories) {
     for (const item of items) {
-      variations.push(blendItem(item, type, serviceSuggestions));
+      variations.push(blendItem(item, type, serviceSuggestions, effectiveProvenance));
     }
   }
 

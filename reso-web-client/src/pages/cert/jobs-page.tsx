@@ -65,6 +65,8 @@ interface CertJob {
   readonly reports?: Record<string, string>;
   readonly error?: string;
   readonly sdkConfig?: Record<string, unknown>;
+  /** Set when the provider explicitly submitted variations for review. */
+  readonly variationsReviewSubmittedAt?: string;
 }
 
 // ── Fixture data for layout review ──────────────────────────────────
@@ -409,6 +411,35 @@ const LiveTimer = ({ startTime }: { readonly startTime: number }) => {
   return <span className="text-xs text-blue-400 dark:text-blue-500 tabular-nums ml-2">{formatDuration(elapsed)}</span>;
 };
 
+/**
+ * Job-level timing readout. While running, ticks live from job.startedAt.
+ * Once complete, shows the total wall-clock duration (completedAt - startedAt).
+ * Falls back to scheduledAt clock time for queued/scheduled jobs that have
+ * no startedAt yet.
+ *
+ * Concurrency-safe: the timing source is the per-job ISO timestamps on the
+ * job record itself. There is no shared state across jobs, so multiple jobs
+ * running concurrently each tick from their own startedAt independently.
+ */
+const JobTimer = ({ job }: { readonly job: CertJob }) => {
+  const startedAtMs = job.startedAt ? Date.parse(job.startedAt) : null;
+  const completedAtMs = job.completedAt ? Date.parse(job.completedAt) : null;
+
+  if (job.status === 'running' && startedAtMs != null) {
+    return <LiveTimer startTime={startedAtMs} />;
+  }
+
+  if (completedAtMs != null && startedAtMs != null && completedAtMs >= startedAtMs) {
+    return (
+      <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums ml-2" title={`Started ${formatTime(job.startedAt!)} · Finished ${formatTime(job.completedAt!)}`}>
+        {formatDuration(completedAtMs - startedAtMs)}
+      </span>
+    );
+  }
+
+  return null;
+};
+
 import { DetailText } from '../../components/cert/detail-text';
 
 import {
@@ -552,7 +583,8 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
             <span className={`text-xs font-semibold uppercase tracking-wider ${statusColor(job.status)}`}>
               {job.status}
             </span>
-            <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
+            <JobTimer job={job} />
+            <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums" title="Scheduled">
               {formatTime(job.scheduledAt)}
             </span>
             <svg className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
@@ -602,7 +634,7 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                 </button>
                 {job.steps.some(s => s.name.toLowerCase().includes('variation') && s.status === 'failed') && (
                   <NavLink to="/cert/variations" state={{ job }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors">
-                    Review Variations
+                    {job.variationsReviewSubmittedAt ? 'Review Variations' : 'Start Variations Review'}
                   </NavLink>
                 )}
                 {onRerun && (
@@ -624,7 +656,7 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                 </button>
                 {job.steps.some(s => s.name.toLowerCase().includes('variation') && s.status === 'failed') && (
                   <NavLink to="/cert/variations" state={{ job }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors">
-                    Review Variations
+                    {job.variationsReviewSubmittedAt ? 'Review Variations' : 'Start Variations Review'}
                   </NavLink>
                 )}
                 {onRerun && (
@@ -1031,6 +1063,7 @@ export const JobsPage = () => {
       error: j.error,
       sdkConfig: j.sdkConfig,
       providerUsi: j.providerUsi,
+      variationsReviewSubmittedAt: j.variationsReviewSubmittedAt,
     })),
   [liveJobs]);
 

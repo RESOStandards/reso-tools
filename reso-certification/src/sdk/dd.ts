@@ -223,10 +223,24 @@ const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
     ].filter(Boolean);
     const summaryDetail = parts.length > 0 ? `: ${parts.join(', ')}` : '';
 
-    // Write variations report alongside other artifacts
+    // Write variations report alongside other artifacts. Wrap the
+    // raw buckets with provenance metadata so the file is durable
+    // even if the surrounding SQLite job record is lost — admins can
+    // still tell which provider/recipient/version produced these
+    // variations by reading the file directly. The blender accepts
+    // either shape (top-level buckets or a `{ variations: {...} }`
+    // wrapper), so both old and new files load cleanly.
     if (hasVariations && ctx.outputPath) {
       const variationsPath = join(ctx.outputPath, 'variations-report.json');
-      await writeFile(variationsPath, JSON.stringify(variations, null, 2));
+      const reportBody = {
+        version: ctx.version,
+        providerUoi: config.providerUoi,
+        providerUsi: config.providerUsi,
+        recipientUoi: config.recipientUoi,
+        generatedOn: new Date().toISOString(),
+        ...(variations as Record<string, unknown>),
+      };
+      await writeFile(variationsPath, JSON.stringify(reportBody, null, 2));
     }
 
     if (hasVariations) {

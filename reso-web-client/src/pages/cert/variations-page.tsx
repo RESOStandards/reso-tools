@@ -24,6 +24,7 @@ import { searchVariations, getVariationsStats, searchLocks, createLock, deleteLo
 import { resolveReportRef, ReportMissingError } from '../../services/report-ref';
 import { useNotifications } from '../../hooks/use-notifications';
 import { saveVariationsReview } from '../../services/variations-save';
+import { markVariationsReviewSubmitted } from '../../services/job-manager';
 import { VariationComments, type VariationComment } from '../../components/cert/variation-comments';
 import { useAuth } from '../../hooks/use-auth';
 
@@ -209,11 +210,21 @@ export const VariationsPage = () => {
           } catch { /* Not authenticated / service unavailable — use local only */ }
         }
 
-        const blended = {
-          ...blendVariations(localReport, serviceSuggestions),
+        const provenance = {
           providerUoi: job.providerUoi as string | undefined,
           providerUsi: job.providerUsi as string | undefined,
           recipientUoi: job.recipientUoi as string | undefined,
+          version: job.version as string | undefined,
+        };
+        // Spread provenance onto the blended report only for keys that are
+        // actually defined, so we don't clobber the report's required
+        // `version` field with `undefined` from a job that lacks it.
+        const definedProvenance = Object.fromEntries(
+          Object.entries(provenance).filter(([, v]) => v !== undefined)
+        );
+        const blended: BlendedVariationsReport = {
+          ...blendVariations(localReport, serviceSuggestions, provenance),
+          ...definedProvenance,
         };
         setReport(blended);
         cacheReport(blended);
@@ -272,7 +283,7 @@ export const VariationsPage = () => {
     />;
   }
 
-  return <ReviewDetailView report={report} onBack={() => setView('list')} ensureFreshToken={ensureFreshProviderToken} user={user} isAdmin={isAdmin} />;
+  return <ReviewDetailView report={report} onBack={() => setView('list')} ensureFreshToken={ensureFreshProviderToken} user={user} isAdmin={isAdmin} jobId={(routeState?.job as { id?: string } | undefined)?.id} />;
 };
 
 // ── Review List View ─────────────────────────────────────────────────
@@ -416,12 +427,14 @@ const ReviewListView = ({ onSelectReport, ensureFreshToken, isAuthenticated }: {
 
 // ── Review Detail View ───────────────────────────────────────────────
 
-const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin }: {
+const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin, jobId }: {
   readonly report: BlendedVariationsReport;
   readonly onBack: () => void;
   readonly ensureFreshToken: () => Promise<string>;
   readonly user: { readonly username: string; readonly email: string; readonly fullName: string } | null;
   readonly isAdmin: boolean;
+  /** Local job ID — set by VariationsPage when navigating from a job card. Used to mark the job as having submitted variations after a successful save. */
+  readonly jobId?: string;
 }) => {
   const reportId = `${report.version}`;
 
@@ -583,6 +596,12 @@ const ReviewDetailView = ({ report, onBack, ensureFreshToken, user, isAdmin }: {
         clearDraft(reportId);
         setActions(new Map());
         setDraftComments(new Map());
+        // First successful save for this job marks variations as
+        // submitted for review — flips the job-card button label from
+        // "Start Variations Review" to "Review Variations" so the
+        // provider knows the submission landed. Idempotent: subsequent
+        // saves are edits and don't change the original timestamp.
+        if (jobId) markVariationsReviewSubmitted(jobId);
       }
     } finally {
       setSaving(false);
@@ -764,7 +783,17 @@ const VariationRow = ({ variation, action, isSelected, isReadOnly, isAdmin, isFa
       role="button"
       tabIndex={0}
     >
-      <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">{variation.type}</div>
+      <div className="text-xs text-gray-500 dark:text-gray-400 capitalize min-w-0">
+        {variation.type}
+        {isAdmin && (variation.providerUoi || variation.recipientUoi) && (
+          <div
+            className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 truncate font-mono normal-case"
+            title={`Provider UOI: ${variation.providerUoi ?? '—'}\nProvider USI: ${variation.providerUsi ?? '—'}\nRecipient UOI: ${variation.recipientUoi ?? '—'}\nDD version: ${variation.version ?? '—'}`}
+          >
+            {variation.providerUoi ?? '—'}<span className="mx-0.5 text-gray-300 dark:text-gray-600">→</span>{variation.recipientUoi ?? '—'}
+          </div>
+        )}
+      </div>
       <div className="truncate"><PathDisplay parts={diff.source} tone="source" /></div>
       <div className="truncate">
         {primary
@@ -928,6 +957,32 @@ const VariationDrawer = ({ variation, action, draftComments, isReadOnly, isAdmin
               <PathDisplay parts={sourceSegments(variation).filter((s): s is string => s != null).map(text => ({ text, changed: true }))} tone="source" />
             </div>
           </div>
+
+          {/* Provenance — admin only. Shows where this variation came from
+              so admins can route follow-ups to the right provider. */}
+          {isAdmin && (variation.providerUoi || variation.providerUsi || variation.recipientUoi || variation.version) && (
+            <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Provenance</div>
+              <dl className="grid grid-cols-[110px_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
+                {variation.providerUoi && <>
+                  <dt className="text-gray-500 dark:text-gray-400">Provider UOI</dt>
+                  <dd className="font-mono text-gray-800 dark:text-gray-200 truncate" title={variation.providerUoi}>{variation.providerUoi}</dd>
+                </>}
+                {variation.providerUsi && <>
+                  <dt className="text-gray-500 dark:text-gray-400">Provider USI</dt>
+                  <dd className="font-mono text-gray-800 dark:text-gray-200 truncate" title={variation.providerUsi}>{variation.providerUsi}</dd>
+                </>}
+                {variation.recipientUoi && <>
+                  <dt className="text-gray-500 dark:text-gray-400">Recipient UOI</dt>
+                  <dd className="font-mono text-gray-800 dark:text-gray-200 truncate" title={variation.recipientUoi}>{variation.recipientUoi}</dd>
+                </>}
+                {variation.version && <>
+                  <dt className="text-gray-500 dark:text-gray-400">DD version</dt>
+                  <dd className="font-mono text-gray-800 dark:text-gray-200">{variation.version}</dd>
+                </>}
+              </dl>
+            </div>
+          )}
 
           {/* Suggestions */}
           {variation.suggestions.length > 0 ? (
