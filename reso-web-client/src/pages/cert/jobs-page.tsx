@@ -325,12 +325,23 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                 )}
               </>
             )}
-            {job.status === 'failed' && (
+            {job.status === 'failed' && (() => {
+              const failedSteps = job.steps.filter(s => s.status === 'failed');
+              const hasVariationsFailure = failedSteps.some(s => s.name.toLowerCase().includes('variation'));
+              // Only hide "View Failure Report" when *every* failure is a
+              // variations failure. Mixed failures (e.g. schema validation
+              // + variations) still need the modal for the non-variations
+              // sections, where "Start Variations Review" is irrelevant.
+              const isVariationsOnlyFailure = failedSteps.length > 0
+                && failedSteps.every(s => s.name.toLowerCase().includes('variation'));
+              return (
               <>
-                <button type="button" onClick={() => setShowFailure(true)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors">
-                  View Failure Report
-                </button>
-                {job.steps.some(s => s.name.toLowerCase().includes('variation') && s.status === 'failed') && (
+                {!isVariationsOnlyFailure && (
+                  <button type="button" onClick={() => setShowFailure(true)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors">
+                    View Failure Report
+                  </button>
+                )}
+                {hasVariationsFailure && (
                   <NavLink to="/cert/variations" state={{ job }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors">
                     {job.variationsReviewSubmittedAt ? 'Review Variations' : 'Start Variations Review'}
                   </NavLink>
@@ -346,7 +357,8 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                   </button>
                 )}
               </>
-            )}
+              );
+            })()}
 
             {/* Delete — available on all completed local jobs */}
             {onDelete && (job.status === 'passed' || job.status === 'failed') && (

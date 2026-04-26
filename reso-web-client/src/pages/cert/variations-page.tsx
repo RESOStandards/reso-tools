@@ -81,14 +81,53 @@ const diffSegments = (src: ReadonlyArray<string | undefined>, tgt: ReadonlyArray
   return { source, target };
 };
 
-const STRATEGY_LABELS: Readonly<Record<string, { label: string; color: string }>> = {
-  'Substring': { label: 'Substring Match', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
-  'Edit Distance': { label: 'Edit Distance', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
-  'Fast Track': { label: 'Fast Track', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' },
-  'Admin Review': { label: 'Admin Review', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
-  'Suggestion': { label: 'Suggestion', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
-  'Policy': { label: 'Policy', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
+interface StrategyMeta {
+  readonly label: string;
+  readonly color: string;
+  /** Plain-language explanation surfaced as a `title` tooltip on the chip. */
+  readonly description: string;
+}
+
+const STRATEGY_LABELS: Readonly<Record<string, StrategyMeta>> = {
+  'Substring': {
+    label: 'Substring Match',
+    color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    description: 'The local name contains the standard name (or vice versa) — likely the same concept with extra prefix or suffix.',
+  },
+  'Edit Distance': {
+    label: 'Edit Distance',
+    color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+    description: 'The local name is within a few character edits of a standard name — likely a typo or minor variant.',
+  },
+  'Fast Track': {
+    label: 'Fast Track',
+    color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+    description: 'Pre-approved by the DD workgroup as a future-standard candidate. Flagging for Fast Track sends it to expedited review.',
+  },
+  'Admin Review': {
+    label: 'Admin Review',
+    color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    description: 'Requires a RESO admin to evaluate before the suggested mapping can be accepted.',
+  },
+  'Suggestion': {
+    label: 'Suggestion',
+    color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+    description: 'A general suggestion from the variations service — not categorized into one of the structured strategies.',
+  },
+  'Policy': {
+    label: 'Policy',
+    color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+    description: 'Matches a RESO policy rule — typically blocks certification until resolved.',
+  },
 };
+
+/** Resolve strategy metadata with a sensible fallback for unknown strategy names. */
+const getStrategyMeta = (strategy: string): StrategyMeta =>
+  STRATEGY_LABELS[strategy] ?? {
+    label: strategy,
+    color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+    description: `Strategy: ${strategy}`,
+  };
 
 // ── Draft localStorage ───────────────────────────────────────────────
 
@@ -839,7 +878,7 @@ const VariationRow = ({ variation, action, isSelected, isReadOnly, isAdmin, isFa
     ? diffSegments(sourceSegments(variation), targetSegments(primary))
     : { source: sourceSegments(variation).filter((s): s is string => s != null).map(text => ({ text, changed: false })), target: [] };
   const extraCount = variation.suggestions.length > 1 ? variation.suggestions.length - 1 : 0;
-  const strategyInfo = primary ? (STRATEGY_LABELS[primary.strategy] ?? { label: primary.strategy, color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' }) : null;
+  const strategyInfo = primary ? getStrategyMeta(primary.strategy) : null;
   const commentCount = (variation.conversations?.length ?? 0) + (hasDraftComments ? 1 : 0);
   const isIgnored = variation.ignored || action === 'ignored';
 
@@ -875,9 +914,14 @@ const VariationRow = ({ variation, action, isSelected, isReadOnly, isAdmin, isFa
           : <span className="text-xs text-gray-400 dark:text-gray-500">No suggestion</span>}
         {extraCount > 0 && <span className="ml-2 text-[10px] text-gray-400 dark:text-gray-500">+{extraCount} more</span>}
       </div>
-      <div>
+      <div className="flex justify-end">
         {strategyInfo && (
-          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${strategyInfo.color}`}>{strategyInfo.label}</span>
+          <span
+            title={strategyInfo.description}
+            className={`text-[10px] font-medium px-2 py-0.5 rounded-full cursor-help ${strategyInfo.color}`}
+          >
+            {strategyInfo.label}
+          </span>
         )}
       </div>
       <div className="text-center text-xs text-gray-500 dark:text-gray-400">
@@ -941,7 +985,7 @@ const VariationsTable = ({ variations, actions, selectedKey, draftComments, isRe
         <div>Type</div>
         <div>Source</div>
         <div>Suggested</div>
-        <div>Strategy</div>
+        <div className="text-right">Strategy</div>
         <div className="text-center">Comments</div>
         <div className="text-right">Actions</div>
       </div>
@@ -1067,14 +1111,19 @@ const VariationDrawer = ({ variation, action, draftComments, isReadOnly, isAdmin
               <div className="space-y-2">
                 {variation.suggestions.map((suggestion, i) => {
                   const diff = diffSegments(sourceSegments(variation), targetSegments(suggestion));
-                  const strategyInfo = STRATEGY_LABELS[suggestion.strategy] ?? { label: suggestion.strategy, color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' };
+                  const strategyInfo = getStrategyMeta(suggestion.strategy);
                   return (
                     <div key={i} className="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="min-w-0 flex-1">
                           <PathDisplay parts={diff.target} tone="target" />
                         </div>
-                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${strategyInfo.color}`}>{strategyInfo.label}</span>
+                        <span
+                          title={strategyInfo.description}
+                          className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 cursor-help ${strategyInfo.color}`}
+                        >
+                          {strategyInfo.label}
+                        </span>
                       </div>
                       {suggestion.suggestedRelatedFieldName && (
                         <div className="text-xs text-purple-600 dark:text-purple-400 mb-2">

@@ -198,7 +198,7 @@ const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
       return { context: ctx, status: 'skipped', summary: 'Variations only checked for DD 2.0' };
     }
 
-    const { variations } = await findVariations({
+    const { variations, fuzziness } = await findVariations({
       pathToMetadataReportJson: ctx.metadataReportPath,
       fromCli: true,
       strictMode: config.strictMode ?? false,
@@ -238,6 +238,10 @@ const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
         providerUsi: config.providerUsi,
         recipientUoi: config.recipientUoi,
         generatedOn: new Date().toISOString(),
+        // findVariations returns fuzziness alongside the buckets; surface
+        // it on the file so the UI can display "Match Sensitivity: N%".
+        // Without this, the blender's `fuzziness ?? 0` fallback shows 0%.
+        fuzziness: fuzziness as number | undefined,
         ...(variations as Record<string, unknown>),
       };
       await writeFile(variationsPath, JSON.stringify(reportBody, null, 2));
