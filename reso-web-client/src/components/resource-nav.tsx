@@ -44,8 +44,11 @@ export const ResourceNav = () => {
         Dashboard
       </NavLink>
 
-      {/* Resources section */}
-      <NavLink to={activeSection === 'resources' ? '/metadata' : `/${resourceNames[0] ?? 'Property'}`} className={sectionHeaderClass('resources')}>
+      {/* Resources section. When already active, the link is a no-op to
+          avoid bouncing the user to /metadata (which would auto-expand
+          the Metadata section instead — the previously-confusing
+          "click to close, but Metadata opens" behavior). */}
+      <NavLink to={activeSection === 'resources' ? location.pathname : `/${resourceNames[0] ?? 'Property'}`} className={sectionHeaderClass('resources')}>
         <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
           <title>Resources</title>
           <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
@@ -66,7 +69,7 @@ export const ResourceNav = () => {
             </div>
           )}
 
-          <ul className="flex flex-wrap sm:flex-col gap-1.5 sm:gap-0.5 mt-1">
+          <ul className="flex flex-wrap sm:flex-col gap-1.5">
             {resourceNames.map(resource => {
               const isActive = activeResource === resource;
               const isReadOnly = READ_ONLY_RESOURCES.has(resource);
@@ -74,10 +77,10 @@ export const ResourceNav = () => {
                 <li key={resource}>
                   <NavLink
                     to={`/${resource}`}
-                    className={`block px-3 py-1.5 rounded sm:rounded text-sm whitespace-nowrap ${
+                    className={`block text-sm whitespace-nowrap pl-5 ${
                       isActive
-                        ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium border border-blue-200 dark:border-blue-800 sm:border-0'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 sm:bg-transparent sm:dark:bg-transparent hover:bg-gray-200 dark:hover:bg-gray-600 sm:hover:bg-gray-100 sm:dark:hover:bg-gray-700'
+                        ? 'text-blue-600 dark:text-blue-400 font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100'
                     }`}>
                     {resource}
                     {isReadOnly && (
@@ -120,8 +123,8 @@ export const ResourceNav = () => {
         </>
       )}
 
-      {/* Metadata section */}
-      <NavLink to={activeSection === 'metadata' ? `/${resourceNames[0] ?? 'Property'}` : '/metadata'} className={sectionHeaderClass('metadata')}>
+      {/* Metadata section — same no-op-when-active rule as Resources. */}
+      <NavLink to={activeSection === 'metadata' ? location.pathname : '/metadata'} className={sectionHeaderClass('metadata')}>
         <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
           <title>Metadata</title>
           <path fillRule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -142,17 +145,17 @@ export const ResourceNav = () => {
             </div>
           )}
 
-          <ul className="flex flex-wrap sm:flex-col gap-1.5 sm:gap-0.5 mt-1">
+          <ul className="flex flex-wrap sm:flex-col gap-1.5">
             {resourceNames.map(resource => {
               const isActive = location.pathname === `/metadata/${resource}`;
               return (
                 <li key={resource}>
                   <NavLink
                     to={`/metadata/${resource}`}
-                    className={`block px-3 py-1.5 rounded text-sm whitespace-nowrap ${
+                    className={`block text-sm whitespace-nowrap pl-5 ${
                       isActive
-                        ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium border border-blue-200 dark:border-blue-800 sm:border-0'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 sm:bg-transparent sm:dark:bg-transparent hover:bg-gray-200 dark:hover:bg-gray-600 sm:hover:bg-gray-100 sm:dark:hover:bg-gray-700'
+                        ? 'text-blue-600 dark:text-blue-400 font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100'
                     }`}>
                     {resource}
                   </NavLink>
@@ -162,6 +165,11 @@ export const ResourceNav = () => {
           </ul>
         </>
       )}
+
+      {/* Divider between Data exploration and Workflows groups. The
+          <hr> participates in the outer flex so it gets the same gap
+          treatment as siblings — no extra padding to manage. */}
+      <hr className="border-gray-200 dark:border-gray-700" />
 
       {/* Organizations / Certification — flat siblings of the outer flex
           so the single outer gap controls all spacing uniformly. */}
@@ -205,6 +213,7 @@ export const ResourceNav = () => {
           for consistent vertical rhythm. */}
       {isLocal && (
         <>
+          <hr className="border-gray-200 dark:border-gray-700" />
           <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
             <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
               <title>Admin</title>
@@ -215,7 +224,7 @@ export const ResourceNav = () => {
           <NavLink
             to="/admin/data-generator"
             className={({ isActive }) =>
-              `flex items-center gap-1.5 text-sm whitespace-nowrap ${
+              `flex items-center gap-1.5 pl-5 text-sm whitespace-nowrap ${
                 isActive
                   ? 'text-amber-700 dark:text-amber-300 font-medium'
                   : 'text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400'
@@ -230,7 +239,7 @@ export const ResourceNav = () => {
           <button
             type="button"
             onClick={() => setShowConnectionInfo(true)}
-            className="flex items-center gap-1.5 text-sm whitespace-nowrap text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 cursor-pointer text-left">
+            className="flex items-center gap-1.5 pl-5 text-sm whitespace-nowrap text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 cursor-pointer text-left">
             <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
               <title>Connection Info</title>
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
