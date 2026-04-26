@@ -164,7 +164,7 @@ export const ResourceNav = () => {
       )}
 
       {/* Workflows: Organizations, Certification */}
-      <div className="mt-1 pt-1.5 border-t border-gray-200 dark:border-gray-700 flex flex-col gap-1.5">
+      <div className="pt-1 border-t border-gray-200 dark:border-gray-700 flex flex-col gap-1.5">
         <NavLink to="/organizations" className={sectionHeaderClass('organizations')}>
           <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
             <title>Organizations</title>
@@ -203,7 +203,7 @@ export const ResourceNav = () => {
 
       {/* Admin section — only show for local server */}
       {isLocal && (
-        <div className="mt-1 pt-1.5 border-t border-gray-200 dark:border-gray-700 flex flex-col gap-0.5">
+        <div className="pt-1 border-t border-gray-200 dark:border-gray-700 flex flex-col gap-0.5">
           <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
             <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
               <title>Admin</title>
