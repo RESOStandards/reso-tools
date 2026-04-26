@@ -25,6 +25,7 @@ import { resolveReportRef, ReportMissingError } from '../../services/report-ref'
 import { useNotifications } from '../../hooks/use-notifications';
 import { saveVariationsReview } from '../../services/variations-save';
 import { markVariationsReviewSubmitted } from '../../services/job-manager';
+import { useJobs } from '../../hooks/use-jobs';
 import { VariationComments, type VariationComment } from '../../components/cert/variation-comments';
 import { useAuth } from '../../hooks/use-auth';
 
@@ -419,6 +420,14 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
   const [staleNotification, setStaleNotification] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
+  // Whether this report has been submitted before (drives CTA label and
+  // the first-time instruction line). Read reactively via useJobs so the
+  // CTA flips from "Submit Review" → "Save Changes" right after the
+  // first successful submit, without a page reload.
+  const { jobs } = useJobs();
+  const job = jobId ? jobs.find(j => j.id === jobId) : undefined;
+  const hasSubmitted = !!job?.variationsReviewSubmittedAt;
+
   // Watch for VARIATIONS_REPORT notifications that indicate someone else updated this report
   const { notifications } = useNotifications();
   useEffect(() => {
@@ -670,23 +679,35 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {isDirty && !isReadOnly && (
+          {!isReadOnly && (
             <>
-              <span className="text-xs text-amber-600 dark:text-amber-400">{actions.size} unsaved</span>
-              <button type="button" onClick={() => {
-                clearDraft(reportId);
-                setActions(new Map());
-                setDraftComments(new Map());
-                // Discarding drafts means giving up the editing claim,
-                // so release the lock for other reviewers.
-                void releaseMyLock();
-              }}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-                Discard
-              </button>
-              <button type="button" onClick={handleSave} disabled={saving}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 transition-colors">
-                {saving ? 'Saving...' : 'Save Changes'}
+              {isDirty && (
+                <>
+                  <span className="text-xs text-amber-600 dark:text-amber-400">{actions.size} unsaved</span>
+                  <button type="button" onClick={() => {
+                    clearDraft(reportId);
+                    setActions(new Map());
+                    setDraftComments(new Map());
+                    // Discarding drafts means giving up the editing claim,
+                    // so release the lock for other reviewers.
+                    void releaseMyLock();
+                  }}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                    Discard
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving || !isDirty}
+                title={!isDirty ? 'Take an action on at least one variation to enable submission' : undefined}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                {saving
+                  ? 'Saving...'
+                  : hasSubmitted
+                    ? 'Save Changes'
+                    : 'Submit Review'}
               </button>
             </>
           )}
@@ -695,6 +716,16 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
           </div>
         </div>
       </div>
+
+      {/* First-time instruction — appears only when the page is fresh
+          (nothing submitted yet, no drafts taken). Disappears once the
+          user starts triaging or has submitted before, so it doesn't
+          nag seasoned reviewers. */}
+      {!hasSubmitted && !isDirty && !isReadOnly && (
+        <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+          Triage each variation below — click <strong>Ignore</strong>, <strong>Fast Track</strong>, or <strong>Remove</strong>. When you're done, click <strong>Submit Review</strong>.
+        </p>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-3 mb-4">
