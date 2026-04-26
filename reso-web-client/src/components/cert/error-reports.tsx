@@ -1057,23 +1057,65 @@ const SPEC_LINKS: Readonly<Record<string, { label: string; url: string }>> = {
 const getSpecLink = (endorsement: string): { label: string; url: string } | undefined =>
   Object.entries(SPEC_LINKS).find(([key]) => endorsement.includes(key))?.[1];
 
+/** Tiny copyable chip used in the modal subtitle for the recipient UOI.
+ *  A local copy of the broader CopyableUoi pattern from
+ *  endorsement-group-card / org-summary-page; kept inline here to avoid
+ *  introducing a third copy or a refactor not in scope for this change. */
+const FailureModalCopy = ({ value }: { readonly value: string }) => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    void navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    });
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      title={copied ? 'Copied!' : `Copy ${value}`}
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider bg-gray-100 text-gray-600 dark:bg-gray-700/60 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+    >
+      {value}
+      {copied ? (
+        <svg className="w-3 h-3 text-green-600 dark:text-green-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fillRule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 011.42-1.42L8.5 12.08l6.79-6.79a1 1 0 011.414 0z" clipRule="evenodd" />
+        </svg>
+      ) : (
+        <svg className="w-3 h-3 opacity-60" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path d="M7 3a1 1 0 011-1h7a1 1 0 011 1v10a1 1 0 01-1 1h-2v2a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h2V3zm2 4h4v6H9V7z" />
+        </svg>
+      )}
+    </button>
+  );
+};
+
 export const FailureReportModal = ({
   endorsement,
   version,
   recipientName,
+  recipientUoi,
   failedStep,
   reports,
   steps,
+  variationsReviewSubmittedAt,
   onClose,
   onReviewVariations,
 }: {
   readonly endorsement: string;
   readonly version: string;
   readonly recipientName: string;
+  /** Recipient UOI surfaced as a small copyable chip next to the name. */
+  readonly recipientUoi?: string;
   readonly failedStep?: string;
   /** Map of reportKey → reference (absolute filesystem path or HTTPS URL). */
   readonly reports?: Record<string, string>;
   readonly steps?: ReadonlyArray<{ name: string; status: string; detail?: string; summary?: string; errors?: ReadonlyArray<string>; requestDetails?: ReadonlyArray<{ method: string; url: string; status?: number; error?: string; responseBody?: string }>; artifacts?: ReadonlyArray<{ label: string; path: string }> }>;
+  /** ISO timestamp from SQLite when the local report was submitted to the
+   *  variations service. Drives the post-submit banner and the footer
+   *  button label flip ("Start Variations Review" → "Variations Report Review"). */
+  readonly variationsReviewSubmittedAt?: string;
   readonly onClose: () => void;
   /** Optional handler to jump to the full Variations Review page. When provided and the report is a variations report, a button appears in the footer. */
   readonly onReviewVariations?: () => void;
@@ -1115,9 +1157,10 @@ export const FailureReportModal = ({
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               Failure Report
             </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              {endorsement} {version} — {recipientName}
-              {failedStep && <span className="ml-2 text-red-500 dark:text-red-400">· Failed at: {failedStep}</span>}
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+              <span>{endorsement} {version} — {recipientName}</span>
+              {recipientUoi && <FailureModalCopy value={recipientUoi} />}
+              {failedStep && <span className="text-red-500 dark:text-red-400">· Failed at: {failedStep}</span>}
             </p>
             {(() => {
               const spec = getSpecLink(endorsement);
@@ -1145,6 +1188,18 @@ export const FailureReportModal = ({
 
         {/* Body — scrollable */}
         <div className="p-5 overflow-y-auto">
+          {variationsReviewSubmittedAt && report.type === 'variations' && (
+            <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-sm text-blue-800 dark:text-blue-200">
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              <span>
+                Submitted for review on{' '}
+                <span className="font-medium">{new Date(variationsReviewSubmittedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>.
+                Open the review to add comments or revise actions.
+              </span>
+            </div>
+          )}
           {anyLoading && (
             <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500 py-6">
               <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
@@ -1202,7 +1257,7 @@ export const FailureReportModal = ({
                 onClick={() => { onClose(); onReviewVariations(); }}
                 className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors"
               >
-                Open in Variations Review
+                {variationsReviewSubmittedAt ? 'Variations Report Review' : 'Start Variations Review'}
                 <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638l-3.96-4.158a.75.75 0 011.08-1.04l5.25 5.5a.75.75 0 010 1.04l-5.25 5.5a.75.75 0 11-1.08-1.04l3.96-4.158H3.75A.75.75 0 013 10z" clipRule="evenodd" />
                 </svg>

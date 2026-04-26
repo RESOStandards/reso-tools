@@ -328,22 +328,22 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
             {job.status === 'failed' && (() => {
               const failedSteps = job.steps.filter(s => s.status === 'failed');
               const hasVariationsFailure = failedSteps.some(s => s.name.toLowerCase().includes('variation'));
-              // Only hide "View Failure Report" when *every* failure is a
-              // variations failure. Mixed failures (e.g. schema validation
-              // + variations) still need the modal for the non-variations
-              // sections, where "Start Variations Review" is irrelevant.
+              // The modal acts as a quick read-only peek at any failure
+              // type — including variations-only failures, where it
+              // shows the variations preview alongside provenance and
+              // submission state. The action button (Start / Variations
+              // Report Review) lives separately on the card.
               const isVariationsOnlyFailure = failedSteps.length > 0
                 && failedSteps.every(s => s.name.toLowerCase().includes('variation'));
+              const detailsLabel = isVariationsOnlyFailure ? 'View Details' : 'View Failure Report';
               return (
               <>
-                {!isVariationsOnlyFailure && (
-                  <button type="button" onClick={() => setShowFailure(true)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors">
-                    View Failure Report
-                  </button>
-                )}
+                <button type="button" onClick={() => setShowFailure(true)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors">
+                  {detailsLabel}
+                </button>
                 {hasVariationsFailure && (
                   <NavLink to="/cert/variations" state={{ job }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors">
-                    {job.variationsReviewSubmittedAt ? 'Review Variations' : 'Start Variations Review'}
+                    {job.variationsReviewSubmittedAt ? 'Variations Report Review' : 'Start Variations Review'}
                   </NavLink>
                 )}
                 {onRerun && (
@@ -395,9 +395,11 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
           endorsement={job.endorsement}
           version={job.version}
           recipientName={job.recipientName}
+          recipientUoi={job.recipientUoi}
           failedStep={job.steps.find(s => s.status === 'failed')?.name ?? job.error}
           reports={job.reports}
           steps={job.steps}
+          variationsReviewSubmittedAt={job.variationsReviewSubmittedAt}
           onClose={() => setShowFailure(false)}
           onReviewVariations={() => navigate('/cert/variations', { state: { job } })}
         />
