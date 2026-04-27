@@ -66,6 +66,7 @@ cd reso-desktop-client && npm run dev
 - Use explicit return types on exported functions.
 - Prefer `unknown` over `any`. Use type narrowing and type guards instead of type assertions.
 - Use `.js` extensions in import paths (required for Node16 module resolution with ESM).
+- **Optional chaining and nullish coalescing**: prefer `a?.b?.c` and `x ?? fallback` over `a && a.b && a.b.c` or `x || fallback`. `??` is correct for "missing" (null/undefined); `||` is only right when zero/empty-string/false should also fall back, which is usually a bug waiting to happen. Apply to property access, method calls (`fn?.()`), and array indexing (`arr?.[0]`).
 - **State management (HIGH PRIORITY):**
   1. **Inside closures** (reduce, map, flatMap) — local mutable state is fine. It is scoped and dies with the closure. Never leak it out.
   2. **Function results** — bind to `const` on the RHS of an arrow function. No `let` unless absolutely necessary (justify it). No refs in the output.
