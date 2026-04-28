@@ -55,19 +55,6 @@ const parseKey = (key: string): { resourceName: string; fieldName?: string; look
   };
 };
 
-// ── Change ID computation ────────────────────────────────────────────
-
-/** Compute a SHA-256 changeId for a set of changes + editor info. */
-const computeChangeId = async (changes: ReadonlyArray<unknown>, editorInfo: Record<string, unknown>): Promise<string> => {
-  const input = JSON.stringify([changes, editorInfo]);
-  const encoder = new TextEncoder();
-  const data = encoder.encode(input);
-  // Use SHA-256 (compatible with Electron's BoringSSL)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 15);
-};
-
 // ── Build payload ────────────────────────────────────────────────────
 
 /** Build the save payload from draft actions and comments. */
@@ -147,30 +134,32 @@ const buildSavePayload = (input: SaveInput, _existingReport: VariationsReportPay
  * Save the variations report with draft actions and comments.
  *
  * 1. Generate cert request ID
- * 2. Fetch existing report (if any)
- * 3. Build new changes
- * 4. Compute changeId
- * 5. POST to service
+ * 2. Fetch existing report (if any) for merge
+ * 3. Build new changes (untagged — the backend filters by missing
+ *    changeId to identify what's new and computes the id itself)
+ * 4. POST merged payload
+ *
+ * On success the backend returns 200 with the persisted data; 304 means
+ * the same payload was already saved (idempotent re-submit), which we
+ * also treat as success since the server-side state matches what we
+ * intended to write.
  */
 export const saveVariationsReview = async (input: SaveInput): Promise<boolean> => {
   const certRequestId = await generateCertRequestId(input.version, input.providerUoi, input.providerUsi, input.recipientUoi);
 
-  // Fetch existing report
+  // Fetch existing report for merge
   const existingReport = await getVariationsReport(input.version, input.providerUoi, input.providerUsi, input.recipientUoi, certRequestId);
 
-  // Build new changes
+  // Build new changes — leave them untagged. The backend identifies
+  // "new" changes as those without a changeId and computes the id
+  // itself; sending pre-tagged changes makes the backend think there
+  // are zero new changes and respond 304.
   const { changes: newChanges, editorInfo } = buildSavePayload(input, existingReport, certRequestId);
 
   if (newChanges.length === 0) return false;
 
-  // Compute changeId
-  const changeId = await computeChangeId(newChanges, editorInfo as unknown as Record<string, unknown>);
-
-  // Tag changes and editor with changeId
-  const taggedChanges = newChanges.map(c => ({ ...c, changeId }));
-  const taggedEditor = { ...editorInfo, changeId };
-
-  // Merge with existing
+  // Merge with existing — past changes/editors keep their changeIds;
+  // the latest editor and the new changes go untagged.
   const existingChanges = existingReport?.changes ?? [];
   const existingEditors = existingReport?.editorInfo ?? [];
 
@@ -181,8 +170,8 @@ export const saveVariationsReview = async (input: SaveInput): Promise<boolean> =
     providerUoi: input.providerUoi,
     providerUsi: input.providerUsi,
     recipientUoi: input.recipientUoi,
-    changes: [...existingChanges, ...taggedChanges],
-    editorInfo: [taggedEditor, ...existingEditors],
+    changes: [...existingChanges, ...newChanges],
+    editorInfo: [editorInfo, ...existingEditors],
   };
 
   return saveVariationsReport(input.version, input.providerUoi, input.providerUsi, input.recipientUoi, certRequestId, payload);

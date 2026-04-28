@@ -741,6 +741,23 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
                   Locked by you · {formatTimeSince(lockHolder.lockUnixTimestamp)}
                 </span>
               )}
+              {hasSubmitted && job?.variationsReviewSubmittedAt && (
+                <span
+                  title={`Submitted at ${new Date(job.variationsReviewSubmittedAt).toLocaleString()}`}
+                  className="inline-flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900/50"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                    className="h-3 w-3"
+                  >
+                    <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+                  </svg>
+                  Submitted {formatTimeSince(Math.floor(new Date(job.variationsReviewSubmittedAt).getTime() / 1000))}
+                </span>
+              )}
             </p>
           </div>
         </div>

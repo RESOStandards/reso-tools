@@ -169,7 +169,9 @@ export const saveVariationsReport = async (
       body: JSON.stringify(payload),
     }
   );
-  return res.ok;
+  // 304 = idempotent re-submit (server already has this exact payload);
+  // treat as success so the UI clears its dirty state.
+  return res.ok || res.status === 304;
 };
 
 // ── Locks ────────────────────────────────────────────────────────────

@@ -354,7 +354,7 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
       const upstream = await fetch(targetUrl, {
         method: req.method,
         headers,
-        body: ['POST', 'PATCH', 'PUT'].includes(req.method)
+        body: ['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method)
           ? (req.headers['content-type']?.includes('application/x-www-form-urlencoded')
             ? new URLSearchParams(req.body as Record<string, string>).toString()
             : JSON.stringify(req.body))

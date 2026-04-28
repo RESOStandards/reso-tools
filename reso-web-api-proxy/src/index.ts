@@ -74,8 +74,11 @@ export const createProxyMiddleware = (): express.Router => {
     }
     if (!headers['accept']) headers['accept'] = 'application/json';
 
-    // Forward body for write methods
-    const hasBody = ['POST', 'PATCH', 'PUT'].includes(req.method);
+    // Forward body for write methods. DELETE is included because some
+    // backends (e.g. v2/locks) take the resource identifiers in the body
+    // rather than the URL — and Express has already parsed JSON bodies
+    // for us regardless of method.
+    const hasBody = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method);
     const body = hasBody
       ? (req.headers['content-type']?.includes('application/x-www-form-urlencoded')
         ? new URLSearchParams(req.body as Record<string, string>).toString()

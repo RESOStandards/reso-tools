@@ -208,7 +208,7 @@ describe('saveVariationsReview', () => {
     expect(body.changes[0].conversations).toHaveLength(1);
   });
 
-  it('includes editor info with changeId', async () => {
+  it('sends new changes and the latest editor untagged for backend to assign changeId', async () => {
     mockFetch
       .mockResolvedValueOnce({ ok: false })
       .mockResolvedValueOnce({ ok: true });
@@ -229,7 +229,9 @@ describe('saveVariationsReview', () => {
     expect(body.editorInfo[0].displayName).toBe('Josh');
     expect(body.editorInfo[0].email).toBe('josh@reso.org');
     expect(body.editorInfo[0].providerUoi).toBe('P001');
-    expect(body.editorInfo[0].changeId).toBeDefined();
-    expect(body.changes[0].changeId).toBe(body.editorInfo[0].changeId);
+    // Backend filters by missing changeId to identify new changes — sending
+    // pre-tagged values would make it think there's nothing new (304).
+    expect(body.editorInfo[0].changeId).toBeUndefined();
+    expect(body.changes[0].changeId).toBeUndefined();
   });
 });

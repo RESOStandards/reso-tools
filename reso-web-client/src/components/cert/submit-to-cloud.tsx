@@ -14,9 +14,7 @@
 
 import { useEffect, useState } from 'react';
 import { Badge, FilterPill } from '../metadata/shared';
-import { CERT_ENV_LABELS, CERT_ENV_SHORT_LABELS /*, SERVICES_URLS */ } from '../../constants/cert';
-// TODO: wire SERVICES_URLS into the cloud-submit POST target — placeholder
-// constant is defined in constants/cert.ts but not yet consumed here.
+import { CERT_ENV_LABELS, CERT_ENV_SHORT_LABELS } from '../../constants/cert';
 import type { CertEnvironment } from '../../constants/cert';
 import type { Job } from '../../services/job-manager';
 

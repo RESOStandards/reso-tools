@@ -28,7 +28,7 @@ const PAGE_CONTAINER = 'max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8';
 
 type JobStatus = 'scheduled' | 'running' | 'passed' | 'failed' | 'cancelled';
 
-interface JobStep {
+export interface JobStep {
   readonly name: string;
   readonly status: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
   readonly duration?: number;
@@ -145,7 +145,7 @@ const stepColor = (status: JobStep['status']): string =>
  * make the chart flicker. The cache below holds the most recent chart
  * data so the row stays stable until the next strategy resumes.
  */
-const StepDetail = ({ step }: { readonly step: JobStep }) => {
+export const StepDetail = ({ step }: { readonly step: JobStep }) => {
   const [cachedReplication, setCachedReplication] = useState<ReplicationProgressData | null>(null);
   // Memoize on step.detail (a stable string) — without this, the parsed
   // object would be a new reference each render, and the useEffect below

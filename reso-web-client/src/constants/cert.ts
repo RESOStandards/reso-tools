@@ -166,12 +166,6 @@ export const CERT_ENV_SHORT_LABELS: Readonly<Record<CertEnvironment, string>> = 
   production: 'Production',
 };
 
-export const SERVICES_URLS: Readonly<Record<CertEnvironment, string>> = {
-  certqa: 'https://services-qa.reso.org',
-  certstg: 'https://services-stg.reso.org',
-  production: 'https://services.reso.org',
-};
-
 // ── Job / step status types ──────────────────────────────────────────
 
 export type JobStatus = 'queued' | 'running' | 'passed' | 'failed' | 'cancelled';
