@@ -12,6 +12,21 @@ contextBridge.exposeInMainWorld('electronStorage', {
   remove: (key: string): Promise<void> => ipcRenderer.invoke('storage:remove', key)
 });
 
+/**
+ * Dedicated login-credentials bridge — backed by its own JSON file
+ * (cert-login-credentials.json) so writes here can't disturb other
+ * persisted state. Each password is individually encrypted via
+ * Electron's safeStorage on the main process side.
+ */
+contextBridge.exposeInMainWorld('loginCredentials', {
+  list: (): Promise<ReadonlyArray<{ username: string; password: string }>> =>
+    ipcRenderer.invoke('login-creds:list'),
+  upsert: (username: string, password: string): Promise<void> =>
+    ipcRenderer.invoke('login-creds:upsert', username, password),
+  remove: (username: string): Promise<void> =>
+    ipcRenderer.invoke('login-creds:remove', username)
+});
+
 contextBridge.exposeInMainWorld('electronUpdates', {
   onUpdateAvailable: (callback: (release: { tagName: string; url: string; name: string }) => void): void => {
     ipcRenderer.on('update:available', (_event, release) => callback(release));

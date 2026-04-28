@@ -91,6 +91,89 @@ const registerStorageHandlers = (): void => {
   });
 };
 
+// ── Login credentials store (dedicated file, per-password encryption) ──
+//
+// Separate from the generic secure-storage.json above on purpose: that
+// store reads + decrypts every key on every write, so a single corrupt
+// value wipes the whole file. Login credentials live in their own JSON
+// array file so a write here can never disturb other persisted state.
+//
+// File shape: [{ username: string, password: string /* base64 of encrypted */ }]
+
+const loginCredsFilePath = (): string =>
+  resolve(app.getPath('userData'), 'cert-login-credentials.json');
+
+interface StoredLoginCredential {
+  readonly username: string;
+  /** base64 of safeStorage.encryptString(plain), or plain text if no encryption. */
+  readonly password: string;
+}
+
+interface LoginCredential {
+  readonly username: string;
+  readonly password: string;
+}
+
+const readLoginCreds = (): ReadonlyArray<StoredLoginCredential> => {
+  try {
+    const raw = readFileSync(loginCredsFilePath(), 'utf-8');
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (c): c is StoredLoginCredential =>
+        c && typeof c.username === 'string' && typeof c.password === 'string',
+    );
+  } catch {
+    return [];
+  }
+};
+
+const writeLoginCreds = (creds: ReadonlyArray<StoredLoginCredential>): void => {
+  mkdirSync(app.getPath('userData'), { recursive: true });
+  writeFileSync(loginCredsFilePath(), JSON.stringify(creds, null, 2), 'utf-8');
+};
+
+const encryptPassword = (plain: string): string =>
+  safeStorage.isEncryptionAvailable()
+    ? safeStorage.encryptString(plain).toString('base64')
+    : plain;
+
+const decryptPassword = (stored: string): string => {
+  if (!safeStorage.isEncryptionAvailable()) return stored;
+  try {
+    return safeStorage.decryptString(Buffer.from(stored, 'base64'));
+  } catch {
+    // Likely written under a different encryption mode. Drop the entry
+    // rather than poisoning the rest of the list.
+    return '';
+  }
+};
+
+const registerLoginCredentialsHandlers = (): void => {
+  ipcMain.handle('login-creds:list', (): ReadonlyArray<LoginCredential> => {
+    return readLoginCreds()
+      .map((c) => ({ username: c.username, password: decryptPassword(c.password) }))
+      .filter((c) => c.password.length > 0);
+  });
+
+  ipcMain.handle('login-creds:upsert', (_event, username: string, password: string): void => {
+    if (!username || !password) return;
+    const existing = readLoginCreds();
+    const others = existing.filter((c) => c.username !== username);
+    const updated: ReadonlyArray<StoredLoginCredential> = [
+      { username, password: encryptPassword(password) },
+      ...others,
+    ];
+    writeLoginCreds(updated);
+  });
+
+  ipcMain.handle('login-creds:remove', (_event, username: string): void => {
+    const existing = readLoginCreds();
+    const updated = existing.filter((c) => c.username !== username);
+    writeLoginCreds(updated);
+  });
+};
+
 // ── Job store (SQLite in main process, accessed via IPC) ──
 
 import { initJobsDb, createJobStore, type JobStore, type JobRecord, type StepRecord, type StatusPatch, type JobFilter } from './job-store.js';
@@ -1285,6 +1368,7 @@ app.whenReady().then(async () => {
   });
 
   registerStorageHandlers();
+  registerLoginCredentialsHandlers();
   registerJobStoreHandlers();
   registerCertRunnerHandlers();
   buildMenu();

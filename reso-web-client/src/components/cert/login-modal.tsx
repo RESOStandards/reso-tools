@@ -1,7 +1,28 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useAuth } from '../../hooks/use-auth';
 import { useDarkMode } from '../../hooks/use-dark-mode';
-import { secureGetJson } from '../../api/secure-storage';
+
+// ── Saved-credentials bridge (Electron-only) ─────────────────────────
+//
+// Backed by a dedicated JSON file in the desktop client's userData
+// (cert-login-credentials.json), independent of auth-context's
+// reso-cert-credentials-v1 key. signOut wipes that auth-context key,
+// but this store is separate so autofill survives a sign-out — which
+// is the user-switching test flow we want.
+
+interface SavedCredential {
+  readonly username: string;
+  readonly password: string;
+}
+
+interface LoginCredentialsBridge {
+  readonly list: () => Promise<ReadonlyArray<SavedCredential>>;
+  readonly upsert: (username: string, password: string) => Promise<void>;
+  readonly remove: (username: string) => Promise<void>;
+}
+
+const getLoginBridge = (): LoginCredentialsBridge | null =>
+  (window as unknown as Record<string, unknown>).loginCredentials as LoginCredentialsBridge | null;
 
 const LOGO_LIGHT =
   'https://www.reso.org/wp-content/uploads/2020/06/RESO-Logo_Horizontal_Blue.png';
@@ -25,30 +46,66 @@ export const LoginModal = ({ open, onClose, onSuccess }: LoginModalProps) => {
   const { isDark } = useDarkMode();
   const { signIn, isSigningIn, error } = useAuth();
   const usernameRef = useRef<HTMLInputElement>(null);
+  const fieldsContainerRef = useRef<HTMLDivElement>(null);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [savedCredentials, setSavedCredentials] = useState<ReadonlyArray<SavedCredential>>([]);
+  const [showCredentials, setShowCredentials] = useState(false);
 
-  // Pre-fill from persisted credentials when the modal opens
+  // Pre-fill from saved credentials when the modal opens. Uses the
+  // dedicated loginCredentials bridge (not auth-context's storage)
+  // so the list survives a sign-out — that's the user-switching
+  // testing flow we need.
   useEffect(() => {
     if (!open) {
       setUsername('');
       setPassword('');
+      setShowCredentials(false);
       return;
     }
     // Defer focus to next tick so the input is mounted
     const focusTimer = setTimeout(() => usernameRef.current?.focus(), 10);
 
-    // Load saved credentials for autofill
-    secureGetJson<{ username: string; password: string }>('reso-cert-credentials-v1')
-      .then(creds => {
-        if (creds?.username) setUsername(creds.username);
-        if (creds?.password) setPassword(creds.password);
-      })
-      .catch(() => {});
+    const bridge = getLoginBridge();
+    if (bridge) {
+      bridge.list()
+        .then(list => {
+          setSavedCredentials(list);
+          const mostRecent = list[0];
+          if (mostRecent) {
+            setUsername(mostRecent.username);
+            setPassword(mostRecent.password);
+          }
+        })
+        .catch(() => {});
+    }
 
     return () => clearTimeout(focusTimer);
   }, [open]);
+
+  // Outside-click on the input area dismisses the dropdown.
+  useEffect(() => {
+    if (!open) return;
+    const onMouseDown = (e: MouseEvent) => {
+      if (fieldsContainerRef.current && !fieldsContainerRef.current.contains(e.target as Node)) {
+        setShowCredentials(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [open]);
+
+  // Filter saved logins by what's typed in the username field.
+  const filteredCredentials = savedCredentials.filter(c =>
+    c.username.toLowerCase().includes(username.toLowerCase()),
+  );
+
+  const pickCredential = (cred: SavedCredential): void => {
+    setUsername(cred.username);
+    setPassword(cred.password);
+    setShowCredentials(false);
+  };
 
   // Escape to dismiss + lock body scroll while open
   useEffect(() => {
@@ -68,14 +125,27 @@ export const LoginModal = ({ open, onClose, onSuccess }: LoginModalProps) => {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!username || !password || isSigningIn) return;
+
     try {
       await signIn(username, password);
-      onClose();
-      onSuccess?.();
     } catch {
-      // Error surfaced via the auth context. User stays in the modal
-      // to correct credentials and retry.
+      // signIn surfaces its error via the auth context. Stay in the
+      // modal so the user can correct credentials and retry.
+      return;
     }
+
+    // Persist for autofill in a separate try block so a save failure
+    // never blocks a successful sign-in. Uses the dedicated bridge
+    // (not auth-context's storage) so this entry survives sign-out.
+    try {
+      const bridge = getLoginBridge();
+      if (bridge) await bridge.upsert(username, password);
+    } catch {
+      // Save failure is non-fatal — login succeeded.
+    }
+
+    onClose();
+    onSuccess?.();
   };
 
   if (!open) return null;
@@ -112,43 +182,71 @@ export const LoginModal = ({ open, onClose, onSuccess }: LoginModalProps) => {
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4" name="reso-cert-login" autoComplete="on">
-              <div>
-                <label
-                  htmlFor="login-modal-username"
-                  className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5"
-                >
-                  Username
-                </label>
-                <input
-                  ref={usernameRef}
-                  id="login-modal-username"
-                  type="text"
-                  autoComplete="username"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  disabled={isSigningIn}
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60 transition-colors"
-                />
-              </div>
+              <div ref={fieldsContainerRef} className="space-y-4">
+                <div className="relative">
+                  <label
+                    htmlFor="login-modal-username"
+                    className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5"
+                  >
+                    Username
+                  </label>
+                  <input
+                    ref={usernameRef}
+                    id="login-modal-username"
+                    name="username"
+                    type="text"
+                    autoComplete="username"
+                    required
+                    value={username}
+                    onChange={(e) => { setUsername(e.target.value); setShowCredentials(true); }}
+                    onFocus={() => setShowCredentials(true)}
+                    disabled={isSigningIn}
+                    className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60 transition-colors"
+                  />
 
-              <div>
-                <label
-                  htmlFor="login-modal-password"
-                  className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5"
-                >
-                  Password
-                </label>
-                <input
-                  id="login-modal-password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={isSigningIn}
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60 transition-colors"
-                />
+                  {showCredentials && filteredCredentials.length > 0 && (
+                    <ul
+                      role="listbox"
+                      aria-label="Saved logins"
+                      className="absolute left-0 right-0 top-full z-20 mt-1 max-h-60 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg"
+                    >
+                      {filteredCredentials.map((c) => (
+                        <li key={c.username}>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => { e.preventDefault(); pickCredential(c); }}
+                            className="w-full text-left px-3 py-2 text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-700"
+                          >
+                            <span className="font-medium">{c.username}</span>
+                            <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
+                              {'•'.repeat(Math.min(c.password.length, 8))}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="login-modal-password"
+                    className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5"
+                  >
+                    Password
+                  </label>
+                  <input
+                    id="login-modal-password"
+                    name="password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isSigningIn}
+                    className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60 transition-colors"
+                  />
+                </div>
               </div>
 
               {error && (
