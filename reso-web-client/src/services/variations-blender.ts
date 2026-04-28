@@ -324,7 +324,10 @@ export const blendVariations = (
     description: localReport.description ?? 'Data Dictionary Variations Report',
     version: localReport.version ?? '',
     generatedOn: localReport.generatedOn ?? new Date().toISOString(),
-    fuzziness: localReport.fuzziness ?? 0,
+    // Default fuzziness = 0.25 (25% of word length) — the value cert-utils
+    // uses for its substring/edit-distance match. A value of 0 means
+    // "exact match only" which surfaces no near-misses.
+    fuzziness: localReport.fuzziness ?? 0.25,
     variations,
     counts,
   };

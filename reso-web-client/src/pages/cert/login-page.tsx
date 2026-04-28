@@ -1,33 +1,64 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../../hooks/use-auth';
 import { useDarkMode } from '../../hooks/use-dark-mode';
 
 // ── Credential persistence via Electron safeStorage ──────────────────
 
-const CERT_LOGIN_KEY = 'cert-login-credentials';
+interface SavedCredential {
+  readonly username: string;
+  readonly password: string;
+}
+
+/** New multi-credential key. Stores an array so users can switch logins. */
+const CERT_LOGIN_LIST_KEY = 'cert-login-credentials-v2';
+/** Legacy single-credential key — read once on first mount, then dropped. */
+const CERT_LOGIN_LEGACY_KEY = 'cert-login-credentials';
 
 interface ElectronStorage {
   readonly get: (key: string) => Promise<string | null>;
   readonly set: (key: string, value: string) => Promise<void>;
+  readonly remove: (key: string) => Promise<void>;
 }
 
 const getStorage = (): ElectronStorage | null =>
   (window as unknown as Record<string, unknown>).electronStorage as ElectronStorage | null;
 
-const saveLoginCredentials = async (username: string, password: string): Promise<void> => {
+const loadAllCredentials = async (): Promise<ReadonlyArray<SavedCredential>> => {
   const storage = getStorage();
-  if (!storage) return;
-  await storage.set(CERT_LOGIN_KEY, JSON.stringify({ username, password }));
+  if (!storage) return [];
+  const raw = await storage.get(CERT_LOGIN_LIST_KEY);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.filter(
+        (c): c is SavedCredential =>
+          c && typeof c.username === 'string' && typeof c.password === 'string',
+      );
+    } catch { /* fall through to legacy migration */ }
+  }
+  // One-time migration from the single-credential key.
+  const legacyRaw = await storage.get(CERT_LOGIN_LEGACY_KEY);
+  if (!legacyRaw) return [];
+  try {
+    const legacy = JSON.parse(legacyRaw) as SavedCredential;
+    if (legacy?.username && legacy?.password) {
+      const list = [legacy];
+      await storage.set(CERT_LOGIN_LIST_KEY, JSON.stringify(list));
+      await storage.remove(CERT_LOGIN_LEGACY_KEY);
+      return list;
+    }
+  } catch { /* nothing to migrate */ }
+  return [];
 };
 
-const loadLoginCredentials = async (): Promise<{ username: string; password: string } | null> => {
+const upsertCredential = async (cred: SavedCredential): Promise<void> => {
   const storage = getStorage();
-  if (!storage) return null;
-  const raw = await storage.get(CERT_LOGIN_KEY);
-  if (!raw) return null;
-  try { return JSON.parse(raw) as { username: string; password: string }; }
-  catch { return null; }
+  if (!storage) return;
+  const existing = await loadAllCredentials();
+  const others = existing.filter(c => c.username !== cred.username);
+  const list = [cred, ...others]; // most-recently-used first
+  await storage.set(CERT_LOGIN_LIST_KEY, JSON.stringify(list));
 };
 
 const LOGO_LIGHT =
@@ -55,24 +86,56 @@ export const LoginPage = () => {
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [savedCredentials, setSavedCredentials] = useState<ReadonlyArray<SavedCredential>>([]);
+  const [showCredentials, setShowCredentials] = useState(false);
+  const formRef = useRef<HTMLDivElement | null>(null);
 
-  // Pre-fill from safeStorage on mount
+  // Load all saved credentials on mount; pre-fill the most-recent one.
   useEffect(() => {
-    loadLoginCredentials().then(creds => {
-      if (creds) {
-        setUsername(creds.username);
-        setPassword(creds.password);
+    loadAllCredentials().then(list => {
+      setSavedCredentials(list);
+      const mostRecent = list[0];
+      if (mostRecent) {
+        setUsername(mostRecent.username);
+        setPassword(mostRecent.password);
       }
     });
   }, []);
+
+  // Close the credentials dropdown on outside click.
+  useEffect(() => {
+    const onMouseDown = (e: MouseEvent) => {
+      if (formRef.current && !formRef.current.contains(e.target as Node)) {
+        setShowCredentials(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, []);
+
+  // Filter saved credentials by what's typed in the username field.
+  const filteredCredentials = savedCredentials.filter(c =>
+    c.username.toLowerCase().includes(username.toLowerCase()),
+  );
+
+  const pickCredential = (cred: SavedCredential): void => {
+    setUsername(cred.username);
+    setPassword(cred.password);
+    setShowCredentials(false);
+  };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!username || !password || isSigningIn) return;
     try {
       await signIn(username, password);
-      // Save credentials on successful login
-      await saveLoginCredentials(username, password);
+      // Append (or move-to-front) on successful login so the dropdown
+      // stays current and the most-recent user pre-fills next time.
+      await upsertCredential({ username, password });
+      setSavedCredentials(prev => [
+        { username, password },
+        ...prev.filter(c => c.username !== username),
+      ]);
       const state = location.state as LocationState | null;
       const target = state?.from?.pathname ?? '/cert';
       navigate(target, { replace: true });
@@ -103,42 +166,69 @@ export const LoginPage = () => {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label
-                htmlFor="username"
-                className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5"
-              >
-                Username
-              </label>
-              <input
-                id="username"
-                type="text"
-                autoComplete="username"
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                disabled={isSigningIn}
-                className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60 transition-colors"
-              />
-            </div>
+            <div ref={formRef} className="relative space-y-4">
+              <div>
+                <label
+                  htmlFor="username"
+                  className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5"
+                >
+                  Username
+                </label>
+                <input
+                  id="username"
+                  type="text"
+                  autoComplete="username"
+                  required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  onFocus={() => setShowCredentials(true)}
+                  disabled={isSigningIn}
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60 transition-colors"
+                />
+              </div>
 
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isSigningIn}
-                className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60 transition-colors"
-              />
+              <div>
+                <label
+                  htmlFor="password"
+                  className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5"
+                >
+                  Password
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setShowCredentials(true)}
+                  disabled={isSigningIn}
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60 transition-colors"
+                />
+              </div>
+
+              {showCredentials && filteredCredentials.length > 0 && (
+                <ul
+                  role="listbox"
+                  aria-label="Saved logins"
+                  className="absolute left-0 right-0 top-full z-10 mt-1 max-h-60 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg"
+                >
+                  {filteredCredentials.map((c) => (
+                    <li key={c.username}>
+                      <button
+                        type="button"
+                        onClick={() => pickCredential(c)}
+                        className="w-full text-left px-3 py-2 text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-700"
+                      >
+                        <span className="font-medium">{c.username}</span>
+                        <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
+                          {'•'.repeat(Math.min(c.password.length, 8))}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             {error && (

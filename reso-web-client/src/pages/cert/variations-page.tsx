@@ -29,11 +29,6 @@ import { useJobs } from '../../hooks/use-jobs';
 import { VariationComments, type VariationComment } from '../../components/cert/variation-comments';
 import { useAuth } from '../../hooks/use-auth';
 
-// ── Constants ────────────────────────────────────────────────────────
-
-/** Emails authorized for Fast Track management (must also be admin). */
-const FT_ADMIN_EMAILS = new Set(['josh@reso.org', 'jason@reso.org']);
-
 // ── Types ────────────────────────────────────────────────────────────
 
 type VariationFilter = 'all' | 'fields' | 'lookups' | 'resources' | 'expansions';
@@ -54,6 +49,15 @@ const FILTER_TABS: ReadonlyArray<{ key: VariationFilter; label: string }> = [
 
 const variationKey = (v: BlendedVariation): string =>
   `${v.resourceName}:${v.fieldName ?? ''}:${v.lookupValue ?? ''}`;
+
+/** Render a relative time like "2m ago" / "1h ago" from a Unix-second timestamp. */
+const formatTimeSince = (unixSeconds: number): string => {
+  const diffSec = Math.floor(Date.now() / 1000) - unixSeconds;
+  if (diffSec < 5) return 'just now';
+  if (diffSec < 60) return `${diffSec}s ago`;
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  return `${Math.floor(diffSec / 3600)}h ago`;
+};
 
 /** Segments that make up a variation path: resource, field, lookup. Undefined slots are skipped. */
 interface PathPart {
@@ -710,10 +714,33 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
           </button>
           <div>
             <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Variations Review</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              DD {report.version} — {report.counts.total} variation{report.counts.total !== 1 ? 's' : ''}
-              {report.counts.ignored > 0 && ` (${report.counts.ignored} ignored)`}
-              {report.counts.fastTrack > 0 && ` (${report.counts.fastTrack} fast track)`}
+            <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2 flex-wrap">
+              <span>
+                DD {report.version} — {report.counts.total} variation{report.counts.total !== 1 ? 's' : ''}
+                {report.counts.ignored > 0 && ` (${report.counts.ignored} ignored)`}
+                {report.counts.fastTrack > 0 && ` (${report.counts.fastTrack} fast track)`}
+              </span>
+              {isLockedByMe && lockHolder && (
+                <span
+                  title={`Lock acquired at ${new Date(lockHolder.lockUnixTimestamp * 1000).toLocaleString()}, expires ${new Date(lockHolder.lockUnixTimestampTTL * 1000).toLocaleString()}`}
+                  className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                    className="h-3 w-3"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Locked by you · {formatTimeSince(lockHolder.lockUnixTimestamp)}
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -791,7 +818,6 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
           draftComments={draftComments}
           isReadOnly={isReadOnly}
           isAdmin={isAdmin}
-          isFastTrackAdmin={isAdmin && FT_ADMIN_EMAILS.has(user?.email ?? '')}
           onSelect={(variation) => setSelectedKey(variationKey(variation))}
           onToggleAction={toggleAction}
         />
@@ -803,7 +829,6 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
         draftComments={selectedKey ? (draftComments.get(selectedKey) ?? []) : []}
         isReadOnly={isReadOnly}
         isAdmin={isAdmin}
-        isFastTrackAdmin={isAdmin && FT_ADMIN_EMAILS.has(user?.email ?? '')}
         userName={user?.fullName ?? user?.username ?? ''}
         userUoi={report.providerUoi ?? ''}
         onClose={() => setSelectedKey(null)}
@@ -866,13 +891,12 @@ interface VariationRowProps {
   readonly isSelected: boolean;
   readonly isReadOnly: boolean;
   readonly isAdmin: boolean;
-  readonly isFastTrackAdmin: boolean;
   readonly hasDraftComments: boolean;
   readonly onSelect: () => void;
   readonly onToggleAction: (status: ActionStatus) => void;
 }
 
-const VariationRow = ({ variation, action, isSelected, isReadOnly, isAdmin, isFastTrackAdmin, hasDraftComments, onSelect, onToggleAction }: VariationRowProps) => {
+const VariationRow = ({ variation, action, isSelected, isReadOnly, isAdmin, hasDraftComments, onSelect, onToggleAction }: VariationRowProps) => {
   const primary = variation.suggestions[0];
   const diff = primary
     ? diffSegments(sourceSegments(variation), targetSegments(primary))
@@ -924,24 +948,44 @@ const VariationRow = ({ variation, action, isSelected, isReadOnly, isAdmin, isFa
           </span>
         )}
       </div>
-      <div className="text-center text-xs text-gray-500 dark:text-gray-400">
-        {commentCount > 0 ? `${commentCount}` : '—'}
+      <div className="flex items-center justify-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+        {commentCount > 0 ? (
+          <>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+              className="h-3.5 w-3.5"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 3.5c-3.866 0-7 2.351-7 5.25 0 1.498.83 2.84 2.137 3.788-.135.62-.42 1.276-.798 1.84a.5.5 0 0 0 .566.766c1.133-.343 2.087-.86 2.74-1.39A8.6 8.6 0 0 0 10 14c3.866 0 7-2.351 7-5.25S13.866 3.5 10 3.5Z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span className="tabular-nums">{commentCount}</span>
+          </>
+        ) : (
+          <span>—</span>
+        )}
       </div>
       <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
         {!isReadOnly ? (
           <>
             <button type="button" onClick={() => onToggleAction('ignored')}
-              className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors cursor-pointer ${action === 'ignored' ? 'bg-gray-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+              className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors cursor-pointer ${action === 'ignored' ? 'bg-amber-600 text-white ring-1 ring-amber-400/60' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
               title="Mark as ignored">
               Ignore
             </button>
-            {isFastTrackAdmin && (
-              <button type="button" onClick={() => onToggleAction('fast-track')}
-                className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors cursor-pointer ${action === 'fast-track' ? 'bg-green-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                title="Fast Track">
-                FT
-              </button>
-            )}
+            {/* FT and Ignore are hints on the provider side and decisions
+                on the admin side; both are visible to any reviewer. The
+                final state is whatever the admin signs off on at submit. */}
+            <button type="button" onClick={() => onToggleAction('fast-track')}
+              className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors cursor-pointer ${action === 'fast-track' ? 'bg-green-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+              title="Fast Track">
+              FT
+            </button>
             {isAdmin && (
               <button type="button" onClick={() => onToggleAction('remove')}
                 className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors cursor-pointer ${action === 'remove' ? 'bg-red-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400'}`}
@@ -965,12 +1009,11 @@ interface VariationsTableProps {
   readonly draftComments: Map<string, ReadonlyArray<VariationComment>>;
   readonly isReadOnly: boolean;
   readonly isAdmin: boolean;
-  readonly isFastTrackAdmin: boolean;
   readonly onSelect: (variation: BlendedVariation) => void;
   readonly onToggleAction: (key: string, status: ActionStatus) => void;
 }
 
-const VariationsTable = ({ variations, actions, selectedKey, draftComments, isReadOnly, isAdmin, isFastTrackAdmin, onSelect, onToggleAction }: VariationsTableProps) => {
+const VariationsTable = ({ variations, actions, selectedKey, draftComments, isReadOnly, isAdmin, onSelect, onToggleAction }: VariationsTableProps) => {
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
     count: variations.length,
@@ -1006,7 +1049,7 @@ const VariationsTable = ({ variations, actions, selectedKey, draftComments, isRe
                   isSelected={selectedKey === key}
                   isReadOnly={isReadOnly}
                   isAdmin={isAdmin}
-                  isFastTrackAdmin={isFastTrackAdmin}
+                  
                   hasDraftComments={(draftComments.get(key)?.length ?? 0) > 0}
                   onSelect={() => onSelect(variation)}
                   onToggleAction={(status) => onToggleAction(key, status)}
@@ -1028,7 +1071,6 @@ interface VariationDrawerProps {
   readonly draftComments: ReadonlyArray<VariationComment>;
   readonly isReadOnly: boolean;
   readonly isAdmin: boolean;
-  readonly isFastTrackAdmin: boolean;
   readonly userName: string;
   readonly userUoi: string;
   readonly onClose: () => void;
@@ -1037,7 +1079,7 @@ interface VariationDrawerProps {
   readonly onRemoveComment: (index: number) => void;
 }
 
-const VariationDrawer = ({ variation, action, draftComments, isReadOnly, isAdmin, isFastTrackAdmin, userName, userUoi, onClose, onToggleAction, onAddComment, onRemoveComment }: VariationDrawerProps) => {
+const VariationDrawer = ({ variation, action, draftComments, isReadOnly, isAdmin, userName, userUoi, onClose, onToggleAction, onAddComment, onRemoveComment }: VariationDrawerProps) => {
   // Close on Escape
   useEffect(() => {
     if (!variation) return;
@@ -1160,15 +1202,13 @@ const VariationDrawer = ({ variation, action, draftComments, isReadOnly, isAdmin
               <div className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Actions</div>
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={() => onToggleAction('ignored')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${action === 'ignored' ? 'bg-gray-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${action === 'ignored' ? 'bg-amber-600 text-white ring-1 ring-amber-400/60' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
                   Ignore
                 </button>
-                {isFastTrackAdmin && (
-                  <button type="button" onClick={() => onToggleAction('fast-track')}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${action === 'fast-track' ? 'bg-green-600 text-white' : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/50'}`}>
-                    Fast Track
-                  </button>
-                )}
+                <button type="button" onClick={() => onToggleAction('fast-track')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${action === 'fast-track' ? 'bg-green-600 text-white' : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/50'}`}>
+                  Fast Track
+                </button>
                 {isAdmin && (
                   <button type="button" onClick={() => onToggleAction('remove')}
                     className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${action === 'remove' ? 'bg-red-600 text-white' : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50'}`}>

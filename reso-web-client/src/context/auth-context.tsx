@@ -133,7 +133,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const refreshProviderToken = useCallback(async (): Promise<string> => {
-    const creds = credentialsRef.current;
+    let creds = credentialsRef.current;
+    // Fall back to secure storage if the in-memory ref is null. This
+    // happens on cold remount paths (HMR during dev, child-Suspense
+    // boundaries that re-mount the provider, hydration races where a
+    // scheduled refresh fires before the initial creds load resolves).
+    // The ref is the fast path; storage is the durable source of truth.
+    if (!creds) {
+      const persisted = await secureGetJson<PersistedCredentials>(CREDS_STORAGE_KEY);
+      if (persisted) {
+        creds = persisted;
+        credentialsRef.current = persisted;
+      }
+    }
     if (!creds) {
       throw new Error(
         'Cannot refresh provider token: credentials are not available. Please sign in again.'
