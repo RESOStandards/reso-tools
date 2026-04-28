@@ -15,7 +15,13 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { SearchInput, FilterPill, Badge } from '../metadata/shared.js';
-import { humanizeScenarioName } from '../../constants/cert';
+import {
+  humanizeScenarioName,
+  STEP_RESOLVE_AUTH,
+  STEP_SERVICE_CHECK,
+  STEP_GENERATE_METADATA,
+  STEP_FETCH_METADATA,
+} from '../../constants/cert';
 import { RequestDetailsPanel } from './request-details';
 import { DetailText } from './detail-text';
 import { useReportRef } from '../../hooks/use-report-ref';
@@ -995,12 +1001,14 @@ const resolveReport = (
         errors: failedSteps.map(s => {
           const message = s.detail ?? s.errors?.join('; ') ?? `Step "${s.name}" failed`;
 
-          // Add guidance for common DD failure modes
-          const guidance = s.name.includes('metadata')
+          // Add guidance for common failure modes. Match against
+          // canonical step names from constants/cert.ts so a rename
+          // upstream propagates here without silent fallthrough.
+          const guidance = (s.name === STEP_GENERATE_METADATA || s.name === STEP_FETCH_METADATA)
             ? 'Check that the server returns well-formed OData 4.0 CSDL XML at the $metadata endpoint.'
-            : s.name.includes('Service check')
+            : s.name === STEP_SERVICE_CHECK
             ? 'Verify the server URL is correct, the server is running, and authentication succeeded.'
-            : s.name.includes('authentication') || s.name.includes('auth')
+            : s.name === STEP_RESOLVE_AUTH
             ? 'Verify the auth token or client credentials are correct and not expired.'
             : undefined;
 

@@ -196,7 +196,6 @@ const writeComplianceReports = (config: EntityEventConfig): PipelineStep<EntityE
     return {
       context: { ...ctx, reports: written },
       summary: `${written.length} reports written`,
-      artifacts: written.map(r => ({ label: r.name, path: r.path })),
     };
   },
 });

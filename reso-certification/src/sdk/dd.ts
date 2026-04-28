@@ -311,7 +311,7 @@ const initReplicationState: TestFunction<DDContext> = async (ctx) => {
  * The UI detects JSON detail strings and renders them as a real-time chart.
  * Falls back to a plain text summary for non-UI consumers.
  */
-const formatReplicationProgress = (info: Record<string, unknown>): string => {
+const formatReplicationProgress = (info: Record<string, unknown>, currentStrategy: string): string => {
   const resourceStats = info.resourceStats as ReadonlyArray<Record<string, unknown>> | undefined;
   const totalFetched = Number(info.totalRecordsFetched ?? 0);
   const throughput = info.throughput != null ? Number(info.throughput) : null;
@@ -327,6 +327,7 @@ const formatReplicationProgress = (info: Record<string, unknown>): string => {
 
   return JSON.stringify({
     _type: 'replication-progress',
+    currentStrategy,
     resources,
     totalRecords: totalFetched,
     totalBytes,
@@ -337,12 +338,15 @@ const formatReplicationProgress = (info: Record<string, unknown>): string => {
 };
 
 /** Build the onProgress adapter and a stats collector for a replication run. */
-const replicationProgressAdapter = (onProgress: import('./types.js').ProgressCallback) => {
+const replicationProgressAdapter = (
+  onProgress: import('./types.js').ProgressCallback,
+  currentStrategy: string,
+) => {
   let lastInfo: Record<string, unknown> = {};
   return {
     callback: (info: Record<string, unknown>) => {
       lastInfo = info;
-      onProgress({ step: 'sub:replicate', status: 'running', message: formatReplicationProgress(info) });
+      onProgress({ step: 'sub:replicate', status: 'running', message: formatReplicationProgress(info, currentStrategy) });
     },
     getLastStats: () => ({
       totalRecordsFetched: Number(lastInfo.totalRecordsFetched ?? 0),
@@ -357,7 +361,7 @@ const replicationProgressAdapter = (onProgress: import('./types.js').ProgressCal
 const replicateTimestampDesc = (config: DDConfig): TestFunction<DDContext> =>
   async (ctx, onProgress) => {
     const pageSize = ctx.version === '1.7' ? DEFAULT_PAGE_SIZE_V17 : DEFAULT_PAGE_SIZE_V20;
-    const progress = replicationProgressAdapter(onProgress);
+    const progress = replicationProgressAdapter(onProgress, 'Timestamp Descending');
     await replicate({
       ...buildReplicationSettings(ctx, config),
       jsonSchemaValidation: ctx.version !== '1.7' ? (config.strictMode ?? true) : false,
@@ -371,7 +375,7 @@ const replicateTimestampDesc = (config: DDConfig): TestFunction<DDContext> =>
 
 const replicateNextLink = (config: DDConfig): TestFunction<DDContext> =>
   async (ctx, onProgress) => {
-    const progress = replicationProgressAdapter(onProgress);
+    const progress = replicationProgressAdapter(onProgress, 'NextLink');
     await replicate({
       ...buildReplicationSettings(ctx, config),
       maxPageSize: DEFAULT_PAGE_SIZE_V20,
@@ -385,7 +389,7 @@ const replicateNextLink = (config: DDConfig): TestFunction<DDContext> =>
 const replicateNextLinkFiltered = (config: DDConfig): TestFunction<DDContext> =>
   async (ctx, onProgress) => {
     const cutoffDate = new Date(new Date().getFullYear() - DEFAULT_YEARS_BACK, 0).toISOString();
-    const progress = replicationProgressAdapter(onProgress);
+    const progress = replicationProgressAdapter(onProgress, 'NextLink (modified-since filter)');
     await replicate({
       ...buildReplicationSettings(ctx, config),
       maxPageSize: DEFAULT_PAGE_SIZE_V20,
@@ -470,7 +474,6 @@ const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext> => ({
     return {
       context: { ...ctx, reports: written },
       summary: `${written.length} reports written`,
-      artifacts: written.map(r => ({ label: r.name, path: r.path })),
     };
   },
 });

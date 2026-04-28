@@ -71,11 +71,28 @@ const KNOWN_SCENARIO_NAMES: Readonly<Record<string, string>> = {
 export const humanizeScenarioName = (name: string): string =>
   KNOWN_SCENARIO_NAMES[name] ?? name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-// ── Common step names ────────────────────────────────────────────────
+// ── Step names ───────────────────────────────────────────────────────
+// Single source of truth — must match the names emitted by the SDK
+// pipeline steps. Reference these constants instead of literal strings
+// so renames here propagate automatically and equality checks stay
+// exact (no fragile substring matches).
 
-export const STEP_SERVICE_CHECK = 'Service check';
 export const STEP_RESOLVE_AUTH = 'Resolve authentication';
+export const STEP_SERVICE_CHECK = 'Service check';
+export const STEP_GENERATE_METADATA = 'Generate metadata report';
 export const STEP_FETCH_METADATA = 'Fetch metadata';
+export const STEP_CHECK_VARIATIONS = 'Check variations';
+export const STEP_REPLICATE_AND_VALIDATE = 'Replicate and validate';
+export const STEP_RUN_CORE_SCENARIOS = 'Run Core scenarios';
+export const STEP_SAMPLE_RECORDS = 'Sample records';
+export const STEP_GENERATE_PAYLOADS = 'Generate payloads';
+export const STEP_RUN_ADD_EDIT_SCENARIOS = 'Run Add/Edit scenarios';
+export const STEP_RUN_ENTITY_EVENT_SCENARIOS = 'Run EntityEvent scenarios';
+export const STEP_WRITE_REPORTS = 'Write reports';
+
+/** True if the step represents the DD variations check. */
+export const isVariationsStep = (s: { readonly name: string }): boolean =>
+  s.name === STEP_CHECK_VARIATIONS;
 
 // ── Step tooltips ────────────────────────────────────────────────────
 
@@ -88,39 +105,39 @@ export const STEP_TOOLTIPS: Readonly<Record<string, string>> = {
 // Order must match the pipeline execution order in the SDK.
 
 export const DD_STEPS: ReadonlyArray<string> = [
-  'Resolve authentication',
-  'Service check',
-  'Generate metadata report',
-  'Check variations',
-  'Replicate and validate',
-  'Write reports',
+  STEP_RESOLVE_AUTH,
+  STEP_SERVICE_CHECK,
+  STEP_GENERATE_METADATA,
+  STEP_CHECK_VARIATIONS,
+  STEP_REPLICATE_AND_VALIDATE,
+  STEP_WRITE_REPORTS,
 ];
 
 export const CORE_STEPS: ReadonlyArray<string> = [
-  'Resolve authentication',
-  'Service check',
-  'Fetch metadata',
-  'Run Core scenarios',
-  'Write reports',
+  STEP_RESOLVE_AUTH,
+  STEP_SERVICE_CHECK,
+  STEP_FETCH_METADATA,
+  STEP_RUN_CORE_SCENARIOS,
+  STEP_WRITE_REPORTS,
 ];
 
 export const ADD_EDIT_STEPS: ReadonlyArray<string> = [
-  'Resolve authentication',
-  'Service check',
-  'Fetch metadata',
-  'Sample records',
-  'Generate payloads',
-  'Run Add/Edit scenarios',
-  'Write reports',
+  STEP_RESOLVE_AUTH,
+  STEP_SERVICE_CHECK,
+  STEP_FETCH_METADATA,
+  STEP_SAMPLE_RECORDS,
+  STEP_GENERATE_PAYLOADS,
+  STEP_RUN_ADD_EDIT_SCENARIOS,
+  STEP_WRITE_REPORTS,
 ];
 
 export const ENTITY_EVENT_STEPS: ReadonlyArray<string> = [
-  'Resolve authentication',
-  'Service check',
-  'Fetch metadata',
-  'Generate payloads',
-  'Run EntityEvent scenarios',
-  'Write reports',
+  STEP_RESOLVE_AUTH,
+  STEP_SERVICE_CHECK,
+  STEP_FETCH_METADATA,
+  STEP_GENERATE_PAYLOADS,
+  STEP_RUN_ENTITY_EVENT_SCENARIOS,
+  STEP_WRITE_REPORTS,
 ];
 
 export const STEPS_BY_ENDORSEMENT: Readonly<Record<string, ReadonlyArray<string>>> = {

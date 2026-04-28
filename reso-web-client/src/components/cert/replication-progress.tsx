@@ -14,6 +14,7 @@ interface ResourceStat {
 
 interface ReplicationProgressData {
   readonly _type: 'replication-progress';
+  readonly currentStrategy?: string;
   readonly resources: ReadonlyArray<ResourceStat>;
   readonly totalRecords: number;
   readonly totalBytes: number | null;
@@ -21,6 +22,8 @@ interface ReplicationProgressData {
   readonly meanResponseMs: number | null;
   readonly anomalyCount: number;
 }
+
+export type { ReplicationProgressData };
 
 /** Try to parse a detail string as replication progress JSON. */
 export const parseReplicationProgress = (detail: string): ReplicationProgressData | null => {
@@ -128,6 +131,11 @@ export const ReplicationProgress = ({ data }: { readonly data: ReplicationProgre
 
   return (
     <div className="mt-1 space-y-1">
+      {data.currentStrategy && (
+        <div className="text-[10px] text-gray-500 dark:text-gray-400 font-mono mb-0.5">
+          Strategy: <span className="text-gray-700 dark:text-gray-200">{data.currentStrategy}</span>
+        </div>
+      )}
       <div className="text-[10px] text-gray-400 dark:text-gray-500 font-mono mb-0.5">
         {industry
           ? <>Top {Math.min(TOP_N, visible.length)} resources by industry usage{industry.providerCount > 0 ? ` (${industry.providerCount.toLocaleString()} providers)` : ''}</>

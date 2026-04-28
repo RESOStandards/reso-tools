@@ -11,7 +11,7 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router';
-import { ReplicationProgress, parseReplicationProgress } from '../../components/cert/replication-progress';
+import { ReplicationProgress, parseReplicationProgress, type ReplicationProgressData } from '../../components/cert/replication-progress';
 import { RequestDetailsPanel } from '../../components/cert/request-details';
 import { SearchInput } from '../../components/metadata/shared';
 import { ConfigBuilder } from '../../components/cert/config-builder';
@@ -123,7 +123,7 @@ import {
   STEP_STATUS_ICONS,
   STEP_STATUS_COLORS,
 } from '../../constants/cert';
-import { STEP_TOOLTIPS, humanizeScenarioName } from '../../constants/cert';
+import { STEP_TOOLTIPS, humanizeScenarioName, isVariationsStep } from '../../constants/cert';
 import type { StepStatus } from '../../constants/cert';
 
 const statusColor = (status: JobStatus): string =>
@@ -136,6 +136,38 @@ const stepColor = (status: JobStep['status']): string =>
   STEP_STATUS_COLORS[status as StepStatus] ?? 'text-gray-400 dark:text-gray-500';
 
 // ── Step pipeline visualization ─────────────────────────────────────
+
+/**
+ * Per-step detail renderer that keeps the replication chart visible
+ * across strategy transitions. Replication progress arrives as a JSON
+ * blob in `step.detail` while a strategy is running; between strategies
+ * detail can briefly clear or change to non-JSON, which would otherwise
+ * make the chart flicker. The cache below holds the most recent chart
+ * data so the row stays stable until the next strategy resumes.
+ */
+const StepDetail = ({ step }: { readonly step: JobStep }) => {
+  const [cachedReplication, setCachedReplication] = useState<ReplicationProgressData | null>(null);
+  // Memoize on step.detail (a stable string) — without this, the parsed
+  // object would be a new reference each render, and the useEffect below
+  // would fire on every render, infinite-looping into React error #185.
+  const live = useMemo(
+    () => step.detail ? parseReplicationProgress(step.detail) : null,
+    [step.detail],
+  );
+
+  useEffect(() => {
+    if (live) setCachedReplication(live);
+  }, [live]);
+
+  const replicationData = live ?? cachedReplication;
+  if (replicationData) return <ReplicationProgress data={replicationData} />;
+  if (step.detail) {
+    return (
+      <DetailText text={step.detail} className={`text-xs mt-0.5 ${step.status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`} />
+    );
+  }
+  return null;
+};
 
 const StepPipeline = ({ steps }: { readonly steps: ReadonlyArray<JobStep> }) => (
   <div className="space-y-1.5">
@@ -166,13 +198,7 @@ const StepPipeline = ({ steps }: { readonly steps: ReadonlyArray<JobStep> }) => 
               )
             )}
           </div>
-          {step.detail && (() => {
-            const replicationData = parseReplicationProgress(step.detail);
-            if (replicationData) return <ReplicationProgress data={replicationData} />;
-            return (
-              <DetailText text={step.detail} className={`text-xs mt-0.5 ${step.status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`} />
-            );
-          })()}
+          <StepDetail step={step} />
         </div>
       </div>
     ))}
@@ -195,6 +221,17 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
   const [showReport, setShowReport] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const navigate = useNavigate();
+
+  // Re-run and Edit hand focus to a different card or panel — collapse
+  // this one as we leave so the page doesn't stack two open panels.
+  const handleRerunClick = () => {
+    setExpanded(false);
+    onRerun?.();
+  };
+  const handleCloneClick = () => {
+    setExpanded(false);
+    onClone?.();
+  };
 
   // Resolve report refs lazily when the compliance modal opens.
   const jobReports = job.reports as Record<string, string> | undefined;
@@ -225,6 +262,8 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
         ? 'border-blue-300 dark:border-blue-700'
         : job.status === 'failed'
         ? 'border-red-200 dark:border-red-800'
+        : job.status === 'cancelled'
+        ? 'border-gray-400 dark:border-gray-500'
         : 'border-gray-200 dark:border-gray-700'
     }`}>
       {/* Header — always visible */}
@@ -254,6 +293,21 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                 {job.error}
               </p>
             )}
+            {job.status === 'cancelled' && (() => {
+              // Find the step where cancellation took effect — the one
+              // that was running, or the last one to have passed before
+              // the cancel signal landed. Falls back to nothing if the
+              // step record was wiped on cancel return.
+              const runningStep = job.steps.find(s => s.status === 'running');
+              const lastPassed = [...job.steps].reverse().find(s => s.status === 'passed');
+              const at = runningStep?.name ?? lastPassed?.name;
+              if (!at) return null;
+              return (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                  Cancelled at: <span className="font-medium text-gray-600 dark:text-gray-300">{at}</span>
+                </p>
+              );
+            })()}
           </div>
           <div className="flex items-center gap-3 shrink-0">
             <span className={`text-xs font-semibold uppercase tracking-wider ${statusColor(job.status)}`}>
@@ -283,6 +337,13 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
       {/* Expanded detail */}
       {expanded && (
         <div className="px-4 pb-4 border-t border-gray-100 dark:border-gray-700/50 pt-3">
+          {job.status === 'cancelled' && (
+            <div className="mb-3 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700/40 border border-gray-300 dark:border-gray-600 text-xs text-gray-600 dark:text-gray-300">
+              {job.steps.length > 0
+                ? 'This run was cancelled before completion — partial results below.'
+                : 'No step data was captured — the run was cancelled before reporting any progress.'}
+            </div>
+          )}
           <StepPipeline steps={job.steps} />
 
           {/* Actions */}
@@ -308,18 +369,18 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                 <button type="button" onClick={() => setShowSubmit(true)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 cursor-pointer transition-colors">
                   Submit to RESO
                 </button>
-                {job.steps.some(s => s.name.toLowerCase().includes('variation') && s.status === 'failed') && (
+                {job.steps.some(s => isVariationsStep(s) && s.status === 'failed') && (
                   <NavLink to="/cert/variations" state={{ job }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors">
                     {job.variationsReviewSubmittedAt ? 'Review Variations' : 'Start Variations Review'}
                   </NavLink>
                 )}
                 {onRerun && (
-                  <button type="button" onClick={onRerun} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
+                  <button type="button" onClick={handleRerunClick} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
                     Re-run
                   </button>
                 )}
                 {onClone && (
-                  <button type="button" onClick={onClone} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors" title="Edit config and re-run">
+                  <button type="button" onClick={handleCloneClick} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors" title="Edit config and re-run">
                     Edit
                   </button>
                 )}
@@ -327,14 +388,14 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
             )}
             {job.status === 'failed' && (() => {
               const failedSteps = job.steps.filter(s => s.status === 'failed');
-              const hasVariationsFailure = failedSteps.some(s => s.name.toLowerCase().includes('variation'));
+              const hasVariationsFailure = failedSteps.some(isVariationsStep);
               // The modal acts as a quick read-only peek at any failure
               // type — including variations-only failures, where it
               // shows the variations preview alongside provenance and
               // submission state. The action button (Start / Variations
               // Report Review) lives separately on the card.
               const isVariationsOnlyFailure = failedSteps.length > 0
-                && failedSteps.every(s => s.name.toLowerCase().includes('variation'));
+                && failedSteps.every(isVariationsStep);
               const detailsLabel = isVariationsOnlyFailure ? 'View Details' : 'View Failure Report';
               return (
               <>
@@ -347,21 +408,35 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                   </NavLink>
                 )}
                 {onRerun && (
-                  <button type="button" onClick={onRerun} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
+                  <button type="button" onClick={handleRerunClick} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
                     Re-run
                   </button>
                 )}
                 {onClone && (
-                  <button type="button" onClick={onClone} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors" title="Edit config and re-run">
+                  <button type="button" onClick={handleCloneClick} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors" title="Edit config and re-run">
                     Edit
                   </button>
                 )}
               </>
               );
             })()}
+            {job.status === 'cancelled' && (
+              <>
+                {onRerun && (
+                  <button type="button" onClick={handleRerunClick} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
+                    Re-run
+                  </button>
+                )}
+                {onClone && (
+                  <button type="button" onClick={handleCloneClick} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors" title="Edit config and re-run">
+                    Edit
+                  </button>
+                )}
+              </>
+            )}
 
             {/* Delete — available on all completed local jobs */}
-            {onDelete && (job.status === 'passed' || job.status === 'failed') && (
+            {onDelete && (job.status === 'passed' || job.status === 'failed' || job.status === 'cancelled') && (
               confirmDelete ? (
                 <div className="flex items-center gap-1 ml-auto">
                   <span className="text-xs text-red-500 dark:text-red-400">Delete results?</span>
