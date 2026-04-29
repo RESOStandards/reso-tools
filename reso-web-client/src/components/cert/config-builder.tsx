@@ -8,7 +8,6 @@
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { SavedConfigsPanel } from './saved-configs-panel';
 import { loadProfiles, loadConnections, saveDraft, clearDraft, type SavedCredentials, type SavedCertConfig } from '../../services/connection-manager';
 import { FilterPill, Badge } from '../metadata/shared';
 import { getOrganizations } from '../../hooks/use-organization-names';
@@ -844,7 +843,7 @@ export const ConfigBuilder = ({
   // When a provider account is signed in, the cert config's provider
   // identity is locked to their org — they can't run jobs on behalf of
   // anyone else. Admins (and signed-out sessions) keep the open picker.
-  const lockedProviderUoi = !isAdmin ? user?.uoi ?? null : null;
+  const lockedProviderUoi = !isAdmin ? user?.providerUoi ?? null : null;
   const { systems: lockedSystems } = useCurrentUserSystems();
 
   const [providerUoi, setProviderUoi] = useState(
@@ -1048,7 +1047,15 @@ export const ConfigBuilder = ({
   const handleStart = () => {
     if (isDirty && onSave) {
       setShowSavePrompt(true);
-      setSavePromptName(savedConfigName ?? `Config ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`);
+      // Suggest "<Existing Name> - <local date/time>" so a Save As keeps
+      // the user's chosen base name and disambiguates revisions; for
+      // brand-new configs fall back to "Config - <local date/time>".
+      const stamp = new Date().toLocaleString(undefined, {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit',
+      });
+      const base = savedConfigName ?? 'Config';
+      setSavePromptName(`${base} - ${stamp}`);
       return;
     }
     onStart({ providerUoi, concurrency, recipients });
@@ -1250,20 +1257,6 @@ export const ConfigBuilder = ({
           />
         ))}
       </div>
-
-      {/* Saved Configs — MRU 3 with search and View All link */}
-      <SavedConfigsPanel
-        onLoad={(imported, _configId, _configName) => {
-          const pUoi = 'providerUoi' in imported && typeof imported.providerUoi === 'string' ? imported.providerUoi : providerUoi;
-          const conc = 'concurrency' in imported && typeof imported.concurrency === 'number' ? imported.concurrency : concurrency;
-          const recs = 'recipients' in imported && Array.isArray(imported.recipients) ? imported.recipients as ReadonlyArray<RecipientConfig> : recipients;
-          setProviderUoi(pUoi);
-          setConcurrency(conc);
-          setRecipients(recs);
-          // Snapshot loaded state for dirty tracking
-          setLoadedSnapshot(JSON.stringify({ providerUoi: pUoi, concurrency: conc, recipients: recs }));
-        }}
-      />
 
       {/* Save prompt (shown when starting with unsaved changes) */}
       {showSavePrompt && (

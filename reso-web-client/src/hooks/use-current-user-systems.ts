@@ -27,7 +27,7 @@ const cache = new Map<string, ReadonlyArray<CertOrganizationSystem>>();
 
 export const useCurrentUserSystems = (): UseCurrentUserSystemsResult => {
   const { user, isAdmin } = useAuth();
-  const uoi = user?.uoi ?? null;
+  const uoi = user?.providerUoi ?? null;
   const apiKey = user?.token ?? null;
 
   const [systems, setSystems] = useState<ReadonlyArray<CertOrganizationSystem>>(

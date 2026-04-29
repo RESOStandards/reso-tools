@@ -67,7 +67,7 @@ export interface LoginResponse {
   readonly fullName: string;
   readonly email: string;
   /** Provider's organization UOI. Present for non-admin (provider) accounts. */
-  readonly uoi?: string;
+  readonly providerUoi?: string;
   /** Additional API keys associated with the account. Present for provider accounts. */
   readonly apiKeys?: ReadonlyArray<CertApiKey>;
 }
