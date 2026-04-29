@@ -6,9 +6,15 @@ Standalone, zero-dependency library for parsing OData 4.01 `$filter` and `$expan
 
 ## Install
 
+This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo:
+
 ```bash
-npm install @reso-standards/odata-expression-parser
+git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools
+npm install
 ```
+
+The package lives at `reso-tools/odata-expression-parser/`. To consume it from another project, link it locally with `npm link` or use a `file:` dependency.
 
 ## Usage
 

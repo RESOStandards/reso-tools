@@ -18,9 +18,15 @@ If you are *just* querying a server, the **[RESO Client SDK](../reso-client/)** 
 
 ## Install
 
+This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo:
+
 ```bash
-npm install @reso-standards/reso-validation
+git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools
+npm install
 ```
+
+The package lives at `reso-tools/reso-validation/`. To consume it from another project, link it locally with `npm link` or use a `file:` dependency.
 
 Zero runtime dependencies. Isomorphic – runs identically in Node.js 22 or later, in any modern browser bundle and in any edge runtime that supports ESM.
 
@@ -216,7 +222,7 @@ For more on the design, the v1/v2/v3 progression and the dependencies on grammar
 
 * **[Package README](../)** – full API surface and type reference
 * **[Source on GitHub](https://github.com/RESOStandards/reso-tools/tree/main/reso-validation)**
-* **[npm Package](https://www.npmjs.com/package/@reso-standards/reso-validation)**
+* **[GitHub source](https://github.com/RESOStandards/reso-tools/tree/main/reso-validation)**
 * **[RCP-19 spec](https://github.com/RESOStandards/transport/blob/main/proposals/validation-expressions.md)** – the canonical RESO Web API Validation Expressions specification, ratified December 2023
 * **[RCP-19 grammar](https://github.com/RESOStandards/transport/tree/main/artifacts/grammars/rcp-19)** – the canonical ANTLR4 grammar that the v1 implementation is built from
 * **[reso-tools#107](https://github.com/RESOStandards/reso-tools/issues/107)** – the v1 RCP-19 interpreter ticket, with the full v1/v2/v3 progression

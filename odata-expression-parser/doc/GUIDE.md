@@ -20,9 +20,15 @@ If you are just *calling* a RESO server, you probably want **[`@reso-standards/r
 
 ## Install
 
+This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo:
+
 ```bash
-npm install @reso-standards/odata-expression-parser
+git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools
+npm install
 ```
+
+The package lives at `reso-tools/odata-expression-parser/`. To consume it from another project, link it locally with `npm link` or use a `file:` dependency.
 
 Zero runtime dependencies. Works in any ESM environment, Node.js 22 or later. The whole library is small enough to ship in a browser bundle without thinking about it.
 
@@ -423,5 +429,5 @@ That is the same idea behind `validateQueryOptions` in **[`@reso-standards/reso-
 
 * **[Package README](../)** – full API surface, supported features, and AST node type table
 * **[Source on GitHub](https://github.com/RESOStandards/reso-tools/tree/main/odata-expression-parser)**
-* **[npm Package](https://www.npmjs.com/package/@reso-standards/odata-expression-parser)**
+* **[GitHub source](https://github.com/RESOStandards/reso-tools/tree/main/odata-expression-parser)**
 * **[OData 4.01 Part 2: URL Conventions](https://docs.oasis-open.org/odata/odata/v4.01/odata-v4.01-part2-url-conventions.html)** – the spec that defines the grammar this parser implements

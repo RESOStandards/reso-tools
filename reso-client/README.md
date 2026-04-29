@@ -6,9 +6,15 @@ OData 4.01 client SDK for TypeScript. Provides URI building, CRUD helpers, CSDL 
 
 ## Install
 
+This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo:
+
 ```bash
-npm install @reso-standards/reso-client
+git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools
+npm install
 ```
+
+The package lives at `reso-tools/reso-client/`. To consume it from another project, link it locally with `npm link` or use a `file:` dependency.
 
 ## Quick Start
 

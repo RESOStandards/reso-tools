@@ -19,9 +19,15 @@ The package covers four endorsements: **Add/Edit (RCP-010)**, **EntityEvent (RCP
 
 ## Install
 
+This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo:
+
 ```bash
-npm install @reso-standards/reso-certification
+git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools
+npm install
 ```
+
+The package lives at `reso-tools/reso-certification/`. To consume it from another project, link it locally with `npm link` or use a `file:` dependency.
 
 The CLI is available as `reso-cert` after install. The SDK exports work in any Node.js 22+ environment. **No Java required** – the entire toolkit is pure TypeScript, built on the **[RESO Client SDK](../reso-client/)** for OData and the **[reso-validation](../reso-validation/)** library for field-level checks.
 
@@ -330,7 +336,7 @@ Use code `1` to gate a release, code `2` to alert someone that the test infrastr
 
 * **[Package README](../)** – full CLI flag reference, endorsement details, and SDK exports
 * **[Source on GitHub](https://github.com/RESOStandards/reso-tools/tree/main/reso-certification)**
-* **[npm Package](https://www.npmjs.com/package/@reso-standards/reso-certification)**
+* **[GitHub source](https://github.com/RESOStandards/reso-tools/tree/main/reso-certification)**
 * **[RCP-010 Add/Edit](https://github.com/RESOStandards/transport/blob/main/proposals/web-api-add-edit.md)** – the spec the Add/Edit cert flow validates
 * **[RCP-027 EntityEvent](https://github.com/RESOStandards/transport/blob/main/proposals/entity-event.md)** – the spec the EntityEvent cert flow validates
 * **[RESO Web API Core](https://github.com/RESOStandards/web-api-commander)** – the canonical reference for what Web API Core compliance covers

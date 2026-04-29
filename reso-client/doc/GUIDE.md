@@ -12,9 +12,15 @@ Developers building applications that consume RESO-compliant OData servers – l
 
 ## Install
 
+This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo:
+
 ```bash
-npm install @reso-standards/reso-client
+git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools
+npm install
 ```
+
+The package lives at `reso-tools/reso-client/`. To consume it from another project, link it locally with `npm link` or use a `file:` dependency.
 
 Requires Node.js 22 or later. Works in any ESM environment – no platform-specific dependencies.
 
@@ -471,5 +477,5 @@ node --env-file=.env npx tsx reso-client/examples/oauth-flow.ts
 
 * **[Package README](../)** – full API surface and type reference
 * **[Source on GitHub](https://github.com/RESOStandards/reso-tools/tree/main/reso-client)**
-* **[npm Package](https://www.npmjs.com/package/@reso-standards/reso-client)**
+* **[GitHub source](https://github.com/RESOStandards/reso-tools/tree/main/reso-client)**
 * **[OData 4.01 Part 1: Protocol](https://docs.oasis-open.org/odata/odata/v4.01/odata-v4.01-part1-protocol.html)** – the underlying spec

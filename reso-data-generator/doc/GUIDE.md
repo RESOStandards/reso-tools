@@ -19,9 +19,15 @@ The generator runs as a CLI, as a programmatic SDK, and through the **[RESO Desk
 
 ## Install
 
+This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo:
+
 ```bash
-npm install @reso-standards/reso-data-generator
+git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools
+npm install
 ```
+
+The package lives at `reso-tools/reso-data-generator/`. To consume it from another project, link it locally with `npm link` or use a `file:` dependency.
 
 Node.js 22 or later. The CLI is the most common entry point; the SDK is for embedding the generator inside another tool.
 
@@ -285,5 +291,5 @@ The current generator produces realistic data **shaped by the RESO Data Dictiona
 
 * **[Package README](../)** – full CLI flag table, output mode details, and SDK type reference
 * **[Source on GitHub](https://github.com/RESOStandards/reso-tools/tree/main/reso-data-generator)**
-* **[npm Package](https://www.npmjs.com/package/@reso-standards/reso-data-generator)**
+* **[GitHub source](https://github.com/RESOStandards/reso-tools/tree/main/reso-data-generator)**
 * **[reso-tools#106](https://github.com/RESOStandards/reso-tools/issues/106)** – the work to make the generator strictly respect any target server's declared field set
