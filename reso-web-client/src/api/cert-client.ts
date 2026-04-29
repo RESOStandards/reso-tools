@@ -49,6 +49,13 @@ const proxiedCertUrl = (path: string): string =>
 
 // ── Login ──────────────────────────────────────────────────────────────────
 
+/** Single API key entry returned for non-admin (provider) accounts. */
+export interface CertApiKey {
+  readonly api_key: string;
+  readonly name: string;
+  readonly id: string;
+}
+
 /** Successful login response from POST /api/v1/account/login. */
 export interface LoginResponse {
   readonly success: true;
@@ -59,9 +66,10 @@ export interface LoginResponse {
   readonly username: string;
   readonly fullName: string;
   readonly email: string;
-  // TODO(non-admin-shape): grab a provider login response and extend this
-  // type with whatever extra identity fields it carries (uoi, providerUoi,
-  // recipientUoi, apiKeys, etc.). Currently typed against the admin response.
+  /** Provider's organization UOI. Present for non-admin (provider) accounts. */
+  readonly uoi?: string;
+  /** Additional API keys associated with the account. Present for provider accounts. */
+  readonly apiKeys?: ReadonlyArray<CertApiKey>;
 }
 
 /** Error response envelope. */

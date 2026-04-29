@@ -812,7 +812,7 @@ const PerformanceVisible = ({ perf }: { readonly perf: PerformanceReport }) => {
           <p className={`mt-1 text-xs font-medium tabular-nums ${perf.deltaPercent >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
             {perf.deltaPercent >= 0
               ? `${perf.deltaPercent}% faster than industry average (${perf.industrySecPer1k.toFixed(2)}s)`
-              : `${Math.abs(perf.deltaPercent)}% slower than industry average (${perf.industrySecPer1k.toFixed(2)}s)`}
+              : `${(perf.secPer1k / perf.industrySecPer1k).toFixed(1)}x slower than industry average (${perf.industrySecPer1k.toFixed(2)}s)`}
           </p>
         </div>
         <div className="border-l border-gray-200 dark:border-gray-700 pl-6">

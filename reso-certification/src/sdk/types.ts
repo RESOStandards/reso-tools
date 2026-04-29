@@ -184,6 +184,10 @@ export interface DDConfig extends BaseComplianceConfig {
   readonly providerUsi?: string;
   /** Recipient Unique Organization Identifier. */
   readonly recipientUoi?: string;
+  /** Optional filter — adds `OriginatingSystemName eq '<value>'` to replication queries. */
+  readonly originatingSystemName?: string;
+  /** Optional filter — adds `OriginatingSystemID eq '<value>'` to replication queries when no name is provided. */
+  readonly originatingSystemId?: string;
 }
 
 /** Inline payloads for Add/Edit config. */

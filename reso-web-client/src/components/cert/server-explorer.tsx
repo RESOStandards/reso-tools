@@ -205,14 +205,20 @@ const FieldDetailPanel = ({
             {filteredLookups.map((l) => (
               <div key={`${l.fieldName}-${l.lookupValue}`} className="flex items-center justify-between py-1.5 text-sm">
                 <div className="min-w-0">
-                  <a
-                    href={lookupWikiUrl(version, field.lookupName ?? field.fieldName, l.lookupValue)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    {l.lookupValue}
-                  </a>
+                  {l.standardRESO ? (
+                    <a
+                      href={lookupWikiUrl(version, field.lookupName ?? field.fieldName, l.lookupValue)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      {l.lookupValue}
+                    </a>
+                  ) : (
+                    <span className="font-medium text-gray-700 dark:text-gray-200">
+                      {l.lookupValue}
+                    </span>
+                  )}
                   {!l.standardRESO && (
                     <span className="ml-1.5 px-1 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
                       local

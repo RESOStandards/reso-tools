@@ -339,6 +339,8 @@ const buildSDKConfig = (recipient: RecipientConfig, endorsement: CertEndorsement
         batchExpand: recipient.ddOptions.batchExpand,
         requestDelay: recipient.ddOptions.requestDelay,
         rateLimitWait: recipient.ddOptions.rateLimitWait,
+        originatingSystemName: recipient.ddOptions.originatingSystemName,
+        originatingSystemId: recipient.ddOptions.originatingSystemId,
         providerUoi,
         providerUsi: recipient.providerUsi,
         recipientUoi: recipient.recipientUoi,

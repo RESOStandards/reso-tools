@@ -40,6 +40,37 @@ const PERF_META_KEYS = new Set([
   'averageResponseTimeMillis', 'averageBandwidth', 'averageResponseBytes',
 ]);
 
+/**
+ * RESO Data Dictionary standard resource names (DD 2.1 superset).
+ * Sourced from `reso-certification/reference-metadata/dd-2.1.json`.
+ *
+ * Used to filter the industry-baseline performance report so the
+ * "top 5 resources by industry usage" chart never surfaces a
+ * provider-defined custom resource (e.g. CustomProperty) that
+ * happens to appear in the aggregated stats.
+ *
+ * If RESO publishes a new DD version with new standard resources,
+ * extend this set; the cert SDK's reference-metadata files are the
+ * authoritative source.
+ */
+const DD_STANDARD_RESOURCES: ReadonlySet<string> = new Set([
+  'Association', 'Building', 'Caravan', 'CaravanStop',
+  'ContactListingNotes', 'ContactListings', 'Contacts',
+  'EntityEvent', 'Field', 'HistoryTransactional',
+  'InternetTracking', 'InternetTrackingSummary',
+  'LockOrBox', 'Lookup', 'Media',
+  'Member', 'MemberAssociation', 'MemberStateLicense',
+  'Model', 'OUID', 'Office', 'OfficeAssociation',
+  'OfficeCorporateLicense', 'OpenHouse', 'OtherPhone',
+  'Property', 'PropertyGreenVerification',
+  'PropertyPowerProduction', 'PropertyPowerStorage',
+  'PropertyRooms', 'PropertyUnitTypes',
+  'Prospecting', 'Queue', 'RelatedLookup', 'Rules',
+  'SavedSearch', 'Showing', 'ShowingAppointment',
+  'ShowingAvailability', 'ShowingRequest',
+  'SocialMedia', 'TeamMembers', 'Teams', 'TransactionManagement',
+]);
+
 /** Initialize the baseline fetch. Safe to call multiple times — only fetches once. */
 export const initIndustryBaseline = (): void => {
   if (cache || fetchPromise) return;
@@ -132,11 +163,15 @@ export const initIndustryBaseline = (): void => {
 
       if (!marketAvg) return null;
 
-      // 3. Extract per-resource stats and rank by record count
+      // 3. Extract per-resource stats and rank by record count.
+      // Restrict to RESO-standard resources so a provider-defined
+      // custom resource (e.g. CustomProperty) that crept into the
+      // aggregated report never appears in "Top 5 by industry usage".
       const topResources: string[] = [];
       if (perfReport) {
         const resourceEntries = Object.entries(perfReport)
           .filter(([k]) => !PERF_META_KEYS.has(k))
+          .filter(([k]) => DD_STANDARD_RESOURCES.has(k))
           .filter(([, v]) => v != null && typeof v === 'object')
           .map(([name, stats]) => ({
             name,

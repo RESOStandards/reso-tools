@@ -280,6 +280,12 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
   throwOnError: true,
   secondsDelayBetweenRequests: config.requestDelay ?? 1,
   rateLimitedWaitTimeMinutes: config.rateLimitWait ?? 15,
+  // Optional OriginatingSystem filter — passed straight to legacy
+  // cert-utils' prepareFilterExpression, which appends
+  // `OriginatingSystemName eq '<v>'` (preferred) or
+  // `OriginatingSystemID eq '<v>'` (fallback) to every replication query.
+  originatingSystemName: config.originatingSystemName,
+  originatingSystemId: config.originatingSystemId,
 });
 
 // ── Replication test functions ──

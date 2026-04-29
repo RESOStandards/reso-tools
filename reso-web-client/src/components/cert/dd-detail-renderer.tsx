@@ -355,19 +355,22 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
 
   const stdRate = pct(totals.resoFields, totals.fields);
 
-  // Filter resources by category
+  // Filter resources by category. RESO/IDX views hide purely-local
+  // resources; Local view hides resources that have any RESO or IDX
+  // standard fields (so RESO-standard resources like Property never
+  // surface as "local" just because they carry a few local extensions).
   const filteredResources = useMemo(() => {
     if (!advertised || activeFilter === 'all') return resources;
     return resources.filter((name) => {
       const res = advertised[name];
       if (activeFilter === 'reso') return res.fields.reso > 0;
       if (activeFilter === 'idx') return res.fields.idx > 0;
-      if (activeFilter === 'local') return res.fields.local > 0;
+      if (activeFilter === 'local') return res.fields.local > 0 && res.fields.reso === 0 && res.fields.idx === 0;
       return true;
     });
   }, [resources, advertised, activeFilter]);
 
-  // Count resources per filter
+  // Count resources per filter — counts must match the filter logic above.
   const filterCounts = useMemo(() => {
     if (!advertised) return { all: 0, reso: 0, idx: 0, local: 0 };
     const entries = Object.entries(advertised);
@@ -375,7 +378,7 @@ export const DDDetailRenderer = ({ report }: { readonly report: CertReportSummar
       all: entries.length,
       reso: entries.filter(([, r]) => r.fields.reso > 0).length,
       idx: entries.filter(([, r]) => r.fields.idx > 0).length,
-      local: entries.filter(([, r]) => r.fields.local > 0).length,
+      local: entries.filter(([, r]) => r.fields.local > 0 && r.fields.reso === 0 && r.fields.idx === 0).length,
     };
   }, [advertised]);
 

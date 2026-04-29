@@ -609,24 +609,36 @@ export const EndorsementList = ({
           </div>
 
           {/* Stats strip — signed-in only. Reserved for the eventual
-              role-aware mini dashboard for providers and admins. */}
-          {isSignedIn && counts && (
-            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-              {typeof totalCount === 'number' && totalCount > 0 && (
-                <Stat label="Total" value={totalCount} accent />
-              )}
-              {typeof certifiedCount === 'number' && certifiedCount > 0 && (
-                <Stat label="Certified" value={certifiedCount} tone="green" />
-              )}
-              {typeof notifiedCount === 'number' && notifiedCount > 0 && (
-                <Stat label="Notified" value={notifiedCount} tone="sky" />
-              )}
-              {typeof passedCount === 'number' && passedCount > 0 && (
-                <Stat label="Passed" value={passedCount} tone="emerald" />
-              )}
-              <SourceBadge source={source} title={fallbackError ?? undefined} />
-            </div>
-          )}
+              role-aware mini dashboard for providers and admins. The
+              global `counts` reflect the full dataset; when the user
+              has filters applied (My Results, status, endorsement,
+              search) we substitute `totalShown` so the header tracks
+              what's actually on screen. */}
+          {isSignedIn && counts && (() => {
+            const filtersActive =
+              showMyResults
+              || activeEndorsements.size > 0
+              || activeStatuses.size > 0
+              || searchInput.trim().length > 0;
+            const displayedTotal = filtersActive ? totalShown : totalCount;
+            return (
+              <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+                {typeof displayedTotal === 'number' && displayedTotal > 0 && (
+                  <Stat label="Total" value={displayedTotal} accent />
+                )}
+                {!filtersActive && typeof certifiedCount === 'number' && certifiedCount > 0 && (
+                  <Stat label="Certified" value={certifiedCount} tone="green" />
+                )}
+                {!filtersActive && typeof notifiedCount === 'number' && notifiedCount > 0 && (
+                  <Stat label="Notified" value={notifiedCount} tone="sky" />
+                )}
+                {!filtersActive && typeof passedCount === 'number' && passedCount > 0 && (
+                  <Stat label="Passed" value={passedCount} tone="emerald" />
+                )}
+                <SourceBadge source={source} title={fallbackError ?? undefined} />
+              </div>
+            );
+          })()}
 
           {/* Search + Filters + Sort — single row. Sort sits trailing
               by convention: filters narrow the set, sort orders it. */}

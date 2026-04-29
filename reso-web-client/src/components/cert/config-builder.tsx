@@ -12,6 +12,8 @@ import { SavedConfigsPanel } from './saved-configs-panel';
 import { loadProfiles, loadConnections, saveDraft, clearDraft, type SavedCredentials, type SavedCertConfig } from '../../services/connection-manager';
 import { FilterPill, Badge } from '../metadata/shared';
 import { getOrganizations } from '../../hooks/use-organization-names';
+import { useAuth } from '../../hooks/use-auth';
+import { useCurrentUserSystems } from '../../hooks/use-current-user-systems';
 import type { CertOrganization, CertOrganizationSystem } from '../../api/cert-client';
 import {
   CERT_ENDORSEMENT_LABELS,
@@ -838,7 +840,16 @@ export const ConfigBuilder = ({
   readonly savedConfigName?: string | null;
   readonly refreshKey?: number;
 }) => {
-  const [providerUoi, setProviderUoi] = useState(initialConfig?.providerUoi ?? '');
+  const { user, isAdmin } = useAuth();
+  // When a provider account is signed in, the cert config's provider
+  // identity is locked to their org — they can't run jobs on behalf of
+  // anyone else. Admins (and signed-out sessions) keep the open picker.
+  const lockedProviderUoi = !isAdmin ? user?.uoi ?? null : null;
+  const { systems: lockedSystems } = useCurrentUserSystems();
+
+  const [providerUoi, setProviderUoi] = useState(
+    lockedProviderUoi ?? initialConfig?.providerUoi ?? '',
+  );
   const [providerName, setProviderName] = useState('');
   const [providerSystems, setProviderSystems] = useState<ReadonlyArray<CertOrganizationSystem>>([]);
   const [concurrency, setConcurrency] = useState(initialConfig?.concurrency ?? DEFAULT_CONCURRENCY);
@@ -875,6 +886,20 @@ export const ConfigBuilder = ({
       .finally(() => setOrgsLoading(false));
 
   }, []);
+
+  // Provider lock — when a non-admin user is signed in, force the
+  // form's providerUoi to their org and use the cert API's systems
+  // list as the source of truth for USIs. Imports / saved configs
+  // that arrive with a different providerUoi get rewritten silently.
+  useEffect(() => {
+    if (!lockedProviderUoi) return;
+    if (providerUoi !== lockedProviderUoi) setProviderUoi(lockedProviderUoi);
+  }, [lockedProviderUoi, providerUoi]);
+
+  useEffect(() => {
+    if (!lockedProviderUoi) return;
+    setProviderSystems(lockedSystems);
+  }, [lockedProviderUoi, lockedSystems]);
 
   // Load saved cert configs and credentials for autocomplete (refreshes after save)
   useEffect(() => {
@@ -1072,22 +1097,29 @@ export const ConfigBuilder = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* Provider org picker */}
         <div className="relative">
-          <label className={LABEL}>Provider</label>
+          <label className={LABEL}>
+            Provider
+            {lockedProviderUoi && (
+              <span className="ml-2 text-[10px] font-normal text-gray-400 dark:text-gray-500">Locked to your account</span>
+            )}
+          </label>
           {providerUoi ? (
             <div className={`${INPUT} flex items-center justify-between`}>
               <div className="min-w-0">
                 <span className="text-sm font-medium">{providerName}</span>
                 <span className="ml-2 text-xs text-gray-400 dark:text-gray-500 font-mono">{providerUoi}</span>
               </div>
-              <button
-                type="button"
-                onClick={() => { setProviderUoi(''); setProviderName(''); setProviderSystems([]); }}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer shrink-0 ml-2"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                </svg>
-              </button>
+              {!lockedProviderUoi && (
+                <button
+                  type="button"
+                  onClick={() => { setProviderUoi(''); setProviderName(''); setProviderSystems([]); }}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer shrink-0 ml-2"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                  </svg>
+                </button>
+              )}
             </div>
           ) : (
             <>
