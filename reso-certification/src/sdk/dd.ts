@@ -376,7 +376,7 @@ const replicateTimestampDesc = (config: DDConfig): TestFunction<DDContext> =>
       onProgress: progress.callback,
     });
     const stats = progress.getLastStats();
-    return { context: ctx, summary: `TIMESTAMP_DESC with $top=${pageSize}`, counts: stats };
+    return { context: ctx, summary: `Timestamp Descending with $top=${pageSize}`, counts: stats };
   };
 
 const replicateNextLink = (config: DDConfig): TestFunction<DDContext> =>
@@ -389,7 +389,7 @@ const replicateNextLink = (config: DDConfig): TestFunction<DDContext> =>
       onProgress: progress.callback,
     });
     const stats = progress.getLastStats();
-    return { context: ctx, summary: `NEXT_LINK with maxPageSize=${DEFAULT_PAGE_SIZE_V20}`, counts: stats };
+    return { context: ctx, summary: `NextLink with maxPageSize=${DEFAULT_PAGE_SIZE_V20}`, counts: stats };
   };
 
 const replicateNextLinkFiltered = (config: DDConfig): TestFunction<DDContext> =>
@@ -405,7 +405,7 @@ const replicateNextLinkFiltered = (config: DDConfig): TestFunction<DDContext> =>
       onProgress: progress.callback,
     });
     const stats = progress.getLastStats();
-    return { context: ctx, summary: `NEXT_LINK + ModificationTimestamp filter (${DEFAULT_YEARS_BACK}yr lookback)`, counts: stats };
+    return { context: ctx, summary: `NextLink (modified-since filter, ${DEFAULT_YEARS_BACK}yr lookback)`, counts: stats };
   };
 
 /** Build the replication step with all strategies as test functions. */
