@@ -20,7 +20,7 @@ import { useLocation, useBlocker } from 'react-router';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
 import { blendVariations, type BlendedVariation, type BlendedSuggestion, type BlendedVariationsReport } from '../../services/variations-blender';
-import { searchVariations, getVariationsStats, searchLocks, createLock, deleteLock, variationsLockResourceId, type LockRecord } from '../../services/variations-service';
+import { searchVariations, getVariationsStats, searchLocks, createLock, deleteLock, variationsLockResourceId, getVariationsReport, generateCertRequestId, type LockRecord } from '../../services/variations-service';
 import { resolveReportRef, ReportMissingError } from '../../services/report-ref';
 import { useNotifications } from '../../hooks/use-notifications';
 import { saveVariationsReview } from '../../services/variations-save';
@@ -555,7 +555,68 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
 
   useEffect(() => { saveDraft(reportId, actions); }, [actions, reportId]);
 
-  const isDirty = actions.size > 0 || draftComments.size > 0;
+  // Hydrate prior decisions from the backend variations report on mount,
+  // so reopening a page that's already been triaged shows the user's
+  // earlier Ignore / Fast Track / Remove choices instead of starting
+  // blank. The hydrated map is also our dirty baseline — `isDirty`
+  // becomes "current actions diverge from what's saved", not "user has
+  // touched anything", so the Submit/Save Changes button only enables
+  // when there are actually new changes to send.
+  const hydratedActionsRef = useRef<Map<string, ActionStatus>>(new Map());
+  const [hydratedKey, setHydratedKey] = useState(0);
+  // Saved conversations from the backend variations report, keyed by
+  // variationKey. Rendered alongside the variation's live conversations
+  // so prior comments from earlier review rounds resurface on reopen.
+  const [savedConversations, setSavedConversations] = useState<Map<string, ReadonlyArray<VariationComment>>>(new Map());
+
+  useEffect(() => {
+    const pUoi = report.providerUoi;
+    const pUsi = report.providerUsi;
+    const rUoi = report.recipientUoi;
+    if (!pUoi || !pUsi || !rUoi) return;
+    let cancelled = false;
+    (async () => {
+      const certRequestId = await generateCertRequestId(report.version, pUoi, pUsi, rUoi);
+      const existing = await getVariationsReport(report.version, pUoi, pUsi, rUoi, certRequestId);
+      if (cancelled || !existing?.changes) return;
+      const hydrated = new Map<string, ActionStatus>();
+      const conversations = new Map<string, ReadonlyArray<VariationComment>>();
+      for (const c of existing.changes as ReadonlyArray<{
+        readonly resourceName?: string;
+        readonly fieldName?: string;
+        readonly lookupValue?: string;
+        readonly ignore?: boolean;
+        readonly flaggedForFastTrack?: boolean;
+        readonly remove?: boolean;
+        readonly conversations?: ReadonlyArray<VariationComment>;
+      }>) {
+        const key = `${c.resourceName ?? ''}:${c.fieldName ?? ''}:${c.lookupValue ?? ''}`;
+        if (c.ignore === true) hydrated.set(key, 'ignored');
+        else if (c.flaggedForFastTrack === true) hydrated.set(key, 'fast-track');
+        else if (c.remove === true) hydrated.set(key, 'remove');
+        if (c.conversations && c.conversations.length > 0) {
+          const prior = conversations.get(key) ?? [];
+          conversations.set(key, [...prior, ...c.conversations]);
+        }
+      }
+      hydratedActionsRef.current = hydrated;
+      setHydratedKey(k => k + 1);
+      setSavedConversations(conversations);
+      // Only adopt the hydrated set as the visible state if the user
+      // hasn't already started editing in this session — local drafts
+      // (loadDraft) win over server state on a fresh mount.
+      setActions(prev => (prev.size === 0 ? hydrated : prev));
+    })();
+    return () => { cancelled = true; };
+  }, [report.version, report.providerUoi, report.providerUsi, report.recipientUoi]);
+
+  const isDirty = useMemo(() => {
+    const baseline = hydratedActionsRef.current;
+    if (actions.size !== baseline.size) return true;
+    for (const [k, v] of actions) if (baseline.get(k) !== v) return true;
+    return draftComments.size > 0;
+    // hydratedKey forces recompute when the baseline arrives.
+  }, [actions, draftComments, hydratedKey]);
   useBlocker(isDirty && !saving);
 
   const filtered = useMemo(() => {
@@ -620,8 +681,19 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
   }, [ensureMyLock]);
 
   const handleSave = useCallback(async () => {
-    if (actions.size === 0) return;
     if (!report.providerUoi || !report.providerUsi || !report.recipientUoi) return;
+
+    // Only send the delta — actions whose status differs from what's
+    // already saved on the server. Without this filter the hydrated
+    // baseline would be re-sent untagged on every Save, and the backend
+    // (which identifies "new" changes by missing changeId) would dedupe
+    // by appending fresh duplicates of decisions the user never touched.
+    const baseline = hydratedActionsRef.current;
+    const deltaActions: ReadonlyArray<{ key: string; status: ActionStatus }> = [...actions.entries()]
+      .filter(([key, status]) => baseline.get(key) !== status)
+      .map(([key, status]) => ({ key, status }));
+
+    if (deltaActions.length === 0 && draftComments.size === 0) return;
 
     setSaving(true);
     try {
@@ -631,7 +703,7 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
         providerUoi: report.providerUoi,
         providerUsi: report.providerUsi,
         recipientUoi: report.recipientUoi,
-        actions: [...actions.entries()].map(([key, status]) => ({ key, status })),
+        actions: deltaActions,
         comments: [...draftComments.entries()].flatMap(([variationKey, comments]) =>
           comments.map(c => ({ variationKey, ...c }))
         ),
@@ -640,8 +712,14 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
       });
 
       if (success) {
+        // Promote what we just sent to the new "saved" baseline so the
+        // visible state stays the same and `isDirty` flips back to
+        // false. (Old model wiped the local map; that emptied the UI
+        // because actions now mirror the full saved state, not just a
+        // pending delta.)
+        hydratedActionsRef.current = new Map(actions);
+        setHydratedKey(k => k + 1);
         clearDraft(reportId);
-        setActions(new Map());
         setDraftComments(new Map());
         // First successful save for this job marks variations as
         // submitted for review — flips the job-card button label from
@@ -741,6 +819,14 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
                   Locked by you · {formatTimeSince(lockHolder.lockUnixTimestamp)}
                 </span>
               )}
+              {(hasSubmitted || savedConversations.size > 0 || hydratedActionsRef.current.size > 0) && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 text-[11px] font-medium text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900/50"
+                  title="Prior decisions and comments exist for this report"
+                >
+                  In Review
+                </span>
+              )}
               {hasSubmitted && job?.variationsReviewSubmittedAt && (
                 <span
                   title={`Submitted at ${new Date(job.variationsReviewSubmittedAt).toLocaleString()}`}
@@ -804,7 +890,7 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
           (nothing submitted yet, no drafts taken). Disappears once the
           user starts triaging or has submitted before, so it doesn't
           nag seasoned reviewers. */}
-      {!hasSubmitted && !isDirty && !isReadOnly && (
+      {!hasSubmitted && !isDirty && !isReadOnly && savedConversations.size === 0 && hydratedActionsRef.current.size === 0 && (
         <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
           Triage each variation below — click <strong>Ignore</strong>, <strong>Fast Track</strong>, or <strong>Remove</strong>. When you're done, click <strong>Submit Review</strong>.
         </p>
@@ -833,6 +919,7 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
           actions={actions}
           selectedKey={selectedKey}
           draftComments={draftComments}
+          savedConversations={savedConversations}
           isReadOnly={isReadOnly}
           isAdmin={isAdmin}
           onSelect={(variation) => setSelectedKey(variationKey(variation))}
@@ -844,6 +931,7 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
         variation={selectedKey ? (filtered.find(v => variationKey(v) === selectedKey) ?? null) : null}
         action={selectedKey ? actions.get(selectedKey) : undefined}
         draftComments={selectedKey ? (draftComments.get(selectedKey) ?? []) : []}
+        savedComments={selectedKey ? (savedConversations.get(selectedKey) ?? []) : []}
         isReadOnly={isReadOnly}
         isAdmin={isAdmin}
         userName={user?.fullName ?? user?.username ?? ''}
@@ -909,23 +997,25 @@ interface VariationRowProps {
   readonly isReadOnly: boolean;
   readonly isAdmin: boolean;
   readonly hasDraftComments: boolean;
+  /** Count of comments hydrated from the saved variations report. */
+  readonly savedCommentCount: number;
   readonly onSelect: () => void;
   readonly onToggleAction: (status: ActionStatus) => void;
 }
 
-const VariationRow = ({ variation, action, isSelected, isReadOnly, isAdmin, hasDraftComments, onSelect, onToggleAction }: VariationRowProps) => {
+const VariationRow = ({ variation, action, isSelected, isReadOnly, isAdmin, hasDraftComments, savedCommentCount, onSelect, onToggleAction }: VariationRowProps) => {
   const primary = variation.suggestions[0];
   const diff = primary
     ? diffSegments(sourceSegments(variation), targetSegments(primary))
     : { source: sourceSegments(variation).filter((s): s is string => s != null).map(text => ({ text, changed: false })), target: [] };
   const extraCount = variation.suggestions.length > 1 ? variation.suggestions.length - 1 : 0;
   const strategyInfo = primary ? getStrategyMeta(primary.strategy) : null;
-  const commentCount = (variation.conversations?.length ?? 0) + (hasDraftComments ? 1 : 0);
+  const commentCount = (variation.conversations?.length ?? 0) + savedCommentCount + (hasDraftComments ? 1 : 0);
   const isIgnored = variation.ignored || action === 'ignored';
 
   return (
     <div
-      className={`grid grid-cols-[80px_minmax(0,1fr)_minmax(0,1fr)_140px_80px_180px] items-center gap-3 px-4 py-2 text-sm cursor-pointer transition-colors ${
+      className={`grid grid-cols-[80px_minmax(0,1fr)_minmax(0,1fr)_140px_110px_180px] items-center gap-3 px-4 py-2 text-sm cursor-pointer transition-colors ${
         isSelected
           ? 'bg-blue-50 dark:bg-blue-900/20'
           : isIgnored
@@ -955,7 +1045,7 @@ const VariationRow = ({ variation, action, isSelected, isReadOnly, isAdmin, hasD
           : <span className="text-xs text-gray-400 dark:text-gray-500">No suggestion</span>}
         {extraCount > 0 && <span className="ml-2 text-[10px] text-gray-400 dark:text-gray-500">+{extraCount} more</span>}
       </div>
-      <div className="flex justify-end">
+      <div className="flex justify-center">
         {strategyInfo && (
           <span
             title={strategyInfo.description}
@@ -987,7 +1077,7 @@ const VariationRow = ({ variation, action, isSelected, isReadOnly, isAdmin, hasD
           <span>—</span>
         )}
       </div>
-      <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+      <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
         {!isReadOnly ? (
           <>
             <button type="button" onClick={() => onToggleAction('ignored')}
@@ -1024,13 +1114,14 @@ interface VariationsTableProps {
   readonly actions: Map<string, ActionStatus>;
   readonly selectedKey: string | null;
   readonly draftComments: Map<string, ReadonlyArray<VariationComment>>;
+  readonly savedConversations: Map<string, ReadonlyArray<VariationComment>>;
   readonly isReadOnly: boolean;
   readonly isAdmin: boolean;
   readonly onSelect: (variation: BlendedVariation) => void;
   readonly onToggleAction: (key: string, status: ActionStatus) => void;
 }
 
-const VariationsTable = ({ variations, actions, selectedKey, draftComments, isReadOnly, isAdmin, onSelect, onToggleAction }: VariationsTableProps) => {
+const VariationsTable = ({ variations, actions, selectedKey, draftComments, savedConversations, isReadOnly, isAdmin, onSelect, onToggleAction }: VariationsTableProps) => {
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
     count: variations.length,
@@ -1041,13 +1132,13 @@ const VariationsTable = ({ variations, actions, selectedKey, draftComments, isRe
 
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
-      <div className="grid grid-cols-[80px_minmax(0,1fr)_minmax(0,1fr)_140px_80px_180px] gap-3 px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+      <div className="grid grid-cols-[80px_minmax(0,1fr)_minmax(0,1fr)_140px_110px_180px] gap-3 px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
         <div>Type</div>
         <div>Source</div>
         <div>Suggested</div>
-        <div className="text-right">Strategy</div>
+        <div className="text-center">Strategy</div>
         <div className="text-center">Comments</div>
-        <div className="text-right">Actions</div>
+        <div className="text-center">Actions</div>
       </div>
       <div ref={parentRef} className="max-h-[calc(100vh-320px)] overflow-auto">
         <div style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
@@ -1066,8 +1157,8 @@ const VariationsTable = ({ variations, actions, selectedKey, draftComments, isRe
                   isSelected={selectedKey === key}
                   isReadOnly={isReadOnly}
                   isAdmin={isAdmin}
-                  
                   hasDraftComments={(draftComments.get(key)?.length ?? 0) > 0}
+                  savedCommentCount={savedConversations.get(key)?.length ?? 0}
                   onSelect={() => onSelect(variation)}
                   onToggleAction={(status) => onToggleAction(key, status)}
                 />
@@ -1086,6 +1177,8 @@ interface VariationDrawerProps {
   readonly variation: BlendedVariation | null;
   readonly action?: ActionStatus;
   readonly draftComments: ReadonlyArray<VariationComment>;
+  /** Comments hydrated from the saved variations report on the backend. */
+  readonly savedComments: ReadonlyArray<VariationComment>;
   readonly isReadOnly: boolean;
   readonly isAdmin: boolean;
   readonly userName: string;
@@ -1096,7 +1189,7 @@ interface VariationDrawerProps {
   readonly onRemoveComment: (index: number) => void;
 }
 
-const VariationDrawer = ({ variation, action, draftComments, isReadOnly, isAdmin, userName, userUoi, onClose, onToggleAction, onAddComment, onRemoveComment }: VariationDrawerProps) => {
+const VariationDrawer = ({ variation, action, draftComments, savedComments, isReadOnly, isAdmin, userName, userUoi, onClose, onToggleAction, onAddComment, onRemoveComment }: VariationDrawerProps) => {
   // Close on Escape
   useEffect(() => {
     if (!variation) return;
@@ -1236,10 +1329,13 @@ const VariationDrawer = ({ variation, action, draftComments, isReadOnly, isAdmin
             </div>
           )}
 
-          {/* Comments */}
+          {/* Comments — merge live (from blended report) and saved
+              (from the persisted variations report). The blender doesn't
+              know about prior saves, so without this merge the comments
+              vanish on reopen. */}
           <div>
             <VariationComments
-              existingComments={variation.conversations ?? []}
+              existingComments={[...(variation.conversations ?? []), ...savedComments]}
               draftComments={draftComments}
               onAddComment={onAddComment}
               onRemoveComment={onRemoveComment}

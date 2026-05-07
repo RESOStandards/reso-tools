@@ -123,7 +123,7 @@ import {
   STEP_STATUS_ICONS,
   STEP_STATUS_COLORS,
 } from '../../constants/cert';
-import { STEP_TOOLTIPS, humanizeScenarioName, isVariationsStep } from '../../constants/cert';
+import { STEP_TOOLTIPS, STEP_WRITE_REPORTS, humanizeScenarioName, isVariationsStep } from '../../constants/cert';
 import type { StepStatus } from '../../constants/cert';
 
 const statusColor = (status: JobStatus): string =>
@@ -519,11 +519,20 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                     const resourceReports = (detailed?.resourceReports ?? []) as ReadonlyArray<Record<string, unknown>>;
                     const isScenarioStep = step.name.includes('Run ') && step.name.includes('scenarios');
                     const hasScenarios = isScenarioStep && resourceReports.length > 0;
+                    // "Write reports" is the API-back-compat finalizer
+                    // that dumps Generic + Detailed JSON to disk. The
+                    // checkmark and timing are still useful as a "step
+                    // ran" indicator, but the "N reports written"
+                    // summary is internal noise — strip it for the
+                    // user-facing modal.
+                    const displayStep = step.name === STEP_WRITE_REPORTS
+                      ? { ...step, detail: undefined }
+                      : step;
 
                     return (
                       <ReportStepCard
                         key={i}
-                        step={step}
+                        step={displayStep}
                         scenarios={hasScenarios ? resourceReports : undefined}
                       />
                     );
@@ -672,7 +681,7 @@ const ReportStepCard = ({
         </div>
         {step.duration != null && step.duration > 0 && (
           <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums shrink-0">
-            {step.duration < 1000 ? `${step.duration}ms` : `${(step.duration / 1000).toFixed(1)}s`}
+            {formatDuration(step.duration)}
           </span>
         )}
       </button>
@@ -698,7 +707,7 @@ const ReportStepCard = ({
                   </div>
                   {s.duration != null && (s.duration as number) > 0 && (
                     <span className="text-gray-400 dark:text-gray-500 tabular-nums">
-                      {(s.duration as number) < 1000 ? `${s.duration}ms` : `${((s.duration as number) / 1000).toFixed(1)}s`}
+                      {formatDuration(s.duration as number)}
                     </span>
                   )}
                 </div>

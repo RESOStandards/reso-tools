@@ -51,13 +51,18 @@ export const VariationComments = ({
   userUoi,
   isReadOnly,
 }: VariationCommentsProps) => {
-  const [expanded, setExpanded] = useState(false);
+  // Default open: when reviewers reopen a variation that's already
+  // accumulated comments, surfacing the thread without an extra click
+  // matches what they're trying to do (read recent context). The toggle
+  // stays available for users who want to collapse a long thread.
+  const [expanded, setExpanded] = useState(true);
   const [message, setMessage] = useState('');
   const [attachUrl, setAttachUrl] = useState('');
   const [attachText, setAttachText] = useState('');
   const [showAttach, setShowAttach] = useState(false);
   const [attachments, setAttachments] = useState<ReadonlyArray<{ displayText: string; url: string }>>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const allComments = [...existingComments, ...draftComments];
   const totalCount = allComments.length;
@@ -69,6 +74,13 @@ export const VariationComments = ({
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
   }, [message]);
+
+  // Scroll the message list to the latest comment whenever it expands
+  // or new entries arrive — newest comment is the most relevant context.
+  useEffect(() => {
+    if (!expanded || !listRef.current) return;
+    listRef.current.scrollTop = listRef.current.scrollHeight;
+  }, [expanded, totalCount]);
 
   const handleSubmit = useCallback(() => {
     if (!message.trim()) return;
@@ -137,7 +149,7 @@ export const VariationComments = ({
         <div className="px-4 pb-3 space-y-2">
           {/* Message list */}
           {allComments.length > 0 && (
-            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+            <div ref={listRef} className="space-y-1.5 max-h-48 overflow-y-auto">
               {allComments.map((comment, i) => {
                 const isReso = isResoMessage(comment);
                 const draft = isDraft(i);

@@ -280,7 +280,10 @@ export const getJob = (id: string): Job | undefined => state.jobs.get(id);
 export const markVariationsReviewSubmitted = (id: string): void => {
   const job = state.jobs.get(id);
   if (!job) return;
-  if (job.variationsReviewSubmittedAt) return;
+  // Refresh on every successful save so the "Submitted X ago" badge
+  // reflects the latest submission, not just the first one. The job
+  // card label flip from "Start" to "Review" already runs off the
+  // mere presence of this timestamp, so updating it is safe.
   updateJob(id, { variationsReviewSubmittedAt: new Date().toISOString() });
 };
 
