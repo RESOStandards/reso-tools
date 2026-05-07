@@ -6,7 +6,17 @@
  * - Per-scenario details with fields, enumerations, expansions, and failure info
  */
 
-import type { EntityProperty, EntityType, ScenarioResult, TestReport } from '../test-runner/types.js';
+import type { EntityType, ScenarioResult, TestReport } from '../test-runner/types.js';
+import {
+  extractPayloadFields,
+  extractEnumerations,
+  extractExpansions,
+  type EnumerationDetail,
+} from '../test-runner/payload-fields.js';
+
+// Re-export so existing consumers that imported EnumerationDetail from
+// this module continue to compile.
+export type { EnumerationDetail };
 
 // ── Public Types ──
 
@@ -42,11 +52,6 @@ export interface EnumerationSummary {
   readonly values: ReadonlyArray<EnumerationDetail>;
 }
 
-export interface EnumerationDetail {
-  readonly fieldName: string;
-  readonly value: unknown;
-}
-
 export interface FailureDetail {
   readonly assertion: string;
   readonly expected?: string;
@@ -77,12 +82,6 @@ const derivePreference = (tags: ReadonlyArray<string>): 'return=representation' 
   return undefined;
 };
 
-/** Checks whether an EntityProperty is an enumeration type. */
-const isEnumProperty = (prop: EntityProperty): boolean =>
-  prop.type.startsWith('org.reso.metadata.enums.') ||
-  prop.type.startsWith('Collection(org.reso.metadata.enums.') ||
-  prop.annotations?.['RESO.OData.Metadata.LookupName'] !== undefined;
-
 /** Maps scenario names to their payload keys. */
 const SCENARIO_PAYLOAD_MAP: Readonly<Record<string, string>> = {
   'create-succeeds-representation': 'createSucceeds',
@@ -93,36 +92,6 @@ const SCENARIO_PAYLOAD_MAP: Readonly<Record<string, string>> = {
   'update-fails': 'updateFails',
   'delete-succeeds': 'deleteSucceeds',
   'delete-fails': 'deleteFails'
-};
-
-/** Extracts field names from a payload, excluding OData annotations and key fields. */
-const extractPayloadFields = (payload: Record<string, unknown>, entityType: EntityType): ReadonlyArray<string> => {
-  const keySet = new Set(entityType.keyProperties);
-  return Object.keys(payload).filter(k => !k.startsWith('@') && !keySet.has(k));
-};
-
-/** Extracts enumeration field names and their values from a payload. */
-const extractEnumerations = (payload: Record<string, unknown>, entityType: EntityType): ReadonlyArray<EnumerationDetail> => {
-  const propMap = new Map(entityType.properties.map(p => [p.name, p]));
-  const results: EnumerationDetail[] = [];
-
-  for (const [fieldName, value] of Object.entries(payload)) {
-    if (fieldName.startsWith('@')) continue;
-    const prop = propMap.get(fieldName);
-    if (prop && isEnumProperty(prop) && value !== null && value !== undefined) {
-      results.push({ fieldName, value });
-    }
-  }
-
-  return results;
-};
-
-/** Extracts expansion (navigation property) field names from a payload. */
-const extractExpansions = (payload: Record<string, unknown>, entityType: EntityType): ReadonlyArray<string> => {
-  const propNames = new Set(entityType.properties.map(p => p.name));
-  return Object.keys(payload).filter(
-    k => !k.startsWith('@') && !propNames.has(k) && (Array.isArray(payload[k]) || typeof payload[k] === 'object')
-  );
 };
 
 /** Builds a ScenarioDetail from a ScenarioResult and its payload. */

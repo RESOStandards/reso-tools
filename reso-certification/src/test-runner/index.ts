@@ -54,3 +54,12 @@ export { extractPrimaryKey, stripPrimaryKey, makeSchemaAssertion, buildScenarioR
 
 // Edm type validator
 export { validateValueAgainstEdm, validateRecordAgainstMetadata } from './edm-validator.js';
+
+// Payload field inspection
+export {
+  isEnumProperty,
+  extractPayloadFields,
+  extractEnumerations,
+  extractExpansions,
+} from './payload-fields.js';
+export type { EnumerationDetail } from './payload-fields.js';

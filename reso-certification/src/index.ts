@@ -41,6 +41,15 @@ export { extractPrimaryKey, stripPrimaryKey, makeSchemaAssertion, buildScenarioR
 // Edm type validator
 export { validateValueAgainstEdm, validateRecordAgainstMetadata } from './test-runner/edm-validator.js';
 
+// Payload field inspection
+export {
+  isEnumProperty,
+  extractPayloadFields,
+  extractEnumerations,
+  extractExpansions,
+} from './test-runner/payload-fields.js';
+export type { EnumerationDetail } from './test-runner/payload-fields.js';
+
 // Types
 export type {
   AuthConfig,
