@@ -242,7 +242,7 @@ const resolveOutputPath = (config: Record<string, unknown>): string | null => {
     const providerUsi = (config.providerUsi as string) ?? 'LOCAL-SYSTEM';
     const recipientUoi = (config.recipientUoi as string) ?? 'LOCAL-RECIPIENT';
     const outputDir = (config.options as Record<string, unknown>)?.outputDir as string | undefined;
-    const resultsPath = outputDir ?? resolve(app.getPath('userData'), '.reso-cert');
+    const resultsPath = outputDir ?? certResultsRoot();
 
     return resolve(resultsPath, `${slug}-${version}`, `${providerUoi}-${providerUsi}`, recipientUoi, 'current');
   } catch {
@@ -254,7 +254,16 @@ const resolveOutputPath = (config: Record<string, unknown>): string | null => {
 
 const CERT_RESULTS_DIR = '.reso-cert';
 
-/** Get the root results directory. */
+/**
+ * Root directory for cert results, anchored to Electron's userData path.
+ *
+ * Avoids relying on process.cwd(): in a packaged app launched from
+ * Finder/Spotlight, cwd is '/' (or, post the module-level chdir, the
+ * read-only resourcesPath inside the app bundle). Either of those
+ * makes mkdir of '.reso-cert' fail. userData is always writable and
+ * is the same location the rest of the app uses (jobs DB, secure
+ * storage, log file).
+ */
 const certResultsRoot = (): string => resolve(app.getPath('userData'), CERT_RESULTS_DIR);
 
 /**
@@ -508,13 +517,17 @@ const registerCertRunnerHandlers = (): void => {
     // Resolve server URL and auth for local runs
     const isLocal = (config.server as Record<string, unknown>)?.url === 'LOCAL_SERVER';
     const serverAuth = (config.server as Record<string, unknown>)?.auth as Record<string, unknown> | undefined;
-    // Ensure outputDir is an absolute path under userData (process.cwd() is / in packaged apps)
+    // Anchor outputDir to certResultsRoot() so the SDK does not fall back
+    // to process.cwd() inside the Worker thread. In a packaged app cwd is
+    // unwritable; the SDK's mkdir on '.reso-cert' there fails with ENOENT
+    // / EPERM. Relative outputDir values from the renderer resolve against
+    // the same anchor so they end up under userData. Absolute values are
+    // preserved by node:path.resolve.
     const existingOptions = (config.options as Record<string, unknown>) ?? {};
-    const outputDir = existingOptions.outputDir as string | undefined;
-    const resolvedOutputDir = outputDir && resolve(outputDir) !== outputDir
-      ? resolve(app.getPath('userData'), outputDir)
-      : outputDir ?? resolve(app.getPath('userData'), '.reso-cert');
-
+    const providedOutputDir = existingOptions.outputDir as string | undefined;
+    const resolvedOutputDir = providedOutputDir
+      ? resolve(app.getPath('userData'), providedOutputDir)
+      : certResultsRoot();
     const resolvedConfig = {
       ...config,
       options: {
