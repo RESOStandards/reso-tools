@@ -63,6 +63,10 @@ export const createClient = async (config: ClientConfig): Promise<ODataClient> =
     const headers: Record<string, string> = {
       Accept: 'application/json',
       'Accept-Encoding': 'gzip, deflate',
+      // Identifying User-Agent so servers behind WAFs (e.g. MLS Grid)
+      // do not reject the request based on undici's default of 'node'.
+      // Consumers can override via config.defaultHeaders or options.headers.
+      'User-Agent': 'RESO-Client-SDK/0.2',
       Authorization: `Bearer ${token}`,
       ...config.defaultHeaders,
       ...options?.headers,

@@ -60,7 +60,8 @@ export const fetchRawMetadataWithVersion = async (baseUrl: string, token: string
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: 'application/xml',
-      'Accept-Encoding': 'gzip, deflate'
+      'Accept-Encoding': 'gzip, deflate',
+      'User-Agent': 'RESO-Client-SDK/0.2'
     }
   });
 

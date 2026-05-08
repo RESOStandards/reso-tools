@@ -30,21 +30,34 @@ const serviceCheck: PipelineStep<EntityEventContext> = {
   name: 'Service check',
   run: async (ctx, onProgress) => {
     const url = ctx.serverUrl;
-    const headers: Record<string, string> = ctx.authToken
-      ? { Authorization: `Bearer ${ctx.authToken}` }
-      : {};
+    // Identifying User-Agent + explicit Accept so servers behind WAFs
+    // do not reject based on undici's default User-Agent of 'node'.
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'User-Agent': 'RESO-Cert/0.11',
+    };
+    if (ctx.authToken) headers['Authorization'] = `Bearer ${ctx.authToken}`;
     const maxAttempts = 10;
+    let lastStatus: number | undefined;
+    let lastBody: string | undefined;
     for (let i = 0; i < maxAttempts; i++) {
       try {
         const response = await fetch(url, { headers });
         if (response.ok) {
           return { context: ctx, summary: 'OData service is ready', requestDetails: [{ method: 'GET', url }] };
         }
-      } catch { /* network error — retry */ }
+        lastStatus = response.status;
+        try { lastBody = (await response.text()).slice(0, 500); } catch { /* ignore body read errors */ }
+      } catch (err) {
+        lastBody = err instanceof Error ? err.message : String(err);
+      }
       await new Promise(resolve => setTimeout(resolve, 2000));
       onProgress({ step: 'Service check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
     }
-    return { context: ctx, status: 'failed', errors: ['OData service did not respond'], requestDetails: [{ method: 'GET', url, error: `No response after ${maxAttempts} attempts` }] };
+    const errorDetail = lastStatus
+      ? `HTTP ${lastStatus}${lastBody ? ` — ${lastBody}` : ''}`
+      : `No response after ${maxAttempts} attempts${lastBody ? ` (last error: ${lastBody})` : ''}`;
+    return { context: ctx, status: 'failed', errors: [`OData service did not respond: ${errorDetail}`], requestDetails: [{ method: 'GET', url, error: errorDetail }] };
   },
 };
 
