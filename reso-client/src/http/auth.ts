@@ -115,13 +115,44 @@ const createClientCredentialsProvider = (auth: ClientCredentialsAuth): TokenProv
 };
 
 /**
+ * Quote-like characters we strip from the ends of a pasted bearer token.
+ * macOS auto-substitutes ASCII quotes with curly quotes in many text fields,
+ * and copy-paste from email/docs frequently introduces them. fetch's Headers
+ * API rejects any value containing characters > 0x7F (the ByteString rule),
+ * so a smart quote at either end of the token throws before the request goes
+ * out. Sanitize at provider construction so every fetch site benefits.
+ */
+const TOKEN_TRIM_QUOTES = new Set([
+  '"',      // U+0022 straight double quote
+  "'",      // U+0027 straight single quote / apostrophe
+  '‘', // left single quotation mark
+  '’', // right single quotation mark
+  '“', // left double quotation mark
+  '”', // right double quotation mark
+]);
+
+/** Strip surrounding whitespace and quote-like wrappers from a pasted bearer token. */
+export const sanitizeBearerToken = (raw: string): string => {
+  let token = raw.trim();
+  while (
+    token.length >= 2 &&
+    TOKEN_TRIM_QUOTES.has(token[0]) &&
+    TOKEN_TRIM_QUOTES.has(token[token.length - 1])
+  ) {
+    token = token.slice(1, -1).trim();
+  }
+  return token;
+};
+
+/**
  * Create a token provider for any auth configuration.
  * For bearer tokens, returns the static token.
  * For client credentials, returns a managed provider with refresh.
  */
 export const createTokenProvider = (auth: AuthConfig): TokenProvider => {
   if (auth.mode === AUTH_MODE_TOKEN) {
-    return async () => auth.authToken;
+    const sanitized = sanitizeBearerToken(auth.authToken);
+    return async () => sanitized;
   }
   return createClientCredentialsProvider(auth);
 };
