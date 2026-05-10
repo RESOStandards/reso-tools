@@ -1,10 +1,13 @@
 /**
- * Variations Save — tests for payload building, key parsing, and change ID computation.
+ * Variations Save — tests for the deltas-only POST contract.
+ *
+ * Since the backend merge refactor (#183), the frontend sends only
+ * new deltas: no GET-and-merge, exactly one fetch per save, no
+ * changeId on any submitted item.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// Mock electronStorage
 const mockStore = new Map<string, string>();
 vi.stubGlobal('electronStorage', {
   get: vi.fn(async (key: string) => mockStore.get(key) ?? null),
@@ -12,12 +15,9 @@ vi.stubGlobal('electronStorage', {
   remove: vi.fn(async (key: string) => { mockStore.delete(key); }),
 });
 
-// Mock fetch for saveVariationsReport
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-// Mock requestProviderToken so the auth-service has something to refresh with.
-// Tests that exercise the network path get a "valid" token via this stub.
 vi.mock('../src/api/cert-client', () => ({
   requestProviderToken: vi.fn(async () => ({
     accessToken: 'test-token',
@@ -27,14 +27,22 @@ vi.mock('../src/api/cert-client', () => ({
 }));
 
 const { saveVariationsReview } = await import('../src/services/variations-save');
+const variationsService = await import('../src/services/variations-service');
 const authService = await import('../src/services/auth-service');
+
+const baseInput = {
+  version: '2.1',
+  providerUoi: 'P001',
+  providerUsi: 'S001',
+  recipientUoi: 'R001',
+  userName: 'Josh',
+  userEmail: 'josh@reso.org',
+};
 
 beforeEach(async () => {
   mockStore.clear();
   vi.clearAllMocks();
   mockFetch.mockResolvedValue({ ok: true, json: async () => null });
-  // Each test starts with a clean auth-service seeded with credentials so
-  // the inner authedFetch can produce a bearer token.
   authService.__resetForTesting();
   authService.__setStorageForTesting({
     get: async (k) => mockStore.get(k) ?? null,
@@ -44,124 +52,127 @@ beforeEach(async () => {
   await authService.setCredentials({ username: 'tester', apiToken: 'cert-api-token' });
 });
 
-describe('saveVariationsReview', () => {
+describe('saveVariationsReview — deltas-only contract', () => {
   it('returns false when there are no actions or comments', async () => {
     const result = await saveVariationsReview({
-      version: '2.1',
-      providerUoi: 'P001',
-      providerUsi: 'S001',
-      recipientUoi: 'R001',
+      ...baseInput,
       actions: [],
       comments: [],
-      userName: 'Josh',
-      userEmail: 'josh@reso.org',
     });
     expect(result).toBe(false);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('does not fetch the existing report before saving (no GET-then-POST)', async () => {
+    const getSpy = vi.spyOn(variationsService, 'getVariationsReport');
+
+    await saveVariationsReview({
+      ...baseInput,
+      actions: [{ key: 'Property:ListPrice', status: 'ignored' }],
+      comments: [],
+    });
+
+    expect(getSpy).not.toHaveBeenCalled();
+  });
+
+  it('issues exactly one fetch call per save', async () => {
+    await saveVariationsReview({
+      ...baseInput,
+      actions: [{ key: 'Property:ListPrice', status: 'ignored' }],
+      comments: [],
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends only the new changes (no past changes, no changeId)', async () => {
+    await saveVariationsReview({
+      ...baseInput,
+      actions: [{ key: 'Property:ListPrice', status: 'ignored' }],
+      comments: [],
+    });
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.changes).toHaveLength(1);
+    expect(body.changes[0].changeId).toBeUndefined();
+  });
+
+  it('sends exactly one editorInfo entry, no changeId, matching the user', async () => {
+    await saveVariationsReview({
+      ...baseInput,
+      actions: [{ key: 'Property:X', status: 'ignored' }],
+      comments: [],
+    });
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.editorInfo).toHaveLength(1);
+    expect(body.editorInfo[0]).toMatchObject({
+      displayName: 'Josh',
+      email: 'josh@reso.org',
+      providerUoi: 'P001',
+      username: 'Josh',
+    });
+    expect(body.editorInfo[0].changeId).toBeUndefined();
+    expect(body.editorInfo[0].editedOn).toBeTruthy();
   });
 
   it('builds correct payload for ignore actions', async () => {
-    // Mock the getVariationsReport call (returns null = no existing report)
-    mockFetch
-      .mockResolvedValueOnce({ ok: false }) // getVariationsReport returns 404
-      .mockResolvedValueOnce({ ok: true }); // saveVariationsReport succeeds
-
-    const result = await saveVariationsReview({
-      version: '2.1',
-      providerUoi: 'P001',
-      providerUsi: 'S001',
-      recipientUoi: 'R001',
+    await saveVariationsReview({
+      ...baseInput,
       actions: [{ key: 'Property:ListPrice', status: 'ignored' }],
       comments: [],
-      userName: 'Josh',
-      userEmail: 'josh@reso.org',
     });
 
-    expect(result).toBe(true);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
-
-    // Check the save payload
-    const saveCall = mockFetch.mock.calls[1];
-    const body = JSON.parse(saveCall[1].body);
-    expect(body.changes).toHaveLength(1);
-    expect(body.changes[0].resourceName).toBe('Property');
-    expect(body.changes[0].fieldName).toBe('ListPrice');
-    expect(body.changes[0].ignore).toBe(true);
-    expect(body.changes[0].flaggedForFastTrack).toBe(false);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.changes[0]).toMatchObject({
+      resourceName: 'Property',
+      fieldName: 'ListPrice',
+      ignore: true,
+      flaggedForFastTrack: false,
+    });
   });
 
   it('builds correct payload for fast-track actions', async () => {
-    mockFetch
-      .mockResolvedValueOnce({ ok: false })
-      .mockResolvedValueOnce({ ok: true });
-
     await saveVariationsReview({
-      version: '2.1',
-      providerUoi: 'P001',
-      providerUsi: 'S001',
-      recipientUoi: 'R001',
+      ...baseInput,
       actions: [{ key: 'Property:CustomField', status: 'fast-track' }],
       comments: [],
-      userName: 'Josh',
-      userEmail: 'josh@reso.org',
     });
 
-    const body = JSON.parse(mockFetch.mock.calls[1][1].body);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(body.changes[0].flaggedForFastTrack).toBe(true);
     expect(body.changes[0].ignore).toBe(false);
   });
 
   it('builds correct payload for remove actions', async () => {
-    mockFetch
-      .mockResolvedValueOnce({ ok: false })
-      .mockResolvedValueOnce({ ok: true });
-
     await saveVariationsReview({
-      version: '2.1',
-      providerUoi: 'P001',
-      providerUsi: 'S001',
-      recipientUoi: 'R001',
+      ...baseInput,
       actions: [{ key: 'Property:BadField', status: 'remove' }],
       comments: [],
-      userName: 'Josh',
-      userEmail: 'josh@reso.org',
     });
 
-    const body = JSON.parse(mockFetch.mock.calls[1][1].body);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(body.changes[0].remove).toBe(true);
   });
 
   it('parses three-part keys (resource:field:lookup)', async () => {
-    mockFetch
-      .mockResolvedValueOnce({ ok: false })
-      .mockResolvedValueOnce({ ok: true });
-
     await saveVariationsReview({
-      version: '2.1',
-      providerUoi: 'P001',
-      providerUsi: 'S001',
-      recipientUoi: 'R001',
+      ...baseInput,
       actions: [{ key: 'Property:StandardStatus:Active', status: 'ignored' }],
       comments: [],
-      userName: 'Josh',
-      userEmail: 'josh@reso.org',
     });
 
-    const body = JSON.parse(mockFetch.mock.calls[1][1].body);
-    expect(body.changes[0].resourceName).toBe('Property');
-    expect(body.changes[0].fieldName).toBe('StandardStatus');
-    expect(body.changes[0].lookupValue).toBe('Active');
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.changes[0]).toMatchObject({
+      resourceName: 'Property',
+      fieldName: 'StandardStatus',
+      lookupValue: 'Active',
+    });
   });
 
   it('attaches comments to related actions', async () => {
-    mockFetch
-      .mockResolvedValueOnce({ ok: false })
-      .mockResolvedValueOnce({ ok: true });
-
     await saveVariationsReview({
-      version: '2.1',
-      providerUoi: 'P001',
-      providerUsi: 'S001',
-      recipientUoi: 'R001',
+      ...baseInput,
       actions: [{ key: 'Property:ListPrice', status: 'ignored' }],
       comments: [{
         variationKey: 'Property:ListPrice',
@@ -170,25 +181,16 @@ describe('saveVariationsReview', () => {
         to: 'RESO',
         message: 'This is a local field name',
       }],
-      userName: 'Josh',
-      userEmail: 'josh@reso.org',
     });
 
-    const body = JSON.parse(mockFetch.mock.calls[1][1].body);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(body.changes[0].conversations).toHaveLength(1);
     expect(body.changes[0].conversations[0].message).toBe('This is a local field name');
   });
 
   it('includes standalone comments not attached to actions', async () => {
-    mockFetch
-      .mockResolvedValueOnce({ ok: false })
-      .mockResolvedValueOnce({ ok: true });
-
     await saveVariationsReview({
-      version: '2.1',
-      providerUoi: 'P001',
-      providerUsi: 'S001',
-      recipientUoi: 'R001',
+      ...baseInput,
       actions: [],
       comments: [{
         variationKey: 'Property:SomeField',
@@ -197,41 +199,32 @@ describe('saveVariationsReview', () => {
         to: 'RESO',
         message: 'Question about this field',
       }],
-      userName: 'Josh',
-      userEmail: 'josh@reso.org',
     });
 
-    const body = JSON.parse(mockFetch.mock.calls[1][1].body);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(body.changes).toHaveLength(1);
-    expect(body.changes[0].resourceName).toBe('Property');
-    expect(body.changes[0].fieldName).toBe('SomeField');
+    expect(body.changes[0]).toMatchObject({
+      resourceName: 'Property',
+      fieldName: 'SomeField',
+    });
     expect(body.changes[0].conversations).toHaveLength(1);
   });
 
-  it('sends new changes and the latest editor untagged for backend to assign changeId', async () => {
-    mockFetch
-      .mockResolvedValueOnce({ ok: false })
-      .mockResolvedValueOnce({ ok: true });
-
+  it('preserves report identifiers in the POST body', async () => {
     await saveVariationsReview({
+      ...baseInput,
+      actions: [{ key: 'Property:X', status: 'ignored' }],
+      comments: [],
+    });
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body).toMatchObject({
       version: '2.1',
       providerUoi: 'P001',
       providerUsi: 'S001',
       recipientUoi: 'R001',
-      actions: [{ key: 'Property:X', status: 'ignored' }],
-      comments: [],
-      userName: 'Josh',
-      userEmail: 'josh@reso.org',
+      description: 'RESO Data Dictionary Change Log',
     });
-
-    const body = JSON.parse(mockFetch.mock.calls[1][1].body);
-    expect(body.editorInfo).toHaveLength(1);
-    expect(body.editorInfo[0].displayName).toBe('Josh');
-    expect(body.editorInfo[0].email).toBe('josh@reso.org');
-    expect(body.editorInfo[0].providerUoi).toBe('P001');
-    // Backend filters by missing changeId to identify new changes — sending
-    // pre-tagged values would make it think there's nothing new (304).
-    expect(body.editorInfo[0].changeId).toBeUndefined();
-    expect(body.changes[0].changeId).toBeUndefined();
+    expect(body.certificationRequestId).toBeTruthy();
   });
 });

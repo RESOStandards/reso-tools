@@ -7,7 +7,6 @@
 
 import {
   saveVariationsReport,
-  getVariationsReport,
   generateCertRequestId,
   type VariationsReportPayload,
   type VariationsEditorInfo,
@@ -58,7 +57,7 @@ const parseKey = (key: string): { resourceName: string; fieldName?: string; look
 // ── Build payload ────────────────────────────────────────────────────
 
 /** Build the save payload from draft actions and comments. */
-const buildSavePayload = (input: SaveInput, _existingReport: VariationsReportPayload | null, _certRequestId: string): {
+const buildSavePayload = (input: SaveInput): {
   changes: ReadonlyArray<VariationsChange>;
   editorInfo: VariationsEditorInfo;
 } => {
@@ -133,35 +132,27 @@ const buildSavePayload = (input: SaveInput, _existingReport: VariationsReportPay
 /**
  * Save the variations report with draft actions and comments.
  *
- * 1. Generate cert request ID
- * 2. Fetch existing report (if any) for merge
- * 3. Build new changes (untagged — the backend filters by missing
- *    changeId to identify what's new and computes the id itself)
- * 4. POST merged payload
+ * Sends only the new deltas — the backend reads the existing report
+ * from S3, merges past changes + new changes, computes the changeId,
+ * and writes the merged shape back. The frontend no longer fetches
+ * or merges history.
  *
- * On success the backend returns 200 with the persisted data; 304 means
- * the same payload was already saved (idempotent re-submit), which we
- * also treat as success since the server-side state matches what we
+ * 1. Generate cert request ID
+ * 2. Build new changes (untagged — backend tags them with a computed
+ *    changeId)
+ * 3. POST deltas
+ *
+ * On success the backend returns 200 with the persisted data; 304
+ * means the same payload was already saved (idempotent re-submit),
+ * treated as success here since the server-side state matches what we
  * intended to write.
  */
 export const saveVariationsReview = async (input: SaveInput): Promise<boolean> => {
   const certRequestId = await generateCertRequestId(input.version, input.providerUoi, input.providerUsi, input.recipientUoi);
 
-  // Fetch existing report for merge
-  const existingReport = await getVariationsReport(input.version, input.providerUoi, input.providerUsi, input.recipientUoi, certRequestId);
-
-  // Build new changes — leave them untagged. The backend identifies
-  // "new" changes as those without a changeId and computes the id
-  // itself; sending pre-tagged changes makes the backend think there
-  // are zero new changes and respond 304.
-  const { changes: newChanges, editorInfo } = buildSavePayload(input, existingReport, certRequestId);
+  const { changes: newChanges, editorInfo } = buildSavePayload(input);
 
   if (newChanges.length === 0) return false;
-
-  // Merge with existing — past changes/editors keep their changeIds;
-  // the latest editor and the new changes go untagged.
-  const existingChanges = existingReport?.changes ?? [];
-  const existingEditors = existingReport?.editorInfo ?? [];
 
   const payload: VariationsReportPayload = {
     description: 'RESO Data Dictionary Change Log',
@@ -170,8 +161,8 @@ export const saveVariationsReview = async (input: SaveInput): Promise<boolean> =
     providerUoi: input.providerUoi,
     providerUsi: input.providerUsi,
     recipientUoi: input.recipientUoi,
-    changes: [...existingChanges, ...newChanges],
-    editorInfo: [editorInfo, ...existingEditors],
+    changes: newChanges,
+    editorInfo: [editorInfo],
   };
 
   return saveVariationsReport(input.version, input.providerUoi, input.providerUsi, input.recipientUoi, certRequestId, payload);
