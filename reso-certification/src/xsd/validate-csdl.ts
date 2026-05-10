@@ -9,7 +9,7 @@
  */
 
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -60,8 +60,14 @@ let validatorModule: XsdValidatorModule | null = null;
 
 const getValidator = async (): Promise<XsdValidatorModule> => {
   if (validatorModule) return validatorModule;
+  // Convert the absolute filesystem path to a file:// URL before passing
+  // to dynamic import(). On Windows, raw absolute paths like 'C:\\...'
+  // are rejected by Node's ESM loader because the drive letter looks
+  // like a URL scheme ("Received protocol 'c:'"). Mac/Linux happen to
+  // tolerate raw paths, but pathToFileURL is the spec-compliant form
+  // and works on all three platforms.
   const validatorPath = join(__dirname, '..', '..', 'xsd-validator', 'index.js');
-  validatorModule = await import(validatorPath) as XsdValidatorModule;
+  validatorModule = await import(pathToFileURL(validatorPath).href) as XsdValidatorModule;
   return validatorModule;
 };
 
