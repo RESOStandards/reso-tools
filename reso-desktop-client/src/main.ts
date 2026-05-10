@@ -274,6 +274,7 @@ const REPORT_FILENAMES: Readonly<Record<string, ReadonlyArray<string>>> = {
   schemaErrors: ['data-availability-schema-validation-errors.json'],
   variations: ['variations-report.json', 'data-dictionary-variations.json'],
   metadata: ['metadata-report.processed.json'],
+  metadataXml: ['metadata.xml'],
   ddReport: ['data-dictionary-2.0.json'],
   report: ['report.json'],
   reportDetailed: ['report-detailed.json'],
@@ -432,6 +433,25 @@ const registerCertRunnerHandlers = (): void => {
       throw err;
     }
     return JSON.parse(readFileSync(normalized, 'utf-8'));
+  });
+
+  /**
+   * Read a report file as raw UTF-8 text (no JSON parsing).
+   * Used for non-JSON artifacts like metadata.xml that the modal exposes
+   * as downloadable files. Same path-safety guards as reports:read-file.
+   */
+  ipcMain.handle('reports:read-text', (_event, absPath: string): string => {
+    const root = certResultsRoot();
+    const normalized = resolve(absPath);
+    if (!normalized.startsWith(root + '/') && normalized !== root) {
+      throw new Error(`Refusing to read outside results root: ${normalized}`);
+    }
+    if (!existsSync(normalized)) {
+      const err = new Error(`Report file not found: ${normalized}`) as Error & { code?: string };
+      err.code = 'MISSING';
+      throw err;
+    }
+    return readFileSync(normalized, 'utf-8');
   });
 
   /**

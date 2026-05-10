@@ -11,6 +11,7 @@
 
 type CertRunner = {
   readonly readReportFile: (absolutePath: string) => Promise<unknown>;
+  readonly readReportFileText: (absolutePath: string) => Promise<string>;
   readonly listReportFiles: (outputDir: string) => Promise<Record<string, string>>;
 };
 
@@ -48,6 +49,35 @@ export const resolveReportRef = async (ref: string, authHeader?: string): Promis
 
   try {
     return await runner.readReportFile(ref);
+  } catch (err) {
+    const code = (err as { code?: string })?.code;
+    const msg = err instanceof Error ? err.message : String(err);
+    if (code === 'MISSING' || /not found/i.test(msg)) {
+      throw new ReportMissingError(ref);
+    }
+    throw err;
+  }
+};
+
+/**
+ * Resolve a report ref to its raw UTF-8 text content (no JSON parsing).
+ * Use for non-JSON artifacts like metadata.xml.
+ */
+export const resolveReportRefText = async (ref: string, authHeader?: string): Promise<string> => {
+  if (isUrl(ref)) {
+    const headers: Record<string, string> = authHeader ? { Authorization: authHeader } : {};
+    const res = await fetch(ref, { headers });
+    if (!res.ok) throw new Error(`Failed to fetch report: ${res.status} ${res.statusText}`);
+    return res.text();
+  }
+
+  const runner = getCertRunner();
+  if (!runner) {
+    throw new Error('Local reports are only available in the desktop app.');
+  }
+
+  try {
+    return await runner.readReportFileText(ref);
   } catch (err) {
     const code = (err as { code?: string })?.code;
     const msg = err instanceof Error ? err.message : String(err);

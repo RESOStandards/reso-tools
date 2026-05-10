@@ -105,6 +105,13 @@ contextBridge.exposeInMainWorld('certRunner', {
   readReportFile: (absolutePath: string): Promise<unknown> =>
     ipcRenderer.invoke('reports:read-file', absolutePath),
 
+  /**
+   * Read a report file as raw UTF-8 text (no JSON parsing).
+   * Use for non-JSON artifacts like metadata.xml.
+   */
+  readReportFileText: (absolutePath: string): Promise<string> =>
+    ipcRenderer.invoke('reports:read-text', absolutePath),
+
   /** List known report files present in a results directory as `{ reportKey → absolute path }`. */
   listReportFiles: (outputDir: string): Promise<Record<string, string>> =>
     ipcRenderer.invoke('reports:list-files', outputDir),
