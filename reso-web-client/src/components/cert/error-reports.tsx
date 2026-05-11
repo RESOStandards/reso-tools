@@ -1231,6 +1231,65 @@ export const FailureReportModal = ({
           )}
           {!anyLoading && !anyMissing && !anyError && (
             <>
+              {/* Metadata artifact downloads — small inline buttons in
+                  the body rather than crowding the modal footer. Match
+                  the styling of the inline step-artifact buttons on
+                  the jobs page step detail (jobs-page.tsx:654). Only
+                  rendered when the underlying file is present. */}
+              {(metadata.data || metadataXmlRef) && (
+                <div className="mb-4 flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Metadata</span>
+                  {metadata.data && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const blob = new Blob([JSON.stringify(metadata.data, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${endorsement.toLowerCase().replace(/\s+/g, '-')}-${version}-metadata-report.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      title="Download the processed metadata report JSON"
+                      className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
+                    >
+                      <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
+                        <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+                      </svg>
+                      Metadata report
+                    </button>
+                  )}
+                  {metadataXmlRef && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const xml = await resolveReportRefText(metadataXmlRef);
+                          const blob = new Blob([xml], { type: 'application/xml' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `${endorsement.toLowerCase().replace(/\s+/g, '-')}-${version}-metadata.xml`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        } catch (err) {
+                          console.error('Failed to download metadata XML:', err);
+                        }
+                      }}
+                      title="Download the raw OData EDMX metadata"
+                      className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
+                    >
+                      <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
+                        <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+                      </svg>
+                      Metadata XML
+                    </button>
+                  )}
+                </div>
+              )}
               {report.type === 'schema-validation' && <SchemaValidationErrorReport report={report} />}
               {report.type === 'variations' && <VariationsReportView report={report} />}
               {report.type === 'generic' && <GenericErrorReport report={report} />}
@@ -1260,53 +1319,6 @@ export const FailureReportModal = ({
                   <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
                 </svg>
                 Download Results
-              </button>
-            )}
-            {metadata.data && (
-              <button
-                type="button"
-                onClick={() => {
-                  const blob = new Blob([JSON.stringify(metadata.data, null, 2)], { type: 'application/json' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `${endorsement.toLowerCase().replace(/\s+/g, '-')}-${version}-metadata-report.json`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
-                  <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
-                </svg>
-                Metadata report
-              </button>
-            )}
-            {metadataXmlRef && (
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const xml = await resolveReportRefText(metadataXmlRef);
-                    const blob = new Blob([xml], { type: 'application/xml' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `${endorsement.toLowerCase().replace(/\s+/g, '-')}-${version}-metadata.xml`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                  } catch (err) {
-                    console.error('Failed to download metadata XML:', err);
-                  }
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
-                  <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
-                </svg>
-                Metadata XML
               </button>
             )}
           </div>
