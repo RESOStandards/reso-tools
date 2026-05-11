@@ -362,10 +362,17 @@ const ReviewListView = ({ isAuthenticated }: {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // In-review endorsements queue. Admin sees everything; providers
-  // see only their own slice (server-side post-filter). Loads in
-  // parallel with the stats so the page is interactive faster.
+  // In-review and resolved endorsement queues. Admin sees everything;
+  // providers see only their own slice (server-side post-filter).
+  // Loads in parallel with the legacy variations-service stats so
+  // the page is interactive faster. IN REVIEW and RESOLVED tile
+  // counts come from these queries (canonical state), not from the
+  // legacy stats endpoint (which only knows about historical
+  // mappings, not in-flight reviews). FAST TRACK and IGNORED counts
+  // stay with the legacy stats — those are per-variation
+  // dispositions across the all-time mappings index.
   const [endorsements, setEndorsements] = useState<ReadonlyArray<EndorsementRow>>([]);
+  const [resolvedEndorsements, setResolvedEndorsements] = useState<ReadonlyArray<EndorsementRow>>([]);
   const [endorsementsLoading, setEndorsementsLoading] = useState(false);
   const [endorsementsError, setEndorsementsError] = useState<string | null>(null);
 
@@ -382,9 +389,15 @@ const ReviewListView = ({ isAuthenticated }: {
   useEffect(() => {
     if (!isAuthenticated) return;
     setEndorsementsLoading(true);
-    listEndorsementsByReviewStatus('in-review')
-      .then(rows => setEndorsements(rows))
-      .catch(err => setEndorsementsError(err instanceof Error ? err.message : 'Failed to load in-review endorsements'))
+    Promise.all([
+      listEndorsementsByReviewStatus('in-review'),
+      listEndorsementsByReviewStatus('resolved'),
+    ])
+      .then(([inReview, resolved]) => {
+        setEndorsements(inReview);
+        setResolvedEndorsements(resolved);
+      })
+      .catch(err => setEndorsementsError(err instanceof Error ? err.message : 'Failed to load endorsements'))
       .finally(() => setEndorsementsLoading(false));
   }, [isAuthenticated]);
 
@@ -399,27 +412,29 @@ const ReviewListView = ({ isAuthenticated }: {
         </p>
       </div>
 
-      {/* Summary tiles */}
-      {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
-            <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">In Review</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900 dark:text-gray-100">{stats.inReview ?? 0}</p>
-          </div>
-          <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
-            <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Fast Track</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-green-600 dark:text-green-400">{stats.fastTrack ?? 0}</p>
-          </div>
-          <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
-            <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Ignored</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-gray-500 dark:text-gray-400">{stats.ignored ?? 0}</p>
-          </div>
-          <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
-            <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Resolved</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-blue-600 dark:text-blue-400">{stats.resolved ?? 0}</p>
-          </div>
+      {/* Summary tiles. IN REVIEW and RESOLVED are sourced from the
+          endorsements DDB (canonical lifecycle state). FAST TRACK and
+          IGNORED come from the legacy variations service stats, which
+          tracks per-variation dispositions across the historical
+          mappings index. */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">In Review</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900 dark:text-gray-100">{endorsements.length}</p>
         </div>
-      )}
+        <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Fast Track</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-green-600 dark:text-green-400">{stats?.fastTrack ?? 0}</p>
+        </div>
+        <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Ignored</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-gray-500 dark:text-gray-400">{stats?.ignored ?? 0}</p>
+        </div>
+        <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Resolved</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-blue-600 dark:text-blue-400">{resolvedEndorsements.length}</p>
+        </div>
+      </div>
 
       {loading && (
         <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500 py-8">
@@ -490,7 +505,10 @@ const ReviewListView = ({ isAuthenticated }: {
         </div>
       )}
 
-      {!loading && isAuthenticated && activeResources.length === 0 && !error && (
+      {/* Empty state only when nothing else on the page would carry
+          information: no in-review queue, no resolved endorsements,
+          no legacy active-resources to surface. */}
+      {!loading && !endorsementsLoading && isAuthenticated && activeResources.length === 0 && endorsements.length === 0 && resolvedEndorsements.length === 0 && !error && !endorsementsError && (
         <div className="text-center py-16">
           <p className="text-gray-400 dark:text-gray-500">
             No active reviews. Run a DD certification test with variations enabled to begin.
@@ -1337,7 +1355,7 @@ const VariationDrawer = ({ variation, action, draftComments, savedComments, isRe
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none cursor-pointer" aria-label="Close">×</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 flex flex-col p-5 gap-4 overflow-y-auto min-h-0">
           {/* Source */}
           <div>
             <div className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Local value</div>
@@ -1450,8 +1468,9 @@ const VariationDrawer = ({ variation, action, draftComments, savedComments, isRe
           {/* Comments — merge live (from blended report) and saved
               (from the persisted variations report). The blender doesn't
               know about prior saves, so without this merge the comments
-              vanish on reopen. */}
-          <div>
+              vanish on reopen. flex-1 + min-h-0 lets the message list
+              fill remaining vertical space when expanded. */}
+          <div className="flex-1 min-h-0 flex flex-col">
             <VariationComments
               existingComments={[...(variation.conversations ?? []), ...savedComments]}
               draftComments={draftComments}

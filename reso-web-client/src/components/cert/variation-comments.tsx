@@ -127,7 +127,7 @@ export const VariationComments = ({
     index >= existingComments.length;
 
   return (
-    <div className="border-t border-gray-100 dark:border-gray-700/50">
+    <div className="border-t border-gray-100 dark:border-gray-700/50 flex flex-col min-h-0 flex-1">
       {/* Toggle button */}
       <button
         type="button"
@@ -146,10 +146,10 @@ export const VariationComments = ({
       </button>
 
       {expanded && (
-        <div className="px-4 pb-3 space-y-2">
-          {/* Message list */}
+        <div className="px-4 pb-3 flex flex-col gap-2 flex-1 min-h-0">
+          {/* Message list — grows to fill the remaining drawer height */}
           {allComments.length > 0 && (
-            <div ref={listRef} className="space-y-1.5 max-h-48 overflow-y-auto">
+            <div ref={listRef} className="space-y-1.5 flex-1 min-h-0 overflow-y-auto">
               {allComments.map((comment, i) => {
                 const isReso = isResoMessage(comment);
                 const draft = isDraft(i);
