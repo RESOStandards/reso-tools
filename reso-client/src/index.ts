@@ -132,3 +132,8 @@ export type {
   ExpandQueryOptions
 } from '@reso-standards/odata-expression-parser';
 export { parseFilter, parseExpand } from '@reso-standards/odata-expression-parser';
+
+// Utilities — CSV serialization (variations export, ingest)
+export { escapeCsvField, rowsToCsv } from './utils/csv.js';
+export { VARIATIONS_CSV_COLUMNS, variationsToCsv } from './utils/variations-csv.js';
+export type { VariationCsvRow } from './utils/variations-csv.js';
