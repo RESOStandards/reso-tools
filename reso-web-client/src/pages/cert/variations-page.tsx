@@ -564,6 +564,7 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
   /** Local job ID — set by VariationsPage when navigating from a job card. Used to mark the job as having submitted variations after a successful save. */
   readonly jobId?: string;
 }) => {
+  const navigate = useNavigate();
   const reportId = `${report.version}`;
 
   const [search, setSearch] = useState('');
@@ -802,7 +803,7 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
     });
   }, [ensureMyLock]);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (options: { finalize?: boolean } = {}) => {
     if (!report.providerUoi || !report.providerUsi || !report.recipientUoi) return;
 
     // Only send the delta — actions whose status differs from what's
@@ -815,7 +816,10 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
       .filter(([key, status]) => baseline.get(key) !== status)
       .map(([key, status]) => ({ key, status }));
 
-    if (deltaActions.length === 0 && draftComments.size === 0) return;
+    // Finalize is allowed without new edits — admin closing out a
+    // review that has no pending changes still needs to send a
+    // request so the backend can flip the endorsement to resolved.
+    if (deltaActions.length === 0 && draftComments.size === 0 && !options.finalize) return;
 
     setSaving(true);
     try {
@@ -831,6 +835,7 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
         ),
         userName: user?.fullName ?? user?.username ?? '',
         userEmail: user?.email ?? '',
+        finalize: options.finalize,
       });
 
       if (success) {
@@ -852,11 +857,16 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
         // Release the lock so other reviewers (and the next poll on
         // open viewers) can become the editor.
         await releaseMyLock();
+        // After admin finalize, the endorsement has flipped to
+        // 'resolved' and there's nothing left to do on this report.
+        // Navigate back to the dashboard so the user sees the
+        // refreshed queue (the row moves out of In Review).
+        if (options.finalize) navigate('/cert/variations');
       }
     } finally {
       setSaving(false);
     }
-  }, [actions, reportId, report, user, draftComments, jobId, releaseMyLock]);
+  }, [actions, reportId, report, user, draftComments, jobId, releaseMyLock, navigate]);
 
   return (
     <div className={`${PAGE_CONTAINER} py-6`}>
@@ -992,7 +1002,7 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
               )}
               <button
                 type="button"
-                onClick={handleSave}
+                onClick={() => handleSave()}
                 disabled={saving || !isDirty}
                 title={!isDirty ? 'Take an action on at least one variation to enable submission' : undefined}
                 className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
@@ -1002,6 +1012,24 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
                     ? 'Save Changes'
                     : 'Submit Review'}
               </button>
+              {/* Finalize — admin only. Saves any pending edits and
+                  flips the endorsement to 'resolved' in one call.
+                  Fires VARIATIONS_RESOLVED notification on the
+                  backend. Only meaningful once the review has been
+                  submitted at least once (something to finalize). */}
+              {isAdmin && hasSubmitted && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const ok = window.confirm('Finalize this review? This will mark it resolved and notify the provider. Any pending changes will be saved.');
+                    if (ok) void handleSave({ finalize: true });
+                  }}
+                  disabled={saving}
+                  title="Save any pending changes and close out this review."
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                  {saving ? 'Finalizing...' : 'Finalize Review'}
+                </button>
+              )}
             </>
           )}
           <div className="text-xs text-gray-400 dark:text-gray-500">

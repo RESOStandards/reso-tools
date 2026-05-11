@@ -40,6 +40,12 @@ interface SaveInput {
   readonly comments: ReadonlyArray<DraftComment>;
   readonly userName: string;
   readonly userEmail: string;
+  /**
+   * Admin-only finalize flag. When true, the backend flips the
+   * endorsement to 'resolved' and notifies the provider. Pending
+   * action/comment deltas are saved in the same call.
+   */
+  readonly finalize?: boolean;
 }
 
 // ── Key parsing ──────────────────────────────────────────────────────
@@ -167,7 +173,10 @@ export const saveVariationsReview = async (input: SaveInput): Promise<boolean> =
 
   const { changes: newChanges, editorInfo } = buildSavePayload(input);
 
-  if (newChanges.length === 0) return false;
+  // Finalize is allowed with zero new changes — admin closing out a
+  // review that has no further edits should still flip the
+  // endorsement to 'resolved' and fire the resolved notification.
+  if (newChanges.length === 0 && !input.finalize) return false;
 
   const payload: VariationsReportPayload = {
     description: 'RESO Data Dictionary Change Log',
@@ -178,6 +187,7 @@ export const saveVariationsReview = async (input: SaveInput): Promise<boolean> =
     recipientUoi: input.recipientUoi,
     changes: newChanges,
     editorInfo: [editorInfo],
+    ...(input.finalize ? { finalize: true } : {}),
   };
 
   return saveVariationsReport(input.version, input.providerUoi, input.providerUsi, input.recipientUoi, certRequestId, payload);

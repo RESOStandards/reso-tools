@@ -121,6 +121,13 @@ export interface VariationsReportPayload {
   readonly providerUoi: string;
   readonly providerUsi: string;
   readonly recipientUoi: string;
+  /**
+   * Admin-only one-shot transition. When true and the caller is an
+   * admin, the backend flips the endorsement's reviewStatus to
+   * 'resolved' and fires a VARIATIONS_RESOLVED notification.
+   * Ignored for non-admins.
+   */
+  readonly finalize?: boolean;
   readonly changes: ReadonlyArray<VariationsChange>;
   readonly editorInfo: ReadonlyArray<VariationsEditorInfo>;
   readonly lastUpdatedOn?: string;
