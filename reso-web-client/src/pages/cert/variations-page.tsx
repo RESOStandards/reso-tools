@@ -16,9 +16,10 @@
  */
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useLocation, useBlocker } from 'react-router';
+import { useLocation, useBlocker, useNavigate, useParams } from 'react-router';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
+import { downloadVariationsCsv } from '../../services/variations-csv-export';
 import { blendVariations, type BlendedVariation, type BlendedSuggestion, type BlendedVariationsReport } from '../../services/variations-blender';
 import { searchVariations, getVariationsStats, searchLocks, createLock, deleteLock, variationsLockResourceId, getVariationsReport, generateCertRequestId, listEndorsementsByReviewStatus, type LockRecord, type EndorsementRow } from '../../services/variations-service';
 import { resolveReportRef, ReportMissingError } from '../../services/report-ref';
@@ -167,16 +168,40 @@ const loadCachedReport = (): BlendedVariationsReport | null => {
 
 export const VariationsPage = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { slug } = useParams<{ slug?: string }>();
   const { isAuthenticated, isAdmin, user } = useAuth();
   const routeState = location.state as { job?: Record<string, unknown>; report?: BlendedVariationsReport } | null;
 
+  // URL is the source of truth for which view is active:
+  //   /cert/variations          → dashboard (list)
+  //   /cert/variations/:slug    → per-review detail
+  // Side-menu link always points at the bare URL → dashboard. Drill-ins
+  // from a job's failure modal push a slug. Refresh of the slug URL
+  // re-hydrates from the localStorage cache for the same slug.
+  const hasSlug = !!slug;
   const [report, setReport] = useState<BlendedVariationsReport | null>(() => {
+    if (!hasSlug) return null;
     if (routeState?.report) return routeState.report;
     return loadCachedReport();
   });
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [view, setView] = useState<ViewMode>(report ? 'detail' : 'list');
+  const [view, setView] = useState<ViewMode>(hasSlug ? 'detail' : 'list');
+
+  // Keep `view` in sync with the URL on same-component re-renders (e.g.
+  // user clicks the side-menu while inside detail — the route changes
+  // to the bare URL but the component does not unmount, so the
+  // initial-state computation above does not run again).
+  useEffect(() => {
+    if (hasSlug) {
+      setView('detail');
+    } else {
+      setView('list');
+      setReport(null);
+      setLoadError(null);
+    }
+  }, [hasSlug]);
 
   // When a job arrives via route state, extract variations and blend with service suggestions
   useEffect(() => {
@@ -290,7 +315,7 @@ export const VariationsPage = () => {
           <p className="text-sm text-amber-800 dark:text-amber-300">{loadError}</p>
           <button
             type="button"
-            onClick={() => { setLoadError(null); setView('list'); }}
+            onClick={() => { setLoadError(null); navigate('/cert/variations'); }}
             className="mt-3 px-3 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-gray-800 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/40 cursor-pointer">
             Back to reviews
           </button>
@@ -303,7 +328,7 @@ export const VariationsPage = () => {
     return <ReviewListView isAuthenticated={isAuthenticated} />;
   }
 
-  return <ReviewDetailView report={report} onBack={() => setView('list')} user={user} isAdmin={isAdmin} jobId={(routeState?.job as { id?: string } | undefined)?.id} />;
+  return <ReviewDetailView report={report} onBack={() => navigate('/cert/variations')} user={user} isAdmin={isAdmin} jobId={(routeState?.job as { id?: string } | undefined)?.id} />;
 };
 
 // ── Review List View ─────────────────────────────────────────────────
@@ -685,7 +710,18 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
     return draftComments.size > 0;
     // hydratedKey forces recompute when the baseline arrives.
   }, [actions, draftComments, hydratedKey]);
-  useBlocker(isDirty && !saving);
+
+  // Block navigation when there are unsaved edits. Without resolving
+  // the blocker (proceed/reset), nav clicks silently no-op and the
+  // user gets stuck. Confirm with the user, then either proceed or
+  // cancel the navigation.
+  const blocker = useBlocker(isDirty && !saving);
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return;
+    const ok = window.confirm('You have unsaved variations review changes. Leave the page and discard them?');
+    if (ok) blocker.proceed();
+    else blocker.reset();
+  }, [blocker]);
 
   const filtered = useMemo(() => {
     let items = report.variations;
@@ -889,8 +925,10 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
               )}
               {(hasSubmitted || savedConversations.size > 0 || hydratedActionsRef.current.size > 0) && (
                 <span
-                  className="inline-flex items-center gap-1 rounded-full bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 text-[11px] font-medium text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900/50"
-                  title="Prior decisions and comments exist for this report"
+                  className="inline-flex items-center gap-1 rounded-full bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 text-[11px] font-medium text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900/50 cursor-help"
+                  title={isAdmin
+                    ? 'Items awaiting your review. Mark each as Fast Track, Ignore, or Remove, then Finalize to notify the provider.'
+                    : 'Items in review are awaiting feedback from RESO staff. You will get a notification when there are new items to follow up on.'}
                 >
                   In Review
                 </span>
@@ -964,9 +1002,9 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
         </p>
       )}
 
-      {/* Filters */}
+      {/* Filters: search left, filter pills + export pushed right. */}
       <div className="flex items-center gap-3 mb-4">
-        <div className="min-w-[250px]">
+        <div className="min-w-[250px] flex-1">
           <SearchInput value={search} onChange={setSearch} placeholder="Search by resource, field, or lookup..." />
         </div>
         <div className="flex items-center gap-1.5">
@@ -974,6 +1012,21 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
             <FilterPill key={tab.key} label={`${tab.label} (${filterCounts[tab.key] ?? 0})`} active={filter === tab.key} onClick={() => setFilter(tab.key)} />
           ))}
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            const filename = `variations-${report.version ?? 'unknown'}-${new Date().toISOString().slice(0, 10)}.csv`;
+            downloadVariationsCsv(filename, report.variations, actions);
+          }}
+          title="Export all variations (full set, ignoring current filter) as CSV"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
+            <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+          </svg>
+          Export CSV
+        </button>
       </div>
 
       {/* Variations table */}
@@ -1079,16 +1132,13 @@ const VariationRow = ({ variation, action, isSelected, isReadOnly, isAdmin, hasD
   const extraCount = variation.suggestions.length > 1 ? variation.suggestions.length - 1 : 0;
   const strategyInfo = primary ? getStrategyMeta(primary.strategy) : null;
   const commentCount = (variation.conversations?.length ?? 0) + savedCommentCount + (hasDraftComments ? 1 : 0);
-  const isIgnored = variation.ignored || action === 'ignored';
 
   return (
     <div
       className={`grid grid-cols-[80px_minmax(0,1fr)_minmax(0,1fr)_140px_110px_180px] items-center gap-3 px-4 py-2 text-sm cursor-pointer transition-colors ${
         isSelected
           ? 'bg-blue-50 dark:bg-blue-900/20'
-          : isIgnored
-            ? 'opacity-60 hover:bg-gray-50 dark:hover:bg-gray-800/50'
-            : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
+          : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
       }`}
       onClick={onSelect}
       onKeyDown={e => { if (e.key === 'Enter') onSelect(); }}

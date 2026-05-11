@@ -370,7 +370,7 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                   Submit to RESO
                 </button>
                 {job.steps.some(s => isVariationsStep(s) && s.status === 'failed') && (
-                  <NavLink to="/cert/variations" state={{ job }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors">
+                  <NavLink to={`/cert/variations/${job.id}`} state={{ job }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors">
                     {job.variationsReviewSubmittedAt ? 'Review Variations' : 'Start Variations Review'}
                   </NavLink>
                 )}
@@ -403,7 +403,7 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                   {detailsLabel}
                 </button>
                 {hasVariationsFailure && (
-                  <NavLink to="/cert/variations" state={{ job }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors">
+                  <NavLink to={`/cert/variations/${job.id}`} state={{ job }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors">
                     {job.variationsReviewSubmittedAt ? 'Variations Report Review' : 'Start Variations Review'}
                   </NavLink>
                 )}
@@ -476,7 +476,7 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
           steps={job.steps}
           variationsReviewSubmittedAt={job.variationsReviewSubmittedAt}
           onClose={() => setShowFailure(false)}
-          onReviewVariations={() => navigate('/cert/variations', { state: { job } })}
+          onReviewVariations={() => navigate(`/cert/variations/${job.id}`, { state: { job } })}
         />
       )}
 
