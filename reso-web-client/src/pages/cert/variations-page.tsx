@@ -20,7 +20,7 @@ import { useLocation, useBlocker } from 'react-router';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
 import { blendVariations, type BlendedVariation, type BlendedSuggestion, type BlendedVariationsReport } from '../../services/variations-blender';
-import { searchVariations, getVariationsStats, searchLocks, createLock, deleteLock, variationsLockResourceId, getVariationsReport, generateCertRequestId, type LockRecord } from '../../services/variations-service';
+import { searchVariations, getVariationsStats, searchLocks, createLock, deleteLock, variationsLockResourceId, getVariationsReport, generateCertRequestId, listEndorsementsByReviewStatus, type LockRecord, type EndorsementRow } from '../../services/variations-service';
 import { resolveReportRef, ReportMissingError } from '../../services/report-ref';
 import { useNotifications } from '../../hooks/use-notifications';
 import { saveVariationsReview } from '../../services/variations-save';
@@ -337,6 +337,13 @@ const ReviewListView = ({ isAuthenticated }: {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // In-review endorsements queue. Admin sees everything; providers
+  // see only their own slice (server-side post-filter). Loads in
+  // parallel with the stats so the page is interactive faster.
+  const [endorsements, setEndorsements] = useState<ReadonlyArray<EndorsementRow>>([]);
+  const [endorsementsLoading, setEndorsementsLoading] = useState(false);
+  const [endorsementsError, setEndorsementsError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!isAuthenticated) return;
     setLoading(true);
@@ -345,6 +352,15 @@ const ReviewListView = ({ isAuthenticated }: {
       .then(data => { if (data) setStats(data as VariationsStats); })
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load variations stats'))
       .finally(() => setLoading(false));
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    setEndorsementsLoading(true);
+    listEndorsementsByReviewStatus('in-review')
+      .then(rows => setEndorsements(rows))
+      .catch(err => setEndorsementsError(err instanceof Error ? err.message : 'Failed to load in-review endorsements'))
+      .finally(() => setEndorsementsLoading(false));
   }, [isAuthenticated]);
 
   const activeResources = stats?.byResource?.filter(r => r.inReview > 0 || r.suggestions > 0) ?? [];
@@ -394,6 +410,58 @@ const ReviewListView = ({ isAuthenticated }: {
       {!loading && !isAuthenticated && (
         <div className="text-center py-16">
           <p className="text-gray-400 dark:text-gray-500">Sign in to view active variations reviews.</p>
+        </div>
+      )}
+
+      {/* In-review endorsements queue (#183 Layer 2A). Admin sees
+          every report awaiting triage across all providers; providers
+          see only their own slice. Sourced from the new `endorsements`
+          DDB table, not from local SQLite — so a session on a fresh
+          machine still surfaces the in-flight reviews. */}
+      {isAuthenticated && (endorsementsLoading || endorsements.length > 0 || endorsementsError) && (
+        <div className="mb-8">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
+            In Review
+          </h2>
+          {endorsementsLoading && (
+            <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500 py-3">
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+              Loading queue...
+            </div>
+          )}
+          {endorsementsError && (
+            <p className="text-sm text-red-500 dark:text-red-400 py-2">{endorsementsError}</p>
+          )}
+          {!endorsementsLoading && endorsements.length > 0 && (
+            <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-800/40 text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  <tr>
+                    <th className="text-left px-4 py-2 font-medium">Provider</th>
+                    <th className="text-left px-4 py-2 font-medium">USI</th>
+                    <th className="text-left px-4 py-2 font-medium">Recipient</th>
+                    <th className="text-left px-4 py-2 font-medium">Endorsement</th>
+                    <th className="text-left px-4 py-2 font-medium">Version</th>
+                    <th className="text-left px-4 py-2 font-medium">Submitted</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {endorsements.map(row => (
+                    <tr key={`${row.providerUoi}::${row.endorsementId}`} className="hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                      <td className="px-4 py-2 font-mono text-xs text-gray-900 dark:text-gray-100">{row.providerUoi}</td>
+                      <td className="px-4 py-2 font-mono text-xs text-gray-600 dark:text-gray-400">{row.providerUsi}</td>
+                      <td className="px-4 py-2 font-mono text-xs text-gray-900 dark:text-gray-100">{row.recipientUoi}</td>
+                      <td className="px-4 py-2 text-gray-700 dark:text-gray-300">{row.endorsement}</td>
+                      <td className="px-4 py-2 text-gray-700 dark:text-gray-300">{row.version}</td>
+                      <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+                        {row.submittedAt ? new Date(row.submittedAt).toLocaleString() : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

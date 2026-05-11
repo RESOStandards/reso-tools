@@ -136,6 +136,59 @@ const variationsReportPath = (
 ): string =>
   `/v2/certification/variations-reports/${encodeURIComponent(version)}/${encodeURIComponent(providerUoi)}/${encodeURIComponent(providerUsi)}/${encodeURIComponent(recipientUoi)}/${encodeURIComponent(certRequestId)}`;
 
+// ── Endorsements list endpoints (Layer 2A) ──
+
+/**
+ * One row in the endorsements DDB table; mirrors `EndorsementRecord`
+ * from the v2 layer. Used by the provider list (`/me`) and the admin
+ * queue (`?reviewStatus=...`) endpoints.
+ */
+export interface EndorsementRow {
+  readonly providerUoi: string;
+  readonly endorsementId: string;
+  readonly recipientUoi: string;
+  readonly providerUsi: string;
+  readonly endorsement: string;
+  readonly version: string;
+  readonly lifecycleStatus: string;
+  readonly reviewStatus: string;
+  readonly manifestS3Path?: string;
+  readonly failedStep?: string;
+  readonly jobId?: string;
+  readonly reportId?: string;
+  readonly environmentName: string;
+  readonly submittedAt?: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+/** List endorsements for the currently-authenticated provider. */
+export const getMyEndorsements = async (): Promise<ReadonlyArray<EndorsementRow>> => {
+  const res = await authedFetch(
+    proxiedUrl('/v2/certification/endorsements/me'),
+    { headers: jsonHeaders }
+  );
+  if (!res.ok) return [];
+  const body = (await res.json()) as { endorsements?: ReadonlyArray<EndorsementRow> };
+  return body.endorsements ?? [];
+};
+
+/**
+ * Admin queue: list endorsements by review status. Provider auth
+ * receives only their own slice (server-side post-filter).
+ */
+export const listEndorsementsByReviewStatus = async (
+  reviewStatus: 'none' | 'in-review' | 'resolved' = 'in-review'
+): Promise<ReadonlyArray<EndorsementRow>> => {
+  const res = await authedFetch(
+    proxiedUrl(`/v2/certification/endorsements?reviewStatus=${encodeURIComponent(reviewStatus)}`),
+    { headers: jsonHeaders }
+  );
+  if (!res.ok) return [];
+  const body = (await res.json()) as { endorsements?: ReadonlyArray<EndorsementRow> };
+  return body.endorsements ?? [];
+};
+
 /** Fetch an existing variations report from S3. */
 export const getVariationsReport = async (
   version: string,
