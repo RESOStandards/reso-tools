@@ -170,6 +170,21 @@ describe('saveVariationsReview — deltas-only contract', () => {
     });
   });
 
+  it('preserves colons in lookup value — splits on first two only', async () => {
+    await saveVariationsReview({
+      ...baseInput,
+      actions: [{ key: 'Property:Foo:bar:baz:qux', status: 'ignored' }],
+      comments: [],
+    });
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.changes[0]).toMatchObject({
+      resourceName: 'Property',
+      fieldName: 'Foo',
+      lookupValue: 'bar:baz:qux',
+    });
+  });
+
   it('attaches comments to related actions', async () => {
     await saveVariationsReview({
       ...baseInput,

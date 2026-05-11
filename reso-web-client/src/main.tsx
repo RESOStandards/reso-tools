@@ -10,6 +10,7 @@ import { AdminLayout } from './pages/admin/admin-layout';
 import { DataGeneratorPage } from './pages/admin/data-generator-page';
 import { CertHomePage } from './pages/cert/cert-home-page';
 import { LoginPage } from './pages/cert/login-page';
+import { RequireAuth } from './components/cert/require-auth';
 import { DetailReportPage } from './pages/cert/detail-report-page';
 import { OrgSummaryPage } from './pages/cert/org-summary-page';
 import { JobsPage } from './pages/cert/jobs-page';
@@ -51,14 +52,24 @@ const router = createBrowserRouter([
       // The cert-specific header chrome is removed; they inherit the
       // Layout header with the auth pill and theme toggle.
       { path: 'cert', element: <Navigate to="/cert/dashboard" replace /> },
-      { path: 'cert/endorsements', element: <CertHomePage /> },
-      { path: 'cert/orgs/:uoi', element: <OrgSummaryPage /> },
-      { path: 'cert/orgs/:uoi/detail/:endorsementId', element: <DetailReportPage /> },
-      { path: 'cert/jobs', element: <JobsPage /> },
-      { path: 'cert/dashboard', element: <DashboardPage /> },
-      { path: 'cert/compare/:jobId', element: <ComparePage /> },
-      { path: 'cert/configs', element: <ConfigsPage /> },
-      { path: 'cert/variations', element: <VariationsPage /> },
+      // Cert pages with user-scoped data are gated by RequireAuth.
+      // Signing out from any of these redirects to /cert/login, preserving
+      // the original path in router state so the login page can redirect
+      // back on success. Side benefit: the unmount-on-redirect clears any
+      // prior user's React state so a session switch can't leak data.
+      {
+        element: <RequireAuth />,
+        children: [
+          { path: 'cert/endorsements', element: <CertHomePage /> },
+          { path: 'cert/orgs/:uoi', element: <OrgSummaryPage /> },
+          { path: 'cert/orgs/:uoi/detail/:endorsementId', element: <DetailReportPage /> },
+          { path: 'cert/jobs', element: <JobsPage /> },
+          { path: 'cert/dashboard', element: <DashboardPage /> },
+          { path: 'cert/compare/:jobId', element: <ComparePage /> },
+          { path: 'cert/configs', element: <ConfigsPage /> },
+          { path: 'cert/variations', element: <VariationsPage /> },
+        ],
+      },
       { path: 'metadata', element: <MetadataPage /> },
       { path: 'metadata/:resource', element: <MetadataPage /> },
       { path: ':resource', element: <SearchPage /> },

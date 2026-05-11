@@ -44,13 +44,28 @@ interface SaveInput {
 
 // ── Key parsing ──────────────────────────────────────────────────────
 
-/** Parse a variation key back into its component parts. */
+/**
+ * Parse a variation key back into its component parts.
+ *
+ * Splits on the first two `:` only — anything past the second `:`
+ * is the lookup value. Lookup values can legitimately contain `:`
+ * (some RESO standards do), so naive split-on-all would corrupt
+ * them. Mirrors the backend's `parseVariationKey` semantics.
+ */
 const parseKey = (key: string): { resourceName: string; fieldName?: string; lookupValue?: string } => {
-  const parts = key.split(':');
+  const firstColon = key.indexOf(':');
+  if (firstColon === -1) return { resourceName: key };
+  const secondColon = key.indexOf(':', firstColon + 1);
+  if (secondColon === -1) {
+    return {
+      resourceName: key.slice(0, firstColon),
+      fieldName: key.slice(firstColon + 1) || undefined,
+    };
+  }
   return {
-    resourceName: parts[0],
-    fieldName: parts[1] || undefined,
-    lookupValue: parts[2] || undefined,
+    resourceName: key.slice(0, firstColon),
+    fieldName: key.slice(firstColon + 1, secondColon) || undefined,
+    lookupValue: key.slice(secondColon + 1) || undefined,
   };
 };
 
