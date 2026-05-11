@@ -15,6 +15,7 @@
     "dist"
   ],
   "scripts": {
+    "prebuild": "node scripts/sync-version.mjs",
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run",

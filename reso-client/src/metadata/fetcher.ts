@@ -9,6 +9,7 @@
 
 import { parseCsdlXml } from '../csdl/parser.js';
 import type { CsdlSchema } from '../csdl/types.js';
+import { SDK_VERSION } from '../version.js';
 
 /**
  * Fetch raw EDMX XML metadata from an OData server.
@@ -61,7 +62,7 @@ export const fetchRawMetadataWithVersion = async (baseUrl: string, token: string
       Authorization: `Bearer ${token}`,
       Accept: 'application/xml',
       'Accept-Encoding': 'gzip, deflate',
-      'User-Agent': 'RESO-Client-SDK/0.2'
+      'User-Agent': `RESO-Client-SDK/${SDK_VERSION}`
     }
   });
 
