@@ -173,7 +173,7 @@ export const VariationsPage = () => {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug?: string }>();
   const { isAuthenticated, isAdmin, user } = useAuth();
-  const routeState = location.state as { job?: Record<string, unknown>; report?: BlendedVariationsReport } | null;
+  const routeState = location.state as { job?: Record<string, unknown>; report?: BlendedVariationsReport; endorsement?: EndorsementRow } | null;
 
   // URL is the source of truth for which view is active:
   //   /cert/variations          → dashboard (list)
@@ -213,6 +213,64 @@ export const VariationsPage = () => {
       setView('detail');
       setLoadError(null);
       window.history.replaceState({}, '');
+      return;
+    }
+
+    // Admin drill-in from the In Review queue: no local job, just an
+    // endorsement row. Fetch the variations-report.json directly from
+    // S3 using the row's reportId (= certificationRequestId).
+    const endorsement = routeState?.endorsement;
+    if (endorsement && !routeState?.job) {
+      if (!endorsement.reportId) {
+        setLoadError('This endorsement is missing its reportId — drill-in from the queue is unavailable until the next save lands the field. Open the report from the originating cert job instead.');
+        setView('detail');
+        return;
+      }
+      setLoading(true);
+      (async () => {
+        try {
+          const serverReport = await getVariationsReport(
+            endorsement.version,
+            endorsement.providerUoi,
+            endorsement.providerUsi,
+            endorsement.recipientUoi,
+            endorsement.reportId!
+          );
+          if (!serverReport) {
+            setLoadError(`Could not fetch the variations report for endorsement ${endorsement.endorsementId} from the service.`);
+            setView('detail');
+            return;
+          }
+          // Cast through the blender's input shape — the service
+          // payload is structurally compatible.
+          const localShape = serverReport as unknown as Parameters<typeof blendVariations>[0];
+          let serviceSuggestions = {};
+          // No local metadata report for an admin drill-in; blend
+          // with empty service suggestions (the saved report already
+          // captures admin/FT decisions).
+          const blended: BlendedVariationsReport = {
+            ...blendVariations(localShape, serviceSuggestions, {
+              providerUoi: endorsement.providerUoi,
+              providerUsi: endorsement.providerUsi,
+              recipientUoi: endorsement.recipientUoi,
+              version: endorsement.version,
+            }),
+            providerUoi: endorsement.providerUoi,
+            providerUsi: endorsement.providerUsi,
+            recipientUoi: endorsement.recipientUoi,
+            version: endorsement.version,
+          };
+          setReport(blended);
+          cacheReport(blended);
+          setView('detail');
+        } catch (err) {
+          setLoadError(err instanceof Error ? err.message : 'Failed to load variations report');
+          setView('detail');
+        } finally {
+          setLoading(false);
+          window.history.replaceState({}, '');
+        }
+      })();
       return;
     }
 
@@ -360,6 +418,7 @@ interface VariationsStats {
 const ReviewListView = ({ isAuthenticated }: {
   readonly isAuthenticated: boolean;
 }) => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<VariationsStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -489,7 +548,11 @@ const ReviewListView = ({ isAuthenticated }: {
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {endorsements.map(row => (
-                    <tr key={`${row.providerUoi}::${row.endorsementId}`} className="hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                    <tr
+                      key={`${row.providerUoi}::${row.endorsementId}`}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800/60 cursor-pointer"
+                      onClick={() => navigate(`/cert/variations/${encodeURIComponent(row.endorsementId)}`, { state: { endorsement: row } })}
+                    >
                       <td className="px-4 py-2 font-mono text-xs text-gray-900 dark:text-gray-100">{row.providerUoi}</td>
                       <td className="px-4 py-2 font-mono text-xs text-gray-600 dark:text-gray-400">{row.providerUsi}</td>
                       <td className="px-4 py-2 font-mono text-xs text-gray-900 dark:text-gray-100">{row.recipientUoi}</td>
