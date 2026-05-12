@@ -6,7 +6,7 @@
  * tool can produce identical CSVs.
  */
 
-import { variationsToCsv, type VariationCsvRow } from '@reso-standards/reso-client';
+import { variationsToCsv, buildVariationKey, type VariationCsvRow } from '@reso-standards/reso-client';
 import type { BlendedVariation } from './variations-blender.js';
 
 type ActionStatus = 'pending' | 'ignored' | 'fast-track' | 'remove';
@@ -19,7 +19,7 @@ const ACTION_TO_OUTCOME: Readonly<Record<ActionStatus, string>> = {
 };
 
 const keyOf = (v: BlendedVariation): string =>
-  `${v.resourceName}:${v.fieldName ?? ''}:${v.lookupValue ?? ''}`;
+  buildVariationKey(v.resourceName, v.fieldName, v.lookupValue);
 
 const toRow = (
   v: BlendedVariation,

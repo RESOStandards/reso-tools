@@ -137,3 +137,7 @@ export { parseFilter, parseExpand } from '@reso-standards/odata-expression-parse
 export { escapeCsvField, rowsToCsv } from './utils/csv.js';
 export { VARIATIONS_CSV_COLUMNS, variationsToCsv } from './utils/variations-csv.js';
 export type { VariationCsvRow } from './utils/variations-csv.js';
+
+// Utilities — variation key (composite identifier)
+export { VARIATION_KEY_SEP, buildVariationKey, parseVariationKey } from './utils/variation-key.js';
+export type { ParsedVariationKey } from './utils/variation-key.js';

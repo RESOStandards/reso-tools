@@ -20,6 +20,7 @@ import { useLocation, useBlocker, useNavigate, useParams } from 'react-router';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
 import { downloadVariationsCsv } from '../../services/variations-csv-export';
+import { buildVariationKey } from '@reso-standards/reso-client';
 import { blendVariations, type BlendedVariation, type BlendedSuggestion, type BlendedVariationsReport } from '../../services/variations-blender';
 import { searchVariations, getVariationsStats, searchLocks, createLock, deleteLock, variationsLockResourceId, getVariationsReport, generateCertRequestId, listEndorsementsByReviewStatus, type LockRecord, type EndorsementRow } from '../../services/variations-service';
 import { resolveReportRef, ReportMissingError } from '../../services/report-ref';
@@ -49,7 +50,7 @@ const FILTER_TABS: ReadonlyArray<{ key: VariationFilter; label: string }> = [
 ];
 
 const variationKey = (v: BlendedVariation): string =>
-  `${v.resourceName}:${v.fieldName ?? ''}:${v.lookupValue ?? ''}`;
+  buildVariationKey(v.resourceName, v.fieldName, v.lookupValue);
 
 /** Render a relative time like "2m ago" / "1h ago" from a Unix-second timestamp. */
 const formatTimeSince = (unixSeconds: number): string => {

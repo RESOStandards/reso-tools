@@ -5,6 +5,7 @@
  * Also handles notification polling for variations report updates.
  */
 
+import { parseVariationKey } from '@reso-standards/reso-client';
 import {
   saveVariationsReport,
   generateCertRequestId,
@@ -50,30 +51,9 @@ interface SaveInput {
 
 // ── Key parsing ──────────────────────────────────────────────────────
 
-/**
- * Parse a variation key back into its component parts.
- *
- * Splits on the first two `:` only — anything past the second `:`
- * is the lookup value. Lookup values can legitimately contain `:`
- * (some RESO standards do), so naive split-on-all would corrupt
- * them. Mirrors the backend's `parseVariationKey` semantics.
- */
-const parseKey = (key: string): { resourceName: string; fieldName?: string; lookupValue?: string } => {
-  const firstColon = key.indexOf(':');
-  if (firstColon === -1) return { resourceName: key };
-  const secondColon = key.indexOf(':', firstColon + 1);
-  if (secondColon === -1) {
-    return {
-      resourceName: key.slice(0, firstColon),
-      fieldName: key.slice(firstColon + 1) || undefined,
-    };
-  }
-  return {
-    resourceName: key.slice(0, firstColon),
-    fieldName: key.slice(firstColon + 1, secondColon) || undefined,
-    lookupValue: key.slice(secondColon + 1) || undefined,
-  };
-};
+// Re-export the shared parser so existing callsites keep the local
+// `parseKey` name without changing.
+const parseKey = parseVariationKey;
 
 // ── Build payload ────────────────────────────────────────────────────
 

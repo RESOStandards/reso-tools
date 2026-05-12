@@ -27,7 +27,7 @@ const jsonHeaders: Readonly<Record<string, string>> = {
 // ---------------------------------------------------------------------------
 
 /** Event types for notification filtering. */
-export type NotificationEventType = 'JOB' | 'VARIATIONS_REPORT' | 'JOB_FAILED';
+export type NotificationEventType = 'JOB' | 'VARIATIONS_REPORT' | 'VARIATIONS_RESOLVED' | 'JOB_FAILED';
 
 /** A single notification from the services API. */
 export interface ServiceNotification {

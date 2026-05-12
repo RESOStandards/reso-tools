@@ -17,7 +17,11 @@ import {
 } from '../api/services-client';
 
 const POLL_INTERVAL_MS = 60_000; // 1 minute
-const EVENT_TYPES: ReadonlyArray<NotificationEventType> = ['JOB', 'VARIATIONS_REPORT', 'JOB_FAILED'];
+// VARIATIONS_REPORT catches VARIATIONS_REPORT_SAVED via BEGINS_WITH prefix
+// match on the server-side notificationId. VARIATIONS_RESOLVED has a
+// different prefix and has to be listed explicitly, or the bell never
+// sees the admin-finalize event.
+const EVENT_TYPES: ReadonlyArray<NotificationEventType> = ['JOB', 'VARIATIONS_REPORT', 'VARIATIONS_RESOLVED', 'JOB_FAILED'];
 
 // ── Singleton poll state ────────────────────────────────────────────
 

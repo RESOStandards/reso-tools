@@ -7,6 +7,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { buildVariationKey } from '@reso-standards/reso-client';
 
 const mockStore = new Map<string, string>();
 vi.stubGlobal('electronStorage', {
@@ -68,7 +69,7 @@ describe('saveVariationsReview — deltas-only contract', () => {
 
     await saveVariationsReview({
       ...baseInput,
-      actions: [{ key: 'Property:ListPrice', status: 'ignored' }],
+      actions: [{ key: buildVariationKey('Property', 'ListPrice'), status: 'ignored' }],
       comments: [],
     });
 
@@ -78,7 +79,7 @@ describe('saveVariationsReview — deltas-only contract', () => {
   it('issues exactly one fetch call per save', async () => {
     await saveVariationsReview({
       ...baseInput,
-      actions: [{ key: 'Property:ListPrice', status: 'ignored' }],
+      actions: [{ key: buildVariationKey('Property', 'ListPrice'), status: 'ignored' }],
       comments: [],
     });
 
@@ -88,7 +89,7 @@ describe('saveVariationsReview — deltas-only contract', () => {
   it('sends only the new changes (no past changes, no changeId)', async () => {
     await saveVariationsReview({
       ...baseInput,
-      actions: [{ key: 'Property:ListPrice', status: 'ignored' }],
+      actions: [{ key: buildVariationKey('Property', 'ListPrice'), status: 'ignored' }],
       comments: [],
     });
 
@@ -100,7 +101,7 @@ describe('saveVariationsReview — deltas-only contract', () => {
   it('sends exactly one editorInfo entry, no changeId, matching the user', async () => {
     await saveVariationsReview({
       ...baseInput,
-      actions: [{ key: 'Property:X', status: 'ignored' }],
+      actions: [{ key: buildVariationKey('Property', 'X'), status: 'ignored' }],
       comments: [],
     });
 
@@ -119,7 +120,7 @@ describe('saveVariationsReview — deltas-only contract', () => {
   it('builds correct payload for ignore actions', async () => {
     await saveVariationsReview({
       ...baseInput,
-      actions: [{ key: 'Property:ListPrice', status: 'ignored' }],
+      actions: [{ key: buildVariationKey('Property', 'ListPrice'), status: 'ignored' }],
       comments: [],
     });
 
@@ -135,7 +136,7 @@ describe('saveVariationsReview — deltas-only contract', () => {
   it('builds correct payload for fast-track actions', async () => {
     await saveVariationsReview({
       ...baseInput,
-      actions: [{ key: 'Property:CustomField', status: 'fast-track' }],
+      actions: [{ key: buildVariationKey('Property', 'CustomField'), status: 'fast-track' }],
       comments: [],
     });
 
@@ -147,7 +148,7 @@ describe('saveVariationsReview — deltas-only contract', () => {
   it('builds correct payload for remove actions', async () => {
     await saveVariationsReview({
       ...baseInput,
-      actions: [{ key: 'Property:BadField', status: 'remove' }],
+      actions: [{ key: buildVariationKey('Property', 'BadField'), status: 'remove' }],
       comments: [],
     });
 
@@ -155,10 +156,10 @@ describe('saveVariationsReview — deltas-only contract', () => {
     expect(body.changes[0].remove).toBe(true);
   });
 
-  it('parses three-part keys (resource:field:lookup)', async () => {
+  it('parses three-part keys (resource, field, lookup)', async () => {
     await saveVariationsReview({
       ...baseInput,
-      actions: [{ key: 'Property:StandardStatus:Active', status: 'ignored' }],
+      actions: [{ key: buildVariationKey('Property', 'StandardStatus', 'Active'), status: 'ignored' }],
       comments: [],
     });
 
@@ -170,10 +171,10 @@ describe('saveVariationsReview — deltas-only contract', () => {
     });
   });
 
-  it('preserves colons in lookup value — splits on first two only', async () => {
+  it('preserves printable punctuation in lookup value (Unit Separator delimiter does not collide)', async () => {
     await saveVariationsReview({
       ...baseInput,
-      actions: [{ key: 'Property:Foo:bar:baz:qux', status: 'ignored' }],
+      actions: [{ key: buildVariationKey('Property', 'Foo', 'bar:baz:qux'), status: 'ignored' }],
       comments: [],
     });
 
@@ -188,9 +189,9 @@ describe('saveVariationsReview — deltas-only contract', () => {
   it('attaches comments to related actions', async () => {
     await saveVariationsReview({
       ...baseInput,
-      actions: [{ key: 'Property:ListPrice', status: 'ignored' }],
+      actions: [{ key: buildVariationKey('Property', 'ListPrice'), status: 'ignored' }],
       comments: [{
-        variationKey: 'Property:ListPrice',
+        variationKey: buildVariationKey('Property', 'ListPrice'),
         timestamp: '2026-04-21T00:00:00Z',
         from: 'P001',
         to: 'RESO',
@@ -208,7 +209,7 @@ describe('saveVariationsReview — deltas-only contract', () => {
       ...baseInput,
       actions: [],
       comments: [{
-        variationKey: 'Property:SomeField',
+        variationKey: buildVariationKey('Property', 'SomeField'),
         timestamp: '2026-04-21T00:00:00Z',
         from: 'P001',
         to: 'RESO',
@@ -228,7 +229,7 @@ describe('saveVariationsReview — deltas-only contract', () => {
   it('preserves report identifiers in the POST body', async () => {
     await saveVariationsReview({
       ...baseInput,
-      actions: [{ key: 'Property:X', status: 'ignored' }],
+      actions: [{ key: buildVariationKey('Property', 'X'), status: 'ignored' }],
       comments: [],
     });
 
