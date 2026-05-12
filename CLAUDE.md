@@ -82,6 +82,26 @@ Before adding any new dependency, run a security audit:
 - Check dependency count (prefer zero or minimal transitive deps)
 - For native/WASM modules: verify cross-platform compatibility (macOS, Windows, Linux) and Electron ABI compatibility
 
+## TanStack supply-chain watch (2026-05-11)
+
+A self-spreading npm worm hit 42 `@tanstack/*` packages on
+2026-05-11, publishing 84 malicious versions between 19:20-19:26 UTC
+([postmortem](https://tanstack.com/blog/npm-supply-chain-compromise-postmortem),
+[GHSA-g7cv-rxg3-hmpx](https://github.com/advisories/GHSA-g7cv-rxg3-hmpx)).
+Our only TanStack dep is `@tanstack/react-virtual@3.13.24` in
+`reso-web-client`, which falls under the postmortem's
+confirmed-clean `@tanstack/virtual*` family.
+
+- The dependency is pinned (no caret) as defense-in-depth so a
+  future compromise of the same package can't auto-resolve into our
+  build via `npm install`.
+- Before bumping the pinned version, **re-check the advisory and
+  postmortem** for additional affected releases and confirm the
+  target version is in a confirmed-clean family. If you're not
+  certain, ask before bumping.
+- If we add any new `@tanstack/*` dependency, same rule — verify the
+  exact version against the latest advisory data and pin.
+
 ## Timing and Delays
 
 - NEVER use `setTimeout`, `setInterval`, or timing-based delays to fix race conditions or synchronization issues. These are hacks that mask the real problem.
