@@ -177,8 +177,16 @@ const registerLoginCredentialsHandlers = (): void => {
 // ── Job store (SQLite in main process, accessed via IPC) ──
 
 import { initJobsDb, createJobStore, type JobStore, type JobRecord, type StepRecord, type StatusPatch, type JobFilter } from './job-store.js';
+import {
+  initPendingTasksDb,
+  createPendingTasksStore,
+  type PendingTasksStore,
+  type PendingTaskInsert,
+  type PendingTaskPatch,
+} from './pending-tasks-store.js';
 
 let jobStore: JobStore | null = null;
+let pendingTasksStore: PendingTasksStore | null = null;
 
 const registerJobStoreHandlers = (): void => {
   const dbPath = resolve(app.getPath('userData'), 'reso-jobs.db');
@@ -206,6 +214,29 @@ const registerJobStoreHandlers = (): void => {
   );
   ipcMain.handle('jobs:clear-completed', () =>
     jobStore!.clearCompleted()
+  );
+};
+
+const registerPendingTasksHandlers = (): void => {
+  const dbPath = resolve(app.getPath('userData'), 'reso-pending-tasks.db');
+  const db = initPendingTasksDb(dbPath);
+  pendingTasksStore = createPendingTasksStore(db);
+  log(`Pending-tasks store initialized: ${dbPath}`);
+
+  ipcMain.handle('pending-tasks:insert', (_event, task: PendingTaskInsert) =>
+    pendingTasksStore!.insert(task)
+  );
+  ipcMain.handle('pending-tasks:update', (_event, id: string, patch: PendingTaskPatch) =>
+    pendingTasksStore!.update(id, patch)
+  );
+  ipcMain.handle('pending-tasks:remove', (_event, id: string) =>
+    pendingTasksStore!.remove(id)
+  );
+  ipcMain.handle('pending-tasks:get', (_event, id: string) =>
+    pendingTasksStore!.get(id)
+  );
+  ipcMain.handle('pending-tasks:list', () =>
+    pendingTasksStore!.list()
   );
 };
 
@@ -1403,6 +1434,7 @@ app.whenReady().then(async () => {
   registerStorageHandlers();
   registerLoginCredentialsHandlers();
   registerJobStoreHandlers();
+  registerPendingTasksHandlers();
   registerCertRunnerHandlers();
   buildMenu();
 

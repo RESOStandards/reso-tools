@@ -65,6 +65,19 @@ contextBridge.exposeInMainWorld('jobStore', {
     ipcRenderer.invoke('jobs:clear-completed'),
 });
 
+contextBridge.exposeInMainWorld('pendingTasksStore', {
+  insert: (task: Record<string, unknown>): Promise<unknown> =>
+    ipcRenderer.invoke('pending-tasks:insert', task),
+  update: (id: string, patch: Record<string, unknown>): Promise<unknown> =>
+    ipcRenderer.invoke('pending-tasks:update', id, patch),
+  remove: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke('pending-tasks:remove', id),
+  get: (id: string): Promise<unknown> =>
+    ipcRenderer.invoke('pending-tasks:get', id),
+  list: (): Promise<unknown> =>
+    ipcRenderer.invoke('pending-tasks:list'),
+});
+
 contextBridge.exposeInMainWorld('certRunner', {
   /** Start a compliance test run. Returns the PipelineResult when done. */
   run: (jobId: string, config: Record<string, unknown>): Promise<unknown> =>

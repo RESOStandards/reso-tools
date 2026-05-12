@@ -21,11 +21,12 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
 import { downloadVariationsCsv } from '../../services/variations-csv-export';
 import { buildVariationKey } from '@reso-standards/reso-client';
+import { enqueueTask, subscribeToTasks } from '../../services/pending-tasks';
+import { VARIATIONS_SAVE_TASK_TYPE, type VariationsSavePayload } from '../../services/pending-task-executors/variations-save';
 import { blendVariations, type BlendedVariation, type BlendedSuggestion, type BlendedVariationsReport } from '../../services/variations-blender';
 import { searchVariations, getVariationsStats, searchLocks, createLock, deleteLock, variationsLockResourceId, getVariationsReport, generateCertRequestId, listEndorsementsByReviewStatus, type LockRecord, type EndorsementRow } from '../../services/variations-service';
 import { resolveReportRef, ReportMissingError } from '../../services/report-ref';
 import { useNotifications } from '../../hooks/use-notifications';
-import { saveVariationsReview } from '../../services/variations-save';
 import { markVariationsReviewSubmitted } from '../../services/job-manager';
 import { useJobs } from '../../hooks/use-jobs';
 import { VariationComments, type VariationComment } from '../../components/cert/variation-comments';
@@ -804,6 +805,32 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
     });
   }, [ensureMyLock]);
 
+  /**
+   * Wait until a queued task settles (success or terminal failure).
+   * Subscribes to the global queue and resolves/rejects when the
+   * specific task transitions. Used to block the UI on Finalize.
+   */
+  const awaitTaskCompletion = (taskId: string): Promise<void> =>
+    new Promise((resolve, reject) => {
+      const unsubscribe = subscribeToTasks((current) => {
+        const task = current.find(t => t.id === taskId);
+        if (!task) {
+          // Task already cleaned up (auto-removed after a successful
+          // linger). Treat as success.
+          unsubscribe();
+          resolve();
+          return;
+        }
+        if (task.status === 'success') {
+          unsubscribe();
+          resolve();
+        } else if (task.status === 'failed' && task.retryCount >= 3) {
+          unsubscribe();
+          reject(new Error(task.lastError ?? 'Save failed'));
+        }
+      });
+    });
+
   const handleSave = useCallback(async (options: { finalize?: boolean } = {}) => {
     if (!report.providerUoi || !report.providerUsi || !report.recipientUoi) return;
 
@@ -823,48 +850,55 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
     if (deltaActions.length === 0 && draftComments.size === 0 && !options.finalize) return;
 
     setSaving(true);
-    try {
-      // Auth handled inside saveVariationsReview via authedFetch.
-      const success = await saveVariationsReview({
-        version: report.version,
-        providerUoi: report.providerUoi,
-        providerUsi: report.providerUsi,
-        recipientUoi: report.recipientUoi,
-        actions: deltaActions,
-        comments: [...draftComments.entries()].flatMap(([variationKey, comments]) =>
-          comments.map(c => ({ variationKey, ...c }))
-        ),
-        userName: user?.fullName ?? user?.username ?? '',
-        userEmail: user?.email ?? '',
-        finalize: options.finalize,
-      });
 
-      if (success) {
-        // Promote what we just sent to the new "saved" baseline so the
-        // visible state stays the same and `isDirty` flips back to
-        // false. (Old model wiped the local map; that emptied the UI
-        // because actions now mirror the full saved state, not just a
-        // pending delta.)
-        hydratedActionsRef.current = new Map(actions);
-        setHydratedKey(k => k + 1);
-        clearDraft(reportId);
-        setDraftComments(new Map());
-        // First successful save for this job marks variations as
-        // submitted for review — flips the job-card button label from
-        // "Start Variations Review" to "Review Variations" so the
-        // provider knows the submission landed. Idempotent: subsequent
-        // saves are edits and don't change the original timestamp.
-        if (jobId) markVariationsReviewSubmitted(jobId);
-        // Release the lock so other reviewers (and the next poll on
-        // open viewers) can become the editor.
+    // Optimistic local cleanup. The pending-tasks queue persists the
+    // payload to SQLite and retries on failure — if the actual
+    // server save never lands, the user can retry from the queue UI.
+    // Lock release waits for actual task completion below, so we
+    // don't free the lock prematurely on a failed save.
+    hydratedActionsRef.current = new Map(actions);
+    setHydratedKey(k => k + 1);
+    clearDraft(reportId);
+    setDraftComments(new Map());
+    if (jobId) markVariationsReviewSubmitted(jobId);
+
+    const payload: VariationsSavePayload = {
+      version: report.version,
+      providerUoi: report.providerUoi,
+      providerUsi: report.providerUsi,
+      recipientUoi: report.recipientUoi,
+      actions: deltaActions,
+      comments: [...draftComments.entries()].flatMap(([variationKey, comments]) =>
+        comments.map(c => ({ variationKey, ...c }))
+      ),
+      userName: user?.fullName ?? user?.username ?? '',
+      userEmail: user?.email ?? '',
+      finalize: options.finalize,
+    };
+
+    const task = await enqueueTask({
+      type: VARIATIONS_SAVE_TASK_TYPE,
+      payload,
+      scope: reportId,
+    });
+
+    if (options.finalize) {
+      // Finalize blocks: wait for the task to settle, then release
+      // lock + navigate. Other saves are fire-and-forget — the
+      // queue's status pill surfaces success/failure.
+      try {
+        await awaitTaskCompletion(task.id);
         await releaseMyLock();
-        // After admin finalize, the endorsement has flipped to
-        // 'resolved' and there's nothing left to do on this report.
-        // Navigate back to the dashboard so the user sees the
-        // refreshed queue (the row moves out of In Review).
-        if (options.finalize) navigate('/cert/variations');
+        navigate('/cert/variations');
+      } catch (err) {
+        console.error('Finalize failed:', err);
+      } finally {
+        setSaving(false);
       }
-    } finally {
+    } else {
+      // Fire-and-forget. When the task succeeds the lock release
+      // fires asynchronously so subsequent reviewers can claim it.
+      void awaitTaskCompletion(task.id).then(() => releaseMyLock()).catch(() => { /* failure surfaced via queue UI */ });
       setSaving(false);
     }
   }, [actions, reportId, report, user, draftComments, jobId, releaseMyLock, navigate]);

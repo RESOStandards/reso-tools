@@ -84,6 +84,16 @@ const router = createBrowserRouter([
   }
 ]);
 
+// Register pending-task executors before initializing the queue, so
+// any tasks left over from the previous session can fire as soon as
+// the queue loads them from SQLite.
+import('./services/pending-task-executors/variations-save').then(({ registerVariationsSaveExecutor }) => {
+  registerVariationsSaveExecutor();
+  return import('./services/pending-tasks');
+}).then(({ initPendingTasks }) => {
+  void initPendingTasks();
+});
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
