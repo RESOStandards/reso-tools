@@ -10,6 +10,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { loadProfiles, loadConnections, saveDraft, clearDraft, type SavedCredentials, type SavedCertConfig } from '../../services/connection-manager';
 import { FilterPill, Badge } from '../metadata/shared';
+import { MaskedInput } from '../masked-input';
 import { getOrganizations } from '../../hooks/use-organization-names';
 import { useAuth } from '../../hooks/use-auth';
 import { useCurrentUserSystems } from '../../hooks/use-current-user-systems';
@@ -199,10 +200,9 @@ const AuthSection = ({
       {auth.mode === 'token' ? (
         <div>
           <label className={LABEL}>Auth Token</label>
-          <input
-            type="password"
+          <MaskedInput
             value={auth.authToken}
-            onChange={e => onChange({ ...auth, authToken: e.target.value })}
+            onChange={v => onChange({ ...auth, authToken: v })}
             placeholder="Bearer token"
             className={INPUT}
           />
@@ -221,10 +221,9 @@ const AuthSection = ({
           </div>
           <div>
             <label className={LABEL}>Client Secret</label>
-            <input
-              type="password"
+            <MaskedInput
               value={auth.clientSecret}
-              onChange={e => onChange({ ...auth, clientSecret: e.target.value })}
+              onChange={v => onChange({ ...auth, clientSecret: v })}
               placeholder="client_secret"
               className={INPUT}
             />
