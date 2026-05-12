@@ -134,9 +134,9 @@ export type {
 export { parseFilter, parseExpand } from '@reso-standards/odata-expression-parser';
 
 // Utilities — CSV serialization (variations export, ingest)
-export { escapeCsvField, rowsToCsv } from './utils/csv.js';
-export { VARIATIONS_CSV_COLUMNS, variationsToCsv } from './utils/variations-csv.js';
-export type { VariationCsvRow } from './utils/variations-csv.js';
+export { escapeCsvField, rowsToCsv, csvToRows } from './utils/csv.js';
+export { VARIATIONS_CSV_COLUMNS, variationsToCsv, csvToVariations } from './utils/variations-csv.js';
+export type { VariationCsvRow, ParseVariationsCsvResult, ParseVariationsCsvError } from './utils/variations-csv.js';
 
 // Utilities — variation key (composite identifier)
 export { VARIATION_KEY_SEP, buildVariationKey, parseVariationKey } from './utils/variation-key.js';
