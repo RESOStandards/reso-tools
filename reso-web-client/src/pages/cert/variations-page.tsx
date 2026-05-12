@@ -31,6 +31,7 @@ import { markVariationsReviewSubmitted } from '../../services/job-manager';
 import { useJobs } from '../../hooks/use-jobs';
 import { VariationComments, type VariationComment } from '../../components/cert/variation-comments';
 import { useAuth } from '../../hooks/use-auth';
+import { useOrganizationNames } from '../../hooks/use-organization-names';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -630,6 +631,7 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
   readonly jobId?: string;
 }) => {
   const navigate = useNavigate();
+  const { lookup: lookupOrg, lookupSystem } = useOrganizationNames();
   const reportId = `${report.version}`;
 
   const [search, setSearch] = useState('');
@@ -1077,6 +1079,40 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
                 </span>
               )}
             </p>
+            {/* Provenance: resolved org names + copyable IDs. Provider sees
+                their own system + the recipient; admin sees all three.
+                Long names wrap by design — readable beats truncated when
+                space is available. */}
+            {(report.providerUoi || report.providerUsi || report.recipientUoi) && (() => {
+              const providerName = report.providerUoi ? lookupOrg(report.providerUoi) : undefined;
+              const systemName = lookupSystem(report.providerUoi, report.providerUsi);
+              const recipientName = report.recipientUoi ? lookupOrg(report.recipientUoi) : undefined;
+              const hasAnyName = !!(providerName || systemName || recipientName);
+              return (
+                <div className="mt-2 space-y-1">
+                  {hasAnyName && (
+                    <div className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1.5 flex-wrap">
+                      {isAdmin && providerName && <span className="font-medium text-gray-700 dark:text-gray-300">{providerName}</span>}
+                      {isAdmin && providerName && systemName && <span className="text-gray-400 dark:text-gray-500">·</span>}
+                      {systemName && <span className="text-gray-700 dark:text-gray-300">{systemName}</span>}
+                      {(providerName || systemName) && recipientName && <span className="text-gray-400 dark:text-gray-500">→</span>}
+                      {recipientName && <span className="font-medium text-gray-700 dark:text-gray-300">{recipientName}</span>}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {isAdmin && report.providerUoi && (
+                      <CopyableChip label="Provider" value={report.providerUoi} mono />
+                    )}
+                    {report.providerUsi && (
+                      <CopyableChip label="USI" value={report.providerUsi} mono />
+                    )}
+                    {report.recipientUoi && (
+                      <CopyableChip label="Recipient" value={report.recipientUoi} mono />
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -1231,6 +1267,35 @@ const UserRoundel = ({ name, pulse }: { readonly name: string; readonly pulse?: 
         {initials || '?'}
       </div>
     </div>
+  );
+};
+
+/**
+ * Small clickable chip that copies its value to the clipboard. Used
+ * in the variations review header to surface UOI / USI / recipient
+ * IDs in a way that's easy to grab when filing or referencing.
+ */
+const CopyableChip = ({ label, value, mono = false }: { readonly label: string; readonly value: string; readonly mono?: boolean }) => {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard.writeText(value);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+      title={copied ? 'Copied' : `Click to copy ${label}: ${value}`}
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors ${mono ? 'font-mono' : ''}`}
+    >
+      <span className="text-[9px] uppercase tracking-wider text-gray-500 dark:text-gray-400">{label}</span>
+      <span>{value}</span>
+      {copied && (
+        <svg className="w-3 h-3 text-green-600 dark:text-green-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+        </svg>
+      )}
+    </button>
   );
 };
 
