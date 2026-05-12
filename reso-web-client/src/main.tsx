@@ -18,6 +18,7 @@ import { DashboardPage } from './pages/cert/dashboard-page';
 import { ComparePage } from './pages/cert/compare-page';
 import { ConfigsPage } from './pages/cert/configs-page';
 import { VariationsPage } from './pages/cert/variations-page';
+import { VariationsImportPage } from './pages/cert/variations-import-page';
 import { DeletePage } from './pages/delete-page';
 import { ErrorPage } from './pages/error-page';
 import { DetailPage } from './pages/detail-page';
@@ -68,6 +69,7 @@ const router = createBrowserRouter([
           { path: 'cert/compare/:jobId', element: <ComparePage /> },
           { path: 'cert/configs', element: <ConfigsPage /> },
           { path: 'cert/variations', element: <VariationsPage /> },
+          { path: 'cert/variations/import', element: <VariationsImportPage /> },
           { path: 'cert/variations/:slug', element: <VariationsPage /> },
         ],
       },
