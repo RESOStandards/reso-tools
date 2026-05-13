@@ -28,7 +28,15 @@ export interface VariationsSavePayload {
   readonly providerUoi: string;
   readonly providerUsi: string;
   readonly recipientUoi: string;
-  readonly actions: ReadonlyArray<{ readonly key: string; readonly status: 'pending' | 'ignored' | 'fast-track' | 'remove' }>;
+  readonly actions: ReadonlyArray<{
+    readonly key: string;
+    readonly status: 'pending' | 'ignored' | 'fast-track' | 'remove';
+    /** Carried so the saved S3 report has the suggestion context. */
+    readonly suggestedResourceName?: string;
+    readonly suggestedFieldName?: string;
+    readonly suggestedLookupValue?: string;
+    readonly suggestedLegacyODataValue?: string;
+  }>;
   readonly comments: ReadonlyArray<{ readonly variationKey: string; readonly from: string; readonly to: string; readonly message: string; readonly timestamp: string; readonly attachments?: ReadonlyArray<{ readonly displayText: string; readonly url: string }> }>;
   readonly userName: string;
   readonly userEmail: string;

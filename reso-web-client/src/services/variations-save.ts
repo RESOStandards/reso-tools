@@ -21,6 +21,17 @@ type ActionStatus = 'pending' | 'ignored' | 'fast-track' | 'remove';
 interface DraftAction {
   readonly key: string;
   readonly status: ActionStatus;
+  /**
+   * Primary suggestion fields carried alongside the decision so the
+   * admin drill-in (which fetches only the saved S3 report) sees the
+   * suggestion that was in play when the decision was made. Without
+   * this, the saved change has just the source identity + decision
+   * flags, and admin sees "No suggestion" on every row.
+   */
+  readonly suggestedResourceName?: string;
+  readonly suggestedFieldName?: string;
+  readonly suggestedLookupValue?: string;
+  readonly suggestedLegacyODataValue?: string;
 }
 
 interface DraftComment {
@@ -71,6 +82,13 @@ const buildSavePayload = (input: SaveInput): {
     const change: Record<string, unknown> = { resourceName };
     if (fieldName) change.fieldName = fieldName;
     if (lookupValue) change.lookupValue = lookupValue;
+    // Carry the primary suggestion alongside the decision so the
+    // admin queue's drill-in (which only has the saved S3 report)
+    // can render what the suggestion was.
+    if (action.suggestedResourceName) change.suggestedResourceName = action.suggestedResourceName;
+    if (action.suggestedFieldName) change.suggestedFieldName = action.suggestedFieldName;
+    if (action.suggestedLookupValue) change.suggestedLookupValue = action.suggestedLookupValue;
+    if (action.suggestedLegacyODataValue) change.suggestedLegacyODataValue = action.suggestedLegacyODataValue;
 
     if (action.status === 'ignored') {
       change.ignore = true;

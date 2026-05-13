@@ -174,7 +174,7 @@ export const VariationsPage = () => {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug?: string }>();
   const [searchParams] = useSearchParams();
-  const { isAuthenticated, isAdmin, user } = useAuth();
+  const { isAuthenticated, isAdmin, user, isHydrating: authHydrating } = useAuth();
   const routeState = location.state as { job?: Record<string, unknown>; report?: BlendedVariationsReport; endorsement?: EndorsementRow } | null;
 
   // URL is the source of truth for which view is active:
@@ -209,6 +209,13 @@ export const VariationsPage = () => {
 
   // When a job arrives via route state, extract variations and blend with service suggestions
   useEffect(() => {
+    // Wait for auth to finish loading persisted credentials before
+    // firing any service fetches. On a hard refresh of
+    // /cert/variations/<slug>, this effect runs before the auth
+    // provider has hydrated the bearer token from secure storage —
+    // fetches go out with no credentials and the page lands on a
+    // scary "No credentials" error.
+    if (authHydrating) return;
     if (routeState?.report) {
       setReport(routeState.report);
       cacheReport(routeState.report);
@@ -377,7 +384,7 @@ export const VariationsPage = () => {
     // Auth-service handles refresh internally now — the function reference
     // is stable (module export), so this effect runs exactly once per
     // route change.
-  }, [routeState, isAuthenticated]);
+  }, [routeState, isAuthenticated, authHydrating, searchParams, slug]);
 
   if (loading) {
     return (
@@ -606,25 +613,21 @@ const ReviewListView = ({ isAuthenticated }: {
                           );
                         }}
                       >
+                        {/* Copyable chips intentionally omitted here —
+                            clicking the row drills into the detail
+                            view where the chips do live, so the queue
+                            cells stay clean. The detail header is the
+                            right place to grab IDs. */}
                         {isAdmin && (
-                          <td className="px-4 py-2 align-top">
-                            <div className="text-sm text-gray-900 dark:text-gray-100">{providerName ?? row.providerUoi}</div>
-                            {providerName && (
-                              <CopyableChip label="UOI" value={row.providerUoi} mono />
-                            )}
+                          <td className="px-4 py-2 align-top text-sm text-gray-900 dark:text-gray-100">
+                            {providerName ?? row.providerUoi}
                           </td>
                         )}
-                        <td className="px-4 py-2 align-top">
-                          <div className="text-sm text-gray-900 dark:text-gray-100">{systemName ?? `USI ${row.providerUsi}`}</div>
-                          {systemName && (
-                            <CopyableChip label="USI" value={row.providerUsi} mono />
-                          )}
+                        <td className="px-4 py-2 align-top text-sm text-gray-900 dark:text-gray-100">
+                          {systemName ?? `USI ${row.providerUsi}`}
                         </td>
-                        <td className="px-4 py-2 align-top">
-                          <div className="text-sm text-gray-900 dark:text-gray-100">{recipientName ?? row.recipientUoi}</div>
-                          {recipientName && (
-                            <CopyableChip label="UOI" value={row.recipientUoi} mono />
-                          )}
+                        <td className="px-4 py-2 align-top text-sm text-gray-900 dark:text-gray-100">
+                          {recipientName ?? row.recipientUoi}
                         </td>
                         <td className="px-4 py-2 align-top text-gray-700 dark:text-gray-300">{row.version}</td>
                         <td className="px-4 py-2 align-top text-xs text-gray-500 dark:text-gray-400 tabular-nums">
@@ -841,7 +844,11 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
         readonly remove?: boolean;
         readonly conversations?: ReadonlyArray<VariationComment>;
       }>) {
-        const key = `${c.resourceName ?? ''}:${c.fieldName ?? ''}:${c.lookupValue ?? ''}`;
+        // Use the shared key builder so hydrated entries match the
+        // keys the table rows compute (Unit Separator, not colons).
+        // Without this, decisions saved last session don't activate
+        // the right action button on re-open.
+        const key = buildVariationKey(c.resourceName ?? '', c.fieldName, c.lookupValue);
         if (c.ignore === true) hydrated.set(key, 'ignored');
         else if (c.flaggedForFastTrack === true) hydrated.set(key, 'fast-track');
         else if (c.remove === true) hydrated.set(key, 'remove');
@@ -993,9 +1000,25 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
     // (which identifies "new" changes by missing changeId) would dedupe
     // by appending fresh duplicates of decisions the user never touched.
     const baseline = hydratedActionsRef.current;
-    const deltaActions: ReadonlyArray<{ key: string; status: ActionStatus }> = [...actions.entries()]
+    // Build a key→variation lookup once so each delta action can pull
+    // its primary suggestion onto the save payload. Without this, the
+    // saved S3 report only carries source identity + decision flags,
+    // and admin drill-ins (which only see the saved report) render
+    // "No suggestion" for every row.
+    const variationByKey = new Map(report.variations.map(v => [variationKey(v), v]));
+    const deltaActions = [...actions.entries()]
       .filter(([key, status]) => baseline.get(key) !== status)
-      .map(([key, status]) => ({ key, status }));
+      .map(([key, status]) => {
+        const primary = variationByKey.get(key)?.suggestions[0];
+        return {
+          key,
+          status,
+          ...(primary?.suggestedResourceName ? { suggestedResourceName: primary.suggestedResourceName } : {}),
+          ...(primary?.suggestedFieldName ? { suggestedFieldName: primary.suggestedFieldName } : {}),
+          ...(primary?.suggestedLookupValue ? { suggestedLookupValue: primary.suggestedLookupValue } : {}),
+          ...(primary?.suggestedLegacyODataValue ? { suggestedLegacyODataValue: primary.suggestedLegacyODataValue } : {}),
+        };
+      });
 
     // Finalize is allowed without new edits — admin closing out a
     // review that has no pending changes still needs to send a
