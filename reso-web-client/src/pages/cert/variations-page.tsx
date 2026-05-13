@@ -1672,7 +1672,14 @@ const VariationDrawer = ({ variation, action, draftComments, savedComments, isRe
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none cursor-pointer" aria-label="Close">×</button>
         </div>
 
-        <div className="flex-1 flex flex-col p-5 gap-4 overflow-y-auto min-h-0">
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Top section: variation context (Source / Provenance /
+              Suggestions / Actions). Owns its own vertical scroll
+              when content overflows. Natural-height by default so
+              the comments panel below stays anchored to the
+              bottom of the drawer rather than getting pushed off-
+              screen by a tall top section. */}
+          <div className="px-5 pt-5 pb-3 flex flex-col gap-4 overflow-y-auto min-h-0">
           {/* Source */}
           <div>
             <div className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Local value</div>
@@ -1782,12 +1789,13 @@ const VariationDrawer = ({ variation, action, draftComments, savedComments, isRe
             </div>
           )}
 
-          {/* Comments — merge live (from blended report) and saved
-              (from the persisted variations report). The blender doesn't
-              know about prior saves, so without this merge the comments
-              vanish on reopen. flex-1 + min-h-0 lets the message list
-              fill remaining vertical space when expanded. */}
-          <div className="flex-1 min-h-0 flex flex-col">
+          </div>
+          {/* Comments panel — permanently visible, anchored to the
+              bottom of the drawer. Merge live conversations (from
+              the blended report) with saved ones (from the persisted
+              variations report) so prior comments don't vanish on
+              reopen. */}
+          <div className="flex-1 min-h-0 flex flex-col border-t border-gray-200 dark:border-gray-700">
             <VariationComments
               existingComments={[...(variation.conversations ?? []), ...savedComments]}
               draftComments={draftComments}

@@ -51,11 +51,6 @@ export const VariationComments = ({
   userUoi,
   isReadOnly,
 }: VariationCommentsProps) => {
-  // Default open: when reviewers reopen a variation that's already
-  // accumulated comments, surfacing the thread without an extra click
-  // matches what they're trying to do (read recent context). The toggle
-  // stays available for users who want to collapse a long thread.
-  const [expanded, setExpanded] = useState(true);
   const [message, setMessage] = useState('');
   const [attachUrl, setAttachUrl] = useState('');
   const [attachText, setAttachText] = useState('');
@@ -75,12 +70,12 @@ export const VariationComments = ({
     }
   }, [message]);
 
-  // Scroll the message list to the latest comment whenever it expands
-  // or new entries arrive — newest comment is the most relevant context.
+  // Scroll the message list to the latest comment whenever a new
+  // entry arrives — newest comment is the most relevant context.
   useEffect(() => {
-    if (!expanded || !listRef.current) return;
+    if (!listRef.current) return;
     listRef.current.scrollTop = listRef.current.scrollHeight;
-  }, [expanded, totalCount]);
+  }, [totalCount]);
 
   const handleSubmit = useCallback(() => {
     if (!message.trim()) return;
@@ -128,25 +123,18 @@ export const VariationComments = ({
 
   return (
     <div className="border-t border-gray-100 dark:border-gray-700/50 flex flex-col min-h-0 flex-1">
-      {/* Toggle button */}
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-1.5 px-4 py-1.5 text-[10px] text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
-      >
-        <svg className={`w-3 h-3 transition-transform ${expanded ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-        </svg>
-        Comments{totalCount > 0 && ` (${totalCount})`}
+      {/* Static header — no toggle. The whole panel is always visible
+          and anchored to the bottom of the drawer per design. */}
+      <div className="flex items-center gap-1.5 px-4 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
+        <span>Comments{totalCount > 0 && ` (${totalCount})`}</span>
         {draftComments.length > 0 && (
-          <span className="text-amber-500 dark:text-amber-400 font-medium">
+          <span className="text-amber-500 dark:text-amber-400 font-medium normal-case tracking-normal">
             +{draftComments.length} unsaved
           </span>
         )}
-      </button>
+      </div>
 
-      {expanded && (
-        <div className="px-4 pb-3 flex flex-col gap-2 flex-1 min-h-0">
+      <div className="px-4 pb-3 flex flex-col gap-2 flex-1 min-h-0">
           {/* Message list — grows to fill the remaining drawer height */}
           {allComments.length > 0 && (
             <div ref={listRef} className="space-y-1.5 flex-1 min-h-0 overflow-y-auto">
@@ -296,7 +284,6 @@ export const VariationComments = ({
             </div>
           )}
         </div>
-      )}
     </div>
   );
 };
