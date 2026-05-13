@@ -16,14 +16,14 @@
  */
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useLocation, useBlocker, useNavigate, useParams } from 'react-router';
+import { useLocation, useBlocker, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { SearchInput, FilterPill } from '../../components/metadata/shared';
 import { downloadVariationsCsv } from '../../services/variations-csv-export';
 import { buildVariationKey } from '@reso-standards/reso-client';
 import { enqueueTask, subscribeToTasks } from '../../services/pending-tasks';
 import { VARIATIONS_SAVE_TASK_TYPE, type VariationsSavePayload } from '../../services/pending-task-executors/variations-save';
-import { blendVariations, type BlendedVariation, type BlendedSuggestion, type BlendedVariationsReport } from '../../services/variations-blender';
+import { blendVariations, buildBlendedFromSavedReport, type BlendedVariation, type BlendedSuggestion, type BlendedVariationsReport } from '../../services/variations-blender';
 import { searchVariations, getVariationsStats, searchLocks, createLock, deleteLock, variationsLockResourceId, getVariationsReport, generateCertRequestId, listEndorsementsByReviewStatus, type LockRecord, type EndorsementRow } from '../../services/variations-service';
 import { resolveReportRef, ReportMissingError } from '../../services/report-ref';
 import { useNotifications } from '../../hooks/use-notifications';
@@ -173,6 +173,7 @@ export const VariationsPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { slug } = useParams<{ slug?: string }>();
+  const [searchParams] = useSearchParams();
   const { isAuthenticated, isAdmin, user } = useAuth();
   const routeState = location.state as { job?: Record<string, unknown>; report?: BlendedVariationsReport; endorsement?: EndorsementRow } | null;
 
@@ -217,10 +218,30 @@ export const VariationsPage = () => {
       return;
     }
 
-    // Admin drill-in from the In Review queue: no local job, just an
-    // endorsement row. Fetch the variations-report.json directly from
-    // S3 using the row's reportId (= certificationRequestId).
-    const endorsement = routeState?.endorsement;
+    // Admin drill-in from the In Review queue, OR a refresh of that
+    // URL. On click, the queue pushes `endorsement` in routeState and
+    // also encodes the components in query params so a refresh
+    // (which loses routeState) still has everything needed to
+    // re-fetch. Build a thin endorsement-shape from whichever source
+    // is available; only the fetch-required fields matter here.
+    const endorsementFromState = routeState?.endorsement;
+    const qpVersion = searchParams.get('v');
+    const qpProviderUoi = searchParams.get('p');
+    const qpProviderUsi = searchParams.get('s');
+    const qpRecipientUoi = searchParams.get('r');
+    const qpReportId = searchParams.get('rid');
+    // Cast: enough fields for the fetch path, not a full row.
+    const fromQueryParams: EndorsementRow | undefined = qpVersion && qpProviderUoi && qpProviderUsi && qpRecipientUoi
+      ? ({
+          endorsementId: slug ?? '',
+          version: qpVersion,
+          providerUoi: qpProviderUoi,
+          providerUsi: qpProviderUsi,
+          recipientUoi: qpRecipientUoi,
+          reportId: qpReportId ?? undefined,
+        } as unknown as EndorsementRow)
+      : undefined;
+    const endorsement = endorsementFromState ?? fromQueryParams;
     if (endorsement && !routeState?.job) {
       if (!endorsement.reportId) {
         setLoadError('This endorsement is missing its reportId — drill-in from the queue is unavailable until the next save lands the field. Open the report from the originating cert job instead.');
@@ -242,25 +263,21 @@ export const VariationsPage = () => {
             setView('detail');
             return;
           }
-          // Cast through the blender's input shape — the service
-          // payload is structurally compatible.
-          const localShape = serverReport as unknown as Parameters<typeof blendVariations>[0];
-          let serviceSuggestions = {};
-          // No local metadata report for an admin drill-in; blend
-          // with empty service suggestions (the saved report already
-          // captures admin/FT decisions).
-          const blended: BlendedVariationsReport = {
-            ...blendVariations(localShape, serviceSuggestions, {
+          // The saved S3 payload stores `changes[]`, not the local
+          // cert-report buckets that blendVariations expects.
+          // Convert directly into BlendedVariationsReport so the
+          // detail view sees the items. Cast through the converter's
+          // looser shape — the typed VariationsChange has stricter
+          // optional-field markers than the converter cares about.
+          const blended = buildBlendedFromSavedReport(
+            serverReport as unknown as Parameters<typeof buildBlendedFromSavedReport>[0],
+            {
               providerUoi: endorsement.providerUoi,
               providerUsi: endorsement.providerUsi,
               recipientUoi: endorsement.recipientUoi,
               version: endorsement.version,
-            }),
-            providerUoi: endorsement.providerUoi,
-            providerUsi: endorsement.providerUsi,
-            recipientUoi: endorsement.recipientUoi,
-            version: endorsement.version,
-          };
+            },
+          );
           setReport(blended);
           cacheReport(blended);
           setView('detail');
@@ -269,7 +286,10 @@ export const VariationsPage = () => {
           setView('detail');
         } finally {
           setLoading(false);
-          window.history.replaceState({}, '');
+          // Clear routeState so a hot re-render doesn't refire this
+          // effect, but keep the URL intact — the query params are
+          // what makes a refresh re-fetch cleanly.
+          window.history.replaceState(null, '', window.location.href);
         }
       })();
       return;
@@ -420,6 +440,8 @@ const ReviewListView = ({ isAuthenticated }: {
   readonly isAuthenticated: boolean;
 }) => {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
+  const { lookup: lookupOrg, lookupSystem } = useOrganizationNames();
   const [stats, setStats] = useState<VariationsStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -456,8 +478,15 @@ const ReviewListView = ({ isAuthenticated }: {
       listEndorsementsByReviewStatus('resolved'),
     ])
       .then(([inReview, resolved]) => {
-        setEndorsements(inReview);
-        setResolvedEndorsements(resolved);
+        // Filter out endorsement rows that pre-date the reportId-on-save
+        // backend change (#612ef65). Without reportId the drill-in
+        // can't fetch the variations-report.json from S3 and a click
+        // would land on a not-found error — user expectation is that
+        // rows without a working drill-in shouldn't appear in the
+        // queue at all. Those rows will re-appear on the next save
+        // once reportId is populated.
+        setEndorsements(inReview.filter(r => !!r.reportId));
+        setResolvedEndorsements(resolved.filter(r => !!r.reportId));
       })
       .catch(err => setEndorsementsError(err instanceof Error ? err.message : 'Failed to load endorsements'))
       .finally(() => setEndorsementsLoading(false));
@@ -539,31 +568,74 @@ const ReviewListView = ({ isAuthenticated }: {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-gray-800/40 text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   <tr>
-                    <th className="text-left px-4 py-2 font-medium">Provider</th>
-                    <th className="text-left px-4 py-2 font-medium">USI</th>
+                    {/* Provider column hidden for provider role — they're
+                        looking at their own rows; the column would be a
+                        wall of their own UOI repeated. */}
+                    {isAdmin && <th className="text-left px-4 py-2 font-medium">Provider</th>}
+                    <th className="text-left px-4 py-2 font-medium">System</th>
                     <th className="text-left px-4 py-2 font-medium">Recipient</th>
-                    <th className="text-left px-4 py-2 font-medium">Endorsement</th>
                     <th className="text-left px-4 py-2 font-medium">Version</th>
                     <th className="text-left px-4 py-2 font-medium">Submitted</th>
+                    <th className="text-left px-4 py-2 font-medium">Modified</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {endorsements.map(row => (
-                    <tr
-                      key={`${row.providerUoi}::${row.endorsementId}`}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800/60 cursor-pointer"
-                      onClick={() => navigate(`/cert/variations/${encodeURIComponent(row.endorsementId)}`, { state: { endorsement: row } })}
-                    >
-                      <td className="px-4 py-2 font-mono text-xs text-gray-900 dark:text-gray-100">{row.providerUoi}</td>
-                      <td className="px-4 py-2 font-mono text-xs text-gray-600 dark:text-gray-400">{row.providerUsi}</td>
-                      <td className="px-4 py-2 font-mono text-xs text-gray-900 dark:text-gray-100">{row.recipientUoi}</td>
-                      <td className="px-4 py-2 text-gray-700 dark:text-gray-300">{row.endorsement}</td>
-                      <td className="px-4 py-2 text-gray-700 dark:text-gray-300">{row.version}</td>
-                      <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 tabular-nums">
-                        {row.submittedAt ? new Date(row.submittedAt).toLocaleString() : '—'}
-                      </td>
-                    </tr>
-                  ))}
+                  {endorsements.map(row => {
+                    const providerName = lookupOrg(row.providerUoi);
+                    const systemName = lookupSystem(row.providerUoi, row.providerUsi);
+                    const recipientName = lookupOrg(row.recipientUoi);
+                    return (
+                      <tr
+                        key={`${row.providerUoi}::${row.endorsementId}`}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-800/60 cursor-pointer"
+                        onClick={() => {
+                          // Encode every component the detail page needs to refetch
+                          // from S3 into query params. On refresh, the page reads
+                          // these instead of relying on routeState (which is lost
+                          // on a hard reload).
+                          const params = new URLSearchParams({
+                            v: row.version,
+                            p: row.providerUoi,
+                            s: row.providerUsi,
+                            r: row.recipientUoi,
+                            ...(row.reportId ? { rid: row.reportId } : {}),
+                          });
+                          navigate(
+                            `/cert/variations/${encodeURIComponent(row.endorsementId)}?${params.toString()}`,
+                            { state: { endorsement: row } },
+                          );
+                        }}
+                      >
+                        {isAdmin && (
+                          <td className="px-4 py-2 align-top">
+                            <div className="text-sm text-gray-900 dark:text-gray-100">{providerName ?? row.providerUoi}</div>
+                            {providerName && (
+                              <CopyableChip label="UOI" value={row.providerUoi} mono />
+                            )}
+                          </td>
+                        )}
+                        <td className="px-4 py-2 align-top">
+                          <div className="text-sm text-gray-900 dark:text-gray-100">{systemName ?? `USI ${row.providerUsi}`}</div>
+                          {systemName && (
+                            <CopyableChip label="USI" value={row.providerUsi} mono />
+                          )}
+                        </td>
+                        <td className="px-4 py-2 align-top">
+                          <div className="text-sm text-gray-900 dark:text-gray-100">{recipientName ?? row.recipientUoi}</div>
+                          {recipientName && (
+                            <CopyableChip label="UOI" value={row.recipientUoi} mono />
+                          )}
+                        </td>
+                        <td className="px-4 py-2 align-top text-gray-700 dark:text-gray-300">{row.version}</td>
+                        <td className="px-4 py-2 align-top text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+                          {row.submittedAt ? new Date(row.submittedAt).toLocaleString() : '—'}
+                        </td>
+                        <td className="px-4 py-2 align-top text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+                          {row.updatedAt ? new Date(row.updatedAt).toLocaleString() : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -789,13 +861,29 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
     return () => { cancelled = true; };
   }, [report.version, report.providerUoi, report.providerUsi, report.recipientUoi]);
 
-  const isDirty = useMemo(() => {
+  /**
+   * Count of unsaved deltas — actions whose status differs from the
+   * hydrated baseline, plus a +1 per draft-only comment thread.
+   * Renamed from a boolean to a number so the "X unsaved" badge in
+   * the header reads accurately (previously it showed `actions.size`,
+   * which double-counted prior saved actions on a re-edit).
+   */
+  const unsavedCount = useMemo(() => {
     const baseline = hydratedActionsRef.current;
-    if (actions.size !== baseline.size) return true;
-    for (const [k, v] of actions) if (baseline.get(k) !== v) return true;
-    return draftComments.size > 0;
+    let count = 0;
+    for (const [k, v] of actions) {
+      if (baseline.get(k) !== v) count += 1;
+    }
+    // Action keys that were dropped (in baseline, missing from current map).
+    for (const k of baseline.keys()) {
+      if (!actions.has(k)) count += 1;
+    }
+    count += draftComments.size;
+    return count;
     // hydratedKey forces recompute when the baseline arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actions, draftComments, hydratedKey]);
+  const isDirty = unsavedCount > 0;
 
   // Block navigation when there are unsaved edits. Without resolving
   // the blocker (proceed/reset), nav clicks silently no-op and the
@@ -1120,7 +1208,7 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
             <>
               {isDirty && (
                 <>
-                  <span className="text-xs text-amber-600 dark:text-amber-400">{actions.size} unsaved</span>
+                  <span className="text-xs text-amber-600 dark:text-amber-400">{unsavedCount} unsaved</span>
                   <button type="button" onClick={() => {
                     clearDraft(reportId);
                     setActions(new Map());

@@ -332,3 +332,112 @@ export const blendVariations = (
     counts,
   };
 };
+
+/**
+ * Build a BlendedVariationsReport directly from a saved
+ * variations-report.json payload (the shape returned by
+ * getVariationsReport from the service). The saved report stores
+ * each variation as a flat `change` record — no fields/lookups
+ * buckets — and the decisions (ignore/fast-track/remove) live on
+ * the change as flags rather than on a separate review state.
+ *
+ * Used by the admin's queue drill-in path, where there is no local
+ * cert metadata to blend with (provider has already produced and
+ * decided on these items; admin just needs to view + adjust).
+ */
+export const buildBlendedFromSavedReport = (
+  saved: {
+    readonly description?: string;
+    readonly version: string;
+    readonly providerUoi?: string;
+    readonly providerUsi?: string;
+    readonly recipientUoi?: string;
+    readonly changes?: ReadonlyArray<Record<string, unknown>>;
+  },
+  provenance: VariationProvenance = {}
+): BlendedVariationsReport => {
+  const merged: VariationProvenance = {
+    providerUoi: provenance.providerUoi ?? saved.providerUoi,
+    providerUsi: provenance.providerUsi ?? saved.providerUsi,
+    recipientUoi: provenance.recipientUoi ?? saved.recipientUoi,
+    version: provenance.version ?? saved.version,
+  };
+
+  const changes = saved.changes ?? [];
+  const variations: BlendedVariation[] = changes
+    .filter(c => typeof c.resourceName === 'string' && (c.resourceName as string).length > 0)
+    .map((c) => {
+      // Type inference: lookup > field > resource. Expansion/complex
+      // are recognized by suggested-related fields. Falls back to
+      // resource for a bare resourceName.
+      const hasLookup = !!c.lookupValue || !!c.legacyODataValue;
+      const hasField = !!c.fieldName;
+      const hasRelated = !!c.suggestedRelatedResourceName
+        || !!c.suggestedRelatedFieldName
+        || !!c.suggestedRelatedLookupValue;
+      const type: BlendedVariation['type'] = hasLookup
+        ? 'lookup'
+        : hasRelated
+          ? 'expansion'
+          : hasField
+            ? 'field'
+            : 'resource';
+
+      // One BlendedSuggestion per change. The saved report doesn't
+      // carry the matching strategy that the local cert run captured,
+      // so we surface the saved suggestion under a generic label.
+      const suggestion: BlendedSuggestion = {
+        suggestedResourceName: c.suggestedResourceName as string | undefined,
+        suggestedFieldName: c.suggestedFieldName as string | undefined,
+        suggestedLookupValue: c.suggestedLookupValue as string | undefined,
+        suggestedLegacyODataValue: c.suggestedLegacyODataValue as string | undefined,
+        suggestedRelatedResourceName: c.suggestedRelatedResourceName as string | undefined,
+        suggestedRelatedFieldName: c.suggestedRelatedFieldName as string | undefined,
+        suggestedRelatedLookupValue: c.suggestedRelatedLookupValue as string | undefined,
+        strategy: (c.strategy as string | undefined) ?? 'Saved Suggestion',
+        isFastTrack: c.flaggedForFastTrack === true,
+      };
+      const hasAnySuggestion = !!(suggestion.suggestedResourceName
+        || suggestion.suggestedFieldName
+        || suggestion.suggestedLookupValue
+        || suggestion.suggestedLegacyODataValue
+        || suggestion.suggestedRelatedResourceName
+        || suggestion.suggestedRelatedFieldName
+        || suggestion.suggestedRelatedLookupValue);
+
+      return {
+        resourceName: c.resourceName as string,
+        fieldName: c.fieldName as string | undefined,
+        lookupValue: c.lookupValue as string | undefined,
+        legacyODataValue: c.legacyODataValue as string | undefined,
+        suggestions: hasAnySuggestion ? [suggestion] : [],
+        ignored: c.ignore === true,
+        source: 'service',
+        type,
+        conversations: c.conversations as BlendedVariation['conversations'],
+        ...merged,
+      };
+    });
+
+  return {
+    description: saved.description ?? 'Data Dictionary Variations Report',
+    version: saved.version,
+    generatedOn: new Date().toISOString(),
+    fuzziness: 0.25,
+    providerUoi: merged.providerUoi,
+    providerUsi: merged.providerUsi,
+    recipientUoi: merged.recipientUoi,
+    variations,
+    counts: {
+      resources: variations.filter(v => v.type === 'resource').length,
+      fields: variations.filter(v => v.type === 'field').length,
+      lookups: variations.filter(v => v.type === 'lookup').length,
+      expansions: variations.filter(v => v.type === 'expansion').length,
+      complexTypes: variations.filter(v => v.type === 'complexType').length,
+      total: variations.length,
+      ignored: variations.filter(v => v.ignored).length,
+      fastTrack: variations.filter(v => v.suggestions.some(s => s.isFastTrack)).length,
+      adminReview: variations.filter(v => v.suggestions.some(s => s.isAdminReview)).length,
+    },
+  };
+};
