@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { NavLink, useLocation, useParams } from 'react-router';
 import { useServer } from '../context/server-context';
+import { useAuth } from '../hooks/use-auth';
 import { READ_ONLY_RESOURCES } from '../types';
 import { ConnectionInfoModal } from './admin/connection-info-modal';
 
@@ -11,6 +12,7 @@ export const ResourceNav = () => {
   const { resource: activeResource } = useParams<{ resource: string }>();
   const location = useLocation();
   const { resources, isLocal, isLoadingResources, loadingStatus, permissions } = useServer();
+  const { isAdmin } = useAuth();
   const [showConnectionInfo, setShowConnectionInfo] = useState(false);
 
   const resourceNames = useMemo(
@@ -205,9 +207,14 @@ export const ResourceNav = () => {
           <NavLink to="/cert/variations" end className={({ isActive }) => `block text-xs ${isActive ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'} cursor-pointer`}>
             Variations
           </NavLink>
-          <NavLink to="/cert/variations/import" className={({ isActive }) => `block text-xs pl-3 ${isActive ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'} cursor-pointer`}>
-            Import
-          </NavLink>
+          {/* Variations Import is admin-only. The page itself also
+              gates by isAdmin, but hiding the link keeps the nav
+              from looking unnecessarily noisy for providers. */}
+          {isAdmin && (
+            <NavLink to="/cert/variations/import" className={({ isActive }) => `block text-xs pl-3 ${isActive ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'} cursor-pointer`}>
+              Import
+            </NavLink>
+          )}
         </div>
       )}
 

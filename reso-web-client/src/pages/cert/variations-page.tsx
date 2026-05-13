@@ -707,6 +707,7 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
 }) => {
   const navigate = useNavigate();
   const { lookup: lookupOrg, lookupSystem } = useOrganizationNames();
+  const { isHydrating: authHydrating } = useAuth();
   const reportId = `${report.version}`;
 
   const [search, setSearch] = useState('');
@@ -824,15 +825,22 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
   const [savedConversations, setSavedConversations] = useState<Map<string, ReadonlyArray<VariationComment>>>(new Map());
 
   useEffect(() => {
+    // Wait for auth to finish loading persisted credentials before
+    // firing any service fetches. On a hard refresh of the detail
+    // URL, this effect would otherwise run before the bearer token
+    // is rehydrated, and the inner authedFetch throws an AuthError
+    // that surfaces as "uncaught (in promise)" in the console.
+    if (authHydrating) return;
     const pUoi = report.providerUoi;
     const pUsi = report.providerUsi;
     const rUoi = report.recipientUoi;
     if (!pUoi || !pUsi || !rUoi) return;
     let cancelled = false;
     (async () => {
-      const certRequestId = await generateCertRequestId(report.version, pUoi, pUsi, rUoi);
-      const existing = await getVariationsReport(report.version, pUoi, pUsi, rUoi, certRequestId);
-      if (cancelled || !existing?.changes) return;
+      try {
+        const certRequestId = await generateCertRequestId(report.version, pUoi, pUsi, rUoi);
+        const existing = await getVariationsReport(report.version, pUoi, pUsi, rUoi, certRequestId);
+        if (cancelled || !existing?.changes) return;
       const hydrated = new Map<string, ActionStatus>();
       const conversations = new Map<string, ReadonlyArray<VariationComment>>();
       for (const c of existing.changes as ReadonlyArray<{
@@ -857,16 +865,23 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
           conversations.set(key, [...prior, ...c.conversations]);
         }
       }
-      hydratedActionsRef.current = hydrated;
-      setHydratedKey(k => k + 1);
-      setSavedConversations(conversations);
-      // Only adopt the hydrated set as the visible state if the user
-      // hasn't already started editing in this session — local drafts
-      // (loadDraft) win over server state on a fresh mount.
-      setActions(prev => (prev.size === 0 ? hydrated : prev));
+        hydratedActionsRef.current = hydrated;
+        setHydratedKey(k => k + 1);
+        setSavedConversations(conversations);
+        // Only adopt the hydrated set as the visible state if the user
+        // hasn't already started editing in this session — local drafts
+        // (loadDraft) win over server state on a fresh mount.
+        setActions(prev => (prev.size === 0 ? hydrated : prev));
+      } catch (err) {
+        // Swallow — hydration failures fall back to whatever the
+        // local draft / route state already populated. The console
+        // captures the error for debugging; we don't want it
+        // surfacing as an "uncaught in promise" rejection.
+        if (!cancelled) console.warn('variations hydration failed', err);
+      }
     })();
     return () => { cancelled = true; };
-  }, [report.version, report.providerUoi, report.providerUsi, report.recipientUoi]);
+  }, [report.version, report.providerUoi, report.providerUsi, report.recipientUoi, authHydrating]);
 
   /**
    * Count of unsaved deltas — actions whose status differs from the
