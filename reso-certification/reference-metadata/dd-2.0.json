@@ -1,7 +1,7 @@
 {
   "description": "RESO Data Dictionary 2.0 Reference Metadata",
   "version": "2.0",
-  "generatedOn": "2026-04-22T15:40:28.683Z",
+  "generatedOn": "2026-05-13T21:04:58.750Z",
   "resources": [
     "Association",
     "Caravan",
@@ -7635,14 +7635,14 @@
     },
     {
       "resourceName": "Property",
-      "fieldName": "GreenBuildingVerification",
+      "fieldName": "GreenBuildingVerifications",
       "type": "Collection(org.reso.metadata.PropertyGreenVerification)",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Green Building Verification"
+          "value": "Green Building Verifications"
         },
         {
           "term": "RESO.DDWikiUrl",
@@ -11802,14 +11802,14 @@
     },
     {
       "resourceName": "Property",
-      "fieldName": "OpenHouse",
+      "fieldName": "OpenHouses",
       "type": "Collection(org.reso.metadata.OpenHouse)",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Open House"
+          "value": "Open Houses"
         },
         {
           "term": "RESO.DDWikiUrl",
@@ -19829,14 +19829,14 @@
     },
     {
       "resourceName": "Contacts",
-      "fieldName": "ContactsOtherPhone",
+      "fieldName": "ContactsOtherPhones",
       "type": "Collection(org.reso.metadata.OtherPhone)",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Contacts Other Phone"
+          "value": "Contacts Other Phones"
         },
         {
           "term": "RESO.DDWikiUrl",
@@ -27879,14 +27879,14 @@
     },
     {
       "resourceName": "Member",
-      "fieldName": "MemberOtherPhone",
+      "fieldName": "MemberOtherPhones",
       "type": "Collection(org.reso.metadata.OtherPhone)",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Member Other Phone"
+          "value": "Member Other Phones"
         },
         {
           "term": "RESO.DDWikiUrl",
@@ -36520,7 +36520,7 @@
     {
       "resourceName": "Prospecting",
       "fieldName": "Contact",
-      "type": "org.reso.metadata.Contact",
+      "type": "org.reso.metadata.Contacts",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -36538,7 +36538,8 @@
         }
       ],
       "isExpansion": true,
-      "typeName": "Contact"
+      "typeName": "Contacts",
+      "sourceResource": "Contacts"
     },
     {
       "resourceName": "Prospecting",
@@ -36633,7 +36634,8 @@
       ],
       "isCollection": true,
       "isExpansion": true,
-      "typeName": "HistoryTransactional"
+      "typeName": "HistoryTransactional",
+      "sourceResource": "HistoryTransactional"
     },
     {
       "resourceName": "Prospecting",
@@ -36727,7 +36729,8 @@
       ],
       "isCollection": true,
       "isExpansion": true,
-      "typeName": "Media"
+      "typeName": "Media",
+      "sourceResource": "Media"
     },
     {
       "resourceName": "Prospecting",
@@ -36847,7 +36850,7 @@
     {
       "resourceName": "Prospecting",
       "fieldName": "OwnerMember",
-      "type": "org.reso.metadata.OwnerMember",
+      "type": "org.reso.metadata.Member",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -36865,7 +36868,8 @@
         }
       ],
       "isExpansion": true,
-      "typeName": "OwnerMember"
+      "typeName": "Member",
+      "sourceResource": "Member"
     },
     {
       "resourceName": "Prospecting",
@@ -36982,7 +36986,8 @@
         }
       ],
       "isExpansion": true,
-      "typeName": "SavedSearch"
+      "typeName": "SavedSearch",
+      "sourceResource": "SavedSearch"
     },
     {
       "resourceName": "Prospecting",
@@ -37123,7 +37128,8 @@
       ],
       "isCollection": true,
       "isExpansion": true,
-      "typeName": "HistoryTransactional"
+      "typeName": "HistoryTransactional",
+      "sourceResource": "HistoryTransactional"
     },
     {
       "resourceName": "Queue",
@@ -37151,7 +37157,7 @@
     {
       "resourceName": "Queue",
       "fieldName": "OriginatingSystem",
-      "type": "org.reso.metadata.OriginatingSystem",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -37169,7 +37175,8 @@
         }
       ],
       "isExpansion": true,
-      "typeName": "OriginatingSystem"
+      "typeName": "OUID",
+      "sourceResource": "OUID"
     },
     {
       "resourceName": "Queue",
@@ -37364,7 +37371,7 @@
     {
       "resourceName": "Queue",
       "fieldName": "SourceSystem",
-      "type": "org.reso.metadata.SourceSystem",
+      "type": "org.reso.metadata.OUID",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
@@ -37382,7 +37389,8 @@
         }
       ],
       "isExpansion": true,
-      "typeName": "SourceSystem"
+      "typeName": "OUID",
+      "sourceResource": "OUID"
     },
     {
       "resourceName": "Queue",

@@ -171,6 +171,55 @@ confirmed-clean `@tanstack/virtual*` family.
 - Validation rules are isomorphic (shared between client and server)
 - The DD docs site is in a separate repo — see `RESOStandards/reso-data-dictionary-documentation` for styling and generator code
 
+## DD Reference-Metadata Regeneration
+
+When DD sheets get a new revision, the `dd-{version}.json` reference-metadata files have to be regenerated from the XLSX. This happens roughly once per DD update.
+
+### Source of truth
+
+- DD sheet PRs land in `RESOStandards/transport`, typically as an issue with the new XLSX attached (e.g. transport#198). Authoritative copies live at `transport/references/dd/RESODataDictionary-{ver}.xlsx` on `main`.
+- The DD docs site (`reso-data-dictionary-documentation`) pulls those same files via `fetch-data.mjs` for HTML output. We pull them directly for JSON generation.
+
+### Generator
+
+`reso-certification/utils/generate-reference-metadata.js` reads an XLSX and writes the same JSON shape as the Commander's MetadataReport — `resources`, `models`, `fields`, `lookups`, `actions`, `functions`. It is the source for the validation refs consumed across the cert stack.
+
+```bash
+node reso-certification/utils/generate-reference-metadata.js path/to/dd-{ver}.xlsx {ver} reso-certification/reference-metadata/dd-{ver}.json
+```
+
+Repeat for each version (1.7, 2.0, 2.1). Also copy/regenerate into `reso-certification/src/etl/reference-metadata/` — both locations are read by different consumers.
+
+### Lint pass after generation
+
+Always diff the new JSON against the previous one and reconcile against the issue's changelog. Counts shifting by more than the listed renames/additions is a smell.
+
+```js
+// Quick diff: resources, fields, lookups, plus rename detection.
+const key = f => f.resourceName + '.' + f.fieldName;
+const aF = new Set(a.fields.map(key)), bF = new Set(b.fields.map(key));
+const added = [...bF].filter(x => !aF.has(x));
+const removed = [...aF].filter(x => !bF.has(x));
+```
+
+Watch for:
+
+- Renames listed in the PR show up cleanly (one add + one remove per rename, names match exactly).
+- New `SourceResource` entries on expansion fields actually populate `sourceResource` on the generated record.
+- Resource count: deltas should match the PR. A drop with no PR mention is usually a stray `https://ddwiki.reso.org/...` row being filtered out — that is cleanup, not regression.
+- Silent field removals (not in the PR changelog) deserve a callout back to whoever updated the sheet.
+
+### Where the JSON ends up consumed
+
+| Consumer | Path | Note |
+|---|---|---|
+| reso-tools cert runner | `reso-certification/reference-metadata/dd-{ver}.json` | Built into `dist/` |
+| reso-tools ETL | `reso-certification/src/etl/reference-metadata/dd-{ver}.json` | Required by `process-metadata.cjs` / `process-lookup-resource-metadata.cjs` |
+| Cert backend `validateBatch` | `reso-certification-backend/aws/lambda-layers/reso-dd-reference/data/dd-{ver}.json` | Needs separate layer publish to take effect on QA/prod |
+| Legacy `getReferenceMetadata` lambda | `aws/lambda-functions/getReferenceMetadata/reference-metadata/dd-{ver}.json` | Update if still in active use |
+
+The backend layer copies are independent of this repo — bumping refs here does not affect server-side `validateBatch` until the `reso-dd-reference` layer is republished.
+
 ## DD Docs URL Conventions
 
 Documentation site: https://dd.reso.org/

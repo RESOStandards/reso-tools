@@ -1,7 +1,7 @@
 {
   "description": "RESO Data Dictionary 2.1 Reference Metadata",
   "version": "2.1",
-  "generatedOn": "2026-04-22T16:15:52.037Z",
+  "generatedOn": "2026-05-13T21:04:59.326Z",
   "resources": [
     "Association",
     "Building",
@@ -8237,14 +8237,14 @@
     },
     {
       "resourceName": "Property",
-      "fieldName": "GreenBuildingVerification",
+      "fieldName": "GreenBuildingVerifications",
       "type": "Collection(org.reso.metadata.PropertyGreenVerification)",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Green Building Verification"
+          "value": "Green Building Verifications"
         },
         {
           "term": "RESO.DDWikiUrl",
@@ -13068,14 +13068,14 @@
     },
     {
       "resourceName": "Property",
-      "fieldName": "OpenHouse",
+      "fieldName": "OpenHouses",
       "type": "Collection(org.reso.metadata.OpenHouse)",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Open House"
+          "value": "Open Houses"
         },
         {
           "term": "RESO.DDWikiUrl",
@@ -20986,26 +20986,6 @@
     },
     {
       "resourceName": "Building",
-      "fieldName": "FloorPlan",
-      "type": "Collection(org.reso.metadata.FloorPlan)",
-      "nullable": true,
-      "isEnumeration": false,
-      "annotations": [
-        {
-          "term": "RESO.OData.Metadata.StandardName",
-          "value": "Floor Plan"
-        },
-        {
-          "term": "Core.Description",
-          "value": "A collection of floor plans available in the building."
-        }
-      ],
-      "isCollection": true,
-      "isExpansion": true,
-      "typeName": "FloorPlan"
-    },
-    {
-      "resourceName": "Building",
       "fieldName": "FloorToAreaRatioAsBuilt",
       "type": "Edm.Decimal",
       "nullable": true,
@@ -21141,14 +21121,14 @@
     },
     {
       "resourceName": "Building",
-      "fieldName": "GreenBuildingVerification",
+      "fieldName": "GreenBuildingVerifications",
       "type": "Collection(org.reso.metadata.PropertyGreenVerification)",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Green Building Verification"
+          "value": "Green Building Verifications"
         },
         {
           "term": "Core.Description",
@@ -26665,14 +26645,14 @@
     },
     {
       "resourceName": "Contacts",
-      "fieldName": "ContactsOtherPhone",
+      "fieldName": "ContactsOtherPhones",
       "type": "Collection(org.reso.metadata.OtherPhone)",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Contacts Other Phone"
+          "value": "Contacts Other Phones"
         },
         {
           "term": "RESO.DDWikiUrl",
@@ -35229,14 +35209,14 @@
     },
     {
       "resourceName": "Member",
-      "fieldName": "MemberOtherPhone",
+      "fieldName": "MemberOtherPhones",
       "type": "Collection(org.reso.metadata.OtherPhone)",
       "nullable": true,
       "isEnumeration": false,
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Member Other Phone"
+          "value": "Member Other Phones"
         },
         {
           "term": "RESO.DDWikiUrl",

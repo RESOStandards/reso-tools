@@ -238,10 +238,10 @@
       },
       "reso": {
         "eqZero": 0,
-        "gtZero": 0,
-        "gte25": 0,
-        "gte50": 0,
-        "gte75": 0,
+        "gtZero": 6,
+        "gte25": 2,
+        "gte50": 2,
+        "gte75": 2,
         "eq100": 0
       },
       "idx": {
@@ -254,10 +254,10 @@
       },
       "local": {
         "eqZero": 0,
-        "gtZero": 8,
-        "gte25": 2,
-        "gte50": 2,
-        "gte75": 2,
+        "gtZero": 2,
+        "gte25": 0,
+        "gte50": 0,
+        "gte75": 0,
         "eq100": 0
       }
     },
@@ -271,9 +271,9 @@
         },
         "lookups": {
           "total": 0.5,
-          "reso": 0,
+          "reso": 0.5,
           "idx": 0,
-          "local": 0.5
+          "local": 0
         }
       },
       "Property": {
@@ -285,9 +285,9 @@
         },
         "lookups": {
           "total": 0.24200000000000005,
-          "reso": 0,
+          "reso": 0.30000000000000004,
           "idx": 0,
-          "local": 0.24200000000000005
+          "local": 0.01
         },
         "expansions": {
           "Media": {
@@ -368,10 +368,10 @@
           },
           "reso": {
             "eqZero": 0,
-            "gtZero": 0,
-            "gte25": 0,
-            "gte50": 0,
-            "gte75": 0,
+            "gtZero": 2,
+            "gte25": 1,
+            "gte50": 1,
+            "gte75": 1,
             "eq100": 0
           },
           "idx": {
@@ -384,10 +384,10 @@
           },
           "local": {
             "eqZero": 0,
-            "gtZero": 2,
-            "gte25": 1,
-            "gte50": 1,
-            "gte75": 1,
+            "gtZero": 0,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
             "eq100": 0
           }
         }
@@ -438,10 +438,10 @@
           },
           "reso": {
             "eqZero": 0,
-            "gtZero": 0,
-            "gte25": 0,
-            "gte50": 0,
-            "gte75": 0,
+            "gtZero": 4,
+            "gte25": 1,
+            "gte50": 1,
+            "gte75": 1,
             "eq100": 0
           },
           "idx": {
@@ -454,10 +454,10 @@
           },
           "local": {
             "eqZero": 0,
-            "gtZero": 5,
-            "gte25": 1,
-            "gte50": 1,
-            "gte75": 1,
+            "gtZero": 1,
+            "gte25": 0,
+            "gte50": 0,
+            "gte75": 0,
             "eq100": 0
           }
         },
