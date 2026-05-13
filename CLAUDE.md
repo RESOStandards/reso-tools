@@ -184,7 +184,9 @@ When DD sheets get a new revision, the `dd-{version}.json` reference-metadata fi
 
 The DD update workflow has two scripted steps that run on every refresh, on any version:
 
-1. **Lint the XLSX** — `reso-certification/utils/lint-dd-sheet.js` deterministically rewrites the dd.reso.org URLs on every row, on every refresh. The published XLSX sheets historically carried legacy `ddwiki.reso.org` Confluence URLs and inconsistent `dd.reso.org` shapes. The lint script forces all hyperlinks and `WikiPageUrl` cells to the canonical pattern in code rather than maintaining them by hand or by Excel formula (formulas were tried before and bloated the file too much).
+1. **Lint the XLSX** — `reso-certification/utils/lint-dd-sheet.py` (Python + openpyxl) deterministically rewrites the dd.reso.org URLs on every row, on every refresh. The published XLSX sheets historically carried legacy `ddwiki.reso.org` Confluence URLs and inconsistent `dd.reso.org` shapes. The lint script forces all hyperlinks and `WikiPageUrl` cells to the canonical pattern in code rather than maintaining them by hand or by Excel formula (formulas were tried before and bloated the file too much).
+
+   **Tooling: openpyxl, not SheetJS.** SheetJS write-back strips cell formatting, comments, and merged-cell layout and roughly doubles the XLSX size. openpyxl preserves all of those and usually shrinks the file slightly. Never use SheetJS to write a DD sheet back out.
 
    Six targets per row (cell value and/or hyperlink, both pointing to the same canonical URL):
 
@@ -199,13 +201,21 @@ The DD update workflow has two scripted steps that run on every refresh, on any 
 
    Note: the lookup-value URL uses `StandardLookupValue` (URL-encoded display name), not `LegacyODataValue` — the live dd.reso.org routes match the display-name shape. `WikiPageTitle` and `LegacyODataValue` columns are left untouched.
 
+   Setup once (venv kept out of git):
+   ```bash
+   cd reso-certification
+   python3 -m venv .venv-dd-lint
+   .venv-dd-lint/bin/pip install openpyxl
+   ```
+
+   Run per refresh:
    ```bash
    for v in 1.7 2.0 2.1; do
-     node reso-certification/utils/lint-dd-sheet.js path/to/RESODataDictionary-$v.xlsx $v
+     reso-certification/.venv-dd-lint/bin/python reso-certification/utils/lint-dd-sheet.py path/to/RESODataDictionary-$v.xlsx $v
    done
    ```
 
-   Writes with `{ compression: true }` and strips per-cell `w`/`h`/`r` metadata to keep file size reasonable. Expect output ~1.7-1.9× the publisher's original — SheetJS structural overhead. Acceptable for now; a follow-up could swap to direct ZIP/XML patching for byte-exact preservation.
+   Expected output is ~0.81-0.84× the publisher's original (openpyxl trims unused metadata).
 
 2. **Generate reference-metadata JSON** — `reso-certification/utils/generate-reference-metadata.js` reads the linted XLSX and writes the same JSON shape as the Commander's MetadataReport (`resources`, `models`, `fields`, `lookups`, `actions`, `functions`). It is the source for the validation refs consumed across the cert stack.
 

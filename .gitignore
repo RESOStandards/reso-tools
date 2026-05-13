@@ -18,6 +18,7 @@ compliance-results.zip
 .env.*
 *.env
 .reso-cert/
+reso-certification/.venv-dd-lint/
 
 # RESO certification test artifacts
 data-availability*.json
