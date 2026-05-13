@@ -180,15 +180,42 @@ When DD sheets get a new revision, the `dd-{version}.json` reference-metadata fi
 - DD sheet PRs land in `RESOStandards/transport`, typically as an issue with the new XLSX attached (e.g. transport#198). Authoritative copies live at `transport/references/dd/RESODataDictionary-{ver}.xlsx` on `main`.
 - The DD docs site (`reso-data-dictionary-documentation`) pulls those same files via `fetch-data.mjs` for HTML output. We pull them directly for JSON generation.
 
-### Generator
+### Workflow
 
-`reso-certification/utils/generate-reference-metadata.js` reads an XLSX and writes the same JSON shape as the Commander's MetadataReport — `resources`, `models`, `fields`, `lookups`, `actions`, `functions`. It is the source for the validation refs consumed across the cert stack.
+The DD update workflow has two scripted steps that run on every refresh, on any version:
 
-```bash
-node reso-certification/utils/generate-reference-metadata.js path/to/dd-{ver}.xlsx {ver} reso-certification/reference-metadata/dd-{ver}.json
-```
+1. **Lint the XLSX** — `reso-certification/utils/lint-dd-sheet.js` deterministically rewrites the dd.reso.org URLs on every row, on every refresh. The published XLSX sheets historically carried legacy `ddwiki.reso.org` Confluence URLs and inconsistent `dd.reso.org` shapes. The lint script forces all hyperlinks and `WikiPageUrl` cells to the canonical pattern in code rather than maintaining them by hand or by Excel formula (formulas were tried before and bloated the file too much).
 
-Repeat for each version (1.7, 2.0, 2.1). Also copy/regenerate into `reso-certification/src/etl/reference-metadata/` — both locations are read by different consumers.
+   Six targets per row (cell value and/or hyperlink, both pointing to the same canonical URL):
+
+   | Tab | Column | Update | Canonical URL |
+   |---|---|---|---|
+   | Fields | `ResourceName` | hyperlink only | `/DD{ver}/{ResourceName}/` |
+   | Fields | `StandardName` | hyperlink only | `/DD{ver}/{ResourceName}/{StandardName}/` |
+   | Fields | `WikiPageUrl` | value + hyperlink | `/DD{ver}/{ResourceName}/{StandardName}/` |
+   | Lookups | `LookupName` | hyperlink only | `/DD{ver}/lookups/{LookupName}/` |
+   | Lookups | `StandardLookupValue` | hyperlink only | `/DD{ver}/lookups/{LookupName}/{encodeURIComponent(StandardLookupValue)}/` |
+   | Lookups | `WikiPageUrl` | value + hyperlink | same as above |
+
+   Note: the lookup-value URL uses `StandardLookupValue` (URL-encoded display name), not `LegacyODataValue` — the live dd.reso.org routes match the display-name shape. `WikiPageTitle` and `LegacyODataValue` columns are left untouched.
+
+   ```bash
+   for v in 1.7 2.0 2.1; do
+     node reso-certification/utils/lint-dd-sheet.js path/to/RESODataDictionary-$v.xlsx $v
+   done
+   ```
+
+   Writes with `{ compression: true }` and strips per-cell `w`/`h`/`r` metadata to keep file size reasonable. Expect output ~1.7-1.9× the publisher's original — SheetJS structural overhead. Acceptable for now; a follow-up could swap to direct ZIP/XML patching for byte-exact preservation.
+
+2. **Generate reference-metadata JSON** — `reso-certification/utils/generate-reference-metadata.js` reads the linted XLSX and writes the same JSON shape as the Commander's MetadataReport (`resources`, `models`, `fields`, `lookups`, `actions`, `functions`). It is the source for the validation refs consumed across the cert stack.
+
+   ```bash
+   node reso-certification/utils/generate-reference-metadata.js path/to/dd-{ver}.xlsx {ver} reso-certification/reference-metadata/dd-{ver}.json
+   ```
+
+   Repeat for each version. Also copy/regenerate into `reso-certification/src/etl/reference-metadata/` — both locations are read by different consumers.
+
+After both steps, open a PR on `RESOStandards/transport` with the linted XLSX files committed to `references/dd/`. The dd-docs site picks them up via `repository_dispatch` from transport and rebuilds.
 
 ### Lint pass after generation
 
