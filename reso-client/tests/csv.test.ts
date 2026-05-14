@@ -94,6 +94,8 @@ describe('variationsToCsv ↔ csvToVariations round-trip', () => {
       suggestedResourceName: undefined,
       suggestedFieldName: 'View',
       suggestedLookupValue: undefined,
+      suggestedStandardLookupValue: undefined,
+      suggestedLegacyODataValue: undefined,
       suggestedRelatedResourceName: undefined,
       suggestedRelatedFieldName: undefined,
       suggestedRelatedLookupValue: undefined,
@@ -130,6 +132,30 @@ describe('variationsToCsv ↔ csvToVariations round-trip', () => {
     expect(result.rows[0].resourceName).toBe('Property');
     expect(result.rows[0].outcome).toBe('Fast Track');
     expect(result.rows[0].comments).toBeUndefined();
+    expect(result.rows[0].suggestedStandardLookupValue).toBeUndefined();
+    expect(result.rows[0].suggestedLegacyODataValue).toBeUndefined();
+  });
+
+  it('round-trips the explicit Standard/Legacy OData suggestion columns', () => {
+    const rows: ReadonlyArray<VariationCsvRow> = [
+      {
+        resourceName: 'Property',
+        fieldName: 'Possession',
+        lookupValue: 'CloseOfEscrow',
+        suggestedResourceName: 'Property',
+        suggestedFieldName: 'Possession',
+        suggestedStandardLookupValue: 'Close Of Escrow',
+        suggestedLegacyODataValue: 'CloseOfEscrow',
+        outcome: 'RESO',
+        comments: "input already matches canonical LegacyODataValue='CloseOfEscrow'",
+      },
+    ];
+    const csv = variationsToCsv(rows);
+    const result = csvToVariations(csv);
+    expect(result.errors).toEqual([]);
+    expect(result.rows[0].suggestedStandardLookupValue).toBe('Close Of Escrow');
+    expect(result.rows[0].suggestedLegacyODataValue).toBe('CloseOfEscrow');
+    expect(result.rows[0].outcome).toBe('RESO');
   });
 });
 
