@@ -1,12 +1,18 @@
 /**
- * Variations report ↔ CSV. Defines the canonical 10-column schema
+ * Variations report ↔ CSV. Defines the canonical 11-column schema
  * used by RESO variations submissions and provides round-trip
  * serialization that handles quoting/escaping properly (works with
  * Google Sheets, Excel, etc.) — unlike the older legacy split-on-
  * comma helpers, which fail the moment a value contains a comma.
  *
+ * The `Comments` column carries free-form rationale or notes for
+ * each row (e.g. why a particular mapping was suggested, what makes
+ * the row ambiguous, etc.). It is optional on import — older 10-column
+ * files still parse.
+ *
  * Consumers: web-client variations review export, reso-certification
- * CLI ingest. Pure functions, no Node or browser deps.
+ * CLI ingest, mapping tools (RESO MCP server). Pure functions, no
+ * Node or browser deps.
  */
 
 import { csvToRows, rowsToCsv } from './csv.js';
@@ -22,6 +28,7 @@ export const VARIATIONS_CSV_COLUMNS = [
   'Suggested Related Field Name',
   'Suggested Related Lookup Value',
   'Outcome',
+  'Comments',
 ] as const;
 
 export interface VariationCsvRow {
@@ -35,6 +42,7 @@ export interface VariationCsvRow {
   readonly suggestedRelatedFieldName?: string;
   readonly suggestedRelatedLookupValue?: string;
   readonly outcome?: string;
+  readonly comments?: string;
 }
 
 export const variationsToCsv = (rows: ReadonlyArray<VariationCsvRow>): string => {
@@ -49,6 +57,7 @@ export const variationsToCsv = (rows: ReadonlyArray<VariationCsvRow>): string =>
     r.suggestedRelatedFieldName,
     r.suggestedRelatedLookupValue,
     r.outcome,
+    r.comments,
   ]);
   return rowsToCsv(VARIATIONS_CSV_COLUMNS, data);
 };
@@ -65,6 +74,7 @@ const HEADER_TO_FIELD: Readonly<Record<string, keyof VariationCsvRow>> = {
   'suggested related field name': 'suggestedRelatedFieldName',
   'suggested related lookup value': 'suggestedRelatedLookupValue',
   'outcome': 'outcome',
+  'comments': 'comments',
 };
 
 export interface ParseVariationsCsvError {

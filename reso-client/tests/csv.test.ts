@@ -98,6 +98,7 @@ describe('variationsToCsv ↔ csvToVariations round-trip', () => {
       suggestedRelatedFieldName: undefined,
       suggestedRelatedLookupValue: undefined,
       outcome: 'Fast Track',
+      comments: 'fuzzy match: "MlgCanView" within 25 % of length to "View"',
     },
     {
       resourceName: 'Property',
@@ -116,7 +117,19 @@ describe('variationsToCsv ↔ csvToVariations round-trip', () => {
     expect(result.rows[0].fieldName).toBe('MlgCanView');
     expect(result.rows[0].suggestedFieldName).toBe('View');
     expect(result.rows[0].outcome).toBe('Fast Track');
+    expect(result.rows[0].comments).toBe('fuzzy match: "MlgCanView" within 25 % of length to "View"');
     expect(result.rows[1].lookupValue).toBe('Active, Pending');
+    expect(result.rows[1].comments).toBeUndefined();
+  });
+
+  it('parses 10-column legacy CSV (no Comments column) without error', () => {
+    const legacyCsv = 'Resource Name,Field Name,Lookup Value,Suggested Resource Name,Suggested Field Name,Suggested Lookup Value,Suggested Related Resource Name,Suggested Related Field Name,Suggested Related Lookup Value,Outcome\nProperty,StandardStatus,,,,Active,,,,Fast Track';
+    const result = csvToVariations(legacyCsv);
+    expect(result.errors).toEqual([]);
+    expect(result.rows.length).toBe(1);
+    expect(result.rows[0].resourceName).toBe('Property');
+    expect(result.rows[0].outcome).toBe('Fast Track');
+    expect(result.rows[0].comments).toBeUndefined();
   });
 });
 
