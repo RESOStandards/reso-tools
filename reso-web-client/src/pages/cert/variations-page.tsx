@@ -73,7 +73,7 @@ const sourceSegments = (v: BlendedVariation): ReadonlyArray<string | undefined> 
   [v.resourceName, v.fieldName, v.lookupValue];
 
 const targetSegments = (s: BlendedSuggestion): ReadonlyArray<string | undefined> =>
-  [s.suggestedResourceName, s.suggestedFieldName, s.suggestedLookupValue];
+  [s.suggestedResourceName, s.suggestedFieldName, s.suggestedLookupValue ?? s.suggestedLegacyODataValue];
 
 /** Compare segment-by-segment and mark which ones differ. */
 const diffSegments = (src: ReadonlyArray<string | undefined>, tgt: ReadonlyArray<string | undefined>): { source: ReadonlyArray<PathPart>; target: ReadonlyArray<PathPart> } => {
@@ -933,7 +933,8 @@ const ReviewDetailView = ({ report, onBack, user, isAdmin, jobId }: {
         (v.lookupValue?.toLowerCase().includes(q) ?? false) ||
         v.suggestions.some(s =>
           (s.suggestedFieldName?.toLowerCase().includes(q) ?? false) ||
-          (s.suggestedLookupValue?.toLowerCase().includes(q) ?? false)
+          (s.suggestedLookupValue?.toLowerCase().includes(q) ?? false) ||
+          (s.suggestedLegacyODataValue?.toLowerCase().includes(q) ?? false)
         )
       );
     }

@@ -90,6 +90,7 @@ export const VariationsImportPage = () => {
             suggestedResourceName: c.suggestedResourceName as string | undefined,
             suggestedFieldName: c.suggestedFieldName as string | undefined,
             suggestedLookupValue: c.suggestedLookupValue as string | undefined,
+            suggestedLegacyODataValue: c.suggestedLegacyODataValue as string | undefined,
             suggestedRelatedResourceName: c.suggestedRelatedResourceName as string | undefined,
             suggestedRelatedFieldName: c.suggestedRelatedFieldName as string | undefined,
             suggestedRelatedLookupValue: c.suggestedRelatedLookupValue as string | undefined,

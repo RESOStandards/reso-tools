@@ -34,6 +34,7 @@ const toRow = (
     suggestedResourceName: primary?.suggestedResourceName,
     suggestedFieldName: primary?.suggestedFieldName,
     suggestedLookupValue: primary?.suggestedLookupValue,
+    suggestedLegacyODataValue: primary?.suggestedLegacyODataValue,
     suggestedRelatedResourceName: primary?.suggestedRelatedResourceName,
     suggestedRelatedFieldName: primary?.suggestedRelatedFieldName,
     suggestedRelatedLookupValue: primary?.suggestedRelatedLookupValue,

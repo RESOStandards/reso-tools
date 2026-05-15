@@ -506,7 +506,7 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
       if (statusFilter !== 'all' && v.status !== statusFilter) return false;
       if (fieldFilter !== 'all' && v.fieldName !== fieldFilter) return false;
       if (query) {
-        const searchable = [v.resourceName, v.fieldName, v.lookupValue, v.legacyODataValue, ...v.suggestions.map(s => s.suggestedFieldName ?? s.suggestedLookupValue ?? '')].join(' ').toLowerCase();
+        const searchable = [v.resourceName, v.fieldName, v.lookupValue, v.legacyODataValue, ...v.suggestions.flatMap(s => [s.suggestedFieldName, s.suggestedLookupValue, s.suggestedLegacyODataValue])].filter(Boolean).join(' ').toLowerCase();
         return searchable.includes(query);
       }
       return true;
@@ -643,7 +643,7 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
                             </span>
                           )}
                           <span className="text-green-700 dark:text-green-400 font-medium">
-                            {s.suggestedLookupValue ?? s.suggestedFieldName ?? s.suggestedResourceName}
+                            {s.suggestedLookupValue ?? s.suggestedLegacyODataValue ?? s.suggestedFieldName ?? s.suggestedResourceName}
                           </span>
                           {s.ddWikiUrl && (
                             <a href={s.ddWikiUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
@@ -871,6 +871,7 @@ const parseRealVariations = (raw: Record<string, unknown>): VariationsReport => 
           suggestedResourceName: s.suggestedResourceName as string | undefined,
           suggestedFieldName: s.suggestedFieldName as string | undefined,
           suggestedLookupValue: s.suggestedLookupValue as string | undefined,
+          suggestedLegacyODataValue: s.suggestedLegacyODataValue as string | undefined,
           strategy: (s.strategy as VariationSuggestion['strategy']) ?? 'Suggestion',
           ddWikiUrl: s.ddWikiUrl as string | undefined,
         })))
@@ -878,6 +879,7 @@ const parseRealVariations = (raw: Record<string, unknown>): VariationsReport => 
           suggestedResourceName: v.suggestedResourceName as string | undefined,
           suggestedFieldName: v.suggestedFieldName as string | undefined ?? v.fieldName as string | undefined,
           suggestedLookupValue: v.suggestedLookupValue as string | undefined,
+          suggestedLegacyODataValue: v.suggestedLegacyODataValue as string | undefined,
           strategy: (v.strategy as VariationSuggestion['strategy']) ?? 'Suggestion',
           ddWikiUrl: v.ddWikiUrl as string | undefined,
         }],
