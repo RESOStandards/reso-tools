@@ -992,8 +992,21 @@ const fetchProviderToken = async () => {
  * @returns {Promise<Object>} map of suggestions keyed by resource/field/value path,
  *   or an empty object if credentials are missing, input is empty, or a network error occurs
  */
+/**
+ * True when the search input has something the Variations Service can
+ * match against. Either `fields` or `lookups` populated is enough —
+ * servers using the Lookup Resource pattern legitimately produce
+ * metadata reports with no static `lookups[]`, so we accept those too.
+ * @param {{ fields?: unknown, lookups?: unknown }} input
+ * @returns {boolean}
+ */
+const hasValidSearchInput = ({ fields = [], lookups = [] } = {}) => {
+  if (!Array.isArray(fields) || !Array.isArray(lookups)) return false;
+  return fields.length > 0 || lookups.length > 0;
+};
+
 const fetchSuggestions = async ({ fields = [], lookups = [] } = {}) => {
-  if (!Array.isArray(fields) || !Array.isArray(lookups) || !(fields?.length && lookups?.length)) {
+  if (!hasValidSearchInput({ fields, lookups })) {
     return {};
   }
 
@@ -1145,6 +1158,7 @@ module.exports = {
   inflateVariations,
   updateVariations,
   isValidUrl,
+  hasValidSearchInput,
   DEFAULT_FUZZINESS,
   MATCHING_STRATEGIES
 };
