@@ -484,12 +484,36 @@ const ACTION_COLORS: Readonly<Record<VariationAction, string>> = {
   'fast-track': 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
 };
 
+/** Color classes for the per-suggestion strategy badge. */
+const STRATEGY_COLORS: Readonly<Record<string, string>> = {
+  'Fast Track':    'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  'Admin Review':  'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  'Substring':     'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+  'Edit Distance': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
+  'Suggestion':    'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+};
+
+/** Tooltip text shown on hover of each strategy badge — short explanation
+ *  of how the variation was identified and what the provider should do. */
+const STRATEGY_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  'Fast Track':    'Canonical correction approved via the Fast Track workgroup. Adopt the suggested mapping.',
+  'Admin Review':  'Correction approved via the Admin Review workflow. Adopt the suggested mapping.',
+  'Substring':     'Detected via substring match against a standard DD value. Exact matches must be fixed in your data.',
+  'Edit Distance': 'Detected via edit-distance (typo / minor variation) match against a standard DD value.',
+  'Suggestion':    'A general suggestion from the variations service — not categorized into one of the structured strategies.',
+};
+
 export const VariationsReportView = ({ report }: { readonly report: VariationsReport }) => {
   const [activeTab, setActiveTab] = useState<VariationTab>(
     report.fields.length > 0 ? 'fields' : report.lookups.length > 0 ? 'lookups' : (report.expansions?.length ?? 0) > 0 ? 'expansions' : 'resources'
   );
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | VariationAction>('all');
+  // Filter by suggestion strategy (Fast Track / Admin Review / Substring /
+  // Edit Distance / Suggestion). The earlier status-based filter mixed
+  // user-action state with service-decision type; strategy is the axis
+  // that actually helps providers understand what they're being flagged
+  // for at a glance.
+  const [strategyFilter, setStrategyFilter] = useState<'all' | string>('all');
   const [fieldFilter, setFieldFilter] = useState<string>('all');
 
   const items = activeTab === 'fields' ? report.fields : activeTab === 'lookups' ? report.lookups : activeTab === 'expansions' ? (report.expansions ?? []) : report.resources;
@@ -503,7 +527,7 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
   const filteredItems = useMemo(() => {
     const query = search.toLowerCase();
     return items.filter(v => {
-      if (statusFilter !== 'all' && v.status !== statusFilter) return false;
+      if (strategyFilter !== 'all' && !v.suggestions.some(s => s.strategy === strategyFilter)) return false;
       if (fieldFilter !== 'all' && v.fieldName !== fieldFilter) return false;
       if (query) {
         const searchable = [v.resourceName, v.fieldName, v.lookupValue, v.legacyODataValue, ...v.suggestions.flatMap(s => [s.suggestedFieldName, s.suggestedLookupValue, s.suggestedLegacyODataValue])].filter(Boolean).join(' ').toLowerCase();
@@ -511,7 +535,7 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
       }
       return true;
     });
-  }, [items, search, statusFilter, fieldFilter]);
+  }, [items, search, strategyFilter, fieldFilter]);
 
   const counts = {
     fields: report.fields.length,
@@ -520,12 +544,19 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
     expansions: report.expansions?.length ?? 0,
   };
 
-  const statusCounts = useMemo(() => ({
-    pending: items.filter(v => !v.status || v.status === 'pending').length,
-    accepted: items.filter(v => v.status === 'accepted').length,
-    ignored: items.filter(v => v.status === 'ignored').length,
-    'fast-track': items.filter(v => v.status === 'fast-track').length,
-  }), [items]);
+  // Build strategy buckets from the actual suggestions in the current
+  // tab's items. A variation contributes to a strategy if any of its
+  // suggestions carries that strategy.
+  const strategyCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const v of items) {
+      const strategies = new Set(v.suggestions.map(s => s.strategy));
+      for (const strategy of strategies) {
+        if (strategy) counts[strategy] = (counts[strategy] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [items]);
 
   return (
     <div className="space-y-4">
@@ -534,16 +565,6 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
         <span className="font-semibold text-amber-600 dark:text-amber-400">
           {counts.fields + counts.lookups + counts.resources} variations found
         </span>
-        {statusCounts['fast-track'] > 0 && (
-          <span className="text-xs text-amber-600 dark:text-amber-400">
-            {statusCounts['fast-track']} fast-tracked
-          </span>
-        )}
-        {statusCounts.ignored > 0 && (
-          <span className="text-xs text-gray-400 dark:text-gray-500">
-            {statusCounts.ignored} ignored
-          </span>
-        )}
         <span className="text-xs text-gray-400 dark:text-gray-500 italic">
           Read-only preview · open Variations Review to triage
         </span>
@@ -565,12 +586,17 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
       <div className="flex items-center gap-3 flex-wrap">
         <SearchInput value={search} onChange={setSearch} placeholder="Filter variations..." />
         <div className="flex items-center gap-1">
-          {(['all', 'pending', 'fast-track', 'ignored'] as const).map(s => (
+          <FilterPill
+            label="All"
+            active={strategyFilter === 'all'}
+            onClick={() => setStrategyFilter('all')}
+          />
+          {Object.keys(strategyCounts).sort().map(strategy => (
             <FilterPill
-              key={s}
-              label={s === 'all' ? 'All' : s === 'fast-track' ? `Fast Track (${statusCounts['fast-track']})` : `${s.charAt(0).toUpperCase() + s.slice(1)} (${statusCounts[s]})`}
-              active={statusFilter === s}
-              onClick={() => setStatusFilter(s)}
+              key={strategy}
+              label={`${strategy} (${strategyCounts[strategy]})`}
+              active={strategyFilter === strategy}
+              onClick={() => setStrategyFilter(strategy)}
             />
           ))}
         </div>
@@ -632,6 +658,8 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
                   <div className="mt-2 space-y-1.5">
                     {v.suggestions.map((s, si) => {
                       const targetDiffers = s.suggestedFieldName && s.suggestedFieldName !== v.fieldName;
+                      const strategyColor = STRATEGY_COLORS[s.strategy] ?? STRATEGY_COLORS.Suggestion;
+                      const strategyDescription = STRATEGY_DESCRIPTIONS[s.strategy] ?? STRATEGY_DESCRIPTIONS.Suggestion;
                       return (
                         <div key={si} className="pl-4 flex items-center gap-2 text-sm">
                           <svg className="w-4 h-4 text-green-500 shrink-0" viewBox="0 0 20 20" fill="currentColor">
@@ -645,6 +673,14 @@ export const VariationsReportView = ({ report }: { readonly report: VariationsRe
                           <span className="text-green-700 dark:text-green-400 font-medium">
                             {s.suggestedLookupValue ?? s.suggestedLegacyODataValue ?? s.suggestedFieldName ?? s.suggestedResourceName}
                           </span>
+                          {s.strategy && (
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${strategyColor}`}
+                              title={strategyDescription}
+                            >
+                              {s.strategy}
+                            </span>
+                          )}
                           {s.ddWikiUrl && (
                             <a href={s.ddWikiUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
                               DD Wiki
