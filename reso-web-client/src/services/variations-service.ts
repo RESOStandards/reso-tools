@@ -234,6 +234,150 @@ export const saveVariationsReport = async (
   return res.ok || res.status === 304;
 };
 
+// ── Items-screen feed (variationsReview pool) ────────────────────────
+//
+// `GET /v2/certification/variations-review-items` is the items-screen
+// dashboard feed. Server scans the variationsReview pool, scope-filters
+// by viewer role (admin = full pool; provider = own partition only),
+// groups by variationKey, attaches one provenance entry per underlying
+// pool row, joins drafts (myDraft + otherDrafts for cross-editor
+// visibility), and emits cursor-based pages. Driven by the design in
+// RESOStandards/reso-tools#150.
+
+/** Lifecycle status of a pool row. */
+export type VariationItemStatus = 'pending' | 'ft-submitted' | 'resolved';
+
+/** Terminal decision recorded when an item is resolved. */
+export type VariationOutcome = 'ignored' | 'removed' | 'accepted' | 'ft-mapped';
+
+/** Submitter's preferred outcome carried forward from the cert-report. */
+export type VariationRequestedAction = 'ignore' | 'remove' | 'fast-track';
+
+/** Action enum for draft + Submit decisions. */
+export type VariationDraftAction = 'ignore' | 'remove' | 'accept' | 'submit-to-ft' | 'ft-mapped';
+
+/** Role of the editor whose action most recently touched a row. */
+export type VariationEditorRole = 'provider' | 'admin' | 'ft-admin';
+
+/** Canonical mapping target — what gets written to the canonical store
+ *  for `accept` / `ft-mapped` outcomes. Mirrors the canonical CSV schema. */
+export interface VariationMapping {
+  readonly suggestedResourceName?: string;
+  readonly suggestedFieldName?: string;
+  readonly suggestedStandardLookupValue?: string;
+  readonly suggestedLegacyODataValue?: string;
+  readonly suggestedRelatedResourceName?: string;
+  readonly suggestedRelatedFieldName?: string;
+  readonly suggestedRelatedLookupValue?: string;
+  readonly notes?: string;
+}
+
+/** One `(providerUoi, providerUsi, recipientUoi)` provenance entry on
+ *  an items-screen row. The accordion-per-provider detail view renders
+ *  one collapsible section per entry. */
+export interface VariationProvenance {
+  readonly providerUoi: string;
+  readonly providerUsi: string;
+  readonly recipientUoi: string;
+  readonly requestedAction?: VariationRequestedAction;
+  readonly submittedByProviderUoi: string;
+  readonly submittedByDisplayName?: string;
+  readonly submittedAt: string;
+  readonly endorsementId: string;
+  readonly environmentName: string;
+  /** Per-row lastEditor metadata, denormalized on the pool row by the
+   *  backend so the UI can render the per-provider ball indicator
+   *  without loading the per-record S3 file. */
+  readonly lastEditorUoi?: string;
+  readonly lastEditorDisplayName?: string;
+  readonly lastEditorEmail?: string;
+  readonly lastEditorRole?: VariationEditorRole;
+  readonly lastUpdatedAt?: string;
+}
+
+/** Draft state for the requesting user on a given item. Absent when
+ *  the user hasn't drafted anything yet. */
+export interface VariationItemMyDraft {
+  readonly action: VariationDraftAction;
+  readonly mapping?: VariationMapping;
+  readonly draftedAt: string;
+}
+
+/** Draft state for another editor on the same item. The items-screen
+ *  surfaces these so editors can see "X has a different draft" before
+ *  Submit. */
+export interface VariationItemOtherDraft {
+  readonly userUoi: string;
+  readonly userDisplayName?: string;
+  readonly action: VariationDraftAction;
+  readonly draftedAt: string;
+}
+
+/** A single row in the items-screen feed response. */
+export interface VariationItem {
+  readonly variationKey: string;
+  readonly resourceName: string;
+  readonly fieldName?: string;
+  readonly lookupValue?: string;
+  readonly status: VariationItemStatus;
+  readonly outcome?: VariationOutcome;
+  readonly mapping?: VariationMapping;
+  readonly provenance: ReadonlyArray<VariationProvenance>;
+  /** High-water `lastUpdatedAt` across all underlying rows. Used by the
+   *  client-side diff to detect "moved since you loaded." */
+  readonly lastUpdatedAt: string;
+  /** Editor metadata from the most-recently-touched row. Drives the
+   *  items-screen "ball with whom" pill. */
+  readonly lastEditorUoi?: string;
+  readonly lastEditorDisplayName?: string;
+  readonly lastEditorEmail?: string;
+  readonly lastEditorRole?: VariationEditorRole;
+  readonly myDraft?: VariationItemMyDraft;
+  readonly otherDrafts: ReadonlyArray<VariationItemOtherDraft>;
+}
+
+/** One page of the items-screen feed plus an opaque cursor for the
+ *  next page. `nextCursor` is absent when the scan is exhausted. */
+export interface VariationItemsPage {
+  readonly items: ReadonlyArray<VariationItem>;
+  readonly nextCursor?: string;
+}
+
+/** Query options for `listVariationItems`. All optional — defaults
+ *  produce the first page of every pool row the caller's role permits. */
+export interface ListVariationItemsOptions {
+  readonly status?: VariationItemStatus;
+  readonly elementType?: 'resource' | 'field' | 'lookup';
+  /** Opaque cursor from the prior page's `nextCursor`. */
+  readonly cursor?: string;
+  /** Cap items per page (defaults to DDB's native 1 MB page size). */
+  readonly limit?: number;
+}
+
+/**
+ * Fetch one page of items-screen rows. Server applies scope based on
+ * the caller's auth context (admin sees full pool; provider sees own
+ * partition only), so callers don't pass scope explicitly.
+ *
+ * Returns an empty page (`{ items: [] }`) on non-2xx; callers should
+ * treat that as no-data, not error, since the items-screen surfaces
+ * its own loading/empty/error UI from page state.
+ */
+export const listVariationItems = async (
+  options?: ListVariationItemsOptions
+): Promise<VariationItemsPage> => {
+  const params = new URLSearchParams();
+  if (options?.status) params.set('status', options.status);
+  if (options?.elementType) params.set('elementType', options.elementType);
+  if (options?.cursor) params.set('cursor', options.cursor);
+  if (options?.limit) params.set('limit', String(options.limit));
+  const qs = params.toString();
+  const path = `/v2/certification/variations-review-items${qs ? `?${qs}` : ''}`;
+  const res = await authedFetch(proxiedUrl(path), { headers: jsonHeaders });
+  if (!res.ok) return { items: [] };
+  return (await res.json()) as VariationItemsPage;
+};
+
 // ── Locks ────────────────────────────────────────────────────────────
 
 /** Lock record from the locks service. */
