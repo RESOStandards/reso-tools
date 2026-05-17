@@ -814,6 +814,10 @@ const writeAnalyticsReports = async ({ outputPath, version, serviceRootUri, repl
     const allResponses = REPLICATION_STATE_SERVICE.getResponses();
     let wCount = 0, wMean = 0, wM2 = 0;
     let totalBytes = 0, totalRecords = 0;
+    // Per-resource Welford state for per-resource anomaly detection.
+    // Parallel implementation in legacy/lib/replication/index.js
+    // (streaming variant) — kept in sync. See #206.
+    const byResource = {};
     for (const r of allResponses) {
       const rt = r.responseTimeMs ?? 0;
       totalBytes += r.responseBytes ?? 0;
@@ -823,15 +827,46 @@ const writeAnalyticsReports = async ({ outputPath, version, serviceRootUri, repl
       const delta = rt - wMean;
       wMean += delta / wCount;
       wM2 += delta * (rt - wMean);
+      const rn = r.resourceName ?? 'unknown';
+      if (!byResource[rn]) byResource[rn] = { count: 0, mean: 0, M2: 0 };
+      const s = byResource[rn];
+      s.count++;
+      const rDelta = rt - s.mean;
+      s.mean += rDelta / s.count;
+      s.M2 += rDelta * (rt - s.mean);
     }
     const stddev = wCount >= 2 ? Math.sqrt(wM2 / wCount) : 0;
+    // Per-resource one-sided anomaly count. Resources with <3 samples
+    // don't get flagged. anomalyCount is the rollup; anomaliesByResource
+    // carries the per-resource breakdown for the items-screen / UI tooltip.
     let anomalyCount = 0;
-    if (wCount >= 3) {
+    const anomaliesByResource = [];
+    for (const rn of Object.keys(byResource)) {
+      const s = byResource[rn];
+      if (s.count < 3) continue;
+      const rStddev = Math.sqrt(s.M2 / s.count);
+      let resAnomalies = 0, maxMs = 0, maxDeltaMs = 0;
       for (const r of allResponses) {
+        if ((r.resourceName ?? 'unknown') !== rn) continue;
         const rt = r.responseTimeMs ?? 0;
-        if (rt > 0 && Math.abs(rt - wMean) > 2 * stddev) {
-          anomalyCount++;
+        if (rt <= 0) continue;
+        if (rt - s.mean > 2 * rStddev) {
+          resAnomalies++;
+          if (rt > maxMs) {
+            maxMs = rt;
+            maxDeltaMs = rt - s.mean;
+          }
         }
+      }
+      if (resAnomalies > 0) {
+        anomaliesByResource.push({
+          resourceName: rn,
+          meanMs: Math.round(s.mean),
+          count: resAnomalies,
+          maxMs: Math.round(maxMs),
+          maxDeltaMs: Math.round(maxDeltaMs),
+        });
+        anomalyCount += resAnomalies;
       }
     }
 
@@ -850,6 +885,7 @@ const writeAnalyticsReports = async ({ outputPath, version, serviceRootUri, repl
           meanResponseMs: Math.round(wMean),
           stddevMs: Math.round(stddev),
           anomalyCount,
+          anomaliesByResource,
         },
         responses: allResponses.map(({ requestUri, ...otherResponseInfo }) => {
           return {

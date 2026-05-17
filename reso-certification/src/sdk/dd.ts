@@ -347,6 +347,12 @@ const formatReplicationProgress = (info: Record<string, unknown>, currentStrateg
     name: String(r.resourceName ?? ''),
     records: Number(r.recordCount ?? 0),
     bytes: Number(r.bytes ?? 0),
+    // Per-resource anomaly metadata for the chart tooltip (#206).
+    // Absent on rows where no timed responses have arrived yet.
+    meanMs: r.meanMs != null ? Number(r.meanMs) : null,
+    anomalyCount: r.anomalyCount != null ? Number(r.anomalyCount) : 0,
+    maxAnomalyMs: r.maxAnomalyMs != null ? Number(r.maxAnomalyMs) : null,
+    maxAnomalyDelta: r.maxAnomalyDelta != null ? Number(r.maxAnomalyDelta) : null,
   }));
 
   return JSON.stringify({

@@ -179,8 +179,18 @@ const replicate = async ({
           );
         }
 
-        // Welford's online algorithm — O(1) per update for running mean, variance, anomaly count
+        // Welford's online algorithm — O(1) per update for running mean / variance.
+        // Global aggregates feed the chart header. Anomaly detection is per-resource
+        // (see byResourceStats below) since resources have very different
+        // response-time distributions — a single global threshold misses slow
+        // Property responses and false-flags fast Lookups. See #206.
         let wCount = 0, wMean = 0, wM2 = 0, wAnomalyCount = 0;
+        // Per-resource Welford state + anomaly tracking. One-sided slow-only
+        // threshold (`rt - mean > 2 * stddev`) so cache hits / 304s / empty
+        // pages don't count.
+        // Shape: { [resourceName]: { count, mean, M2, anomalyCount,
+        //                            maxAnomalyMs, maxAnomalyDelta } }
+        const byResourceStats = {};
         let lastProgressTime = 0;
         const PROGRESS_INTERVAL_MS = 500;
         const replicationStartTime = Date.now();
@@ -204,16 +214,37 @@ const replicate = async ({
             // Update running stats
             const responseTimeMs = otherIteratorInfo.responseTimeMs ?? 0;
             if (responseTimeMs > 0) {
+              // Global running mean — drives the header "avg" display
+              // and the backward-compat fields. No longer used for the
+              // anomaly check.
               wCount++;
               const delta = responseTimeMs - wMean;
               wMean += delta / wCount;
               const delta2 = responseTimeMs - wMean;
               wM2 += delta * delta2;
 
-              if (wCount >= 3) {
-                const stddev = Math.sqrt(wM2 / wCount);
-                if (Math.abs(responseTimeMs - wMean) > 2 * stddev) {
+              // Per-resource Welford + one-sided slow-only anomaly check.
+              const rn = resourceName ?? 'unknown';
+              if (!byResourceStats[rn]) byResourceStats[rn] = {
+                count: 0, mean: 0, M2: 0,
+                anomalyCount: 0, maxAnomalyMs: 0, maxAnomalyDelta: 0,
+              };
+              const s = byResourceStats[rn];
+              s.count++;
+              const rDelta = responseTimeMs - s.mean;
+              s.mean += rDelta / s.count;
+              const rDelta2 = responseTimeMs - s.mean;
+              s.M2 += rDelta * rDelta2;
+
+              if (s.count >= 3) {
+                const rStddev = Math.sqrt(s.M2 / s.count);
+                if (responseTimeMs - s.mean > 2 * rStddev) {
+                  s.anomalyCount++;
                   wAnomalyCount++;
+                  if (responseTimeMs > s.maxAnomalyMs) {
+                    s.maxAnomalyMs = responseTimeMs;
+                    s.maxAnomalyDelta = responseTimeMs - s.mean;
+                  }
                 }
               }
             }
@@ -245,6 +276,20 @@ const replicate = async ({
                 if (!byResource[rn]) byResource[rn] = { resourceName: rn, recordCount: 0, bytes: 0 };
                 byResource[rn].recordCount += r.recordCount ?? 0;
                 byResource[rn].bytes += r.responseBytes ?? 0;
+              }
+              // Merge per-resource Welford state for any resource that's
+              // been seen in the response stream. Resources without timed
+              // responses stay without these fields (UI handles absence).
+              for (const rn of Object.keys(byResource)) {
+                const s = byResourceStats[rn];
+                if (s && s.count > 0) {
+                  byResource[rn].meanMs = Math.round(s.mean);
+                  byResource[rn].anomalyCount = s.anomalyCount;
+                  if (s.anomalyCount > 0) {
+                    byResource[rn].maxAnomalyMs = Math.round(s.maxAnomalyMs);
+                    byResource[rn].maxAnomalyDelta = Math.round(s.maxAnomalyDelta);
+                  }
+                }
               }
               const resourceStats = Object.values(byResource);
 

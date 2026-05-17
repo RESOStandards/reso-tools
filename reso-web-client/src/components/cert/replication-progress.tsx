@@ -10,6 +10,14 @@ interface ResourceStat {
   readonly name: string;
   readonly records: number;
   readonly bytes: number;
+  /** Per-resource Welford mean (ms). Absent until at least one timed
+   *  response has arrived for this resource. */
+  readonly meanMs?: number | null;
+  /** Count of responses >2σ slower than this resource's mean
+   *  (one-sided, ≥3 samples required). See reso-tools #206. */
+  readonly anomalyCount?: number;
+  readonly maxAnomalyMs?: number | null;
+  readonly maxAnomalyDelta?: number | null;
 }
 
 interface ReplicationProgressData {
@@ -48,6 +56,34 @@ const humanizeMs = (ms: number): string => {
   const mins = Math.floor(ms / 60_000);
   const secs = Math.round((ms % 60_000) / 1000);
   return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+};
+
+/**
+ * Build the per-resource anomaly tooltip text. One line per resource
+ * that produced anomalies (sorted by count, desc), plus a header line
+ * explaining the threshold. See reso-tools #206.
+ *
+ *   Responses >2σ slower than their resource's mean.
+ *   Property (mean 2.1s): 4 anomalies, max 8.2s (+6.1s)
+ *   Member (mean 0.8s): 2 anomalies, max 3.4s (+2.6s)
+ */
+const buildAnomalyTooltip = (resources: ReadonlyArray<ResourceStat>): string => {
+  const withAnomalies = resources.filter(r => (r.anomalyCount ?? 0) > 0);
+  if (withAnomalies.length === 0) return '';
+  const lines = [...withAnomalies]
+    .sort((a, b) => (b.anomalyCount ?? 0) - (a.anomalyCount ?? 0))
+    .map(r => {
+      const mean = r.meanMs != null ? humanizeMs(r.meanMs) : '–';
+      const max = r.maxAnomalyMs != null ? humanizeMs(r.maxAnomalyMs) : '–';
+      const delta = r.maxAnomalyDelta != null ? humanizeMs(r.maxAnomalyDelta) : null;
+      const label = r.anomalyCount === 1 ? 'anomaly' : 'anomalies';
+      const deltaSuffix = delta ? ` (+${delta})` : '';
+      return `${r.name} (mean ${mean}): ${r.anomalyCount} ${label}, max ${max}${deltaSuffix}`;
+    });
+  return [
+    "Responses >2σ slower than their resource's mean.",
+    ...lines,
+  ].join('\n');
 };
 
 /** Bar colors cycle for resources. */
@@ -170,13 +206,21 @@ export const ReplicationProgress = ({ data }: { readonly data: ReplicationProgre
       <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 font-mono pt-0.5 border-t border-gray-200 dark:border-gray-700">
         <span className="w-24 text-right font-semibold">Total</span>
         <span className="flex-1">
-          {[
-            `${data.totalRecords.toLocaleString()} records`,
-            data.throughput != null ? `${data.throughput.toLocaleString()} rec/s` : null,
-            data.meanResponseMs != null ? `avg ${humanizeMs(data.meanResponseMs)}` : null,
-            data.totalBytes != null && data.totalBytes > 0 ? humanizeBytes(data.totalBytes) : null,
-            data.anomalyCount > 0 ? `${data.anomalyCount} anomal${data.anomalyCount === 1 ? 'y' : 'ies'}` : null,
-          ].filter(Boolean).join(' \u2013 ')}
+          {`${data.totalRecords.toLocaleString()} records`}
+          {data.throughput != null && ` \u2013 ${data.throughput.toLocaleString()} rec/s`}
+          {data.meanResponseMs != null && ` \u2013 avg ${humanizeMs(data.meanResponseMs)}`}
+          {data.totalBytes != null && data.totalBytes > 0 && ` \u2013 ${humanizeBytes(data.totalBytes)}`}
+          {data.anomalyCount > 0 && (
+            <>
+              {' \u2013 '}
+              <span
+                title={buildAnomalyTooltip(data.resources)}
+                className="underline decoration-dotted decoration-gray-400 dark:decoration-gray-500 cursor-help"
+              >
+                {data.anomalyCount} anomal{data.anomalyCount === 1 ? 'y' : 'ies'}
+              </span>
+            </>
+          )}
         </span>
       </div>
       {industryLoading && data.meanResponseMs != null && (
