@@ -82,7 +82,12 @@ describe('blendVariations', () => {
     expect(result.variations[0].suggestions[0].strategy).toBe('Admin Review');
   });
 
-  it('ignored items from service suppress the variation', () => {
+  it('ignored items from service are dropped from the in-review report', () => {
+    // The Variations Review page is the queue of items that still need
+    // attention. Anything the service has already flagged as ignored is
+    // resolved — it doesn't belong in this report. The data drops out
+    // of the variations array entirely so list / tab counts / CSV
+    // export / summary badges all stay consistent.
     const local = makeLocalReport({
       variations: {
         resources: [],
@@ -102,10 +107,10 @@ describe('blendVariations', () => {
       },
     };
     const result = blendVariations(local, service);
-    expect(result.variations).toHaveLength(1);
-    expect(result.variations[0].ignored).toBe(true);
-    expect(result.variations[0].suggestions).toHaveLength(0);
-    expect(result.variations[0].source).toBe('service');
+    expect(result.variations).toHaveLength(0);
+    expect(result.counts.total).toBe(0);
+    expect(result.counts.ignored).toBe(0);
+    expect(result.counts.fields).toBe(0);
   });
 
   it('Fast Track suggestions are tagged correctly', () => {
@@ -235,7 +240,9 @@ describe('Counts', () => {
     expect(result.counts.total).toBe(5);
   });
 
-  it('counts ignored and FT correctly', () => {
+  it('drops service-ignored items from counts; only in-review items contribute', () => {
+    // Two items locally; F1 is ignored on the service (dropped from
+    // the report), F2 has a fast-track suggestion (kept).
     const local = makeLocalReport({
       variations: {
         resources: [],
@@ -255,7 +262,9 @@ describe('Counts', () => {
       },
     };
     const result = blendVariations(local, service);
-    expect(result.counts.ignored).toBe(1);
+    expect(result.variations).toHaveLength(1);
+    expect(result.counts.total).toBe(1);
+    expect(result.counts.ignored).toBe(0);
     expect(result.counts.fastTrack).toBe(1);
   });
 });

@@ -204,27 +204,20 @@ const getServiceData = (
   return { suggestions: lookupData.suggestions ?? [], ignored: lookupData.ignored ?? false };
 };
 
-/** Blend a single local variation item with service data. */
+/** Blend a single local variation item with service data. Returns null
+ *  when the service has the item flagged as resolved-ignored — those
+ *  drop out of the in-review report entirely (they're done; they'll
+ *  surface in general history/search, not in the active queue). */
 const blendItem = (
   item: LocalVariationItem,
   type: BlendedVariation['type'],
   serviceSuggestions: ServiceSuggestionsMap,
   provenance: VariationProvenance
-): BlendedVariation => {
+): BlendedVariation | null => {
   const serviceData = getServiceData(serviceSuggestions, item.resourceName, item.fieldName, item.lookupValue);
 
   if (serviceData?.ignored) {
-    return {
-      ...provenance,
-      resourceName: item.resourceName,
-      fieldName: item.fieldName,
-      lookupValue: item.lookupValue,
-      legacyODataValue: item.legacyODataValue,
-      suggestions: [],
-      ignored: true,
-      source: 'service',
-      type,
-    };
+    return null;
   }
 
   if (serviceData && serviceData.suggestions.length > 0) {
@@ -303,7 +296,8 @@ export const blendVariations = (
 
   for (const { items, type } of categories) {
     for (const item of items) {
-      variations.push(blendItem(item, type, serviceSuggestions, effectiveProvenance));
+      const blended = blendItem(item, type, serviceSuggestions, effectiveProvenance);
+      if (blended) variations.push(blended);
     }
   }
 
