@@ -29,6 +29,7 @@ import {
 } from '../constants/cert';
 import type { CertEndorsement, JobStatus, StepStatus } from '../constants/cert';
 import { resolveReportRef } from './report-ref';
+import { getBearerToken } from './auth-service';
 
 // ── Re-export status types from shared constants ─────────────────────
 
@@ -491,7 +492,18 @@ const runJobElectron = async (job: Job): Promise<void> => {
   });
 
   try {
-    const result = await runner.run(job.id, job.sdkConfig ?? {});
+    // Thread the user's services.reso.org session bearer (cached
+    // in-memory since login) onto the SDK config so the variations
+    // check can call the Variations Service. Separate from
+    // `server.auth` which is the server-under-test's OData auth. No
+    // network unless the cached token is expired.
+    const servicesAuthToken = await getBearerToken().catch(() => undefined);
+    const sdkConfig = {
+      ...(job.sdkConfig ?? {}),
+      ...(servicesAuthToken ? { servicesAuthToken } : {}),
+    };
+
+    const result = await runner.run(job.id, sdkConfig);
 
     // Map SDK step results to our format
     const finalSteps: ReadonlyArray<JobStep> = result.steps

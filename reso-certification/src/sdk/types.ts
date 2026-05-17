@@ -141,6 +141,15 @@ export interface BaseComplianceConfig {
     readonly url: string;
     readonly auth: AuthConfig;
   };
+  /**
+   * Caller's session bearer for services.reso.org / Cert API
+   * (provider, admin, FT admin — whichever role the caller holds).
+   * Distinct from `server.auth`, which is the server-under-test's
+   * OData API auth. When supplied, the variations check forwards this
+   * token so the service's `ignored` / suggestion state is honored.
+   * Refreshed at run-time by the caller.
+   */
+  readonly servicesAuthToken?: string;
   readonly options?: {
     readonly failFast?: boolean;
     readonly outputDir?: string;

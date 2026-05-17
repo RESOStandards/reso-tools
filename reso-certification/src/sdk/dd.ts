@@ -212,10 +212,14 @@ const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
       return { context: ctx, status: 'skipped', summary: 'Variations only checked for DD 2.0' };
     }
 
+    // Forward the caller's services.reso.org session bearer so the
+    // variations check can call the Variations Service. Without it the
+    // legacy code falls back to env-var auth (CLI path).
     const { variations, fuzziness } = await findVariations({
       pathToMetadataReportJson: ctx.metadataReportPath,
       fromCli: true,
       strictMode: config.strictMode ?? false,
+      ...(config.servicesAuthToken ? { bearerToken: config.servicesAuthToken } : {}),
     });
 
     const v = variations as Record<string, unknown[]>;

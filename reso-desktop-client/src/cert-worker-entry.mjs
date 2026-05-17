@@ -4,10 +4,24 @@
  */
 
 import { parentPort } from 'node:worker_threads';
-import { runComplianceTests } from '@reso-standards/reso-certification';
+
+// The legacy cert-utils variations module reads RESO_SERVICES_URL at
+// module-load time to build the Variations Service URLs. Packaged
+// app contexts don't carry that env var, so set the default before
+// the cert module imports.
+if (!process.env.RESO_SERVICES_URL) {
+  process.env.RESO_SERVICES_URL = 'https://services.reso.org';
+}
+
+const { runComplianceTests } = await import('@reso-standards/reso-certification');
 
 parentPort?.on('message', async (msg) => {
   if (msg.type !== 'run') return;
+
+  // Dev override (same as cert-worker.ts) — see comment there.
+  if (process.env.RESO_SERVICES_QA_BEARER_TOKEN) {
+    msg.config = { ...msg.config, servicesAuthToken: process.env.RESO_SERVICES_QA_BEARER_TOKEN };
+  }
 
   try {
     const result = await runComplianceTests(

@@ -20,7 +20,12 @@ const {
   CERTIFICATION_API_KEY
 } = process.env;
 
-const VARIATIONS_SERVICE_SEARCH_URL = `${RESO_SERVICES_URL}/certification/variations/search`,
+// v2 search reads from the variations-v2.json.gz store the new admin
+// write path populates; the v1 path (/certification/variations/search)
+// reads the old variations.json.gz file which isn't being written
+// anymore on QA. Update writes still go through the v1 path until the
+// admin tooling moves over.
+const VARIATIONS_SERVICE_SEARCH_URL = `${RESO_SERVICES_URL}/v2/certification/variations/search`,
   VARIATIONS_SERVICE_UPDATE_URL = `${RESO_SERVICES_URL}/certification/variations`;
 
 const DEFAULT_FUZZINESS = 0.25,
@@ -888,7 +893,12 @@ const findVariations = async ({
   version = DEFAULT_DD_VERSION,
   useSuggestions = true,
   fromCli = false,
-  outputPath
+  outputPath,
+  // Bearer token for the Variations Service. SDK callers pass one
+  // (typically from a logged-in session). When omitted, the body
+  // mints a fresh token via fetchProviderToken() using `.env`
+  // credentials (CLI path).
+  bearerToken
 } = {}) => {
   // custom logger
   const { LOG, LOG_ERROR } = getLoggers(fromCli);
@@ -919,11 +929,20 @@ const findVariations = async ({
       version
     };
 
-    if (useSuggestions && !checkRequiredCredentials()?.hasMissingItems) {
-      LOG('Fetching suggestions...');
-      const mappings = (await fetchSuggestions(metadataReportJson)) ?? {};
-      args.suggestionsMap = mappings ?? {};
-      LOG('Done');
+    if (useSuggestions) {
+      // Resolve the bearer: caller-supplied (SDK path) takes
+      // precedence; otherwise mint via fetchProviderToken() using
+      // `.env` credentials (CLI path).
+      const token = bearerToken ?? (await fetchProviderToken())?.token;
+      if (token) {
+        LOG('Fetching suggestions...');
+        const mappings = (await fetchSuggestions(metadataReportJson, token)) ?? {};
+        LOG(`Mappings received: ${Object.keys(mappings ?? {}).length} resource keys, total bytes ${JSON.stringify(mappings ?? {}).length}`);
+        args.suggestionsMap = mappings ?? {};
+        LOG('Done');
+      } else {
+        LOG('Skipping external suggestions...');
+      }
     } else {
       LOG('Skipping external suggestions...');
     }
@@ -1005,18 +1024,17 @@ const hasValidSearchInput = ({ fields = [], lookups = [] } = {}) => {
   return fields.length > 0 || lookups.length > 0;
 };
 
-const fetchSuggestions = async ({ fields = [], lookups = [] } = {}) => {
+const fetchSuggestions = async ({ fields = [], lookups = [] } = {}, bearerToken) => {
   if (!hasValidSearchInput({ fields, lookups })) {
     return {};
   }
 
+  if (!bearerToken) {
+    return {};
+  }
+
   try {
-    const { token } = await fetchProviderToken();
-
-    if (!token) {
-      return {};
-    }
-
+    const token = bearerToken;
     const response = await fetch(VARIATIONS_SERVICE_SEARCH_URL, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1027,7 +1045,11 @@ const fetchSuggestions = async ({ fields = [], lookups = [] } = {}) => {
     });
 
     if (response.ok) {
-      return JSON.parse(gunzipSync(Buffer.from(await response.text(), 'base64')).toString('utf-8'));
+      // v2 search wraps the result in `{ mappings: {...} }`; the rest
+      // of the legacy code expects the bare `{ Property: {...} }`
+      // shape (v1 contract). Unwrap when the envelope is present.
+      const parsed = JSON.parse(gunzipSync(Buffer.from(await response.text(), 'base64')).toString('utf-8'));
+      return parsed?.mappings ?? parsed ?? {};
     } else {
       console.error('Could not process response from Variations Service!');
       return {};

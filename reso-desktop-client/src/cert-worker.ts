@@ -10,6 +10,18 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import { resolve } from 'node:path';
 
+// The legacy cert-utils variations module reads RESO_SERVICES_URL at
+// module-load time (via process.env) to build the Variations Service
+// URLs. In the CLI use case that comes from `.env`; in the desktop
+// worker process the parent shell rarely has it set, so the legacy
+// module bails with "undefined/certification/variations/search".
+// Default to the public services host — the variations service is a
+// single, stable endpoint and no consumer of this worker wants to
+// point elsewhere.
+if (!process.env.RESO_SERVICES_URL) {
+  process.env.RESO_SERVICES_URL = 'https://services.reso.org';
+}
+
 const certPkg = workerData?.certPath
   ? resolve(workerData.certPath)
   : '@reso-standards/reso-certification';
@@ -26,6 +38,14 @@ const loadCertModule = async () => {
 
 parentPort?.on('message', async (msg: { type: string; config: Record<string, unknown>; jobId: string }) => {
   if (msg.type !== 'run') return;
+
+  // Dev override: when RESO_SERVICES_QA_BEARER_TOKEN is set in the
+  // worker's env, use it as the services bearer instead of whatever
+  // the renderer derived from the logged-in session. Lets you point
+  // the cert step at a known-good token without re-logging-in.
+  if (process.env.RESO_SERVICES_QA_BEARER_TOKEN) {
+    msg.config = { ...msg.config, servicesAuthToken: process.env.RESO_SERVICES_QA_BEARER_TOKEN };
+  }
 
   try {
     const certModule = await loadCertModule();
