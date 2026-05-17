@@ -146,12 +146,12 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
   // --- Rule 1: Entity type key required ---
   // --- Rule 2: Entity type BaseType must be resolvable ---
   for (const entityType of schema.entityTypes) {
-    const etPath = `EntityType(${entityType.name})`;
+    const etPath = `EntityType('${entityType.name}')`;
 
     if (entityType.key.length === 0 && !entityType.abstract && !entityType.baseType) {
       errors.push({
         path: etPath,
-        message: 'Entity type has no key properties defined',
+        message: `Entity type '${entityType.name}' has no key properties defined`,
         specUrl: spec.entityTypeKey,
       });
     }
@@ -162,7 +162,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
       if (!propertyNames.has(keyProp)) {
         errors.push({
           path: `${etPath}/Key`,
-          message: `Key property '${keyProp}' does not exist in entity type properties`,
+          message: `Entity type '${entityType.name}' lists '${keyProp}' as a Key property but '${keyProp}' isn't declared as one of its properties.`,
           specUrl: spec.entityTypeKey,
         });
       }
@@ -306,7 +306,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
   // --- Rule 8: Constraint Property exists on source entity type ---
   // --- Rule 9: Constraint ReferencedProperty exists on target entity type ---
   for (const entityType of schema.entityTypes) {
-    const etPath = `EntityType(${entityType.name})`;
+    const etPath = `EntityType('${entityType.name}')`;
     const propertyNames = new Set(entityType.properties.map(p => p.name));
 
     for (const navProp of entityType.navigationProperties) {
