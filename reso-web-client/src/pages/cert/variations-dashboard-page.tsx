@@ -95,6 +95,15 @@ export const VariationsDashboardPage = () => {
     setSelectedItem(null);
   }, []);
 
+  /** Drawer reports a successful saveDraft / deleteDraft → keep the
+   *  row chip + drawer header in sync without a full list refetch.
+   *  Replaces the matching row in items[] AND the drawer's
+   *  selectedItem (same VariationItem identity by variationKey). */
+  const handleItemUpdated = useCallback((updated: VariationItem) => {
+    setItems(prev => prev.map(i => i.variationKey === updated.variationKey ? updated : i));
+    setSelectedItem(prev => prev && prev.variationKey === updated.variationKey ? updated : prev);
+  }, []);
+
   return (
     <div className="flex flex-col h-full gap-4 p-4 min-h-0">
       <header className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-3 shrink-0">
@@ -143,7 +152,11 @@ export const VariationsDashboardPage = () => {
         />
       )}
 
-      <VariationDetailDrawer item={selectedItem} onClose={handleDrawerClose} />
+      <VariationDetailDrawer
+        item={selectedItem}
+        onClose={handleDrawerClose}
+        onItemUpdated={handleItemUpdated}
+      />
     </div>
   );
 };

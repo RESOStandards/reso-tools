@@ -378,6 +378,68 @@ export const listVariationItems = async (
   return (await res.json()) as VariationItemsPage;
 };
 
+// ── Drafts (variationsReviewDrafts pool) ─────────────────────────────
+//
+// Per-user, server-side scratch state for the items-screen. Save is
+// idempotent and unlocked — concurrent editors each have their own
+// row. 30-day TTL is enforced by the backend's `variationsReviewDrafts`
+// table. See reso-tools#150 and cert-backend PR #103.
+
+/** Payload for POST /v2/certification/variations-review-drafts. */
+export interface SaveDraftBody {
+  readonly variationKey: string;
+  readonly action: VariationDraftAction;
+  /** Required for `accept` / `ft-mapped`. Server returns 400 if
+   *  missing. */
+  readonly mapping?: VariationMapping;
+  /** Optional — surfaces in other editors' `otherDrafts` so they
+   *  see who's drafting. */
+  readonly userDisplayName?: string;
+}
+
+/** Response from save — the affected item's current state so the
+ *  client can diff against its load-time snapshot and prompt the
+ *  user inline if something moved while they were drafting (status
+ *  drift, other editors' new drafts). */
+export interface SaveDraftResult {
+  readonly variationKey: string;
+  readonly myDraft?: VariationItemMyDraft;
+  readonly otherDrafts: ReadonlyArray<VariationItemOtherDraft>;
+  readonly status: VariationItemStatus;
+  readonly lastUpdatedAt: string;
+}
+
+/**
+ * Save or update the requesting user's draft on a single item.
+ * Returns the affected item's current pool state so the caller can
+ * detect drift since drawer-open time.
+ *
+ * Returns null on non-2xx. Callers should surface error state — a
+ * 400 typically means the action's mapping requirements weren't met
+ * (`accept` / `ft-mapped` need a target).
+ */
+export const saveDraft = async (body: SaveDraftBody): Promise<SaveDraftResult | null> => {
+  const res = await authedFetch(proxiedUrl('/v2/certification/variations-review-drafts'), {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as SaveDraftResult;
+};
+
+/**
+ * Discard the user's draft on a single item. Idempotent — DELETE on
+ * a key that has no draft still returns ok.
+ */
+export const deleteDraft = async (variationKey: string): Promise<boolean> => {
+  const res = await authedFetch(
+    proxiedUrl(`/v2/certification/variations-review-drafts/${encodeURIComponent(variationKey)}`),
+    { method: 'DELETE', headers: jsonHeaders }
+  );
+  return res.ok;
+};
+
 // ── Locks ────────────────────────────────────────────────────────────
 
 /** Lock record from the locks service. */
