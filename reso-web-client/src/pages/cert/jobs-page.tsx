@@ -9,7 +9,7 @@
  * will be wired in when the reso-certification-backend SDK is ready.
  */
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router';
 import { ReplicationProgress, parseReplicationProgress, type ReplicationProgressData } from '../../components/cert/replication-progress';
 import { RequestDetailsPanel } from '../../components/cert/request-details';
@@ -18,8 +18,12 @@ import { ConfigBuilder } from '../../components/cert/config-builder';
 import { SubmitToCloud } from '../../components/cert/submit-to-cloud';
 import { FailureReportModal } from '../../components/cert/error-reports';
 import { useJobs } from '../../hooks/use-jobs';
+import { useAuth } from '../../hooks/use-auth';
 import { useReportRef } from '../../hooks/use-report-ref';
 import { useOrganizationNames } from '../../hooks/use-organization-names';
+import { submitReportForReview } from '../../services/variations-save';
+import { resolveReportRef } from '../../services/report-ref';
+import { markVariationsReviewSubmitted } from '../../services/job-manager';
 import type { BatchConfig } from '../../components/cert/config-builder';
 
 const PAGE_CONTAINER = 'max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8';
@@ -220,7 +224,64 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
   const [showFailure, setShowFailure] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  /** Latched while the variations report is uploading to the cloud
+   *  on first-submit click. Disables the Review Variations button so
+   *  the user can't double-fire while the network is in flight. */
+  const [submittingForReview, setSubmittingForReview] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  /**
+   * Click handler for "Start Variations Review" / "Review Variations"
+   * buttons on this job card. On first click (job hasn't yet been
+   * submitted for review), resolves the local variations report and
+   * uploads it to the cloud — each variation lands in the
+   * variationsReview pool with status: 'pending'. On subsequent
+   * clicks, just navigates to the dashboard.
+   *
+   * The dashboard is the single review surface — the old per-report
+   * drill-in went away in Phase 7 of #150. Cert run results flow
+   * straight into the pool when the user starts a review.
+   */
+  const handleReviewVariations = useCallback(async () => {
+    if (submittingForReview) return;
+    // Already submitted: just navigate. (No re-upload — would
+    // duplicate entries in the pool.)
+    if (job.variationsReviewSubmittedAt) {
+      navigate('/cert/variations');
+      return;
+    }
+    const reports = job.reports as Record<string, string> | undefined;
+    const ref = reports?.variations ?? reports?.variationsReport;
+    if (!ref) {
+      console.error('handleReviewVariations: no variations report on job', job.id);
+      navigate('/cert/variations');
+      return;
+    }
+    setSubmittingForReview(true);
+    try {
+      const localReport = await resolveReportRef(ref) as Parameters<typeof submitReportForReview>[0]['localReport'];
+      const result = await submitReportForReview({
+        version: job.version,
+        providerUoi: job.providerUoi,
+        providerUsi: job.providerUsi ?? '',
+        recipientUoi: job.recipientUoi,
+        localReport,
+        userName: user?.fullName ?? user?.username ?? '',
+        userEmail: user?.email ?? '',
+      });
+      if (result.ok) {
+        markVariationsReviewSubmitted(job.id);
+      } else {
+        console.error('submitReportForReview failed:', result.error);
+      }
+    } catch (err) {
+      console.error('submitReportForReview threw:', err);
+    } finally {
+      setSubmittingForReview(false);
+      navigate('/cert/variations');
+    }
+  }, [job, submittingForReview, navigate, user]);
 
   // Re-run and Edit hand focus to a different card or panel — collapse
   // this one as we leave so the page doesn't stack two open panels.
@@ -370,9 +431,16 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                   Submit to RESO
                 </button>
                 {job.steps.some(s => isVariationsStep(s) && s.status === 'failed') && (
-                  <NavLink to={`/cert/variations/${job.id}`} state={{ job }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors">
-                    {job.variationsReviewSubmittedAt ? 'Review Variations' : 'Start Variations Review'}
-                  </NavLink>
+                  <button
+                    type="button"
+                    onClick={() => { void handleReviewVariations(); }}
+                    disabled={submittingForReview}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
+                  >
+                    {submittingForReview
+                      ? 'Submitting…'
+                      : job.variationsReviewSubmittedAt ? 'Review Variations' : 'Start Variations Review'}
+                  </button>
                 )}
                 {onRerun && (
                   <button type="button" onClick={handleRerunClick} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
@@ -403,9 +471,16 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
                   {detailsLabel}
                 </button>
                 {hasVariationsFailure && (
-                  <NavLink to={`/cert/variations/${job.id}`} state={{ job }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer transition-colors">
-                    {job.variationsReviewSubmittedAt ? 'Variations Report Review' : 'Start Variations Review'}
-                  </NavLink>
+                  <button
+                    type="button"
+                    onClick={() => { void handleReviewVariations(); }}
+                    disabled={submittingForReview}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
+                  >
+                    {submittingForReview
+                      ? 'Submitting…'
+                      : job.variationsReviewSubmittedAt ? 'Variations Report Review' : 'Start Variations Review'}
+                  </button>
                 )}
                 {onRerun && (
                   <button type="button" onClick={handleRerunClick} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer transition-colors">
@@ -476,7 +551,7 @@ const JobCard = ({ job, onRerun, onDelete, onClone, onCancel, highlighted }: { r
           steps={job.steps}
           variationsReviewSubmittedAt={job.variationsReviewSubmittedAt}
           onClose={() => setShowFailure(false)}
-          onReviewVariations={() => navigate(`/cert/variations/${job.id}`, { state: { job } })}
+          onReviewVariations={() => { void handleReviewVariations(); }}
         />
       )}
 

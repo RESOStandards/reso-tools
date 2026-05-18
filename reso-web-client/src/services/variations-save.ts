@@ -190,3 +190,147 @@ export const saveVariationsReview = async (input: SaveInput): Promise<boolean> =
 
   return saveVariationsReport(input.version, input.providerUoi, input.providerUsi, input.recipientUoi, certRequestId, payload);
 };
+
+// ── Auto-submit on Review click ──────────────────────────────────────
+//
+// The provider hits "Review variations" on jobs-page → we resolve
+// the job's local variations-report file, flatten its buckets into
+// VariationsChange[] entries (no user decisions yet), and POST to
+// the variations-reports endpoint. Backend pushes each variation
+// into the variationsReview pool with status: 'pending'. The user
+// then reviews on the new items-screen dashboard.
+//
+// This replaces the old per-report drill-in: instead of reviewing
+// locally and submitting later, the act of starting a review IS the
+// submit. Single review surface (the dashboard) — see reso-tools#150
+// Phase 7.
+
+/** A variation as it appears in a local cert-run report. The runner
+ *  writes these into buckets (resources / fields / lookups /
+ *  expansions / complexTypes); we flatten all five buckets into a
+ *  single submission. */
+interface LocalVariationItem {
+  readonly resourceName: string;
+  readonly fieldName?: string;
+  readonly lookupValue?: string;
+  readonly legacyODataValue?: string;
+  readonly suggestions?: ReadonlyArray<Record<string, unknown>>;
+}
+
+interface LocalVariationsReport {
+  readonly resources?: ReadonlyArray<LocalVariationItem>;
+  readonly fields?: ReadonlyArray<LocalVariationItem>;
+  readonly lookups?: ReadonlyArray<LocalVariationItem>;
+  readonly expansions?: ReadonlyArray<LocalVariationItem>;
+  readonly complexTypes?: ReadonlyArray<LocalVariationItem>;
+}
+
+interface SubmitReportForReviewInput {
+  readonly version: string;
+  readonly providerUoi: string;
+  readonly providerUsi: string;
+  readonly recipientUoi: string;
+  /** Resolved local-report JSON (caller resolves the ref via
+   *  `resolveReportRef` and passes the parsed body in). Keeping
+   *  `resolveReportRef` out of this module preserves the boundary
+   *  between save logic and storage plumbing. */
+  readonly localReport: LocalVariationsReport;
+  readonly userName: string;
+  readonly userEmail: string;
+}
+
+interface SubmitReportForReviewResult {
+  readonly ok: boolean;
+  readonly itemCount: number;
+  readonly error?: string;
+}
+
+/** Pick the first suggestion's primary identity fields if available.
+ *  Matches the pattern in `buildSavePayload` — admin queue's saved
+ *  S3 report should render a suggestion alongside the source. */
+const pickPrimarySuggestion = (
+  suggestions?: ReadonlyArray<Record<string, unknown>>
+): Partial<VariationsChange> => {
+  const first = suggestions?.[0];
+  if (!first) return {};
+  return {
+    ...(typeof first.suggestedResourceName === 'string' ? { suggestedResourceName: first.suggestedResourceName } : {}),
+    ...(typeof first.suggestedFieldName === 'string' ? { suggestedFieldName: first.suggestedFieldName } : {}),
+    ...(typeof first.suggestedLookupValue === 'string' ? { suggestedLookupValue: first.suggestedLookupValue } : {}),
+    ...(typeof first.suggestedLegacyODataValue === 'string' ? { suggestedLegacyODataValue: first.suggestedLegacyODataValue } : {}),
+  };
+};
+
+/**
+ * Submit a job's local variations report to the cloud for review.
+ * Flattens the report's buckets into VariationsChange[] (no
+ * `requestedAction`, no decision flags — items land in the pool as
+ * `status: 'pending'`). The user reviews + decides on the new
+ * items-screen dashboard.
+ *
+ * Returns { ok, itemCount, error? }. Caller should toast on ok and
+ * navigate to /cert/variations.
+ */
+export const submitReportForReview = async (
+  input: SubmitReportForReviewInput
+): Promise<SubmitReportForReviewResult> => {
+  const allVariations: ReadonlyArray<LocalVariationItem> = [
+    ...(input.localReport.resources ?? []),
+    ...(input.localReport.fields ?? []),
+    ...(input.localReport.lookups ?? []),
+    ...(input.localReport.expansions ?? []),
+    ...(input.localReport.complexTypes ?? []),
+  ];
+
+  if (allVariations.length === 0) {
+    return { ok: false, itemCount: 0, error: 'No variations in this report.' };
+  }
+
+  const changes: ReadonlyArray<VariationsChange> = allVariations.map(v => ({
+    resourceName: v.resourceName,
+    ...(v.fieldName ? { fieldName: v.fieldName } : {}),
+    ...(v.lookupValue ? { lookupValue: v.lookupValue } : {}),
+    ...(v.legacyODataValue ? { legacyODataValue: v.legacyODataValue } : {}),
+    ...pickPrimarySuggestion(v.suggestions),
+  } as VariationsChange));
+
+  const certRequestId = await generateCertRequestId(
+    input.version, input.providerUoi, input.providerUsi, input.recipientUoi
+  );
+
+  const editorInfo: VariationsEditorInfo = {
+    displayName: input.userName,
+    editedOn: new Date().toISOString(),
+    email: input.userEmail,
+    providerUoi: input.providerUoi,
+    username: input.userName,
+  };
+
+  const payload: VariationsReportPayload = {
+    description: 'RESO Data Dictionary Change Log',
+    version: input.version,
+    certificationRequestId: certRequestId,
+    providerUoi: input.providerUoi,
+    providerUsi: input.providerUsi,
+    recipientUoi: input.recipientUoi,
+    changes,
+    editorInfo: [editorInfo],
+  };
+
+  try {
+    const ok = await saveVariationsReport(
+      input.version, input.providerUoi, input.providerUsi, input.recipientUoi,
+      certRequestId, payload
+    );
+    if (!ok) {
+      return { ok: false, itemCount: 0, error: 'Upload to cloud failed.' };
+    }
+    return { ok: true, itemCount: changes.length };
+  } catch (err) {
+    return {
+      ok: false,
+      itemCount: 0,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+};

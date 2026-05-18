@@ -17,7 +17,6 @@ import { JobsPage } from './pages/cert/jobs-page';
 import { DashboardPage } from './pages/cert/dashboard-page';
 import { ComparePage } from './pages/cert/compare-page';
 import { ConfigsPage } from './pages/cert/configs-page';
-import { VariationsPage } from './pages/cert/variations-page';
 import { VariationsDashboardPage } from './pages/cert/variations-dashboard-page';
 import { VariationsImportPage } from './pages/cert/variations-import-page';
 import { DeletePage } from './pages/delete-page';
@@ -71,7 +70,9 @@ const router = createBrowserRouter([
           { path: 'cert/configs', element: <ConfigsPage /> },
           { path: 'cert/variations', element: <VariationsDashboardPage /> },
           { path: 'cert/variations/import', element: <VariationsImportPage /> },
-          { path: 'cert/variations/:slug', element: <VariationsPage /> },
+          // :key opens the detail drawer on the dashboard via URL.
+          // Bookmarkable / shareable per-item URL. See #150 Phase 7.
+          { path: 'cert/variations/:key', element: <VariationsDashboardPage /> },
         ],
       },
       { path: 'metadata', element: <MetadataPage /> },

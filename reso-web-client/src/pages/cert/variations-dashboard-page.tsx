@@ -4,17 +4,22 @@
  * Aggregates in-review variations across all reports. Server applies
  * scope based on the caller's auth context (admin sees the full pool;
  * provider sees their own partition). Cursor-based pagination via
- * "Load more" today; will become infinite scroll in Phase 3 with the
- * virtualized row table.
+ * the virtualized table's near-end watcher.
  *
- * Replaces the list mode of the old VariationsPage (which still
- * serves the per-report drill-in at /cert/variations/:slug; cleaned
- * up in Phase 7). See reso-tools#150.
+ * URL-driven detail drawer:
+ *   /cert/variations         → dashboard, no drawer
+ *   /cert/variations/:key    → dashboard with drawer open for :key
  *
- * Phase 2 of the items-screen rewrite.
+ * Both routes render this component (see main.tsx). The :key param
+ * drives `selectedItem` — bookmarkable, shareable URLs; browser-back
+ * closes the drawer.
+ *
+ * Replaces the old VariationsPage entirely (deleted in Phase 7).
+ * See reso-tools#150.
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useNavigate, useParams, useLocation } from 'react-router';
 import {
   listVariationItems,
   type VariationItem,
@@ -37,12 +42,24 @@ const STATUS_LABELS: Record<StatusFilter, string> = {
 };
 
 export const VariationsDashboardPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { key: routeKey } = useParams<{ key?: string }>();
+  const decodedRouteKey = routeKey ? decodeURIComponent(routeKey) : null;
+
   const [items, setItems] = useState<ReadonlyArray<VariationItem>>([]);
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  /** Item passed via route state on row click (fast path — avoids
+   *  re-fetching when the user clicks a row in this same page).
+   *  Direct URL access falls back to `items.find(...)`. */
+  const stateItem = (location.state as { item?: VariationItem } | null)?.item;
+  /** Items we've fetched specifically by variationKey when the URL
+   *  has a :key that's not in items[] (e.g. direct deep link). */
+  const [keyFetchedItems, setKeyFetchedItems] = useState<ReadonlyArray<VariationItem>>([]);
 
   // First page (or refetch on filter change).
   useEffect(() => {
@@ -85,23 +102,54 @@ export const VariationsDashboardPage = () => {
     }
   }, [nextCursor, loadingMore, statusFilter]);
 
-  const [selectedItem, setSelectedItem] = useState<VariationItem | null>(null);
+  /** Resolve the URL :key to a VariationItem. Tries (in order): route
+   *  state (fast path on row click), the dashboard's items[], and the
+   *  key-fetched items[] (direct deep-link fallback). */
+  const selectedItem: VariationItem | null = useMemo(() => {
+    if (!decodedRouteKey) return null;
+    if (stateItem && stateItem.variationKey === decodedRouteKey) return stateItem;
+    const fromList = items.find(i => i.variationKey === decodedRouteKey);
+    if (fromList) return fromList;
+    const fromKeyFetched = keyFetchedItems.find(i => i.variationKey === decodedRouteKey);
+    return fromKeyFetched ?? null;
+  }, [decodedRouteKey, stateItem, items, keyFetchedItems]);
+
+  // Direct deep-link fallback: if URL has :key but the item isn't in
+  // items[] or stateItem, fetch the list until we find it. v0.11 has
+  // no get-by-key endpoint, so we walk the pages. Skips the fetch if
+  // already covered by another source.
+  useEffect(() => {
+    if (!decodedRouteKey) return;
+    if (stateItem?.variationKey === decodedRouteKey) return;
+    if (items.some(i => i.variationKey === decodedRouteKey)) return;
+    if (keyFetchedItems.some(i => i.variationKey === decodedRouteKey)) return;
+    let cancelled = false;
+    const findByKey = async () => {
+      const page = await listVariationItems();
+      if (cancelled) return;
+      const found = page.items.find(i => i.variationKey === decodedRouteKey);
+      if (found) setKeyFetchedItems(prev => [...prev, found]);
+    };
+    void findByKey();
+    return () => { cancelled = true; };
+  }, [decodedRouteKey, stateItem, items, keyFetchedItems]);
 
   const handleRowClick = useCallback((item: VariationItem) => {
-    setSelectedItem(item);
-  }, []);
+    navigate(`/cert/variations/${encodeURIComponent(item.variationKey)}`, {
+      state: { item },
+    });
+  }, [navigate]);
 
   const handleDrawerClose = useCallback(() => {
-    setSelectedItem(null);
-  }, []);
+    navigate('/cert/variations');
+  }, [navigate]);
 
-  /** Drawer reports a successful saveDraft / deleteDraft → keep the
-   *  row chip + drawer header in sync without a full list refetch.
-   *  Replaces the matching row in items[] AND the drawer's
-   *  selectedItem (same VariationItem identity by variationKey). */
+  /** Drawer reports a successful saveDraft / deleteDraft / submit →
+   *  keep the row chip + drawer in sync without a full list refetch.
+   *  Updates items[] AND keyFetchedItems[] (covers both sources). */
   const handleItemUpdated = useCallback((updated: VariationItem) => {
     setItems(prev => prev.map(i => i.variationKey === updated.variationKey ? updated : i));
-    setSelectedItem(prev => prev && prev.variationKey === updated.variationKey ? updated : prev);
+    setKeyFetchedItems(prev => prev.map(i => i.variationKey === updated.variationKey ? updated : i));
   }, []);
 
   return (
