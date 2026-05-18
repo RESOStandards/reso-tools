@@ -440,6 +440,89 @@ export const deleteDraft = async (variationKey: string): Promise<boolean> => {
   return res.ok;
 };
 
+// ── Submit decisions (save-variation-decisions) ──────────────────────
+//
+// `POST /v2/certification/save-variation-decisions` is the single
+// resolution endpoint. Server acquires the canonical-resource lock,
+// re-fetches each item's current pool state, and per-item branches:
+// applied (decision committed), stale (someone resolved it first),
+// noop (already in target state), or rejected (validation failure;
+// draft preserved). Per-provider rollup notifications fan out once
+// at the end of the batch. See reso-tools#150.
+
+/** One decision in a Submit batch. */
+export interface SubmitDecision {
+  readonly variationKey: string;
+  readonly action: VariationDraftAction;
+  /** Required for `accept` / `ft-mapped`. */
+  readonly mapping?: VariationMapping;
+}
+
+export interface SubmitAppliedItem {
+  readonly variationKey: string;
+  readonly outcome?: VariationOutcome;
+  readonly action: VariationDraftAction;
+}
+
+export interface SubmitStaleItem {
+  readonly variationKey: string;
+  readonly resolvedBy: string;
+  readonly resolvedAt: string;
+  readonly currentOutcome?: VariationOutcome;
+}
+
+export interface SubmitNoopItem {
+  readonly variationKey: string;
+  readonly reason: string;
+}
+
+export interface SubmitRejectedItem {
+  readonly variationKey: string;
+  readonly reason: string;
+}
+
+export interface SubmitVariationDecisionsResult {
+  readonly applied: ReadonlyArray<SubmitAppliedItem>;
+  readonly stale: ReadonlyArray<SubmitStaleItem>;
+  readonly noop: ReadonlyArray<SubmitNoopItem>;
+  readonly rejected: ReadonlyArray<SubmitRejectedItem>;
+  readonly rollupNotificationsFanOutTo: ReadonlyArray<string>;
+}
+
+/**
+ * Submit one or more decisions to the canonical store. Atomic per
+ * batch under the canonical-resource lock; per-item outcomes returned
+ * so the caller can render "5 applied, 1 stale, 2 rejected" rather
+ * than a single success/fail.
+ *
+ * Returns null on non-2xx beyond the documented 409 conflict (where
+ * the body still parses and carries applied/stale/noop/rejected).
+ * The 409 case is reported as a result so the caller can show the
+ * conflict detail to the user.
+ */
+export const submitVariationDecisions = async (
+  decisions: ReadonlyArray<SubmitDecision>,
+  options?: { readonly ddVersion?: string; readonly userDisplayName?: string }
+): Promise<SubmitVariationDecisionsResult | null> => {
+  const res = await authedFetch(
+    proxiedUrl('/v2/certification/save-variation-decisions'),
+    {
+      method: 'POST',
+      headers: jsonHeaders,
+      body: JSON.stringify({
+        decisions,
+        ...(options?.ddVersion ? { ddVersion: options.ddVersion } : {}),
+        ...(options?.userDisplayName ? { userDisplayName: options.userDisplayName } : {}),
+      }),
+    }
+  );
+  // 200 (success) and 409 (canonical-write under-lock failure) both
+  // return the per-item shape. Treat 409 as a parseable result so
+  // the UI can render the partial-applied detail.
+  if (!res.ok && res.status !== 409) return null;
+  return (await res.json()) as SubmitVariationDecisionsResult;
+};
+
 // ── Locks ────────────────────────────────────────────────────────────
 
 /** Lock record from the locks service. */

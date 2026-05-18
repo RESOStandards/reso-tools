@@ -29,6 +29,7 @@ import {
   getVariationsReport,
   saveDraft,
   deleteDraft,
+  submitVariationDecisions,
   type VariationItem,
   type VariationItemStatus,
   type VariationProvenance,
@@ -36,6 +37,7 @@ import {
   type VariationsReportPayload,
   type VariationsChange,
   type VariationsComment,
+  type SubmitVariationDecisionsResult,
 } from '../../services/variations-service';
 import { ballWithWhom, humanizeTimeAgo } from './variation-items-table';
 
@@ -98,6 +100,11 @@ const actionDef = (action: VariationDraftAction): ActionDef | undefined =>
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error' | 'mapping-required';
 
+/** Submit state machine. Mirrors the per-item branches the server
+ *  returns on `POST /v2/certification/save-variation-decisions` —
+ *  applied / stale / noop / rejected. */
+type SubmitState = 'idle' | 'submitting' | 'applied' | 'stale' | 'noop' | 'rejected' | 'error';
+
 interface DriftSnapshot {
   readonly status: VariationItemStatus;
   readonly lastUpdatedAt: string;
@@ -129,6 +136,8 @@ export const VariationDetailDrawer = ({ item, onClose, onItemUpdated }: Variatio
   const [selectedAction, setSelectedAction] = useState<VariationDraftAction | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [submitState, setSubmitState] = useState<SubmitState>('idle');
+  const [submitResult, setSubmitResult] = useState<SubmitVariationDecisionsResult | null>(null);
   const [drift, setDrift] = useState<DriftSnapshot | null>(null);
   /** Snapshot of the item's pool state at drawer-open time. Drift is
    *  any change in `status` or `lastUpdatedAt` since this point — i.e.
@@ -155,6 +164,8 @@ export const VariationDetailDrawer = ({ item, onClose, onItemUpdated }: Variatio
     setSelectedAction(item.myDraft?.action ?? null);
     setSaveState('idle');
     setSaveError(null);
+    setSubmitState('idle');
+    setSubmitResult(null);
     setDrift(null);
     openedSnapshotRef.current = {
       status: item.status,
@@ -218,6 +229,54 @@ export const VariationDetailDrawer = ({ item, onClose, onItemUpdated }: Variatio
     } catch (err) {
       setSaveState('error');
       setSaveError(err instanceof Error ? err.message : 'Save failed.');
+    }
+  };
+
+  const runSubmit = async () => {
+    if (!item || !selectedAction) return;
+    const def = actionDef(selectedAction);
+    if (def?.requiresMapping) return; // button is already disabled in this case
+    setSubmitState('submitting');
+    setSubmitResult(null);
+    try {
+      const result = await submitVariationDecisions([{
+        variationKey: item.variationKey,
+        action: selectedAction,
+      }]);
+      if (!result) {
+        setSubmitState('error');
+        return;
+      }
+      setSubmitResult(result);
+      if (result.applied.length > 0) {
+        setSubmitState('applied');
+        const a = result.applied[0];
+        // Propagate the resolved state so the row chip drops out of
+        // the "in review" filter and the drawer header updates.
+        if (onItemUpdated) {
+          const next: VariationItem = {
+            ...item,
+            status: 'resolved',
+            outcome: a.outcome,
+            otherDrafts: item.otherDrafts,
+          };
+          // Drop myDraft — server cleared the processed draft.
+          delete (next as { myDraft?: unknown }).myDraft;
+          onItemUpdated(next);
+        }
+        lastSavedActionRef.current = null;
+      } else if (result.stale.length > 0) {
+        setSubmitState('stale');
+      } else if (result.noop.length > 0) {
+        setSubmitState('noop');
+      } else if (result.rejected.length > 0) {
+        setSubmitState('rejected');
+      } else {
+        setSubmitState('error');
+      }
+    } catch (err) {
+      setSubmitState('error');
+      console.error('runSubmit failed', err);
     }
   };
 
@@ -304,6 +363,45 @@ export const VariationDetailDrawer = ({ item, onClose, onItemUpdated }: Variatio
 
         {/* Content (scrolls) */}
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4 min-h-0">
+          {/* Submit result banner — one outcome line per response
+              branch from the save-variation-decisions endpoint. */}
+          {submitState === 'applied' && submitResult && submitResult.applied[0] && (
+            <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 rounded px-3 py-2 text-xs text-emerald-900 dark:text-emerald-200">
+              <span className="font-medium">Submitted.</span>
+              {submitResult.applied[0].outcome && (
+                <> Outcome: <span className="font-mono">{submitResult.applied[0].outcome}</span>.</>
+              )}
+              {submitResult.rollupNotificationsFanOutTo.length > 0 && (
+                <> Notifications sent to {submitResult.rollupNotificationsFanOutTo.length} provider{submitResult.rollupNotificationsFanOutTo.length === 1 ? '' : 's'}.</>
+              )}
+            </div>
+          )}
+          {submitState === 'stale' && submitResult && submitResult.stale[0] && (
+            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+              <span className="font-medium">Already resolved.</span>
+              {' '}{submitResult.stale[0].resolvedBy} resolved this {humanizeTimeAgo(submitResult.stale[0].resolvedAt)}
+              {submitResult.stale[0].currentOutcome && (
+                <> as <span className="font-mono">{submitResult.stale[0].currentOutcome}</span></>
+              )}
+              . Your draft was cleared.
+            </div>
+          )}
+          {submitState === 'noop' && submitResult && submitResult.noop[0] && (
+            <div className="bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-xs text-gray-700 dark:text-gray-300">
+              <span className="font-medium">No-op:</span> {submitResult.noop[0].reason}
+            </div>
+          )}
+          {submitState === 'rejected' && submitResult && submitResult.rejected[0] && (
+            <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 rounded px-3 py-2 text-xs text-rose-900 dark:text-rose-200">
+              <span className="font-medium">Rejected:</span> {submitResult.rejected[0].reason}. Your draft is preserved.
+            </div>
+          )}
+          {submitState === 'error' && (
+            <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 rounded px-3 py-2 text-xs text-rose-900 dark:text-rose-200">
+              <span className="font-medium">Submit failed.</span> Try again — your draft is preserved.
+            </div>
+          )}
+
           {/* Drift banner — fires when status or lastUpdatedAt
               changed between drawer-open and the latest save response.
               Means someone else acted on this item while the user was
@@ -416,11 +514,26 @@ export const VariationDetailDrawer = ({ item, onClose, onItemUpdated }: Variatio
 
           <button
             type="button"
-            disabled
-            className="px-3 py-1.5 text-sm bg-blue-100 text-blue-400 dark:bg-blue-900/20 dark:text-blue-500 rounded cursor-not-allowed"
-            title="Wired in Phase 6"
+            onClick={() => { void runSubmit(); }}
+            disabled={
+              !selectedAction ||
+              saveState === 'mapping-required' ||
+              submitState === 'submitting' ||
+              submitState === 'applied' ||
+              item.status === 'resolved'
+            }
+            className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600"
+            title={
+              item.status === 'resolved'
+                ? 'Item is already resolved'
+                : submitState === 'applied'
+                  ? 'Submitted'
+                  : !selectedAction
+                    ? 'Select an action first'
+                    : 'Submit this decision to canonical'
+            }
           >
-            Submit
+            {submitState === 'submitting' ? 'Submitting…' : 'Submit'}
           </button>
         </div>
       </div>
