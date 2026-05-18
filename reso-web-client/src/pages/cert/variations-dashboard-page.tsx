@@ -20,6 +20,7 @@ import {
   type VariationItem,
   type VariationItemStatus,
 } from '../../services/variations-service';
+import { VariationItemsTable } from '../../components/cert/variation-items-table';
 
 type StatusFilter = VariationItemStatus | 'all';
 
@@ -83,9 +84,15 @@ export const VariationsDashboardPage = () => {
     }
   }, [nextCursor, loadingMore, statusFilter]);
 
+  const handleRowClick = useCallback((item: VariationItem) => {
+    // Phase 4 wires this to the detail drawer. For Phase 3 it's a
+    // no-op marker so the row's click affordance is visible in the UI.
+    console.debug('VariationsDashboard: row clicked', item.variationKey);
+  }, []);
+
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <header className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-3">
+    <div className="flex flex-col h-full gap-4 p-4 min-h-0">
+      <header className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-3 shrink-0">
         <h1 className="text-lg font-semibold">Variations Review</h1>
         <div className="flex gap-1.5" role="tablist" aria-label="Status filter">
           {STATUS_FILTERS.map(s => (
@@ -108,7 +115,7 @@ export const VariationsDashboardPage = () => {
       </header>
 
       {error && (
-        <div className="text-sm text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 rounded px-3 py-2">
+        <div className="text-sm text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 rounded px-3 py-2 shrink-0">
           {error}
         </div>
       )}
@@ -121,41 +128,14 @@ export const VariationsDashboardPage = () => {
         <div className="text-sm text-gray-500 dark:text-gray-400">No variations in this view.</div>
       )}
 
-      {/* Phase 2: bare-bones row rendering. Phase 3 swaps in a
-          virtualized table with strategy badges, ball-with-whom pill,
-          provenance summary, and infinite scroll. */}
       {items.length > 0 && (
-        <ul className="flex flex-col gap-1">
-          {items.map(item => (
-            <li
-              key={item.variationKey}
-              className="flex items-center gap-3 px-3 py-2 text-xs font-mono border border-gray-200 dark:border-gray-700 rounded hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer"
-            >
-              <span className="flex-1 truncate">
-                {item.resourceName}
-                {item.fieldName ? ` · ${item.fieldName}` : ''}
-                {item.lookupValue ? ` · ${item.lookupValue}` : ''}
-              </span>
-              <span className="text-gray-500 dark:text-gray-400 w-20 text-right">{item.status}</span>
-              <span className="text-gray-400 dark:text-gray-500 w-16 text-right">
-                {item.provenance.length} org{item.provenance.length === 1 ? '' : 's'}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {nextCursor && !loadingMore && (
-        <button
-          type="button"
-          onClick={() => { void loadMore(); }}
-          className="self-start px-3 py-2 text-sm bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded cursor-pointer"
-        >
-          Load more
-        </button>
-      )}
-      {loadingMore && (
-        <div className="text-sm text-gray-500 dark:text-gray-400">Loading more…</div>
+        <VariationItemsTable
+          items={items}
+          onRowClick={handleRowClick}
+          onLoadMore={() => { void loadMore(); }}
+          hasMore={!!nextCursor}
+          isLoadingMore={loadingMore}
+        />
       )}
     </div>
   );
