@@ -21,6 +21,7 @@ import {
   type VariationItemStatus,
 } from '../../services/variations-service';
 import { VariationItemsTable } from '../../components/cert/variation-items-table';
+import { VariationDetailDrawer } from '../../components/cert/variation-detail-drawer';
 
 type StatusFilter = VariationItemStatus | 'all';
 
@@ -84,10 +85,14 @@ export const VariationsDashboardPage = () => {
     }
   }, [nextCursor, loadingMore, statusFilter]);
 
+  const [selectedItem, setSelectedItem] = useState<VariationItem | null>(null);
+
   const handleRowClick = useCallback((item: VariationItem) => {
-    // Phase 4 wires this to the detail drawer. For Phase 3 it's a
-    // no-op marker so the row's click affordance is visible in the UI.
-    console.debug('VariationsDashboard: row clicked', item.variationKey);
+    setSelectedItem(item);
+  }, []);
+
+  const handleDrawerClose = useCallback(() => {
+    setSelectedItem(null);
   }, []);
 
   return (
@@ -137,6 +142,8 @@ export const VariationsDashboardPage = () => {
           isLoadingMore={loadingMore}
         />
       )}
+
+      <VariationDetailDrawer item={selectedItem} onClose={handleDrawerClose} />
     </div>
   );
 };
