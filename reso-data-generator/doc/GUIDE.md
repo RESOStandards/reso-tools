@@ -19,15 +19,15 @@ The generator runs as a CLI, as a programmatic SDK, and through the **[RESO Desk
 
 ## Install
 
-This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo:
+This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
 
 ```bash
 git clone https://github.com/RESOStandards/reso-tools.git
-cd reso-tools
+cd reso-tools/reso-data-generator
 npm install
 ```
 
-The package lives at `reso-tools/reso-data-generator/`. To consume it from another project, link it locally with `npm link` or use a `file:` dependency.
+This package has no sibling dependencies — `npm install` just runs. To bootstrap every package at once, run `npm run bootstrap` from the repo root instead. To consume the SDK from another project, link it locally with `npm link` or use a `file:` dependency.
 
 Node.js 22 or later. The CLI is the most common entry point; the SDK is for embedding the generator inside another tool.
 

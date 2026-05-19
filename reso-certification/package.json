@@ -18,6 +18,7 @@
     "reso-cert": "./dist/cli/index.js"
   },
   "scripts": {
+    "preinstall": "node ../scripts/bootstrap-deps.mjs || true",
     "build": "tsc && rm -rf dist/legacy dist/etl && cp -r src/legacy dist/legacy && cp -r src/etl dist/etl",
     "dev": "tsc --watch",
     "test": "vitest run",

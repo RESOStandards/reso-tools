@@ -12,6 +12,7 @@
     "reso-mcp": "./dist/index.js"
   },
   "scripts": {
+    "preinstall": "node ../scripts/bootstrap-deps.mjs || true",
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run",

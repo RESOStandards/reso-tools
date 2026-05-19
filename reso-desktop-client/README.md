@@ -6,22 +6,18 @@ Electron desktop application for browsing any RESO-compliant OData server. Conne
 
 ## Quick Start
 
+This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+
 ```bash
-# 1. Build dependencies
-cd ../reso-client && npm install && npm run build
-cd ../reso-reference-server && npm install && npm run build
-cd ../reso-web-client && npm install && npm run build
-
-# 2. Install desktop client dependencies (runs electron-rebuild automatically)
-cd ../reso-desktop-client && npm install
-
-# 3. Launch
+git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools/reso-desktop-client
+npm install
 npm run dev
 ```
 
-The desktop client starts immediately and connects to external servers via the built-in CORS proxy. The reference server starts in the background for local test data.
+The `preinstall` hook walks the `file:` dep tree and builds sibling packages this one depends on (`reso-certification`, `reso-reference-server`, `reso-web-api-proxy` — and their transitive deps) before the install proceeds. The `postinstall` hook rebuilds native modules (e.g., `better-sqlite3`) for Electron's Node.js version. To bootstrap every package at once, run `npm run bootstrap` from the repo root instead.
 
-> **Note:** `npm install` automatically rebuilds native modules (e.g., `better-sqlite3`) for Electron's Node.js version via the `postinstall` script.
+The desktop client starts immediately and connects to external servers via the built-in CORS proxy. The reference server starts in the background for local test data.
 
 ## Scripts
 
