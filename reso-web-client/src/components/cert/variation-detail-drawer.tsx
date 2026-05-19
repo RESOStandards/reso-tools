@@ -38,8 +38,69 @@ import {
   type VariationsChange,
   type VariationsComment,
   type SubmitVariationDecisionsResult,
+  type VariationOutcome,
+  type VariationEditorRole,
 } from '../../services/variations-service';
-import { ballWithWhom, humanizeTimeAgo } from './variation-items-table';
+
+// ── Pill + time helpers (formerly in variation-items-table) ─────────
+
+/** Compact relative-time formatter — "5d ago" / "3h ago" / "just now". */
+const humanizeTimeAgo = (iso: string): string => {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return '';
+  const deltaMs = Date.now() - t;
+  if (deltaMs < 60_000) return 'just now';
+  const minutes = Math.floor(deltaMs / 60_000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(months / 12)}y ago`;
+};
+
+interface Pill {
+  readonly label: string;
+  readonly className: string;
+}
+
+const outcomeLabel = (outcome: VariationOutcome | undefined): string => {
+  if (!outcome) return 'Resolved';
+  if (outcome === 'ignored') return 'Ignored';
+  if (outcome === 'removed') return 'Removed';
+  if (outcome === 'accepted') return 'Accepted';
+  if (outcome === 'ft-mapped') return 'FT Mapped';
+  return outcome;
+};
+
+/** Derive the "ball with whom" pill from item status + last editor role. */
+const ballWithWhom = (item: VariationItem): Pill => {
+  if (item.status === 'resolved') {
+    return {
+      label: outcomeLabel(item.outcome),
+      className: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+    };
+  }
+  if (item.status === 'ft-submitted') {
+    return {
+      label: 'FT WG Review',
+      className: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+    };
+  }
+  const lastRole: VariationEditorRole | undefined = item.lastEditorRole;
+  if (lastRole === 'admin' || lastRole === 'ft-admin') {
+    return {
+      label: 'Awaiting Provider',
+      className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    };
+  }
+  return {
+    label: 'Awaiting Admin',
+    className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  };
+};
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
