@@ -10,6 +10,7 @@
   "private": true,
   "main": "dist/main.js",
   "scripts": {
+    "preinstall": "node ../scripts/bootstrap-deps.mjs || true",
     "build": "tsc && cp src/server-entry.mjs dist/",
     "build:server-bundle": "node scripts/bundle-server.mjs",
     "start": "env -u ELECTRON_RUN_AS_NODE electron dist/main.js",

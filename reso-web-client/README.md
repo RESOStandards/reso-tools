@@ -23,12 +23,21 @@ React-based OData browser UI with server switcher for connecting to external ODa
 - React Router v7 (URL-based state for shareable links)
 - Communicates with the reference server OData API at `http://localhost:8080`
 
+## Install
+
+This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+
+```bash
+git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools/reso-web-client
+npm install
+```
+
+The `preinstall` hook automatically builds sibling packages this one depends on (`odata-expression-parser`, `reso-client`, `reso-validation`). To bootstrap every package at once, run `npm run bootstrap` from the repo root instead.
+
 ## Development
 
 ```bash
-# Install dependencies
-npm install
-
 # Start the dev server (proxy to API at localhost:8080)
 npm run dev
 

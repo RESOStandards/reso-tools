@@ -6,18 +6,31 @@ Works with any MCP client: Claude, Cursor, Windsurf, VS Code, or your own applic
 
 > **New here?** The [User Guide](doc/GUIDE.md) is a dialogue-format walkthrough – every example is a real question to an AI assistant, the actual MCP tool call, and the live response from a seeded reference server. It covers auth, metadata exploration, querying, searching, and the full Add/Edit + EntityEvent loop including error handling.
 
+## Install
+
+This package isn't on npm yet. Build from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+
+```bash
+git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools/reso-mcp-server
+npm install      # preinstall hook builds sibling deps automatically
+npm run build
+```
+
+The built binary lives at `reso-tools/reso-mcp-server/dist/index.js`. Note its absolute path — you'll point your MCP client at it below.
+
 ## Quick Start
 
 ### Claude Code / Claude Desktop
 
-Add to your MCP settings (`~/.claude/claude_desktop_config.json` or via `/mcp add`):
+Add to your MCP settings (`~/.claude/claude_desktop_config.json` or via `/mcp add`). Replace `/absolute/path/to/` with the directory where you cloned `reso-tools`:
 
 ```json
 {
   "mcpServers": {
     "reso": {
-      "command": "npx",
-      "args": ["@reso-standards/reso-mcp-server"]
+      "command": "node",
+      "args": ["/absolute/path/to/reso-tools/reso-mcp-server/dist/index.js"]
     }
   }
 }
@@ -29,8 +42,8 @@ Certification tools only:
 {
   "mcpServers": {
     "reso-cert": {
-      "command": "npx",
-      "args": ["@reso-standards/reso-mcp-server", "--scope", "cert"]
+      "command": "node",
+      "args": ["/absolute/path/to/reso-tools/reso-mcp-server/dist/index.js", "--scope", "cert"]
     }
   }
 }
@@ -141,8 +154,11 @@ Or use the `authenticate` tool first to get a token, then pass it to subsequent 
 
 ## Development
 
+From the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo:
+
 ```bash
-npm install
+cd reso-tools/reso-mcp-server
+npm install    # preinstall builds sibling deps if their dist/ is missing
 npm run build
 npm run dev    # Watch mode
 ```

@@ -276,13 +276,19 @@ Compliance tests run automatically on push to `main` and on pull requests via Gi
 
 ## Development
 
+This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+
 ```bash
-npm install
+git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools/reso-reference-server
+npm install    # preinstall builds sibling deps if their dist/ is missing
 npm run build
 npm test       # 254 tests
 npm run dev    # tsc --watch
 npm start      # node dist/index.js
 ```
+
+The `preinstall` hook automatically builds sibling packages this one depends on (`reso-data-generator`, `odata-expression-parser`, `reso-validation`). To bootstrap every package at once, run `npm run bootstrap` from the repo root instead.
 
 ## License
 

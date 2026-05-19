@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "preinstall": "node ../scripts/bootstrap-deps.mjs || true",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",

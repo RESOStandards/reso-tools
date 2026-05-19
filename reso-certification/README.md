@@ -12,15 +12,17 @@ Compliance testing toolkit for RESO OData servers. Run certification tests from 
 
 ## Install
 
-This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo:
+This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
 
 ```bash
 git clone https://github.com/RESOStandards/reso-tools.git
-cd reso-tools
+cd reso-tools/reso-certification
 npm install
 ```
 
-The package lives at `reso-tools/reso-certification/`. To consume it from another project, link it locally with `npm link` or use a `file:` dependency.
+The `preinstall` hook automatically builds sibling packages this one depends on (`reso-client`, `reso-validation`). To bootstrap every package at once, run `npm run bootstrap` from the repo root instead.
+
+To consume the SDK from another project, link it locally with `npm link` or use a `file:` dependency.
 
 ## Getting Started
 

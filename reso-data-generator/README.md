@@ -4,6 +4,21 @@ Generates realistic RESO Data Dictionary test data for OData servers. Supports t
 
 > **[User Guide](doc/GUIDE.md)** – a task-oriented walkthrough with realistic examples.
 
+## Install
+
+This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+
+```bash
+git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools/reso-data-generator
+npm install
+npm run build
+```
+
+This package has no sibling dependencies — `npm install` just runs. To bootstrap every package at once, run `npm run bootstrap` from the repo root instead.
+
+The CLI examples below use `npx reso-data-generator`, which will be the entry point once this package is published to npm. For now, after `npm run build`, run the local binary directly (`node dist/cli.js`) or `npm link` it onto your `PATH`.
+
 ## CLI Usage
 
 ### Interactive Mode

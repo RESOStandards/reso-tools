@@ -8,17 +8,24 @@ Lightweight CORS proxy and static file server for RESO web clients. Enables brow
 - **Health Check** (`/health`) – Returns `{ "status": "ok" }` so the web client can detect proxy availability.
 - **Static File Serving** – Serves a built web UI with SPA fallback (all unknown routes serve `index.html`).
 
+## Install
+
+This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+
+```bash
+git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools/reso-web-api-proxy
+npm install
+npm run build
+```
+
+This package has no sibling dependencies — `npm install` just runs. To bootstrap every package at once, run `npm run bootstrap` from the repo root instead.
+
 ## Usage
 
 ### As a Standalone Server
 
 ```bash
-# Install
-npm install
-
-# Build
-npm run build
-
 # Start (serves UI from a directory + proxy)
 npm start -- --port 8888 --ui ../reso-web-client/dist
 

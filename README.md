@@ -46,8 +46,8 @@ docker compose --profile seed up seed
 ### Desktop Client (SQLite, No Docker)
 
 ```bash
-npm run bootstrap       # build all packages
 cd reso-desktop-client
+npm install             # preinstall hook builds sibling deps automatically
 npm run dev             # launches Electron with bundled reference server
 ```
 
@@ -70,7 +70,7 @@ docker compose --profile proxy up -d
 
 ### Building Individual Packages
 
-Each package can be built independently once its dependencies are in place:
+Each package can be installed and built independently — running `npm install` from a subpackage triggers a `preinstall` hook that walks the `file:` dep tree and builds any sibling whose `dist/` is missing.
 
 ```bash
 cd reso-client && npm install && npm run build
@@ -78,7 +78,7 @@ cd reso-mcp-server && npm install && npm run build
 cd reso-web-client && npm install && npm run build
 ```
 
-Shared libraries (`odata-expression-parser`, `reso-validation`, `reso-client`, `reso-data-generator`) have no internal dependencies and can be built in any order. Packages that depend on them (`reso-reference-server`, `reso-certification`, `reso-web-client`, `reso-desktop-client`) require the shared libs to be built first. See [scripts/bootstrap.sh](scripts/bootstrap.sh) for the full dependency order.
+Shared libraries (`odata-expression-parser`, `reso-validation`, `reso-client`, `reso-data-generator`) have no internal dependencies. Packages that depend on them (`reso-reference-server`, `reso-certification`, `reso-web-client`, `reso-desktop-client`) get their deps built automatically by the `preinstall` hook. See [scripts/bootstrap.sh](scripts/bootstrap.sh) for the full top-down dependency order, or [scripts/bootstrap-deps.mjs](scripts/bootstrap-deps.mjs) for the per-package walker.
 
 ## Development
 

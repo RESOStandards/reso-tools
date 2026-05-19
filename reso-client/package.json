@@ -15,6 +15,7 @@
     "dist"
   ],
   "scripts": {
+    "preinstall": "node ../scripts/bootstrap-deps.mjs || true",
     "prebuild": "node scripts/sync-version.mjs",
     "build": "tsc",
     "dev": "tsc --watch",

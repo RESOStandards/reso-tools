@@ -12,15 +12,15 @@ Developers building applications that consume RESO-compliant OData servers – l
 
 ## Install
 
-This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo:
+This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
 
 ```bash
 git clone https://github.com/RESOStandards/reso-tools.git
-cd reso-tools
+cd reso-tools/reso-client
 npm install
 ```
 
-The package lives at `reso-tools/reso-client/`. To consume it from another project, link it locally with `npm link` or use a `file:` dependency.
+The `preinstall` hook automatically builds sibling packages this one depends on (`odata-expression-parser`). To bootstrap every package at once, run `npm run bootstrap` from the repo root instead. To consume the SDK from another project, link it locally with `npm link` or use a `file:` dependency.
 
 Requires Node.js 22 or later. Works in any ESM environment – no platform-specific dependencies.
 
