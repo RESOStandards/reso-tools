@@ -221,6 +221,12 @@ const buildStructuralUrl = (
 ): QuerySpec | undefined => {
   switch (assertion) {
     case 'metadata':
+      // URL kept for the scenario dispatcher (so it knows this assertion
+      // can run). The actual fetch is delegated to the SDK in
+      // `test-runner.ts` so the `$format=application/xml` query param +
+      // header conventions live in one place (the reso-client SDK's
+      // `fetchRawMetadataWithVersion`). Don't be tempted to mirror that
+      // formatting here — it'll drift.
       return { url: `${serverUrl}/$metadata`, selectFields: [] };
     case 'service-document':
       return { url: serverUrl, selectFields: [] };

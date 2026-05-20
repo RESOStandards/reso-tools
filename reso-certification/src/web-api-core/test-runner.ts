@@ -6,6 +6,7 @@
  */
 
 import { odataRequest } from '../test-runner/index.js';
+import { fetchMetadataWithVersion, MetadataFetchError } from '../test-runner/metadata.js';
 import type { TestParams } from './sampling.js';
 import { buildScenarioQuery } from './queries.js';
 import { scenariosForVersion, type CoreScenario } from './scenarios.js';
@@ -278,7 +279,7 @@ const assertData = (
 
 /** Run structural scenarios (metadata, service-document, fetch-by-key, select, top, skip, count). */
 const runStructuralScenario = async (
-  _serverUrl: string,
+  serverUrl: string,
   _resource: string,
   assertion: string,
   query: { readonly url: string; readonly selectFields: ReadonlyArray<string> },
@@ -292,26 +293,39 @@ const runStructuralScenario = async (
 
   try {
     if (assertion === 'metadata') {
-      const response = await odataRequest({ method: 'GET', url: query.url, authToken });
-      // Metadata returns XML, not JSON — check status and rawBody instead of body
-      const statusOk = response.status === 200;
-      const odataVersion = response.headers['odata-version'];
-      const hasODataHeader = odataVersion === '4.0' || odataVersion === '4.01';
-      assertions.push(
-        statusOk
-          ? { passed: true, message: `HTTP 200` }
-          : { passed: false, message: `Expected HTTP 200, got ${response.status}` }
-      );
-      assertions.push(
-        hasODataHeader
-          ? { passed: true, message: `OData-Version: ${odataVersion}` }
-          : { passed: false, message: `Missing or invalid OData-Version header: ${odataVersion ?? 'none'}` }
-      );
-      assertions.push(
-        response.rawBody?.includes('<edmx:Edmx')
-          ? { passed: true, message: 'Valid EDMX metadata' }
-          : { passed: false, message: 'Response does not contain EDMX metadata' }
-      );
+      // Delegate the fetch to the SDK so `$format=application/xml` + auth
+      // headers + version-detection conventions stay in one place. The
+      // SDK throws `MetadataFetchError` on non-2xx; we catch it to map
+      // the status / odata-version header onto compliance assertions.
+      try {
+        const result = await fetchMetadataWithVersion(serverUrl, authToken);
+        assertions.push({ passed: true, message: 'HTTP 200' });
+        assertions.push(
+          result.odataVersion === '4.0' || result.odataVersion === '4.01'
+            ? { passed: true, message: `OData-Version: ${result.odataVersion}` }
+            : { passed: false, message: `Missing or invalid OData-Version header: ${result.odataVersion ?? 'none'}` }
+        );
+        assertions.push(
+          result.xml.includes('<edmx:Edmx')
+            ? { passed: true, message: 'Valid EDMX metadata' }
+            : { passed: false, message: 'Response does not contain EDMX metadata' }
+        );
+      } catch (err) {
+        if (!(err instanceof MetadataFetchError)) throw err;
+        assertions.push({ passed: false, message: `Expected HTTP 200, got ${err.status}` });
+        const odataVersion = err.headers['odata-version'];
+        assertions.push(
+          odataVersion === '4.0' || odataVersion === '4.01'
+            ? { passed: true, message: `OData-Version: ${odataVersion}` }
+            : { passed: false, message: `Missing or invalid OData-Version header: ${odataVersion ?? 'none'}` }
+        );
+        // Body inspection on the failure path would require buffering the
+        // response in the SDK — out of scope for this fix. A non-2xx
+        // response is almost never well-formed EDMX, so flag the EDMX
+        // assertion as failed (consistent with prior behavior on bad
+        // status).
+        assertions.push({ passed: false, message: 'Response does not contain EDMX metadata' });
+      }
     } else if (assertion === 'skip') {
       // Skip test requires two requests and comparing results
       const resp1 = await odataRequest({ method: 'GET', url: query.url, authToken });
