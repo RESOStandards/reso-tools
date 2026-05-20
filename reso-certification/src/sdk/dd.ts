@@ -6,16 +6,16 @@
  * our own metadata serializer and Lookup Resource fetcher.
  */
 
-import { writeFile, mkdir, copyFile, rename } from 'node:fs/promises';
+import { writeFile, copyFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { resolveAuthToken } from '../test-runner/auth.js';
-import { fetchMetadataWithVersion } from '../test-runner/metadata.js';
+import { fetchMetadataWithVersion, persistMetadataXml } from '../test-runner/metadata.js';
 import { generateMetadataReport } from '../metadata/serializer.js';
 import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
-import type { DDConfig, PipelineStep, StepResult, TestFunction } from './types.js';
+import type { BaseTestContext, DDConfig, PipelineStep, StepResult, TestFunction } from './types.js';
 import { createPipeline } from './pipeline.js';
-import { createGenericReportGenerator, createDetailedReportGenerator, writeReports } from './reports.js';
+import { createGenericReportGenerator, createDetailedReportGenerator, writeReports, prepareOutputDir } from './reports.js';
 import type { PipelineResult } from './types.js';
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
 
@@ -38,32 +38,11 @@ const DEFAULT_LIMIT = 100000;
 const DEFAULT_PAGE_SIZE_V17 = 100;
 const DEFAULT_PAGE_SIZE_V20 = 1000;
 const DEFAULT_YEARS_BACK = 3;
-const DEFAULT_RESULTS_PATH = '.reso-cert';
-
-/** Build the cert-utils compatible output directory path. */
-const buildOutputPath = (config: DDConfig): string => {
-  const resultsPath = config.options?.outputDir ?? join(process.cwd(), DEFAULT_RESULTS_PATH);
-  const providerUoi = config.providerUoi ?? `LOCAL-${Date.now()}`;
-  const providerUsi = config.providerUsi ?? 'LOCAL-SYSTEM';
-  const recipientUoi = config.recipientUoi ?? 'LOCAL-RECIPIENT';
-  return join(resultsPath, `data-dictionary-${config.version}`, `${providerUoi}-${providerUsi}`, recipientUoi, 'current');
-};
-
-/** Archive existing current results before a new run. */
-const archiveCurrentResults = async (currentPath: string): Promise<void> => {
-  if (!existsSync(currentPath)) return;
-  const archivedDir = join(dirname(currentPath), 'archived', new Date().toISOString().replace(/[:.]/g, ''));
-  await mkdir(dirname(archivedDir), { recursive: true });
-  await rename(currentPath, archivedDir);
-};
 
 // ── Pipeline Context ──
 
-interface DDContext {
-  readonly serverUrl: string;
+interface DDContext extends BaseTestContext {
   readonly version: '1.7' | '2.0' | '2.1';
-  readonly outputPath: string;
-  readonly authToken?: string;
   readonly metadataReportPath?: string;
   readonly lookupResourceAvailable?: boolean;
   readonly lookupRecordCount?: number;
@@ -125,7 +104,9 @@ const resolveAuth = (config: DDConfig): PipelineStep<DDContext> => ({
 const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Generate metadata report',
   run: async (ctx, onProgress) => {
-    await mkdir(ctx.outputPath, { recursive: true });
+    // outputPath is prepped by runDDCompliance before the pipeline
+    // starts (build + archive + mkdir via prepareOutputDir). No local
+    // mkdir needed here.
 
     // Fetch and validate EDMX metadata (also detects OData version)
     onProgress({ step: 'sub:metadata', status: 'running', message: 'Fetching OData XML metadata...' });
@@ -143,9 +124,9 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
     const baseReport = generateMetadataReport(edmxXml, ctx.version);
     onProgress({ step: 'sub:metadata', status: 'running', message: `Found ${baseReport.resources.length} resources, ${baseReport.fields.length.toLocaleString()} fields, ${baseReport.lookups.length.toLocaleString()} lookups` });
 
-    // Write raw metadata XML
-    const metadataXmlPath = join(ctx.outputPath, 'metadata.xml');
-    await writeFile(metadataXmlPath, edmxXml);
+    // Persist raw EDMX next to the report files (shared helper, same
+    // semantics as every other compliance pipeline).
+    const metadataXmlPath = await persistMetadataXml(ctx.outputPath, edmxXml);
 
     // Write base metadata report
     const baseReportPath = join(ctx.outputPath, 'metadata-report.json');
@@ -527,10 +508,7 @@ export const runDDCompliance = async (
   config: DDConfig,
   onProgress?: (progress: import('./types.js').StepProgress) => void,
 ) => {
-  const outputPath = buildOutputPath(config);
-
-  // Archive previous results before starting
-  await archiveCurrentResults(outputPath);
+  const outputPath = await prepareOutputDir('data-dictionary', config.version, config);
 
   const pipeline = createDDPipeline(config);
   const initialContext: DDContext = {

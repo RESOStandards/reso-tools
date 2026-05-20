@@ -9,19 +9,18 @@ import {
   parseMetadataXml,
   resolveAuthToken,
 } from '../test-runner/index.js';
+import { persistMetadataXml } from '../test-runner/metadata.js';
 import { runAllScenarios } from '../add-edit/index.js';
 import type { AddEditConfig, PipelineStep } from './types.js';
 import { createPipeline } from './pipeline.js';
-import { addEditReportGenerators, writeReports, buildOutputPath, archiveCurrentResults } from './reports.js';
+import { addEditReportGenerators, writeReports, prepareOutputDir } from './reports.js';
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
+import type { BaseTestContext } from './types.js';
 
 // ── Pipeline Context ──
 
-interface AddEditContext {
-  readonly serverUrl: string;
+interface AddEditContext extends BaseTestContext {
   readonly resource: string;
-  readonly authToken?: string;
-  readonly metadataXml?: string;
   readonly entityType?: unknown;
   readonly sampleKeys?: ReadonlyArray<string>;
   readonly payloadsDir?: string;
@@ -72,6 +71,9 @@ const fetchAndParseMetadata = (config: AddEditConfig): PipelineStep<AddEditConte
     const metadataXml = config.metadataPath
       ? await loadMetadataFromFile(config.metadataPath)
       : await fetchMetadata(ctx.serverUrl, ctx.authToken!);
+
+    // Persist raw EDMX next to the report files (CLI + UI download).
+    await persistMetadataXml(ctx.outputPath, metadataXml);
 
     const metadata = parseMetadataXml(metadataXml);
 
@@ -253,8 +255,8 @@ const runTests = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
 const writeComplianceReports = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
   name: 'Write reports',
   run: async (ctx, onProgress) => {
-    const outputDir = buildOutputPath('web-api-add-edit', config.specVersion ?? '2.0.0', config);
-    await archiveCurrentResults(outputDir);
+    // outputPath is prepped by runAddEditCompliance before the
+    // pipeline starts (prepareOutputDir).
     const generators = addEditReportGenerators(config.specVersion ?? '2.0.0');
 
     // Adapt testReport into resourceReports shape for the detailed report serializer
@@ -276,7 +278,7 @@ const writeComplianceReports = (config: AddEditConfig): PipelineStep<AddEditCont
       duration: 0,
     };
 
-    const written = await writeReports(pipelineResult, generators, outputDir, onProgress);
+    const written = await writeReports(pipelineResult, generators, ctx.outputPath, onProgress);
 
     return {
       context: { ...ctx, reports: written },
@@ -317,9 +319,11 @@ export const runAddEditCompliance = async (
   onProgress?: (progress: import('./types.js').StepProgress) => void,
 ) => {
   const pipeline = createAddEditPipeline(config);
+  const outputPath = await prepareOutputDir('web-api-add-edit', config.specVersion ?? '2.0.0', config);
   const initialContext: AddEditContext = {
     serverUrl: config.server.url,
     resource: config.resource,
+    outputPath,
   };
 
   return pipeline.run(

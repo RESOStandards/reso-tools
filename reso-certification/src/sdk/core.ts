@@ -6,23 +6,20 @@
  */
 
 import { resolveAuthToken } from '../test-runner/auth.js';
-import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, getEntityType } from '../test-runner/metadata.js';
+import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, getEntityType, persistMetadataXml } from '../test-runner/metadata.js';
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
 import { resolveTestParams, WELL_KNOWN_RESOURCES } from '../web-api-core/index.js';
 import { runCoreResourceScenarios, type ResourceTestReport } from '../web-api-core/test-runner.js';
-import type { CoreConfig, PipelineStep, StepResult } from './types.js';
+import type { BaseTestContext, CoreConfig, PipelineStep, StepResult } from './types.js';
 import { createPipeline } from './pipeline.js';
-import { coreReportGenerators, writeReports, buildOutputPath, archiveCurrentResults } from './reports.js';
+import { coreReportGenerators, writeReports, prepareOutputDir } from './reports.js';
 
 // ── Pipeline Context ──
 
-interface CoreContext {
-  readonly serverUrl: string;
+interface CoreContext extends BaseTestContext {
   readonly version: '2.0.0' | '2.1.0';
   readonly enumMode: 'auto' | 'isflags' | 'collections' | 'string';
   readonly resources: ReadonlyArray<string>;
-  readonly authToken?: string;
-  readonly metadataXml?: string;
   readonly resourceReports?: ReadonlyArray<ResourceTestReport>;
   readonly [key: string]: unknown;
 }
@@ -67,6 +64,11 @@ const fetchAndParseMetadata = (config: CoreConfig): PipelineStep<CoreContext> =>
     const metadataXml = config.metadataPath
       ? await loadMetadataFromFile(config.metadataPath)
       : await fetchMetadata(ctx.serverUrl, ctx.authToken!);
+
+    // Persist raw EDMX next to the report files so CLI users can grep
+    // it and the desktop client's "Download Metadata XML" button
+    // (job.reports.metadataXml) lights up automatically.
+    await persistMetadataXml(ctx.outputPath, metadataXml);
 
     const metadata = parseMetadataXml(metadataXml);
 
@@ -185,8 +187,9 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
 const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> => ({
   name: 'Write reports',
   run: async (ctx, onProgress) => {
-    const outputDir = buildOutputPath('web-api-core', config.version ?? '2.0.0', config);
-    await archiveCurrentResults(outputDir);
+    // outputPath is prepped (built + archived + mkdir'd) by
+    // runCoreCompliance before the pipeline starts so the fetch step
+    // can persist metadata.xml. Reuse it here instead of rebuilding.
     const generators = coreReportGenerators(config.version ?? '2.0.0');
 
     const resourceReports = ctx.resourceReports as ReadonlyArray<ResourceTestReport> ?? [];
@@ -200,7 +203,7 @@ const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> =
       duration: 0,
     };
 
-    const written = await writeReports(pipelineResult, generators, outputDir, onProgress);
+    const written = await writeReports(pipelineResult, generators, ctx.outputPath, onProgress);
 
     return {
       context: { ...ctx, reports: written },
@@ -229,11 +232,13 @@ export const runCoreCompliance = async (
 ) => {
   const pipeline = createCorePipeline(config);
   const resources = config.resources ?? WELL_KNOWN_RESOURCES.map(r => r.resource);
+  const outputPath = await prepareOutputDir('web-api-core', config.version ?? '2.0.0', config);
   const initialContext: CoreContext = {
     serverUrl: config.server.url,
     version: config.version ?? '2.0.0',
     enumMode: config.enumMode ?? 'auto',
     resources,
+    outputPath,
   };
 
   return pipeline.run(

@@ -3,7 +3,8 @@
  * @reso-standards/reso-client's CSDL parser and type validation to @reso-standards/validation.
  */
 
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { fetchRawMetadata, fetchRawMetadataWithVersion, parseCsdlXml } from '@reso-standards/reso-client';
 
 // Re-export so cert-side callers have a single import surface for the
@@ -80,6 +81,20 @@ export const fetchMetadataWithVersion = async (serverUrl: string, authToken: str
 
 /** Reads OData XML metadata from a local file. */
 export const loadMetadataFromFile = async (filePath: string): Promise<string> => readFile(filePath, 'utf-8');
+
+/**
+ * Persist raw EDMX metadata XML to `metadata.xml` in the given output
+ * directory. Returns the absolute path. Used by every compliance
+ * pipeline's fetch-metadata step so CLI users can find the metadata
+ * alongside the report files, and the desktop client's UI can wire its
+ * "Download Metadata XML" button to `job.reports.metadataXml`
+ * (filename mapped in `reso-desktop-client/src/main.ts`).
+ */
+export const persistMetadataXml = async (outputPath: string, xml: string): Promise<string> => {
+  const path = join(outputPath, 'metadata.xml');
+  await writeFile(path, xml);
+  return path;
+};
 
 /**
  * Parses an OData EDMX XML metadata document into a structured representation.

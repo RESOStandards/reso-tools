@@ -20,6 +20,30 @@ export type ProgressCallback = (progress: StepProgress) => void;
 /** Context accumulated across pipeline steps. Each step can read from and add to this. */
 export type PipelineContext = Record<string, unknown>;
 
+/**
+ * Shared base shape for any compliance-test pipeline context. Each
+ * runner's bespoke context (CoreContext / DDContext / AddEditContext /
+ * EntityEventContext / future runners) extends this so cross-runner
+ * helpers (output-dir setup, metadata persistence, …) can operate on
+ * any of them via the base type. Interface composition, not class
+ * inheritance — stays consistent with the project's no-classes rule.
+ */
+export interface BaseTestContext {
+  /** OData server base URL — set by the run*Compliance entry. */
+  readonly serverUrl: string;
+  /** Bearer token — set by the resolveAuth pipeline step. */
+  readonly authToken?: string;
+  /** Absolute path to this run's `current/` results directory. Built
+   *  by `prepareOutputDir` before the pipeline starts so any step can
+   *  write artifacts (metadata.xml, downloaded payloads, etc.) next
+   *  to the report files for CLI consumption + UI download buttons. */
+  readonly outputPath: string;
+  /** Raw EDMX metadata XML — set by the fetchAndParseMetadata step
+   *  when the metadata fetch succeeds. Shared helpers
+   *  (`persistMetadataXml`, etc.) read it from here. */
+  readonly metadataXml?: string;
+}
+
 /** Output returned by a pipeline step. */
 export interface StepOutput<TContext extends PipelineContext = PipelineContext> {
   /** Updated context for the next step. */
