@@ -1,23 +1,20 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { resolveAuthToken } from '../test-runner/auth.js';
-import { fetchMetadata, loadMetadataFromFile, parseMetadataXml } from '../test-runner/metadata.js';
+import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, persistMetadataXml } from '../test-runner/metadata.js';
 import { runAllEntityEventScenarios } from '../entity-event/test-runner.js';
 import type { EntityEventConfig as EERunnerConfig } from '../entity-event/types.js';
-import type { EntityEventConfig, PipelineStep } from './types.js';
+import type { BaseTestContext, EntityEventConfig, PipelineStep } from './types.js';
 import { createPipeline } from './pipeline.js';
-import { entityEventReportGenerators, writeReports, buildOutputPath, archiveCurrentResults } from './reports.js';
+import { entityEventReportGenerators, writeReports, prepareOutputDir } from './reports.js';
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
 import type { StepResult } from './types.js';
 
 // ── Pipeline Context ──
 
-interface EntityEventContext {
-  readonly serverUrl: string;
+interface EntityEventContext extends BaseTestContext {
   readonly mode: 'observe' | 'full';
   readonly writableResource: string;
-  readonly authToken?: string;
-  readonly metadataXml?: string;
   readonly payloadsDir?: string;
   readonly testReport?: unknown;
   readonly [key: string]: unknown;
@@ -78,6 +75,9 @@ const fetchAndParseMetadata = (config: EntityEventConfig): PipelineStep<EntityEv
     const metadataXml = config.payloadsDir
       ? await loadMetadataFromFile(config.payloadsDir)
       : await fetchMetadata(ctx.serverUrl, ctx.authToken!);
+
+    // Persist raw EDMX next to the report files (CLI + UI download).
+    await persistMetadataXml(ctx.outputPath, metadataXml);
 
     const metadata = parseMetadataXml(metadataXml);
 
@@ -179,11 +179,11 @@ const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> =
 });
 
 /** Write generic and detailed compliance reports. */
-const writeComplianceReports = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
+const writeComplianceReports = (_config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
   name: 'Write reports',
   run: async (ctx, onProgress) => {
-    const outputDir = buildOutputPath('entity-event', '1.0.0', config);
-    await archiveCurrentResults(outputDir);
+    // outputPath is prepped by runEntityEventCompliance before the
+    // pipeline starts (prepareOutputDir).
     const generators = entityEventReportGenerators('1.0.0');
 
     const testReport = ctx.testReport as { scenarios: ReadonlyArray<unknown>; summary: { total: number; passed: number; failed: number; skipped?: number } };
@@ -204,7 +204,7 @@ const writeComplianceReports = (config: EntityEventConfig): PipelineStep<EntityE
       duration: 0,
     };
 
-    const written = await writeReports(pipelineResult, generators, outputDir, onProgress);
+    const written = await writeReports(pipelineResult, generators, ctx.outputPath, onProgress);
 
     return {
       context: { ...ctx, reports: written },
@@ -232,10 +232,12 @@ export const runEntityEventCompliance = async (
   onProgress?: (progress: import('./types.js').StepProgress) => void,
 ) => {
   const pipeline = createEntityEventPipeline(config);
+  const outputPath = await prepareOutputDir('entity-event', '1.0.0', config);
   const initialContext: EntityEventContext = {
     serverUrl: config.server.url,
     mode: config.mode ?? 'observe',
     writableResource: config.writableResource ?? 'Property',
+    outputPath,
   };
 
   return pipeline.run(

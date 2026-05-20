@@ -31,6 +31,26 @@ export const archiveCurrentResults = async (currentPath: string): Promise<void> 
   await rename(currentPath, archivedDir);
 };
 
+/**
+ * One-shot output-dir preparation for a compliance pipeline run:
+ * build the canonical nested path, archive any previous `current/`,
+ * then mkdir the new one. Returns the path so the caller can stash
+ * it on `BaseTestContext.outputPath` before the pipeline starts —
+ * downstream steps then have a writable location for artifacts
+ * (metadata.xml, downloaded payloads, etc.) without each runner
+ * reimplementing this prelude.
+ */
+export const prepareOutputDir = async (
+  endorsementSlug: string,
+  version: string,
+  config: BaseComplianceConfig,
+): Promise<string> => {
+  const outputPath = buildOutputPath(endorsementSlug, version, config);
+  await archiveCurrentResults(outputPath);
+  await mkdir(outputPath, { recursive: true });
+  return outputPath;
+};
+
 // ── Report Types ──
 
 /** Base fields shared by all report formats (required by the Cert API). */
