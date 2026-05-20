@@ -169,7 +169,7 @@ const runScenario = async (
     return { tag: scenario.tag, name: scenario.name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url };
   } catch (err) {
     assertions.push({ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` });
-    return { tag: scenario.tag, name: scenario.name, passed: false, skipped: false, assertions, duration: Date.now() - start };
+    return { tag: scenario.tag, name: scenario.name, passed: false, skipped: false, assertions, duration: Date.now() - start, requestUrl: query.url };
   }
 };
 
@@ -370,7 +370,7 @@ const runStructuralScenario = async (
   }
 
   const allPassed = assertions.every(a => a.passed);
-  return { tag, name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start };
+  return { tag, name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestUrl: query.url };
 };
 
 /** Run server-driven paging scenario (v2.1.0). */
@@ -382,10 +382,12 @@ const runPagingScenario = async (
   start: number,
 ): Promise<ScenarioResult> => {
   const assertions: AssertionResult[] = [];
+  // Initial paging URL — kept in scope outside the try/while so the
+  // returned ScenarioResult can surface it in the failure report.
+  const initialUrl = `${serverUrl}/${resource}?$top=2&$select=${params.keyField}`;
 
   try {
-    // Start with $top=1 to get a small page
-    let url: string | undefined = `${serverUrl}/${resource}?$top=2&$select=${params.keyField}`;
+    let url: string | undefined = initialUrl;
     const allKeys = new Set<string>();
     let pages = 0;
     const maxPages = 20;
@@ -423,7 +425,7 @@ const runPagingScenario = async (
   }
 
   const allPassed = assertions.every(a => a.passed);
-  return { tag: 'server-driven-paging', name: 'Server-driven paging', passed: allPassed, skipped: false, assertions, duration: Date.now() - start };
+  return { tag: 'server-driven-paging', name: 'Server-driven paging', passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestUrl: initialUrl };
 };
 
 // ── Main runner ──
