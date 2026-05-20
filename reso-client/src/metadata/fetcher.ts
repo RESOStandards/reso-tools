@@ -32,6 +32,34 @@ export interface MetadataFetchResult {
 }
 
 /**
+ * Thrown when the server returns a non-2xx response to a metadata fetch.
+ *
+ * Carries the HTTP status, headers, and final URL alongside the message so
+ * callers that care about the response (e.g. a test runner asserting on the
+ * status as part of compliance checks) don't have to parse the error
+ * message. Happy-path callers that only need to know "metadata isn't
+ * available" still see a plain Error — they can ignore the extra fields.
+ *
+ * TODO(future): if we accumulate more callers that treat non-2xx as data
+ * rather than an exceptional condition, consider switching to a result-shape
+ * API (`{ ok, status, xml?, ... }`) and reserving throw for transport
+ * errors. For now the throw semantics match every happy-path caller's
+ * "can't continue without metadata" handling.
+ */
+export class MetadataFetchError extends Error {
+  readonly name = 'MetadataFetchError';
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly statusText: string,
+    readonly headers: Readonly<Record<string, string>>,
+    readonly url: string,
+  ) {
+    super(message);
+  }
+}
+
+/**
  * Detect the OData version from EDMX XML content.
  *
  * OData 4.0:  xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0"
@@ -67,7 +95,19 @@ export const fetchRawMetadataWithVersion = async (baseUrl: string, token: string
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch metadata from ${metadataUrl}: ${response.status} ${response.statusText}`);
+    // Snapshot the headers into a plain object so callers can read them
+    // without juggling a fetch Headers instance. Lowercased keys, since
+    // OData servers send `OData-Version` / `odata-version` / etc. and
+    // callers shouldn't have to remember which.
+    const headers: Record<string, string> = {};
+    response.headers.forEach((value, key) => { headers[key.toLowerCase()] = value; });
+    throw new MetadataFetchError(
+      `Failed to fetch metadata from ${metadataUrl}: ${response.status} ${response.statusText}`,
+      response.status,
+      response.statusText,
+      headers,
+      metadataUrl,
+    );
   }
 
   const xml = await response.text();

@@ -110,7 +110,7 @@ export { authConfigFromEnv, configFromEnv } from './env.js';
 export type { EnvConfig } from './env.js';
 
 // Metadata fetcher
-export { fetchRawMetadata, fetchRawMetadataWithVersion, fetchAndParseMetadata, type MetadataFetchOptions, type MetadataFetchResult } from './metadata/fetcher.js';
+export { fetchRawMetadata, fetchRawMetadataWithVersion, fetchAndParseMetadata, MetadataFetchError, type MetadataFetchOptions, type MetadataFetchResult } from './metadata/fetcher.js';
 
 // Lookup resolver
 export { createLookupResolver } from './lookup/resolver.js';

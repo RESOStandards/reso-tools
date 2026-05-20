@@ -196,7 +196,8 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
       counts: { resources: report.resources.length, fields: report.fields.length, lookups: report.lookups.length },
       artifacts,
       requestDetails: [
-        { method: 'GET', url: `${ctx.serverUrl}/$metadata` },
+        // Match what the wrapper actually fetches (useFormatParam: true).
+        { method: 'GET', url: `${ctx.serverUrl}/$metadata?$format=application/xml` },
         ...(lookupResourceAvailable ? [{ method: 'GET', url: lookupUrl }] : []),
       ],
       ...(validationErrors.length > 0 ? { errors: validationErrors } : {}),
