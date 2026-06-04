@@ -1,7 +1,7 @@
 {
   "description": "RESO Data Dictionary 2.0 Reference Metadata",
   "version": "2.0",
-  "generatedOn": "2026-05-13T21:47:33.506Z",
+  "generatedOn": "2026-06-04T21:42:53.263Z",
   "resources": [
     "Association",
     "Caravan",
@@ -25781,7 +25781,7 @@
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Lookup Display Name"
+          "value": "Standard Lookup Value"
         },
         {
           "term": "RESO.DDWikiUrl",
@@ -25789,7 +25789,7 @@
         },
         {
           "term": "Core.Description",
-          "value": "The Data Dictionary LookupDisplayName of the enumerated value. This field is required when the LookupValue for a given item corresponds to a RESO standard value, meaning a standard lookup display name, known synonym, local name or translation of that value. Local lookups may omit this value if they don't correspond to an existing RESO standard lookup value."
+          "value": "The Data Dictionary StandardLookupValue of the enumerated value. This field is required when the LookupValue for a given item corresponds to a RESO standard value, meaning a standard lookup display name, known synonym, local name or translation of that value. Local lookups may omit this value if they don't correspond to an existing RESO standard lookup value."
         }
       ],
       "elementStatus": "Active"
