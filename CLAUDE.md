@@ -257,6 +257,19 @@ Watch for:
 
 The backend layer copies are independent of this repo — bumping refs here does not affect server-side `validateBatch` until the `reso-dd-reference` layer is republished.
 
+## Pre-publish review
+
+Non-trivial PRs against the DD reference data path — `reso-certification/utils/generate-reference-metadata.js`, the `dd-{ver}.json` files in `reference-metadata/` and `src/etl/reference-metadata/`, the principles doc at `reso-certification/docs/dd-reference-fitness-principles.md`, or the fitness checker at `reso-certification/utils/check-dd-reference-fitness.js` — are reviewed against codified invariants before they reach the cert backend's publish gate. The review applies refute-by-default precision against a private library of review patterns. The patterns themselves are RESO review IP and live in a separate private location; this CLAUDE.md does not reproduce them.
+
+PR authors don't need to invoke the review themselves; it runs on the maintainer side before merge. The **most useful upstream signal** the review benefits from is a clear PR body that:
+
+- Links the upstream XLSX change (transport ticket or transport PR).
+- Lists per-tab deltas matching the JSON diff magnitudes.
+- Identifies any documented version-rename when cross-version FK targets diverge.
+- States explicitly when the generator (`generate-reference-metadata.js`) is touched and why (refactor / new column projection / structural fix).
+
+A PR body in that shape lets the review focus precisely. The fitness principles doc enumerates what the projection must satisfy; the review enforces those plus intent-drift signals the runtime tests cannot see.
+
 ## DD Docs URL Conventions
 
 Documentation site: https://dd.reso.org/
