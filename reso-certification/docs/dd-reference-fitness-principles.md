@@ -22,7 +22,7 @@ Lambda layer copy (reso-dd-reference/data/dd-{ver}.json)
         │  PR #118 data-consistency tests run as the contract gate
         │  before each layer publish.
         ▼
-Cert runtime consumers (validateBatch, getReferenceMetadata, lens registry)
+Cert runtime consumers (validateBatch, getReferenceMetadata, pre-publish adversarial review)
 ```
 
 The XLSX is sensitive to error in the upstream sense: an error here cascades to every downstream consumer. Treat XLSX mutations with maximum care — back-up before edit, openpyxl-only writes, linter pass after, diff against prior state before commit, audit deltas against the source ticket.
@@ -107,16 +107,16 @@ Any XLSX edit to a non-projected column will not show in the JSON diff. The XLSX
 
 ## Where principles are enforced
 
-| Principle | XLSX-time | JSON-time (reso-tools) | Layer-time (cert-backend) | Lens (PR review) |
+| Principle | XLSX-time | JSON-time (reso-tools) | Layer-time (cert-backend) | Pre-publish review |
 |---|---|---|---|---|
-| 1. Pure projector | — | `check-dd-reference-fitness.js` | — | `dd-reference-shape` |
+| 1. Pure projector | — | `check-dd-reference-fitness.js` | — | ✓ |
 | 2. Resource completeness | — | `check-dd-reference-fitness.js` | PR #118 test #3 | — |
 | 3. Expansion shape | — | `check-dd-reference-fitness.js` | PR #118 test #5a | — |
-| 4. sourceResource resolves | — | `check-dd-reference-fitness.js` | PR #118 test #5b | `dd-reference-shape` |
+| 4. sourceResource resolves | — | `check-dd-reference-fitness.js` | PR #118 test #5b | ✓ |
 | 5. Non-Edm resolves | — | `check-dd-reference-fitness.js` | PR #118 test #4 | — |
 | 6. Lookup completeness | — | `check-dd-reference-fitness.js` | PR #118 test #1 (schema) | — |
-| 7. Cross-version FK | — | `check-dd-reference-fitness.js` | — | `dd-reference-shape` |
-| 8. Count delta justified | — | (operator audit) | — | `dd-reference-shape` |
+| 7. Cross-version FK | — | `check-dd-reference-fitness.js` | — | ✓ |
+| 8. Count delta justified | — | (operator audit) | — | ✓ |
 | 9. Canonical URLs | `lint-dd-sheet.py` | — | — | — |
 | 10. Version header match | — | `check-dd-reference-fitness.js` | PR #118 test #2 | — |
 
@@ -125,7 +125,7 @@ Any XLSX edit to a non-projected column will not show in the JSON diff. The XLSX
 1. Append the principle to this document with rationale.
 2. Codify it as a check in `reso-certification/utils/check-dd-reference-fitness.js` (reso-tools-side, runs after generation).
 3. Codify it as a vitest test in `aws/lambda-layers/reso-dd-reference/tests/data-consistency.test.ts` (cert-backend-side, runs before layer publish).
-4. If the principle's violation is review-detectable (e.g., a PR modifies the generator without updating the tests), codify it as a lens under `.claude/agents/lenses/` in cert-backend.
+4. If the principle's violation is review-detectable (e.g., a PR modifies the generator without updating the tests), surface it to the pre-publish adversarial review process for codification.
 
 ## Related
 
@@ -134,5 +134,4 @@ Any XLSX edit to a non-projected column will not show in the JSON diff. The XLSX
 - XLSX diff: `reso-certification/utils/diff-dd-sheet.py`
 - JSON fitness check: `reso-certification/utils/check-dd-reference-fitness.js`
 - Cert-backend tests: PR #118 (`aws/lambda-layers/reso-dd-reference/tests/data-consistency.test.ts`)
-- Lens registry: cert-backend PR #117 (`.claude/agents/lenses/`)
 - Project workflow: see "DD Reference-Metadata Regeneration" in [CLAUDE.md](../../CLAUDE.md)
