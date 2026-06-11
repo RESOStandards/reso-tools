@@ -36,3 +36,6 @@ upi-validation-report.json
 
 # Sample fixtures are intentional — exempt them from the patterns above
 !sample-reports/**
+
+# Local MCP server config (may contain bearer tokens)
+.mcp.json
