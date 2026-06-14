@@ -341,6 +341,20 @@ const computeVariations = async ({
     // create metadata map
     const { metadataMap: metadataReportMap = {}, stats: metadataReportStats = {} } = buildMetadataMap(metadataReportJson);
 
+    // A suggested lookup target counts as already present in the provider's
+    // metadata if they declare it in EITHER form — wire (legacyODataValues) or
+    // display (lookupValues, incl. the StandardName annotation). Form-agnostic by
+    // design: same rule whichever transport the provider uses. Shared by both the
+    // lookupValue and legacyODataValue suppression checks so they stay identical.
+    const isSuggestedLookupTargetPresent = ({ suggestedResourceName, suggestedFieldName, suggestedLegacyODataValue, suggestedLookupValue }) =>
+      !!(
+        metadataReportMap?.[suggestedResourceName]?.[suggestedFieldName]?.legacyODataValues?.[suggestedLegacyODataValue] ||
+        metadataReportMap?.[suggestedResourceName]?.[suggestedFieldName]?.lookupValues?.[suggestedLookupValue] ||
+        Object.values(metadataReportMap?.[suggestedResourceName]?.[suggestedFieldName]?.lookupValues ?? {})?.some(
+          ({ standardLookupValue = null }) => !!suggestedLookupValue && suggestedLookupValue === standardLookupValue
+        )
+      );
+
     if (fromCli) {
       console.log(`Time taken: ${calculateElapsedTimeString(startTime, true)}`);
       console.log('Metadata info:', getMetadataInfo(metadataReportStats));
@@ -604,15 +618,7 @@ const computeVariations = async ({
                     if (lookupValueSuggestions?.length) {
                       //iterate through suggestions and determine if at least one was found in the system
                       const hasAtLeastOneSuggestedLookupValue =
-                        lookupValueSuggestions.some(
-                          ({ suggestedResourceName, suggestedFieldName, suggestedLookupValue }) =>
-                            !!(
-                              metadataReportMap?.[suggestedResourceName]?.[suggestedFieldName]?.lookupValues?.[suggestedLookupValue] ||
-                              Object.values(metadataReportMap?.[suggestedResourceName]?.[suggestedFieldName]?.lookupValues ?? {})?.some(
-                                ({ standardLookupValue = null }) => !!suggestedLookupValue && suggestedLookupValue === standardLookupValue
-                              )
-                            ) ?? false
-                        ) ?? false;
+                        lookupValueSuggestions.some(isSuggestedLookupTargetPresent) ?? false;
 
                       if (!hasAtLeastOneSuggestedLookupValue) {
                         POSSIBLE_VARIATIONS.lookupValues.push(
@@ -735,27 +741,22 @@ const computeVariations = async ({
 
                   if (!ignoreLegacyODataValueMapping) {
                     if (legacyODataValueSuggestions?.length) {
-                      POSSIBLE_VARIATIONS.legacyODataValues.push(
-                        ...(legacyODataValueSuggestions.flatMap(
-                          ({
-                            suggestedResourceName,
-                            suggestedFieldName,
-                            suggestedLegacyODataValue,
-                            suggestedLookupValue,
-                            isAdminReview,
-                            isFastTrack,
-                            ...suggestion
-                          }) => {
-                            // Suppress when the vendor already has the suggested target in either
-                            // form: wire (suggestedLegacyODataValue → legacyODataValues map) or
-                            // display (suggestedLookupValue → lookupValues map). v2's
-                            // checkLookupForm rewrites machine-friendly sources to wire form, so
-                            // the wire-form path covers most post-cleanup suggestions; single-cap
-                            // sources keep display form and need the lookupValues path.
-                            if (
-                              !(metadataReportMap?.[suggestedResourceName]?.[suggestedFieldName]?.legacyODataValues?.[suggestedLegacyODataValue]
-                                || metadataReportMap?.[suggestedResourceName]?.[suggestedFieldName]?.lookupValues?.[suggestedLookupValue])
-                            ) {
+                      //iterate through suggestions and determine if at least one was found in the system
+                      const hasAtLeastOneSuggestedLegacyODataValue =
+                        legacyODataValueSuggestions.some(isSuggestedLookupTargetPresent) ?? false;
+
+                      if (!hasAtLeastOneSuggestedLegacyODataValue) {
+                        POSSIBLE_VARIATIONS.legacyODataValues.push(
+                          ...(legacyODataValueSuggestions.flatMap(
+                            ({
+                              suggestedResourceName,
+                              suggestedFieldName,
+                              suggestedLegacyODataValue,
+                              suggestedLookupValue,
+                              isAdminReview,
+                              isFastTrack,
+                              ...suggestion
+                            }) => {
                               return [
                                 {
                                   resourceName,
@@ -775,12 +776,10 @@ const computeVariations = async ({
                                   ...suggestion
                                 }
                               ];
-                            } else {
-                              return [];
                             }
-                          }
-                        ) ?? [])
-                      );
+                          ) ?? [])
+                        );
+                      }
                     } else if (!isStandardLegacyODataValue) {
                       // use machine matching techniques
                       Object.keys(standardLegacyODataValues).forEach(standardODataLookupValue => {

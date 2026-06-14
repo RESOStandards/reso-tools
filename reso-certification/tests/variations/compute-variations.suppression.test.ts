@@ -184,3 +184,94 @@ describe('computeVariations: Issue 2 suppression (v3.0.0)', () => {
     expect(wasFlagged(result, 'Barbecue')).toBe(false);
   });
 });
+
+describe('computeVariations: suppression is entry-level any-one + form-agnostic, both transports', () => {
+  // Several suggestions on one source value (the entry-level any-one axis).
+  const multiSuggestionsFor = (sourceKey: string, sugs: Record<string, unknown>[]) => ({
+    Property: { Appliances: { [sourceKey]: { suggestions: sugs } } },
+  });
+  const sug = (extra: Record<string, unknown>) => ({
+    suggestedResourceName: 'Property',
+    suggestedFieldName: 'Appliances',
+    isFastTrack: true,
+    ...extra,
+  });
+  // A local non-canonical value the vendor stores, with distinct wire ('LocalHeater')
+  // and display ('Local Heater') forms — so the suggestions-map key selects which
+  // transport/site processes it: wire key → legacyODataValue site, display key →
+  // lookupValue site.
+  const LOCAL = lookup('LocalHeater', 'Local Heater');
+  const CANON = lookup('WaterHeater', 'Water Heater'); // a canonical the vendor declares
+
+  // ── entry-level any-one: one satisfied suggestion passes the whole entry ──
+  it('wire source · several suggestions · one already present → whole entry passes (any-one)', async () => {
+    const result = await computeVariations({
+      metadataReportJson: metadataReport([LOCAL, CANON]),
+      version: DD_2_0, fuzziness: FUZZ,
+      suggestionsMap: multiSuggestionsFor('LocalHeater', [
+        sug({ suggestedLookupValue: 'Water Heater' }), // present (vendor has it)
+        sug({ suggestedLookupValue: 'Dishwasher' }),   // absent
+      ]),
+    });
+    expect(wasFlagged(result, 'LocalHeater')).toBe(false);
+  });
+
+  it('wire source · several suggestions · none present → whole entry fails', async () => {
+    const result = await computeVariations({
+      metadataReportJson: metadataReport([LOCAL]),
+      version: DD_2_0, fuzziness: FUZZ,
+      suggestionsMap: multiSuggestionsFor('LocalHeater', [
+        sug({ suggestedLookupValue: 'Water Heater' }), // absent
+        sug({ suggestedLookupValue: 'Dishwasher' }),   // absent
+      ]),
+    });
+    expect(wasFlagged(result, 'LocalHeater')).toBe(true);
+  });
+
+  it('display source · several suggestions · one already present → whole entry passes (any-one)', async () => {
+    const result = await computeVariations({
+      metadataReportJson: metadataReport([LOCAL, CANON]),
+      version: DD_2_0, fuzziness: FUZZ,
+      suggestionsMap: multiSuggestionsFor('Local Heater', [
+        sug({ suggestedLookupValue: 'Water Heater' }), // present
+        sug({ suggestedLookupValue: 'Dishwasher' }),   // absent
+      ]),
+    });
+    expect(wasFlagged(result, 'Local Heater')).toBe(false);
+  });
+
+  it('display source · several suggestions · none present → whole entry fails', async () => {
+    const result = await computeVariations({
+      metadataReportJson: metadataReport([LOCAL]),
+      version: DD_2_0, fuzziness: FUZZ,
+      suggestionsMap: multiSuggestionsFor('Local Heater', [
+        sug({ suggestedLookupValue: 'Water Heater' }), // absent
+        sug({ suggestedLookupValue: 'Dishwasher' }),   // absent
+      ]),
+    });
+    expect(wasFlagged(result, 'Local Heater')).toBe(true);
+  });
+
+  // ── form-agnostic: each site finds the target in EITHER transport ──
+  it('display source · wire-form suggestion · vendor has wire form → passes (display site checks wire too)', async () => {
+    const result = await computeVariations({
+      metadataReportJson: metadataReport([LOCAL, CANON]),
+      version: DD_2_0, fuzziness: FUZZ,
+      suggestionsMap: multiSuggestionsFor('Local Heater', [
+        sug({ suggestedLegacyODataValue: 'WaterHeater' }), // wire-form target; vendor has WaterHeater (wire)
+      ]),
+    });
+    expect(wasFlagged(result, 'Local Heater')).toBe(false);
+  });
+
+  it('wire source · display-form suggestion · vendor has display form → passes (wire site checks display too)', async () => {
+    const result = await computeVariations({
+      metadataReportJson: metadataReport([LOCAL, CANON]),
+      version: DD_2_0, fuzziness: FUZZ,
+      suggestionsMap: multiSuggestionsFor('LocalHeater', [
+        sug({ suggestedLookupValue: 'Water Heater' }), // display-form target; vendor has Water Heater (display)
+      ]),
+    });
+    expect(wasFlagged(result, 'LocalHeater')).toBe(false);
+  });
+});
