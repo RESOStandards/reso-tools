@@ -741,12 +741,20 @@ const computeVariations = async ({
                             suggestedResourceName,
                             suggestedFieldName,
                             suggestedLegacyODataValue,
+                            suggestedLookupValue,
                             isAdminReview,
                             isFastTrack,
                             ...suggestion
                           }) => {
+                            // Suppress when the vendor already has the suggested target in either
+                            // form: wire (suggestedLegacyODataValue → legacyODataValues map) or
+                            // display (suggestedLookupValue → lookupValues map). v2's
+                            // checkLookupForm rewrites machine-friendly sources to wire form, so
+                            // the wire-form path covers most post-cleanup suggestions; single-cap
+                            // sources keep display form and need the lookupValues path.
                             if (
-                              !metadataReportMap?.[suggestedResourceName]?.[suggestedFieldName]?.lookupValues?.[suggestedLegacyODataValue]
+                              !(metadataReportMap?.[suggestedResourceName]?.[suggestedFieldName]?.legacyODataValues?.[suggestedLegacyODataValue]
+                                || metadataReportMap?.[suggestedResourceName]?.[suggestedFieldName]?.lookupValues?.[suggestedLookupValue])
                             ) {
                               return [
                                 {
@@ -756,6 +764,7 @@ const computeVariations = async ({
                                   suggestedResourceName,
                                   suggestedFieldName,
                                   suggestedLegacyODataValue,
+                                  ...(suggestedLookupValue != null ? { suggestedLookupValue } : {}),
                                   strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
                                   ddWikiUrl: getDDWikiUrl({
                                     version, standardMetadataMap,
