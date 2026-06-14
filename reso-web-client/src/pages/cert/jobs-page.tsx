@@ -127,7 +127,7 @@ import {
   STEP_STATUS_ICONS,
   STEP_STATUS_COLORS,
 } from '../../constants/cert';
-import { STEP_TOOLTIPS, STEP_WRITE_REPORTS, humanizeScenarioName, isVariationsStep } from '../../constants/cert';
+import { STEP_TOOLTIPS, STEP_WRITE_REPORTS, humanizeScenarioName, isVariationsStep, toDDVersionShort } from '../../constants/cert';
 import type { StepStatus } from '../../constants/cert';
 
 const statusColor = (status: JobStatus): string =>
@@ -862,7 +862,7 @@ export const JobsPage = () => {
         endorsements: [endorsementKey] as BatchConfig['recipients'][0]['endorsements'],
         auth: (server.auth as BatchConfig['recipients'][0]['auth']) ?? { mode: 'token' as const, authToken: '' },
         ddOptions: {
-          version: ((sdk.version as string) ?? '2.0') as '1.7' | '2.0' | '2.1',
+          version: toDDVersionShort((sdk.version as string) ?? '2.0'),
           strictMode: sdk.strictMode as boolean | undefined,
           batchExpand: sdk.batchExpand as boolean | undefined,
           requestDelay: sdk.requestDelay as number | undefined,

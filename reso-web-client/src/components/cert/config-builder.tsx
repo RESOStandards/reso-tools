@@ -16,6 +16,7 @@ import { useAuth } from '../../hooks/use-auth';
 import { useCurrentUserSystems } from '../../hooks/use-current-user-systems';
 import type { CertOrganization, CertOrganizationSystem } from '../../api/cert-client';
 import {
+  CURRENT_DD_VERSION,
   CERT_ENDORSEMENT_LABELS,
   CERT_ENDORSEMENT_COLORS,
   MEMORY_WARNING_THRESHOLD,
@@ -45,7 +46,10 @@ export interface ClientCredentialsConfig {
 export type AuthConfig = AuthTokenConfig | ClientCredentialsConfig;
 
 interface DDOptions {
-  readonly version: '1.7' | '2.0' | '2.1';
+  // Free-form: the UI only lets users *select* the current version, but a
+  // re-run or import can legitimately carry a past version. The server gates
+  // which versions are actually supported (dd-{ver}.json existence check).
+  readonly version: string;
   readonly originatingSystemName?: string;
   readonly originatingSystemId?: string;
   readonly limit?: number;
@@ -141,7 +145,7 @@ const buildRecipientFromConfig = async (
 
 // ── Defaults ─────────────────────────────────────────────────────────
 
-const DEFAULT_DD: DDOptions = { version: '2.1', strictMode: true };
+const DEFAULT_DD: DDOptions = { version: CURRENT_DD_VERSION, strictMode: true };
 const DEFAULT_CORE: CoreOptions = { version: '2.0.0', enumMode: 'auto' };
 const DEFAULT_ADD_EDIT: AddEditOptions = { resource: 'Property' };
 const DEFAULT_ENTITY_EVENT: EntityEventOptions = { mode: 'observe', maxEvents: 1000, pollInterval: 5000, pollTimeout: 60000 };
@@ -268,8 +272,8 @@ const DDOptionsSection = ({
     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
       <div>
         <label className={LABEL}>DD Version</label>
-        <select value={options.version} onChange={e => onChange({ ...options, version: e.target.value as DDOptions['version'] })} className={SELECT}>
-          <option value="2.1">2.1</option>
+        <select value={options.version} onChange={e => onChange({ ...options, version: e.target.value })} className={SELECT}>
+          <option value={CURRENT_DD_VERSION}>{CURRENT_DD_VERSION}</option>
         </select>
       </div>
       <div>

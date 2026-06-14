@@ -31,8 +31,21 @@ export interface TestParams {
   readonly multiLookupField?: string;
   readonly multiLookupValue1?: string;
   readonly multiLookupValue2?: string;
+  /** A plain (non-lookup) Edm.String field + a sample substring, for the
+   *  optional string-function tests (contains/startswith/endswith). */
   readonly stringField?: string;
   readonly stringValue?: string;
+  /** Additional sample values for the OData 4.01 `in` operator scenario.
+   *  Need at least 2 distinct lookup values; the runner skips the scenario
+   *  if fewer than 2 of `singleLookupValue` / `singleLookupValue2` /
+   *  `singleLookupValue3` are populated. */
+  readonly singleLookupValue2?: string;
+  readonly singleLookupValue3?: string;
+  /** Map from single-lookup field name to its RESO.OData.Metadata.LookupName
+   *  annotation value. Used by the Lookup Resource validation scenario
+   *  (`GET /Lookup?$filter=LookupName eq '<lookupName>'`). Sampled from the
+   *  metadata at test-setup time. Falls back to the field name if absent. */
+  readonly lookupNameByField?: Readonly<Record<string, string>>;
   readonly expandField?: string;
   readonly skippedTypes: ReadonlyArray<string>;
 }
@@ -249,14 +262,20 @@ export const resolveTestParams = async (
     : undefined;
   if (!timestampField) skippedTypes.push('timestamp');
 
-  // Resolve single lookup
+  // Resolve single lookup field + up to 3 distinct sample values (the third
+  // and second are used by the OData 4.01 `in` operator scenario; the runner
+  // accepts as few as 2 to construct the in-list).
   let singleLookupField: string | undefined;
   let singleLookupValue: string | undefined;
+  let singleLookupValue2: string | undefined;
+  let singleLookupValue3: string | undefined;
   for (const field of singleLookupFields) {
-    const vals = collectValues(records, field);
-    if (vals.length > 0) {
+    const distinct = Array.from(new Set(collectValues(records, field).map(String)));
+    if (distinct.length > 0) {
       singleLookupField = field;
-      singleLookupValue = String(vals[0]);
+      singleLookupValue = distinct[0];
+      singleLookupValue2 = distinct[1];
+      singleLookupValue3 = distinct[2];
       break;
     }
   }
@@ -266,22 +285,27 @@ export const resolveTestParams = async (
   const multiResult = findMultiLookupValues(multiLookupFields, records);
   if (!multiResult) skippedTypes.push('multiLookup');
 
-  // Resolve string field for contains/startswith/endswith (v2.1.0)
-  const plainStringFields = entityType.properties
+  // Resolve a plain string field + sample substring for the optional string
+  // function tests (contains/startswith/endswith). v2.1.0.
+  const stringSample = entityType.properties
     .filter(p => p.type === 'Edm.String' && !p.annotations?.['RESO.OData.Metadata.LookupName'])
-    .map(p => p.name);
-  let stringField: string | undefined;
-  let stringValue: string | undefined;
-  for (const field of plainStringFields) {
-    const vals = collectValues(records, field);
-    if (vals.length > 0) {
-      const val = String(vals[0]);
-      if (val.length >= 3) {
-        stringField = field;
-        // Use a substring from the middle for contains/startswith/endswith
-        stringValue = val.slice(0, Math.min(5, val.length));
-        break;
-      }
+    .map(p => {
+      const vals = collectValues(records, p.name);
+      const val = vals.length > 0 ? String(vals[0]) : '';
+      return val.length >= 3 ? { field: p.name, value: val.slice(0, Math.min(5, val.length)) } : undefined;
+    })
+    .find((m): m is { field: string; value: string } => m != null);
+  const stringField = stringSample?.field;
+  const stringValue = stringSample?.value;
+
+  // Map single-lookup fields to their RESO.OData.Metadata.LookupName annotation
+  // for the Lookup Resource validation scenario.
+  const lookupNameByField: Record<string, string> = {};
+  for (const field of singleLookupFields) {
+    const prop = entityType.properties.find(p => p.name === field);
+    const lookupName = prop?.annotations?.['RESO.OData.Metadata.LookupName'];
+    if (typeof lookupName === 'string' && lookupName) {
+      lookupNameByField[field] = lookupName;
     }
   }
 
@@ -302,11 +326,14 @@ export const resolveTestParams = async (
     datetimeValue,
     singleLookupField,
     singleLookupValue,
+    singleLookupValue2,
+    singleLookupValue3,
     multiLookupField: multiResult?.field,
     multiLookupValue1: multiResult?.value1,
     multiLookupValue2: multiResult?.value2,
     stringField,
     stringValue,
+    lookupNameByField: Object.keys(lookupNameByField).length ? lookupNameByField : undefined,
     skippedTypes,
   };
 };

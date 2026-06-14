@@ -29,8 +29,21 @@ export const CERT_ENDORSEMENT_COLORS: Readonly<Record<CertEndorsement, string>> 
 export type DDVersion = '1.7' | '2.0' | '2.1';
 export type CoreVersion = '2.0.0' | '2.1.0';
 
-export const DEFAULT_DD_VERSION: DDVersion = '2.0';
+/** The current DD version — the only one selectable in the UI. Past versions
+ *  stay runnable from the CLI/SDK, which gate server-side via the existence
+ *  check against the dd-{ver}.json reference metadata. */
+export const CURRENT_DD_VERSION: DDVersion = '2.1';
+export const DEFAULT_DD_VERSION: DDVersion = CURRENT_DD_VERSION;
 export const DEFAULT_CORE_VERSION: CoreVersion = '2.0.0';
+
+/**
+ * Normalize a version string to DD MAJOR.MINOR form (e.g. "2.1.0" → "2.1").
+ * Pure: strips the patch level — no allowlist, no fallback. Whether a version
+ * is actually supported is gated server-side (existence of the dd-{ver}.json
+ * reference metadata), so the UI carries no version list of its own.
+ */
+export const toDDVersionShort = (version: string): string =>
+  version.split('.').slice(0, 2).join('.');
 
 export const ENDORSEMENT_DEFAULT_VERSIONS: Readonly<Record<CertEndorsement, string>> = {
   dd: DEFAULT_DD_VERSION,

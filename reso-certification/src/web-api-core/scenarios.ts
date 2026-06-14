@@ -29,6 +29,10 @@ interface BaseScenario {
   readonly tag: string;
   readonly name: string;
   readonly minVersion: MinVersion;
+  /** When true, this scenario is an "Optional Test": its failure never affects
+   *  the Core verdict (it renders Passed / Not Supported / Not Tested instead).
+   *  Absent = required (the default). */
+  readonly optional?: boolean;
 }
 
 export interface StructuralScenario extends BaseScenario {
@@ -89,6 +93,8 @@ export interface StringEnumScenario extends BaseScenario {
   readonly valueParam2?: string;
 }
 
+/** String function filters (contains / startswith / endswith). Optional: per
+ *  the workgroup these are not required for Core certification. */
 export interface StringFunctionScenario extends BaseScenario {
   readonly category: 'string-function';
   readonly func: 'contains' | 'startswith' | 'endswith';
@@ -106,6 +112,29 @@ export interface ExpandScenario extends BaseScenario {
   readonly fieldParam: string;
 }
 
+export interface InOperatorScenario extends BaseScenario {
+  readonly category: 'in-operator';
+  readonly enumType: 'single';
+  readonly fieldParam: string;
+  /** List of value parameters to put inside the `in (…)` clause. Per RCP-039
+   *  the example uses three values; minimum 2 to be meaningful. Gated on the
+   *  server advertising OData-Version 4.01 in the response header — the test
+   *  runner skips this scenario for 4.0-only servers. */
+  readonly valueParams: ReadonlyArray<string>;
+}
+
+export interface LookupResourceValidationScenario extends BaseScenario {
+  readonly category: 'lookup-resource';
+  readonly assertion: 'lookup-resource-validation';
+  /** Which LookupName to fetch and validate. Per RCP-039 the provider supplies
+   *  the LookupName + sample values; this scenario runs first among string-enum
+   *  tests so cascade-skip can short-circuit dependent scenarios if the
+   *  Lookup Resource doesn't carry the expected name/values. */
+  readonly fieldParam: string;
+  readonly valueParam: string;
+  readonly valueParam2?: string;
+}
+
 export type CoreScenario =
   | StructuralScenario
   | FilterScenario
@@ -116,7 +145,9 @@ export type CoreScenario =
   | StringEnumScenario
   | StringFunctionScenario
   | PagingScenario
-  | ExpandScenario;
+  | ExpandScenario
+  | InOperatorScenario
+  | LookupResourceValidationScenario;
 
 // ── v2.0.0 Scenarios (45 total) ──
 
@@ -201,10 +232,13 @@ const stringEnumScenarios: ReadonlyArray<StringEnumScenario> = [
   { tag: 'filter-string-enum-multi-all', name: 'String enum collection: all()', category: 'string-enum', enumType: 'multi', op: 'all', fieldParam: 'multiLookupField', valueParam: 'multiLookupValue1', valueParam2: 'multiLookupValue2', minVersion: '2.1.0' },
 ];
 
+// String function filters — OPTIONAL ("Optional Tests"): not required for Core
+// certification per the workgroup. A failure renders "Not Supported", never a
+// Core fail. Restored from the pre-RCP-039 set, now tagged optional.
 const stringFunctionScenarios: ReadonlyArray<StringFunctionScenario> = [
-  { tag: 'filter-string-contains', name: 'String: contains()', category: 'string-function', func: 'contains', fieldParam: 'stringField', valueParam: 'stringValue', minVersion: '2.1.0' },
-  { tag: 'filter-string-startswith', name: 'String: startswith()', category: 'string-function', func: 'startswith', fieldParam: 'stringField', valueParam: 'stringValue', minVersion: '2.1.0' },
-  { tag: 'filter-string-endswith', name: 'String: endswith()', category: 'string-function', func: 'endswith', fieldParam: 'stringField', valueParam: 'stringValue', minVersion: '2.1.0' },
+  { tag: 'filter-string-contains', name: 'String: contains()', category: 'string-function', func: 'contains', fieldParam: 'stringField', valueParam: 'stringValue', minVersion: '2.1.0', optional: true },
+  { tag: 'filter-string-startswith', name: 'String: startswith()', category: 'string-function', func: 'startswith', fieldParam: 'stringField', valueParam: 'stringValue', minVersion: '2.1.0', optional: true },
+  { tag: 'filter-string-endswith', name: 'String: endswith()', category: 'string-function', func: 'endswith', fieldParam: 'stringField', valueParam: 'stringValue', minVersion: '2.1.0', optional: true },
 ];
 
 const pagingScenarios: ReadonlyArray<PagingScenario> = [
@@ -213,6 +247,19 @@ const pagingScenarios: ReadonlyArray<PagingScenario> = [
 
 const expandScenarios: ReadonlyArray<ExpandScenario> = [
   { tag: 'expand', name: '$expand navigation property', category: 'expand', fieldParam: 'expandField', minVersion: '2.1.0' },
+];
+
+// Runs first among string-enum tests; cascade-skip applies to dependent
+// scenarios if the LookupName / sample values aren't present in the
+// Lookup Resource. Per RCP-039.
+const lookupResourceScenarios: ReadonlyArray<LookupResourceValidationScenario> = [
+  { tag: 'lookup-resource-validation', name: 'Lookup Resource: LookupName and sample values present', category: 'lookup-resource', assertion: 'lookup-resource-validation', fieldParam: 'singleLookupField', valueParam: 'singleLookupValue', minVersion: '2.1.0' },
+];
+
+// OData 4.01 in-operator. Gated on the response advertising OData-Version 4.01.
+// Per RCP-039: `GET /Property?$filter=StandardStatus in ('Active', 'Pending', 'Sold')`.
+const inOperatorScenarios: ReadonlyArray<InOperatorScenario> = [
+  { tag: 'filter-string-enum-single-in', name: 'String enum: in (...)', category: 'in-operator', enumType: 'single', fieldParam: 'singleLookupField', valueParams: ['singleLookupValue', 'singleLookupValue2', 'singleLookupValue3'], minVersion: '2.1.0' },
 ];
 
 // ── All Scenarios ──
@@ -227,8 +274,10 @@ export const allScenarios: ReadonlyArray<CoreScenario> = [
   ...enumScenarios,
   ...collectionScenarios,
   ...errorScenarios,
+  ...lookupResourceScenarios,
   ...stringEnumScenarios,
   ...stringFunctionScenarios,
+  ...inOperatorScenarios,
   ...pagingScenarios,
   ...expandScenarios,
 ];

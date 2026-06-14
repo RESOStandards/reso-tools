@@ -23,6 +23,7 @@ import {
   type SavedCredentials,
   type SavedCertConfig,
 } from './connection-manager';
+import { toDDVersionShort } from '../constants/cert';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -202,7 +203,7 @@ export const importConfig = async (
         providerName,
         recipientName,
         endorsements: [...endorsements],
-        ddVersion: entry.ddOptions?.version ?? '2.1',
+        ddVersion: toDDVersionShort(entry.ddOptions?.version ?? '2.1'),
         limit: entry.ddOptions?.limit,
         strictMode: entry.ddOptions?.strictMode ?? true,
         requestDelay: entry.ddOptions?.requestDelay,

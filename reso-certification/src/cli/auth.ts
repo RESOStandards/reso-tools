@@ -17,23 +17,73 @@ export interface CliAuthFlags {
 }
 
 /**
- * Load a .env file from the given directory (defaults to cwd) and merge
- * its values into process.env. Existing env vars take precedence.
+ * Load a .env file from the first directory in `searchPaths` that contains
+ * one, merging its values into process.env. Existing env vars take precedence.
  *
- * No-op if the .env file does not exist.
+ * If no `searchPaths` argument is given, falls back to `[process.cwd()]` —
+ * preserves the old single-cwd behavior.
+ *
+ * No-op if no .env file is found in any of the search paths.
  */
-export const loadDotEnv = (cwd?: string): void => {
-  const envPath = resolve(cwd ?? process.cwd(), '.env');
-  try {
-    const content = readFileSync(envPath, 'utf-8');
-    const parsed = parseEnv(content);
-    for (const [key, value] of Object.entries(parsed)) {
-      if (!(key in process.env)) {
-        process.env[key] = value;
+export const loadDotEnv = (searchPaths?: ReadonlyArray<string>): void => {
+  const paths = searchPaths && searchPaths.length > 0 ? searchPaths : [process.cwd()];
+  for (const dir of paths) {
+    const envPath = resolve(dir, '.env');
+    try {
+      const content = readFileSync(envPath, 'utf-8');
+      const parsed = parseEnv(content);
+      for (const [key, value] of Object.entries(parsed)) {
+        if (!(key in process.env)) {
+          process.env[key] = value;
+        }
       }
+      return;
+    } catch {
+      // try next path
     }
-  } catch {
-    // .env file not found or unreadable — that's fine
+  }
+};
+
+/**
+ * Mint a fresh OAuth2 bearer token via the client_credentials grant when
+ * the env carries `TOKEN_URI`, `CLIENT_ID`, and `CLIENT_SECRET`. Returns the
+ * token string on success, or `undefined` when the env vars are missing or
+ * the mint fails. The caller decides whether to fall through to another
+ * auth path or surface the error.
+ *
+ * Generic enough to use for any CLI subcommand that needs a fresh provider
+ * token (variations service, future provider-services endpoints, etc.).
+ */
+export const mintOAuth2ClientCredentialsToken = async (): Promise<string | undefined> => {
+  const tokenUri = process.env.TOKEN_URI;
+  const clientId = process.env.CLIENT_ID;
+  const clientSecret = process.env.CLIENT_SECRET;
+  if (!tokenUri || !clientId || !clientSecret) return undefined;
+
+  try {
+    const params = new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: clientId,
+      client_secret: clientSecret,
+    });
+    const res = await fetch(tokenUri, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+    if (!res.ok) {
+      console.error(`OAuth2 token mint failed: HTTP ${res.status} ${res.statusText}`);
+      return undefined;
+    }
+    const parsed = (await res.json()) as { access_token?: unknown };
+    if (typeof parsed.access_token !== 'string') {
+      console.error('OAuth2 token mint succeeded but response had no access_token.');
+      return undefined;
+    }
+    return parsed.access_token;
+  } catch (err) {
+    console.error('OAuth2 token mint threw:', err instanceof Error ? err.message : String(err));
+    return undefined;
   }
 };
 

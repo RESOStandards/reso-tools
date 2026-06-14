@@ -21,6 +21,7 @@ import {
   maskSecret,
 } from '../../services/connection-manager';
 import { importConfig, readConfigFile, type ImportResult } from '../../services/config-import';
+import { toDDVersionShort } from '../../constants/cert';
 
 const PAGE_CONTAINER = 'max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8';
 const CARD = 'bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:border-blue-300 dark:hover:border-blue-600 transition-colors cursor-pointer';
@@ -87,7 +88,7 @@ export const ConfigsPage = () => {
           ? { mode: 'client_credentials' as const, clientId: conn.clientId ?? '', clientSecret, tokenUrl: conn.tokenUrl ?? '', scope: conn.scope ?? '', authToken: '' }
           : { mode: 'token' as const, authToken, clientId: '', clientSecret: '', tokenUrl: '', scope: '' },
         endorsements: [...config.endorsements],
-        ddOptions: { version: config.ddVersion ?? '2.1', strictMode: config.strictMode ?? true, limit: config.limit, requestDelay: config.requestDelay, rateLimitWait: config.rateLimitWait, batchExpand: config.batchExpand },
+        ddOptions: { version: toDDVersionShort(config.ddVersion ?? '2.1'), strictMode: config.strictMode ?? true, limit: config.limit, requestDelay: config.requestDelay, rateLimitWait: config.rateLimitWait, batchExpand: config.batchExpand },
         coreOptions: { version: '2.0.0' },
         addEditOptions: { resource: 'Property', specVersion: '2.0.0' },
         entityEventOptions: { mode: 'full' as const, writableResource: 'Property' },

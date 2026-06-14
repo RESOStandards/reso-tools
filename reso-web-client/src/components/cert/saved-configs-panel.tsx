@@ -15,6 +15,7 @@ import {
   type SavedCertConfig,
   type SavedCredentials,
 } from '../../services/connection-manager';
+import { toDDVersionShort } from '../../constants/cert';
 
 interface SavedConfigsPanelProps {
   /** Called when the user loads a saved config into the form. */
@@ -58,7 +59,7 @@ export const SavedConfigsPanel = ({ onLoad }: SavedConfigsPanelProps) => {
           ? { mode: 'client_credentials' as const, clientId: conn.clientId ?? '', clientSecret, tokenUrl: conn.tokenUrl ?? '', scope: conn.scope ?? '', authToken: '' }
           : { mode: 'token' as const, authToken, clientId: '', clientSecret: '', tokenUrl: '', scope: '' },
         endorsements: [...cfg.endorsements],
-        ddOptions: { version: cfg.ddVersion ?? '2.1', strictMode: cfg.strictMode ?? true, limit: cfg.limit, requestDelay: cfg.requestDelay, rateLimitWait: cfg.rateLimitWait, batchExpand: cfg.batchExpand },
+        ddOptions: { version: toDDVersionShort(cfg.ddVersion ?? '2.1'), strictMode: cfg.strictMode ?? true, limit: cfg.limit, requestDelay: cfg.requestDelay, rateLimitWait: cfg.rateLimitWait, batchExpand: cfg.batchExpand },
         coreOptions: { version: '2.0.0' },
         addEditOptions: { resource: 'Property', specVersion: '2.0.0' },
         entityEventOptions: { mode: 'full' as const, writableResource: 'Property' },

@@ -14,6 +14,8 @@ import type {
   ErrorScenario,
   StringEnumScenario,
   StringFunctionScenario,
+  InOperatorScenario,
+  LookupResourceValidationScenario,
   ExpandScenario,
 } from './scenarios.js';
 
@@ -170,20 +172,53 @@ const buildStringEnumUrl = (
   return { url, selectFields };
 };
 
-const buildStringFunctionUrl = (
+// Build `$filter=Field in ('A','B','C')` against the resource being tested.
+// Skipped at runtime when the server's response advertises OData-Version 4.0
+// only (the `in` operator was introduced in 4.01); the gate lives in test-runner.
+const buildInOperatorUrl = (
   serverUrl: string,
   resource: string,
   params: TestParams,
-  scenario: StringFunctionScenario,
+  scenario: InOperatorScenario,
 ): QuerySpec | undefined => {
   const field = resolveField(params, scenario.fieldParam);
-  const value = resolveParam(params, scenario.valueParam);
-  if (!field || value == null) return undefined;
+  if (!field) return undefined;
+
+  const values = scenario.valueParams
+    .map(p => resolveParam(params, p))
+    .filter((v): v is string => v != null && v !== '');
+  // Need at least two values to make `in` meaningful; otherwise it degenerates to `eq`.
+  if (values.length < 2) return undefined;
 
   const selectFields = [params.keyField, field];
-  const filterExpr = `${scenario.func}(${field},'${value}')`;
+  const valueList = values.map(v => `'${v}'`).join(',');
+  const filterExpr = `${field} in (${valueList})`;
   const url = `${serverUrl}/${resource}?$filter=${encodeURIComponent(filterExpr)}&$select=${selectFields.join(',')}`;
   return { url, selectFields };
+};
+
+// GET /Lookup?$filter=LookupName eq 'X'. Used to validate that the provider's
+// Lookup Resource carries the LookupName the provider supplied AND the sample
+// lookup values they listed. Sample-value presence check happens in the test
+// runner against the returned payload, not here.
+const buildLookupResourceUrl = (
+  serverUrl: string,
+  params: TestParams,
+  scenario: LookupResourceValidationScenario,
+): QuerySpec | undefined => {
+  const field = resolveField(params, scenario.fieldParam);
+  if (!field) return undefined;
+  // Per RCP-039, providers must use RESO.OData.Metadata.LookupName on
+  // Edm.String enum fields. The runner resolves the LookupName from the
+  // metadata annotation on `field`. The URL filter uses that LookupName.
+  // We delegate the actual annotation lookup to the test runner so this
+  // builder stays a pure URL constructor; the runner will pass the
+  // resolved LookupName via a future param. For now produce a sentinel
+  // URL using the field name as a placeholder for the LookupName.
+  const lookupName = params.lookupNameByField?.[field] ?? field;
+  const filterExpr = `LookupName eq '${lookupName}'`;
+  const url = `${serverUrl}/Lookup?$filter=${encodeURIComponent(filterExpr)}&$select=LookupName,LookupValue,StandardLookupValue`;
+  return { url, selectFields: ['LookupName', 'LookupValue', 'StandardLookupValue'] };
 };
 
 const buildExpandUrl = (
@@ -257,6 +292,24 @@ const buildStructuralUrl = (
   }
 };
 
+// String function filter: $filter=contains|startswith|endswith(Field,'value').
+// Optional ("Optional Tests") — restored alongside the RCP-039 work.
+const buildStringFunctionUrl = (
+  serverUrl: string,
+  resource: string,
+  params: TestParams,
+  scenario: StringFunctionScenario,
+): QuerySpec | undefined => {
+  const field = resolveField(params, scenario.fieldParam);
+  const value = resolveParam(params, scenario.valueParam);
+  if (!field || value == null) return undefined;
+
+  const selectFields = [params.keyField, field];
+  const filterExpr = `${scenario.func}(${field},'${value}')`;
+  const url = `${serverUrl}/${resource}?$filter=${encodeURIComponent(filterExpr)}&$select=${selectFields.join(',')}`;
+  return { url, selectFields };
+};
+
 // ── Main dispatcher ──
 
 /**
@@ -286,6 +339,10 @@ export const buildScenarioQuery = (
       return buildStringEnumUrl(serverUrl, resource, params, scenario);
     case 'string-function':
       return buildStringFunctionUrl(serverUrl, resource, params, scenario);
+    case 'in-operator':
+      return buildInOperatorUrl(serverUrl, resource, params, scenario);
+    case 'lookup-resource':
+      return buildLookupResourceUrl(serverUrl, params, scenario);
     case 'expand':
       return buildExpandUrl(serverUrl, resource, params, scenario);
     case 'paging':

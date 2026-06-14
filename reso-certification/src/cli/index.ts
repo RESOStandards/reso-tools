@@ -11,6 +11,12 @@
  * Exit codes: 0 = all scenarios passed, 1 = one or more failed, 2 = runtime error.
  */
 
+// IMPORTANT: env-bootstrap MUST be the very first import. It calls
+// loadDotEnv() as an import-time side effect so that subsequent imports
+// (notably anything that transitively touches src/legacy/*) see env vars
+// like RESO_SERVICES_URL populated when they destructure process.env.
+import './env-bootstrap.js';
+
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Command } from 'commander';
@@ -20,8 +26,41 @@ import { startMockServer, stopMockServer } from '../add-edit/mock/server.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
 import { loadConfigFile, configEntryToAddEdit, configEntryToEntityEvent } from '../sdk/config.js';
 import type { AddEditConfig, EntityEventConfig, CoreConfig, DDConfig, PipelineResult } from '../sdk/types.js';
-import { loadDotEnv, resolveCliAuth } from './auth.js';
+import { resolveCliAuth, mintOAuth2ClientCredentialsToken } from './auth.js';
+import { CURRENT_DD_VERSION, CERTIFIABLE_DD_VERSIONS, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
 import { resolveRenderMode, runWithProgress, runConfigEntries } from './render.js';
+
+// ── Legacy CJS bridge — lets us call the frozen v3.0.0 findVariations ──
+
+const createRequire = (await import('node:module')).createRequire;
+const requireLegacy = createRequire(import.meta.url);
+
+interface LegacyVariationsOptions {
+  readonly pathToMetadataReportJson: string;
+  readonly fuzziness?: number;
+  readonly version?: string;
+  readonly useSuggestions?: boolean;
+  readonly fromCli?: boolean;
+  readonly bearerToken?: string;
+}
+
+interface LegacyVariationsModule {
+  readonly findVariations: (opts: LegacyVariationsOptions) => Promise<unknown>;
+}
+
+const isLegacyVariationsModule = (m: unknown): m is LegacyVariationsModule =>
+  typeof m === 'object' &&
+  m !== null &&
+  typeof (m as Record<string, unknown>).findVariations === 'function';
+
+const legacyVariationsRaw: unknown = requireLegacy(
+  resolve(import.meta.dirname, '../legacy/lib/variations/index.js')
+);
+if (!isLegacyVariationsModule(legacyVariationsRaw)) {
+  throw new Error('Failed to load legacy variations module — findVariations export missing.');
+}
+const { findVariations: legacyFindVariations } = legacyVariationsRaw;
+
 
 /** Default port for mock OData servers when started via --mock. */
 const DEFAULT_MOCK_PORT = 8800;
@@ -39,10 +78,6 @@ const formatResultJson = (results: ReadonlyArray<PipelineResult>): string =>
 /** Determine exit code from pipeline results. */
 const resolveExitCode = (results: ReadonlyArray<PipelineResult>): number =>
   results.some(r => r.status === 'failed') ? 1 : 0;
-
-// ── Load .env early ──
-
-loadDotEnv();
 
 // ── Program ──
 
@@ -417,9 +452,9 @@ coreCmd.action(
 
 const ddCmd = program
   .command('dd')
-  .description('Data Dictionary 1.7/2.0 compliance testing')
+  .description('Data Dictionary compliance testing')
   .requiredOption('--url <url>', 'Server base URL')
-  .option('--dd-version <version>', 'DD version: 2.0 or 2.1', '2.0')
+  .option('--dd-version <version>', `DD version (${CERTIFIABLE_DD_VERSIONS.join(' or ')})`, CURRENT_DD_VERSION)
   .option('--limit <n>', 'Max records to replicate per resource', '100000')
   .option('--strict', 'Strict mode: fail on variations and enforce JSON schema validation')
   .option('--batch-expand', 'Batch all expansions per resource into a single $expand request');
@@ -443,9 +478,9 @@ ddCmd.action(
     outputDir?: string;
   }) => {
     try {
-      const ddVersion = opts.ddVersion as '1.7' | '2.0' | '2.1';
-      if (ddVersion !== '2.0' && ddVersion !== '2.1') {
-        throw new Error(`Invalid version "${opts.ddVersion}". RESO certification requires DD 2.0 or 2.1.`);
+      const ddVersion = normalizeDDVersion(opts.ddVersion);
+      if (!isCertifiableDDVersion(ddVersion)) {
+        throw new Error(`Invalid version "${opts.ddVersion}". RESO certification requires DD ${CERTIFIABLE_DD_VERSIONS.join(' or ')}.`);
       }
 
       const renderMode = resolveRenderMode(opts);
@@ -481,6 +516,73 @@ ddCmd.action(
     }
   },
 );
+
+// ── Find Variations Subcommand ──
+//
+// Mirrors `findVariations` from reso-certification-utils. Runs the frozen
+// v3.0.0 variations detection in `src/legacy/lib/variations/` against a
+// metadata-report.json. By default the cloud variations service is called
+// to fetch human-provided suggestions in addition to algorithmic ones;
+// pass --disable-variations-service-check to skip that call and use only
+// the local algorithmic suggestions.
+
+const DEFAULT_FUZZINESS = 0.25;
+const DEFAULT_DD_VERSION = '2.0';
+
+program
+  .command('find-variations')
+  .description('Find DD variations in a metadata report (frozen v3.0.0 detection)')
+  .requiredOption('-p, --metadata <path>', 'Path to metadata-report JSON file')
+  .option(
+    '-f, --fuzziness <float>',
+    `Fuzzy-match threshold (0–1, default ${DEFAULT_FUZZINESS})`,
+    String(DEFAULT_FUZZINESS)
+  )
+  .option(
+    '-v, --version <version>',
+    `Data Dictionary version (default ${DEFAULT_DD_VERSION})`,
+    DEFAULT_DD_VERSION
+  )
+  .option(
+    '--disable-variations-service-check',
+    'Skip the cloud variations service call (use algorithmic suggestions only)'
+  )
+  .action(
+    async (opts: {
+      metadata: string;
+      fuzziness: string;
+      version: string;
+      disableVariationsServiceCheck?: boolean;
+    }) => {
+      try {
+        const fuzziness = Number.parseFloat(opts.fuzziness);
+        if (!Number.isFinite(fuzziness) || fuzziness < 0 || fuzziness > 1) {
+          throw new Error(`--fuzziness must be a number in [0, 1], got '${opts.fuzziness}'`);
+        }
+
+        // Mint a fresh OAuth2 bearer token via client_credentials when the
+        // .env carries TOKEN_URI + CLIENT_ID + CLIENT_SECRET. This avoids
+        // operators having to maintain a long-lived static token. If the
+        // mint fails or env vars are missing, fall through to whatever
+        // findVariations does on its own (its fetchProviderToken path).
+        const bearerToken = opts.disableVariationsServiceCheck
+          ? undefined
+          : await mintOAuth2ClientCredentialsToken();
+
+        await legacyFindVariations({
+          pathToMetadataReportJson: resolve(opts.metadata),
+          fuzziness,
+          version: opts.version,
+          useSuggestions: !opts.disableVariationsServiceCheck,
+          fromCli: true,
+          ...(bearerToken ? { bearerToken } : {}),
+        });
+      } catch (error) {
+        console.error('Error:', error instanceof Error ? error.message : String(error));
+        process.exitCode = 2;
+      }
+    }
+  );
 
 // ── Metadata Report subcommand group ──
 //

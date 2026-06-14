@@ -14,6 +14,7 @@ import { fetchMetadataWithVersion, persistMetadataXml } from '../test-runner/met
 import { generateMetadataReport } from '../metadata/serializer.js';
 import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
 import type { BaseTestContext, DDConfig, PipelineStep, StepResult, TestFunction } from './types.js';
+import type { DDVersion } from './dd-versions.js';
 import { createPipeline } from './pipeline.js';
 import { createGenericReportGenerator, createDetailedReportGenerator, writeReports, prepareOutputDir } from './reports.js';
 import type { PipelineResult } from './types.js';
@@ -42,7 +43,7 @@ const DEFAULT_YEARS_BACK = 3;
 // ── Pipeline Context ──
 
 interface DDContext extends BaseTestContext {
-  readonly version: '1.7' | '2.0' | '2.1';
+  readonly version: DDVersion;
   readonly metadataReportPath?: string;
   readonly lookupResourceAvailable?: boolean;
   readonly lookupRecordCount?: number;
@@ -190,8 +191,8 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
 const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Check variations',
   run: async (ctx, _onProgress) => {
-    if (ctx.version !== '2.0' && ctx.version !== '2.1') {
-      return { context: ctx, status: 'skipped', summary: 'Variations only checked for DD 2.0' };
+    if (parseFloat(ctx.version) < 2.0) {
+      return { context: ctx, status: 'skipped', summary: 'Variations are only checked for DD 2.0 and higher' };
     }
 
     // Forward the caller's services.reso.org session bearer so the

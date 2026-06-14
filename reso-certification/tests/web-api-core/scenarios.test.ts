@@ -29,13 +29,34 @@ describe('scenario definitions', () => {
     expect(v210.length).toBeGreaterThan(45);
   });
 
-  it('v2.1.0 includes string-enum, string-function, paging, and expand scenarios', () => {
+  it('v2.1.0 includes string-enum, in-operator, lookup-resource, paging, and expand scenarios', () => {
     const v210 = scenariosForVersion('2.1.0');
     const categories = new Set(v210.map(s => s.category));
     expect(categories.has('string-enum')).toBe(true);
-    expect(categories.has('string-function')).toBe(true);
+    expect(categories.has('in-operator')).toBe(true);
+    expect(categories.has('lookup-resource')).toBe(true);
     expect(categories.has('paging')).toBe(true);
     expect(categories.has('expand')).toBe(true);
+  });
+
+  it('v2.1.0 includes string-function scenarios as OPTIONAL (kept per the workgroup, non-failing)', () => {
+    const v210 = scenariosForVersion('2.1.0');
+    const categories = new Set(v210.map(s => s.category));
+    expect(categories.has('string-function')).toBe(true);
+    for (const tag of ['filter-string-contains', 'filter-string-startswith', 'filter-string-endswith']) {
+      const scenario = v210.find(s => s.tag === tag);
+      expect(scenario).toBeDefined();
+      expect(scenario?.optional).toBe(true);
+    }
+  });
+
+  it('lookup-resource-validation scenario sorts before string-enum scenarios', () => {
+    const v210 = scenariosForVersion('2.1.0');
+    const lookupIdx = v210.findIndex(s => s.tag === 'lookup-resource-validation');
+    const stringEnumIdx = v210.findIndex(s => s.category === 'string-enum');
+    expect(lookupIdx).toBeGreaterThanOrEqual(0);
+    expect(stringEnumIdx).toBeGreaterThanOrEqual(0);
+    expect(lookupIdx).toBeLessThan(stringEnumIdx);
   });
 
   it('covers all expected categories', () => {

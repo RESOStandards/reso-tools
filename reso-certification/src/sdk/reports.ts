@@ -1,7 +1,51 @@
 import { mkdir, writeFile, rename } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import type { BaseComplianceConfig, PipelineResult, PipelineContext, ProgressCallback } from './types.js';
+import { optionalOutcome } from '../web-api-core/test-runner.js';
+
+// ── Software version ──
+
+/**
+ * The RESO Tools version that produced a report, read from the package
+ * manifest at module load. Stamped onto every report for provenance —
+ * a certified result must record which tool version generated it.
+ * Falls back to 'unknown' if the manifest can't be resolved (e.g. bundled).
+ */
+/**
+ * Resolve the RESO Tools version from a package manifest. Returns the
+ * manifest's `version`, or 'unknown' if the manifest can't be read or parsed
+ * (e.g. a bundled context where the relative path misses) or carries no
+ * version. Pure and side-effect-free so the fallback is directly testable.
+ */
+export const resolveSoftwareVersion = (manifestUrl: URL | string): string => {
+  try {
+    const pkgPath = fileURLToPath(manifestUrl);
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version?: string };
+    return pkg.version ?? 'unknown';
+  } catch {
+    return 'unknown';
+  }
+};
+
+/**
+ * Build-time provenance injection. When this module is bundled (the desktop
+ * cert-worker esbuild bundle), `import.meta.url` points at the bundle — not the
+ * cert SDK — so the relative manifest read below resolves to the wrong package
+ * (or none) and provenance silently becomes 'unknown'. The bundler defines
+ * `__RESO_CERT_SDK_VERSION__` with the cert SDK version so the stamp is correct
+ * regardless of bundle location. Non-bundled (source, tests) the symbol is
+ * absent and we fall back to reading the manifest.
+ * See reso-desktop-client/scripts/bundle-cert-worker.mjs.
+ */
+declare const __RESO_CERT_SDK_VERSION__: string | undefined;
+
+// dist/sdk/reports.js → ../../package.json is the package root (non-bundled).
+export const SOFTWARE_VERSION: string =
+  typeof __RESO_CERT_SDK_VERSION__ !== 'undefined'
+    ? __RESO_CERT_SDK_VERSION__
+    : resolveSoftwareVersion(new URL('../../package.json', import.meta.url));
 
 // ── Output Path Builder ──
 
@@ -57,6 +101,7 @@ export const prepareOutputDir = async (
 export interface BaseReport {
   readonly description: string;
   readonly version: string;
+  readonly softwareVersion: string;
   readonly generatedOn: string;
   readonly remarks: string;
 }
@@ -107,8 +152,13 @@ export const serializeCoreRemarks = (result: PipelineResult): string => {
   const testStep = result.steps.find(s => s.counts);
   if (!testStep?.counts) return `Web API Core compliance test ${result.status}.`;
 
-  const { total = 0, passed = 0, failed = 0, skipped = 0 } = testStep.counts;
-  return `${passed} passed, ${failed} failed, ${skipped} skipped out of ${total} tests.`;
+  const { passed = 0, failed = 0, skipped = 0, optionalPassed = 0, optionalNotSupported = 0, optionalNotTested = 0 } = testStep.counts;
+  const requiredTotal = passed + failed + skipped;
+  const optionalTotal = optionalPassed + optionalNotSupported + optionalNotTested;
+  const base = `${passed} passed, ${failed} failed, ${skipped} skipped out of ${requiredTotal} required tests.`;
+  return optionalTotal > 0
+    ? `${base} Optional: ${optionalPassed} passed, ${optionalNotSupported} not supported, ${optionalNotTested} not tested.`
+    : base;
 };
 
 // ── Generic Report Generator ──
@@ -124,6 +174,7 @@ export const createGenericReportGenerator = (
   generate: (result) => ({
     description,
     version,
+    softwareVersion: SOFTWARE_VERSION,
     generatedOn: new Date().toISOString(),
     remarks: serializeRemarks(result),
   }),
@@ -147,6 +198,7 @@ export const createDetailedReportGenerator = (
     return {
       description,
       version,
+      softwareVersion: SOFTWARE_VERSION,
       generatedOn: new Date().toISOString(),
       remarks: serializeRemarks(result),
       outcome: result.status,
@@ -172,6 +224,19 @@ export const createDetailedReportGenerator = (
             tag: s.tag,
             passed: s.passed,
             skipped: s.skipped ?? false,
+            // Optional ("Optional Tests") scenarios carry their rendered
+            // outcome (Passed / Not Supported / Not Tested) so the report
+            // is self-describing; required scenarios use passed/skipped.
+            ...(s.optional
+              ? {
+                  optional: true,
+                  outcome: optionalOutcome({
+                    passed: Boolean(s.passed),
+                    skipped: Boolean(s.skipped),
+                    errored: Boolean(s.errored),
+                  }),
+                }
+              : {}),
             duration: s.duration,
             requestUrl: s.requestUrl,
             assertions: (s.assertions as ReadonlyArray<Record<string, unknown>> ?? []).map(a => ({

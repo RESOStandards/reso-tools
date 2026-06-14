@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { AuthConfig } from '../test-runner/types.js';
 import type { AddEditConfig, EntityEventConfig, CoreConfig, DDConfig } from './types.js';
+import { coerceDDVersion } from './dd-versions.js';
 
 // ── Config File Types ──
 
@@ -129,7 +130,7 @@ export const configEntryToDD = (entry: ConfigEntry, providerUoi: string): DDConf
     url: entry.serviceRootUri,
     auth: resolveAuthFromEntry(entry),
   },
-  version: (entry.version as '1.7' | '2.0') ?? '2.0',
+  version: coerceDDVersion(entry.version),
   options: {
     outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/dd`,
   },

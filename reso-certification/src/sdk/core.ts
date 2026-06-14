@@ -151,10 +151,16 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
       });
     }
 
+    // Required scenarios drive the verdict. Optional ("Optional Tests")
+    // results are tallied separately and never contribute to `totalFailed`.
     const totalPassed = resourceReports.reduce((sum, r) => sum + r.summary.passed, 0);
     const totalFailed = resourceReports.reduce((sum, r) => sum + r.summary.failed, 0);
     const totalSkipped = resourceReports.reduce((sum, r) => sum + r.summary.skipped, 0);
     const totalScenarios = resourceReports.reduce((sum, r) => sum + r.summary.total, 0);
+    const optPassed = resourceReports.reduce((sum, r) => sum + r.summary.optional.passed, 0);
+    const optNotSupported = resourceReports.reduce((sum, r) => sum + r.summary.optional.notSupported, 0);
+    const optNotTested = resourceReports.reduce((sum, r) => sum + r.summary.optional.notTested, 0);
+    const optTotal = optPassed + optNotSupported + optNotTested;
 
     // Compute union coverage across all resources
     const allTypes = ['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup'];
@@ -177,8 +183,19 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     return {
       context: { ...ctx, resourceReports, coverageMatrix: { coveredTypes, missingTypes, fullCoverage } },
       status,
-      summary: `${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped (${totalScenarios} scenarios across ${resourceReports.length} resources). ${coverageMsg}${modeMsg}`,
-      counts: { total: totalScenarios, passed: totalPassed, failed: totalFailed, skipped: totalSkipped, resources: resourceReports.length },
+      summary: `${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped`
+        + (optTotal > 0 ? `; optional: ${optPassed} passed, ${optNotSupported} not supported, ${optNotTested} not tested` : '')
+        + ` (${totalScenarios} scenarios across ${resourceReports.length} resources). ${coverageMsg}${modeMsg}`,
+      counts: {
+        total: totalScenarios,
+        passed: totalPassed,
+        failed: totalFailed,
+        skipped: totalSkipped,
+        optionalPassed: optPassed,
+        optionalNotSupported: optNotSupported,
+        optionalNotTested: optNotTested,
+        resources: resourceReports.length,
+      },
       ...(coverageFailed ? { errors: [`Full coverage required but missing types: ${missingTypes.join(', ')}`] } : {}),
     };
   },

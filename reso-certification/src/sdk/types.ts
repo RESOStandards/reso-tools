@@ -1,4 +1,5 @@
 import type { AuthConfig } from '../test-runner/types.js';
+import type { DDVersion } from './dd-versions.js';
 
 // ── Pipeline ──
 
@@ -200,7 +201,7 @@ export interface BaseComplianceConfig {
  */
 export interface DDConfig extends BaseComplianceConfig {
   readonly endorsement: 'dd';
-  readonly version: '1.7' | '2.0' | '2.1';
+  readonly version: DDVersion;
   readonly limit?: number;
   readonly strictMode?: boolean;
   /** Batch all expansions for a resource into a single $expand request (default: false). */

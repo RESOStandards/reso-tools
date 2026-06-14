@@ -26,6 +26,7 @@ import {
   CERT_ENDORSEMENT_LABELS,
   ENDORSEMENT_DEFAULT_VERSIONS,
   stepsForEndorsement,
+  toDDVersionShort,
 } from '../constants/cert';
 import type { CertEndorsement, JobStatus, StepStatus } from '../constants/cert';
 import { resolveReportRef } from './report-ref';
@@ -337,7 +338,7 @@ const buildSDKConfig = (recipient: RecipientConfig, endorsement: CertEndorsement
         ...base,
         options: { ...base.options },
         endorsement: 'dd',
-        version: recipient.ddOptions.version,
+        version: toDDVersionShort(recipient.ddOptions.version),
         limit: recipient.ddOptions.limit,
         strictMode: recipient.ddOptions.strictMode,
         batchExpand: recipient.ddOptions.batchExpand,
@@ -388,7 +389,7 @@ const expandBatchConfig = (config: BatchConfig): ReadonlyArray<Job> =>
       endorsement: CERT_ENDORSEMENT_LABELS[endorsement as keyof typeof CERT_ENDORSEMENT_LABELS] ?? endorsement,
       endorsementKey: endorsement,
       version: endorsement === 'dd'
-        ? recipient.ddOptions.version
+        ? toDDVersionShort(recipient.ddOptions.version)
         : endorsement === 'core'
         ? (recipient.coreOptions.version ?? ENDORSEMENT_DEFAULT_VERSIONS[endorsement as keyof typeof ENDORSEMENT_DEFAULT_VERSIONS])
         : ENDORSEMENT_DEFAULT_VERSIONS[endorsement as keyof typeof ENDORSEMENT_DEFAULT_VERSIONS],

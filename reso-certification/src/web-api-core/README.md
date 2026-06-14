@@ -122,13 +122,17 @@ Three enum modes exist. The mode is **auto-detected from metadata** or set with 
 | filter-string-enum-multi-any | `Features/any(x:x eq 'Value1' or x eq 'Value2')` |
 | filter-string-enum-multi-all | `Features/all(x:x eq 'Value1' or x eq 'Value2')` |
 
-### String Function Tests (v2.1.0)
+### Lookup Resource Validation (v2.1.0, per RCP-039)
+
+| Scenario | Description |
+|----------|-------------|
+| lookup-resource-validation | `GET /Lookup?$filter=LookupName eq 'X'` then verify the provider-supplied LookupName and sample values are present. Runs first; dependent string-enum scenarios cascade-skip if this fails. |
+
+### `in` Operator Tests (v2.1.0, OData 4.01 only)
 
 | Scenario | Filter |
 |----------|--------|
-| filter-string-contains | `contains(Field,'value')` |
-| filter-string-startswith | `startswith(Field,'value')` |
-| filter-string-endswith | `endswith(Field,'value')` |
+| filter-string-enum-single-in | `StandardStatus in ('Active','Pending','Sold')`. Gated on response advertising OData-Version 4.01; skipped for 4.0-only servers. |
 
 ### Error Code Tests
 

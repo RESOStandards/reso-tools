@@ -36,6 +36,19 @@ export interface ScenarioResult {
   readonly requestLatency?: number;
   /** URL that was requested (for diagnostics). */
   readonly requestUrl?: string;
+  /** OData-Version header detected from the server's metadata response.
+   *  Populated only by the metadata-validation scenario. Used by the main
+   *  runner to gate scenarios that require a specific OData minor version
+   *  (e.g., the `in` operator requires 4.01). */
+  readonly odataVersion?: string;
+  /** True when this scenario is an Optional Test: a failure renders
+   *  "Not Supported" and never contributes to the Core verdict. Propagated
+   *  from the scenario's `optional` flag. */
+  readonly optional?: boolean;
+  /** True when the request errored (no determinate server response) rather
+   *  than an assertion failing. For optional scenarios this maps to
+   *  "Not Tested", never "Not Supported". */
+  readonly errored?: boolean;
 }
 
 /** Coverage of a data type category for a resource. */
@@ -51,13 +64,64 @@ export interface ResourceTestReport {
   readonly params: TestParams;
   readonly scenarios: ReadonlyArray<ScenarioResult>;
   readonly coverage: ReadonlyArray<TypeCoverage>;
-  readonly summary: {
-    readonly total: number;
-    readonly passed: number;
-    readonly failed: number;
-    readonly skipped: number;
-  };
+  readonly summary: CoreSummary;
 }
+
+/** The three outcomes an Optional Test can render. */
+export type OptionalOutcome = 'Passed' | 'Not Supported' | 'Not Tested';
+
+/** Tally of optional-test outcomes. Never affects the Core verdict. */
+export interface OptionalOutcomeCounts {
+  readonly passed: number;
+  readonly notSupported: number;
+  readonly notTested: number;
+}
+
+/** Scenario summary. `passed`/`failed`/`skipped` count REQUIRED scenarios
+ *  only — they are the verdict surface (`failed > 0` ⇒ Core fail). Optional
+ *  ("Optional Tests") results live in their own bucket and never reach the
+ *  verdict. `total` counts every scenario, required and optional. */
+export interface CoreSummary {
+  readonly total: number;
+  readonly passed: number;
+  readonly failed: number;
+  readonly skipped: number;
+  readonly optional: OptionalOutcomeCounts;
+}
+
+/** Derive an Optional Test's outcome. A skipped or errored (indeterminate)
+ *  result is "Not Tested" — the test couldn't run, so support is unknown.
+ *  A determinate run maps pass→"Passed", fail→"Not Supported". */
+export const optionalOutcome = (
+  result: Pick<ScenarioResult, 'passed' | 'skipped' | 'errored'>,
+): OptionalOutcome =>
+  result.skipped || result.errored
+    ? 'Not Tested'
+    : result.passed
+      ? 'Passed'
+      : 'Not Supported';
+
+/** Summarize scenario results. The verdict surface (passed/failed/skipped)
+ *  counts REQUIRED scenarios only — an optional failure can never make
+ *  `failed > 0`. Optional results are tallied separately by outcome. A
+ *  scenario with no `optional` flag defaults to required. */
+export const summarizeScenarios = (
+  results: ReadonlyArray<ScenarioResult>,
+): CoreSummary => {
+  const required = results.filter(r => r.optional !== true);
+  const optional = results.filter(r => r.optional === true);
+  return {
+    total: results.length,
+    passed: required.filter(r => r.passed && !r.skipped).length,
+    failed: required.filter(r => !r.passed && !r.skipped).length,
+    skipped: required.filter(r => r.skipped).length,
+    optional: {
+      passed: optional.filter(r => optionalOutcome(r) === 'Passed').length,
+      notSupported: optional.filter(r => optionalOutcome(r) === 'Not Supported').length,
+      notTested: optional.filter(r => optionalOutcome(r) === 'Not Tested').length,
+    },
+  };
+};
 
 /** Build coverage matrix from resolved test params. */
 const buildCoverage = (params: TestParams): ReadonlyArray<TypeCoverage> => [
@@ -170,7 +234,7 @@ const runScenario = async (
     return { tag: scenario.tag, name: scenario.name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url };
   } catch (err) {
     assertions.push({ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` });
-    return { tag: scenario.tag, name: scenario.name, passed: false, skipped: false, assertions, duration: Date.now() - start, requestUrl: query.url };
+    return { tag: scenario.tag, name: scenario.name, passed: false, skipped: false, errored: true, assertions, duration: Date.now() - start, requestUrl: query.url };
   }
 };
 
@@ -248,7 +312,33 @@ const assertData = (
           : [String(resolve(scenario.valueParam))],
       );
 
+    case 'in-operator': {
+      // Validate every returned record's lookup value is in the requested set.
+      const field = resolveField(scenario.fieldParam);
+      const values = scenario.valueParams
+        .map(p => resolve(p))
+        .filter((v): v is string | number => v != null && v !== '')
+        .map(String);
+      if (values.length < 2) {
+        return { passed: false, message: `Need at least 2 sample values for 'in' operator; got ${values.length}` };
+      }
+      const valueSet = new Set(values);
+      const failures: string[] = [];
+      for (const [i, record] of records.entries()) {
+        const actual = record[field];
+        if (actual == null) continue;
+        if (!valueSet.has(String(actual))) {
+          failures.push(`Record ${i}: ${field}=${JSON.stringify(actual)} not in (${values.map(v => `'${v}'`).join(',')})`);
+        }
+      }
+      return failures.length === 0
+        ? { passed: true, message: `All ${records.length} records satisfy ${field} in (${values.length} values)` }
+        : { passed: false, message: `${failures.length} records failed: ${failures[0]}` };
+    }
+
     case 'string-function': {
+      // Optional string function (contains/startswith/endswith). Every
+      // returned record must satisfy the predicate against the sample value.
       const strField = resolveField(scenario.fieldParam);
       const strValue = String(resolve(scenario.valueParam) ?? '');
       const func = scenario.func;
@@ -267,6 +357,38 @@ const assertData = (
       return failures.length === 0
         ? { passed: true, message: `All ${records.length} records satisfy ${func}()` }
         : { passed: false, message: `${failures.length} records failed: ${failures[0]}` };
+    }
+
+    case 'lookup-resource': {
+      // The fetched payload is the Lookup Resource filtered by LookupName.
+      // Validate (1) at least one row came back, (2) every returned row's
+      // LookupName matches what we asked for, and (3) the provider's
+      // declared sample lookup values appear in the returned set.
+      const field = resolveField(scenario.fieldParam);
+      const expectedLookupName = params.lookupNameByField?.[field] ?? field;
+      const sampleValues = [
+        params.singleLookupValue,
+        params.singleLookupValue2,
+        params.singleLookupValue3,
+      ].filter((v): v is string => typeof v === 'string' && v.length > 0);
+
+      if (records.length === 0) {
+        return { passed: false, message: `Lookup Resource returned no rows for LookupName '${expectedLookupName}'` };
+      }
+      const wrongName = records.find(r => r.LookupName != null && String(r.LookupName) !== expectedLookupName);
+      if (wrongName) {
+        return { passed: false, message: `Lookup Resource returned a row with LookupName=${JSON.stringify(wrongName.LookupName)}, expected '${expectedLookupName}'` };
+      }
+      const returnedValues = new Set(records.flatMap(r => {
+        const a = r.StandardLookupValue != null ? [String(r.StandardLookupValue)] : [];
+        const b = r.LookupValue != null ? [String(r.LookupValue)] : [];
+        return [...a, ...b];
+      }));
+      const missing = sampleValues.filter(v => !returnedValues.has(v));
+      if (missing.length > 0) {
+        return { passed: false, message: `Lookup Resource missing sample value(s): ${missing.map(v => `'${v}'`).join(', ')} for LookupName '${expectedLookupName}'` };
+      }
+      return { passed: true, message: `Lookup Resource validated: LookupName '${expectedLookupName}' with ${sampleValues.length} sample value(s) present` };
     }
 
     case 'expand':
@@ -290,6 +412,7 @@ const runStructuralScenario = async (
   const assertions: AssertionResult[] = [];
   const tag = assertion;
   const name = assertion;
+  let odataVersion: string | undefined;
 
   try {
     if (assertion === 'metadata') {
@@ -299,6 +422,7 @@ const runStructuralScenario = async (
       // the status / odata-version header onto compliance assertions.
       try {
         const result = await fetchMetadataWithVersion(serverUrl, authToken);
+        odataVersion = result.odataVersion;
         assertions.push({ passed: true, message: 'HTTP 200' });
         assertions.push(
           result.odataVersion === '4.0' || result.odataVersion === '4.01'
@@ -313,7 +437,7 @@ const runStructuralScenario = async (
       } catch (err) {
         if (!(err instanceof MetadataFetchError)) throw err;
         assertions.push({ passed: false, message: `Expected HTTP 200, got ${err.status}` });
-        const odataVersion = err.headers['odata-version'];
+        odataVersion = err.headers['odata-version'];
         assertions.push(
           odataVersion === '4.0' || odataVersion === '4.01'
             ? { passed: true, message: `OData-Version: ${odataVersion}` }
@@ -384,7 +508,7 @@ const runStructuralScenario = async (
   }
 
   const allPassed = assertions.every(a => a.passed);
-  return { tag, name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestUrl: query.url };
+  return { tag, name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestUrl: query.url, odataVersion };
 };
 
 /** Run server-driven paging scenario (v2.1.0). */
@@ -457,20 +581,58 @@ export const runCoreResourceScenarios = async (
   const scenarios = scenariosForVersion(version);
   const results: ScenarioResult[] = [];
 
-  for (const scenario of scenarios) {
-    const result = await runScenario(serverUrl, resource, scenario, params, authToken);
-    results.push(result);
-  }
+  // Track cross-scenario state for cascade-skip + OData-version gating.
+  let lookupResourceFailed = false;
+  let detectedODataVersion: string | undefined;
 
-  const passed = results.filter(r => r.passed && !r.skipped).length;
-  const failed = results.filter(r => !r.passed && !r.skipped).length;
-  const skipped = results.filter(r => r.skipped).length;
+  for (const scenario of scenarios) {
+    // Cascade-skip: dependent string-enum + in-operator scenarios are
+    // pointless if the Lookup Resource didn't return the expected
+    // LookupName / sample values. Skip them with a clear reason.
+    if (lookupResourceFailed && (scenario.category === 'string-enum' || scenario.category === 'in-operator')) {
+      results.push({
+        tag: scenario.tag,
+        name: scenario.name,
+        passed: false,
+        skipped: true,
+        assertions: [{ passed: false, message: 'Skipped: lookup-resource-validation failed earlier in this run' }],
+        duration: 0,
+        optional: scenario.optional,
+      });
+      continue;
+    }
+
+    // OData 4.01 gate: the `in` operator was introduced in 4.01. Skip on 4.0.
+    if (scenario.category === 'in-operator' && detectedODataVersion && detectedODataVersion !== '4.01') {
+      results.push({
+        tag: scenario.tag,
+        name: scenario.name,
+        passed: false,
+        skipped: true,
+        assertions: [{ passed: false, message: `Skipped: 'in' operator requires OData-Version 4.01 (server reports ${detectedODataVersion})` }],
+        duration: 0,
+        optional: scenario.optional,
+      });
+      continue;
+    }
+
+    const result = await runScenario(serverUrl, resource, scenario, params, authToken);
+    results.push({ ...result, optional: scenario.optional });
+
+    // Latch state for subsequent iterations.
+    if (scenario.tag === 'lookup-resource-validation' && !result.passed && !result.skipped) {
+      lookupResourceFailed = true;
+    }
+    if (result.odataVersion && !detectedODataVersion) {
+      detectedODataVersion = result.odataVersion;
+    }
+  }
 
   return {
     resource,
     params,
     coverage: buildCoverage(params),
     scenarios: results,
-    summary: { total: results.length, passed, failed, skipped },
+    summary: summarizeScenarios(results),
   };
 };

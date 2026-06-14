@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
+  SOFTWARE_VERSION,
+  resolveSoftwareVersion,
   serializeAddEditRemarks,
   serializeEntityEventRemarks,
   serializeCoreRemarks,
@@ -98,6 +102,34 @@ describe('serializeCoreRemarks', () => {
     expect(remarks).toContain('0 failed');
     expect(remarks).toContain('3 skipped');
   });
+
+  it('renders optional outcomes separately and never as a failure', () => {
+    const result = makeResult({
+      steps: [
+        makeStep({
+          counts: {
+            total: 10, passed: 6, failed: 0, skipped: 1,
+            optionalPassed: 1, optionalNotSupported: 1, optionalNotTested: 1,
+          },
+        }),
+      ],
+    });
+
+    const remarks = serializeCoreRemarks(result);
+
+    // Required verdict surface reconciles: 6 + 0 + 1 = 7 required tests.
+    expect(remarks).toContain('6 passed, 0 failed, 1 skipped out of 7 required tests.');
+    expect(remarks).toContain('Optional: 1 passed, 1 not supported, 1 not tested.');
+    // An optional "not supported" must never read as a Core failure.
+    expect(remarks).not.toMatch(/[1-9]\d* failed/);
+  });
+
+  it('omits the optional clause when there are no optional tests', () => {
+    const result = makeResult({
+      steps: [makeStep({ counts: { total: 5, passed: 5, failed: 0, skipped: 0 } })],
+    });
+    expect(serializeCoreRemarks(result)).not.toContain('Optional:');
+  });
 });
 
 describe('createGenericReportGenerator', () => {
@@ -107,10 +139,11 @@ describe('createGenericReportGenerator', () => {
 
     expect(report.description).toBe('Web API Add/Edit');
     expect(report.version).toBe('2.0.0');
+    expect(report.softwareVersion).toBeTruthy();
     expect(report.generatedOn).toBeTruthy();
     expect(report.remarks).toBe('test remarks');
-    // Should only have the 4 base fields
-    expect(Object.keys(report)).toEqual(['description', 'version', 'generatedOn', 'remarks']);
+    // Base fields, including the RESO Tools software version for provenance
+    expect(Object.keys(report)).toEqual(['description', 'version', 'softwareVersion', 'generatedOn', 'remarks']);
   });
 
   it('has correct filename', () => {
@@ -271,5 +304,47 @@ describe('pre-built report generator sets', () => {
   it('coreReportGenerators produces 2 generators', () => {
     const generators = coreReportGenerators('2.0.0');
     expect(generators).toHaveLength(2);
+  });
+});
+
+describe('SOFTWARE_VERSION provenance', () => {
+  // A certified report must record WHICH tool version produced it. Truthy is
+  // not enough — the recorded value must be the actual package version, and
+  // every report the SDK can emit must carry it.
+  const manifestVersion = (() => {
+    const pkgPath = fileURLToPath(new URL('../../package.json', import.meta.url));
+    return (JSON.parse(readFileSync(pkgPath, 'utf8')) as { version?: string }).version;
+  })();
+
+  it('equals the package.json version (records the exact tool version, not a stale literal)', () => {
+    expect(SOFTWARE_VERSION).toBe(manifestVersion);
+  });
+
+  it('is a non-empty string — provenance is never blank', () => {
+    expect(typeof SOFTWARE_VERSION).toBe('string');
+    expect(SOFTWARE_VERSION.length).toBeGreaterThan(0);
+  });
+
+  it('every report generator from every endorsement stamps the exact SOFTWARE_VERSION', () => {
+    // Guards against a future report generator that forgets provenance: a
+    // silent gap where a certified result ships without its tool version.
+    const generators = [
+      ...addEditReportGenerators('2.0.0'),
+      ...entityEventReportGenerators('RCP-027'),
+      ...coreReportGenerators('2.0.0'),
+    ];
+    expect(generators.length).toBeGreaterThan(0);
+    for (const generator of generators) {
+      const report = generator.generate(makeResult());
+      expect(report.softwareVersion).toBe(SOFTWARE_VERSION);
+    }
+  });
+
+  it('resolveSoftwareVersion reads the version from a readable manifest', () => {
+    expect(resolveSoftwareVersion(new URL('../../package.json', import.meta.url))).toBe(manifestVersion);
+  });
+
+  it('resolveSoftwareVersion falls back to "unknown" when the manifest path cannot be resolved (the bundled-context failure mode)', () => {
+    expect(resolveSoftwareVersion(new URL('./nonexistent-package-xyz.json', import.meta.url))).toBe('unknown');
   });
 });

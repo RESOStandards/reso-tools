@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { CURRENT_DD_VERSION } from '../../src/sdk/dd-versions.js';
 import {
   loadConfigFile,
   generateLocalUoi,
@@ -130,7 +131,7 @@ describe('configEntryToCore', () => {
 });
 
 describe('configEntryToDD', () => {
-  it('converts with default version', () => {
+  it('converts with default version (the current DD version)', () => {
     const config = configEntryToDD({
       serviceRootUri: 'https://api.example.com',
       recipientUoi: 'R001',
@@ -139,7 +140,8 @@ describe('configEntryToDD', () => {
     }, 'P001');
 
     expect(config.endorsement).toBe('dd');
-    expect(config.version).toBe('2.0');
+    // An entry with no version coerces to the current DD version.
+    expect(config.version).toBe(CURRENT_DD_VERSION);
   });
 });
 
