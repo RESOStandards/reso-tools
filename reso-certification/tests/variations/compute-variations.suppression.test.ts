@@ -2,8 +2,8 @@
  * Issue-2 suppression tests for the legacy v3.0.0 `computeVariations`.
  *
  * Issue 2: "if the vendor already has the suggestion's target, the local
- * element shouldn't be flagged." Uncovered during the M00000050-50039 /
- * M00000460 investigation.
+ * element shouldn't be flagged." Uncovered during a machine-based provider
+ * investigation (anonymized).
  *
  * The dual-form existence check in `lib/variations/index.js` implements it:
  * suppress when the suggestion's WIRE form is present in the vendor's
@@ -66,7 +66,7 @@ const wasFlagged = (report: unknown, sourceKey: string): boolean => {
 };
 
 describe('computeVariations: Issue 2 suppression (v3.0.0)', () => {
-  // 1. Realistic — exactly the M00000460 / CommonWaterHeater shape.
+  // 1. Realistic — a machine-based enum / CommonWaterHeater shape.
   // Vendor has WaterHeater (wire form) + StandardName "Water Heater", plus a
   // local CommonWaterHeater. Cloud-supplied suggestion is display-form
   // "Water Heater" on `suggestedLookupValue`. The display form matches the
