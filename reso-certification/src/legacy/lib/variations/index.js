@@ -1190,5 +1190,13 @@ module.exports = {
   isValidUrl,
   hasValidSearchInput,
   DEFAULT_FUZZINESS,
-  MATCHING_STRATEGIES
+  MATCHING_STRATEGIES,
+  // Additive exports (no behavior change) — leaf primitives reused by the v2
+  // /compute reimpl so it stays faithful while only the walk is new code.
+  MIN_MATCHING_LENGTH,
+  CLOSE_MATCH_DISTANCE,
+  normalizeDataElementName,
+  classifySuggestionStrategy,
+  getDDWikiUrl,
+  prepareResults
 };
