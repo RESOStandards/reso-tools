@@ -1,9 +1,16 @@
 /**
  * /compute (v2) parity + Int* fix.
  *
- * Faithful mode (`applyIntEnumFix: false`) must reproduce legacy `computeVariations`
- * exactly on every case. Fixed mode (default) applies the type-aware Int* gate:
- * machine enums drop the StandardName-derived forms (5 → 3 on the machine-enum subset).
+ * Faithful mode (`applyIntEnumFix: false`) reproduces legacy `computeVariations` on every case
+ * here. Two intentional divergences from legacy are deliberately NOT covered here — faithful
+ * mode cannot reproduce legacy on inputs that hit them, so each has its own acceptance test:
+ *   - the legacy OData edit-distance budget now uses Math.floor, uniform across levels, not
+ *     legacy's Math.round — see compute-v2-legacy-odata-floor.test.ts;
+ *   - an exact match now filters out the element's other (substring/edit-distance) suggestions
+ *     rather than ordering the exact to the head — see compute-v2-exact-match-filters-fuzzy.test.ts
+ *     (the former 'lowercase resource' and 'noisy field' cases moved there).
+ * Fixed mode (default) also applies the type-aware Int* gate: machine enums drop the
+ * StandardName-derived forms (5 → 3 on the machine-enum subset).
  *
  * All inputs are anonymized synthetic — no vendor reports or identifiers.
  */
@@ -33,8 +40,8 @@ const heatingReport = {
 };
 
 const cases = [
-  { name: 'lowercase resource', version: '1.7', report: { fields: [{ resourceName: 'property', fieldName: 'ListPrice' }] } },
-  { name: 'noisy field', version: '1.7', report: { fields: [{ resourceName: 'Property', fieldName: 'list_price' }] } },
+  // 'lowercase resource' (property) and 'noisy field' (list_price) moved to
+  // compute-v2-exact-match-filters-fuzzy.test.ts — they hit the exact-match-wins divergence.
   { name: 'field machine match (substring)', version: '1.7', report: { fields: [{ resourceName: 'Property', fieldName: 'APIModificationTimestamp' }] } },
   { name: 'close-match misspelling', version: '1.7', report: { fields: [{ resourceName: 'Property', fieldName: 'ListPrce' }] } },
   {

@@ -83,9 +83,9 @@ const isSuggestedLookupTargetPresent = (
 
 /**
  * Shared machine-matching pass: substring (incl. case/punctuation-insensitive
- * exact) then edit distance, against the provided standard values. Exact matches
- * go to the head of the collection (legacy ordering). `round` is Math.floor for
- * resource/field/lookup and Math.round for legacyOData (preserved legacy quirk).
+ * exact) then edit distance, against the provided standard values. When an element
+ * produces any exact match, only the exact(s) are emitted and the rest are filtered
+ * out. The edit-distance budget uses Math.floor uniformly across all four levels.
  */
 const machineMatch = (
   localValue: string,
@@ -94,10 +94,10 @@ const machineMatch = (
   makeSuggestion: (standardValue: string, extra: Json) => Json,
   collection: Json[],
   fuzziness: number,
-  round: (n: number) => number = Math.floor,
 ): void => {
   const normalizedLocal = normalizeDataElementName(localValue);
   const isMinMatchingLength = (localValue?.length ?? 0) > MIN_MATCHING_LENGTH;
+  const produced: Json[] = [];
 
   for (const standardValue of standardValues) {
     if (hasStandard(standardValue)) continue;
@@ -112,22 +112,23 @@ const machineMatch = (
 
     if (isExactMatch || isSubstringMatch) {
       const suggestion = makeSuggestion(standardValue, { strategy: MATCHING_STRATEGIES.SUBSTRING });
-      if (isExactMatch) {
-        suggestion.exactMatch = true;
-        collection.unshift(suggestion);
-      } else {
-        collection.push(suggestion);
-      }
+      if (isExactMatch) suggestion.exactMatch = true;
+      produced.push(suggestion);
     } else if (isMinMatchingLength) {
       const d = distance(normalizedLocal, normalizedStandard);
-      const maxDistance = round(fuzziness * (localValue?.length ?? 0));
+      const maxDistance = Math.floor(fuzziness * (localValue?.length ?? 0));
       if (d <= maxDistance) {
         const extra: Json = { distance: d, maxDistance, strategy: MATCHING_STRATEGIES.EDIT_DISTANCE };
         if (d <= CLOSE_MATCH_DISTANCE) extra.closeMatch = true;
-        collection.push(makeSuggestion(standardValue, extra));
+        produced.push(makeSuggestion(standardValue, extra));
       }
     }
   }
+
+  // Exact filters the rest: if this element produced any exact match, emit only the exact(s)
+  // and drop every substring / edit-distance suggestion; otherwise emit all that were produced.
+  const exacts = produced.filter((s) => s.exactMatch === true);
+  collection.push(...(exacts.length ? exacts : produced));
 };
 
 /**
@@ -222,16 +223,13 @@ const resolveResource = (resourceName: string, ctx: Ctx): void => {
           const { standardResourceName = null } = entry as Json;
           return !!s.suggestedResourceName && s.suggestedResourceName === standardResourceName;
         })),
-      ({ suggestedResourceName, isAdminReview, isFastTrack, ...rest }) =>
-        metadataReportMap?.[suggestedResourceName as never]
-          ? []
-          : [{
-              resourceName,
-              suggestedResourceName,
-              strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
-              ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName }),
-              ...rest,
-            }],
+      ({ suggestedResourceName, isAdminReview, isFastTrack, ...rest }) => [{
+        resourceName,
+        suggestedResourceName,
+        strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
+        ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName }),
+        ...rest,
+      }],
       out.resources,
     );
     return;
@@ -291,18 +289,15 @@ const resolveField = (resourceName: string, fieldName: string, ctx: Ctx): void =
           const { standardFieldName = null } = entry as Json;
           return !!s.suggestedFieldName && s.suggestedFieldName === standardFieldName;
         })),
-      ({ suggestedResourceName, suggestedFieldName, isAdminReview, isFastTrack, ...rest }) =>
-        (metadataReportMap?.[suggestedResourceName as never] as Json)?.[suggestedFieldName as never]
-          ? []
-          : [{
-              resourceName,
-              fieldName,
-              suggestedResourceName,
-              suggestedFieldName,
-              strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
-              ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName, fieldName: suggestedFieldName }),
-              ...rest,
-            }],
+      ({ suggestedResourceName, suggestedFieldName, isAdminReview, isFastTrack, ...rest }) => [{
+        resourceName,
+        fieldName,
+        suggestedResourceName,
+        suggestedFieldName,
+        strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
+        ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName, fieldName: suggestedFieldName }),
+        ...rest,
+      }],
       out.fields,
     );
     return;
@@ -429,7 +424,6 @@ const resolveLookupsAndLegacy = (resourceName: string, fieldName: string, ctx: C
         }),
         out.legacyODataValues,
         fuzziness,
-        Math.round, // legacyOData edit-distance uses Math.round (preserved legacy quirk)
       );
     }
   }
