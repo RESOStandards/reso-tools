@@ -1,10 +1,11 @@
 import { resolve } from 'node:path';
+import type { EnumMode } from '@reso-standards/reso-common';
 
 /** Database backend type. */
 export type DbBackend = 'postgres' | 'mongodb' | 'sqlite';
 
-/** Enumeration mode: string enums with Lookup Resource, or OData EnumType definitions. */
-export type EnumMode = 'string' | 'enum-type';
+/** Enumeration mode (string enums with Lookup Resource, or OData EnumType definitions) — re-exported from the shared reso-common model. */
+export type { EnumMode };
 
 /** Server configuration derived from environment variables with sensible defaults. */
 export interface ServerConfig {

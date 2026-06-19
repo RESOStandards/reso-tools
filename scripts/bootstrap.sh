@@ -62,6 +62,7 @@ echo ""
 
 # Layer 1: shared libraries (no internal deps)
 echo "── Shared Libraries ──"
+build_pkg reso-common
 build_pkg odata-expression-parser
 build_pkg reso-validation
 build_pkg reso-client

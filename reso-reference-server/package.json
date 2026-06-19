@@ -20,6 +20,7 @@
     "node": ">=22.0.0"
   },
   "dependencies": {
+    "@reso-standards/reso-common": "file:../reso-common",
     "@reso-standards/reso-data-generator": "file:../reso-data-generator",
     "@reso-standards/odata-expression-parser": "file:../odata-expression-parser",
     "@reso-standards/reso-validation": "file:../reso-validation",

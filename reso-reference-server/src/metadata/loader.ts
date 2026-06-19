@@ -1,26 +1,16 @@
 import { readFile } from 'node:fs/promises';
 import { isEnumType } from '@reso-standards/reso-validation';
-import type { ResoField, ResoLookup, ResoMetadata } from './types.js';
-import { KEY_FIELD_MAP } from './types.js';
+import type { ResoField, ResoMetadata } from './types.js';
 
 export { isEnumType };
+// Pure metadata helpers now live in the shared reso-common package (universal, zero-dep).
+export { getFieldsForResource, getKeyFieldForResource, getLookupsForType } from '@reso-standards/reso-common';
 
 /** Reads and parses a RESO metadata JSON file from disk. */
 export const loadMetadata = async (filePath: string): Promise<ResoMetadata> => {
   const content = await readFile(filePath, 'utf-8');
   return JSON.parse(content) as ResoMetadata;
 };
-
-/** Returns all fields belonging to a specific resource. */
-export const getFieldsForResource = (metadata: ResoMetadata, resourceName: string): ReadonlyArray<ResoField> =>
-  metadata.fields.filter(f => f.resourceName === resourceName);
-
-/** Returns all lookup values for a given enum type (fully qualified name). */
-export const getLookupsForType = (metadata: ResoMetadata, lookupName: string): ReadonlyArray<ResoLookup> =>
-  metadata.lookups.filter(l => l.lookupName === lookupName);
-
-/** Returns the primary key field name for a resource, or undefined if unknown. */
-export const getKeyFieldForResource = (resourceName: string): string | undefined => KEY_FIELD_MAP[resourceName];
 
 /** Extracts the lookup name from a field type string. For enums, returns the type itself. */
 export const getLookupNameFromType = (type: string): string => type;
