@@ -15,8 +15,9 @@ const metadata: ResoMetadata = {
     { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus', isEnumeration: true, annotations: [] },
   ],
   lookups: [
+    // Active has no StandardName (self-closing member); Pending has one (wrapped member).
     { lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Active', type: 'Edm.Int32', annotations: [] },
-    { lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Pending', type: 'Edm.Int32', annotations: [] },
+    { lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Pending', type: 'Edm.Int32', annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Pending Sale' }] },
   ],
 };
 
@@ -32,11 +33,17 @@ describe('generateEdmx — enum-type representation', () => {
     expect(edmx).toContain('Name="StandardStatus" Type="org.reso.metadata.enums.StandardStatus"');
     expect(edmx).toContain('<EnumType Name="StandardStatus">');
     expect(edmx).toContain('<Member Name="Active" Value="0"/>');
-    expect(edmx).toContain('<Member Name="Pending" Value="1"/>');
+    expect(edmx).toContain('<Member Name="Pending" Value="1">');
   });
 
   it('does not emit a LookupName annotation in enum-type mode', () => {
     expect(edmx).not.toContain('RESO.OData.Metadata.LookupName');
+  });
+
+  it('wraps members carrying a StandardName and self-closes those without', () => {
+    expect(edmx).toContain('<Member Name="Pending" Value="1">');
+    expect(edmx).toContain('<Annotation Term="RESO.OData.Metadata.StandardName" String="Pending Sale"/>');
+    expect(edmx).toContain('<Member Name="Active" Value="0"/>');
   });
 });
 

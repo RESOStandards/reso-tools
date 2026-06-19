@@ -118,11 +118,14 @@ const generateEntitySet = (resourceName: string, fields: ReadonlyArray<ResoField
 /** Collected EnumType definition for EDMX generation. */
 interface EnumTypeDefinition {
   readonly enumTypeName: string;
-  readonly members: ReadonlyArray<{ readonly name: string; readonly value: number }>;
+  readonly members: ReadonlyArray<{ readonly name: string; readonly value: number; readonly standardName?: string }>;
 }
 
 /** Enum namespace prefix used in the RESO metadata. */
 const ENUM_PREFIX = 'org.reso.metadata.enums.';
+
+/** The annotation term carrying a lookup's human-friendly display name. */
+const ANNOTATION_STANDARD_NAME = 'RESO.OData.Metadata.StandardName';
 
 /**
  * Collects all unique enum types referenced by the active resources and
@@ -150,7 +153,11 @@ const collectEnumTypes = (metadata: ResoMetadata, targetResources: ReadonlyArray
       // emitted as EnumType members). Filtered silently — no logging in a pure lib.
       const members = lookups
         .filter(l => isValidSimpleIdentifier(l.lookupValue))
-        .map((l, index) => ({ name: l.lookupValue, value: index }));
+        .map((l, index) => ({
+          name: l.lookupValue,
+          value: index,
+          standardName: l.annotations.find(a => a.term === ANNOTATION_STANDARD_NAME)?.value,
+        }));
 
       return { enumTypeName: shortName, members };
     })
@@ -159,7 +166,13 @@ const collectEnumTypes = (metadata: ResoMetadata, targetResources: ReadonlyArray
 
 /** Renders a single EnumType XML element. */
 const generateEnumTypeXml = (enumType: EnumTypeDefinition): string => {
-  const memberElements = enumType.members.map(m => `        <Member Name="${escapeXml(m.name)}" Value="${m.value}"/>`).join('\n');
+  const memberElements = enumType.members
+    .map(m =>
+      m.standardName
+        ? `        <Member Name="${escapeXml(m.name)}" Value="${m.value}">\n          <Annotation Term="${ANNOTATION_STANDARD_NAME}" String="${escapeXml(m.standardName)}"/>\n        </Member>`
+        : `        <Member Name="${escapeXml(m.name)}" Value="${m.value}"/>`,
+    )
+    .join('\n');
 
   return `      <EnumType Name="${escapeXml(enumType.enumTypeName)}">\n${memberElements}\n      </EnumType>`;
 };

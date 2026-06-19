@@ -87,17 +87,54 @@ const extractTypeName = (type: string): string => {
   return dotIndex >= 0 ? unwrapped.slice(dotIndex + 1) : unwrapped;
 };
 
+/**
+ * CSDL constant-expression names (per the OData CSDL XSD GInlineExpressions / GExpression).
+ * A vocabulary annotation's value may be written EITHER as an inline attribute
+ * (`<Annotation Term="..." String="..."/>`) OR as a child element
+ * (`<Annotation Term="..."><String>...</String></Annotation>`) — same names either way, and
+ * identical between OData 4.0 and 4.01. RESO's terms (StandardName, LookupName, DDWikiUrl,
+ * Description) are all String constants.
+ */
+const CONSTANT_EXPRESSION_NAMES = [
+  'String', 'Bool', 'Int', 'Decimal', 'Float',
+  'Date', 'DateTimeOffset', 'Duration', 'Guid', 'TimeOfDay', 'EnumMember', 'Binary'
+] as const;
+
+/** Extracts an annotation's constant value from either the inline-attribute or child-element form. */
+const annotationConstantValue = (ann: Record<string, unknown>): string | undefined => {
+  for (const name of CONSTANT_EXPRESSION_NAMES) {
+    const attr = ann[`@_${name}`];
+    if (attr !== undefined && attr !== null) return String(attr);
+    const child = ann[name];
+    if (child !== undefined && child !== null) {
+      // fast-xml-parser yields a primitive for <String>text</String>, or an object carrying
+      // '#text' when the element itself has attributes.
+      return typeof child === 'object' ? String((child as Record<string, unknown>)['#text'] ?? '') : String(child);
+    }
+  }
+  return undefined;
+};
+
+/**
+ * Parses vocabulary Annotations on a CSDL element into a term→value map, handling both the
+ * inline-attribute and wrapped child-element constant forms. Dynamic expressions
+ * (Record/Collection/Path) are skipped — RESO terms are all constants.
+ */
+const parseAnnotations = (raw: Record<string, unknown>): Record<string, string> => {
+  const result: Record<string, string> = {};
+  const rawAnnotations = (raw.Annotation as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
+  for (const ann of rawAnnotations) {
+    const term = ann['@_Term'] as string | undefined;
+    if (!term) continue;
+    const value = annotationConstantValue(ann);
+    if (value !== undefined) result[term] = value;
+  }
+  return result;
+};
+
 const parseProperties = (rawProperties: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<CsdlProperty> =>
   rawProperties.map(rawProp => {
-    const annotations: Record<string, string> = {};
-    const rawAnnotations = (rawProp.Annotation as ReadonlyArray<Record<string, string>> | undefined) ?? [];
-    for (const ann of rawAnnotations) {
-      const term = ann['@_Term'];
-      const value = ann['@_String'] ?? ann['@_Bool'] ?? '';
-      if (term) {
-        annotations[term] = value;
-      }
-    }
+    const annotations = parseAnnotations(rawProp);
 
     return {
       name: rawProp['@_Name'] as string,
@@ -221,14 +258,22 @@ const parseComplexTypes = (rawComplexTypes: ReadonlyArray<Record<string, unknown
 const parseEnumTypes = (rawEnumTypes: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<CsdlEnumType> =>
   rawEnumTypes.map(rawEnum => {
     const name = rawEnum['@_Name'] as string;
-    const rawMembers = (rawEnum.Member as ReadonlyArray<Record<string, string>> | undefined) ?? [];
-    const members: ReadonlyArray<CsdlEnumMember> = rawMembers.map(m => ({
-      name: m['@_Name'],
-      ...(m['@_Value'] !== undefined && { value: m['@_Value'] })
-    }));
+    const rawMembers = (rawEnum.Member as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
+    const members: ReadonlyArray<CsdlEnumMember> = rawMembers.map(m => {
+      const annotations = parseAnnotations(m);
+      return {
+        name: m['@_Name'] as string,
+        ...(m['@_Value'] !== undefined && { value: m['@_Value'] as string }),
+        ...(Object.keys(annotations).length > 0 && { annotations })
+      };
+    });
+    // namespace is injected onto each raw enum at flatMap time — enum types and entity types
+    // can live in separate namespaced schemas, and the enum's own namespace forms its FQDN.
+    const namespace = rawEnum.__schemaNamespace as string | undefined;
     return {
       name,
       members,
+      ...(namespace !== undefined && { namespace }),
       ...(rawEnum['@_UnderlyingType'] !== undefined && {
         underlyingType: rawEnum['@_UnderlyingType'] as string
       }),
@@ -396,7 +441,9 @@ export const parseCsdlXml = (xml: string): CsdlSchema => {
 
   // Merge elements from all schemas
   const rawEntityTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.EntityType as ReadonlyArray<Record<string, unknown>>) ?? []);
-  const rawEnumTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.EnumType as ReadonlyArray<Record<string, unknown>>) ?? []);
+  const rawEnumTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s =>
+    ((s.EnumType as ReadonlyArray<Record<string, unknown>>) ?? []).map(e => ({ ...e, __schemaNamespace: s['@_Namespace'] }))
+  );
   const rawComplexTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.ComplexType as ReadonlyArray<Record<string, unknown>>) ?? []);
   const rawActions: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.Action as ReadonlyArray<Record<string, unknown>>) ?? []);
   const rawFunctions: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.Function as ReadonlyArray<Record<string, unknown>>) ?? []);

@@ -139,10 +139,12 @@ const detectEnumeration = (
   const type = field.type;
   const unwrapped = type.startsWith('Collection(') ? type.slice('Collection('.length, -1) : type;
 
-  // OData EnumType (single or collection)
+  // OData EnumType (single or collection): match the field type against the enum's full FQDN at
+  // the TRANSPORT level. The enum's true namespace comes from CsdlEnumType.namespace — entity
+  // types and enum types often live in separate schemas (e.g. org.reso.metadata vs
+  // org.reso.metadata.enums), so enumTypeNames is keyed by each enum's real namespace + name and
+  // field.type === the enum FQDN exactly. (Display uses the parsed tail; joins use the FQDN.)
   if (enumTypeNames.has(unwrapped)) return true;
-
-  // IsFlags enum
   if (isFlagsTypeNames.has(unwrapped)) return true;
 
   // String enum: Edm.String or Collection(Edm.String) with LookupName annotation
@@ -184,12 +186,17 @@ const enumMemberToLookup = (
   const lookupName = `${namespace}.${enumType.name}`;
   const type = enumType.underlyingType ?? 'Edm.Int32';
 
-  // Enum member annotations aren't currently parsed by reso-client's CSDL parser,
-  // but we include the structure for when they are
+  // Carry member annotations (e.g. StandardName) so the report keeps BOTH values: the legacy
+  // OData value (lookupValue) and the standard display name (annotation).
+  const annotations = member.annotations
+    ? Object.entries(member.annotations).map(([term, value]) => ({ term, value }))
+    : [];
+
   return {
     lookupName,
     lookupValue: member.name,
     type,
+    ...(annotations.length > 0 && { annotations })
   };
 };
 
@@ -218,13 +225,13 @@ export const serializeMetadataReport = (
   const resources: ReadonlyArray<MetadataReportResource> =
     schema.entityContainer.entitySets.map(es => ({ resourceName: es.name }));
 
-  // Build sets for enumeration detection
-  const enumTypeNames = new Set(
-    schema.enumTypes.map(et => `${schema.namespace}.${et.name}`)
-  );
-  const isFlagsTypeNames = new Set(
-    schema.enumTypes.filter(et => et.isFlags).map(et => `${schema.namespace}.${et.name}`)
-  );
+  // Build sets for enumeration detection, keyed by each enum's full FQDN. The enum's true
+  // namespace (CsdlEnumType.namespace) is used so a field's type matches at the transport level —
+  // entity types and enum types often live in separate namespaced schemas (e.g.
+  // org.reso.metadata vs org.reso.metadata.enums).
+  const enumFqn = (et: CsdlEnumType): string => `${et.namespace ?? schema.namespace}.${et.name}`;
+  const enumTypeNames = new Set(schema.enumTypes.map(enumFqn));
+  const isFlagsTypeNames = new Set(schema.enumTypes.filter(et => et.isFlags).map(enumFqn));
 
   // Fields from all entity types (properties + navigation properties)
   const allFieldsByResource = getAllFields(schema);
@@ -234,7 +241,7 @@ export const serializeMetadataReport = (
 
   // Lookups from enum type definitions
   const lookups: ReadonlyArray<MetadataReportLookup> = schema.enumTypes.flatMap(enumType =>
-    enumType.members.map(member => enumMemberToLookup(enumType, member, schema.namespace))
+    enumType.members.map(member => enumMemberToLookup(enumType, member, enumType.namespace ?? schema.namespace))
   );
 
   // Actions and Functions

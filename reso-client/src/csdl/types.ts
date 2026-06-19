@@ -75,12 +75,20 @@ export interface CsdlComplexType {
 export interface CsdlEnumMember {
   readonly name: string;
   readonly value?: string;
+  /** Vocabulary annotations on the member (e.g. RESO.OData.Metadata.StandardName). */
+  readonly annotations?: Readonly<Record<string, string>>;
 }
 
 /** An enumeration type definition. */
 export interface CsdlEnumType {
   readonly name: string;
   readonly members: ReadonlyArray<CsdlEnumMember>;
+  /**
+   * The namespace the enum type was declared in. Entity types and enum types often live in
+   * separate namespaced schemas (e.g. org.reso.metadata vs org.reso.metadata.enums), so this
+   * is needed to form the enum's full FQDN for transport-level matching against field types.
+   */
+  readonly namespace?: string;
   /** The underlying integer type (e.g. Edm.Int32). */
   readonly underlyingType?: string;
   /** Whether this enum supports bitwise combination of members. */
