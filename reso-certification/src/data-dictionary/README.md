@@ -103,7 +103,7 @@ Tested against the RESO reference server (Docker, PostgreSQL, 153 Property recor
 
 ## Metadata Report
 
-The pipeline generates a metadata report (`metadata-report.json` or `metadata-report.processed.json`) in the RESO standard format:
+The pipeline always generates a canonical metadata report at `metadata-report.json` in the RESO standard format. When a Lookup Resource is present it holds the merged result; otherwise it holds the base report:
 
 ```json
 {
@@ -147,8 +147,8 @@ Results are written to a directory structure compatible with `reso-certification
       <recipientUoi>/
         current/
           metadata.xml                           # Raw EDMX XML from /$metadata
-          metadata-report.json                   # Serialized metadata report (from EDMX)
-          metadata-report.processed.json         # Merged report (if Lookup Resource available)
+          metadata-report.json                   # Canonical metadata report (merged when Lookup Resource present, else base)
+          metadata-report.raw.json               # Pre-merge base report (only when a Lookup Resource merge occurred)
           lookup-resource-lookup-metadata.json    # Raw Lookup Resource data dump
           data-availability-report.json          # Replication results and field coverage
           data-availability-responses.json       # Raw OData response data
@@ -186,8 +186,8 @@ ln -s .reso-cert results
 | File | Description |
 |------|-------------|
 | `metadata.xml` | Raw EDMX XML downloaded from `/$metadata` |
-| `metadata-report.json` | Metadata serialized from EDMX (resources, fields, enum lookups) |
-| `metadata-report.processed.json` | Metadata merged with Lookup Resource data (if available) |
+| `metadata-report.json` | Canonical metadata report — merged with Lookup Resource data when available, base (EDMX-serialized) report otherwise |
+| `metadata-report.raw.json` | Pre-merge base report from EDMX, written only when a Lookup Resource merge occurred |
 | `lookup-resource-lookup-metadata.json` | Raw Lookup Resource records (LookupName, LookupValue, StandardLookupValue, LegacyODataValue) |
 | `data-availability-report.json` | Field coverage, record counts, and data availability statistics per resource |
 | `data-availability-responses.json` | Raw OData response payloads from replication |

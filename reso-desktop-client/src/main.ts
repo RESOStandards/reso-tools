@@ -304,7 +304,10 @@ const certResultsRoot = (): string => resolve(app.getPath('userData'), CERT_RESU
 const REPORT_FILENAMES: Readonly<Record<string, ReadonlyArray<string>>> = {
   schemaErrors: ['data-availability-schema-validation-errors.json'],
   variations: ['variations-report.json', 'data-dictionary-variations.json'],
-  metadata: ['metadata-report.processed.json'],
+  // metadata-report.json is the canonical (merged-or-base) report; .processed is the
+  // pre-inversion merged name. Its presence uniquely marks an old merged run, so list
+  // it first — new runs have no .processed and fall through to metadata-report.json.
+  metadata: ['metadata-report.processed.json', 'metadata-report.json'],
   metadataXml: ['metadata.xml'],
   ddReport: ['data-dictionary-2.0.json'],
   report: ['report.json'],

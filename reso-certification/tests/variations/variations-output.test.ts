@@ -39,14 +39,14 @@ describe('Variations report output', () => {
     const expectedFiles: Record<string, string> = {
       schemaErrors: 'data-availability-schema-validation-errors.json',
       variations: 'variations-report.json',
-      metadata: 'metadata-report.processed.json',
+      metadata: 'metadata-report.json',
       report: 'report.json',
       reportDetailed: 'report-detailed.json',
     };
 
     // Verify the filenames match what the pipeline writes
     expect(expectedFiles.variations).toBe('variations-report.json');
-    expect(expectedFiles.metadata).toBe('metadata-report.processed.json');
+    expect(expectedFiles.metadata).toBe('metadata-report.json');
     expect(expectedFiles.report).toBe('report.json');
     expect(expectedFiles.reportDetailed).toBe('report-detailed.json');
   });

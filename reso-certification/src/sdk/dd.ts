@@ -129,10 +129,6 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
     // semantics as every other compliance pipeline).
     const metadataXmlPath = await persistMetadataXml(ctx.outputPath, edmxXml);
 
-    // Write base metadata report
-    const baseReportPath = join(ctx.outputPath, 'metadata-report.json');
-    await writeFile(baseReportPath, JSON.stringify(baseReport, null, 2));
-
     // Fetch Lookup Resource and merge if available
     const lookupUrl = `${ctx.serverUrl}/Lookup`;
     onProgress({ step: 'sub:metadata', status: 'running', message: 'Fetching Lookup Resource...' });
@@ -150,7 +146,16 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
       onProgress({ step: 'sub:metadata', status: 'running', message: 'Lookup Resource not available (HTTP 404)' });
     }
 
-    let metadataReportPath = baseReportPath;
+    // The canonical metadata report is ALWAYS metadata-report.json. `report` is the
+    // merged result when a Lookup Resource is present, otherwise the base report
+    // unchanged — so downstream always reads metadata-report.json and never has to
+    // choose between a base file and a ".processed" file (this inverts the old scheme
+    // where metadata-report.json was the base and metadata-report.processed.json the
+    // merged variant). When a merge actually happens we also keep the pre-merge
+    // snapshot as metadata-report.raw.json; with no Lookup Resource the two would be
+    // byte-identical, so raw is written only when it differs.
+    const metadataReportPath = join(ctx.outputPath, 'metadata-report.json');
+    await writeFile(metadataReportPath, JSON.stringify(report, null, 2));
 
     if (lookupResourceAvailable && rawRecords) {
       // Write raw lookup resource data
@@ -158,9 +163,8 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
       const lookupDump = serializeLookupResourceDump(rawRecords);
       await writeFile(join(ctx.outputPath, 'lookup-resource-lookup-metadata.json'), JSON.stringify(lookupDump, null, 2));
 
-      // Write processed (merged) metadata report
-      metadataReportPath = join(ctx.outputPath, 'metadata-report.processed.json');
-      await writeFile(metadataReportPath, JSON.stringify(report, null, 2));
+      // Pre-merge metadata report (provenance): the base before the Lookup Resource merge.
+      await writeFile(join(ctx.outputPath, 'metadata-report.raw.json'), JSON.stringify(baseReport, null, 2));
     }
 
     const lookupMsg = lookupResourceAvailable

@@ -154,7 +154,9 @@ const transformFieldWithLookup = (field: MetadataReportField): MetadataReportFie
 /**
  * Merge a base metadata report with Lookup Resource data.
  *
- * This produces the equivalent of cert-utils' metadata-report.processed.json:
+ * This produces the merged metadata report. The DD pipeline writes it as the
+ * canonical metadata-report.json and keeps the pre-merge base as metadata-report.raw.json
+ * (the equivalent of cert-utils' old metadata-report.json + metadata-report.processed.json pair):
  * 1. Fields with LookupName annotations get their type replaced with the lookup name
  * 2. Lookup Resource records are transformed and appended to the lookups array
  */
