@@ -83,3 +83,37 @@ describe('CSDL schema Alias resolution', () => {
     expect(field?.type).toBe('org.reso.metadata.enums.StandardStatus');
   });
 });
+
+describe('XML entity decoding in annotation values', () => {
+  // A StandardName like "Flex R&D" is escaped to "Flex R&amp;D" in EDMX; the parser must decode
+  // it back. (With processEntities off it parsed to the literal "Flex R&amp;D", corrupting it.)
+  const edmx = `<?xml version="1.0" encoding="UTF-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:DataServices>
+    <Schema Namespace="org.reso.metadata" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityType Name="Property">
+        <Key><PropertyRef Name="ListingKey"/></Key>
+        <Property Name="ListingKey" Type="Edm.String"/>
+      </EntityType>
+      <EntityContainer Name="Default">
+        <EntitySet Name="Property" EntityType="org.reso.metadata.Property"/>
+      </EntityContainer>
+    </Schema>
+    <Schema Namespace="org.reso.metadata.enums" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EnumType Name="PropertySubcategory">
+        <Member Name="FlexRAndD" Value="0">
+          <Annotation Term="RESO.OData.Metadata.StandardName" String="Flex R&amp;D"/>
+        </Member>
+      </EnumType>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>`;
+
+  it('decodes &amp; in a member StandardName', () => {
+    const schema = parseCsdlXml(edmx);
+    const member = schema.enumTypes
+      .find(e => e.name === 'PropertySubcategory')
+      ?.members.find(m => m.name === 'FlexRAndD');
+    expect(member?.annotations?.['RESO.OData.Metadata.StandardName']).toBe('Flex R&D');
+  });
+});

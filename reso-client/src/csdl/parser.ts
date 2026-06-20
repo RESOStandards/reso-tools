@@ -42,7 +42,10 @@ import type {
 const xmlParserOptions = {
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
-  processEntities: false,
+  // Decode XML entities (&amp; -> &, &lt; -> <, ...) so annotation/text values with XML-special
+  // characters (e.g. a StandardName of "Flex R&D") parse faithfully. With this off, an escaped
+  // value parses back as its literal entity form ("Flex R&amp;D"), corrupting any such value.
+  processEntities: true,
   isArray: (name: string) =>
     [
       'EntityType',
