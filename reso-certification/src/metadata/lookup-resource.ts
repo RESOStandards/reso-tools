@@ -172,6 +172,30 @@ export const mergeWithLookupResource = (
   ],
 });
 
+/** The unqualified (display) lookup name — the tail of a possibly-namespaced lookup name. */
+const parseLookupName = (lookupName: string): string =>
+  lookupName.includes('.') ? lookupName.slice(lookupName.lastIndexOf('.') + 1) : lookupName;
+
+/**
+ * Synthesize a Lookup Resource dataset from a DD reference report's lookups — the inverse of
+ * transformLookupRecord. Produces the raw records a string-representation provider would serve at
+ * /Lookup, so the certification self-test can exercise the string + Lookup Resource model against
+ * the reference. The LookupName is the unqualified (short) name, matching a string-mode field's
+ * LookupName annotation; StandardName and LegacyODataValue annotations become the record's
+ * StandardLookupValue and LegacyODataValue.
+ */
+export const synthesizeLookupResourceRecords = (report: MetadataReport): ReadonlyArray<RawLookupRecord> =>
+  report.lookups.map(lookup => {
+    const standardName = lookup.annotations?.find(a => a.term === STANDARD_NAME_ANNOTATION_TERM)?.value;
+    const legacyValue = lookup.annotations?.find(a => a.term === LEGACY_ODATA_VALUE_TERM)?.value;
+    return {
+      LookupName: parseLookupName(lookup.lookupName),
+      LookupValue: lookup.lookupValue,
+      ...(standardName ? { StandardLookupValue: standardName } : {}),
+      ...(legacyValue ? { LegacyODataValue: legacyValue } : {}),
+    };
+  });
+
 /**
  * Full pipeline: fetch Lookup Resource, merge with base report.
  * Returns the base report unchanged if Lookup resource is not available.

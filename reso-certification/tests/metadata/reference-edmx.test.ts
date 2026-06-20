@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { MetadataReport } from '../../src/metadata/serializer.js';
 import { generateMetadataReport } from '../../src/metadata/serializer.js';
 import { generateReferenceEdmx } from '../../src/metadata/reference-edmx.js';
+import { synthesizeLookupResourceRecords, mergeWithLookupResource } from '../../src/metadata/lookup-resource.js';
 
 /** A minimal Property report: an Edm primitive key plus one enum field with two lookup values. */
 const report: MetadataReport = {
@@ -85,5 +86,27 @@ describe('enum detection with a CSDL schema Alias', () => {
     expect(field?.isEnumeration).toBe(true);
     expect(field?.type).toBe('org.reso.metadata.enums.StandardStatus');
     expect(lookup?.lookupName).toBe(field?.type);
+  });
+});
+
+describe('string + Lookup Resource representation', () => {
+  // The string rep keeps enum values out of the metadata — a provider serves them at /Lookup.
+  // Synthesize that dataset from the DD reference, merge it into the string-mode base report, and
+  // the result must be internally consistent: enum fields and their lookups join by the SHORT
+  // LookupName, and the standard display name is preserved.
+  it('synthesizes a Lookup Resource dataset and merges into a consistent report', () => {
+    const base = generateMetadataReport(generateReferenceEdmx(report, ['Property'], 'string'), '2.1');
+    const records = synthesizeLookupResourceRecords(report);
+    const merged = mergeWithLookupResource(base, records);
+
+    const field = merged.fields.find(f => f.fieldName === 'StandardStatus');
+    const lookup = merged.lookups.find(l => l.lookupValue === 'Pending');
+
+    // string-rep join is by the unqualified LookupName
+    expect(field?.type).toBe('StandardStatus');
+    expect(lookup?.lookupName).toBe('StandardStatus');
+    expect(lookup?.lookupName).toBe(field?.type);
+    // both values preserved — the standard display name survives synthesis + merge
+    expect(lookup?.annotations?.find(a => a.term === 'RESO.OData.Metadata.StandardName')?.value).toBe('Pending Sale');
   });
 });
