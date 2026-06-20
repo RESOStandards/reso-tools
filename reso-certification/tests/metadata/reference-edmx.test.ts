@@ -110,3 +110,11 @@ describe('string + Lookup Resource representation', () => {
     expect(lookup?.annotations?.find(a => a.term === 'RESO.OData.Metadata.StandardName')?.value).toBe('Pending Sale');
   });
 });
+
+describe('primary key in the metadata report', () => {
+  it('marks the entity key field with isPrimaryKey, sourced from the CSDL <Key>', () => {
+    const rt = generateMetadataReport(generateReferenceEdmx(report, ['Property'], 'string'), '2.1');
+    expect(rt.fields.find(f => f.fieldName === 'ListingKey')?.isPrimaryKey).toBe(true);
+    expect(rt.fields.find(f => f.fieldName === 'StandardStatus')?.isPrimaryKey).toBeUndefined();
+  });
+});

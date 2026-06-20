@@ -588,7 +588,7 @@ const toAnnotations = (annotations?: Readonly<Record<string, string>>): Readonly
   annotations ? Object.entries(annotations).map(([term, value]) => ({ term, value })) : [];
 
 /** Convert a single CSDL property to a FieldInfo. */
-const propertyToFieldInfo = (resourceName: string, prop: CsdlProperty, namespace: string): FieldInfo => {
+const propertyToFieldInfo = (resourceName: string, prop: CsdlProperty, namespace: string, keyFields: ReadonlySet<string>): FieldInfo => {
   const rawType = isCollectionType(prop.type) ? unwrapCollectionType(prop.type) : prop.type;
   const lookupName = prop.annotations?.[LOOKUP_NAME_TERM];
   const isCsdlEnum = !isEdmPrimitive(prop.type) && !prop.type.startsWith('Collection(Edm.');
@@ -608,7 +608,8 @@ const propertyToFieldInfo = (resourceName: string, prop: CsdlProperty, namespace
     scale: prop.scale,
     precision: prop.precision,
     annotations: toAnnotations(prop.annotations),
-    lookupName: lookupName ?? undefined
+    lookupName: lookupName ?? undefined,
+    ...(keyFields.has(prop.name) ? { isPrimaryKey: true } : {})
   };
 };
 
@@ -621,8 +622,9 @@ export const getFieldsForEntityType = (
   entityType: CsdlEntityType,
   resourceName: string
 ): ReadonlyArray<FieldInfo> => {
+  const keyFields = new Set(entityType.key);
   const fields = entityType.properties.map(p =>
-    propertyToFieldInfo(resourceName, p, schema.namespace)
+    propertyToFieldInfo(resourceName, p, schema.namespace, keyFields)
   );
 
   const navFields: ReadonlyArray<FieldInfo> = entityType.navigationProperties.map(nav => ({

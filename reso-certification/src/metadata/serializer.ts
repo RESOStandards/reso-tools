@@ -34,6 +34,8 @@ export interface MetadataReportField {
   readonly isExpansion?: boolean;
   readonly isEnumeration?: boolean;
   readonly isComplexType?: boolean;
+  /** True when the field is (part of) the entity type's key, from the CSDL <Key> element. */
+  readonly isPrimaryKey?: boolean;
   readonly annotations: ReadonlyArray<{ readonly term: string; readonly value: string }>;
 }
 
@@ -173,6 +175,7 @@ const fieldInfoToReportField = (
     ...(field.isCollection ? { isCollection: true } : {}),
     ...(field.isExpansion ? { isExpansion: true } : {}),
     ...(isEnum ? { isEnumeration: true } : {}),
+    ...(field.isPrimaryKey ? { isPrimaryKey: true } : {}),
     annotations: field.annotations,
   };
 };

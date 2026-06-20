@@ -219,6 +219,8 @@ export interface FieldInfo {
   readonly annotations: ReadonlyArray<FieldAnnotation>;
   /** RESO Lookup Resource name (from RESO.OData.Metadata.LookupName annotation). */
   readonly lookupName?: string;
+  /** True when this property is (part of) the entity type's key, from the CSDL <Key> element. */
+  readonly isPrimaryKey?: boolean;
 }
 
 /** Validation error for a CSDL document. */

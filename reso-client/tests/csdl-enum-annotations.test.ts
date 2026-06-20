@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseCsdlXml } from '../src/index.js';
+import { parseCsdlXml, getAllFields } from '../src/index.js';
 
 /**
  * Enum types declared in a separate namespaced schema (org.reso.metadata.enums) from the
@@ -115,5 +115,14 @@ describe('XML entity decoding in annotation values', () => {
       .find(e => e.name === 'PropertySubcategory')
       ?.members.find(m => m.name === 'FlexRAndD');
     expect(member?.annotations?.['RESO.OData.Metadata.StandardName']).toBe('Flex R&D');
+  });
+});
+
+describe('primary key flag from the CSDL <Key>', () => {
+  it('marks the entity key field as isPrimaryKey', () => {
+    // The top-level `edmx` declares <Key><PropertyRef Name="ListingKey"/></Key> on Property.
+    const fields = getAllFields(parseCsdlXml(edmx)).Property ?? [];
+    expect(fields.find(f => f.fieldName === 'ListingKey')?.isPrimaryKey).toBe(true);
+    expect(fields.find(f => f.fieldName === 'StandardStatus')?.isPrimaryKey).toBeUndefined();
   });
 });
