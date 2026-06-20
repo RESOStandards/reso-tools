@@ -50,3 +50,36 @@ describe('CSDL enum namespace + member annotations', () => {
     expect(pending?.annotations?.['RESO.OData.Metadata.StandardName']).toBe('Pending Sale');
   });
 });
+
+describe('CSDL schema Alias resolution', () => {
+  // The enum schema declares Alias="RESOEnums" and the field references the enum by that alias —
+  // a spec-valid CSDL spelling that must resolve to the same FQDN as the namespace form.
+  const aliasedEdmx = `<?xml version="1.0" encoding="UTF-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:DataServices>
+    <Schema Namespace="org.reso.metadata" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityType Name="Property">
+        <Key><PropertyRef Name="ListingKey"/></Key>
+        <Property Name="ListingKey" Type="Edm.String"/>
+        <Property Name="StandardStatus" Type="RESOEnums.StandardStatus"/>
+      </EntityType>
+      <EntityContainer Name="Default">
+        <EntitySet Name="Property" EntityType="org.reso.metadata.Property"/>
+      </EntityContainer>
+    </Schema>
+    <Schema Namespace="org.reso.metadata.enums" Alias="RESOEnums" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EnumType Name="StandardStatus">
+        <Member Name="Active" Value="0"/>
+      </EnumType>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>`;
+
+  it('canonicalizes an alias-qualified field type to its namespace form', () => {
+    const schema = parseCsdlXml(aliasedEdmx);
+    const field = schema.entityTypes
+      .find(e => e.name === 'Property')
+      ?.properties.find(p => p.name === 'StandardStatus');
+    expect(field?.type).toBe('org.reso.metadata.enums.StandardStatus');
+  });
+});

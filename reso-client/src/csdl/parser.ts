@@ -88,6 +88,24 @@ const extractTypeName = (type: string): string => {
 };
 
 /**
+ * Resolve a CSDL schema Alias prefix in a qualified type reference to its namespace. CSDL lets a
+ * schema declare `Alias="X"` and lets qualified names use the alias or the namespace
+ * interchangeably (e.g. `WEBAPI.Office` == `reso.web.api.Office`). Canonicalizing to the namespace
+ * form lets downstream FQDN comparisons (enum detection, expansion) match regardless of which
+ * spelling a provider used. No-op for Edm primitives, unqualified names, and any prefix that is
+ * not a declared alias. Handles Collection(...) wrappers.
+ */
+const canonicalizeType = (type: string, aliasMap: Readonly<Record<string, string>>): string => {
+  const inner = isCollectionType(type) ? unwrapCollectionType(type) : type;
+  const dot = inner.lastIndexOf('.');
+  if (dot < 0) return type;
+  const namespace = aliasMap[inner.slice(0, dot)];
+  if (!namespace) return type;
+  const canonical = `${namespace}.${inner.slice(dot + 1)}`;
+  return isCollectionType(type) ? `Collection(${canonical})` : canonical;
+};
+
+/**
  * CSDL constant-expression names (per the OData CSDL XSD GInlineExpressions / GExpression).
  * A vocabulary annotation's value may be written EITHER as an inline attribute
  * (`<Annotation Term="..." String="..."/>`) OR as a child element
@@ -132,13 +150,13 @@ const parseAnnotations = (raw: Record<string, unknown>): Record<string, string> 
   return result;
 };
 
-const parseProperties = (rawProperties: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<CsdlProperty> =>
+const parseProperties = (rawProperties: ReadonlyArray<Record<string, unknown>>, aliasMap: Readonly<Record<string, string>>): ReadonlyArray<CsdlProperty> =>
   rawProperties.map(rawProp => {
     const annotations = parseAnnotations(rawProp);
 
     return {
       name: rawProp['@_Name'] as string,
-      type: rawProp['@_Type'] as string,
+      type: canonicalizeType(rawProp['@_Type'] as string, aliasMap),
       ...(rawProp['@_Nullable'] !== undefined && {
         nullable: rawProp['@_Nullable'] === 'true'
       }),
@@ -173,10 +191,10 @@ const parseReferentialConstraints = (rawConstraints: ReadonlyArray<Record<string
  *
  * @see https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_NavigationProperty
  */
-const parseNavigationProperties = (rawNavProps: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<CsdlNavigationProperty> =>
+const parseNavigationProperties = (rawNavProps: ReadonlyArray<Record<string, unknown>>, aliasMap: Readonly<Record<string, string>>): ReadonlyArray<CsdlNavigationProperty> =>
   rawNavProps.map(rawNav => {
     const name = rawNav['@_Name'] as string;
-    const type = rawNav['@_Type'] as string;
+    const type = canonicalizeType(rawNav['@_Type'] as string, aliasMap);
     const collection = isCollectionType(type);
     const entityTypeName = extractTypeName(type);
 
@@ -202,7 +220,7 @@ const parseNavigationProperties = (rawNavProps: ReadonlyArray<Record<string, unk
     };
   });
 
-const parseEntityTypes = (rawEntityTypes: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<CsdlEntityType> =>
+const parseEntityTypes = (rawEntityTypes: ReadonlyArray<Record<string, unknown>>, aliasMap: Readonly<Record<string, string>>): ReadonlyArray<CsdlEntityType> =>
   rawEntityTypes.map(rawEntity => {
     const name = rawEntity['@_Name'] as string;
 
@@ -215,10 +233,10 @@ const parseEntityTypes = (rawEntityTypes: ReadonlyArray<Record<string, unknown>>
     return {
       name,
       key,
-      properties: parseProperties(rawProperties),
-      navigationProperties: parseNavigationProperties(rawNavProperties),
+      properties: parseProperties(rawProperties, aliasMap),
+      navigationProperties: parseNavigationProperties(rawNavProperties, aliasMap),
       ...(rawEntity['@_BaseType'] !== undefined && {
-        baseType: rawEntity['@_BaseType'] as string
+        baseType: canonicalizeType(rawEntity['@_BaseType'] as string, aliasMap)
       }),
       ...(rawEntity['@_Abstract'] !== undefined && {
         abstract: rawEntity['@_Abstract'] === 'true'
@@ -232,7 +250,7 @@ const parseEntityTypes = (rawEntityTypes: ReadonlyArray<Record<string, unknown>>
     };
   });
 
-const parseComplexTypes = (rawComplexTypes: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<CsdlComplexType> =>
+const parseComplexTypes = (rawComplexTypes: ReadonlyArray<Record<string, unknown>>, aliasMap: Readonly<Record<string, string>>): ReadonlyArray<CsdlComplexType> =>
   rawComplexTypes.map(rawComplex => {
     const name = rawComplex['@_Name'] as string;
 
@@ -241,10 +259,10 @@ const parseComplexTypes = (rawComplexTypes: ReadonlyArray<Record<string, unknown
 
     return {
       name,
-      properties: parseProperties(rawProperties),
-      navigationProperties: parseNavigationProperties(rawNavProperties),
+      properties: parseProperties(rawProperties, aliasMap),
+      navigationProperties: parseNavigationProperties(rawNavProperties, aliasMap),
       ...(rawComplex['@_BaseType'] !== undefined && {
-        baseType: rawComplex['@_BaseType'] as string
+        baseType: canonicalizeType(rawComplex['@_BaseType'] as string, aliasMap)
       }),
       ...(rawComplex['@_Abstract'] !== undefined && {
         abstract: rawComplex['@_Abstract'] === 'true'
@@ -439,6 +457,15 @@ export const parseCsdlXml = (xml: string): CsdlSchema => {
   // Use the namespace from the first schema that has entity types, or fall back to the first schema
   const namespace: string = (schemas.find(s => s.EntityType) ?? schemas[0])['@_Namespace'] as string ?? '';
 
+  // CSDL allows a schema Alias as a shorthand for its Namespace; qualified type references may use
+  // the alias or the namespace interchangeably. Map alias -> namespace so canonicalizeType can
+  // normalize every qualified type reference (field/nav/base types) before downstream FQDN matching.
+  const aliasMap: Readonly<Record<string, string>> = Object.fromEntries(
+    schemas
+      .filter(s => s['@_Alias'] && s['@_Namespace'])
+      .map(s => [s['@_Alias'] as string, s['@_Namespace'] as string])
+  );
+
   // Merge elements from all schemas
   const rawEntityTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.EntityType as ReadonlyArray<Record<string, unknown>>) ?? []);
   const rawEnumTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s =>
@@ -455,9 +482,9 @@ export const parseCsdlXml = (xml: string): CsdlSchema => {
 
   return {
     namespace,
-    entityTypes: parseEntityTypes(rawEntityTypes),
+    entityTypes: parseEntityTypes(rawEntityTypes, aliasMap),
     enumTypes: parseEnumTypes(rawEnumTypes),
-    complexTypes: parseComplexTypes(rawComplexTypes),
+    complexTypes: parseComplexTypes(rawComplexTypes, aliasMap),
     actions: parseActions(rawActions),
     functions: parseFunctions(rawFunctions),
     entityContainer: parseEntityContainer(rawContainer)
