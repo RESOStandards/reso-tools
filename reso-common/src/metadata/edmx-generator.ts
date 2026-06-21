@@ -37,6 +37,14 @@ const toEdmxType = (field: ResoField, enumMode: EnumMode): string => {
     return isCol ? 'Collection(Edm.String)' : 'Edm.String';
   }
 
+  // DD numeric with scale 0 is an Integer — the DD's precision/scale columns don't map cleanly to
+  // OData, and an empty Suggested Max Precision (our scale 0) denotes a whole number. Emit Edm.Int64,
+  // matching the Commander's EDMXProcessor; the exact bucket is not significant (data capacity is the
+  // schema-validation step's concern). scale > 0 stays a true Decimal.
+  if ((rawType === 'Edm.Decimal' || rawType === 'Edm.Double') && (field.scale ?? 0) === 0) {
+    return isCol ? 'Collection(Edm.Int64)' : 'Edm.Int64';
+  }
+
   return field.type;
 };
 
@@ -52,13 +60,16 @@ const generateProperty = (field: ResoField, enumMode: EnumMode): string => {
     // Nullable="true" is the OData default for non-collection properties — only emit when false
     attrs.push('Nullable="false"');
   }
-  if (field.maxLength !== undefined) {
+  // Emit facets only on the types that carry them, keyed off the EMITTED type — a DD Decimal with
+  // scale 0 is emitted as Edm.Int64, which must not carry Precision/Scale/MaxLength.
+  const emittedBase = unwrapCollection(type);
+  if (emittedBase === 'Edm.String' && field.maxLength !== undefined) {
     attrs.push(`MaxLength="${field.maxLength}"`);
   }
-  if (field.precision !== undefined) {
+  if (emittedBase === 'Edm.Decimal' && field.precision !== undefined) {
     attrs.push(`Precision="${field.precision}"`);
   }
-  if (field.scale !== undefined) {
+  if (emittedBase === 'Edm.Decimal' && field.scale !== undefined) {
     attrs.push(`Scale="${field.scale}"`);
   }
 

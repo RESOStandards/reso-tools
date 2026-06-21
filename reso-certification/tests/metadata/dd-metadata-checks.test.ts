@@ -188,10 +188,13 @@ describe('checkFieldTypes', () => {
     expect(findings[0].message).toContain('Collection(Edm.String)');
   });
 
-  // Self-test invariant: the DD reference's own field types MUST satisfy their declared DD types.
-  it.each(['2.0', '2.1'])('DD %s reference passes the field-type gate clean', (version) => {
+  // Self-test invariant: the GENERATED reference's field types satisfy their declared DD types. The
+  // raw dd-json types numerics as Edm.Decimal; generateReferenceArtifacts emits Edm.Int64 for the
+  // scale-0 ones (matching the Commander), which is what the gate actually checks.
+  it.each(['2.0', '2.1'])('DD %s generated reference passes the field-type gate clean', (version) => {
     const ref = getReferenceMetadata(version) as MetadataReport & DdReference;
-    expect(checkFieldTypes(ref, ref)).toEqual([]);
+    const { metadataReport } = generateReferenceArtifacts(ref, ref.resources as unknown as string[], 'string', version);
+    expect(checkFieldTypes(metadataReport, ref)).toEqual([]);
   });
 });
 

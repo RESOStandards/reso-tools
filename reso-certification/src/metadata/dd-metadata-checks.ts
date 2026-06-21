@@ -202,7 +202,11 @@ const expectedDdDataType = (field: DdReferenceField): DdDataType | null => {
     case EDM.STRING: return 'String';
     case EDM.DATE: return 'Date';
     case EDM.DECIMAL:
-    case EDM.DOUBLE: return 'Decimal';
+    case EDM.DOUBLE:
+      // DD numeric: scale 0 (an empty DD Suggested Max Precision) denotes an Integer — the Commander
+      // emits Edm.Int64 for these; scale > 0 is a true Decimal. The provider's Int bucket need not
+      // match the DD's; data capacity is the schema-validation step. (Matches buildNumberTest.)
+      return (field.scale ?? 0) === 0 ? 'Integer' : 'Decimal';
     case EDM.INT16:
     case EDM.INT32:
     case EDM.INT64: return 'Integer';
