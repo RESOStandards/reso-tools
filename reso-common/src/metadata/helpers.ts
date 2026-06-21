@@ -17,5 +17,16 @@ export const getFieldsForResource = (metadata: ResoMetadata, resourceName: strin
 export const getLookupsForType = (metadata: ResoMetadata, lookupName: string): ReadonlyArray<ResoLookup> =>
   metadata.lookups.filter(l => l.lookupName === lookupName);
 
-/** Primary key field name for a resource, or undefined if unknown. */
-export const getKeyFieldForResource = (resourceName: string): string | undefined => KEY_FIELD_MAP[resourceName];
+/** The default primary-key convention: `{ResourceName}Key`. */
+const keyifyResourceName = (resourceName: string): string => `${resourceName.trim()}Key`;
+
+/**
+ * Primary key field name for a resource. Returns the KEY_FIELD_MAP exception when one exists,
+ * otherwise the `{ResourceName}Key` convention — mirroring the Web API Commander's
+ * getKeyFieldForResource, so every resource resolves to a real key field (see KEY_FIELD_MAP for
+ * provenance and the DD-2.2 retirement note). Generators should prefer a field's own
+ * `isPrimaryKey` when the metadata carries it; this is the fallback for DD-reference generation,
+ * where the DD does not encode keys.
+ */
+export const getKeyFieldForResource = (resourceName: string): string =>
+  KEY_FIELD_MAP[resourceName] ?? keyifyResourceName(resourceName);

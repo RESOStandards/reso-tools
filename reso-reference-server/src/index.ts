@@ -65,10 +65,10 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
   const resourceSpecs = activeResources
     .map(resource => ({
       resourceName: resource,
-      keyField: getKeyFieldForResource(resource)!,
+      keyField: getKeyFieldForResource(resource),
       fields: getFieldsForResource(metadata, resource)
     }))
-    .filter(spec => spec.keyField && spec.fields.length > 0);
+    .filter(spec => spec.fields.length > 0);
 
   // Create data access layer based on configured backend
   let dal: DataAccessLayer;

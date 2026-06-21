@@ -1,10 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { KEY_FIELD_MAP, type ResoMetadata } from '../src/index.js';
+import { KEY_FIELD_MAP, getKeyFieldForResource, type ResoMetadata } from '../src/index.js';
 
 describe('reso-common metadata model', () => {
-  it('exposes the DD key-field map', () => {
+  it('stores only the key-field exceptions, resolving the convention via the helper', () => {
+    // Exceptions are stored verbatim...
     expect(KEY_FIELD_MAP.Property).toBe('ListingKey');
-    expect(KEY_FIELD_MAP.Member).toBe('MemberKey');
+    expect(KEY_FIELD_MAP.InternetTrackingSummary).toBe('ListingId'); // a non-*Key exception
+    // ...convention resources are NOT stored — the helper applies {ResourceName}Key.
+    expect(KEY_FIELD_MAP.Member).toBeUndefined();
+    expect(getKeyFieldForResource('Member')).toBe('MemberKey');     // convention via fallback
+    expect(getKeyFieldForResource('Property')).toBe('ListingKey');  // exception via helper
+    expect(getKeyFieldForResource('Anything')).toBe('AnythingKey'); // unknown → convention
   });
 
   it('constructs a ResoMetadata value', () => {

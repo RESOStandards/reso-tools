@@ -79,7 +79,7 @@ const generateNavigationProperty = (field: ResoField): string => {
 /** Generates an EDMX EntityType element for a resource. */
 const generateEntityType = (
   resourceName: string,
-  keyField: string,
+  keyFields: ReadonlyArray<string>,
   fields: ReadonlyArray<ResoField>,
   targetResourceSet: ReadonlySet<string>,
   enumMode: EnumMode
@@ -91,9 +91,12 @@ const generateEntityType = (
   const properties = regularFields.map(f => generateProperty(f, enumMode)).join('\n');
   const navProperties = expansionFields.map(generateNavigationProperty).join('\n');
 
+  // One PropertyRef per key field — compound keys carry every field the data marks as primary.
+  const keyRefs = keyFields.map(k => `          <PropertyRef Name="${escapeXml(k)}"/>`).join('\n');
+
   return `      <EntityType Name="${escapeXml(resourceName)}">
         <Key>
-          <PropertyRef Name="${escapeXml(keyField)}"/>
+${keyRefs}
         </Key>
 ${properties}
 ${navProperties ? `${navProperties}\n` : ''}      </EntityType>`;
@@ -195,13 +198,17 @@ export const generateEdmx = (metadata: ResoMetadata, targetResources: ReadonlyAr
   const resourceData = targetResources
     .map(resource => {
       const fields = getFieldsForResource(metadata, resource);
-      const keyField = getKeyFieldForResource(resource);
-      if (!keyField || fields.length === 0) return null;
-      return { resource, keyField, fields };
+      if (fields.length === 0) return null;
+      // Prefer keys the data carries (the live-server / generated CSDL <Key>, compound-safe); fall
+      // back to the single DD convention via getKeyFieldForResource (the DD does not encode keys
+      // through 2.1).
+      const dataKeys = fields.filter(f => f.isPrimaryKey).map(f => f.fieldName);
+      const keyFields = dataKeys.length > 0 ? dataKeys : [getKeyFieldForResource(resource)];
+      return { resource, keyFields, fields };
     })
     .filter((d): d is NonNullable<typeof d> => d !== null);
 
-  const entityTypes = resourceData.map(d => generateEntityType(d.resource, d.keyField, d.fields, targetResourceSet, enumMode)).join('\n');
+  const entityTypes = resourceData.map(d => generateEntityType(d.resource, d.keyFields, d.fields, targetResourceSet, enumMode)).join('\n');
 
   const entitySets = resourceData.map(d => generateEntitySet(d.resource, d.fields, targetResourceSet)).join('\n');
 

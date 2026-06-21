@@ -2,7 +2,6 @@ import { Router } from 'express';
 import type { DataAccessLayer, NavigationPropertyBinding, ResourceContext } from '../db/data-access.js';
 import { getFieldsForResource, getKeyFieldForResource } from '../metadata/loader.js';
 import type { ResoMetadata } from '../metadata/types.js';
-import { KEY_FIELD_MAP } from '../metadata/types.js';
 import { collectionHandler, createHandler, deleteHandler, readHandler, updateHandler } from './handlers.js';
 
 /**
@@ -27,7 +26,7 @@ export const buildNavigationBindings = (
 ): ReadonlyArray<NavigationPropertyBinding> => {
   const parentFields = getFieldsForResource(metadata, resource);
   const expansionFields = parentFields.filter(f => f.isExpansion);
-  const parentKeyField = KEY_FIELD_MAP[resource];
+  const parentKeyField = getKeyFieldForResource(resource);
   const targetResourceSet = new Set(targetResources);
   const bindings: NavigationPropertyBinding[] = [];
 
@@ -35,8 +34,7 @@ export const buildNavigationBindings = (
     const targetResource = field.typeName;
     if (!targetResource || !targetResourceSet.has(targetResource)) continue;
 
-    const targetKeyField = KEY_FIELD_MAP[targetResource];
-    if (!targetKeyField) continue;
+    const targetKeyField = getKeyFieldForResource(targetResource);
 
     const targetFields = getFieldsForResource(metadata, targetResource);
     const hasResourceRecordKey =

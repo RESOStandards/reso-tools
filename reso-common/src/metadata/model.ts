@@ -33,6 +33,12 @@ export interface ResoField {
   readonly maxLength?: number;
   readonly scale?: number;
   readonly precision?: number;
+  /**
+   * True when this field is (part of) the entity type's primary key, from the CSDL <Key>.
+   * Set when parsing live-server or generated metadata (which always carries keys); generators
+   * prefer this over the KEY_FIELD_MAP/convention fallback when it is present.
+   */
+  readonly isPrimaryKey?: boolean;
   readonly annotations: ReadonlyArray<ResoAnnotation>;
 }
 
@@ -57,44 +63,43 @@ export interface ResoMetadata {
 /** Enumeration mode: string enums with Lookup Resource, or OData EnumType definitions. */
 export type EnumMode = 'string' | 'enum-type';
 
-/** Map of resource names to their primary key field names (from DD 2.0). */
+/**
+ * Primary-key field EXCEPTIONS — resources whose key field deviates from the default
+ * `{ResourceName}Key` convention. Ported verbatim from the Web API Commander's
+ * DataDictionaryMetadata.getKeyFieldForResource (the switch cases):
+ * https://github.com/RESOStandards/web-api-commander/blob/ff8baf0fae753fe98d591e2723ecbcc8195fe98a/src/main/java/org/reso/commander/common/DataDictionaryMetadata.java#L4
+ *
+ * The DD does not encode primary keys through 2.1, so there is nothing to read from the
+ * reference data — this list is hand-maintained the way the Commander does it. Resolve keys
+ * via `getKeyFieldForResource`, which applies the `{ResourceName}Key` convention for anything
+ * NOT listed here; only the exceptions live in this map. (Direct indexing returns undefined for
+ * convention resources by design — go through the helper.)
+ *
+ * Live-server and generated metadata DO carry keys (the CSDL <Key>), so `generateEdmx` prefers
+ * a field's own `isPrimaryKey` over this fallback. DD 2.2 will carry keys in the spec, at which
+ * point the data is authoritative and this map can be generated/retired.
+ *
+ * Verified against dd-1.7/2.0/2.1: every resource's resolved key (exception or convention) is a
+ * real, existing field — see the dd-key-coverage regression test.
+ */
 export const KEY_FIELD_MAP: Readonly<Record<string, string>> = {
   Property: 'ListingKey',
-  Association: 'AssociationKey',
-  ContactListingNotes: 'ContactKey',
-  ContactListings: 'ContactListingsKey',
   Contacts: 'ContactKey',
-  EntityEvent: 'EntityEventSequence',
-  Field: 'FieldKey',
-  HistoryTransactional: 'HistoryTransactionalKey',
+  ContactListingNotes: 'ContactKey',
   InternetTracking: 'EventKey',
-  LockOrBox: 'LockOrBoxKey',
-  Lookup: 'LookupKey',
-  Media: 'MediaKey',
-  Member: 'MemberKey',
-  MemberAssociation: 'AssociationKey',
-  MemberStateLicense: 'MemberStateLicenseKey',
-  Office: 'OfficeKey',
-  OfficeAssociation: 'AssociationKey',
-  OfficeCorporateLicense: 'OfficeCorporateLicenseKey',
-  OpenHouse: 'OpenHouseKey',
-  OtherPhone: 'OtherPhoneKey',
+  InternetTrackingSummary: 'ListingId',
   OUID: 'OrganizationUniqueIdKey',
+  Queue: 'QueueTransactionKey',
   PropertyGreenVerification: 'GreenBuildingVerificationKey',
-  PropertyPowerProduction: 'PowerProductionKey',
-  PropertyPowerStorage: 'PowerStorageKey',
   PropertyRooms: 'RoomKey',
   PropertyUnitTypes: 'UnitTypeKey',
-  Prospecting: 'ProspectingKey',
-  Queue: 'QueueTransactionKey',
+  EntityEvent: 'EntityEventSequence',
+  MemberAssociation: 'AssociationKey',
+  OfficeAssociation: 'AssociationKey',
+  TransactionManagement: 'TransactionKey',
   Rules: 'RuleKey',
-  SavedSearch: 'SavedSearchKey',
-  Showing: 'ShowingKey',
-  ShowingAppointment: 'ShowingAppointmentKey',
-  ShowingAvailability: 'ShowingAvailabilityKey',
-  ShowingRequest: 'ShowingRequestKey',
-  SocialMedia: 'SocialMediaKey',
-  TeamMembers: 'TeamMemberKey',
   Teams: 'TeamKey',
-  TransactionManagement: 'TransactionKey'
+  TeamMembers: 'TeamMemberKey',
+  PropertyPowerProduction: 'PowerProductionKey',
+  PropertyPowerStorage: 'PowerStorageKey'
 };

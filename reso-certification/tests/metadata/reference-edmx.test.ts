@@ -117,4 +117,66 @@ describe('primary key in the metadata report', () => {
     expect(rt.fields.find(f => f.fieldName === 'ListingKey')?.isPrimaryKey).toBe(true);
     expect(rt.fields.find(f => f.fieldName === 'StandardStatus')?.isPrimaryKey).toBeUndefined();
   });
+
+  // A convention resource (no exception, no key in the DD data): the stored {ResourceName}Key
+  // convention is blended into the generated <Key>, and the round-trip serializes it back as
+  // isPrimaryKey — the SAME serializer path a provider's metadata takes. This is how the DD
+  // reference, which does not encode keys through 2.1, still yields a keyed report.
+  it('blends the {ResourceName}Key convention into <Key> and serializes it back as isPrimaryKey', () => {
+    const conv: MetadataReport = {
+      description: 'test', version: '2.1', generatedOn: '2026-06-19T00:00:00.000Z',
+      resources: [{ resourceName: 'Member' }],
+      fields: [
+        { resourceName: 'Member', fieldName: 'MemberKey', type: 'Edm.String', annotations: [] },
+        { resourceName: 'Member', fieldName: 'MemberFirstName', type: 'Edm.String', annotations: [] },
+      ],
+      lookups: [], actions: [], functions: [],
+    };
+    const rt = generateMetadataReport(generateReferenceEdmx(conv, ['Member'], 'string'), '2.1');
+    expect(rt.fields.find(f => f.fieldName === 'MemberKey')?.isPrimaryKey).toBe(true);
+    expect(rt.fields.find(f => f.fieldName === 'MemberFirstName')?.isPrimaryKey).toBeUndefined();
+  });
+
+  // When the data itself carries the key (DD 2.2+, or any live-server metadata), that wins over
+  // the convention: generateEdmx prefers the field's own isPrimaryKey for the <Key>.
+  it('prefers a data-carried isPrimaryKey over the convention fallback', () => {
+    const dataKeyed: MetadataReport = {
+      description: 'test', version: '2.2', generatedOn: '2026-06-19T00:00:00.000Z',
+      resources: [{ resourceName: 'Widget' }],
+      fields: [
+        { resourceName: 'Widget', fieldName: 'CustomId', type: 'Edm.String', isPrimaryKey: true, annotations: [] },
+        { resourceName: 'Widget', fieldName: 'WidgetKey', type: 'Edm.String', annotations: [] },
+      ],
+      lookups: [], actions: [], functions: [],
+    };
+    const edmx = generateReferenceEdmx(dataKeyed, ['Widget'], 'string');
+    expect(edmx).toContain('<PropertyRef Name="CustomId"/>');
+    expect(edmx).not.toContain('<PropertyRef Name="WidgetKey"/>');
+    const rt = generateMetadataReport(edmx, '2.2');
+    expect(rt.fields.find(f => f.fieldName === 'CustomId')?.isPrimaryKey).toBe(true);
+    expect(rt.fields.find(f => f.fieldName === 'WidgetKey')?.isPrimaryKey).toBeUndefined();
+  });
+
+  // Compound key: every field the data marks isPrimaryKey becomes a PropertyRef in <Key>, and all
+  // of them round-trip back as isPrimaryKey. (OData allows multi-field keys; the DD reference is
+  // single-key, but live-server metadata can be compound.)
+  it('emits a PropertyRef per isPrimaryKey field for a compound key and round-trips all of them', () => {
+    const compound: MetadataReport = {
+      description: 'test', version: '2.2', generatedOn: '2026-06-19T00:00:00.000Z',
+      resources: [{ resourceName: 'Pair' }],
+      fields: [
+        { resourceName: 'Pair', fieldName: 'PartA', type: 'Edm.String', isPrimaryKey: true, annotations: [] },
+        { resourceName: 'Pair', fieldName: 'PartB', type: 'Edm.String', isPrimaryKey: true, annotations: [] },
+        { resourceName: 'Pair', fieldName: 'Payload', type: 'Edm.String', annotations: [] },
+      ],
+      lookups: [], actions: [], functions: [],
+    };
+    const edmx = generateReferenceEdmx(compound, ['Pair'], 'string');
+    expect(edmx).toContain('<PropertyRef Name="PartA"/>');
+    expect(edmx).toContain('<PropertyRef Name="PartB"/>');
+    const rt = generateMetadataReport(edmx, '2.2');
+    expect(rt.fields.find(f => f.fieldName === 'PartA')?.isPrimaryKey).toBe(true);
+    expect(rt.fields.find(f => f.fieldName === 'PartB')?.isPrimaryKey).toBe(true);
+    expect(rt.fields.find(f => f.fieldName === 'Payload')?.isPrimaryKey).toBeUndefined();
+  });
 });

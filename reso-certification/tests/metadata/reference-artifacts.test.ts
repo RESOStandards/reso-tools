@@ -52,4 +52,9 @@ describe('generateReferenceArtifacts — string + Lookup Resource representation
     expect(lookup?.lookupName).toBe('StandardStatus');
     expect(lookup?.lookupName).toBe(field?.type);
   });
+
+  // The blended key survives the full bundle assembly (EDMX → serialize → Lookup Resource merge).
+  it('carries isPrimaryKey on the key field through the assembled bundle', () => {
+    expect(artifacts.metadataReport.fields.find(f => f.fieldName === 'ListingKey')?.isPrimaryKey).toBe(true);
+  });
 });

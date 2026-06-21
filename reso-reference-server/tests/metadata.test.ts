@@ -60,12 +60,12 @@ describe('getKeyFieldForResource', () => {
     expect(getKeyFieldForResource('Property')).toBe('ListingKey');
   });
 
-  it('returns MemberKey for Member', () => {
+  it('returns MemberKey for Member via the {ResourceName}Key convention', () => {
     expect(getKeyFieldForResource('Member')).toBe('MemberKey');
   });
 
-  it('returns undefined for unknown resource', () => {
-    expect(getKeyFieldForResource('Unknown')).toBeUndefined();
+  it('falls back to the {ResourceName}Key convention for unmapped resources (Commander parity)', () => {
+    expect(getKeyFieldForResource('Unknown')).toBe('UnknownKey');
   });
 });
 
