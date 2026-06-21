@@ -176,6 +176,22 @@ export const mergeWithLookupResource = (
 const parseLookupName = (lookupName: string): string =>
   lookupName.includes('.') ? lookupName.slice(lookupName.lastIndexOf('.') + 1) : lookupName;
 
+const unwrapCollectionType = (type: string): string =>
+  type.startsWith('Collection(') && type.endsWith(')') ? type.slice('Collection('.length, -1) : type;
+
+/**
+ * Sentinel sample value for an open enumeration that carries no standard members. Matches the Web
+ * API Commander's `Sample{LookupName}EnumValue` pattern, which is filtered out everywhere the
+ * reference metadata is consumed (e.g. buildMetadataMap skips `Sample…EnumValue`), so it never
+ * reaches variations, DD docs, or any comparison against the standard. The name is deliberately
+ * self-identifying so it cannot be mistaken for a standard value.
+ */
+const sampleEnumValue = (lookupName: string): string => `Sample${lookupName}EnumValue`;
+
+/** The enumeration a field references: its LookupName annotation (string rep) or the short tail of its type (EnumType rep). */
+const enumReferenceName = (field: MetadataReportField): string =>
+  field.annotations.find(a => a.term === LOOKUP_NAME_ANNOTATION_TERM)?.value ?? parseLookupName(unwrapCollectionType(field.type));
+
 /**
  * Synthesize a Lookup Resource dataset from a DD reference report's lookups — the inverse of
  * transformLookupRecord. Produces the raw records a string-representation provider would serve at
@@ -183,9 +199,15 @@ const parseLookupName = (lookupName: string): string =>
  * the reference. The LookupName is the unqualified (short) name, matching a string-mode field's
  * LookupName annotation; StandardName and LegacyODataValue annotations become the record's
  * StandardLookupValue and LegacyODataValue.
+ *
+ * Open enumerations — referenced by a field but carrying no standard members (e.g. CountyOrParish,
+ * City) — get a single sentinel sample record each, exactly as a real provider would populate its
+ * own values. Without it the strict Lookup Resource referential-integrity check would flag every
+ * open enumeration the reference defines but does not itself enumerate. The sentinel is sample-only
+ * (see sampleEnumValue) and is filtered out of every downstream comparison.
  */
-export const synthesizeLookupResourceRecords = (report: MetadataReport): ReadonlyArray<RawLookupRecord> =>
-  report.lookups.map(lookup => {
+export const synthesizeLookupResourceRecords = (report: MetadataReport): ReadonlyArray<RawLookupRecord> => {
+  const standardRecords: ReadonlyArray<RawLookupRecord> = report.lookups.map(lookup => {
     const standardName = lookup.annotations?.find(a => a.term === STANDARD_NAME_ANNOTATION_TERM)?.value;
     const legacyValue = lookup.annotations?.find(a => a.term === LEGACY_ODATA_VALUE_TERM)?.value;
     return {
@@ -195,6 +217,19 @@ export const synthesizeLookupResourceRecords = (report: MetadataReport): Readonl
       ...(legacyValue ? { LegacyODataValue: legacyValue } : {}),
     };
   });
+
+  const enumsWithRecords = new Set(standardRecords.map(r => r.LookupName));
+  const referencedEnums = new Set(
+    report.fields
+      .filter(f => f.isEnumeration && !f.isExpansion)
+      .map(enumReferenceName),
+  );
+  const sampleRecords: ReadonlyArray<RawLookupRecord> = [...referencedEnums]
+    .filter(name => !enumsWithRecords.has(name))
+    .map(name => ({ LookupName: name, LookupValue: sampleEnumValue(name) }));
+
+  return [...standardRecords, ...sampleRecords];
+};
 
 /**
  * Full pipeline: fetch Lookup Resource, merge with base report.

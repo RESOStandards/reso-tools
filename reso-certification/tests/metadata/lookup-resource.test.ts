@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeWithLookupResource, serializeLookupResourceDump } from '../../src/metadata/lookup-resource.js';
+import { mergeWithLookupResource, serializeLookupResourceDump, synthesizeLookupResourceRecords } from '../../src/metadata/lookup-resource.js';
 import type { MetadataReport } from '../../src/metadata/serializer.js';
 import type { RawLookupRecord } from '../../src/metadata/lookup-resource.js';
 
@@ -128,6 +128,44 @@ describe('mergeWithLookupResource', () => {
     const result = mergeWithLookupResource(baseWithLookups, lookupRecords);
     expect(result.lookups).toHaveLength(4); // 1 existing + 3 new
     expect(result.lookups[0].lookupName).toBe('ExistingLookup');
+  });
+});
+
+describe('synthesizeLookupResourceRecords', () => {
+  const enumField = (fieldName: string, lookupName: string) => ({
+    resourceName: 'Property', fieldName, type: `org.reso.metadata.enums.${lookupName}`, isEnumeration: true, annotations: [],
+  });
+
+  it('synthesizes records from standard lookup values (short LookupName + StandardLookupValue)', () => {
+    const report: MetadataReport = {
+      ...baseReport,
+      fields: [enumField('StandardStatus', 'StandardStatus')],
+      lookups: [{ lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'ActiveUnderContract', type: 'Edm.Int32', annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Active Under Contract' }] }],
+    };
+    const records = synthesizeLookupResourceRecords(report);
+    const auc = records.find(r => r.LookupValue === 'ActiveUnderContract');
+    expect(auc?.LookupName).toBe('StandardStatus');
+    expect(auc?.StandardLookupValue).toBe('Active Under Contract');
+    expect(records.some(r => String(r.LookupValue).startsWith('Sample'))).toBe(false);
+  });
+
+  it('seeds a single self-identifying sample sentinel for an open enumeration (no standard values)', () => {
+    // CountyOrParish is referenced by a field but has no standard lookup values in the DD.
+    const report: MetadataReport = { ...baseReport, fields: [enumField('CountyOrParish', 'CountyOrParish')], lookups: [] };
+    const samples = synthesizeLookupResourceRecords(report).filter(r => r.LookupName === 'CountyOrParish');
+    expect(samples).toHaveLength(1);
+    expect(samples[0].LookupValue).toBe('SampleCountyOrParishEnumValue');
+    // Matches the Sample…EnumValue sentinel that buildMetadataMap filters out downstream.
+    expect(samples[0].LookupValue.startsWith('Sample') && samples[0].LookupValue.endsWith('EnumValue')).toBe(true);
+  });
+
+  it('does not seed a sample when the enumeration already carries standard values', () => {
+    const report: MetadataReport = {
+      ...baseReport,
+      fields: [enumField('StandardStatus', 'StandardStatus')],
+      lookups: [{ lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Active', type: 'Edm.Int32', annotations: [] }],
+    };
+    expect(synthesizeLookupResourceRecords(report).every(r => !String(r.LookupValue).startsWith('Sample'))).toBe(true);
   });
 });
 

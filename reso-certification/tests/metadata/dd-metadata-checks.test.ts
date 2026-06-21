@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
-import { checkDisallowedSynonyms, checkClosedEnumValues, checkFieldTypes, checkSuggestedMaxConstraints, runDdMetadataChecks } from '../../src/metadata/dd-metadata-checks.js';
+import {
+  checkDisallowedSynonyms, checkClosedEnumValues, checkFieldTypes, checkSuggestedMaxConstraints,
+  checkLookupResourceFields, checkLookupNameAnnotations, checkLookupNameIntegrity, runDdMetadataChecks,
+} from '../../src/metadata/dd-metadata-checks.js';
 import type { DdReference } from '../../src/metadata/dd-metadata-checks.js';
+import { generateReferenceArtifacts } from '../../src/metadata/reference-artifacts.js';
 import type { MetadataReport, MetadataReportLookup } from '../../src/metadata/serializer.js';
 
 const createRequire = (await import('node:module')).createRequire;
@@ -16,11 +20,11 @@ const emptyReport = (fields: ReadonlyArray<{ resourceName: string; fieldName: st
 });
 
 const makeReport = (
-  fields: ReadonlyArray<{ resourceName: string; fieldName: string; type: string; isCollection?: boolean; isFlags?: boolean; isEnumeration?: boolean; isExpansion?: boolean; maxLength?: number; precision?: number; scale?: number }>,
+  fields: ReadonlyArray<{ resourceName: string; fieldName: string; type: string; isCollection?: boolean; isFlags?: boolean; isEnumeration?: boolean; isExpansion?: boolean; maxLength?: number; precision?: number; scale?: number; annotations?: ReadonlyArray<{ term: string; value: string }> }>,
   lookups: ReadonlyArray<MetadataReportLookup>,
 ): MetadataReport => ({
   description: 'test', version: '2.1', generatedOn: '2026-06-21T00:00:00.000Z',
-  resources: [], fields: fields.map((f) => ({ ...f, annotations: [] })), lookups, actions: [], functions: [],
+  resources: [], fields: fields.map((f) => ({ ...f, annotations: f.annotations ?? [] })), lookups, actions: [], functions: [],
 });
 
 describe('checkDisallowedSynonyms', () => {
@@ -225,6 +229,78 @@ describe('checkSuggestedMaxConstraints (SHOULD warnings)', () => {
   it.each(['2.0', '2.1'])('DD %s reference is silent under suggested-max (provider == reference)', (version) => {
     const ref = getReferenceMetadata(version) as MetadataReport & DdReference;
     expect(checkSuggestedMaxConstraints(ref, ref)).toEqual([]);
+  });
+});
+
+describe('Lookup Resource checks', () => {
+  const LN = 'RESO.OData.Metadata.LookupName';
+  const reference: DdReference = {
+    fields: [{ resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus', isEnumeration: true }],
+    lookups: [],
+  };
+
+  describe('checkLookupResourceFields', () => {
+    it('skips when there is no Lookup resource (EnumType representation)', () => {
+      expect(checkLookupResourceFields(makeReport([{ resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' }], []), reference)).toEqual([]);
+    });
+
+    it('passes when the Lookup resource declares all mandatory fields', () => {
+      const fields = ['LookupKey', 'LookupName', 'LookupValue', 'ModificationTimestamp'].map((fieldName) => ({ resourceName: 'Lookup', fieldName, type: 'Edm.String' }));
+      expect(checkLookupResourceFields(makeReport(fields, []), reference)).toEqual([]);
+    });
+
+    it('flags a missing mandatory Lookup field', () => {
+      const fields = ['LookupKey', 'LookupName', 'LookupValue'].map((fieldName) => ({ resourceName: 'Lookup', fieldName, type: 'Edm.String' })); // no ModificationTimestamp
+      const findings = checkLookupResourceFields(makeReport(fields, []), reference);
+      expect(findings).toHaveLength(1);
+      expect(findings[0]).toMatchObject({ check: 'lookup-resource-fields', fieldName: 'ModificationTimestamp', severity: 'error' });
+    });
+  });
+
+  describe('checkLookupNameAnnotations', () => {
+    it('flags a string-enum field missing the LookupName annotation', () => {
+      const findings = checkLookupNameAnnotations(makeReport([{ resourceName: 'Property', fieldName: 'StandardStatus', type: 'Edm.String', isEnumeration: true }], []), reference);
+      expect(findings).toHaveLength(1);
+      expect(findings[0]).toMatchObject({ check: 'lookup-name-annotation', fieldName: 'StandardStatus', severity: 'error' });
+    });
+
+    it('passes a string-enum field that carries the annotation', () => {
+      const field = { resourceName: 'Property', fieldName: 'StandardStatus', type: 'Edm.String', isEnumeration: true, annotations: [{ term: LN, value: 'StandardStatus' }] };
+      expect(checkLookupNameAnnotations(makeReport([field], []), reference)).toEqual([]);
+    });
+
+    it('exempts the EnumType representation (nominal type needs no annotation)', () => {
+      const field = { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus', isEnumeration: true };
+      expect(checkLookupNameAnnotations(makeReport([field], []), reference)).toEqual([]);
+    });
+  });
+
+  describe('checkLookupNameIntegrity', () => {
+    const annotated = (value: string) => ({ resourceName: 'Property', fieldName: 'StandardStatus', type: 'Edm.String', annotations: [{ term: LN, value }] });
+
+    it('flags an annotation that does not resolve to the Lookup data', () => {
+      const report = makeReport([annotated('Nonexistent')], [{ lookupName: 'StandardStatus', lookupValue: 'Active', type: 'Edm.String', annotations: [] }]);
+      const findings = checkLookupNameIntegrity(report, reference);
+      expect(findings).toHaveLength(1);
+      expect(findings[0]).toMatchObject({ check: 'lookup-name-integrity', fieldName: 'StandardStatus', severity: 'error' });
+      expect(findings[0].message).toContain('Nonexistent');
+    });
+
+    it('passes when the annotation resolves to a Lookup Resource entry', () => {
+      const report = makeReport([annotated('StandardStatus')], [{ lookupName: 'StandardStatus', lookupValue: 'Active', type: 'Edm.String', annotations: [] }]);
+      expect(checkLookupNameIntegrity(report, reference)).toEqual([]);
+    });
+  });
+
+  // Self-test: the generated string-rep reference is internally consistent — its Lookup resource has
+  // the mandatory fields, every string-enum field carries the LookupName annotation, and every
+  // annotation resolves to the Lookup data.
+  it('the generated DD 2.1 string-rep reference passes all Lookup Resource checks clean', () => {
+    const ref = getReferenceMetadata('2.1') as MetadataReport & DdReference;
+    const { metadataReport } = generateReferenceArtifacts(ref, ref.resources as unknown as string[], 'string', '2.1');
+    expect(checkLookupResourceFields(metadataReport, ref)).toEqual([]);
+    expect(checkLookupNameAnnotations(metadataReport, ref)).toEqual([]);
+    expect(checkLookupNameIntegrity(metadataReport, ref)).toEqual([]);
   });
 });
 

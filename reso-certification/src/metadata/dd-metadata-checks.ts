@@ -280,6 +280,86 @@ export const checkFieldTypes = (report: MetadataReport, reference: DdReference):
   });
 };
 
+/** The Lookup Resource (string representation) entity set name and its mandatory metadata fields. */
+const LOOKUP_RESOURCE = 'Lookup';
+const LOOKUP_MANDATORY_FIELDS: ReadonlyArray<string> = ['LookupKey', 'LookupName', 'LookupValue', 'ModificationTimestamp'];
+/** The annotation term tying a string-enumeration field to its Lookup Resource enumeration. */
+const LOOKUP_NAME_ANNOTATION = 'RESO.OData.Metadata.LookupName';
+
+/**
+ * Lookup Resource mandatory fields (metadata): when a provider serves the string representation (a
+ * "Lookup" resource is present), that resource MUST declare LookupKey, LookupName, LookupValue and
+ * ModificationTimestamp. Guarded on the Lookup resource existing — the EnumType representation has
+ * none, so this is skipped there. (The Commander additionally checks each Lookup record carries
+ * non-null values for these; that is data validation, outside this metadata gate.)
+ */
+export const checkLookupResourceFields = (
+  report: MetadataReport,
+  _reference: DdReference,
+): ReadonlyArray<MetadataCheckFinding> => {
+  const lookupFields = new Set(report.fields.filter((f) => f.resourceName === LOOKUP_RESOURCE).map((f) => f.fieldName));
+  if (lookupFields.size === 0) return [];
+  return LOOKUP_MANDATORY_FIELDS.filter((mf) => !lookupFields.has(mf)).map((mf) => ({
+    check: 'lookup-resource-fields' as const,
+    severity: 'error' as const,
+    resourceName: LOOKUP_RESOURCE,
+    fieldName: mf,
+    message: `The "${LOOKUP_RESOURCE}" Resource MUST contain the field "${mf}".`,
+  }));
+};
+
+/**
+ * LookupName annotation requirement: a standard lookup field served in the string representation
+ * (Edm.String or Collection(Edm.String)) MUST carry the RESO.OData.Metadata.LookupName annotation
+ * tying it to its enumeration. EnumType representations (a nominal type) are exempt.
+ */
+export const checkLookupNameAnnotations = (
+  report: MetadataReport,
+  reference: DdReference,
+): ReadonlyArray<MetadataCheckFinding> => {
+  const standardLookupFields = new Set(
+    reference.fields.filter((f) => f.isEnumeration && !f.isExpansion).map((f) => fieldKey(f.resourceName, f.fieldName)),
+  );
+  return report.fields.flatMap((field) => {
+    if (!standardLookupFields.has(fieldKey(field.resourceName, field.fieldName))) return [];
+    if (unwrapCollection(field.type) !== 'Edm.String') return []; // EnumType representation is exempt
+    return field.annotations.some((a) => a.term === LOOKUP_NAME_ANNOTATION)
+      ? []
+      : [{
+          check: 'lookup-name-annotation' as const,
+          severity: 'error' as const,
+          resourceName: field.resourceName,
+          fieldName: field.fieldName,
+          message: `"${field.fieldName}" in the "${field.resourceName}" resource is a string-enumeration field and MUST carry the "${LOOKUP_NAME_ANNOTATION}" annotation.`,
+        }];
+  });
+};
+
+/**
+ * LookupName referential integrity: every field carrying a LookupName annotation MUST reference an
+ * enumeration that exists in the Lookup Resource data (report.lookups). Catches an annotation that
+ * points at a missing or misspelled Lookup Resource entry.
+ */
+export const checkLookupNameIntegrity = (
+  report: MetadataReport,
+  _reference: DdReference,
+): ReadonlyArray<MetadataCheckFinding> => {
+  const lookupDataNames = new Set(report.lookups.map((l) => l.lookupName));
+  return report.fields.flatMap((field) => {
+    const annotation = field.annotations.find((a) => a.term === LOOKUP_NAME_ANNOTATION);
+    if (!annotation) return [];
+    return lookupDataNames.has(annotation.value)
+      ? []
+      : [{
+          check: 'lookup-name-integrity' as const,
+          severity: 'error' as const,
+          resourceName: field.resourceName,
+          fieldName: field.fieldName,
+          message: `"${field.fieldName}" in the "${field.resourceName}" resource references LookupName "${annotation.value}", which is not present in the Lookup Resource.`,
+        }];
+  });
+};
+
 /**
  * Suggested-max checks (SHOULD): the DD's maxLength / precision / scale are recommendations, not
  * requirements, so a provider value that differs from the suggested maximum yields a WARNING, not a
@@ -330,5 +410,8 @@ export const runDdMetadataChecks = (
   ...checkDisallowedSynonyms(report, reference),
   ...checkClosedEnumValues(report, reference),
   ...checkFieldTypes(report, reference),
+  ...checkLookupResourceFields(report, reference),
+  ...checkLookupNameAnnotations(report, reference),
+  ...checkLookupNameIntegrity(report, reference),
   ...checkSuggestedMaxConstraints(report, reference),
 ];
