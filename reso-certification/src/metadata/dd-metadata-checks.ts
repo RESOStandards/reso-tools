@@ -13,7 +13,7 @@
  * `lookupStatus` ("Locked with Enumerations" = a closed enum) are DD-authored descriptors carried
  * in dd-{ver}.json.
  */
-import type { MetadataReport } from './serializer.js';
+import type { MetadataReport, MetadataReportField } from './serializer.js';
 
 /** The kind of metadata-gate violation. */
 export type MetadataCheckKind = 'disallowed-synonym' | 'closed-enum-value' | 'field-type';
@@ -37,6 +37,9 @@ export interface DdReferenceField {
   readonly type: string;
   readonly lookupStatus?: string;
   readonly synonyms?: string;
+  readonly isEnumeration?: boolean;
+  readonly isCollection?: boolean;
+  readonly isExpansion?: boolean;
 }
 
 /** The DD reference shape these checks read (a structural superset of MetadataReport). */
@@ -144,9 +147,121 @@ export const checkClosedEnumValues = (
     });
 };
 
+/** OData EDM type names (mirrors the Web API Commander TypeMappings.ODataTypes). */
+const EDM = {
+  INT16: 'Edm.Int16', INT32: 'Edm.Int32', INT64: 'Edm.Int64',
+  STRING: 'Edm.String', DATE: 'Edm.Date', DATETIME_OFFSET: 'Edm.DateTimeOffset',
+  BOOLEAN: 'Edm.Boolean', DECIMAL: 'Edm.Decimal', DOUBLE: 'Edm.Double',
+} as const;
+
+/** The DD data-type names the Commander asserts ("MUST be <name> data type"). */
+type DdDataType = 'String' | 'Date' | 'Decimal' | 'Integer' | 'Boolean' | 'Timestamp' | 'Single Enumeration' | 'Multiple Enumeration';
+
+const EDM_PRIMITIVES: ReadonlySet<string> = new Set(Object.values(EDM));
+const INT_TYPES: ReadonlySet<string> = new Set([EDM.INT16, EDM.INT32, EDM.INT64]);
+
+const unwrapCollection = (type: string): string =>
+  type.startsWith('Collection(') && type.endsWith(')') ? type.slice('Collection('.length, -1) : type;
+
+/** Derive the DD data type the standard declares for a reference field, or null if it isn't a typed data field. */
+const expectedDdDataType = (field: DdReferenceField): DdDataType | null => {
+  if (field.isExpansion) return null;
+  const base = unwrapCollection(field.type);
+  const isCollection = field.isCollection === true || field.type.startsWith('Collection(');
+  // A real enumeration is flagged AND has a nominal (enum-FQDN) type. isEnumeration alone can be set
+  // for a primitive that merely carries a LookupStatus (e.g. the Boolean YN field BuiltPre1978YN), so
+  // the primitive type wins there — matching the Commander, which derives from the EDM type. A
+  // non-enum nominal type (a complex type) is not enumeration-flagged, so it falls through to null.
+  if (field.isEnumeration && !base.startsWith('Edm.')) {
+    return isCollection ? 'Multiple Enumeration' : 'Single Enumeration';
+  }
+  switch (base) {
+    case EDM.STRING: return 'String';
+    case EDM.DATE: return 'Date';
+    case EDM.DECIMAL:
+    case EDM.DOUBLE: return 'Decimal';
+    case EDM.INT16:
+    case EDM.INT32:
+    case EDM.INT64: return 'Integer';
+    case EDM.BOOLEAN: return 'Boolean';
+    case EDM.DATETIME_OFFSET: return 'Timestamp';
+    default: return null;
+  }
+};
+
+/**
+ * Validate a provider field's OData type against the DD-declared data type — a faithful port of the
+ * Commander's assertDataTypeMapping. Returns an error fragment if the type is wrong, else null.
+ * `underlying` is the provider enum's underlying type (from its lookups); only used for EnumType reps.
+ */
+const validateFieldType = (expected: DdDataType, field: MetadataReportField, underlying: string | undefined): string | null => {
+  const found = unwrapCollection(field.type);
+  const isCollection = field.isCollection === true || field.type.startsWith('Collection(');
+
+  switch (expected) {
+    case 'String':
+      return found === EDM.STRING ? null : `MUST map to ${EDM.STRING} but found ${field.type}`;
+    case 'Date':
+      return found === EDM.DATE ? null : `MUST map to ${EDM.DATE} but found ${field.type}`;
+    case 'Decimal':
+      return found === EDM.DECIMAL || found === EDM.DOUBLE ? null : `MUST map to ${EDM.DECIMAL} or ${EDM.DOUBLE} but found ${field.type}`;
+    case 'Integer':
+      return INT_TYPES.has(found) ? null : `MUST map to ${EDM.INT16}, ${EDM.INT32} or ${EDM.INT64} but found ${field.type}`;
+    case 'Boolean':
+      return found === EDM.BOOLEAN ? null : `MUST map to ${EDM.BOOLEAN} but found ${field.type}`;
+    case 'Timestamp':
+      return found === EDM.DATETIME_OFFSET ? null : `MUST map to ${EDM.DATETIME_OFFSET} but found ${field.type}`;
+    case 'Single Enumeration':
+      if (isCollection) return 'single enumerations cannot be collections';
+      if (found === EDM.STRING) return null; // string + Lookup Resource representation
+      if (EDM_PRIMITIVES.has(found)) return `enumerated data types MUST declare a unique nominal (lookup) type, found primitive ${found}`;
+      if (!INT_TYPES.has(underlying ?? '')) return `enumerated types MUST use an underlying type of ${EDM.INT16}, ${EDM.INT32} or ${EDM.INT64}`;
+      return field.isFlags ? 'IsFlags="true" but MUST be false for single-valued enumerations' : null;
+    case 'Multiple Enumeration':
+      if (found === EDM.STRING) return isCollection ? null : `multiple enumerations MUST use Collection(${EDM.STRING}), found ${EDM.STRING}`;
+      if (EDM_PRIMITIVES.has(found)) return `enumerated data type MUST declare a unique nominal type, found primitive ${found}`;
+      if (!INT_TYPES.has(underlying ?? '')) return `enumerated types MUST use an underlying type of ${EDM.INT16}, ${EDM.INT32} or ${EDM.INT64}`;
+      return !isCollection && !field.isFlags ? 'multi-enumerations MUST have IsFlags="true"' : null;
+  }
+};
+
+/**
+ * Field-type check: a provider field MUST map to the DD-declared data type. The three enum
+ * representations (Edm.String + Lookup Resource, the EnumType FQDN, and a Collection for multi) are
+ * all accepted where valid, matching the Commander's assertDataTypeMapping exactly. Only fields the
+ * provider actually declares are checked (field existence is a separate concern).
+ */
+export const checkFieldTypes = (report: MetadataReport, reference: DdReference): ReadonlyArray<MetadataCheckFinding> => {
+  const providerByKey = new Map(report.fields.map((f) => [fieldKey(f.resourceName, f.fieldName), f]));
+  // Provider enum underlying type: each lookup carries it as its `type`; first wins (uniform per enum).
+  const providerUnderlying = report.lookups.reduce(
+    (acc, l) => (acc.has(l.lookupName) ? acc : acc.set(l.lookupName, l.type)),
+    new Map<string, string>(),
+  );
+
+  return reference.fields.flatMap((refField) => {
+    const provider = providerByKey.get(fieldKey(refField.resourceName, refField.fieldName));
+    if (!provider || provider.isExpansion) return [];
+    const expected = expectedDdDataType(refField);
+    if (expected == null) return [];
+    // Underlying type from the enum's lookups; an open enum with no standard members carries none, so
+    // default to Edm.Int32 (the OData/RESO default). A non-int underlying, when present, still fails.
+    const underlying = providerUnderlying.get(unwrapCollection(provider.type)) ?? EDM.INT32;
+    const error = validateFieldType(expected, provider, underlying);
+    return error
+      ? [{
+          check: 'field-type' as const,
+          resourceName: refField.resourceName,
+          fieldName: refField.fieldName,
+          message: `"${refField.fieldName}" in the "${refField.resourceName}" resource MUST be a ${expected} data type: ${error}.`,
+        }]
+      : [];
+  });
+};
+
 /**
  * Run the full DD metadata gate. Returns the combined findings across all checks; an empty array
- * means the metadata passes. The field-type check slots in here next.
+ * means the metadata passes.
  */
 export const runDdMetadataChecks = (
   report: MetadataReport,
@@ -154,4 +269,5 @@ export const runDdMetadataChecks = (
 ): ReadonlyArray<MetadataCheckFinding> => [
   ...checkDisallowedSynonyms(report, reference),
   ...checkClosedEnumValues(report, reference),
+  ...checkFieldTypes(report, reference),
 ];

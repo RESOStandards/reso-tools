@@ -36,6 +36,8 @@ export interface MetadataReportField {
   readonly isComplexType?: boolean;
   /** True when the field is (part of) the entity type's key, from the CSDL <Key> element. */
   readonly isPrimaryKey?: boolean;
+  /** True when the field's enum type declares IsFlags="true" (the OData bitmask enum representation). */
+  readonly isFlags?: boolean;
   readonly annotations: ReadonlyArray<{ readonly term: string; readonly value: string }>;
 }
 
@@ -162,6 +164,10 @@ const fieldInfoToReportField = (
   isFlagsTypeNames: ReadonlySet<string>,
 ): MetadataReportField => {
   const isEnum = detectEnumeration(field, enumTypeNames, isFlagsTypeNames);
+  // The field's enum type declares IsFlags="true" (carried for the DD field-type check; matches the
+  // EnumType the field references, unwrapping any Collection()).
+  const unwrapped = field.type.startsWith('Collection(') ? field.type.slice('Collection('.length, -1) : field.type;
+  const isFlagsEnum = isFlagsTypeNames.has(unwrapped);
 
   return {
     resourceName: field.resourceName,
@@ -175,6 +181,7 @@ const fieldInfoToReportField = (
     ...(field.isCollection ? { isCollection: true } : {}),
     ...(field.isExpansion ? { isExpansion: true } : {}),
     ...(isEnum ? { isEnumeration: true } : {}),
+    ...(isFlagsEnum ? { isFlags: true } : {}),
     ...(field.isPrimaryKey ? { isPrimaryKey: true } : {}),
     annotations: field.annotations,
   };

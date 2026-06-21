@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
-import { checkDisallowedSynonyms, checkClosedEnumValues, runDdMetadataChecks } from '../../src/metadata/dd-metadata-checks.js';
+import { checkDisallowedSynonyms, checkClosedEnumValues, checkFieldTypes, runDdMetadataChecks } from '../../src/metadata/dd-metadata-checks.js';
 import type { DdReference } from '../../src/metadata/dd-metadata-checks.js';
 import type { MetadataReport, MetadataReportLookup } from '../../src/metadata/serializer.js';
 
@@ -16,7 +16,7 @@ const emptyReport = (fields: ReadonlyArray<{ resourceName: string; fieldName: st
 });
 
 const makeReport = (
-  fields: ReadonlyArray<{ resourceName: string; fieldName: string; type: string }>,
+  fields: ReadonlyArray<{ resourceName: string; fieldName: string; type: string; isCollection?: boolean; isFlags?: boolean; isEnumeration?: boolean; isExpansion?: boolean }>,
   lookups: ReadonlyArray<MetadataReportLookup>,
 ): MetadataReport => ({
   description: 'test', version: '2.1', generatedOn: '2026-06-21T00:00:00.000Z',
@@ -129,6 +129,65 @@ describe('checkClosedEnumValues', () => {
   it.each(['2.0', '2.1'])('DD %s reference passes the closed-enum gate clean', (version) => {
     const ref = getReferenceMetadata(version) as MetadataReport & DdReference;
     expect(checkClosedEnumValues(ref, ref)).toEqual([]);
+  });
+});
+
+describe('checkFieldTypes', () => {
+  const SS = 'org.reso.metadata.enums.StandardStatus';
+  // Reference declares: a String, an Integer, a Single Enumeration, and a Multiple Enumeration.
+  const reference: DdReference = {
+    fields: [
+      { resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String' },
+      { resourceName: 'Property', fieldName: 'BedroomsTotal', type: 'Edm.Int64' },
+      { resourceName: 'Property', fieldName: 'StandardStatus', type: SS, isEnumeration: true, isCollection: false },
+      { resourceName: 'Property', fieldName: 'Appliances', type: 'org.reso.metadata.enums.Appliances', isEnumeration: true, isCollection: true },
+    ],
+    lookups: [],
+  };
+  const enumLookup = (name: string): MetadataReportLookup => ({ lookupName: name, lookupValue: 'X', type: 'Edm.Int32', annotations: [] });
+
+  it('passes a primitive that maps to the DD type', () => {
+    expect(checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String' }], []), reference)).toEqual([]);
+  });
+
+  it('flags a primitive with the wrong EDM type', () => {
+    const findings = checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'BedroomsTotal', type: 'Edm.String' }], []), reference);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toMatchObject({ check: 'field-type', fieldName: 'BedroomsTotal' });
+    expect(findings[0].message).toContain('Integer');
+  });
+
+  it('accepts a single enumeration as Edm.String + Lookup Resource', () => {
+    expect(checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'StandardStatus', type: 'Edm.String', isEnumeration: true }], []), reference)).toEqual([]);
+  });
+
+  it('accepts a single enumeration as an EnumType FQDN with an Int underlying type', () => {
+    expect(checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS, isEnumeration: true }], [enumLookup(SS)]), reference)).toEqual([]);
+  });
+
+  it('flags a single enumeration declared as a collection', () => {
+    const findings = checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS, isEnumeration: true, isCollection: true }], [enumLookup(SS)]), reference);
+    expect(findings[0].message).toContain('cannot be collections');
+  });
+
+  it('flags a single enumeration EnumType with IsFlags=true', () => {
+    const findings = checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS, isEnumeration: true, isFlags: true }], [enumLookup(SS)]), reference);
+    expect(findings[0].message).toContain('IsFlags');
+  });
+
+  it('accepts a multiple enumeration as Collection(Edm.String)', () => {
+    expect(checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'Appliances', type: 'Collection(Edm.String)', isEnumeration: true, isCollection: true }], []), reference)).toEqual([]);
+  });
+
+  it('flags a multiple enumeration declared as a non-collection Edm.String', () => {
+    const findings = checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'Appliances', type: 'Edm.String', isEnumeration: true, isCollection: false }], []), reference);
+    expect(findings[0].message).toContain('Collection(Edm.String)');
+  });
+
+  // Self-test invariant: the DD reference's own field types MUST satisfy their declared DD types.
+  it.each(['2.0', '2.1'])('DD %s reference passes the field-type gate clean', (version) => {
+    const ref = getReferenceMetadata(version) as MetadataReport & DdReference;
+    expect(checkFieldTypes(ref, ref)).toEqual([]);
   });
 });
 
