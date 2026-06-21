@@ -233,9 +233,23 @@ const validateDdMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
     const errors = findings.filter(f => f.severity === 'error');
     const warnings = findings.filter(f => f.severity === 'warning');
 
-    // SHOULD recommendations are surfaced but do not fail certification.
-    for (const w of warnings) {
-      onProgress({ step: 'sub:dd-metadata', status: 'running', message: w.message });
+    // Write the per-field findings alongside the other artifacts so a provider receives the same
+    // per-field detail the Commander returned (MUST errors + SHOULD warnings) — rather than flooding
+    // progress with hundreds of individual warning messages.
+    const findingsPath = ctx.outputPath ? join(ctx.outputPath, 'metadata-validation-report.json') : undefined;
+    if (findingsPath && findings.length > 0) {
+      await writeFile(findingsPath, JSON.stringify({
+        version: ctx.version,
+        generatedOn: new Date().toISOString(),
+        errorCount: errors.length,
+        warningCount: warnings.length,
+        findings,
+      }, null, 2));
+    }
+    const artifacts = findingsPath && findings.length > 0 ? [{ label: 'Metadata validation report', path: findingsPath }] : undefined;
+
+    if (warnings.length > 0) {
+      onProgress({ step: 'sub:dd-metadata', status: 'running', message: `${warnings.length} Suggested Max (SHOULD) deviation${warnings.length === 1 ? '' : 's'} — see metadata-validation-report.json` });
     }
     const warningSuffix = warnings.length ? ` (${warnings.length} warning${warnings.length === 1 ? '' : 's'})` : '';
 
@@ -245,12 +259,14 @@ const validateDdMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
         status: 'failed',
         errors: errors.map(e => e.message),
         summary: `Metadata validation failed: ${errors.length} issue${errors.length === 1 ? '' : 's'}${warningSuffix}`,
+        ...(artifacts ? { artifacts } : {}),
       };
     }
 
     return {
       context: { ...ctx, ddMetadataValid: true },
       summary: `Metadata validation passed${warningSuffix}`,
+      ...(artifacts ? { artifacts } : {}),
     };
   },
 });
