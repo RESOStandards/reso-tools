@@ -109,6 +109,9 @@ export const checkDisallowedSynonyms = (
 /** The annotation term carrying a lookup's human-friendly standard display name. */
 const STANDARD_NAME = 'RESO.OData.Metadata.StandardName';
 
+/** The annotation term tying a string-enumeration field to its Lookup Resource enumeration. */
+const LOOKUP_NAME_ANNOTATION = 'RESO.OData.Metadata.LookupName';
+
 /** A field's enum is CLOSED when its DD lookupStatus is "Locked with Enumerations". */
 const isClosedEnum = (lookupStatus: string | undefined): boolean => (lookupStatus ?? '').startsWith('Locked');
 
@@ -264,10 +267,16 @@ export const checkFieldTypes = (report: MetadataReport, reference: DdReference):
     if (!provider || provider.isExpansion) return [];
     const expected = expectedDdDataType(refField);
     if (expected == null) return [];
+    // A field carrying a LookupName annotation is the string + Lookup Resource representation; its EDM
+    // type is Edm.String even though the merged report rewrites field.type to the LookupName for the
+    // variations join. Use the effective EDM type so the type-class check routes to the string branch.
+    const isStringRep = provider.annotations.some((a) => a.term === LOOKUP_NAME_ANNOTATION);
+    const isCollection = provider.isCollection === true || provider.type.startsWith('Collection(');
+    const effectiveType = isStringRep ? (isCollection ? `Collection(${EDM.STRING})` : EDM.STRING) : provider.type;
     // Underlying type from the enum's lookups; an open enum with no standard members carries none, so
     // default to Edm.Int32 (the OData/RESO default). A non-int underlying, when present, still fails.
     const underlying = providerUnderlying.get(unwrapCollection(provider.type)) ?? EDM.INT32;
-    const error = validateFieldType(expected, provider, underlying);
+    const error = validateFieldType(expected, { ...provider, type: effectiveType }, underlying);
     return error
       ? [{
           check: 'field-type' as const,
@@ -283,8 +292,6 @@ export const checkFieldTypes = (report: MetadataReport, reference: DdReference):
 /** The Lookup Resource (string representation) entity set name and its mandatory metadata fields. */
 const LOOKUP_RESOURCE = 'Lookup';
 const LOOKUP_MANDATORY_FIELDS: ReadonlyArray<string> = ['LookupKey', 'LookupName', 'LookupValue', 'ModificationTimestamp'];
-/** The annotation term tying a string-enumeration field to its Lookup Resource enumeration. */
-const LOOKUP_NAME_ANNOTATION = 'RESO.OData.Metadata.LookupName';
 
 /**
  * Lookup Resource mandatory fields (metadata): when a provider serves the string representation (a

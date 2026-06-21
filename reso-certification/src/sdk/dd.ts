@@ -12,6 +12,9 @@ import { join, dirname } from 'node:path';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadataWithVersion, persistMetadataXml } from '../test-runner/metadata.js';
 import { generateMetadataReport } from '../metadata/serializer.js';
+import type { MetadataReport } from '../metadata/serializer.js';
+import { runDdMetadataChecks } from '../metadata/dd-metadata-checks.js';
+import type { DdReference } from '../metadata/dd-metadata-checks.js';
 import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
 import type { BaseTestContext, DDConfig, PipelineStep, StepResult, TestFunction } from './types.js';
 import type { DDVersion } from './dd-versions.js';
@@ -28,10 +31,13 @@ import certUtils from '../legacy/index.js';
 import certUtilsCommon from '../legacy/common.js';
 // @ts-expect-error — legacy CJS
 import certUtilsReplicationUtils from '../legacy/lib/replication/utils.js';
+// @ts-expect-error — legacy CJS (reference metadata loader)
+import certUtilsEtl from '../etl/index.cjs';
 
 const { replicate, findVariations } = certUtils;
 const { createReplicationStateServiceInstance } = certUtilsCommon;
 const { REPLICATION_STRATEGIES } = certUtilsReplicationUtils;
+const { getReferenceMetadata } = certUtilsEtl as { getReferenceMetadata: (version: string) => DdReference };
 
 // ── Constants ──
 
@@ -45,6 +51,9 @@ const DEFAULT_YEARS_BACK = 3;
 interface DDContext extends BaseTestContext {
   readonly version: DDVersion;
   readonly metadataReportPath?: string;
+  /** The merged metadata report, threaded so the DD metadata gate runs without re-reading the file. */
+  readonly metadataReport?: MetadataReport;
+  readonly ddMetadataValid?: boolean;
   readonly lookupResourceAvailable?: boolean;
   readonly lookupRecordCount?: number;
   readonly variationsFound?: boolean;
@@ -177,7 +186,7 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
     ];
 
     return {
-      context: { ...ctx, metadataReportPath, lookupResourceAvailable, lookupRecordCount, odataVersion },
+      context: { ...ctx, metadataReportPath, metadataReport: report, lookupResourceAvailable, lookupRecordCount, odataVersion },
       summary: `${report.resources.length} resources, ${report.fields.length.toLocaleString()} fields, ${report.lookups.length.toLocaleString()} lookups${lookupMsg}. ${formatValidationSummary(validation)}`,
       counts: { resources: report.resources.length, fields: report.fields.length, lookups: report.lookups.length },
       artifacts,
@@ -188,6 +197,60 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
       ],
       ...(validationErrors.length > 0 ? { errors: validationErrors } : {}),
       ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {}),
+    };
+  },
+});
+
+/**
+ * DD metadata gate — the fail-fast metadata-validation step. Runs AFTER the semantic/structural
+ * OData validation (in generateMetadata) and BEFORE variations: metadata issues (wrong data types,
+ * disallowed synonyms, closed-enum violations, Lookup Resource integrity) short-circuit the mapping
+ * (variations) check, mirroring the Web API Commander. `error` findings fail the step (the pipeline
+ * is fail-fast, so variations never runs); `warning` findings (the DD's SHOULD suggested-max
+ * attributes) are surfaced as non-blocking messages.
+ */
+const validateDdMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
+  name: 'Validate DD metadata',
+  run: async (ctx, onProgress) => {
+    const report = ctx.metadataReport;
+    if (!report) {
+      return { context: ctx, status: 'skipped', summary: 'No metadata report available for DD metadata validation' };
+    }
+
+    // Skip gracefully if this version ships no reference metadata.
+    const reference = (() => {
+      try {
+        return getReferenceMetadata(ctx.version);
+      } catch {
+        return undefined;
+      }
+    })();
+    if (!reference) {
+      return { context: ctx, status: 'skipped', summary: `No DD reference metadata for version ${ctx.version}` };
+    }
+
+    const findings = runDdMetadataChecks(report, reference);
+    const errors = findings.filter(f => f.severity === 'error');
+    const warnings = findings.filter(f => f.severity === 'warning');
+
+    // SHOULD recommendations are surfaced but do not fail certification.
+    for (const w of warnings) {
+      onProgress({ step: 'sub:dd-metadata', status: 'running', message: w.message });
+    }
+    const warningSuffix = warnings.length ? ` (${warnings.length} warning${warnings.length === 1 ? '' : 's'})` : '';
+
+    if (errors.length > 0) {
+      return {
+        context: { ...ctx, ddMetadataValid: false },
+        status: 'failed',
+        errors: errors.map(e => e.message),
+        summary: `Metadata validation failed: ${errors.length} issue${errors.length === 1 ? '' : 's'}${warningSuffix}`,
+      };
+    }
+
+    return {
+      context: { ...ctx, ddMetadataValid: true },
+      summary: `Metadata validation passed${warningSuffix}`,
     };
   },
 });
@@ -503,6 +566,7 @@ export const createDDPipeline = (config: DDConfig) =>
     resolveAuth(config),
     ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),
     generateMetadata(config),
+    validateDdMetadata(config),
     ...(config.version !== '1.7' ? [runVariations(config)] : []),
     replicateAndValidate(config),
     writeComplianceReports(config),

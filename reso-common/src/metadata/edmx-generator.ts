@@ -14,10 +14,19 @@ const isValidSimpleIdentifier = (name: string): boolean => SIMPLE_IDENTIFIER_RE.
 const unwrapCollection = (type: string): string =>
   type.startsWith('Collection(') && type.endsWith(')') ? type.slice('Collection('.length, -1) : type;
 
+/**
+ * Whether a field is an enumeration for EDMX generation: a nominal (non-Edm) enum type, or the string
+ * representation (Edm.String + isEnumeration). A PRIMITIVE type carrying a spurious isEnumeration flag
+ * (e.g. the DD 2.1 Boolean quirk BuiltPre1978YN — a Boolean with a LookupStatus) is NOT an enum; the
+ * declared type wins, matching the DD field-type check.
+ */
+const isEnumField = (field: ResoField, rawType: string): boolean =>
+  isEnumType(rawType) || (field.isEnumeration === true && rawType === 'Edm.String');
+
 /** Maps a RESO field type to an EDMX Property type string. */
 const toEdmxType = (field: ResoField, enumMode: EnumMode): string => {
   const rawType = unwrapCollection(field.type);
-  const isEnum = isEnumType(rawType) || field.isEnumeration;
+  const isEnum = isEnumField(field, rawType);
   const isCol = field.isCollection || field.type.startsWith('Collection(');
 
   if (isEnum) {
@@ -55,7 +64,7 @@ const generateProperty = (field: ResoField, enumMode: EnumMode): string => {
 
   // LookupName annotation: only in string mode for enum fields
   const rawType = unwrapCollection(field.type);
-  const isEnum = isEnumType(rawType) || field.isEnumeration;
+  const isEnum = isEnumField(field, rawType);
   const lookupShortName = field.typeName ?? (rawType.includes('.') ? rawType.slice(rawType.lastIndexOf('.') + 1) : null);
   const lookupAnnotation =
     enumMode === 'string' && isEnum && lookupShortName

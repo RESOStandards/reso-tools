@@ -17,6 +17,8 @@ import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
 import { computeVariationsV2 } from '../../src/variations-v2/compute.js';
 import { generateReferenceArtifacts } from '../../src/metadata/reference-artifacts.js';
+import { runDdMetadataChecks } from '../../src/metadata/dd-metadata-checks.js';
+import type { DdReference } from '../../src/metadata/dd-metadata-checks.js';
 import type { MetadataReport } from '../../src/metadata/serializer.js';
 
 const createRequire = (await import('node:module')).createRequire;
@@ -87,5 +89,41 @@ describe('DD reference self-test (DD 2.1)', () => {
     const nonIdentifier = enumLookups.filter((l) => !SIMPLE_IDENTIFIER.test(String(l.lookupValue)));
     expect(nonIdentifier).toEqual([]);
     expect(stringLookups.length).toBeGreaterThanOrEqual(enumLookups.length);
+  });
+});
+
+// The DD metadata GATE (fail-fast metadata-validation, run before variations) must also be silent
+// on the reference: the generated reference passes every MUST check in both representations.
+describe('DD metadata gate self-test (DD 2.1)', () => {
+  const ref = getReferenceMetadata(VERSION) as MetadataReport;
+  const targetResources = ref.resources as unknown as string[];
+  const gateErrors = (report: MetadataReport) =>
+    runDdMetadataChecks(report, ref as unknown as DdReference).filter((f) => f.severity === 'error');
+
+  it.each(REP_MODES)('rep=%s: the generated reference passes the metadata gate with ZERO errors', (enumMode) => {
+    const { metadataReport } = generateReferenceArtifacts(ref, targetResources, enumMode, VERSION);
+    expect(gateErrors(metadataReport)).toEqual([]);
+  });
+
+  it('TEETH: a disallowed-synonym field surfaces a gate error', () => {
+    const { metadataReport } = generateReferenceArtifacts(ref, targetResources, 'string', VERSION);
+    // NormalizedListingStatus is a disallowed synonym of Property.StandardStatus.
+    const corrupted: MetadataReport = {
+      ...metadataReport,
+      fields: [...metadataReport.fields, { resourceName: 'Property', fieldName: 'NormalizedListingStatus', type: 'Edm.String', annotations: [] }],
+    };
+    const errors = gateErrors(corrupted);
+    expect(errors.some((e) => e.check === 'disallowed-synonym')).toBe(true);
+  });
+
+  it('TEETH: a wrong field data type surfaces a gate error', () => {
+    const { metadataReport } = generateReferenceArtifacts(ref, targetResources, 'string', VERSION);
+    // Force the Decimal field ListPrice to an Edm.String type.
+    const corrupted: MetadataReport = {
+      ...metadataReport,
+      fields: metadataReport.fields.map((f) =>
+        f.resourceName === 'Property' && f.fieldName === 'ListPrice' ? { ...f, type: 'Edm.String', isEnumeration: false } : f),
+    };
+    expect(gateErrors(corrupted).some((e) => e.check === 'field-type')).toBe(true);
   });
 });
