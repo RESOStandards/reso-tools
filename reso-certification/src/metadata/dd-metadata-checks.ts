@@ -16,11 +16,26 @@
 import type { MetadataReport, MetadataReportField } from './serializer.js';
 
 /** The kind of metadata-gate violation. */
-export type MetadataCheckKind = 'disallowed-synonym' | 'closed-enum-value' | 'field-type';
+export type MetadataCheckKind =
+  | 'disallowed-synonym'
+  | 'closed-enum-value'
+  | 'field-type'
+  | 'lookup-resource-fields'
+  | 'lookup-name-annotation'
+  | 'lookup-name-integrity'
+  | 'suggested-max';
 
-/** A single metadata-gate finding — a fail-fast metadata issue, not a mapping variation. */
+/**
+ * Finding severity. `error` is a MUST violation that fails the metadata gate (fail-fast before
+ * variations); `warning` is a SHOULD recommendation (e.g. the DD Suggested Max attributes) that is
+ * surfaced as a message but does not fail certification.
+ */
+export type MetadataCheckSeverity = 'error' | 'warning';
+
+/** A single metadata-gate finding — a metadata issue (or recommendation), not a mapping variation. */
 export interface MetadataCheckFinding {
   readonly check: MetadataCheckKind;
+  readonly severity: MetadataCheckSeverity;
   readonly resourceName: string;
   readonly fieldName: string;
   readonly message: string;
@@ -40,6 +55,9 @@ export interface DdReferenceField {
   readonly isEnumeration?: boolean;
   readonly isCollection?: boolean;
   readonly isExpansion?: boolean;
+  readonly maxLength?: number;
+  readonly precision?: number;
+  readonly scale?: number;
 }
 
 /** The DD reference shape these checks read (a structural superset of MetadataReport). */
@@ -80,6 +98,7 @@ export const checkDisallowedSynonyms = (
       })
       .map((syn) => ({
         check: 'disallowed-synonym' as const,
+        severity: 'error' as const,
         resourceName: refField.resourceName,
         fieldName: syn,
         message: `"${syn}" in the "${refField.resourceName}" resource is a disallowed synonym of the standard field "${refField.fieldName}". Use "${refField.fieldName}".`,
@@ -140,6 +159,7 @@ export const checkClosedEnumValues = (
         })
         .map((v) => ({
           check: 'closed-enum-value' as const,
+          severity: 'error' as const,
           resourceName: refField.resourceName,
           fieldName: refField.fieldName,
           message: `"${v.lookupValue}" is not a permitted value of the closed enumeration "${refField.fieldName}" in the "${refField.resourceName}" resource. Closed enumerations may not carry values outside the Data Dictionary.`,
@@ -251,6 +271,7 @@ export const checkFieldTypes = (report: MetadataReport, reference: DdReference):
     return error
       ? [{
           check: 'field-type' as const,
+          severity: 'error' as const,
           resourceName: refField.resourceName,
           fieldName: refField.fieldName,
           message: `"${refField.fieldName}" in the "${refField.resourceName}" resource MUST be a ${expected} data type: ${error}.`,
@@ -260,8 +281,47 @@ export const checkFieldTypes = (report: MetadataReport, reference: DdReference):
 };
 
 /**
+ * Suggested-max checks (SHOULD): the DD's maxLength / precision / scale are recommendations, not
+ * requirements, so a provider value that differs from the suggested maximum yields a WARNING, not a
+ * gate failure — matching the Commander, which only logs these. Only fields the provider declares
+ * are checked, and only the attributes the DD actually suggests for each field.
+ */
+export const checkSuggestedMaxConstraints = (
+  report: MetadataReport,
+  reference: DdReference,
+): ReadonlyArray<MetadataCheckFinding> => {
+  const providerByKey = new Map(report.fields.map((f) => [fieldKey(f.resourceName, f.fieldName), f]));
+
+  const attributes = [
+    { name: 'Length', suggested: (f: DdReferenceField) => f.maxLength, actual: (f: MetadataReportField) => f.maxLength },
+    { name: 'Precision', suggested: (f: DdReferenceField) => f.precision, actual: (f: MetadataReportField) => f.precision },
+    { name: 'Scale', suggested: (f: DdReferenceField) => f.scale, actual: (f: MetadataReportField) => f.scale },
+  ] as const;
+
+  return reference.fields.flatMap((refField) => {
+    const provider = providerByKey.get(fieldKey(refField.resourceName, refField.fieldName));
+    if (!provider) return [];
+    return attributes.flatMap(({ name, suggested, actual }) => {
+      const want = suggested(refField);
+      if (want == null) return [];
+      const got = actual(provider);
+      return got === want
+        ? []
+        : [{
+            check: 'suggested-max' as const,
+            severity: 'warning' as const,
+            resourceName: refField.resourceName,
+            fieldName: refField.fieldName,
+            message: `${name} for "${refField.fieldName}" in the "${refField.resourceName}" resource SHOULD be equal to the RESO Suggested Max ${name} of ${want} but was ${got ?? 'not set'}.`,
+          }];
+    });
+  });
+};
+
+/**
  * Run the full DD metadata gate. Returns the combined findings across all checks; an empty array
- * means the metadata passes.
+ * means the metadata passes. Callers fail certification on `error` findings (before variations) and
+ * surface `warning` findings as non-blocking messages.
  */
 export const runDdMetadataChecks = (
   report: MetadataReport,
@@ -270,4 +330,5 @@ export const runDdMetadataChecks = (
   ...checkDisallowedSynonyms(report, reference),
   ...checkClosedEnumValues(report, reference),
   ...checkFieldTypes(report, reference),
+  ...checkSuggestedMaxConstraints(report, reference),
 ];

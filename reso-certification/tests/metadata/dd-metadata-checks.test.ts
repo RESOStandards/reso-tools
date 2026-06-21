@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
-import { checkDisallowedSynonyms, checkClosedEnumValues, checkFieldTypes, runDdMetadataChecks } from '../../src/metadata/dd-metadata-checks.js';
+import { checkDisallowedSynonyms, checkClosedEnumValues, checkFieldTypes, checkSuggestedMaxConstraints, runDdMetadataChecks } from '../../src/metadata/dd-metadata-checks.js';
 import type { DdReference } from '../../src/metadata/dd-metadata-checks.js';
 import type { MetadataReport, MetadataReportLookup } from '../../src/metadata/serializer.js';
 
@@ -16,7 +16,7 @@ const emptyReport = (fields: ReadonlyArray<{ resourceName: string; fieldName: st
 });
 
 const makeReport = (
-  fields: ReadonlyArray<{ resourceName: string; fieldName: string; type: string; isCollection?: boolean; isFlags?: boolean; isEnumeration?: boolean; isExpansion?: boolean }>,
+  fields: ReadonlyArray<{ resourceName: string; fieldName: string; type: string; isCollection?: boolean; isFlags?: boolean; isEnumeration?: boolean; isExpansion?: boolean; maxLength?: number; precision?: number; scale?: number }>,
   lookups: ReadonlyArray<MetadataReportLookup>,
 ): MetadataReport => ({
   description: 'test', version: '2.1', generatedOn: '2026-06-21T00:00:00.000Z',
@@ -188,6 +188,43 @@ describe('checkFieldTypes', () => {
   it.each(['2.0', '2.1'])('DD %s reference passes the field-type gate clean', (version) => {
     const ref = getReferenceMetadata(version) as MetadataReport & DdReference;
     expect(checkFieldTypes(ref, ref)).toEqual([]);
+  });
+});
+
+describe('checkSuggestedMaxConstraints (SHOULD warnings)', () => {
+  const reference: DdReference = {
+    fields: [
+      { resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String', maxLength: 4000 },
+      { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal', precision: 14, scale: 2 },
+    ],
+    lookups: [],
+  };
+
+  it('warns (warning severity, not error) when a Suggested Max attribute differs', () => {
+    const findings = checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String', maxLength: 2000 }], []), reference);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toMatchObject({ check: 'suggested-max', severity: 'warning', fieldName: 'PublicRemarks' });
+    expect(findings[0].message).toContain('Suggested Max Length of 4000 but was 2000');
+  });
+
+  it('emits a warning per differing attribute (precision and scale)', () => {
+    const findings = checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal', precision: 10, scale: 4 }], []), reference);
+    expect(findings).toHaveLength(2);
+    const joined = findings.map((f) => f.message).join(' ');
+    expect(joined).toContain('Precision');
+    expect(joined).toContain('Scale');
+  });
+
+  it('is silent when the attributes match the suggested maxima', () => {
+    expect(checkSuggestedMaxConstraints(makeReport([
+      { resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String', maxLength: 4000 },
+      { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal', precision: 14, scale: 2 },
+    ], []), reference)).toEqual([]);
+  });
+
+  it.each(['2.0', '2.1'])('DD %s reference is silent under suggested-max (provider == reference)', (version) => {
+    const ref = getReferenceMetadata(version) as MetadataReport & DdReference;
+    expect(checkSuggestedMaxConstraints(ref, ref)).toEqual([]);
   });
 });
 
