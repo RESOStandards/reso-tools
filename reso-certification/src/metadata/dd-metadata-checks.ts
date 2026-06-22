@@ -12,6 +12,19 @@
  * the source of truth for what's allowed: `synonyms` (disallowed alternate field names) and
  * `lookupStatus` ("Locked with Enumerations" = a closed enum) are DD-authored descriptors carried
  * in dd-{ver}.json.
+ *
+ * These REPLACE the Commander's per-field DD BDD .feature scenarios (DataDictionary.java +
+ * LookupResource.java) — we deliberately do NOT port the BDD/Cucumber layer. The Commander's
+ * scenarios are per-field TYPE assertions; these checks compute the same thing directly,
+ * parameterized over the DD reference (each resource/field), with per-field findings as the
+ * equivalent output. Conceptually they collapse into TYPE conformance — a field's declared type,
+ * its enum representation (single/multi, closed, the LookupName annotation + Lookup Resource
+ * integrity) and its type facets — plus one naming check (disallowed synonyms). Each check cites
+ * the Commander BDD scenario it implements.
+ *
+ * Intentionally NOT implemented: `"X" MUST contain at least one standard lookup` — latent in the
+ * Commander (0 uses in the v1.7/v2.0 generated features) and incompatible with open enums that
+ * carry no standard values; `When "X" exists` and `MAY contain` are non-failing guards/info.
  */
 import type { MetadataReport, MetadataReportField } from './serializer.js';
 
@@ -82,6 +95,9 @@ const parseSynonyms = (synonyms: string | undefined): ReadonlyArray<string> =>
  * each standard field carrying `synonyms`, flag any of those synonym names that appear as a field
  * in the provider's SAME resource. A synonym that is itself a standard field name is skipped — it's
  * a legitimate field, not a synonym misuse (the DD reference is verified free of such collisions).
+ *
+ * Commander BDD: `Given that the following synonyms for "X" DO NOT exist in the "R" metadata`
+ * (DataDictionary.java theFollowingSynonymsForDONOTExistInTheMetadata). The one NAMING check.
  */
 export const checkDisallowedSynonyms = (
   report: MetadataReport,
@@ -124,6 +140,9 @@ const isClosedEnum = (lookupStatus: string | undefined): boolean => (lookupStatu
  * representations and across enums shared by several fields (e.g. IanaTimeZoneValues). A provider
  * value is permitted if EITHER its machine value OR its StandardName matches a standard value's
  * machine value or StandardName — covering providers that key by either form.
+ *
+ * Commander BDD: `Then "X" MUST contain only standard enumerations` (DataDictionary.java
+ * mustContainOnlyStandardEnumerations) — applied dynamically to closed (lookupStatus "Locked") enums.
  */
 export const checkClosedEnumValues = (
   report: MetadataReport,
@@ -257,6 +276,9 @@ const validateFieldType = (expected: DdDataType, field: MetadataReportField, und
  * representations (Edm.String + Lookup Resource, the EnumType FQDN, and a Collection for multi) are
  * all accepted where valid, matching the Commander's assertDataTypeMapping exactly. Only fields the
  * provider actually declares are checked (field existence is a separate concern).
+ *
+ * Commander BDD: `Then "X" MUST be "<type>" data type` (DataDictionary.java assertDataTypeMapping;
+ * derived per BDDProcessor build{Number,Integer,Decimal,Boolean,Date,Timestamp,String,Enum}Test).
  */
 export const checkFieldTypes = (report: MetadataReport, reference: DdReference): ReadonlyArray<MetadataCheckFinding> => {
   const providerByKey = new Map(report.fields.map((f) => [fieldKey(f.resourceName, f.fieldName), f]));
@@ -303,6 +325,9 @@ const LOOKUP_MANDATORY_FIELDS: ReadonlyArray<string> = ['LookupKey', 'LookupName
  * ModificationTimestamp. Guarded on the Lookup resource existing — the EnumType representation has
  * none, so this is skipped there. (The Commander additionally checks each Lookup record carries
  * non-null values for these; that is data validation, outside this metadata gate.)
+ *
+ * Commander BDD: `Then "Lookup" Resource data and metadata MUST contain the following fields`
+ * (LookupResource.java, RCP-032 lookup-resource-tests.feature) — the metadata half.
  */
 export const checkLookupResourceFields = (
   report: MetadataReport,
@@ -323,6 +348,9 @@ export const checkLookupResourceFields = (
  * LookupName annotation requirement: a standard lookup field served in the string representation
  * (Edm.String or Collection(Edm.String)) MUST carry the RESO.OData.Metadata.LookupName annotation
  * tying it to its enumeration. EnumType representations (a nominal type) are exempt.
+ *
+ * Commander BDD: `Then RESO Lookups using String or String Collection data types MUST have the
+ * annotation "RESO.OData.Metadata.LookupName"` (LookupResource.java, RCP-032).
  */
 export const checkLookupNameAnnotations = (
   report: MetadataReport,
@@ -349,7 +377,11 @@ export const checkLookupNameAnnotations = (
 /**
  * LookupName referential integrity: every field carrying a LookupName annotation MUST reference an
  * enumeration that exists in the Lookup Resource data (report.lookups). Catches an annotation that
- * points at a missing or misspelled Lookup Resource entry.
+ * points at a missing or misspelled Lookup Resource entry. (The inverse — values served but not
+ * advertised — is the schema-validation phase's job.)
+ *
+ * Commander BDD: `And fields with the annotation term "X" MUST have a LookupName in the Lookup
+ * Resource` (LookupResource.java, RCP-032).
  */
 export const checkLookupNameIntegrity = (
   report: MetadataReport,
@@ -376,6 +408,9 @@ export const checkLookupNameIntegrity = (
  * requirements, so a provider value that differs from the suggested maximum yields a WARNING, not a
  * gate failure — matching the Commander, which only logs these. Only fields the provider declares
  * are checked, and only the attributes the DD actually suggests for each field.
+ *
+ * Commander BDD: `And "X" {precision|scale|length} SHOULD be equal to the RESO Suggested Max ...`
+ * (DataDictionary.java {precision|scale|length}SHOULDBeEqualTo... — the only SHOULD/warning checks).
  */
 export const checkSuggestedMaxConstraints = (
   report: MetadataReport,
