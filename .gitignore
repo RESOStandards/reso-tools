@@ -19,6 +19,8 @@ compliance-results.zip
 *.env
 .reso-cert/
 reso-certification/.venv-dd-lint/
+__pycache__/
+*.pyc
 
 # RESO certification test artifacts
 data-availability*.json
