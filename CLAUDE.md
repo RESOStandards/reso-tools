@@ -173,6 +173,14 @@ confirmed-clean `@tanstack/virtual*` family.
 
 ## DD Reference-Metadata Regeneration
 
+> **As of 2026-06-22, generation moved to transport; reso-tools now CONSUMES the JSON.** The DD reference tooling (XLSX → `dd-{ver}.json` generation, linting, fitness checks) lives in `RESOStandards/transport` at `references/dd/tools/` (all-Python/openpyxl); its `generate-dd-json` workflow regenerates `references/dd/json/dd-{ver}.json` on every sheet change. To refresh reso-tools' reference metadata from transport:
+>
+> ```bash
+> npm run update:dd-reference   # fetch dd-{ver}.json from transport main, then run the cert tests
+> ```
+>
+> That runs `reso-certification/utils/fetch-dd-reference.mjs` (writes both `reso-certification/reference-metadata/` and `reso-certification/src/etl/reference-metadata/` — the two locations cert + ETL read) and validates via `test:certification`. NOTE: the ref server's `reso-reference-server/server-metadata.json` is a *separate* DD-2.0-derived artifact (the server's served schema) — it is **not** updated by this and would need its own validated refresh. The historical reso-tools-side generation workflow below is retained for reference; the live tooling is in transport.
+
 When DD sheets get a new revision, the `dd-{version}.json` reference-metadata files have to be regenerated from the XLSX. This happens roughly once per DD update.
 
 ### Source of truth

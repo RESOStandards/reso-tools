@@ -1,7 +1,7 @@
 {
   "description": "RESO Data Dictionary 2.1 Reference Metadata",
   "version": "2.1",
-  "generatedOn": "2026-06-04T21:42:53.918Z",
+  "generatedOn": "2026-06-22T17:49:26.000Z",
   "resources": [
     "Association",
     "Building",
@@ -8065,7 +8065,7 @@
         },
         {
           "term": "Core.Description",
-          "value": "A numerical value representing the linear measurement of the boundary or edge of a property that directly faces the road, street, or other significant feature. "
+          "value": "A numerical value representing the linear measurement of the boundary or edge of a property that directly faces the road, street, or other significant feature."
         }
       ],
       "maxLength": 14,
@@ -20621,7 +20621,7 @@
       "fieldName": "BuiltPre1978YN",
       "type": "Edm.Boolean",
       "nullable": true,
-      "isEnumeration": true,
+      "isEnumeration": false,
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
@@ -20635,8 +20635,7 @@
           "term": "Core.Description",
           "value": "Indicates whether or not the building was built before 1978."
         }
-      ],
-      "lookupStatus": "Open"
+      ]
     },
     {
       "resourceName": "Building",
@@ -29291,7 +29290,7 @@
         },
         {
           "term": "Core.Description",
-          "value": "A list of phone types (e.g., Home, Mobile, Second) that do not already exist in the given phone fields or if a second type of phone field is needed. "
+          "value": "A list of phone types (e.g., Home, Mobile, Second) that do not already exist in the given phone fields or if a second type of phone field is needed."
         }
       ],
       "maxLength": 25,
@@ -36735,7 +36734,7 @@
         },
         {
           "term": "Core.Description",
-          "value": "A list of phone types (e.g., Home, Mobile, Second) that do not already exist in the given phone fields or if a second type of phone field is needed. "
+          "value": "A list of phone types (e.g., Home, Mobile, Second) that do not already exist in the given phone fields or if a second type of phone field is needed."
         }
       ],
       "maxLength": 25,
@@ -55549,7 +55548,7 @@
         },
         {
           "term": "Core.Description",
-          "value": "An architectural style that is typically a metal pole barn or other barn-like structure with a living area that encompasses a portion of or the entire building. "
+          "value": "An architectural style that is typically a metal pole barn or other barn-like structure with a living area that encompasses a portion of or the entire building."
         },
         {
           "term": "RESO.OData.Metadata.LegacyODataValue",
@@ -117608,11 +117607,11 @@
       "annotations": [
         {
           "term": "RESO.OData.Metadata.StandardName",
-          "value": "Appraiser "
+          "value": "Appraiser"
         },
         {
           "term": "RESO.DDWikiUrl",
-          "value": "https://dd.reso.org/DD2.1/lookups/OfficeCorporateLicenseType/Appraiser%20/"
+          "value": "https://dd.reso.org/DD2.1/lookups/OfficeCorporateLicenseType/Appraiser/"
         },
         {
           "term": "Core.Description",

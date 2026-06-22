@@ -32,6 +32,7 @@
     "test:web-client": "cd reso-web-client && npx vitest run",
     "test:certification": "cd reso-certification && npx vitest run",
     "test:mcp": "cd reso-mcp-server && npx vitest run",
+    "update:dd-reference": "node reso-certification/utils/fetch-dd-reference.mjs && npm run test:certification",
     "precommit": "npm run lint && npm run typecheck && npm test",
     "bench": "npm run bench:filter-parser && npm run bench:certification",
     "bench:filter-parser": "cd odata-expression-parser && npx vitest bench",
