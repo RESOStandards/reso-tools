@@ -71,7 +71,7 @@ def trim_whitespace(ws, stats: dict) -> None:
     for row in ws.iter_rows(min_row=2):
         for cell in row:
             v = cell.value
-            if isinstance(v, str) and v != v.strip() and v.strip() != "":
+            if isinstance(v, str) and v != v.strip():
                 cell.value = v.strip()
                 stats["whitespace_trimmed"] += 1
             hl = getattr(cell, "hyperlink", None)
@@ -80,27 +80,43 @@ def trim_whitespace(ws, stats: dict) -> None:
                 hl.target = target.strip()
 
 
-def check_lookup_status(ws) -> list[str]:
-    """Flag fields that carry a LookupStatus but are NOT an enumeration data type. Only
-    'String List, Single/Multi' are enumerations; a Boolean / Number / Date / Timestamp / plain
-    String field with a LookupStatus is an inconsistency (e.g. BuiltPre1978YN, a Boolean carrying
-    'Open'). Warn rather than auto-fix — clearing the status vs. changing the data type is a human
-    decision."""
+def check_type_status_agreement(ws) -> list[str]:
+    """SimpleDataType and LookupStatus must agree: a field is an enumeration IF AND ONLY IF its data
+    type is 'String List, Single/Multi'. Flag both directions of disagreement —
+      (a) a LookupStatus on a non-enumeration type — e.g. BuiltPre1978YN (a Boolean carrying 'Open',
+          fixed by clearing the status) or HistoryTransactional.ClassName (a String that should be
+          'String List, Single', fixed by correcting the type); and
+      (b) an enumeration data type carrying no LookupStatus.
+    Warn rather than auto-fix — which side is authoritative (clear the status vs. correct the type)
+    depends on the field's true nature and is a human call. Warnings are qualified by Resource.Field
+    because a field name (e.g. ClassName) can appear on many resources with differing rows."""
     headers = header_indexes(ws)
     c_type = headers.get("SimpleDataType")
     c_ls = headers.get("LookupStatus")
     c_field = headers.get("StandardName")
+    c_res = headers.get("ResourceName")
     if not (c_type and c_ls and c_field):
         return []
     warnings: list[str] = []
     for row in ws.iter_rows(min_row=2):
+        field_name = row[c_field - 1].value
+        if not field_name:
+            continue
         data_type = row[c_type - 1].value
         lookup_status = row[c_ls - 1].value
-        field_name = row[c_field - 1].value
-        if field_name and lookup_status and str(data_type) not in ENUM_DATA_TYPES:
+        resource = row[c_res - 1].value if c_res else None
+        label = f"{resource}.{field_name}" if resource else field_name
+        is_enum_type = str(data_type) in ENUM_DATA_TYPES
+        has_status = lookup_status not in (None, "")
+        if has_status and not is_enum_type:
             warnings.append(
-                f"{field_name}: SimpleDataType={data_type!r} carries LookupStatus={lookup_status!r} "
+                f"{label}: SimpleDataType={data_type!r} carries LookupStatus={lookup_status!r} "
                 f"but is not an enumeration data type"
+            )
+        elif is_enum_type and not has_status:
+            warnings.append(
+                f"{label}: SimpleDataType={data_type!r} is an enumeration data type "
+                f"but carries no LookupStatus"
             )
     return warnings
 
@@ -215,11 +231,11 @@ def main() -> None:
         "wiki_value": 0, "wiki_link": 0, "skipped": 0, "whitespace_trimmed": 0,
     }
 
-    lookup_status_warnings: list[str] = []
+    type_status_warnings: list[str] = []
     if "Fields" in wb.sheetnames:
         trim_whitespace(wb["Fields"], field_stats)
         lint_fields(wb["Fields"], base, field_stats)
-        lookup_status_warnings = check_lookup_status(wb["Fields"])
+        type_status_warnings = check_type_status_agreement(wb["Fields"])
     if "Lookups" in wb.sheetnames:
         trim_whitespace(wb["Lookups"], lookup_stats)
         lint_lookups(wb["Lookups"], base, lookup_stats)
@@ -246,12 +262,12 @@ def main() -> None:
         f"whitespace-trimmed={lookup_stats['whitespace_trimmed']}"
     )
 
-    if lookup_status_warnings:
+    if type_status_warnings:
         print(
-            f"\n  WARNING: {len(lookup_status_warnings)} field(s) carry a LookupStatus but are not "
-            f"an enumeration data type (review — clear the status or fix the data type):"
+            f"\n  WARNING: {len(type_status_warnings)} field(s) have a SimpleDataType / LookupStatus "
+            f"disagreement (review — clear the status or correct the data type):"
         )
-        for warning in lookup_status_warnings:
+        for warning in type_status_warnings:
             print(f"    - {warning}")
 
 
