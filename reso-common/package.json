@@ -10,11 +10,13 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./reference-metadata/*": "./reference-metadata/*"
   },
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "reference-metadata"
   ],
   "scripts": {
     "build": "tsc",

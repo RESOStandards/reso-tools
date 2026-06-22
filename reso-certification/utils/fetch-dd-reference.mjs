@@ -4,13 +4,16 @@
  *
  * transport (RESOStandards/transport) owns DD reference generation: its generate-dd-json workflow
  * regenerates references/dd/json/dd-{ver}.json from the XLSX on every sheet change. reso-tools
- * CONSUMES those artifacts — it no longer generates its own. This script copies the live JSON from
- * transport into the two reference-metadata locations reso-tools bundles:
- *   - reso-certification/reference-metadata/dd-{ver}.json         (built into dist/, cert runner)
- *   - reso-certification/src/etl/reference-metadata/dd-{ver}.json (ETL)
+ * CONSUMES those artifacts — it no longer generates its own. reso-common owns the DD reference
+ * metadata (single source; the cert pipeline reads it via reso-common's `reference-metadata/*`
+ * subpath export). This script writes the live JSON from transport into:
+ *   - reso-common/reference-metadata/dd-{ver}.json            — the single source of truth
+ *   - reso-certification/reference-metadata/dd-{ver}.json     — synced copy still read by the desktop
+ *     client (electron-builder extraResources + dev path) and two cert tests; retire once those
+ *     repoint to reso-common (Phase A tail).
  *
  * Run from the repo root when transport's DD reference JSON updates:
- *   node reso-certification/utils/fetch-dd-reference.mjs
+ *   node reso-certification/utils/fetch-dd-reference.mjs       (or `npm run update:dd-reference`)
  *
  * Override the source ref with TRANSPORT_REF (default: main).
  */
@@ -25,8 +28,8 @@ const sourceUrl = (version) =>
   `https://raw.githubusercontent.com/RESOStandards/transport/${REF}/references/dd/json/dd-${version}.json`;
 
 const targets = (version) => [
+  `reso-common/reference-metadata/dd-${version}.json`,
   `reso-certification/reference-metadata/dd-${version}.json`,
-  `reso-certification/src/etl/reference-metadata/dd-${version}.json`,
 ];
 
 for (const version of VERSIONS) {

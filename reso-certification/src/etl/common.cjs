@@ -51,7 +51,7 @@ const getSimpleDataType = (type, isCollection) => {
  * @param {String} version the version of the metadata to fetch, for example "1.7" (current default)
  * @returns the latest copy of the metadata file at the URL in the description
  */
-const getMetadata = (version = CURRENT_DD_VERSION) => require(`./reference-metadata/dd-${version}.json`) || {};
+const getMetadata = (version = CURRENT_DD_VERSION) => require(`@reso-standards/reso-common/reference-metadata/dd-${version}.json`) || {};
 
 /**
  *
