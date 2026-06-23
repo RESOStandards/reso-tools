@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
 import {
-  checkDisallowedSynonyms, checkClosedEnumValues, checkFieldTypes, checkSuggestedMaxConstraints,
+  checkDisallowedSynonyms, checkClosedEnumValues, checkFieldTypes, checkExpansionStructure, checkSuggestedMaxConstraints,
   checkLookupResourceFields, checkLookupNameAnnotations, checkLookupNameIntegrity, runDdMetadataChecks,
 } from '../../src/metadata/dd-metadata-checks.js';
 import type { DdReference } from '../../src/metadata/dd-metadata-checks.js';
@@ -198,6 +198,56 @@ describe('checkFieldTypes', () => {
   });
 });
 
+describe('checkExpansionStructure', () => {
+  // Media is a standard expansion — the provider MUST declare it as a NavigationProperty, not a
+  // Complex Type or plain field. The rule is general (Transport "Expansions and False Positives"),
+  // not Media-specific; Media is just the triggering instance.
+  const reference: DdReference = {
+    fields: [
+      { resourceName: 'Property', fieldName: 'Media', type: 'Collection(org.reso.metadata.Media)', isExpansion: true },
+      { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' },
+    ],
+    lookups: [],
+  };
+
+  it('flags a standard expansion modeled as a non-expansion (e.g. an OData Complex Type)', () => {
+    const findings = checkExpansionStructure(makeReport(
+      [
+        { resourceName: 'Property', fieldName: 'Media', type: 'Collection(Property.MediaType)', isExpansion: false },
+        { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' },
+      ], []), reference);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toMatchObject({ check: 'expansion-structure', severity: 'error', resourceName: 'Property', fieldName: 'Media' });
+    expect(findings[0].message).toContain('NavigationProperty');
+    expect(findings[0].message).toContain('discussions/166');
+  });
+
+  it('flags an expansion declared as a plain field (no isExpansion flag at all)', () => {
+    const findings = checkExpansionStructure(makeReport(
+      [{ resourceName: 'Property', fieldName: 'Media', type: 'Edm.String' }], []), reference);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toMatchObject({ check: 'expansion-structure', fieldName: 'Media' });
+  });
+
+  it('passes when the provider declares the expansion as a NavigationProperty', () => {
+    expect(checkExpansionStructure(makeReport(
+      [{ resourceName: 'Property', fieldName: 'Media', type: 'Collection(org.reso.metadata.Media)', isExpansion: true }], []), reference)).toEqual([]);
+  });
+
+  it('does not fire when the provider omits the standard expansion (field-existence / mapping concern, not a type violation)', () => {
+    expect(checkExpansionStructure(makeReport(
+      [{ resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' }], []), reference)).toEqual([]);
+  });
+
+  // Self-test: the DD reference declares standard expansions (146 in dd-2.1) and every one is a
+  // NavigationProperty, so the gate is clean against the reference itself — and non-vacuously so.
+  it.each(['2.0', '2.1'])('DD %s reference declares expansions and passes the gate clean', (version) => {
+    const ref = getReferenceMetadata(version) as MetadataReport & DdReference;
+    expect(ref.fields.some((f) => f.isExpansion === true)).toBe(true);
+    expect(checkExpansionStructure(ref, ref)).toEqual([]);
+  });
+});
+
 describe('checkSuggestedMaxConstraints (SHOULD warnings)', () => {
   const reference: DdReference = {
     fields: [
@@ -314,5 +364,17 @@ describe('runDdMetadataChecks', () => {
       lookups: [],
     };
     expect(runDdMetadataChecks(emptyReport([{ resourceName: 'Property', fieldName: 'RetsStatus' }]), reference)).toHaveLength(1);
+  });
+
+  it('aggregates the expansion-structure check (Media modeled as a non-expansion)', () => {
+    const reference: DdReference = {
+      fields: [{ resourceName: 'Property', fieldName: 'Media', type: 'Collection(org.reso.metadata.Media)', isExpansion: true }],
+      lookups: [],
+    };
+    const findings = runDdMetadataChecks(
+      makeReport([{ resourceName: 'Property', fieldName: 'Media', type: 'Collection(Property.MediaType)', isExpansion: false }], []),
+      reference,
+    );
+    expect(findings.some((f) => f.check === 'expansion-structure' && f.fieldName === 'Media')).toBe(true);
   });
 });

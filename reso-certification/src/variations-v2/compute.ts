@@ -265,21 +265,19 @@ const resolveField = (resourceName: string, fieldName: string, ctx: Ctx): void =
   const isStandardField = !!stdResource?.[fieldName];
   const { ignored = false, suggestions = [] } = (((sMap?.[resourceName] as Json) ?? {})?.[fieldName] as Json) ?? {};
 
-  // standard expansion that the provider didn't model as an expansion — cannot be ignored
-  const isStandardExpansion = !!(stdResource?.[fieldName] as Json)?.isExpansion;
-  if (isStandardExpansion && !reportField?.isExpansion) {
-    out.expansions.push({
-      resourceName,
-      fieldName,
-      strategy: MATCHING_STRATEGIES.SUBSTRING,
-      exactMatch: true,
-      ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName, fieldName }),
-      message: `The '${fieldName}' field MUST be defined as an OData expansion.`,
-    });
-    return;
-  }
+  // NOTE: exact-name expansion conformance — a standard expansion the provider declared as a
+  // non-NavigationProperty (Complex Type or plain field) — is the DD metadata gate's job
+  // (checkExpansionStructure), not the matcher's. Relocated from the legacy field-level expansion pre-branch; the
+  // matcher carries no structural exception, it only finds APPROXIMATE expansion variations.
 
   if (ignored) return;
+
+  // Like-with-like (Aug-4 Transport rule): a provider expansion is matched against the standard
+  // EXPANSIONS → out.expansions; a plain field against the standard FIELDS → out.fields. A local
+  // expansion variant is allowed when the provider also declares the standard expansion
+  // (machineMatch's hasStandard skip = the Issue-2 canonical suppression).
+  const isExpansionField = reportField?.isExpansion === true;
+  const collection = isExpansionField ? out.expansions : out.fields;
 
   if ((suggestions as Json[])?.length) {
     emitSuggestionsUnlessSatisfied(
@@ -298,16 +296,15 @@ const resolveField = (resourceName: string, fieldName: string, ctx: Ctx): void =
         ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName, fieldName: suggestedFieldName }),
         ...rest,
       }],
-      out.fields,
+      collection,
     );
     return;
   }
 
   if (!isStandardField) {
-    if (reportField?.isExpansion) return; // expansion fields aren't name-matched
     machineMatch(
       fieldName,
-      Object.keys(stdResource).filter((sf) => !(stdResource?.[sf] as Json)?.isExpansion),
+      Object.keys(stdResource).filter((sf) => (!!(stdResource?.[sf] as Json)?.isExpansion) === isExpansionField),
       (standardFieldName) => !!(metadataReportMap?.[resourceName] as Json)?.[standardFieldName as never],
       (suggestedFieldName, extra) => ({
         resourceName,
@@ -316,7 +313,7 @@ const resolveField = (resourceName: string, fieldName: string, ctx: Ctx): void =
         ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName, fieldName: suggestedFieldName }),
         ...extra,
       }),
-      out.fields,
+      collection,
       fuzziness,
     );
     return;

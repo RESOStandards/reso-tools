@@ -33,6 +33,7 @@ export type MetadataCheckKind =
   | 'disallowed-synonym'
   | 'closed-enum-value'
   | 'field-type'
+  | 'expansion-structure'
   | 'lookup-resource-fields'
   | 'lookup-name-annotation'
   | 'lookup-name-integrity'
@@ -127,6 +128,25 @@ const STANDARD_NAME = 'RESO.OData.Metadata.StandardName';
 
 /** The annotation term tying a string-enumeration field to its Lookup Resource enumeration. */
 const LOOKUP_NAME_ANNOTATION = 'RESO.OData.Metadata.LookupName';
+
+/**
+ * Public provenance for the standard-expansion structural rule: the August 2025 Transport
+ * "Expansions and False Positives" discussion. The Confluence agenda is the internal record; this
+ * public discussion is the link a provider-facing message can use.
+ *
+ * The rule is GENERAL, not Media-specific. The discussion body and the August 4 motion are worded
+ * around the triggering instance (a provider serving Media as an OData Complex Type), but the
+ * Certification Subgroup stated the general requirement verbatim:
+ *
+ *   "The Certification Subgroup confirmed that providers need to follow the Data Dictionary
+ *    definitions for standard expansions, such as Media. This is consistent with the requirement
+ *    that standard names and data types must match what's in the DD even if they existed in a
+ *    different format prior to standardization by RESO."
+ *
+ * So this check fires for ANY standard expansion modeled as a non-NavigationProperty — Media is the
+ * example, not the limit.
+ */
+const STANDARD_NAMES_EXPANSIONS_WG_URL = 'https://github.com/RESOStandards/transport/discussions/166';
 
 /** A field's enum is CLOSED when its DD lookupStatus is "Locked with Enumerations". */
 const isClosedEnum = (lookupStatus: string | undefined): boolean => (lookupStatus ?? '').startsWith('Locked');
@@ -315,6 +335,38 @@ export const checkFieldTypes = (report: MetadataReport, reference: DdReference):
   });
 };
 
+/**
+ * Expansion-structure check: a provider that declares a standard expansion field but models it as a
+ * non-expansion (an OData Complex Type or a plain property rather than a NavigationProperty) fails
+ * the gate. Fires only when the provider actually declares the field — a standard expansion the
+ * provider simply omits is a field-existence / mapping concern (the variations beat), not a
+ * metadata-type violation. General rule, following from the Transport ticket (see
+ * STANDARD_NAMES_EXPANSIONS_WG_URL); Media-as-Complex-Type is the triggering instance, not the limit.
+ *
+ * This relocates the legacy compute.ts field-level expansion pre-branch upstream into the gate: exact-name
+ * structural conformance is a metadata issue (fail-fast here), while fuzzy expansion matching stays
+ * the variations beat. The variations matcher therefore carries no structural exception.
+ */
+export const checkExpansionStructure = (
+  report: MetadataReport,
+  reference: DdReference,
+): ReadonlyArray<MetadataCheckFinding> => {
+  const providerByKey = new Map(report.fields.map((f) => [fieldKey(f.resourceName, f.fieldName), f]));
+  return reference.fields
+    .filter((refField) => refField.isExpansion === true)
+    .flatMap((refField) => {
+      const provider = providerByKey.get(fieldKey(refField.resourceName, refField.fieldName));
+      if (!provider || provider.isExpansion === true) return [];
+      return [{
+        check: 'expansion-structure' as const,
+        severity: 'error' as const,
+        resourceName: refField.resourceName,
+        fieldName: refField.fieldName,
+        message: `"${refField.fieldName}" in the "${refField.resourceName}" resource is a standard expansion and MUST be declared as an OData NavigationProperty (expansion), not as a Complex Type or plain field. See ${STANDARD_NAMES_EXPANSIONS_WG_URL}.`,
+      }];
+    });
+};
+
 /** The Lookup Resource (string representation) entity set name and its mandatory metadata fields. */
 const LOOKUP_RESOURCE = 'Lookup';
 const LOOKUP_MANDATORY_FIELDS: ReadonlyArray<string> = ['LookupKey', 'LookupName', 'LookupValue', 'ModificationTimestamp'];
@@ -456,6 +508,7 @@ export const runDdMetadataChecks = (
   ...checkDisallowedSynonyms(report, reference),
   ...checkClosedEnumValues(report, reference),
   ...checkFieldTypes(report, reference),
+  ...checkExpansionStructure(report, reference),
   ...checkLookupResourceFields(report, reference),
   ...checkLookupNameAnnotations(report, reference),
   ...checkLookupNameIntegrity(report, reference),
