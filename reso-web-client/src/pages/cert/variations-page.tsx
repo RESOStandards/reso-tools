@@ -166,8 +166,15 @@ const clearDraft = (reportId: string): void => localStorage.removeItem(`${DRAFT_
  * as "no per-tuple context" and degrades to no-op. Cross-provider lock
  * + save semantics are wired in the next slice (see #150 + #208).
  */
-const adaptPoolItemsToReport = (items: ReadonlyArray<VariationItem>): BlendedVariationsReport => {
-  const variations: BlendedVariation[] = items.map(item => {
+export const adaptPoolItemsToReport = (items: ReadonlyArray<VariationItem>): BlendedVariationsReport => {
+  // #203: render only items still in review (service status 'pending'). Resolved items
+  // (ignored/accepted/removed/ft-mapped) belong in general search/history, not this queue. An item
+  // the viewer ignores *this session* stays 'pending' on the service until Submit (its staged state
+  // is the draft-actions overlay), so it remains visible here, then drops on the next mount once
+  // resolved. Both `variations` and `counts` derive from this filtered set, so they stay in sync.
+  const variations: BlendedVariation[] = items
+    .filter(item => item.status === 'pending')
+    .map(item => {
     const elementType: BlendedVariation['type'] = item.lookupValue
       ? 'lookup'
       : item.fieldName
@@ -233,8 +240,9 @@ export const VariationsPage = () => {
 
   // Pool-fed fetch. Viewer scope is applied server-side from the auth
   // context (provider sees their own slice; admin sees the full pool).
-  // Filters (endorsement, status, element, age) get layered on in the
-  // next slice — for now this loads the unfiltered first page.
+  // #203: status is filtered to in-review ('pending') so resolved items don't surface here and so
+  // pagination returns in-review rows rather than a first page of resolved ones; the adapter also
+  // re-filters defensively. The remaining filters (endorsement, element, age) layer on in a later slice.
   useEffect(() => {
     if (authHydrating) return;
     if (!isAuthenticated) {
@@ -246,7 +254,7 @@ export const VariationsPage = () => {
     setLoadError(null);
     (async () => {
       try {
-        const page = await listVariationItems();
+        const page = await listVariationItems({ status: 'pending' });
         if (cancelled) return;
         setReport(adaptPoolItemsToReport(page.items));
       } catch (err) {
