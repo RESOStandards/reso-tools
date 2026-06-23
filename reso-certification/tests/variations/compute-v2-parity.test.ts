@@ -2,13 +2,17 @@
  * /compute (v2) parity + Int* fix.
  *
  * Faithful mode (`applyIntEnumFix: false`) reproduces legacy `computeVariations` on every case
- * here. Two intentional divergences from legacy are deliberately NOT covered here — faithful
+ * here. Three intentional divergences from legacy are deliberately NOT covered here — faithful
  * mode cannot reproduce legacy on inputs that hit them, so each has its own acceptance test:
  *   - the legacy OData edit-distance budget now uses Math.floor, uniform across levels, not
  *     legacy's Math.round — see compute-v2-legacy-odata-floor.test.ts;
  *   - an exact match now filters out the element's other (substring/edit-distance) suggestions
  *     rather than ordering the exact to the head — see compute-v2-exact-match-filters-fuzzy.test.ts
- *     (the former 'lowercase resource' and 'noisy field' cases moved there).
+ *     (the former 'lowercase resource' and 'noisy field' cases moved there);
+ *   - the ddWikiUrl for a curated legacy-form (suggestedLegacyODataValue) suggestion now resolves
+ *     the display lookup value (URL-encoded) instead of legacy's wire form — the #212 fix — see
+ *     compute-v2-legacy-form-ddwikiurl.test.ts (the former 'legacyOData suggestion (Edm.Int64)'
+ *     case moved there).
  * Fixed mode (default) also applies the type-aware Int* gate: machine enums drop the
  * StandardName-derived forms (5 → 3 on the machine-enum subset).
  *
@@ -48,11 +52,6 @@ const cases = [
     name: 'lookup suggestion (Edm.String)', version: '1.7',
     report: { fields: [{ resourceName: 'Property', fieldName: 'StandardStatus', type: 'StandardStatusLookups' }], lookups: [{ lookupName: 'StandardStatusLookups', type: 'Edm.String', lookupValue: 'Active UC' }] },
     suggestionsMap: { Property: { StandardStatus: { 'Active UC': { suggestions: [{ suggestedResourceName: 'Property', suggestedFieldName: 'StandardStatus', suggestedLookupValue: 'Active Under Contract' }] } } } },
-  },
-  {
-    name: 'legacyOData suggestion (Edm.Int64)', version: '1.7',
-    report: { fields: [{ resourceName: 'Property', fieldName: 'ExteriorFeatures', type: 'ExteriorFeaturesLookups.ExteriorFeatures' }], lookups: [{ lookupName: 'ExteriorFeaturesLookups.ExteriorFeatures', type: 'Edm.Int64', lookupValue: 'Grill' }] },
-    suggestionsMap: { Property: { ExteriorFeatures: { Grill: { suggestions: [{ suggestedResourceName: 'Property', suggestedFieldName: 'ExteriorFeatures', suggestedLegacyODataValue: 'GasGrill' }] } } } },
   },
   { name: 'resource ignore', version: '1.7', report: { fields: [{ resourceName: 'property', fieldName: 'ListPrice' }] }, suggestionsMap: { property: { ignored: true } } },
   { name: 'field ignore (hierarchical)', version: '1.7', report: { fields: [{ resourceName: 'Property', fieldName: 'list_price' }] }, suggestionsMap: { Property: { ignored: true } } },
