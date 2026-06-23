@@ -181,14 +181,16 @@ confirmed-clean `@tanstack/virtual*` family.
 >
 > That runs `reso-certification/utils/fetch-dd-reference.mjs`, which writes **`reso-common/reference-metadata/`** — the single source of truth. The cert pipeline (the `getReferenceMetadata`/`getMetadata` chokepoints in `src/etl`, feeding the DD gate, variations, ETL, schema and legacy) reads it via reso-common's `reference-metadata/*` subpath export (kept out of reso-common's browser-facing main index so the web client isn't bloated). The fetch also writes a synced copy at `reso-certification/reference-metadata/` still read by the desktop client (electron-builder `extraResources` + dev path) and two cert tests — retire that copy once they repoint to reso-common (the Phase A tail; see reso-tools #217 for the ref-server Phase B). NOTE: the ref server's `reso-reference-server/server-metadata.json` is a *separate* DD-2.0 served-schema artifact, not updated here. The historical reso-tools-side generation workflow below is retained for reference; the live tooling is in transport.
 
-When DD sheets get a new revision, the `dd-{version}.json` reference-metadata files have to be regenerated from the XLSX. This happens roughly once per DD update.
+When DD sheets get a new revision, **transport** regenerates `dd-{ver}.json` (its `generate-dd-json` workflow) and reso-tools pulls the result via `npm run update:dd-reference` (above). Generation, linting, and fitness checks all run in transport now — the subsections below describe that workflow (which moved out of reso-tools) and how reso-tools consumes its output. This happens roughly once per DD update.
 
 ### Source of truth
 
 - DD sheet PRs land in `RESOStandards/transport`, typically as an issue with the new XLSX attached (e.g. transport#198). Authoritative copies live at `transport/references/dd/RESODataDictionary-{ver}.xlsx` on `main`.
 - The DD docs site (`reso-data-dictionary-documentation`) pulls those same files via `fetch-data.mjs` for HTML output. We pull them directly for JSON generation.
 
-### Workflow
+### Historical generation workflow — moved to transport
+
+> The two scripted steps below (XLSX lint + JSON generation) used to run in reso-tools. They now live in transport's `references/dd/tools/` (all-Python/openpyxl) and run in its `generate-dd-json` workflow — **do not run them against reso-tools**; refresh via `npm run update:dd-reference` instead. They are kept here only as a description of what transport's workflow does. The one rule that outlives the move: DD XLSX write-back is **openpyxl only, never SheetJS**.
 
 The DD update workflow has two scripted steps that run on every refresh, on any version:
 
@@ -258,10 +260,12 @@ Watch for:
 
 | Consumer | Path | Note |
 |---|---|---|
-| reso-tools cert runner | `reso-certification/reference-metadata/dd-{ver}.json` | Built into `dist/` |
-| reso-tools ETL | `reso-certification/src/etl/reference-metadata/dd-{ver}.json` | Required by `process-metadata.cjs` / `process-lookup-resource-metadata.cjs` |
-| Cert backend `validateBatch` | `reso-certification-backend/aws/lambda-layers/reso-dd-reference/data/dd-{ver}.json` | Needs separate layer publish to take effect on QA/prod |
-| Legacy `getReferenceMetadata` lambda | `aws/lambda-functions/getReferenceMetadata/reference-metadata/dd-{ver}.json` | Update if still in active use |
+| **Single source** | `reso-common/reference-metadata/dd-{ver}.json` | Written by `fetch-dd-reference.mjs`; the cert pipeline reads it via reso-common's `reference-metadata/*` subpath export |
+| reso-tools cert runner + ETL | *(via the reso-common subpath)* | `getReferenceMetadata`/`getMetadata` in `src/etl` resolve to reso-common; feed the DD gate, variations, ETL, schema, legacy |
+| Desktop client + 2 cert tests | `reso-certification/reference-metadata/dd-{ver}.json` | Synced copy (electron-builder `extraResources` + dev path); retire after the Phase A tail (#217) |
+| Ref server | `reso-reference-server/server-metadata.json` | *Separate* DD-2.0 served-schema artifact — NOT updated here (Phase B, #217) |
+| Cert backend `validateBatch` | `reso-certification-backend/aws/lambda-layers/reso-dd-reference/data/dd-{ver}.json` | Independent; needs a separate layer publish to take effect on QA/prod |
+| Legacy `getReferenceMetadata` lambda | `aws/lambda-functions/getReferenceMetadata/reference-metadata/dd-{ver}.json` | Independent; update if still in active use |
 
 The backend layer copies are independent of this repo — bumping refs here does not affect server-side `validateBatch` until the `reso-dd-reference` layer is republished.
 
