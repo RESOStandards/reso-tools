@@ -402,7 +402,7 @@ const resolveLookupsAndLegacy = (resourceName: string, fieldName: string, ctx: C
           suggestedLegacyODataValue,
           ...(suggestedLookupValue != null ? { suggestedLookupValue } : {}),
           strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
-          ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName, fieldName: suggestedFieldName, lookupValue: suggestedLegacyODataValue }),
+          ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName, fieldName: suggestedFieldName, lookupValue: suggestedLookupValue, legacyODataValue: suggestedLegacyODataValue }),
           ...rest,
         }],
         out.legacyODataValues,
