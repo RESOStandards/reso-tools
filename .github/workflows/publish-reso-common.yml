@@ -1,0 +1,51 @@
+name: Publish reso-common
+
+# Publishes @reso-standards/reso-common to npm via npm Trusted Publishing (GitHub OIDC — no token).
+# Trigger: push a tag `reso-common-v<version>` whose <version> matches reso-common/package.json.
+# Provenance is generated automatically (public repo + public package + OIDC).
+on:
+  push:
+    tags:
+      - 'reso-common-v*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC handshake for npm Trusted Publishing
+      contents: read
+    defaults:
+      run:
+        working-directory: reso-common
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      # Trusted Publishing requires npm >= 11.5.1
+      - name: Ensure recent npm
+        run: npm install -g npm@latest
+
+      - name: Verify tag matches package version
+        if: github.ref_type == 'tag'
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#reso-common-v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match reso-common/package.json ($PKG_VERSION)"
+            exit 1
+          fi
+
+      - name: Install, build, test
+        run: |
+          npm install
+          npm run build
+          npm test
+
+      - name: Publish (Trusted Publishing / OIDC)
+        run: npm publish --access public
