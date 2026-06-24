@@ -22,7 +22,7 @@
  * a report from scratch (see `serializer.ts`).
  */
 
-import type { MetadataReport, MetadataReportResource } from './serializer.js';
+import type { MetadataReport, MetadataReportResource } from '@reso-standards/reso-metadata-utils';
 
 /** True if the report's `resources[]` is missing, undefined, or empty. */
 const needsSynthesis = (report: MetadataReport): boolean =>

@@ -6,16 +6,15 @@
  * by reso-certification-utils for DD testing.
  */
 
-import {
-  parseCsdlXml,
-  getAllFields,
-  type CsdlSchema,
-  type CsdlEnumType,
-  type CsdlEnumMember,
-  type CsdlAction,
-  type CsdlFunction,
-  type FieldInfo,
-} from '@reso-standards/reso-metadata-utils';
+import { parseCsdlXml, getAllFields } from './csdl/parser.js';
+import type {
+  CsdlSchema,
+  CsdlEnumType,
+  CsdlEnumMember,
+  CsdlAction,
+  CsdlFunction,
+  FieldInfo,
+} from './csdl/types.js';
 
 // ── Output Types ──
 

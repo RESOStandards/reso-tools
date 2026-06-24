@@ -7,7 +7,7 @@
  */
 
 import { odataRequest, buildResourceUrl } from '../test-runner/index.js';
-import type { MetadataReport, MetadataReportField, MetadataReportLookup } from './serializer.js';
+import type { MetadataReport, MetadataReportField, MetadataReportLookup } from '@reso-standards/reso-metadata-utils';
 
 // ── Constants ──
 

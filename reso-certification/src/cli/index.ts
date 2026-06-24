@@ -21,7 +21,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Command } from 'commander';
 import { synthesizeResourcesFromFields } from '../metadata/index.js';
-import type { MetadataReport } from '../metadata/index.js';
+import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { startMockServer, stopMockServer } from '../add-edit/mock/server.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
 import { loadConfigFile, configEntryToAddEdit, configEntryToEntityEvent } from '../sdk/config.js';

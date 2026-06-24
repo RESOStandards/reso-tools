@@ -137,18 +137,8 @@ export type {
 } from './sdk/variations-service.js';
 
 // ── Metadata Report ──
-
-export {
-  serializeMetadataReport,
-  generateMetadataReport,
-} from './metadata/index.js';
-
-export type {
-  MetadataReport,
-  MetadataReportField,
-  MetadataReportLookup,
-  MetadataReportResource,
-} from './metadata/index.js';
+// The serializer (serializeMetadataReport/generateMetadataReport + MetadataReport*) moved to
+// @reso-standards/reso-metadata-utils (reso-tools #221). Import from there directly.
 
 // ── Data Dictionary (stub) ──
 

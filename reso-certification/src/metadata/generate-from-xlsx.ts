@@ -11,7 +11,7 @@
 
 import { writeFileSync } from 'node:fs';
 import { resolve, basename } from 'node:path';
-import type { MetadataReport, MetadataReportField, MetadataReportLookup, MetadataReportResource } from './serializer.js';
+import type { MetadataReport, MetadataReportField, MetadataReportLookup, MetadataReportResource } from '@reso-standards/reso-metadata-utils';
 
 // ── XLSX reading (dynamic import to avoid hard dependency) ──
 

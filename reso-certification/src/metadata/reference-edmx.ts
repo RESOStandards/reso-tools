@@ -10,7 +10,7 @@
  */
 import { generateEdmx } from '@reso-standards/reso-common';
 import type { EnumMode, ResoMetadata } from '@reso-standards/reso-common';
-import type { MetadataReport } from './serializer.js';
+import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 
 /** Adapt a cert MetadataReport to reso-common's ResoMetadata (the generateEdmx input shape). */
 export const metadataReportToResoMetadata = (report: MetadataReport): ResoMetadata => ({

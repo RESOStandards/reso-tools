@@ -10,8 +10,8 @@ import {
   parseMetadataXml,
   getEntityType,
   runComplianceTests,
-  generateMetadataReport,
 } from '@reso-standards/reso-certification';
+import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import type { ComplianceConfig } from '@reso-standards/reso-certification';
 
 /** Auth args common to most tools. */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { MetadataReport } from '../../src/metadata/serializer.js';
+import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { generateReferenceArtifacts } from '../../src/metadata/reference-artifacts.js';
 
 const report: MetadataReport = {

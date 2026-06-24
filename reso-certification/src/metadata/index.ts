@@ -3,17 +3,8 @@
  * with optional Lookup Resource merge.
  */
 
-export {
-  serializeMetadataReport,
-  generateMetadataReport,
-} from './serializer.js';
-
-export type {
-  MetadataReport,
-  MetadataReportField,
-  MetadataReportLookup,
-  MetadataReportResource,
-} from './serializer.js';
+// The metadata-report serializer moved to @reso-standards/reso-metadata-utils (reso-tools #221).
+// Import serializeMetadataReport/generateMetadataReport + the MetadataReport* types from there.
 
 export { synthesizeResourcesFromFields } from './synthesize-resources.js';
 
