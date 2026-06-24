@@ -15,7 +15,7 @@ import {
   type CsdlAction,
   type CsdlFunction,
   type FieldInfo,
-} from '@reso-standards/reso-client';
+} from '@reso-standards/reso-metadata-utils';
 
 // ── Output Types ──
 

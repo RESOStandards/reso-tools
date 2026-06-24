@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createLookupResolver } from '../src/lookup/resolver.js';
-import type { CsdlSchema } from '../src/csdl/types.js';
+import type { CsdlSchema } from '@reso-standards/reso-metadata-utils';
 
 /** Minimal schema with CSDL enum types and a Lookup entity set. */
 const schemaWithLookupResource: CsdlSchema = {

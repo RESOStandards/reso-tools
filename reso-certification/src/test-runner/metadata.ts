@@ -5,12 +5,13 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { fetchRawMetadata, fetchRawMetadataWithVersion, parseCsdlXml } from '@reso-standards/reso-client';
+import { fetchRawMetadata, fetchRawMetadataWithVersion } from '@reso-standards/reso-client';
+import { parseCsdlXml } from '@reso-standards/reso-metadata-utils';
 
 // Re-export so cert-side callers have a single import surface for the
 // metadata fetch family — they don't need to reach into reso-client.
 export { MetadataFetchError } from '@reso-standards/reso-client';
-import type { CsdlEntityType, CsdlProperty, CsdlSchema } from '@reso-standards/reso-client';
+import type { CsdlEntityType, CsdlProperty, CsdlSchema } from '@reso-standards/reso-metadata-utils';
 import { type ResoField, type ValidationFailure, validateRecord } from '@reso-standards/reso-validation';
 import type { EntityProperty, EntityType, ParsedMetadata } from './types.js';
 

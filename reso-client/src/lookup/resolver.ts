@@ -8,7 +8,7 @@
  * values are lazy-fetched from it. Otherwise, CSDL enum members are used.
  */
 
-import type { CsdlEntityType, CsdlSchema } from '../csdl/types.js';
+import type { CsdlEntityType, CsdlSchema } from '@reso-standards/reso-metadata-utils';
 import type { LookupResolver, LookupResolverConfig, LookupValue } from './types.js';
 
 /** The RESO annotation term that indicates a field uses the Lookup Resource. */

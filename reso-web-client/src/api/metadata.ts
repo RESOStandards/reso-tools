@@ -1,4 +1,5 @@
-import type { CsdlSchema, LookupResolver, LookupValue } from '@reso-standards/reso-client';
+import type { LookupResolver, LookupValue } from '@reso-standards/reso-client';
+import type { CsdlSchema } from '@reso-standards/reso-metadata-utils';
 import { entityTypeToFields } from './metadata-adapter';
 import { getCachedSchema, setCachedSchema, getCachedLookup, setCachedLookup } from './schema-cache';
 import type { ResoField, ResoLookup } from '../types';
@@ -63,7 +64,7 @@ const fetchCsdlSchema = async (baseUrl: string, token?: string): Promise<CsdlSch
   }
 
   // 3. Network fetch
-  const { parseCsdlXml } = await import('@reso-standards/reso-client');
+  const { parseCsdlXml } = await import('@reso-standards/reso-metadata-utils');
 
   const headers: Record<string, string> = { Accept: 'application/xml' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -95,7 +96,7 @@ const fetchCsdlSchema = async (baseUrl: string, token?: string): Promise<CsdlSch
  * Returns the fresh schema on success, or throws on failure (existing cache is preserved).
  */
 export const refreshSchema = async (baseUrl: string, token?: string): Promise<CsdlSchema> => {
-  const { parseCsdlXml } = await import('@reso-standards/reso-client');
+  const { parseCsdlXml } = await import('@reso-standards/reso-metadata-utils');
   const cacheKey = baseUrl || '__local__';
 
   const headers: Record<string, string> = { Accept: 'application/xml' };

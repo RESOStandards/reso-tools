@@ -52,34 +52,9 @@ export { buildUri } from './uri/builder.js';
 export type { UriBuilder } from './uri/builder.js';
 export { parseQueryString } from './uri/parser.js';
 
-// CSDL parser & validator
-export { parseCsdlXml, discoverResources, getEntityType, getEnumType, getComplexType, getFieldsForResource, getFieldsForEntityType, getAllFields } from './csdl/parser.js';
-export { validateCsdl } from './csdl/validator.js';
-export type {
-  CsdlSchema,
-  CsdlEntityType,
-  CsdlProperty,
-  CsdlNavigationProperty,
-  CsdlReferentialConstraint,
-  CsdlComplexType,
-  CsdlEnumType,
-  CsdlEnumMember,
-  CsdlEntityContainer,
-  CsdlEntitySet,
-  CsdlNavigationPropertyBinding,
-  CsdlSingleton,
-  CsdlActionImport,
-  CsdlFunctionImport,
-  CsdlParameter,
-  CsdlReturnType,
-  CsdlAction,
-  CsdlFunction,
-  CsdlValidationError,
-  CsdlResourceInfo,
-  CsdlValidationResult,
-  FieldAnnotation,
-  FieldInfo
-} from './csdl/types.js';
+// CSDL parse/validate + the Csdl* types moved to @reso-standards/reso-metadata-utils (reso-tools #221).
+// Consumers import them directly from that package — no pass-through re-export here, per the
+// "each lib owns its deps" rule. The metadata fetchers below still live in reso-client (Stage 3 pending).
 
 // Query validator
 export { validateQueryOptions } from './query/validator.js';

@@ -1,0 +1,48 @@
+{
+  "name": "@reso-standards/reso-metadata-utils",
+  "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RESOStandards/reso-tools.git",
+    "directory": "reso-metadata-utils"
+  },
+  "description": "RESO OData metadata processing utilities — CSDL parse, validate (CSDL/XSD), serialize (EDMX → report), and metadata fetching. The Node-side processing layer above reso-common's pure model + EDMX generation.",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@reso-standards/reso-common": "file:../reso-common",
+    "fast-xml-parser": "^5.5.10"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

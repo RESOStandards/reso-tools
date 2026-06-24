@@ -1,8 +1,8 @@
 /**
- * Converts CSDL schema types from @reso-standards/reso-client into the ResoField
+ * Converts CSDL schema types from @reso-standards/reso-metadata-utils into the ResoField
  * types used by the UI. This enables the UI to work with any OData server's $metadata.
  */
-import type { CsdlEntityType, CsdlProperty, CsdlSchema } from '@reso-standards/reso-client';
+import type { CsdlEntityType, CsdlProperty, CsdlSchema } from '@reso-standards/reso-metadata-utils';
 import type { ResoAnnotation, ResoField } from '../types';
 
 /** The RESO annotation term that indicates a field uses the Lookup Resource. */

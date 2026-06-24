@@ -27,8 +27,8 @@
     "node": ">=22"
   },
   "dependencies": {
-    "fast-xml-parser": "^5.2.0",
-    "@reso-standards/odata-expression-parser": "file:../odata-expression-parser"
+    "@reso-standards/odata-expression-parser": "file:../odata-expression-parser",
+    "@reso-standards/reso-metadata-utils": "file:../reso-metadata-utils"
   },
   "devDependencies": {
     "typescript": "^5.7.0",
