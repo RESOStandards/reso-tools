@@ -6,7 +6,7 @@
  * our own metadata serializer and Lookup Resource fetcher.
  */
 
-import { writeFile, copyFile } from 'node:fs/promises';
+import { writeFile, copyFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { resolveAuthToken } from '../test-runner/auth.js';
@@ -22,6 +22,7 @@ import { createPipeline } from './pipeline.js';
 import { createGenericReportGenerator, createDetailedReportGenerator, writeReports, prepareOutputDir } from './reports.js';
 import type { PipelineResult } from './types.js';
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
+import { computeVariationsViaService } from './variations-service.js';
 
 // ── Cert-utils imports (local copy for modification) ──
 
@@ -34,7 +35,7 @@ import certUtilsReplicationUtils from '../legacy/lib/replication/utils.js';
 // @ts-expect-error — legacy CJS (reference metadata loader)
 import certUtilsEtl from '../etl/index.cjs';
 
-const { replicate, findVariations } = certUtils;
+const { replicate } = certUtils;
 const { createReplicationStateServiceInstance } = certUtilsCommon;
 const { REPLICATION_STRATEGIES } = certUtilsReplicationUtils;
 const { getReferenceMetadata } = certUtilsEtl as { getReferenceMetadata: (version: string) => DdReference };
@@ -278,13 +279,15 @@ const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
       return { context: ctx, status: 'skipped', summary: 'Variations are only checked for DD 2.0 and higher' };
     }
 
-    // Forward the caller's services.reso.org session bearer so the
-    // variations check can call the Variations Service. Without it the
-    // legacy code falls back to env-var auth (CLI path).
-    const { variations, fuzziness } = await findVariations({
-      pathToMetadataReportJson: ctx.metadataReportPath,
-      fromCli: true,
-      strictMode: config.strictMode ?? false,
+    // Read the merged metadata report (threaded by the gate, else from
+    // disk) and POST it to the backend /compute service, which runs the
+    // canonical + in-review blend and the matcher server-side. Forward the
+    // caller's session bearer (UI/Desktop); the CLI path mints from .env.
+    const metadataReportJson =
+      ctx.metadataReport ?? (ctx.metadataReportPath ? (JSON.parse(await readFile(ctx.metadataReportPath, 'utf8')) as unknown) : undefined);
+    const { variations, fuzziness } = await computeVariationsViaService({
+      metadataReportJson,
+      version: ctx.version,
       ...(config.servicesAuthToken ? { bearerToken: config.servicesAuthToken } : {}),
     });
 
