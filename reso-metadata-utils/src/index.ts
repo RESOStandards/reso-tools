@@ -1,10 +1,11 @@
 /**
  * @reso-standards/reso-metadata-utils — RESO OData metadata processing utilities.
  *
- * The Node-side processing layer: CSDL parse + validate (CSDL/XSD), serialize (EDMX → report),
- * and metadata fetching. Sits above reso-common (the pure model + EDMX generation). Symbols
- * migrate in here from reso-client and reso-certification per reso-tools #221 — the split is
- * by dependency: this is the deps-requiring side; reso-common stays the zero-dep substrate.
+ * The deps-requiring side of the RESO metadata split (reso-tools #221): CSDL parse + validate,
+ * EDMX → metadata-report serialization, and (Node-only, later) XSD validation + metadata
+ * fetching. Symbols migrate in here from reso-client and reso-certification. reso-common (the
+ * zero-dep ResoMetadata model + EDMX generation) is a sibling, not a dependency — nothing here
+ * imports it.
  */
 
 // CSDL parser, validator, and types — moved from reso-client/csdl (reso-tools #221, Stage 1).
@@ -44,3 +45,14 @@ export type {
   FieldAnnotation,
   FieldInfo
 } from './csdl/types.js';
+
+// Metadata-report serializer — EDMX/CSDL → RESO metadata-report.json (← reso-certification, #221 Stage 2a).
+export { serializeMetadataReport, generateMetadataReport } from './serializer.js';
+export type {
+  MetadataReport,
+  MetadataReportField,
+  MetadataReportLookup,
+  MetadataReportResource,
+  MetadataReportModel,
+  MetadataReportOperation
+} from './serializer.js';

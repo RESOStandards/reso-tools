@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mergeWithLookupResource, serializeLookupResourceDump, synthesizeLookupResourceRecords } from '../../src/metadata/lookup-resource.js';
-import type { MetadataReport } from '../../src/metadata/serializer.js';
+import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import type { RawLookupRecord } from '../../src/metadata/lookup-resource.js';
 
 const baseReport: MetadataReport = {

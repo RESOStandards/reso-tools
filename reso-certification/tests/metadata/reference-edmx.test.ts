@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { MetadataReport } from '../../src/metadata/serializer.js';
-import { generateMetadataReport } from '../../src/metadata/serializer.js';
+import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
+import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import { generateReferenceEdmx } from '../../src/metadata/reference-edmx.js';
 import { synthesizeLookupResourceRecords, mergeWithLookupResource } from '../../src/metadata/lookup-resource.js';
 

@@ -6,7 +6,7 @@ import {
 } from '../../src/metadata/dd-metadata-checks.js';
 import type { DdReference } from '../../src/metadata/dd-metadata-checks.js';
 import { generateReferenceArtifacts } from '../../src/metadata/reference-artifacts.js';
-import type { MetadataReport, MetadataReportLookup } from '../../src/metadata/serializer.js';
+import type { MetadataReport, MetadataReportLookup } from '@reso-standards/reso-metadata-utils';
 
 const createRequire = (await import('node:module')).createRequire;
 const require = createRequire(import.meta.url);

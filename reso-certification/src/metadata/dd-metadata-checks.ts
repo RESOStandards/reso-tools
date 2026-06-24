@@ -26,7 +26,7 @@
  * Commander (0 uses in the v1.7/v2.0 generated features) and incompatible with open enums that
  * carry no standard values; `When "X" exists` and `MAY contain` are non-failing guards/info.
  */
-import type { MetadataReport, MetadataReportField } from './serializer.js';
+import type { MetadataReport, MetadataReportField } from '@reso-standards/reso-metadata-utils';
 
 /** The kind of metadata-gate violation. */
 export type MetadataCheckKind =

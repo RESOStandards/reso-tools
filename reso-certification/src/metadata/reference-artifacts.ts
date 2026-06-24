@@ -13,8 +13,8 @@
  */
 import type { EnumMode } from '@reso-standards/reso-common';
 import { generateReferenceEdmx } from './reference-edmx.js';
-import { generateMetadataReport } from './serializer.js';
-import type { MetadataReport } from './serializer.js';
+import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
+import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import {
   synthesizeLookupResourceRecords,
   serializeLookupResourceDump,

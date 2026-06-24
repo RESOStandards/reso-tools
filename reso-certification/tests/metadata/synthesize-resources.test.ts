@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { synthesizeResourcesFromFields } from '../../src/metadata/synthesize-resources.js';
-import type { MetadataReport, MetadataReportField } from '../../src/metadata/serializer.js';
+import type { MetadataReport, MetadataReportField } from '@reso-standards/reso-metadata-utils';
 
 // Tiny field-shape factory so each test can build readable fixtures
 // without restating the full MetadataReportField structure every time.

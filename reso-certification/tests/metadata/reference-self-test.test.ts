@@ -19,7 +19,7 @@ import { computeVariationsV2 } from '../../src/variations-v2/compute.js';
 import { generateReferenceArtifacts } from '../../src/metadata/reference-artifacts.js';
 import { runDdMetadataChecks } from '../../src/metadata/dd-metadata-checks.js';
 import type { DdReference } from '../../src/metadata/dd-metadata-checks.js';
-import type { MetadataReport } from '../../src/metadata/serializer.js';
+import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 
 const createRequire = (await import('node:module')).createRequire;
 const require = createRequire(import.meta.url);
