@@ -27,6 +27,7 @@ import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity
 import { loadConfigFile, configEntryToAddEdit, configEntryToEntityEvent } from '../sdk/config.js';
 import type { AddEditConfig, EntityEventConfig, CoreConfig, DDConfig, PipelineResult } from '../sdk/types.js';
 import { resolveCliAuth, mintOAuth2ClientCredentialsToken } from './auth.js';
+import { computeVariationsViaService } from '../sdk/variations-service.js';
 import { CURRENT_DD_VERSION, CERTIFIABLE_DD_VERSIONS, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
 import { resolveRenderMode, runWithProgress, runConfigEntries } from './render.js';
 
@@ -493,6 +494,7 @@ ddCmd.action(
 
       const config: DDConfig = {
         endorsement: 'dd',
+        fromCli: true,
         server: { url: opts.url, auth },
         version: ddVersion,
         limit: Number(opts.limit),
@@ -583,6 +585,53 @@ program
       }
     }
   );
+
+// ── Compute Variations Subcommand ──
+//
+// Standalone variations check against the cloud /compute service for any
+// metadata-report.json — no full cert run. The matcher + the canonical /
+// in-review blend run server-side; this sends the report and prints the
+// variations. CLI auth: an OAuth2 client_credentials token from .env
+// (TOKEN_URI / CLIENT_ID / CLIENT_SECRET); if absent, the service falls back
+// to minting from CERT_AUTH_API_* creds, else it reports how to authenticate.
+
+program
+  .command('compute-variations')
+  .description('Compute DD variations for a metadata report via the cloud Variations Service')
+  .requiredOption('-p, --metadata <path>', 'Path to metadata-report JSON file')
+  .option('-v, --version <version>', `Data Dictionary version (default ${DEFAULT_DD_VERSION})`, DEFAULT_DD_VERSION)
+  .option('-f, --fuzziness <float>', `Fuzzy-match threshold (0–1, default ${DEFAULT_FUZZINESS})`, String(DEFAULT_FUZZINESS))
+  .option('-o, --output <path>', 'Write the variations report here (default: stdout)')
+  .action(async (opts: { metadata: string; version: string; fuzziness: string; output?: string }) => {
+    try {
+      const fuzziness = Number.parseFloat(opts.fuzziness);
+      if (!Number.isFinite(fuzziness) || fuzziness < 0 || fuzziness > 1) {
+        throw new Error(`--fuzziness must be a number in [0, 1], got '${opts.fuzziness}'`);
+      }
+
+      const metadataReportJson = JSON.parse(await readFile(resolve(opts.metadata), 'utf-8')) as unknown;
+      const bearerToken = await mintOAuth2ClientCredentialsToken();
+
+      const report = await computeVariationsViaService({
+        metadataReportJson,
+        version: opts.version,
+        fuzziness,
+        fromCli: true,
+        ...(bearerToken ? { bearerToken } : {}),
+      });
+
+      const out = JSON.stringify(report, null, 2);
+      if (opts.output) {
+        await writeFile(resolve(opts.output), out);
+        console.log(`Variations report written to ${resolve(opts.output)}`);
+      } else {
+        console.log(out);
+      }
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exitCode = 2;
+    }
+  });
 
 // ── Metadata Report subcommand group ──
 //

@@ -127,6 +127,15 @@ export type {
   ProgressCallback,
 } from './sdk/types.js';
 
+// ── Variations Service (standalone; also used by the DD pipeline) ──
+
+export { computeVariationsViaService, isVariationsAuthError } from './sdk/variations-service.js';
+export type {
+  ComputeVariationsViaServiceInput,
+  VariationsServiceReport,
+  VariationsServiceErrorCode,
+} from './sdk/variations-service.js';
+
 // ── Metadata Report ──
 
 export {

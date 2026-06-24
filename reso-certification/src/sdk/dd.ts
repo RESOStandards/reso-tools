@@ -289,6 +289,7 @@ const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
       metadataReportJson,
       version: ctx.version,
       ...(config.servicesAuthToken ? { bearerToken: config.servicesAuthToken } : {}),
+      ...(config.fromCli ? { fromCli: true } : {}),
     });
 
     const v = variations as Record<string, unknown[]>;

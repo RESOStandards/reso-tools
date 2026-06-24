@@ -10,8 +10,10 @@
  *  - CLI (non-members, the free path): omit the bearer and a provider token is
  *    minted from `.env` credentials, exactly as `findVariations` did.
  *
- * It throws rather than silently degrading: a cert tool that can't reach the
- * service should fail loudly, not return a partial report.
+ * It throws rather than silently degrading. Auth failures carry a `code` so
+ * callers can react — the UI catches an auth code to prompt re-login; the CLI
+ * surfaces the `.env` setup instructions. The `fromCli` flag (threaded from the
+ * Commander CLI helper, as the legacy did) tailors the not-configured message.
  */
 
 import { gzipSync, gunzipSync } from 'node:zlib';
@@ -22,6 +24,9 @@ export interface ComputeVariationsViaServiceInput {
   readonly fuzziness?: number;
   /** Logged-in session bearer (Desktop / UI). Omit to mint from `.env` (CLI). */
   readonly bearerToken?: string;
+  /** True when invoked from the CLI — points the not-configured error at the
+   *  `.env` credentials rather than passing a token programmatically. */
+  readonly fromCli?: boolean;
 }
 
 export interface VariationsServiceReport {
@@ -30,6 +35,22 @@ export interface VariationsServiceReport {
   readonly fuzziness: number;
   readonly variations: Record<string, unknown>;
 }
+
+/** Auth/setup errors carry one of these on `error.code`. */
+export type VariationsServiceErrorCode = 'AUTH_REQUIRED' | 'AUTH_REJECTED' | 'SERVICE_ERROR';
+
+const serviceError = (code: VariationsServiceErrorCode, message: string): Error => {
+  const error = new Error(message);
+  (error as Error & { code: VariationsServiceErrorCode }).code = code;
+  return error;
+};
+
+/** True for the two auth failures — the UI uses this to decide to prompt login. */
+export const isVariationsAuthError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) return false;
+  const { code } = error as Error & { code?: string };
+  return code === 'AUTH_REQUIRED' || code === 'AUTH_REJECTED';
+};
 
 /**
  * Mint a provider token from `.env` credentials — the CLI path. Mirrors the
@@ -55,13 +76,16 @@ export const computeVariationsViaService = async (
 ): Promise<VariationsServiceReport> => {
   const servicesUrl = process.env.RESO_SERVICES_URL;
   if (!servicesUrl) {
-    throw new Error('Variations Service: RESO_SERVICES_URL is not set.');
+    throw serviceError('SERVICE_ERROR', 'Variations Service: RESO_SERVICES_URL is not set.');
   }
 
   const token = input.bearerToken ?? (await mintProviderToken());
   if (!token) {
-    throw new Error(
-      'Variations Service: no provider token. Pass a logged-in session bearer, or set CERT_AUTH_API_BASE_URL / CERT_AUTH_API_USERNAME / CERTIFICATION_API_KEY for the CLI.',
+    throw serviceError(
+      'AUTH_REQUIRED',
+      input.fromCli
+        ? 'Variations check requires authentication. Set CERT_AUTH_API_BASE_URL, CERT_AUTH_API_USERNAME, and CERTIFICATION_API_KEY in your .env so the CLI can mint a provider token.'
+        : 'Variations check requires authentication. Pass a provider token (bearerToken) — e.g. the session token from logging in.',
     );
   }
 
@@ -78,8 +102,17 @@ export const computeVariationsViaService = async (
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'text/plain' },
     body: gzipSync(JSON.stringify(body)).toString('base64'),
   });
+
+  if (response.status === 401 || response.status === 403) {
+    throw serviceError(
+      'AUTH_REJECTED',
+      input.fromCli
+        ? 'Variations check: the provider token was rejected. Re-check your CERT_AUTH_API_* .env credentials.'
+        : 'Variations check: your session token was rejected or has expired. Log in again to continue.',
+    );
+  }
   if (!response.ok) {
-    throw new Error(`Variations Service /compute failed: ${response.status} ${response.statusText}`);
+    throw serviceError('SERVICE_ERROR', `Variations Service /compute failed: ${response.status} ${response.statusText}`);
   }
 
   const text = await response.text();

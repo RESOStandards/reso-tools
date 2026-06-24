@@ -175,6 +175,12 @@ export interface BaseComplianceConfig {
    * Refreshed at run-time by the caller.
    */
   readonly servicesAuthToken?: string;
+  /**
+   * True when the run was launched from the CLI (vs the SDK / UI). The
+   * variations check uses it to tailor an auth-setup failure — CLI users are
+   * pointed at `.env` credentials, SDK callers at passing a provider token.
+   */
+  readonly fromCli?: boolean;
   readonly options?: {
     readonly failFast?: boolean;
     readonly outputDir?: string;
