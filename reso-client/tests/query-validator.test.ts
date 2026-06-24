@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CsdlEntityType } from '../src/csdl/types.js';
+import type { CsdlEntityType } from '@reso-standards/reso-metadata-utils';
 import { validateQueryOptions } from '../src/query/validator.js';
 
 const entityType: CsdlEntityType = {

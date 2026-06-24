@@ -216,15 +216,13 @@ await queryEntities(client, "Property", {
 
 ### CSDL Metadata Parsing
 
-Parse and validate EDMX/CSDL XML metadata documents.
+Parse and validate EDMX/CSDL XML metadata documents. The parser, validator, and `Csdl*` types
+live in [`@reso-standards/reso-metadata-utils`](../reso-metadata-utils); reso-client provides the
+metadata fetchers.
 
 ```typescript
-import {
-  fetchAndParseMetadata,
-  parseCsdlXml,
-  validateCsdl,
-  getEntityType,
-} from "@reso-standards/reso-client";
+import { fetchAndParseMetadata } from "@reso-standards/reso-client";
+import { parseCsdlXml, validateCsdl, getEntityType } from "@reso-standards/reso-metadata-utils";
 
 // Fetch and parse from a server
 const schema = await fetchAndParseMetadata("http://localhost:8080", "my-token");

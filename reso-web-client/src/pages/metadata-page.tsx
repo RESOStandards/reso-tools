@@ -1,4 +1,4 @@
-import type { CsdlComplexType, CsdlEnumType, CsdlNavigationProperty, CsdlSchema, FieldInfo } from '@reso-standards/reso-client';
+import type { CsdlComplexType, CsdlEnumType, CsdlNavigationProperty, CsdlSchema, FieldInfo } from '@reso-standards/reso-metadata-utils';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { FriendlyError } from '../components/friendly-error';
@@ -24,7 +24,7 @@ const formatRelativeTime = (timestamp: number): string => {
 
 /** Fetch CSDL schema, with caching handled by metadata.ts internals. */
 const fetchSchema = async (baseUrl?: string, token?: string): Promise<CsdlSchema> => {
-  const { parseCsdlXml } = await import('@reso-standards/reso-client');
+  const { parseCsdlXml } = await import('@reso-standards/reso-metadata-utils');
 
   const isLocalhost = (url: string): boolean => {
     try { return ['localhost', '127.0.0.1', '::1'].includes(new URL(url).hostname); }
@@ -355,7 +355,7 @@ export const MetadataPage = () => {
 
     const load = async () => {
       try {
-        const { getFieldsForResource } = await import('@reso-standards/reso-client');
+        const { getFieldsForResource } = await import('@reso-standards/reso-metadata-utils');
         const f = getFieldsForResource(schema, resource);
         if (!cancelled) {
           setFields(f);
@@ -381,7 +381,7 @@ export const MetadataPage = () => {
       setSchema(freshSchema);
       // Re-derive fields from the fresh schema
       if (resource) {
-        const { getFieldsForResource } = await import('@reso-standards/reso-client');
+        const { getFieldsForResource } = await import('@reso-standards/reso-metadata-utils');
         setFields(getFieldsForResource(freshSchema, resource));
       }
       // Update the timestamp

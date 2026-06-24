@@ -16,7 +16,7 @@ export interface LookupValue {
 /** Configuration for creating a lookup resolver. */
 export interface LookupResolverConfig {
   /** The parsed CSDL schema (from parseCsdlXml). */
-  readonly schema: import('../csdl/types.js').CsdlSchema;
+  readonly schema: import('@reso-standards/reso-metadata-utils').CsdlSchema;
   /** Base URL for the OData server. Required for Lookup Resource fetching. */
   readonly baseUrl?: string;
   /** Bearer token for authenticated requests. */

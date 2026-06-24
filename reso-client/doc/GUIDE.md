@@ -280,7 +280,8 @@ OData servers expose their schema at `/$metadata` as a CSDL (XML) document. The 
 ### Fetch and Parse Server Metadata
 
 ```typescript
-import { fetchAndParseMetadata, getEntityType } from '@reso-standards/reso-client';
+import { fetchAndParseMetadata } from '@reso-standards/reso-client';
+import { getEntityType } from '@reso-standards/reso-metadata-utils';
 
 const schema = await fetchAndParseMetadata('http://localhost:8080', 'your-token');
 
@@ -297,7 +298,7 @@ Parsed types you can work with: `CsdlEntityType`, `CsdlProperty`, `CsdlNavigatio
 ### Validate Metadata Before Trusting It
 
 ```typescript
-import { validateCsdl } from '@reso-standards/reso-client';
+import { validateCsdl } from '@reso-standards/reso-metadata-utils';
 
 const result = validateCsdl(schema);
 if (!result.valid) {

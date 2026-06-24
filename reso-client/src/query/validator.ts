@@ -8,7 +8,7 @@
 
 import { parseFilter, parseExpand, ExpandParseError } from '@reso-standards/odata-expression-parser';
 import type { FilterExpression, ExpandExpression } from '@reso-standards/odata-expression-parser';
-import type { CsdlEntityType } from '../csdl/types.js';
+import type { CsdlEntityType } from '@reso-standards/reso-metadata-utils';
 import type { ODataQueryOptions } from '../types.js';
 
 /** A single validation error. */

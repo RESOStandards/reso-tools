@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { serializeMetadataReport, generateMetadataReport } from '../../src/metadata/serializer.js';
-import { parseCsdlXml } from '@reso-standards/reso-client';
+import { parseCsdlXml } from '@reso-standards/reso-metadata-utils';
 
 // Minimal but complete EDMX with entity container, properties, enums, and navigation
 const testEdmx = `<?xml version="1.0" encoding="utf-8"?>

@@ -433,7 +433,7 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     let lastRequestUrl: string | null = null;
     const loadMetadata = async () => {
       try {
-        const { parseCsdlXml, discoverResources } = await import('@reso-standards/reso-client');
+        const { parseCsdlXml, discoverResources } = await import('@reso-standards/reso-metadata-utils');
         const cacheKey = activeServer.baseUrl || '__local__';
 
         // Check IndexedDB cache first

@@ -30,6 +30,7 @@
   "dependencies": {
     "@reso-standards/reso-client": "file:../reso-client",
     "@reso-standards/reso-common": "file:../reso-common",
+    "@reso-standards/reso-metadata-utils": "file:../reso-metadata-utils",
     "@reso-standards/reso-validation": "file:../reso-validation",
     "@reso/reso-certification-etl": "https://github.com/RESOStandards/reso-certification-etl/archive/refs/heads/main.tar.gz",
     "@reso/reso-certification-utils": "https://github.com/RESOStandards/reso-certification-utils/archive/refs/tags/v3.0.0.tar.gz",

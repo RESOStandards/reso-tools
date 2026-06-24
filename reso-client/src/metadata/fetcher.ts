@@ -7,8 +7,8 @@
  * OData-Version header.
  */
 
-import { parseCsdlXml } from '../csdl/parser.js';
-import type { CsdlSchema } from '../csdl/types.js';
+import { parseCsdlXml } from '@reso-standards/reso-metadata-utils';
+import type { CsdlSchema } from '@reso-standards/reso-metadata-utils';
 import { SDK_VERSION } from '../version.js';
 
 /**

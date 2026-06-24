@@ -3,7 +3,7 @@
  * Combines XSD structural validation and CSDL semantic validation.
  */
 
-import { parseCsdlXml, validateCsdl } from '@reso-standards/reso-client';
+import { parseCsdlXml, validateCsdl } from '@reso-standards/reso-metadata-utils';
 import { validateCsdlXml, detectODataVersion } from '../xsd/validate-csdl.js';
 import type { ODataVersion, XsdValidationError } from '../xsd/validate-csdl.js';
 
