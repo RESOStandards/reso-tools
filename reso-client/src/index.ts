@@ -54,7 +54,7 @@ export { parseQueryString } from './uri/parser.js';
 
 // CSDL parse/validate + the Csdl* types moved to @reso-standards/reso-metadata-utils (reso-tools #221).
 // Consumers import them directly from that package — no pass-through re-export here, per the
-// "each lib owns its deps" rule. The metadata fetchers below still live in reso-client (Stage 3 pending).
+// "each lib owns its deps" rule.
 
 // Query validator
 export { validateQueryOptions } from './query/validator.js';
