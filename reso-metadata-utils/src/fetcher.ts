@@ -7,9 +7,9 @@
  * OData-Version header.
  */
 
-import { parseCsdlXml } from '@reso-standards/reso-metadata-utils';
-import type { CsdlSchema } from '@reso-standards/reso-metadata-utils';
-import { SDK_VERSION } from '../version.js';
+import { parseCsdlXml } from './csdl/parser.js';
+import type { CsdlSchema } from './csdl/types.js';
+import { VERSION } from './version.js';
 
 /**
  * Fetch raw EDMX XML metadata from an OData server.
@@ -90,7 +90,7 @@ export const fetchRawMetadataWithVersion = async (baseUrl: string, token: string
       Authorization: `Bearer ${token}`,
       Accept: 'application/xml',
       'Accept-Encoding': 'gzip, deflate',
-      'User-Agent': `RESO-Client-SDK/${SDK_VERSION}`
+      'User-Agent': `RESO-Metadata-Utils/${VERSION}`
     }
   });
 

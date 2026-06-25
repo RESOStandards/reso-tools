@@ -2,9 +2,9 @@
  * @reso-standards/reso-metadata-utils — RESO OData metadata processing utilities.
  *
  * The deps-requiring side of the RESO metadata split (reso-tools #221): CSDL parse + validate,
- * EDMX → metadata-report serialization, and (Node-only, later) XSD validation + metadata
- * fetching. Symbols migrate in here from reso-client and reso-certification. reso-common (the
- * zero-dep ResoMetadata model + EDMX generation) is a sibling, not a dependency — nothing here
+ * EDMX → metadata-report serialization, and metadata fetching. (XSD validation lands later under a
+ * Node-only subpath.) Symbols migrate in here from reso-client and reso-certification. reso-common
+ * (the zero-dep ResoMetadata model + EDMX generation) is a sibling, not a dependency — nothing here
  * imports it.
  */
 
@@ -56,3 +56,7 @@ export type {
   MetadataReportModel,
   MetadataReportOperation
 } from './serializer.js';
+
+// Metadata fetcher — fetch + version-detect + parse $metadata from an OData server (← reso-client, #221 Stage 3).
+export { fetchRawMetadata, fetchRawMetadataWithVersion, fetchAndParseMetadata, MetadataFetchError } from './fetcher.js';
+export type { MetadataFetchOptions, MetadataFetchResult } from './fetcher.js';

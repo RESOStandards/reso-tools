@@ -84,8 +84,8 @@ export { isODataError, parseODataError, getErrorTargets } from './response/error
 export { authConfigFromEnv, configFromEnv } from './env.js';
 export type { EnvConfig } from './env.js';
 
-// Metadata fetcher
-export { fetchRawMetadata, fetchRawMetadataWithVersion, fetchAndParseMetadata, MetadataFetchError, type MetadataFetchOptions, type MetadataFetchResult } from './metadata/fetcher.js';
+// Metadata fetcher moved to @reso-standards/reso-metadata-utils (reso-tools #221, Stage 3).
+// Import fetchRawMetadata*, fetchAndParseMetadata, and MetadataFetchError from there directly.
 
 // Lookup resolver
 export { createLookupResolver } from './lookup/resolver.js';
