@@ -3,9 +3,10 @@ import type { ResoField, ResoLookup, ResoMetadata } from './model.js';
 
 /**
  * Whether a field type denotes an enum/lookup — i.e. anything that is not an `Edm.`
- * primitive. This mirrors the predicate used by `@reso-standards/reso-validation`;
- * kept here so `reso-common` has zero runtime dependencies. Consolidate later by having
- * validation import this one.
+ * primitive. This is the canonical copy; `@reso-standards/reso-validation` and
+ * `reso-data-generator` carry duplicates pending consolidation.
+ * TODO(#222): collapse those duplicates onto this one, and add an `isEnumField` that reads the
+ * precomputed `isEnumeration` flag (crude `isEnumType` fallback). See reso-tools #222.
  */
 export const isEnumType = (type: string): boolean => !type.startsWith('Edm.');
 
