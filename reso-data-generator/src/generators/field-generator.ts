@@ -10,6 +10,7 @@ const SKIP_FIELDS = new Set([
 ]);
 
 /** Returns true if the type is an OData enum (non-Edm) type. */
+// TODO(#222): duplicate of reso-common's isEnumType — consolidate to one shared helper. See reso-tools #222.
 export const isEnumType = (type: string): boolean => !type.startsWith('Edm.');
 
 /** Returns true if the type is a numeric Edm type. */
