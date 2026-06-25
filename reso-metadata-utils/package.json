@@ -26,6 +26,7 @@
     "access": "public"
   },
   "scripts": {
+    "prebuild": "node scripts/sync-version.mjs",
     "build": "tsc",
     "prepublishOnly": "npm run build",
     "dev": "tsc --watch",

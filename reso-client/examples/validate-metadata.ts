@@ -5,8 +5,7 @@
  * Run: npx tsx examples/validate-metadata.ts
  */
 
-import { fetchAndParseMetadata } from '../src/index.js';
-import { getEntityType, validateCsdl } from '@reso-standards/reso-metadata-utils';
+import { fetchAndParseMetadata, getEntityType, validateCsdl } from '@reso-standards/reso-metadata-utils';
 
 const main = async (): Promise<void> => {
   const serverUrl = 'http://localhost:8080';

@@ -6,7 +6,8 @@
  */
 
 import { odataRequest } from '../test-runner/index.js';
-import { fetchMetadataWithVersion, MetadataFetchError } from '../test-runner/metadata.js';
+import { fetchMetadataWithVersion } from '../test-runner/metadata.js';
+import { MetadataFetchError } from '@reso-standards/reso-metadata-utils';
 import type { TestParams } from './sampling.js';
 import { buildScenarioQuery } from './queries.js';
 import { scenariosForVersion, type CoreScenario } from './scenarios.js';
