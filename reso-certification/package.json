@@ -33,7 +33,6 @@
     "@reso-standards/reso-metadata-utils": "file:../reso-metadata-utils",
     "@reso-standards/reso-validation": "file:../reso-validation",
     "@reso/reso-certification-etl": "https://github.com/RESOStandards/reso-certification-etl/archive/refs/heads/main.tar.gz",
-    "@reso/reso-certification-utils": "https://github.com/RESOStandards/reso-certification-utils/archive/refs/tags/v3.0.0.tar.gz",
     "ajv": "^8.18.0",
     "ajv-errors": "^3.0.0",
     "ajv-formats": "^3.0.1",
@@ -46,14 +45,13 @@
     "fs-extra": "^11.3.4",
     "humanize-duration": "^3.33.2",
     "listr2": "^9.0.5",
-    "xlsx": "^0.18.5",
     "yauzl": "^3.3.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^20.0.0",
-    "@vitest/coverage-v8": "^2.1.9",
+    "@vitest/coverage-v8": "^4.1.9",
     "typescript": "^5.6.0",
-    "vitest": "^2.0.0"
+    "vitest": "^4.1.9"
   }
 }
