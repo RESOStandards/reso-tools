@@ -22,7 +22,7 @@ import { createPipeline } from './pipeline.js';
 import { createGenericReportGenerator, createDetailedReportGenerator, writeReports, prepareOutputDir } from './reports.js';
 import type { PipelineResult } from './types.js';
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
-import { computeVariationsViaService } from './variations-service.js';
+import { computeVariationsViaService } from '../variations/index.js';
 
 // ── Cert-utils imports (local copy for modification) ──
 

@@ -27,7 +27,7 @@ import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity
 import { loadConfigFile, configEntryToAddEdit, configEntryToEntityEvent } from '../sdk/config.js';
 import type { AddEditConfig, EntityEventConfig, CoreConfig, DDConfig, PipelineResult } from '../sdk/types.js';
 import { resolveCliAuth, mintOAuth2ClientCredentialsToken } from './auth.js';
-import { computeVariationsViaService } from '../sdk/variations-service.js';
+import { computeVariationsViaService } from '../variations/index.js';
 import { CURRENT_DD_VERSION, CERTIFIABLE_DD_VERSIONS, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
 import { resolveRenderMode, runWithProgress, runConfigEntries } from './render.js';
 

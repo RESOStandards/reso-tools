@@ -1,12 +1,12 @@
 /**
- * Unit tests for the Variations Service client (src/sdk/variations-service.ts):
+ * Unit tests for the Variations Service client (src/variations/service.ts):
  * the two auth paths (passed session bearer vs minted CLI token), the
  * client-aware coded auth errors, and the loud-failure cases.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { gzipSync } from 'node:zlib';
-import { computeVariationsViaService, isVariationsAuthError } from '../../src/sdk/variations-service.js';
+import { computeVariationsViaService, isVariationsAuthError } from '../../src/variations/index.js';
 
 const report = {
   description: 'Data Dictionary Variations Report',

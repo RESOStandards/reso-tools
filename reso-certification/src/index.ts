@@ -127,14 +127,15 @@ export type {
   ProgressCallback,
 } from './sdk/types.js';
 
-// ── Variations Service (standalone; also used by the DD pipeline) ──
+// ── Variations (standalone; also used by the DD pipeline) ──
 
-export { computeVariationsViaService, isVariationsAuthError } from './sdk/variations-service.js';
+export { computeVariationsViaService, isVariationsAuthError, findVariations } from './variations/index.js';
 export type {
   ComputeVariationsViaServiceInput,
   VariationsServiceReport,
   VariationsServiceErrorCode,
-} from './sdk/variations-service.js';
+  FindVariationsInput,
+} from './variations/index.js';
 
 // ── Metadata Report ──
 // The serializer (serializeMetadataReport/generateMetadataReport + MetadataReport*) moved to
