@@ -1,0 +1,14 @@
+/**
+ * Variations defaults. These mirror the frozen v3.0.0 `findVariations` values
+ * so the thin-client swap keeps identical behavior at the call sites (CLI flag
+ * defaults, output filename). The DD version default matches the legacy `2.0`.
+ */
+
+/** Fuzzy-match threshold passed to the service when a caller omits one. */
+export const DEFAULT_FUZZINESS = 0.25;
+
+/** Data Dictionary version assumed when a caller omits one. */
+export const DEFAULT_DD_VERSION = '2.0';
+
+/** Report filename written into the output directory (unchanged from legacy). */
+export const VARIATIONS_REPORT_FILENAME = 'data-dictionary-variations.json';
