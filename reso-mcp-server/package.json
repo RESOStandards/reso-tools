@@ -21,16 +21,16 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "zod": "^3.23.0",
+    "@reso-standards/odata-expression-parser": "file:../odata-expression-parser",
+    "@reso-standards/reso-certification": "file:../reso-certification",
     "@reso-standards/reso-client": "file:../reso-client",
     "@reso-standards/reso-metadata-utils": "file:../reso-metadata-utils",
     "@reso-standards/reso-validation": "file:../reso-validation",
-    "@reso-standards/reso-certification": "file:../reso-certification",
-    "@reso-standards/odata-expression-parser": "file:../odata-expression-parser"
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^5.6.0",
-    "vitest": "^2.0.0"
+    "vitest": "^4.1.9"
   }
 }
