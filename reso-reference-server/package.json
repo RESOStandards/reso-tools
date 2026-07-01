@@ -20,9 +20,9 @@
     "node": ">=22.0.0"
   },
   "dependencies": {
+    "@reso-standards/odata-expression-parser": "file:../odata-expression-parser",
     "@reso-standards/reso-common": "file:../reso-common",
     "@reso-standards/reso-data-generator": "file:../reso-data-generator",
-    "@reso-standards/odata-expression-parser": "file:../odata-expression-parser",
     "@reso-standards/reso-validation": "file:../reso-validation",
     "better-sqlite3": "^11.0.0",
     "express": "^4.21.0",
@@ -38,6 +38,6 @@
     "@types/swagger-ui-express": "^4.1.7",
     "fast-xml-parser": "^5.4.2",
     "typescript": "~5.6.0",
-    "vitest": "^2.0.0"
+    "vitest": "^4.1.9"
   }
 }
