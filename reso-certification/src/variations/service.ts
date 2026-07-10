@@ -19,6 +19,7 @@
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { mintProviderToken, serviceError, isServiceAuthError } from '../sdk/common.js';
 import type { ServiceErrorCode } from '../sdk/common.js';
+import type { VariationSuggestionItem } from './csv.js';
 
 export interface ComputeVariationsViaServiceInput {
   readonly metadataReportJson: unknown;
@@ -90,4 +91,147 @@ export const computeVariationsViaService = async (
 
   const text = await response.text();
   return JSON.parse(gunzipSync(Buffer.from(text, 'base64')).toString('utf-8')) as VariationsServiceReport;
+};
+
+/** Suggestions per POST. The store serializes admin writes on its ETag, so
+ *  chunks go sequentially; this bounds each request body. Mirrors the v2
+ *  re-importer (cert-backend utils/variations-import.mjs). */
+const DEFAULT_CHUNK_SIZE = 1000;
+
+export interface UpdateVariationsViaServiceInput {
+  readonly items: ReadonlyArray<VariationSuggestionItem>;
+  /** Logged-in session bearer (Desktop / UI). Omit to mint from `.env` (CLI). */
+  readonly bearerToken?: string;
+  /** The FT admin secret (`FT_ADMIN_SECRET`). Required to land Admin- and
+   *  Fast-Track-flagged canonical entries; sent as `x-ft-admin-secret`. */
+  readonly adminSecret?: string;
+  /** Flag the whole submission as admin-review. Mutually exclusive with `fastTrack`. */
+  readonly adminReview?: boolean;
+  /** Flag the whole submission as fast-track. Mutually exclusive with `adminReview`. */
+  readonly fastTrack?: boolean;
+  /** Allow overwriting existing canonical entries. */
+  readonly overwrite?: boolean;
+  /** Suggestions per POST (default 1000). */
+  readonly chunkSize?: number;
+  /** True when invoked from the CLI — tailors the not-configured error. */
+  readonly fromCli?: boolean;
+}
+
+export interface UpdateVariationsResult {
+  readonly submitted: number;
+  readonly chunks: number;
+  /** Numeric stats returned by the service (e.g. `updatedFields`), summed across chunks. */
+  readonly stats: Readonly<Record<string, number>>;
+  /** Items the service refused on permission, rejected on validation, or corrected,
+   *  summed across chunks. Surfaced so a run that submits N but lands fewer is visible
+   *  rather than reading as clean. Mirrors the reference caller's rollup. */
+  readonly permissionDenied: number;
+  readonly validationFailed: number;
+  readonly corrections: number;
+}
+
+const chunk = <T>(items: ReadonlyArray<T>, size: number): ReadonlyArray<ReadonlyArray<T>> =>
+  Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, i * size + size));
+
+/** True for a permission-denied group carrying an `items` array. */
+const hasItemsArray = (value: unknown): value is { readonly items: ReadonlyArray<unknown> } =>
+  typeof value === 'object' && value !== null && Array.isArray((value as { items?: unknown }).items);
+
+/**
+ * Submit human-reviewed variation suggestions to the v2 admin endpoint
+ * (`POST /v2/certification/variations`). This is the admin-write counterpart to
+ * `computeVariationsViaService`: it replaces the legacy `updateVariations`,
+ * repointed to v2 with OAuth2 bearer auth and the `x-ft-admin-secret` admin gate.
+ *
+ * The submission's review flags are batch-level: `adminReview` XOR `fastTrack`
+ * (mutually exclusive, as the service requires) and `overwrite` apply to every
+ * item. Chunks POST sequentially. Throws with a coded error — auth failures
+ * carry `AUTH_REQUIRED` / `AUTH_REJECTED` so the CLI and UI can react.
+ */
+export const updateVariationsViaService = async (
+  input: UpdateVariationsViaServiceInput,
+): Promise<UpdateVariationsResult> => {
+  const servicesUrl = process.env.RESO_SERVICES_URL;
+  if (!servicesUrl) {
+    throw serviceError('SERVICE_ERROR', 'Variations Service: RESO_SERVICES_URL is not set.');
+  }
+  if (input.adminReview && input.fastTrack) {
+    throw serviceError(
+      'SERVICE_ERROR',
+      'A submission cannot be both admin-review and fast-track; the two flags are mutually exclusive.',
+    );
+  }
+  if (input.items.length === 0) {
+    throw serviceError('SERVICE_ERROR', 'No variation suggestions to submit.');
+  }
+
+  const token = input.bearerToken ?? (await mintProviderToken());
+  if (!token) {
+    throw serviceError(
+      'AUTH_REQUIRED',
+      input.fromCli
+        ? 'Updating variations requires authentication. Set TOKEN_URI, CLIENT_ID, and CLIENT_SECRET in your .env so the CLI can mint a provider token.'
+        : 'Updating variations requires authentication. Pass a provider token (bearerToken).',
+    );
+  }
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+  if (input.adminSecret) headers['x-ft-admin-secret'] = input.adminSecret;
+  if (input.overwrite) headers.Overwrite = 'true';
+  if (input.fastTrack) headers.isFastTrack = 'true';
+  else if (input.adminReview) headers.isAdminReview = 'true';
+
+  const size = input.chunkSize && input.chunkSize > 0 ? input.chunkSize : DEFAULT_CHUNK_SIZE;
+  const chunks = chunk(input.items, size);
+  const url = `${servicesUrl}/v2/certification/variations`;
+
+  const stats: Record<string, number> = {};
+  const rejected = { permissionDenied: 0, validationFailed: 0, corrections: 0 };
+
+  // Sequential by design: concurrent admin writes race on the store's ETag.
+  for (const [index, batch] of chunks.entries()) {
+    const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(batch) });
+    // Name how much already landed so a mid-run failure is reconcilable.
+    const committed = index > 0 ? ` — ${index} of ${chunks.length} chunk(s) already committed to the store` : '';
+
+    if (response.status === 401 || response.status === 403) {
+      throw serviceError(
+        'AUTH_REJECTED',
+        (input.fromCli
+          ? 'Update variations: the provider token or admin secret was rejected. Re-check your .env credentials.'
+          : 'Update variations: your session token was rejected or has expired. Log in again to continue.') + committed,
+      );
+    }
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      throw serviceError(
+        'SERVICE_ERROR',
+        `Update variations chunk ${index + 1}/${chunks.length} failed: ${response.status} ${response.statusText}` +
+          (detail ? ` — ${detail.slice(0, 500)}` : '') +
+          committed,
+      );
+    }
+
+    const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+    for (const [key, value] of Object.entries(body)) {
+      if (typeof value === 'number') stats[key] = (stats[key] ?? 0) + value;
+    }
+    if (Array.isArray(body.permissionDenied)) {
+      rejected.permissionDenied += body.permissionDenied.reduce<number>((n, group) => n + (hasItemsArray(group) ? group.items.length : 0), 0);
+    }
+    if (Array.isArray(body.validationFailed)) rejected.validationFailed += body.validationFailed.length;
+    if (Array.isArray(body.corrections)) rejected.corrections += body.corrections.length;
+  }
+
+  return {
+    submitted: input.items.length,
+    chunks: chunks.length,
+    stats,
+    permissionDenied: rejected.permissionDenied,
+    validationFailed: rejected.validationFailed,
+    corrections: rejected.corrections,
+  };
 };

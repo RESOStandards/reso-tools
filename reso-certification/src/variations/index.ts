@@ -8,12 +8,17 @@
 
 export {
   computeVariationsViaService,
+  updateVariationsViaService,
   isVariationsAuthError,
   type ComputeVariationsViaServiceInput,
+  type UpdateVariationsViaServiceInput,
+  type UpdateVariationsResult,
   type VariationsServiceReport,
   type VariationsServiceErrorCode,
 } from './service.js';
 
 export { findVariations, type FindVariationsInput } from './find-variations.js';
+
+export { parseVariationsCsv, type VariationSuggestionItem, type ParsedVariationsCsv } from './csv.js';
 
 export { DEFAULT_DD_VERSION, DEFAULT_FUZZINESS, VARIATIONS_REPORT_FILENAME } from './constants.js';
