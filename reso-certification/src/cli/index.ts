@@ -27,7 +27,7 @@ import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity
 import { loadConfigFile, configEntryToAddEdit, configEntryToEntityEvent } from '../sdk/config.js';
 import type { AddEditConfig, EntityEventConfig, CoreConfig, DDConfig, PipelineResult } from '../sdk/types.js';
 import { resolveCliAuth, mintOAuth2ClientCredentialsToken } from './auth.js';
-import { computeVariationsViaService } from '../variations/index.js';
+import { computeVariationsViaService, updateVariationsViaService, parseVariationsCsv } from '../variations/index.js';
 import { CURRENT_DD_VERSION, CERTIFIABLE_DD_VERSIONS, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
 import { resolveRenderMode, runWithProgress, runConfigEntries } from './render.js';
 
@@ -632,6 +632,80 @@ program
       process.exitCode = 2;
     }
   });
+
+// ── Update Variations Subcommand (Admin) ──
+//
+// Submit human-reviewed variation suggestions from a CSV to the v2 admin
+// endpoint (POST /v2/certification/variations). Auth: an OAuth2 client_credentials
+// token from .env (TOKEN_URI / CLIENT_ID / CLIENT_SECRET); the FT_ADMIN_SECRET
+// env var is sent as the x-ft-admin-secret admin gate. Review flags
+// (--admin-review XOR --fast-track, --overwrite) apply to the whole submission.
+
+program
+  .command('update-variations')
+  .description('Submit reviewed variation suggestions from a CSV to the cloud Variations Service (admin)')
+  .requiredOption('-s, --suggestions <path>', 'Path to the variations suggestions CSV file')
+  .option('--admin-review', 'Flag the whole submission as admin-review')
+  .option('--fast-track', 'Flag the whole submission as fast-track (mutually exclusive with --admin-review)')
+  .option('--overwrite', 'Allow overwriting existing canonical entries')
+  .option('--chunk-size <n>', 'Suggestions per request (default 1000)')
+  .action(
+    async (opts: {
+      suggestions: string;
+      adminReview?: boolean;
+      fastTrack?: boolean;
+      overwrite?: boolean;
+      chunkSize?: string;
+    }) => {
+      try {
+        const chunkSize = opts.chunkSize === undefined ? undefined : Number.parseInt(opts.chunkSize, 10);
+        if (chunkSize !== undefined && (!Number.isInteger(chunkSize) || chunkSize <= 0)) {
+          throw new Error(`--chunk-size must be a positive integer, got '${opts.chunkSize}'`);
+        }
+
+        const csv = await readFile(resolve(opts.suggestions), 'utf-8');
+        const { items, recognizedColumns, skippedColumns } = parseVariationsCsv(csv);
+        if (skippedColumns.length) {
+          console.error(`Ignoring unrecognized columns: ${skippedColumns.join(', ')}`);
+        }
+        console.log(`Parsed ${items.length} suggestion(s) from columns: ${recognizedColumns.join(', ')}.`);
+
+        if ((opts.adminReview || opts.fastTrack) && !process.env.FT_ADMIN_SECRET) {
+          console.error(
+            'Warning: admin-review / fast-track submissions need FT_ADMIN_SECRET in your .env to land; the service may reject them otherwise.',
+          );
+        }
+
+        const bearerToken = await mintOAuth2ClientCredentialsToken();
+        const result = await updateVariationsViaService({
+          items,
+          fromCli: true,
+          adminReview: opts.adminReview,
+          fastTrack: opts.fastTrack,
+          overwrite: opts.overwrite,
+          ...(bearerToken ? { bearerToken } : {}),
+          ...(process.env.FT_ADMIN_SECRET ? { adminSecret: process.env.FT_ADMIN_SECRET } : {}),
+          ...(chunkSize ? { chunkSize } : {}),
+        });
+
+        console.log(`Submitted ${result.submitted} suggestion(s) in ${result.chunks} chunk(s).`);
+        if (Object.keys(result.stats).length) {
+          console.log('Stats:');
+          Object.entries(result.stats).forEach(([key, value]) => console.log(`  • ${key}: ${value}`));
+        }
+        if (result.permissionDenied || result.validationFailed || result.corrections) {
+          console.error(
+            `Not everything landed as submitted — permission-denied: ${result.permissionDenied}, ` +
+              `validation-failed: ${result.validationFailed}, corrections: ${result.corrections}. ` +
+              'Review before assuming the run was clean.',
+          );
+        }
+      } catch (error) {
+        console.error('Error:', error instanceof Error ? error.message : String(error));
+        process.exitCode = 2;
+      }
+    },
+  );
 
 // ── Metadata Report subcommand group ──
 //
