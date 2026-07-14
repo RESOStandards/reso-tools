@@ -1,14 +1,8 @@
-import { getFieldsForResource, getKeyFieldForResource, getLookupsForType, isEnumType } from './helpers.js';
+import { getFieldsForResource, getKeyFieldForResource, getLookupsForType, isEnumType, isValidSimpleIdentifier } from './helpers.js';
 import type { EnumMode, ResoField, ResoMetadata } from './model.js';
 
 /** Escapes special XML characters in attribute values. */
 const escapeXml = (str: string): string => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-/** OData SimpleIdentifier: starts with letter or underscore, then letters/digits/underscores, max 128 chars. */
-const SIMPLE_IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
-
-/** Checks whether a string is a valid OData SimpleIdentifier. */
-const isValidSimpleIdentifier = (name: string): boolean => SIMPLE_IDENTIFIER_RE.test(name);
 
 /** Unwrap Collection(X) → X */
 const unwrapCollection = (type: string): string =>
