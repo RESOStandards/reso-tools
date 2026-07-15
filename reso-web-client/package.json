@@ -4,17 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "preinstall": "node ../scripts/bootstrap-deps.mjs || true",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run"
   },
   "dependencies": {
-    "@reso-standards/odata-expression-parser": "file:../odata-expression-parser",
-    "@reso-standards/reso-client": "file:../reso-client",
-    "@reso-standards/reso-metadata-utils": "file:../reso-metadata-utils",
-    "@reso-standards/reso-validation": "file:../reso-validation",
+    "@reso-standards/odata-expression-parser": "^0.1.0",
+    "@reso-standards/reso-client": "^0.2.0",
+    "@reso-standards/reso-metadata-utils": "^0.1.0",
+    "@reso-standards/reso-validation": "^0.1.0",
     "@tanstack/react-virtual": "3.13.24",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

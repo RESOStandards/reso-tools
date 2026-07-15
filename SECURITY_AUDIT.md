@@ -22,6 +22,8 @@ Pre-publish adversarial review of the six public npm packages ahead of the npm p
 - **LICENSE as EULA pointer** (Accepted): the `LICENSE` file references the RESO EULA at reso.org/eula rather than inlining full text, matching the already-published reso-common.
 - **Broken sourcemaps** (Low → Pending): shipped `.js.map` files reference `../src` paths not in the tarball; to be resolved with `inlineSources` or by dropping map emission for the published build.
 - **Missing or stale READMEs** (Low → Pending): reso-metadata-utils has none; reso-validation's is stale.
+- **Electron advisories** (High → Pending, desktop): reso-desktop-client's Electron carries multiple advisories; the fix is a major bump (electron 43), deferred because it needs desktop ABI and build verification and ties to the desktop signing work. Surfaced by the workspaces install unifying the audit view (#230); not introduced by it.
+- **esbuild dev-server file read** (Low → Pending): a transitive esbuild advisory (arbitrary file read via the development server on Windows only); the fix is bundled with the same breaking bump. Development-only, low risk.
 
 ### Method
 

@@ -10,7 +10,6 @@
   "private": true,
   "main": "dist/main.js",
   "scripts": {
-    "preinstall": "node ../scripts/bootstrap-deps.mjs || true",
     "build": "tsc && cp src/server-entry.mjs dist/",
     "build:server-bundle": "node scripts/bundle-server.mjs",
     "start": "env -u ELECTRON_RUN_AS_NODE electron dist/main.js",
@@ -21,9 +20,9 @@
     "package": "npm run build && npm run build:server-bundle && npm run build:cert-worker && electron-builder"
   },
   "dependencies": {
-    "@reso-standards/reso-certification": "file:../reso-certification",
-    "@reso-standards/reso-reference-server": "file:../reso-reference-server",
-    "@reso-standards/reso-web-api-proxy": "file:../reso-web-api-proxy",
+    "@reso-standards/reso-certification": "^0.10.0",
+    "@reso-standards/reso-reference-server": "^0.8.0",
+    "@reso-standards/reso-web-api-proxy": "^0.1.0",
     "better-sqlite3": "^12.9.0"
   },
   "devDependencies": {
