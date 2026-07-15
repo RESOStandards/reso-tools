@@ -178,6 +178,7 @@ The GitHub repo merges PRs with **Rebase and merge** — the trunk stays linear,
 - The OData client handles URI building, CRUD, pagination, and metadata parsing – it is used by both the web UI and the certification runner
 - Validation rules are isomorphic (shared between client and server)
 - The DD docs site is in a separate repo — see `RESOStandards/reso-data-dictionary-documentation` for styling and generator code
+- **Metadata reports — `metadata-report.json` is canonical.** As of v1.0.0-pre the scheme was inverted so `metadata-report.json` is **ALWAYS** the canonical *final* report (merged when a Lookup Resource is present, else the base), and the pre-merge base is written as `metadata-report.raw.json`. New runs no longer emit `.processed`, so downstream can **always rely on `metadata-report.json`** (see `src/sdk/dd.ts:159`, `metadata/lookup-resource.ts:158`). **Legacy exception:** older cert-utils bundles used the *opposite* pair — `metadata-report.json` = base, `metadata-report.processed.json` = merged — so when consuming a pre-inversion bundle, prefer `metadata-report.processed.json` when present, falling back to `metadata-report.json` (cf. desktop `main.ts:307`). This carve-out retires once old bundles age out.
 
 ## DD Reference-Metadata Regeneration
 
