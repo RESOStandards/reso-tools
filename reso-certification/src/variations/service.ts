@@ -19,6 +19,7 @@
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { mintProviderToken, serviceError, isServiceAuthError } from '../sdk/common.js';
 import type { ServiceErrorCode } from '../sdk/common.js';
+import { MAX_COMPUTE_PAYLOAD_BYTES } from './constants.js';
 import type { VariationSuggestionItem } from './csv.js';
 
 export interface ComputeVariationsViaServiceInput {
@@ -71,10 +72,24 @@ export const computeVariationsViaService = async (
 
   // text/plain + gzip+base64 mirrors the legacy /search call: large metadata
   // reports compress well, and the handler compresses its response in kind.
+  const compressedBody = gzipSync(JSON.stringify(body)).toString('base64');
+
+  // Guard the Lambda's 6 MB sync-invocation ceiling client-side so an oversized
+  // report gets an actionable message, not a cryptic gateway failure. Even
+  // Cotality-scale reports (~45 MB raw → ~3.2 MB compressed) clear this today;
+  // the durable fix for the giants is reso-tools #227.
+  if (compressedBody.length > MAX_COMPUTE_PAYLOAD_BYTES) {
+    const mb = (bytes: number): string => (bytes / 1024 / 1024).toFixed(1);
+    throw serviceError(
+      'SERVICE_ERROR',
+      `This metadata report is too large for the variations service: the compressed request is ${mb(compressedBody.length)} MB, over the ${mb(MAX_COMPUTE_PAYLOAD_BYTES)} MB limit. Please contact dev@reso.org.`,
+    );
+  }
+
   const response = await fetch(`${servicesUrl}/v2/certification/variations/compute`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'text/plain' },
-    body: gzipSync(JSON.stringify(body)).toString('base64'),
+    body: compressedBody,
   });
 
   if (response.status === 401 || response.status === 403) {
