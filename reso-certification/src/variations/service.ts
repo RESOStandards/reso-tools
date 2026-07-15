@@ -75,10 +75,12 @@ export const computeVariationsViaService = async (
   const compressedBody = gzipSync(JSON.stringify(body)).toString('base64');
 
   // Guard the Lambda's 6 MB sync-invocation ceiling client-side so an oversized
-  // report gets an actionable message, not a cryptic gateway failure. Even
-  // Cotality-scale reports (~45 MB raw → ~3.2 MB compressed) clear this today;
-  // the durable fix for the giants is reso-tools #227.
-  if (compressedBody.length > MAX_COMPUTE_PAYLOAD_BYTES) {
+  // report gets an actionable message, not a cryptic gateway failure. Reject at
+  // `>=` the limit, not `>`: the 6 MB cap is on the whole event (body + request
+  // envelope), so the compressed body must be *strictly under* 6 MB to fit. Even
+  // Cotality-scale reports (~45 MB raw → ~3.2 MB compressed) clear this; the
+  // durable fix for the giants is reso-tools #227.
+  if (compressedBody.length >= MAX_COMPUTE_PAYLOAD_BYTES) {
     const mb = (bytes: number): string => (bytes / 1024 / 1024).toFixed(1);
     throw serviceError(
       'SERVICE_ERROR',
