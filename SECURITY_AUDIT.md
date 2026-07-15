@@ -4,6 +4,31 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
+## v1.0.0 Security Notes – 2026-07-15
+
+Pre-publish adversarial review of the six public npm packages ahead of the npm publish and public/private split (#220). All six are clean on the security-critical axes — zero known vulnerabilities, no secrets in shipped code, no dangerous runtime patterns. The findings below are publish hygiene and packaging mechanics.
+
+### Findings Addressed
+
+- **Consumer-side install hook** (High → Fixed, #230): reso-client and reso-certification shipped a `preinstall` hook (`node ../scripts/bootstrap-deps.mjs`) that ran on every consumer install and pointed at a path outside the package. Removed; clean-clone development uses the root bootstrap. The remaining hooks are removed in the workspaces migration.
+- **reso-certification package leak** (High → Fixed, #220): with no `files` allowlist, `npm publish` would have shipped 661 files / 31 MB — all of `src/`, `tests/`, `coverage/`, `.reso-cert/` local run artifacts and `__pycache__/`. Added `files: ["dist"]`; the tarball is now 306 files / 3.8 MB.
+- **Publish metadata** (Medium → Fixed, #220): added `license` (RESO EULA), `publishConfig.access: public`, `repository` and `prepublishOnly` to the packages that lacked them.
+- **reso-common version conflict** (High → Fixed, #220): 0.1.2 was already published with different content; bumped to 0.2.0, a backward-compatible export addition.
+
+### Noted Risks (Accepted / Pending)
+
+- **`reso-certification-etl` supply chain** (High → Pending, #230): resolves to a mutable GitHub `main` tarball with no version pin or integrity check. Being published to public npm and pinned to a version in the workspaces migration.
+- **`file:` dependencies** (Pending, #230): reso-client and reso-certification carry `file:../` deps that cannot resolve for consumers; the workspaces migration converts them to `^` version ranges resolved from the registry.
+- **LICENSE as EULA pointer** (Accepted): the `LICENSE` file references the RESO EULA at reso.org/eula rather than inlining full text, matching the already-published reso-common.
+- **Broken sourcemaps** (Low → Pending): shipped `.js.map` files reference `../src` paths not in the tarball; to be resolved with `inlineSources` or by dropping map emission for the published build.
+- **Missing or stale READMEs** (Low → Pending): reso-metadata-utils has none; reso-validation's is stale.
+
+### Method
+
+Automated adversarial per-package review, one agent per package: `npm audit`, `npm pack --dry-run`, and secret, supply-chain and dangerous-code scans over shipped output, followed by manual verification of the resolved items.
+
+---
+
 ## v0.5 Security Notes – 2026-04-06
 
 ### Findings
