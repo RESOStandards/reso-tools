@@ -139,6 +139,14 @@ confirmed-clean `@tanstack/virtual*` family.
 - GitHub milestones match the branch version
 - **Release tags**: Use short-form tags (`v0.8`, `v0.9`) until real patch releases ship in production. Package.json versions use full SemVer (`0.8.0`), but Git tags and GitHub Releases use short form so `/releases/tag/v0.8` works.
 
+### Merge Strategy
+
+The GitHub repo merges PRs with **Rebase and merge** — the trunk stays linear, with no merge commits. Keep feature branches linear so they remain rebaseable:
+
+- **To update a feature branch against its base, rebase it** (`git rebase origin/<base>`, e.g. `origin/v1.0.0-pre`) — do **not** merge the base into the branch. A merge commit on the branch makes the PR un-rebaseable, and GitHub reports "This branch cannot be rebased due to conflicts" even when an ordinary merge would be a clean fast-forward.
+- Conflict resolution captured inside a merge commit is **not** reused by rebase: rebase replays each commit individually, so it re-hits the original conflicts. That is the failure mode, not a real conflict.
+- If a branch already carries a merge commit, **linearize it** before opening/updating the PR — cherry-pick or rebase the real commits onto the base tip, drop the merge commit, resolve conflicts once, then force-push. (Force-push a feature branch only; never a release branch.)
+
 ### Release Checklist
 
 1. **Run full test suite**: `npm test` from root – all packages must pass
