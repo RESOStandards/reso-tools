@@ -1,7 +1,13 @@
 {
   "name": "@reso-standards/reso-client",
   "version": "0.2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RESOStandards/reso-tools.git",
+    "directory": "reso-client"
+  },
   "description": "RESO Client SDK for TypeScript — OData 4.01 URI builder, CRUD helpers, CSDL metadata validation, and query parsing.",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -11,13 +17,17 @@
       "import": "./dist/index.js"
     }
   },
+  "sideEffects": false,
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "preinstall": "node ../scripts/bootstrap-deps.mjs || true",
     "prebuild": "node scripts/sync-version.mjs",
     "build": "tsc",
+    "prepublishOnly": "npm run build",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
