@@ -14,10 +14,15 @@ export const DEFAULT_DD_VERSION = '2.0';
 export const VARIATIONS_REPORT_FILENAME = 'data-dictionary-variations.json';
 
 /**
- * Max compressed request payload for the `/compute` call. The Lambda synchronous
- * invocation payload is capped at 6 MB, and the `base64(gzip)` body is essentially
- * the whole event — so a report that compresses over this fails at the gateway.
- * The client flags it with an actionable message instead of a cryptic 4xx. The
- * durable fix (presigned-URL or chunked upload) is tracked in reso-tools #227.
+ * Rough client-side pre-check for the `/compute` compressed payload. The Lambda
+ * sync limit is 6 MB on the whole *event* (body + the envelope API Gateway injects:
+ * headers, `requestContext`, authorizer context) — which the client can't measure
+ * or predict precisely. So this only catches *obviously* oversized bodies to avoid
+ * a wasted upload; the gateway's **413** (caught in `service.ts`) is the precise
+ * backstop for the envelope edge. Durable fix for the giants: reso-tools #227.
  */
 export const MAX_COMPUTE_PAYLOAD_BYTES = 6 * 1024 * 1024;
+
+/** Shared user-facing message for both the client-side pre-check and a gateway 413. */
+export const PAYLOAD_TOO_LARGE_MESSAGE =
+  'This metadata report is too large for the variations service. Please contact dev@reso.org.';

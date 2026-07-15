@@ -128,4 +128,12 @@ describe('computeVariationsViaService — service failures', () => {
     expect((err as Error).message).toMatch(/dev@reso\.org/);
     expect(mockFetch()).not.toHaveBeenCalled();
   });
+
+  it('a 413 from /compute: SERVICE_ERROR with the same graceful too-large message', async () => {
+    mockFetch().mockResolvedValue({ ok: false, status: 413, statusText: 'Payload Too Large' });
+    const err = await computeVariationsViaService({ metadataReportJson: {}, version: '2.1', bearerToken: 't' }).catch(e => e);
+    expect(codeOf(err)).toBe('SERVICE_ERROR');
+    expect((err as Error).message).toMatch(/too large/i);
+    expect((err as Error).message).toMatch(/dev@reso\.org/);
+  });
 });
