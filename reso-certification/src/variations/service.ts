@@ -19,7 +19,7 @@
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { mintProviderToken, serviceError, isServiceAuthError } from '../sdk/common.js';
 import type { ServiceErrorCode } from '../sdk/common.js';
-import { MAX_COMPUTE_PAYLOAD_BYTES } from './constants.js';
+import { MAX_COMPUTE_PAYLOAD_BYTES, PAYLOAD_TOO_LARGE_MESSAGE } from './constants.js';
 import type { VariationSuggestionItem } from './csv.js';
 
 export interface ComputeVariationsViaServiceInput {
@@ -74,17 +74,16 @@ export const computeVariationsViaService = async (
   // reports compress well, and the handler compresses its response in kind.
   const compressedBody = gzipSync(JSON.stringify(body)).toString('base64');
 
-  // Guard the Lambda's 6 MB sync-invocation ceiling client-side so an oversized
-  // report gets an actionable message, not a cryptic gateway failure. Reject at
-  // `>=` the limit, not `>`: the 6 MB cap is on the whole event (body + request
-  // envelope), so the compressed body must be *strictly under* 6 MB to fit. Even
-  // Cotality-scale reports (~45 MB raw → ~3.2 MB compressed) clear this; the
-  // durable fix for the giants is reso-tools #227.
+  // Rough pre-check: reject an obviously-oversized compressed body before the
+  // upload. `>=` because the 6 MB cap is on the whole event (body + envelope), so
+  // an exactly-6 MB body already can't fit. The gateway 413 below is the precise
+  // backstop for the envelope edge; both hand back the same message. Cotality-scale
+  // reports (~45 MB raw → ~3.2 MB compressed) clear this easily.
   if (compressedBody.length >= MAX_COMPUTE_PAYLOAD_BYTES) {
     const mb = (bytes: number): string => (bytes / 1024 / 1024).toFixed(1);
     throw serviceError(
       'SERVICE_ERROR',
-      `This metadata report is too large for the variations service: the compressed request is ${mb(compressedBody.length)} MB, over the ${mb(MAX_COMPUTE_PAYLOAD_BYTES)} MB limit. Please contact dev@reso.org.`,
+      `Compressed request is ${mb(compressedBody.length)} MB (limit ~${mb(MAX_COMPUTE_PAYLOAD_BYTES)} MB). ${PAYLOAD_TOO_LARGE_MESSAGE}`,
     );
   }
 
@@ -101,6 +100,11 @@ export const computeVariationsViaService = async (
         ? 'Variations check: the provider token was rejected. Re-check your CERT_AUTH_API_* .env credentials.'
         : 'Variations check: your session token was rejected or has expired. Log in again to continue.',
     );
+  }
+  if (response.status === 413) {
+    // Gateway rejected the payload (event exceeded Lambda's 6 MB ceiling despite the
+    // client pre-check). Hand back the same graceful message as the local guard.
+    throw serviceError('SERVICE_ERROR', PAYLOAD_TOO_LARGE_MESSAGE);
   }
   if (!response.ok) {
     throw serviceError('SERVICE_ERROR', `Variations Service /compute failed: ${response.status} ${response.statusText}`);
