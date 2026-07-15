@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { gzipSync } from 'node:zlib';
+import { randomBytes } from 'node:crypto';
 import { computeVariationsViaService, isVariationsAuthError } from '../../src/variations/index.js';
 
 const report = {
@@ -112,5 +113,19 @@ describe('computeVariationsViaService — service failures', () => {
     const err = await computeVariationsViaService({ metadataReportJson: {}, version: '2.1', bearerToken: 't' }).catch(e => e);
     expect(codeOf(err)).toBe('SERVICE_ERROR');
     expect((err as Error).message).toMatch(/503/);
+  });
+
+  it('guards the compressed-payload ceiling: SERVICE_ERROR at dev@reso.org, before any POST', async () => {
+    // ~6 MB of random data → incompressible → base64(gzip) clears the 6 MB Lambda ceiling.
+    const oversized = randomBytes(6 * 1024 * 1024).toString('base64');
+    const err = await computeVariationsViaService({
+      metadataReportJson: { fields: [], _pad: oversized },
+      version: '2.1',
+      bearerToken: 't',
+    }).catch(e => e);
+    expect(codeOf(err)).toBe('SERVICE_ERROR');
+    expect((err as Error).message).toMatch(/too large/i);
+    expect((err as Error).message).toMatch(/dev@reso\.org/);
+    expect(mockFetch()).not.toHaveBeenCalled();
   });
 });
