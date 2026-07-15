@@ -63,6 +63,10 @@ echo ""
 # Layer 1: shared libraries (no internal deps)
 echo "── Shared Libraries ──"
 build_pkg reso-common
+# reso-metadata-utils is the deps-requiring metadata sibling to reso-common
+# (fast-xml-parser only); reso-client/certification/mcp/web-client depend on it,
+# so it must build here in Layer 1, before those consumers below.
+build_pkg reso-metadata-utils
 build_pkg odata-expression-parser
 build_pkg reso-validation
 build_pkg reso-client
