@@ -1,6 +1,12 @@
 {
   "name": "@reso-standards/reso-certification",
   "version": "0.10.0",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RESOStandards/reso-tools.git",
+    "directory": "reso-certification"
+  },
   "description": "RESO certification testing toolkit — Add/Edit (RCP-010), Web API Core, Data Dictionary",
   "type": "module",
   "engines": {
@@ -17,9 +23,15 @@
   "bin": {
     "reso-cert": "./dist/cli/index.js"
   },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "preinstall": "node ../scripts/bootstrap-deps.mjs || true",
     "build": "tsc && rm -rf dist/legacy dist/etl && cp -r src/legacy dist/legacy && cp -r src/etl dist/etl",
+    "prepublishOnly": "npm run build",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
