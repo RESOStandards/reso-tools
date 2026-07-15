@@ -70,15 +70,15 @@ docker compose --profile proxy up -d
 
 ### Building Individual Packages
 
-Each package can be installed and built independently — running `npm install` from a subpackage triggers a `preinstall` hook that walks the `file:` dep tree and builds any sibling whose `dist/` is missing.
+The repo is an **npm workspace**. `npm install` at the root installs every package's dependencies once and links the inter-package deps locally; `npm run build` builds all packages in dependency order.
 
 ```bash
-cd reso-client && npm install && npm run build
-cd reso-mcp-server && npm install && npm run build
-cd reso-web-client && npm install && npm run build
+npm install                            # install + link all workspaces
+npm run build                          # build all (topological order)
+npm run build -w reso-certification    # or build just one
 ```
 
-Shared libraries (`odata-expression-parser`, `reso-validation`, `reso-client`, `reso-data-generator`) have no internal dependencies. Packages that depend on them (`reso-reference-server`, `reso-certification`, `reso-web-client`, `reso-desktop-client`) get their deps built automatically by the `preinstall` hook. See [scripts/bootstrap.sh](scripts/bootstrap.sh) for the full top-down dependency order, or [scripts/bootstrap-deps.mjs](scripts/bootstrap-deps.mjs) for the per-package walker.
+Each package still builds and tests independently (`cd reso-certification && npm run build`) — the workspace linking resolves its inter-package deps from the local packages. The public packages publish to npm with `^` version ranges, so a consumer installs them from the registry without the monorepo.
 
 ## Development
 

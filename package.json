@@ -1,13 +1,28 @@
 {
   "private": true,
   "name": "@reso-standards/reso-tools",
+  "workspaces": [
+    "reso-common",
+    "reso-metadata-utils",
+    "odata-expression-parser",
+    "reso-validation",
+    "reso-data-generator",
+    "reso-web-api-proxy",
+    "reso-client",
+    "reso-certification",
+    "reso-reference-server",
+    "reso-web-client",
+    "reso-mcp-server",
+    "reso-desktop-client"
+  ],
   "type": "module",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "bootstrap": "bash scripts/bootstrap.sh",
-    "bootstrap:force": "bash scripts/bootstrap.sh --force",
+    "bootstrap": "npm install && npm run build",
+    "bootstrap:force": "npm install && npm run build",
+    "build": "npm run build --workspaces --if-present",
     "lint": "biome check .",
     "lint:fix": "biome check --fix .",
     "typecheck": "npm run typecheck:common && npm run typecheck:metadata-utils && npm run typecheck:filter-parser && npm run typecheck:validation && npm run typecheck:client && npm run typecheck:data-generator && npm run typecheck:server && npm run typecheck:web-client && npm run typecheck:certification && npm run typecheck:mcp && npm run typecheck:desktop && npm run typecheck:proxy",

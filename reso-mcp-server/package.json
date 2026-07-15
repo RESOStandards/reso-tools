@@ -12,7 +12,6 @@
     "reso-mcp": "./dist/index.js"
   },
   "scripts": {
-    "preinstall": "node ../scripts/bootstrap-deps.mjs || true",
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run",
@@ -21,11 +20,11 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@reso-standards/odata-expression-parser": "file:../odata-expression-parser",
-    "@reso-standards/reso-certification": "file:../reso-certification",
-    "@reso-standards/reso-client": "file:../reso-client",
-    "@reso-standards/reso-metadata-utils": "file:../reso-metadata-utils",
-    "@reso-standards/reso-validation": "file:../reso-validation",
+    "@reso-standards/odata-expression-parser": "^0.1.0",
+    "@reso-standards/reso-certification": "^0.10.0",
+    "@reso-standards/reso-client": "^0.2.0",
+    "@reso-standards/reso-metadata-utils": "^0.1.0",
+    "@reso-standards/reso-validation": "^0.1.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
