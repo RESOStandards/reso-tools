@@ -7,7 +7,7 @@ const { resolve, join } = require('path');
 const { getOrgsMap, getOrgSystemsMap, processDataDictionaryResults } = require('../misc/data-access/cert-api-client');
 const { CERTIFICATION_FILES } = require('../../common');
 
-const { processLookupResourceMetadataFiles } = require('@reso/reso-certification-etl');
+const { processLookupResourceMetadataFiles } = require('../../../etl/index.cjs');
 
 const CERTIFICATION_RESULTS_DIRECTORY = 'current',
   PATH_DATA_SEPARATOR = '-';

@@ -14,11 +14,11 @@ Pre-publish adversarial review of the six public npm packages ahead of the npm p
 - **reso-certification package leak** (High → Fixed, #220): with no `files` allowlist, `npm publish` would have shipped 661 files / 31 MB — all of `src/`, `tests/`, `coverage/`, `.reso-cert/` local run artifacts and `__pycache__/`. Added `files: ["dist"]`; the tarball is now 306 files / 3.8 MB.
 - **Publish metadata** (Medium → Fixed, #220): added `license` (RESO EULA), `publishConfig.access: public`, `repository` and `prepublishOnly` to the packages that lacked them.
 - **reso-common version conflict** (High → Fixed, #220): 0.1.2 was already published with different content; bumped to 0.2.0, a backward-compatible export addition.
+- **`reso-certification-etl` supply chain** (High → Fixed, #220): the dependency resolved to a mutable GitHub `main` tarball with no version pin or integrity check. Rather than pin or publish it, it was **removed** — the two symbols reso-certification used (`getReferenceMetadata`, `processLookupResourceMetadataFiles`) already exist in the in-package v2 ETL (`src/etl`), so the five `src/legacy` requires repoint there and the tarball dependency is dropped. The old package stays recoverable from the `reso-certification-utils` repo.
+- **`file:` dependencies** (High → Fixed, #230): reso-client and reso-certification carried `file:../` deps that cannot resolve for consumers; the workspaces migration converted them to `^` version ranges resolved from the registry.
 
 ### Noted Risks (Accepted / Pending)
 
-- **`reso-certification-etl` supply chain** (High → Pending, #230): resolves to a mutable GitHub `main` tarball with no version pin or integrity check. Being published to public npm and pinned to a version in the workspaces migration.
-- **`file:` dependencies** (Pending, #230): reso-client and reso-certification carry `file:../` deps that cannot resolve for consumers; the workspaces migration converts them to `^` version ranges resolved from the registry.
 - **LICENSE as EULA pointer** (Accepted): the `LICENSE` file references the RESO EULA at reso.org/eula rather than inlining full text, matching the already-published reso-common.
 - **Broken sourcemaps** (Low → Pending): shipped `.js.map` files reference `../src` paths not in the tarball; to be resolved with `inlineSources` or by dropping map emission for the published build.
 - **Missing or stale READMEs** (Low → Pending): reso-metadata-utils has none; reso-validation's is stale.
@@ -56,7 +56,7 @@ Automated adversarial per-package review, one agent per package: `npm audit`, `n
 
 ### Noted Risks (Accepted)
 
-- **`reso-certification-utils@3.0.0` supply chain**: Installed from GitHub (not npm). Git tags are not cryptographically signed. Transitive dependency on `@reso/reso-certification-etl` also from GitHub. Risk accepted because both repos are under RESOStandards org control. Will migrate to npm publishing in a future release.
+- **`reso-certification-utils@3.0.0` supply chain**: Installed from GitHub (not npm). Git tags are not cryptographically signed. Transitive dependency on `@reso/reso-certification-etl` also from GitHub. Risk accepted because both repos are under RESOStandards org control. _Update: the `@reso/reso-certification-etl` dependency was later removed entirely — its symbols moved to the in-package v2 ETL; see the v1.0.0 notes above._
 - **IPC storage API**: The `storage:get`/`storage:set` handlers accept any key/value string from the renderer. Currently only the renderer (same-origin, sandboxed) can access these. No rate limiting. Acceptable for a desktop app with trusted renderer content.
 - **EPIPE exception handler**: `process.on('uncaughtException')` suppresses EPIPE errors (broken stdout pipe on shutdown). Non-EPIPE errors are re-thrown. Could theoretically mask an error with a `code` property of `'EPIPE'` from a different source, but this is unlikely in practice.
 - **Stub packages**: `pg` and `mongodb` are replaced with empty stubs in the desktop server bundle (SQLite-only mode). If the server code ever conditionally requires these at runtime, the stubs would silently return empty objects instead of throwing.
