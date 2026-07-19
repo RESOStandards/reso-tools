@@ -11,18 +11,17 @@ Open-source monorepo for building and testing RESO-compliant OData servers. Incl
 | `reso-client/` | OData 4.01 client SDK |
 | `odata-expression-parser/` | `$filter` and `$expand` expression parser |
 | `reso-validation/` | Field and business-rule validation for RESO Data Dictionary |
-| `reso-data-generator/` | Test data generator with FK dependency resolution |
 | `reso-reference-server/` | Metadata-driven OData reference server (PostgreSQL, MongoDB, SQLite) |
-| `reso-web-client/` | React + Vite browser UI (`@reso/web-client`) |
-| `reso-desktop-client/` | Electron desktop shell (`@reso/desktop-client`) |
 | `reso-certification/` | RESO certification CLI + SDK (Add/Edit, EntityEvent, Web API Core, DD) |
 | `reso-mcp-server/` | MCP server for AI agents (query, metadata, validate, compliance) |
 | `.github/pages/` | GitHub Pages site including DD documentation generator |
 
+The browser UI, Electron desktop shell, CORS proxy and test-data generator moved to the private `reso-tools-private` repo for the v1.0.0 split; the public packages above consume them (where needed) from the npm registry.
+
 ## Common Commands
 
 ```bash
-npm test                    # Run all tests (1,097 across 8 packages)
+npm test                    # Run all tests (1,315 across 8 packages)
 npm run test:server         # Run server tests only
 npm run test:validation     # Run validation tests only
 npm run lint                # Biome lint check
@@ -34,8 +33,8 @@ npm run precommit           # Lint + typecheck + tests — REQUIRED before every
 cd reso-reference-server && docker compose up -d
 docker compose --profile seed up seed
 
-# Desktop client (SQLite, no Docker)
-cd reso-desktop-client && npm run dev
+# Desktop certification app — source now lives in reso-tools-private;
+# distributed as a downloadable release: /RESOStandards/reso-tools/releases/latest
 
 # DD documentation site (separate repo)
 # See https://github.com/RESOStandards/reso-data-dictionary-documentation
@@ -88,12 +87,16 @@ A self-spreading npm worm hit 42 `@tanstack/*` packages on
 2026-05-11, publishing 84 malicious versions between 19:20-19:26 UTC
 ([postmortem](https://tanstack.com/blog/npm-supply-chain-compromise-postmortem),
 [GHSA-g7cv-rxg3-hmpx](https://github.com/advisories/GHSA-g7cv-rxg3-hmpx)).
-Our only TanStack dep is `@tanstack/react-virtual@3.13.24` in
+The only TanStack dep is `@tanstack/react-virtual@3.13.24` in
 `reso-web-client`, which falls under the postmortem's
-confirmed-clean `@tanstack/virtual*` family.
+confirmed-clean `@tanstack/virtual*` family. As of the v1.0.0 split
+`reso-web-client` moved to the private `reso-tools-private` repo, so
+this pinned dependency and the watch below now live there — **the
+public repo has no TanStack dependency.** The discipline is retained
+here because it applies to any repo in the org.
 
 - The dependency is pinned (no caret) as defense-in-depth so a
-  future compromise of the same package can't auto-resolve into our
+  future compromise of the same package can't auto-resolve into a
   build via `npm install`.
 - Before bumping the pinned version, **re-check the advisory and
   postmortem** for additional affected releases and confirm the
@@ -127,8 +130,7 @@ confirmed-clean `@tanstack/virtual*` family.
 
 - Each package manages its own `package.json` and dependencies
 - Root `package.json` has convenience scripts for cross-package lint and test
-- `reso-web-client` is a standalone React app that talks to any OData server via proxy
-- `reso-desktop-client` spawns the reference server as a child process on a random port
+- The browser UI (`reso-web-client`), Electron desktop shell (`reso-desktop-client`), CORS proxy and test-data generator live in the private `reso-tools-private` repo, which consumes the public packages from the npm registry
 - DD documentation site lives in a separate repo (`RESOStandards/reso-data-dictionary-documentation`), not in this monorepo
 - Compliance testing requires a running server (Docker or desktop) with seeded data
 
@@ -155,7 +157,7 @@ The GitHub repo merges PRs with **Rebase and merge** — the trunk stays linear,
 4. **Update RELEASES.md**: Add all changes under the version heading. This is the canonical changelog – memory and READMEs reference it, not the other way around.
 5. **Update READMEs**: Test counts, new features, CLI examples, package table in root README. Cross-check against RELEASES.md.
 6. **Update test badge**: `![Tests](https://img.shields.io/badge/tests-XXXX%20passed-brightgreen)` in root README
-6. **Desktop client**:
+6. **Desktop client** (source now in `reso-tools-private`; the app is built there and its binaries published to this public repo's Releases — the exact build/publish wiring is the distribution follow-up):
    - Update `version` in `reso-desktop-client/package.json` (the About dialog reads it via `app.getVersion()` automatically – do not hardcode)
    - Pick a release name and update the `RELEASE_NAME` constant in `reso-desktop-client/src/main.ts` (search for the comment block above `setAboutPanelOptions`)
    - Rebuild web client: `cd reso-web-client && npm run build`

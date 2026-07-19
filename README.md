@@ -1,24 +1,20 @@
 # RESO Tools
 
-![Tests](https://img.shields.io/badge/tests-1322%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1315%20passed-brightgreen)
 ![Compliance](https://img.shields.io/badge/RESO%20compliance-4%2F4%20suites-blue)
 [![Download](https://img.shields.io/github/v/release/RESOStandards/reso-tools?label=download&color=blue)](https://github.com/RESOStandards/reso-tools/releases/latest)
 
-Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compliant OData servers. Includes a reference server, desktop client, web UI, certification test runner, MCP server for AI agents and shared libraries for OData parsing, validation and data generation.
+Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compliant OData servers. This repository provides the reference server, certification test runner, MCP server for AI agents and shared libraries for OData parsing and validation. The desktop certification app is distributed as a downloadable [release](https://github.com/RESOStandards/reso-tools/releases/latest).
 
 ## Packages
 
 | Package | Description | Tests |
 |---------|-------------|-------|
-| [`reso-client/`](reso-client/) | OData 4.01 client SDK -- URI builder, CRUD helpers, CSDL metadata parsing, OAuth2 Client Credentials | 118 |
+| [`reso-client/`](reso-client/) | OData 4.01 client SDK -- URI builder, CRUD helpers, CSDL metadata parsing, OAuth2 Client Credentials | 96 |
 | [`odata-expression-parser/`](odata-expression-parser/) | Zero-dependency `$filter` and `$expand` expression parser | 180 |
 | [`reso-validation/`](reso-validation/) | Isomorphic field and business-rule validation for RESO Data Dictionary records | 98 |
-| [`reso-data-generator/`](reso-data-generator/) | Realistic test data generator with geo-consistent addresses, relational integrity and field-aware bounds | 116 |
-| [`reso-reference-server/`](reso-reference-server/) | Metadata-driven OData reference server (PostgreSQL, MongoDB, SQLite) | 254 |
-| [`reso-web-client/`](reso-web-client/) | React + Vite browser UI with cert analytics, server explorer and performance reports | 138 |
-| [`reso-web-api-proxy/`](reso-web-api-proxy/) | Lightweight CORS proxy and static file server for web client deployments | -- |
-| [`reso-desktop-client/`](reso-desktop-client/) | Electron desktop shell with end-to-end certification testing (DD, Core, Add/Edit, EntityEvent), secure storage and bundled reference server | -- |
-| [`reso-certification/`](reso-certification/) | RESO certification CLI + SDK – Add/Edit, EntityEvent, Web API Core, DD ([docs](reso-certification/README.md)) | 272 |
+| [`reso-reference-server/`](reso-reference-server/) | Metadata-driven OData reference server (PostgreSQL, MongoDB, SQLite) | 258 |
+| [`reso-certification/`](reso-certification/) | RESO certification CLI + SDK – Add/Edit, EntityEvent, Web API Core, DD ([docs](reso-certification/README.md)) | 562 |
 | [`reso-mcp-server/`](reso-mcp-server/) | MCP server – exposes OData query, write, validation, certification tools for AI agents ([guide](reso-mcp-server/doc/GUIDE.md)) | 21 |
 
 ## Quick Start
@@ -32,7 +28,7 @@ npm run bootstrap        # builds only packages that need it
 npm run bootstrap:force  # rebuilds everything from scratch
 ```
 
-This installs dependencies and builds all 10 packages in the correct order. Takes about 30 seconds on a warm cache.
+This installs dependencies and builds all 8 packages in the correct order. Takes about 30 seconds on a warm cache.
 
 ### Reference Server (Docker)
 
@@ -43,30 +39,9 @@ docker compose --profile seed up seed
 # Server: http://localhost:8080  UI: http://localhost:5173
 ```
 
-### Desktop Client (SQLite, No Docker)
+### Desktop Certification App
 
-```bash
-cd reso-desktop-client
-npm install             # preinstall hook builds sibling deps automatically
-npm run dev             # launches Electron with bundled reference server
-```
-
-The desktop client connects to external OData servers out of the box. A bundled reference server starts in the background for local test data.
-
-### Web Client with Proxy (No Reference Server)
-
-```bash
-cd reso-web-api-proxy && npm install && npm run build
-npm start -- --port 8888 --ui ../reso-web-client/dist
-```
-
-Or with Docker:
-
-```bash
-cd reso-web-client
-docker compose --profile proxy up -d
-# UI + Proxy: http://localhost:8888
-```
+A cross-platform desktop app (macOS, Windows, Linux) runs the full certification suite — Data Dictionary, Web API Core, Add/Edit, EntityEvent — against any OData server, with a bundled reference server and browser UI for local test data. Download the latest build from [Releases](https://github.com/RESOStandards/reso-tools/releases/latest).
 
 ### Building Individual Packages
 
@@ -97,7 +72,6 @@ npm run test:server
 npm run test:client
 npm run test:validation
 npm run test:filter-parser
-npm run test:data-generator
 npm run test:certification
 npm run test:mcp
 

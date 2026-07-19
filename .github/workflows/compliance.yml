@@ -38,7 +38,7 @@ jobs:
       - name: Install all package dependencies
         run: |
           npm install
-          for dir in reso-validation odata-expression-parser reso-client reso-data-generator reso-reference-server reso-web-client reso-web-api-proxy; do
+          for dir in reso-validation odata-expression-parser reso-client reso-reference-server; do
             (cd "$dir" && npm install)
           done
           git clone --depth 1 --branch v3.0.0 https://github.com/RESOStandards/reso-certification-utils.git /tmp/cert-utils
@@ -52,7 +52,6 @@ jobs:
           cd reso-validation && npx tsc && cd ..
           cd odata-expression-parser && npx tsc && cd ..
           cd reso-client && npx tsc && cd ..
-          cd reso-data-generator && npx tsc && cd ..
           cd reso-reference-server && npx tsc && cd ..
           cd reso-certification && npx tsc && rm -rf dist/legacy dist/etl && cp -r src/legacy dist/legacy && cp -r src/etl dist/etl && cd ..
           cd reso-mcp-server && npx tsc && cd ..

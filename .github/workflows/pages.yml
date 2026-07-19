@@ -69,12 +69,8 @@ jobs:
             "reso-validation:@reso-standards/reso-validation:Isomorphic validation library"
             "odata-expression-parser:@reso-standards/odata-expression-parser:OData filter parser"
             "reso-client:@reso-standards/reso-client:RESO Client SDK"
-            "reso-data-generator:@reso-standards/reso-data-generator:Test data generator"
             "reso-certification:@reso-standards/reso-certification:Certification testing tools"
             "reso-reference-server:@reso-standards/reso-reference-server:OData reference server"
-            "reso-web-client:@reso-standards/reso-web-client:React browser UI"
-            "reso-desktop-client:@reso-standards/reso-desktop-client:Electron desktop shell"
-            "reso-web-api-proxy:@reso-standards/reso-web-api-proxy:CORS proxy server"
             "reso-mcp-server:@reso-standards/reso-mcp-server:MCP server for AI agents"
           )
 
@@ -251,12 +247,8 @@ jobs:
             "reso-validation:@reso-standards/reso-validation"
             "odata-expression-parser:@reso-standards/odata-expression-parser"
             "reso-client:@reso-standards/reso-client"
-            "reso-data-generator:@reso-standards/reso-data-generator"
             "reso-certification:@reso-standards/reso-certification"
             "reso-reference-server:@reso-standards/reso-reference-server"
-            "reso-web-client:@reso-standards/reso-web-client"
-            "reso-desktop-client:@reso-standards/reso-desktop-client"
-            "reso-web-api-proxy:@reso-standards/reso-web-api-proxy"
             "reso-mcp-server:@reso-standards/reso-mcp-server"
           )
 
