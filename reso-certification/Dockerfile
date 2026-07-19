@@ -1,46 +1,19 @@
 FROM node:22-alpine AS build
 
-RUN apk add --no-cache git
-
 WORKDIR /app
 
-# Copy workspace dependencies (same resolution chain as the server Dockerfile)
-COPY odata-expression-parser/ /deps/odata-expression-parser/
-COPY reso-validation/ /deps/reso-validation/
-COPY reso-client/ /deps/reso-client/
-
-# Build odata-expression-parser
-WORKDIR /deps/odata-expression-parser
-RUN npm install && npm run build
-
-# Build reso-validation
-WORKDIR /deps/reso-validation
-RUN npm install && npm run build
-
-# Build reso-client (depends on filter-parser)
-WORKDIR /deps/reso-client
-RUN rm -f package-lock.json \
- && sed -i 's|file:../odata-expression-parser|file:/deps/odata-expression-parser|' package.json \
- && npm install && npm run build
-
-# Pre-clone reso-certification-utils and strip lefthook prepare script.
-# npm always runs prepare for git deps regardless of --ignore-scripts or --omit=dev.
-RUN git clone --depth 1 --branch v3.0.0 https://github.com/RESOStandards/reso-certification-utils.git /tmp/cert-utils \
- && cd /tmp/cert-utils && npm pkg delete scripts.prepare
-
-# Build reso-certification (depends on reso-client + reso-validation)
-WORKDIR /app
+# Install dependencies. All @reso-standards/* deps resolve from the npm registry
+# as caret ranges — no sibling COPY-into-/deps, no file: rewrites, no source builds.
 COPY reso-certification/package.json ./
-RUN sed -i 's|file:../reso-client|file:/deps/reso-client|' package.json \
- && sed -i 's|file:../reso-validation|file:/deps/reso-validation|' package.json \
- && sed -i 's|git+https://github.com/RESOStandards/reso-certification-utils.git#v3.0.0|file:/tmp/cert-utils|' package.json \
- && npm install
+RUN npm install
 
 COPY reso-certification/tsconfig.json ./
 COPY reso-certification/src/ ./src/
-COPY reso-certification/src/legacy/ ./src/legacy/
 COPY reso-certification/xsd-validator/ ./xsd-validator/
 COPY reso-certification/xsd/ ./xsd/
+# schema-validation-settings.json is read at runtime by the DD/schema validators
+# (src/sdk/dd.ts and src/legacy/lib/schema); it lives at the package root.
+COPY reso-certification/schema-validation-settings.json ./
 RUN cd xsd-validator && npm install && cd ..
 RUN npm run build
 RUN npm prune --omit=dev
@@ -60,11 +33,9 @@ COPY --from=build /app/package.json ./
 COPY --from=build /app/src/legacy ./src/legacy
 COPY --from=build /app/xsd-validator ./xsd-validator
 COPY --from=build /app/xsd ./xsd
+COPY --from=build /app/schema-validation-settings.json ./
 COPY --from=build /app/sample-payloads ./sample-payloads
 COPY --from=build /app/sample-metadata.xml ./
-COPY --from=build /deps/odata-expression-parser /deps/odata-expression-parser
-COPY --from=build /deps/reso-validation /deps/reso-validation
-COPY --from=build /deps/reso-client /deps/reso-client
 
 # Install wget for health checks in entrypoint
 RUN apk add --no-cache wget

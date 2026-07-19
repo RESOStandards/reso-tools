@@ -44,16 +44,6 @@ services:
       timeout: 5s
       retries: 5
 
-  ui:
-    build:
-      context: ..
-      dockerfile: reso-web-client/Dockerfile
-    ports:
-      - "5173:80"
-    depends_on:
-      - server
-    restart: unless-stopped
-
   # Optional: seed PostgreSQL with realistic test data
   # Usage: docker compose --profile seed up
   seed:
@@ -124,20 +114,6 @@ services:
     profiles:
       - mongodb
 
-  ui-mongo:
-    build:
-      context: ..
-      dockerfile: reso-web-client/Dockerfile
-    ports:
-      - "5173:80"
-    environment:
-      API_UPSTREAM: server-mongo:8080
-    depends_on:
-      - server-mongo
-    restart: unless-stopped
-    profiles:
-      - mongodb
-
   seed-mongo:
     build:
       context: ..
@@ -162,7 +138,7 @@ services:
 
   # ---------------------------------------------------------------------------
   # SQLite backend (lightweight, no external database)
-  # Usage: docker compose --profile sqlite up -d server-sqlite ui-sqlite
+  # Usage: docker compose --profile sqlite up -d server-sqlite
   # Seed:  docker compose --profile sqlite --profile seed-sqlite up
   # ---------------------------------------------------------------------------
   server-sqlite:
@@ -187,20 +163,6 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
-    restart: unless-stopped
-    profiles:
-      - sqlite
-
-  ui-sqlite:
-    build:
-      context: ..
-      dockerfile: reso-web-client/Dockerfile
-    ports:
-      - "5173:80"
-    environment:
-      API_UPSTREAM: server-sqlite:8080
-    depends_on:
-      - server-sqlite
     restart: unless-stopped
     profiles:
       - sqlite
@@ -239,8 +201,6 @@ services:
     environment:
       SERVER_URL: http://server:8080
       AUTH_TOKEN: admin-token
-      SEED_COUNTS: ${SEED_COUNTS:-}
-      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:
@@ -262,8 +222,6 @@ services:
     environment:
       SERVER_URL: http://server:8080
       AUTH_TOKEN: admin-token
-      SEED_COUNTS: ${SEED_COUNTS:-}
-      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:
@@ -285,8 +243,6 @@ services:
     environment:
       SERVER_URL: http://server-mongo:8080
       AUTH_TOKEN: admin-token
-      SEED_COUNTS: ${SEED_COUNTS:-}
-      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:
@@ -308,8 +264,6 @@ services:
     environment:
       SERVER_URL: http://server-mongo:8080
       AUTH_TOKEN: admin-token
-      SEED_COUNTS: ${SEED_COUNTS:-}
-      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:
@@ -331,8 +285,6 @@ services:
     environment:
       SERVER_URL: http://server-sqlite:8080
       AUTH_TOKEN: admin-token
-      SEED_COUNTS: ${SEED_COUNTS:-}
-      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:
@@ -354,8 +306,6 @@ services:
     environment:
       SERVER_URL: http://server-sqlite:8080
       AUTH_TOKEN: admin-token
-      SEED_COUNTS: ${SEED_COUNTS:-}
-      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:
@@ -416,8 +366,6 @@ services:
       SERVER_URL: http://server-entity-event:8080
       AUTH_TOKEN: admin-token
       MODE: full
-      SEED_COUNTS: ${SEED_COUNTS:-}
-      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:
@@ -473,8 +421,6 @@ services:
       SERVER_URL: http://server-entity-event-mongo:8080
       AUTH_TOKEN: admin-token
       MODE: full
-      SEED_COUNTS: ${SEED_COUNTS:-}
-      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:
@@ -519,8 +465,6 @@ services:
       SERVER_URL: http://server-entity-event-sqlite:8080
       AUTH_TOKEN: admin-token
       MODE: full
-      SEED_COUNTS: ${SEED_COUNTS:-}
-      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:
@@ -579,8 +523,6 @@ services:
       SERVER_URL: http://server-addedit:8080
       AUTH_TOKEN: admin-token
       RESOURCE: Property
-      SEED_COUNTS: ${SEED_COUNTS:-}
-      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:
@@ -635,8 +577,6 @@ services:
       SERVER_URL: http://server-addedit-mongo:8080
       AUTH_TOKEN: admin-token
       RESOURCE: Property
-      SEED_COUNTS: ${SEED_COUNTS:-}
-      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:
@@ -680,8 +620,6 @@ services:
       SERVER_URL: http://server-addedit-sqlite:8080
       AUTH_TOKEN: admin-token
       RESOURCE: Property
-      SEED_COUNTS: ${SEED_COUNTS:-}
-      SEED_DEFAULT: ${SEED_DEFAULT:-10}
     volumes:
       - ./compliance:/config:ro
     depends_on:

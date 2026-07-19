@@ -1,35 +1,20 @@
 # Build stage
 #
-# NOTE: Build context is the tools/ directory so that the file: dependencies
-# (odata-expression-parser, reso-validation) can be resolved.
+# NOTE: docker-compose builds this image with the tools/ root as the build
+# context (context: ..), so COPY paths are prefixed with reso-reference-server/.
+# Standalone: docker build -f reso-reference-server/Dockerfile .   (from tools/)
 #
-# From docker-compose: context is set to .. (tools/)
-# Standalone: docker build -f reso-reference-server/Dockerfile .
+# The @reso-standards/* dependencies (reso-common, odata-expression-parser,
+# reso-validation) resolve from the npm registry via npm install.
 
 FROM node:22-alpine AS build
 WORKDIR /app
 
-# Copy file: dependencies
-COPY odata-expression-parser/ /deps/odata-expression-parser/
-COPY reso-validation/ /deps/reso-validation/
-
-# Build file: dependencies (server depends on these)
-WORKDIR /deps/odata-expression-parser
-RUN npm install && npx tsc
-
-WORKDIR /deps/reso-validation
-RUN npm install && npx tsc
-
-WORKDIR /app
-
-# Copy server source
+# Install dependencies (resolved from the npm registry)
 COPY reso-reference-server/package.json reso-reference-server/package-lock.json* ./
-
-# Rewrite file: dependency paths for the Docker build context
-RUN sed -i 's|file:../odata-expression-parser|file:/deps/odata-expression-parser|' package.json \
- && sed -i 's|file:../reso-validation|file:/deps/reso-validation|' package.json
-
 RUN npm install
+
+# Build the server
 COPY reso-reference-server/tsconfig.json ./
 COPY reso-reference-server/src/ ./src/
 RUN npm run build
@@ -41,8 +26,6 @@ FROM node:22-alpine
 WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /deps/odata-expression-parser /deps/odata-expression-parser
-COPY --from=build /deps/reso-validation /deps/reso-validation
 COPY reso-reference-server/package.json ./
 COPY reso-reference-server/server-metadata.json ./
 COPY reso-reference-server/seed-data ./seed-data

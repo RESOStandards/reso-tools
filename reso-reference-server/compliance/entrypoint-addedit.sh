@@ -4,7 +4,7 @@ set -e
 # ---------------------------------------------------------------------------
 # Add/Edit (RCP-010) compliance entrypoint
 #
-# 1. Seed test data via the data generator
+# 1. Seed the static dataset (POST /admin/seed)
 # 2. Run the reso-cert add-edit pipeline (handles health check, metadata,
 #    record sampling, payload generation, test execution, and reports)
 # ---------------------------------------------------------------------------
@@ -12,9 +12,6 @@ set -e
 SERVER_URL="${SERVER_URL:-http://server:8080}"
 AUTH_TOKEN="${AUTH_TOKEN:-admin-token}"
 RESOURCE="${RESOURCE:-Property}"
-
-# Load shared seed helpers (seed_count function)
-. "$(dirname "$0")/seed-helpers.sh" 2>/dev/null || . /config/seed-helpers.sh
 
 echo "============================================"
 echo " RESO Add/Edit (RCP-010) Compliance Test"
