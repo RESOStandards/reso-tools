@@ -4,6 +4,8 @@ A metadata-driven OData 4.01 reference server for the [RESO Data Dictionary](htt
 
 > **[User Guide](doc/GUIDE.md)** – a task-oriented walkthrough with realistic examples.
 
+> **Use it as a package.** Also published to npm as `@reso-standards/reso-reference-server` — import `createApp`, `startServer` and `loadConfig` to embed a RESO OData server in your own Node process (handy for test harnesses). Running the server directly from the package (`npx`, no clone or Docker) is tracked in [#238](https://github.com/RESOStandards/reso-tools/issues/238).
+
 ## Quick Start (Docker)
 
 The server supports three database backends: **PostgreSQL** (default), **MongoDB**, and **SQLite**. Each has its own Docker Compose profile.
