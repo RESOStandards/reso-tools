@@ -1,0 +1,69 @@
+name: Publish reso-certification
+
+# Publishes @reso-standards/reso-certification to npm via npm Trusted Publishing (GitHub OIDC — no token).
+# Trigger: push a tag `reso-certification-v<version>` matching reso-certification/package.json.
+# Deps (publish these FIRST): odata-expression-parser, reso-metadata-utils, reso-common,
+# reso-validation, reso-client. Publish LAST of the set (tier 2).
+# Provenance is generated automatically (public repo + OIDC).
+on:
+  push:
+    tags:
+      - 'reso-certification-v*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC handshake for npm Trusted Publishing
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      # Trusted Publishing requires npm >= 11.5.1
+      - name: Ensure recent npm
+        run: npm install -g npm@latest
+
+      - name: Verify tag matches package version
+        if: github.ref_type == 'tag'
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#reso-certification-v}"
+          PKG_VERSION="$(node -p "require('./reso-certification/package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match reso-certification/package.json ($PKG_VERSION)"
+            exit 1
+          fi
+
+      # Workspace-scoped install + build: the target and its @reso-standards deps, in
+      # topological order — not the private/UI packages (electron, vite). reso-certification's
+      # own build copies src/legacy + src/etl into dist (see its package.json build script).
+      - name: Install and build (target + deps)
+        run: |
+          npm install \
+            -w @reso-standards/odata-expression-parser \
+            -w @reso-standards/reso-metadata-utils \
+            -w @reso-standards/reso-common \
+            -w @reso-standards/reso-validation \
+            -w @reso-standards/reso-client \
+            -w @reso-standards/reso-certification \
+            --include-workspace-root
+          npm run build \
+            -w @reso-standards/odata-expression-parser \
+            -w @reso-standards/reso-metadata-utils \
+            -w @reso-standards/reso-common \
+            -w @reso-standards/reso-validation \
+            -w @reso-standards/reso-client \
+            -w @reso-standards/reso-certification \
+            --if-present
+
+      - name: Test
+        run: npm test -w @reso-standards/reso-certification
+
+      - name: Publish (Trusted Publishing / OIDC)
+        run: npm publish -w @reso-standards/reso-certification --access public
