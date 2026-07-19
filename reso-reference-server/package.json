@@ -2,11 +2,27 @@
   "name": "@reso-standards/reso-reference-server",
   "version": "0.8.0",
   "description": "RESO Reference OData Server — metadata-driven CRUD server for RESO Data Dictionary resources",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RESOStandards/reso-tools.git",
+    "directory": "reso-reference-server"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js"
   },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "src/ui-config.json",
+    "src/field-groups.json",
+    "server-metadata.json",
+    "public"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
