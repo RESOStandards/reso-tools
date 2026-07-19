@@ -65,11 +65,11 @@ services:
       - |
         echo "Waiting for server at http://server:8080..."
         until wget -qO- http://server:8080/health > /dev/null 2>&1; do sleep 2; done
-        echo "Server ready. Seeding data with dependency resolution..."
+        echo "Server ready. Loading static seed data..."
 
-        wget -qO- --post-data='{"resource":"Property","count":50,"resolveDependencies":true,"relatedRecords":{"Media":5,"OpenHouse":2,"Showing":2,"PropertyRooms":3,"PropertyGreenVerification":1,"PropertyPowerProduction":1,"PropertyUnitTypes":2}}' \
+        wget -qO- --post-data='{}' \
           --header='Content-Type: application/json' --header='Authorization: Bearer admin-token' \
-          http://server:8080/admin/data-generator || true
+          http://server:8080/admin/seed || true
 
         echo "Seed complete."
     depends_on:
@@ -147,11 +147,11 @@ services:
       - |
         echo "Waiting for server at http://server-mongo:8080..."
         until wget -qO- http://server-mongo:8080/health > /dev/null 2>&1; do sleep 2; done
-        echo "Server ready. Seeding data with dependency resolution..."
+        echo "Server ready. Loading static seed data..."
 
-        wget -qO- --post-data='{"resource":"Property","count":50,"resolveDependencies":true,"relatedRecords":{"Media":5,"OpenHouse":2,"Showing":2,"PropertyRooms":3,"PropertyGreenVerification":1,"PropertyPowerProduction":1,"PropertyUnitTypes":2}}' \
+        wget -qO- --post-data='{}' \
           --header='Content-Type: application/json' --header='Authorization: Bearer admin-token' \
-          http://server-mongo:8080/admin/data-generator || true
+          http://server-mongo:8080/admin/seed || true
 
         echo "Seed complete."
     depends_on:
@@ -214,11 +214,11 @@ services:
       - |
         echo "Waiting for server at http://server-sqlite:8080..."
         until wget -qO- http://server-sqlite:8080/health > /dev/null 2>&1; do sleep 2; done
-        echo "Server ready. Seeding data with dependency resolution..."
+        echo "Server ready. Loading static seed data..."
 
-        wget -qO- --post-data='{"resource":"Property","count":50,"resolveDependencies":true,"relatedRecords":{"Media":5,"OpenHouse":2,"Showing":2,"PropertyRooms":3,"PropertyGreenVerification":1,"PropertyPowerProduction":1,"PropertyUnitTypes":2}}' \
+        wget -qO- --post-data='{}' \
           --header='Content-Type: application/json' --header='Authorization: Bearer admin-token' \
-          http://server-sqlite:8080/admin/data-generator || true
+          http://server-sqlite:8080/admin/seed || true
 
         echo "Seed complete."
     depends_on:

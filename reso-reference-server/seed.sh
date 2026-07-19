@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # RESO Reference Server — Seed Data Script
 #
-# Seeds the reference server with realistic test data using the admin API.
-# Uses dependency resolution to create resources in the correct order with valid FK linkages.
+# Loads the committed static seed dataset (seed-data/seed.json.gz) into a running
+# reference server via POST /admin/seed. The server inserts it through the DAL with
+# FK links preserved. Idempotent — re-running is a no-op once the server is seeded.
 # Works with both Docker and locally running server instances.
 #
 # Usage:
@@ -28,56 +29,11 @@ done
 echo "Server is ready."
 echo ""
 
-# Generate Property records with dependency resolution
-# Automatically creates Member, Office, Teams in correct order with valid FK linkages
-echo "Generating 50 Property records with dependencies (Member, Office, Teams, etc.)..."
-curl -sf -X POST "$URL/admin/data-generator" \
+echo "Loading static seed data (Property, Member, Office, Media and related resources)..."
+curl -sf -X POST "$URL/admin/seed" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
-  -d '{
-    "resource": "Property",
-    "count": 50,
-    "resolveDependencies": true,
-    "relatedRecords": {
-      "Media": 5,
-      "OpenHouse": 2,
-      "Showing": 2,
-      "PropertyRooms": 3,
-      "PropertyGreenVerification": 1,
-      "PropertyPowerProduction": 1,
-      "PropertyUnitTypes": 2
-    }
-  }' | tee /dev/stderr | jq -r '"  Property: \(.created) created, \(.failed) failed"' 2>/dev/null || true
-echo ""
-
-# Generate Media for Member records (headshots, team photos)
-echo "Generating Media for existing Member records..."
-curl -sf -X POST "$URL/admin/data-generator" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{
-    "resource": "Member",
-    "count": 10,
-    "resolveDependencies": true,
-    "relatedRecords": {
-      "Media": 2
-    }
-  }' | tee /dev/stderr | jq -r '"  Member: \(.created) created, \(.failed) failed"' 2>/dev/null || true
-echo ""
-
-# Generate Media for Office records (building exteriors, logos)
-echo "Generating Media for existing Office records..."
-curl -sf -X POST "$URL/admin/data-generator" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{
-    "resource": "Office",
-    "count": 5,
-    "resolveDependencies": true,
-    "relatedRecords": {
-      "Media": 3
-    }
-  }' | tee /dev/stderr | jq -r '"  Office: \(.created) created, \(.failed) failed"' 2>/dev/null || true
+  | tee /dev/stderr | jq -r '"  \(.message): \(.loaded) records loaded"' 2>/dev/null || true
 echo ""
 
 echo "Seed complete."

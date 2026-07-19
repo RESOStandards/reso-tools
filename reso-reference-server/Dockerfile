@@ -1,7 +1,7 @@
 # Build stage
 #
-# NOTE: Build context is the tools/ directory so that all file: dependencies
-# (odata-expression-parser, reso-validation, reso-data-generator) can be resolved.
+# NOTE: Build context is the tools/ directory so that the file: dependencies
+# (odata-expression-parser, reso-validation) can be resolved.
 #
 # From docker-compose: context is set to .. (tools/)
 # Standalone: docker build -f reso-reference-server/Dockerfile .
@@ -12,8 +12,6 @@ WORKDIR /app
 # Copy file: dependencies
 COPY odata-expression-parser/ /deps/odata-expression-parser/
 COPY reso-validation/ /deps/reso-validation/
-COPY reso-data-generator/package.json reso-data-generator/tsconfig.json /deps/reso-data-generator/
-COPY reso-data-generator/src/ /deps/reso-data-generator/src/
 
 # Build file: dependencies (server depends on these)
 WORKDIR /deps/odata-expression-parser
@@ -22,9 +20,6 @@ RUN npm install && npx tsc
 WORKDIR /deps/reso-validation
 RUN npm install && npx tsc
 
-WORKDIR /deps/reso-data-generator
-RUN npm install && npm run build
-
 WORKDIR /app
 
 # Copy server source
@@ -32,8 +27,7 @@ COPY reso-reference-server/package.json reso-reference-server/package-lock.json*
 
 # Rewrite file: dependency paths for the Docker build context
 RUN sed -i 's|file:../odata-expression-parser|file:/deps/odata-expression-parser|' package.json \
- && sed -i 's|file:../reso-validation|file:/deps/reso-validation|' package.json \
- && sed -i 's|file:../reso-data-generator|file:/deps/reso-data-generator|' package.json
+ && sed -i 's|file:../reso-validation|file:/deps/reso-validation|' package.json
 
 RUN npm install
 COPY reso-reference-server/tsconfig.json ./
@@ -49,9 +43,9 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /deps/odata-expression-parser /deps/odata-expression-parser
 COPY --from=build /deps/reso-validation /deps/reso-validation
-COPY --from=build /deps/reso-data-generator /deps/reso-data-generator
 COPY reso-reference-server/package.json ./
 COPY reso-reference-server/server-metadata.json ./
+COPY reso-reference-server/seed-data ./seed-data
 COPY reso-reference-server/public ./public
 # Config resolves serverRoot to ../src when running from dist/
 COPY reso-reference-server/src/ui-config.json reso-reference-server/src/field-groups.json ./src/

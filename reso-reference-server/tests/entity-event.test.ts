@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { describe, expect, it, vi } from 'vitest';
-import { createDataResetHandler } from '../src/admin/data-generator.js';
+import { createDataResetHandler } from '../src/admin/reset.js';
 import type { CollectionResult, DataAccessLayer, EntityRecord, ResourceContext, SingleResult } from '../src/db/data-access.js';
 import type { CompactionRunner } from '../src/db/entity-event-compaction.js';
 import { startCompaction, stopCompaction } from '../src/db/entity-event-compaction.js';

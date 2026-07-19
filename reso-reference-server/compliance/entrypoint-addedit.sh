@@ -27,12 +27,11 @@ echo ""
 echo "Waiting for server..."
 until wget -qO- "$SERVER_URL/health" > /dev/null 2>&1; do sleep 2; done
 
-PROP_COUNT=$(seed_count Property)
-echo "Seeding $PROP_COUNT Property records..."
-wget -qO- --post-data="{\"resource\":\"Property\",\"count\":$PROP_COUNT,\"resolveDependencies\":true}" \
+echo "Loading static seed data..."
+wget -qO- --post-data='{}' \
   --header='Content-Type: application/json' \
   --header="Authorization: Bearer $AUTH_TOKEN" \
-  "$SERVER_URL/admin/data-generator" || true
+  "$SERVER_URL/admin/seed" || true
 echo "Seed complete."
 echo ""
 

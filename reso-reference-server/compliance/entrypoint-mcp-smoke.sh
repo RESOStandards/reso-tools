@@ -27,11 +27,11 @@ echo "Server is up."
 echo ""
 
 # Seed a single Property record so the query tool returns something
-echo "Seeding 1 Property record..."
-wget -qO- --post-data='{"resource":"Property","count":1,"resolveDependencies":true}' \
+echo "Loading static seed data..."
+wget -qO- --post-data='{}' \
   --header="Content-Type: application/json" \
   --header="Authorization: Bearer $AUTH_TOKEN" \
-  "$SERVER_URL/admin/data-generator" > /dev/null || true
+  "$SERVER_URL/admin/seed" > /dev/null || true
 echo "Seed complete."
 echo ""
 

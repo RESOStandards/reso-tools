@@ -106,7 +106,7 @@ curl -X POST http://localhost:8080/Property \
   -d '{"ListPrice": 250000, "City": "Austin", "StateOrProvince": "TX", "PostalCode": "78701", "Country": "US", "BedroomsTotal": 3}'
 ```
 
-Seeding uses the data generator with automatic dependency resolution (`resolveDependencies: true`). A single seed call creates all resources in topological order with valid FK linkages: Office (10), Member (25), OUID (2), Teams (5), Property (50), plus child collections (Media, OpenHouse, Showing, Rooms, etc.) – 892 records total.
+Seeding loads a committed static dataset (`seed-data/seed.json.gz`) via `POST /admin/seed`. The server inserts it through the DAL with FK links preserved: Office (17), Member (39), OUID (2), Teams (5), Property (50), plus child collections (Media, OpenHouse, Showing, Rooms, etc.) — 948 records total. The call is idempotent — it is a no-op once the server is already seeded.
 
 ### Reseed (drop existing data)
 
@@ -181,8 +181,8 @@ The server implements OData 4.01 features required by the RESO Web API Add/Edit 
 | GET | `/{Resource}('{key}')` | Get a record by key (supports `$expand`) |
 | PATCH | `/{Resource}('{key}')` | Update a record |
 | DELETE | `/{Resource}('{key}')` | Delete a record |
-| GET | `/admin/data-generator/status` | Resource counts and available generators |
-| POST | `/admin/data-generator` | Generate seed data (supports `resolveDependencies`) |
+| POST | `/admin/seed` | Load the committed static seed dataset (idempotent) |
+| DELETE | `/admin/data-generator/reset` | Truncate all resource data (schema preserved) |
 
 ## Enumeration Modes
 
