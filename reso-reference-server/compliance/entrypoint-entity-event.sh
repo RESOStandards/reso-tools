@@ -4,7 +4,7 @@ set -e
 # ---------------------------------------------------------------------------
 # EntityEvent (RCP-027) compliance entrypoint
 #
-# 1. Seed test data via the data generator (creates EntityEvent records)
+# 1. Seed the static dataset (POST /admin/seed; includes EntityEvent records)
 # 2. Run the reso-cert entity-event pipeline (handles health check, metadata,
 #    payload generation, test execution, and reports)
 # ---------------------------------------------------------------------------
@@ -13,9 +13,6 @@ SERVER_URL="${SERVER_URL:-http://server:8080}"
 AUTH_TOKEN="${AUTH_TOKEN:-admin-token}"
 WRITABLE_RESOURCE="${WRITABLE_RESOURCE:-Property}"
 MODE="${MODE:-full}"
-
-# Load shared seed helpers (seed_count function)
-. "$(dirname "$0")/seed-helpers.sh" 2>/dev/null || . /config/seed-helpers.sh
 
 echo "============================================"
 echo " RESO EntityEvent (RCP-027) Compliance Test"

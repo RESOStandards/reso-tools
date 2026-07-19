@@ -4,16 +4,13 @@ set -e
 # ---------------------------------------------------------------------------
 # Web API Core compliance entrypoint
 #
-# 1. Seed test data via the data generator
+# 1. Seed the static dataset (POST /admin/seed)
 # 2. Run the reso-cert core pipeline (handles health check, metadata,
 #    field sampling, scenario execution, and reports)
 # ---------------------------------------------------------------------------
 
 SERVER_URL="${SERVER_URL:-http://server:8080}"
 AUTH_TOKEN="${AUTH_TOKEN:-admin-token}"
-
-# Load shared seed helpers (seed_count function)
-. "$(dirname "$0")/seed-helpers.sh" 2>/dev/null || . /config/seed-helpers.sh
 
 echo "============================================"
 echo " RESO Web API Core Compliance Test"

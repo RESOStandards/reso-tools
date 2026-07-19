@@ -26,7 +26,7 @@ until wget -qO- "$SERVER_URL/health" > /dev/null 2>&1; do sleep 2; done
 echo "Server is up."
 echo ""
 
-# Seed a single Property record so the query tool returns something
+# Seed the static dataset so the query tools return something
 echo "Loading static seed data..."
 wget -qO- --post-data='{}' \
   --header="Content-Type: application/json" \

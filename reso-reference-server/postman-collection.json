@@ -1058,126 +1058,38 @@
       "name": "Admin",
       "item": [
         {
-          "name": "Data Generator — Status",
+          "name": "Load Static Seed",
           "request": {
-            "method": "GET",
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/seed",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "seed"]
+            },
+            "description": "Load the committed static seed dataset via the Add/Edit API. Idempotent — skips if the database already contains data. Requires admin role."
+          }
+        },
+        {
+          "name": "Reset Data",
+          "request": {
+            "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/admin/data-generator/status",
+              "raw": "{{base_url}}/admin/data-generator/reset",
               "host": ["{{base_url}}"],
-              "path": ["admin", "data-generator", "status"]
+              "path": ["admin", "data-generator", "reset"]
             },
-            "description": "Returns available resources, field counts, current record counts and related resource info. Requires admin role."
-          }
-        },
-        {
-          "name": "Data Generator — Generate Properties",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"resource\": \"Property\",\n  \"count\": 10\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/admin/data-generator",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "data-generator"]
-            },
-            "description": "Generate synthetic Property records. Requires admin role."
-          }
-        },
-        {
-          "name": "Data Generator — With Related Records",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"resource\": \"Property\",\n  \"count\": 5,\n  \"relatedRecords\": {\n    \"Media\": 3,\n    \"OpenHouse\": 1\n  }\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/admin/data-generator",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "data-generator"]
-            },
-            "description": "Generate Properties with related Media and OpenHouse records."
-          }
-        },
-        {
-          "name": "Data Generator — With Dependencies",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"resource\": \"Property\",\n  \"count\": 10,\n  \"resolveDependencies\": true,\n  \"relatedRecords\": {\n    \"Media\": 3,\n    \"OpenHouse\": 1\n  }\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/admin/data-generator",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "data-generator"]
-            },
-            "description": "Generate Properties with FK dependency resolution (creates Members and Offices first, then links them). Requires admin role."
-          }
-        },
-        {
-          "name": "Data Generator — Generate Members",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"resource\": \"Member\",\n  \"count\": 10\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/admin/data-generator",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "data-generator"]
-            },
-            "description": "Generate synthetic Member records. Requires admin role."
-          }
-        },
-        {
-          "name": "Data Generator — Generate Offices",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"resource\": \"Office\",\n  \"count\": 5\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/admin/data-generator",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "data-generator"]
-            },
-            "description": "Generate synthetic Office records. Requires admin role."
+            "description": "Truncate all seeded data. Requires admin role."
           }
         }
       ]

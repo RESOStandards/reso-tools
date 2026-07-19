@@ -4,7 +4,7 @@ set -e
 # ---------------------------------------------------------------------------
 # Data Dictionary compliance entrypoint
 #
-# 1. Seed test data via the data generator
+# 1. Seed the static dataset (POST /admin/seed)
 # 2. Run the reso-cert dd pipeline (handles health check, metadata
 #    serialization, Lookup Resource merge, variations, and replication)
 # ---------------------------------------------------------------------------
@@ -12,9 +12,6 @@ set -e
 SERVER_URL="${SERVER_URL:-http://server:8080}"
 AUTH_TOKEN="${AUTH_TOKEN:-admin-token}"
 DD_VERSION="${DD_VERSION:-2.0}"
-
-# Load shared seed helpers (seed_count function)
-. "$(dirname "$0")/seed-helpers.sh" 2>/dev/null || . /config/seed-helpers.sh
 
 echo "============================================"
 echo " RESO Data Dictionary ${DD_VERSION} Compliance Test"
