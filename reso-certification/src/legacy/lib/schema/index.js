@@ -4,7 +4,7 @@ const { generateSchema, generateJsonSchema } = require('./generate');
 const path = require('path');
 const { validatePayload, validate, combineErrors, VALIDATION_ERROR_MESSAGES } = require('./validate');
 const { getErrorHandler, DATA_DICTIONARY_VERSIONS } = require('../../common');
-const { getReferenceMetadata } = require('@reso/reso-certification-etl');
+const { getReferenceMetadata } = require('../../../etl/index.cjs');
 const { processFiles, createDirectoryIfNotPresent, writeFile, readFile } = require('./utils');
 
 const ERROR_REPORT = 'schema-validation-report.json';

@@ -1,6 +1,6 @@
 'use strict';
 
-const { getReferenceMetadata } = require('@reso/reso-certification-etl');
+const { getReferenceMetadata } = require('../../../etl/index.cjs');
 const { writeFile } = require('fs/promises');
 
 const ANNOTATION_STANDARD_NAME = 'RESO.OData.Metadata.StandardName';

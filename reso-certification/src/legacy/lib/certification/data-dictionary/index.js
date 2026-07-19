@@ -27,7 +27,7 @@ const { REPLICATION_STRATEGIES } = require('../../replication/utils');
 const { findVariations } = require('../../variations');
 const { replicate } = require('../../replication');
 
-const { processLookupResourceMetadataFiles } = require('@reso/reso-certification-etl');
+const { processLookupResourceMetadataFiles } = require('../../../../etl/index.cjs');
 
 const RESULTS_PATH_NAME = 'results',
   CONFIG_FILE_NAME = 'config.xml',

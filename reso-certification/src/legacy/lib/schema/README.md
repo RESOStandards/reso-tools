@@ -37,7 +37,7 @@ $ reso-certification-utils schema -V -p <path to payloads file, zip, or director
 # Usage in a library
 
 ```js
-const { getReferenceMetadata } = require('reso-certification-etl');
+const { getReferenceMetadata } = require('../etl/index.cjs');
 const { generateJsonSchema, validate, combineErrors } = require('./lib/schema');
 const fs = require('fs/promises');
 

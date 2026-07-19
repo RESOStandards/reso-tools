@@ -1,6 +1,6 @@
 'use strict';
 
-const { getReferenceMetadata } = require('@reso/reso-certification-etl');
+const { getReferenceMetadata } = require('../../../../etl/index.cjs');
 const { generateJsonSchema, validate, combineErrors } = require('../../schema');
 const fs = require('fs/promises');
 const { exit } = require('process');
