@@ -1,0 +1,63 @@
+name: Publish reso-reference-server
+
+# Publishes @reso-standards/reso-reference-server to npm via npm Trusted Publishing (GitHub OIDC — no token).
+# Trigger: push a tag `reso-reference-server-v<version>` matching reso-reference-server/package.json.
+# Deps (publish these FIRST): odata-expression-parser, reso-common, reso-validation.
+# Provenance is generated automatically (public repo + OIDC).
+on:
+  push:
+    tags:
+      - 'reso-reference-server-v*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC handshake for npm Trusted Publishing
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      # Trusted Publishing requires npm >= 11.5.1
+      - name: Ensure recent npm
+        run: npm install -g npm@latest
+
+      - name: Verify tag matches package version
+        if: github.ref_type == 'tag'
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#reso-reference-server-v}"
+          PKG_VERSION="$(node -p "require('./reso-reference-server/package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match reso-reference-server/package.json ($PKG_VERSION)"
+            exit 1
+          fi
+
+      # Workspace-scoped install + build: the target and its @reso-standards deps, in
+      # topological order — not the private/UI packages (electron, vite).
+      - name: Install and build (target + deps)
+        run: |
+          npm install \
+            -w @reso-standards/odata-expression-parser \
+            -w @reso-standards/reso-common \
+            -w @reso-standards/reso-validation \
+            -w @reso-standards/reso-reference-server \
+            --include-workspace-root
+          npm run build \
+            -w @reso-standards/odata-expression-parser \
+            -w @reso-standards/reso-common \
+            -w @reso-standards/reso-validation \
+            -w @reso-standards/reso-reference-server \
+            --if-present
+
+      - name: Test
+        run: npm test -w @reso-standards/reso-reference-server
+
+      - name: Publish (Trusted Publishing / OIDC)
+        run: npm publish -w @reso-standards/reso-reference-server --access public

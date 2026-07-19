@@ -26,6 +26,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "prepublishOnly": "npm run build",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "test": "vitest run",

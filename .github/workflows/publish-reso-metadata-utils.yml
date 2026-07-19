@@ -1,0 +1,52 @@
+name: Publish reso-metadata-utils
+
+# Publishes @reso-standards/reso-metadata-utils to npm via npm Trusted Publishing (GitHub OIDC — no token).
+# Trigger: push a tag `reso-metadata-utils-v<version>` matching reso-metadata-utils/package.json.
+# Deps: none (tier 0). Provenance is generated automatically (public repo + OIDC).
+on:
+  push:
+    tags:
+      - 'reso-metadata-utils-v*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC handshake for npm Trusted Publishing
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      # Trusted Publishing requires npm >= 11.5.1
+      - name: Ensure recent npm
+        run: npm install -g npm@latest
+
+      - name: Verify tag matches package version
+        if: github.ref_type == 'tag'
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#reso-metadata-utils-v}"
+          PKG_VERSION="$(node -p "require('./reso-metadata-utils/package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match reso-metadata-utils/package.json ($PKG_VERSION)"
+            exit 1
+          fi
+
+      # Workspace-scoped install + build — pulls in only the target (and any @reso-standards
+      # deps), not the private/UI packages (electron, vite).
+      - name: Install and build
+        run: |
+          npm install -w @reso-standards/reso-metadata-utils --include-workspace-root
+          npm run build -w @reso-standards/reso-metadata-utils --if-present
+
+      - name: Test
+        run: npm test -w @reso-standards/reso-metadata-utils
+
+      - name: Publish (Trusted Publishing / OIDC)
+        run: npm publish -w @reso-standards/reso-metadata-utils --access public
