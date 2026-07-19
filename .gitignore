@@ -32,8 +32,8 @@ reso-variations.json
 upi-validation-report.json
 *.resoscript
 # Side-effect copy from SDK initReplicationState when run from repo
-# root — canonical copies under reso-certification/ and
-# reso-desktop-client/ are still tracked. See v0.12 cleanup.
+# root — the canonical copy under reso-certification/ is still
+# tracked. See v0.12 cleanup.
 /schema-validation-settings.json
 
 # Sample fixtures are intentional — exempt them from the patterns above

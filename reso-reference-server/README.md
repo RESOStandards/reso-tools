@@ -127,7 +127,7 @@ reso-reference-server/
 └── CLAUDE.md        # Coding conventions
 ```
 
-See also: [`reso-web-client/`](../reso-web-client/) (React UI) and [`reso-desktop-client/`](../reso-desktop-client/) (Electron shell).
+See also: the desktop certification app, distributed from [Releases](https://github.com/RESOStandards/reso-tools/releases/latest), which bundles a browser UI over this server.
 
 The server is **metadata-driven**: it reads `server-metadata.json` (RESO Data Dictionary 2.0) at startup and dynamically:
 
@@ -288,7 +288,7 @@ npm run dev    # tsc --watch
 npm start      # node dist/index.js
 ```
 
-The `preinstall` hook automatically builds sibling packages this one depends on (`reso-data-generator`, `odata-expression-parser`, `reso-validation`). To bootstrap every package at once, run `npm run bootstrap` from the repo root instead.
+This package's inter-package dependencies (`odata-expression-parser`, `reso-validation`, `reso-common`) are resolved by npm workspaces: `npm install` at the repo root links them locally, and published consumers install them from the npm registry. To bootstrap and build every package at once, run `npm run bootstrap` from the repo root.
 
 ## License
 
