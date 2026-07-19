@@ -250,7 +250,7 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
   app.use(odataRouter);
 
   // Admin endpoints (data generator, etc.)
-  const adminRouter = createAdminRouter(metadata, dal, authConfig, config.enumMode, readOnlyResources);
+  const adminRouter = createAdminRouter(metadata, dal, authConfig, readOnlyResources);
   app.use(adminRouter);
 
   // Swagger UI
