@@ -3,6 +3,7 @@ const fs = require('fs/promises');
 const CURRENT_DD_VERSION = '2.1';
 const STANDARD_NAME_ANNOTATION_TERM = 'RESO.OData.Metadata.StandardName';
 const DD_WIKI_URL_TERM = 'RESO.DDWikiUrl';
+const PAYLOADS_TERM = 'RESO.OData.Metadata.Payloads';
 const FIELDS = 'fields';
 const LOOKUPS = 'lookups';
 const EXPANSIONS = 'expansions';
@@ -12,6 +13,22 @@ const buildAnnotationMap = (annotations = []) =>
     acc[term] = value;
     return acc;
   }, {});
+
+/**
+ * Normalize a field's payloads to a trimmed, non-empty string array. Tolerant of
+ * the top-level array (DD 2.2 shape), the legacy top-level comma-string, or the
+ * RESO.OData.Metadata.Payloads annotation (pre-2.2 transport form). The annotation
+ * was a carry-through of the old XLSX -> OData XML -> JSON pipeline; generation now
+ * goes XLSX -> JSON directly and emits payloads as a top-level property, so read the
+ * top-level property first and fall back to the annotation for older refs. Returns
+ * [] when none are present (never ['']).
+ */
+const normalizePayloads = (field, annotationMap = {}) => {
+  const raw = field?.payloads ?? annotationMap[PAYLOADS_TERM];
+  return (Array.isArray(raw) ? raw : String(raw ?? '').split(','))
+    .map(payload => String(payload).trim())
+    .filter(Boolean);
+};
 
 const getSimpleDataType = (type, isCollection) => {
   switch (type) {
@@ -79,15 +96,14 @@ const getLookupMap = (version = CURRENT_DD_VERSION) =>
  */
 const getStandardMetadata = (version = CURRENT_DD_VERSION) => {
   const { fields, lookups } = getMetadata(version) || {};
-  const PAYLOADS_TERM = 'RESO.OData.Metadata.Payloads';
   const standardFields = fields?.map(field => {
     const annotationMap = buildAnnotationMap(field?.annotations);
     const url = annotationMap[DD_WIKI_URL_TERM];
 
-    // TODO: this is probably incorrect 
+    // TODO: this is probably incorrect
     const type = field?.type?.startsWith('Edm.') ? field.type : 'Edm.EnumType';
 
-    const payloads = (annotationMap[PAYLOADS_TERM] || '').split(',');
+    const payloads = normalizePayloads(field, annotationMap);
 
     const transformedField = {
       resourceName: field.resourceName,
@@ -358,6 +374,7 @@ module.exports = {
   getMetadata,
   getLookupMap,
   getStandardMetadata,
+  normalizePayloads,
   reportTypes,
   CATEGORIES,
   CURRENT_DD_VERSION
