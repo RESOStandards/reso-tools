@@ -241,11 +241,11 @@
       },
       "idx": {
         "eqZero": 0,
-        "gtZero": 0,
-        "gte25": 0,
-        "gte50": 0,
-        "gte75": 0,
-        "eq100": 0
+        "gtZero": 6,
+        "gte25": 6,
+        "gte50": 5,
+        "gte75": 5,
+        "eq100": 3
       },
       "local": {
         "eqZero": 0,
@@ -275,10 +275,10 @@
       },
       "idx": {
         "eqZero": 0,
-        "gtZero": 0,
-        "gte25": 0,
-        "gte50": 0,
-        "gte75": 0,
+        "gtZero": 6,
+        "gte25": 2,
+        "gte50": 2,
+        "gte75": 2,
         "eq100": 0
       },
       "local": {
@@ -295,13 +295,13 @@
         "fields": {
           "total": 1,
           "reso": 1,
-          "idx": 0,
+          "idx": 1,
           "local": 0
         },
         "lookups": {
           "total": 0.5,
           "reso": 0.5,
-          "idx": 0,
+          "idx": 0.5,
           "local": 0
         }
       },
@@ -323,13 +323,13 @@
         "fields": {
           "total": 1.1247500000000001,
           "reso": 1.333,
-          "idx": 0,
+          "idx": 1.333,
           "local": 0.5
         },
         "lookups": {
           "total": 0.24200000000000005,
           "reso": 0.30000000000000004,
-          "idx": 0,
+          "idx": 0.30000000000000004,
           "local": 0.01
         },
         "expansions": {
@@ -337,7 +337,7 @@
             "fields": {
               "total": 0.5833333333333334,
               "reso": 0.625,
-              "idx": 0,
+              "idx": 0.625,
               "local": 0.5
             },
             "lookups": {
@@ -385,11 +385,11 @@
           },
           "idx": {
             "eqZero": 0,
-            "gtZero": 0,
-            "gte25": 0,
-            "gte50": 0,
-            "gte75": 0,
-            "eq100": 0
+            "gtZero": 1,
+            "gte25": 1,
+            "gte50": 1,
+            "gte75": 1,
+            "eq100": 1
           },
           "local": {
             "eqZero": 0,
@@ -419,10 +419,10 @@
           },
           "idx": {
             "eqZero": 0,
-            "gtZero": 0,
-            "gte25": 0,
-            "gte50": 0,
-            "gte75": 0,
+            "gtZero": 2,
+            "gte25": 1,
+            "gte50": 1,
+            "gte75": 1,
             "eq100": 0
           },
           "local": {
@@ -525,11 +525,11 @@
           },
           "idx": {
             "eqZero": 0,
-            "gtZero": 0,
-            "gte25": 0,
-            "gte50": 0,
-            "gte75": 0,
-            "eq100": 0
+            "gtZero": 3,
+            "gte25": 3,
+            "gte50": 3,
+            "gte75": 3,
+            "eq100": 1
           },
           "local": {
             "eqZero": 0,
@@ -559,10 +559,10 @@
           },
           "idx": {
             "eqZero": 0,
-            "gtZero": 0,
-            "gte25": 0,
-            "gte50": 0,
-            "gte75": 0,
+            "gtZero": 4,
+            "gte25": 1,
+            "gte50": 1,
+            "gte75": 1,
             "eq100": 0
           },
           "local": {
@@ -595,11 +595,11 @@
               },
               "idx": {
                 "eqZero": 0,
-                "gtZero": 0,
-                "gte25": 0,
-                "gte50": 0,
-                "gte75": 0,
-                "eq100": 0
+                "gtZero": 2,
+                "gte25": 2,
+                "gte50": 1,
+                "gte75": 1,
+                "eq100": 1
               },
               "local": {
                 "eqZero": 0,
