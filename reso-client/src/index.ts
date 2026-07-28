@@ -91,6 +91,11 @@ export type { EnvConfig } from './env.js';
 export { createLookupResolver } from './lookup/resolver.js';
 export type { LookupValue, LookupResolverConfig, LookupResolver } from './lookup/types.js';
 
+// Enum abstraction — one representation-aware handle per enumeration field (classify + buildFilter +
+// decodeValue + encodeValue), on the shared reso-metadata-utils decoder. See references/enumerations.md.
+export { resolveEnum } from './enum/enum-field.js';
+export type { EnumField, EnumFieldInput, EnumRepresentation, EnumFilterOp } from './enum/enum-field.js';
+
 // Re-export expression parser types for convenience
 export type {
   FilterExpression,
