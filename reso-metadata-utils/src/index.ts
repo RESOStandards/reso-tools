@@ -17,8 +17,10 @@ export {
   getComplexType,
   getFieldsForResource,
   getFieldsForEntityType,
-  getAllFields
+  getAllFields,
+  extractTypeName
 } from './csdl/parser.js';
+export { decodeFlagsValue } from './csdl/enum-value.js';
 export { validateCsdl } from './csdl/validator.js';
 export type {
   CsdlSchema,
