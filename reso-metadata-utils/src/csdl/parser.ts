@@ -84,7 +84,7 @@ const unwrapCollectionType = (type: string): string => type.slice('Collection('.
  * e.g. "Collection(org.reso.metadata.Media)" → "Media"
  * e.g. "org.reso.metadata.Property" → "Property"
  */
-const extractTypeName = (type: string): string => {
+export const extractTypeName = (type: string): string => {
   const unwrapped = isCollectionType(type) ? unwrapCollectionType(type) : type;
   const dotIndex = unwrapped.lastIndexOf('.');
   return dotIndex >= 0 ? unwrapped.slice(dotIndex + 1) : unwrapped;
