@@ -18,7 +18,6 @@ docker compose up -d
 ```
 
 This starts:
-- **UI** at `http://localhost:5173` (React SPA with nginx reverse proxy)
 - **Server** at `http://localhost:8080` (OData API, `DB_BACKEND=postgres`)
 - **PostgreSQL** at `localhost:5432`
 
@@ -32,11 +31,10 @@ docker compose --profile seed up seed
 
 ```bash
 cd reso-reference-server
-docker compose --profile mongodb up -d mongodb server-mongo ui-mongo
+docker compose --profile mongodb up -d mongodb server-mongo
 ```
 
 This starts:
-- **UI** at `http://localhost:5173`
 - **Server** at `http://localhost:8080` (OData API, `DB_BACKEND=mongodb`)
 - **MongoDB** at `localhost:27017`
 
@@ -50,11 +48,10 @@ docker compose --profile seed-mongo up seed-mongo
 
 ```bash
 cd reso-reference-server
-docker compose --profile sqlite up -d server-sqlite ui-sqlite
+docker compose --profile sqlite up -d server-sqlite
 ```
 
 This starts:
-- **UI** at `http://localhost:5173`
 - **Server** at `http://localhost:8080` (OData API, `DB_BACKEND=sqlite`)
 - No external database – SQLite file stored in a Docker volume
 
@@ -77,11 +74,11 @@ docker compose up -d
 docker compose --profile seed up seed
 
 # – or start with MongoDB – 
-docker compose --profile mongodb up -d mongodb server-mongo ui-mongo
+docker compose --profile mongodb up -d mongodb server-mongo
 docker compose --profile mongodb --profile seed-mongo up seed-mongo
 
 # – or start with SQLite – 
-docker compose --profile sqlite up -d server-sqlite ui-sqlite
+docker compose --profile sqlite up -d server-sqlite
 docker compose --profile sqlite --profile seed-sqlite up seed-sqlite
 ```
 
@@ -93,9 +90,6 @@ curl http://localhost:8080/health
 
 # OData metadata
 curl http://localhost:8080/\$metadata
-
-# Browse the UI
-open http://localhost:5173
 
 # Query Property records via the API
 curl -H 'Accept: application/json' 'http://localhost:8080/Property?\$top=5&\$select=ListPrice,City,StateOrProvince'
@@ -220,7 +214,7 @@ docker compose --profile seed up --exit-code-from seed
 docker compose --profile compliance-core up --build --exit-code-from compliance-core
 
 # MongoDB
-docker compose --profile mongodb up -d --build --wait mongodb server-mongo ui-mongo
+docker compose --profile mongodb up -d --build --wait mongodb server-mongo
 docker compose --profile mongodb --profile seed-mongo up seed-mongo
 docker compose --profile compliance-core-mongo up --build --exit-code-from compliance-core-mongo
 
