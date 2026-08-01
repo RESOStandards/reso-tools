@@ -19,8 +19,15 @@
  * parameterized over the DD reference (each resource/field), with per-field findings as the
  * equivalent output. Conceptually they collapse into TYPE conformance — a field's declared type,
  * its enum representation (single/multi, closed, the LookupName annotation + Lookup Resource
- * integrity) and its type facets — plus one naming check (disallowed synonyms). Each check cites
- * the Commander BDD scenario it implements.
+ * mandatory fields) and its type facets — plus one naming check (disallowed synonyms). Each check
+ * cites the Commander BDD scenario it implements.
+ *
+ * NOTE on Lookup Resource value presence: whether a field's advertised LookupName actually resolves
+ * to rows in the Lookup Resource is deliberately NOT a metadata-gate check. Per RCP-032 a field MUST
+ * carry the LookupName annotation (checked here), but is only required to expose Lookup values when
+ * the field is populated in data — a population-gated concern the schema-validation phase owns, not
+ * this metadata gate. Enforcing value presence here false-fails conformant open lookups (e.g. City,
+ * BuildingFeatures) that are simply unpopulated.
  *
  * Intentionally NOT implemented: `"X" MUST contain at least one standard lookup` — latent in the
  * Commander (0 uses in the v1.7/v2.0 generated features) and incompatible with open enums that
@@ -36,7 +43,6 @@ export type MetadataCheckKind =
   | 'expansion-structure'
   | 'lookup-resource-fields'
   | 'lookup-name-annotation'
-  | 'lookup-name-integrity'
   | 'suggested-max';
 
 /**
@@ -427,35 +433,6 @@ export const checkLookupNameAnnotations = (
 };
 
 /**
- * LookupName referential integrity: every field carrying a LookupName annotation MUST reference an
- * enumeration that exists in the Lookup Resource data (report.lookups). Catches an annotation that
- * points at a missing or misspelled Lookup Resource entry. (The inverse — values served but not
- * advertised — is the schema-validation phase's job.)
- *
- * Commander BDD: `And fields with the annotation term "X" MUST have a LookupName in the Lookup
- * Resource` (LookupResource.java, RCP-032).
- */
-export const checkLookupNameIntegrity = (
-  report: MetadataReport,
-  _reference: DdReference,
-): ReadonlyArray<MetadataCheckFinding> => {
-  const lookupDataNames = new Set(report.lookups.map((l) => l.lookupName));
-  return report.fields.flatMap((field) => {
-    const annotation = field.annotations.find((a) => a.term === LOOKUP_NAME_ANNOTATION);
-    if (!annotation) return [];
-    return lookupDataNames.has(annotation.value)
-      ? []
-      : [{
-          check: 'lookup-name-integrity' as const,
-          severity: 'error' as const,
-          resourceName: field.resourceName,
-          fieldName: field.fieldName,
-          message: `"${field.fieldName}" in the "${field.resourceName}" resource references LookupName "${annotation.value}", which is not present in the Lookup Resource.`,
-        }];
-  });
-};
-
-/**
  * Suggested-max checks (SHOULD): the DD's maxLength / precision / scale are recommendations, not
  * requirements, so a provider value that differs from the suggested maximum yields a WARNING, not a
  * gate failure — matching the Commander, which only logs these. Only fields the provider declares
@@ -511,6 +488,5 @@ export const runDdMetadataChecks = (
   ...checkExpansionStructure(report, reference),
   ...checkLookupResourceFields(report, reference),
   ...checkLookupNameAnnotations(report, reference),
-  ...checkLookupNameIntegrity(report, reference),
   ...checkSuggestedMaxConstraints(report, reference),
 ];

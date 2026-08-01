@@ -43,6 +43,16 @@ const createDefinitions = async (resources, lookups, additionalProperties = fals
 
   const isSimpleType = type => type?.startsWith('Edm.');
 
+  // A field is a lookup (enumeration) field if it advertises values, carries the LookupName annotation
+  // (Edm.String representation), or is flagged isEnumeration (nominal EnumType representation). A nominal
+  // (non-Edm) type with none of these is an unhandled ComplexType, NOT an enumeration — mirroring
+  // common.js's isLookupField/isComplexType split. Only lookup fields get an enum (the advertised set,
+  // or a fail-closed empty enum when nothing is advertised); ComplexTypes keep their object typing.
+  const LOOKUP_NAME_TERM = 'RESO.OData.Metadata.LookupName';
+  const hasLookupNameAnnotation = field => (field?.annotations ?? []).some(a => a?.term === LOOKUP_NAME_TERM);
+  const isLookupField = (field, possibleValues) =>
+    possibleValues.length > 0 || hasLookupNameAnnotation(field) || field?.isEnumeration === true;
+
   const definitions = {};
 
   // This can be expanded to add more custom errors where the error value doesn't need to be known before running the schema. For eg. length in this case.
@@ -87,21 +97,28 @@ const createDefinitions = async (resources, lookups, additionalProperties = fals
           if (field.type === EDM_DATE) itemTypeSchema['format'] = 'date';
           if (mappedType === 'number') {
             if (!field.scale && field.precision) {
-              if (field.precision) itemTypeSchema['maximum'] = Number('9'.repeat(field.precision));
+              // A numeric field with scale 0 is an integer (an int is a number with scale 0). Type it as
+              // JSON integer so fractional values (e.g. 3.5) are rejected, and cap it at the precision max.
+              itemTypeSchema['type'] = 'integer';
+              itemTypeSchema['maximum'] = Number('9'.repeat(field.precision));
             }
           }
 
           if (!isSimpleType(field.type)) {
             const possibleValues = getPossibleLookupValues(field.type);
-            if (possibleValues.length > 0) {
-              if (!additionalProperties) {
-                itemTypeSchema['enum'] = possibleValues;
-              }
+            if (isLookupField(field, possibleValues)) {
+              // Enum enforcement is INDEPENDENT of additionalProperties: additionalProperties permits extra
+              // *fields*, but enum *values* must always be advertised. Attach the advertised set, or fail
+              // closed when a lookup field advertises NOTHING — an empty enum rejects any real value that
+              // shows up. [null] is the smallest valid enum; the nullable block below seeds null for nullable
+              // fields (so [] there), leaving [null] for the non-nullable case. Whether null is ACCEPTED is
+              // governed by `type` (nullable -> ['string','null'], non-nullable -> ['string']).
+              itemTypeSchema['enum'] =
+                possibleValues.length > 0 ? possibleValues : field.nullable === false ? [null] : [];
+              itemTypeSchema['type'] =
+                possibleValues.length > 0 ? Array.from(new Set(possibleValues.map(v => typeof v))) : ['string'];
             }
-            if (!possibleValues.length) {
-              possibleValues.push('');
-            }
-            itemTypeSchema['type'] = Array.from(new Set(possibleValues.map(v => typeof v)));
+            // A nominal non-lookup type (unhandled ComplexType) keeps its object typing — no enum applied.
           }
         }
 
@@ -159,21 +176,27 @@ const createDefinitions = async (resources, lookups, additionalProperties = fals
         if (field.type === EDM_DATE) schema['format'] = 'date';
         if (fieldType === 'number') {
           if (!field.scale && field.precision) {
-            if (field.precision) schema['maximum'] = Number('9'.repeat(field.precision));
+            // A numeric field with scale 0 is an integer (an int is a number with scale 0). Type it as
+            // JSON integer so fractional values (e.g. 3.5) are rejected, and cap it at the precision max.
+            schema['type'] = 'integer';
+            schema['maximum'] = Number('9'.repeat(field.precision));
           }
         }
 
         if (!isSimpleType(field.type)) {
           const possibleValues = getPossibleLookupValues(field.type);
-          if (possibleValues.length > 0) {
-            if (!additionalProperties) {
-              schema['enum'] = possibleValues;
-            }
+          if (isLookupField(field, possibleValues)) {
+            // Enum enforcement is INDEPENDENT of additionalProperties (see the collection branch above):
+            // extra fields may be allowed, but enum values must always be advertised. Attach the advertised
+            // set, or fail closed with an empty enum when a lookup field advertises NOTHING. [null] is the
+            // smallest valid enum; the nullable block seeds null for nullable fields (so [] there), leaving
+            // [null] for the non-nullable case. Null ACCEPTANCE is governed by `type`.
+            schema['enum'] =
+              possibleValues.length > 0 ? possibleValues : field.nullable === false ? [null] : [];
+            schema['type'] =
+              possibleValues.length > 0 ? Array.from(new Set(possibleValues.map(v => typeof v))) : ['string'];
           }
-          if (!possibleValues.length) {
-            possibleValues.push('');
-          }
-          schema['type'] = Array.from(new Set(possibleValues.map(v => typeof v)));
+          // A nominal non-lookup type (unhandled ComplexType) keeps its object typing — no enum applied.
         }
 
         if (customErrors.length) {
