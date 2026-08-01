@@ -9,6 +9,7 @@
 import { writeFile, copyFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadataWithVersion, persistMetadataXml } from '../test-runner/metadata.js';
 import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
@@ -385,7 +386,7 @@ const initReplicationState: TestFunction<DDContext> = async (ctx) => {
   if (!ctx.replicationStateService) {
     const settingsFile = 'schema-validation-settings.json';
     if (!existsSync(settingsFile)) {
-      const packageRoot = join(dirname(new URL(import.meta.url).pathname), '..', '..');
+      const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
       const sourcePaths = [
         join(packageRoot, settingsFile),
         join(packageRoot, 'src', 'legacy', settingsFile),
