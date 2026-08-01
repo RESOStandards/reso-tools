@@ -37,7 +37,7 @@ const makeMockDal = (totalAvailable: number): DataAccessLayer => ({
 const makeCtx = (dal: DataAccessLayer): HandlerContext => ({
   resourceCtx: mockResourceCtx,
   dal,
-  baseUrl: 'http://localhost:8080'
+  baseUrlOverride: 'http://localhost:8080'
 });
 
 const makeReq = (query: Record<string, string> = {}, headers: Record<string, string> = {}): Partial<Request> => ({
@@ -352,6 +352,28 @@ describe('server-driven paging', () => {
 
       expect((res._body.value as unknown[]).length).toBe(10);
       expect(res._headers['Preference-Applied']).toBe('odata.maxpagesize=10');
+    });
+  });
+
+  describe('request-derived base URL (no BASE_URL override)', () => {
+    const derivedCtx = (dal: DataAccessLayer): HandlerContext => ({ resourceCtx: mockResourceCtx, dal }); // no override
+    const derivedReq = (host: string, protocol = 'http'): Request =>
+      ({ query: {}, headers: {}, protocol, get: (h: string) => (h.toLowerCase() === 'host' ? host : undefined) }) as unknown as Request;
+
+    it('builds @odata.context + @odata.nextLink against the request Host (Docker published port, not the internal one)', async () => {
+      const handler = collectionHandler(derivedCtx(makeMockDal(500)));
+      const res = makeRes();
+      await handler(derivedReq('localhost:3000'), res as unknown as Response, vi.fn());
+      // No static config, yet both links carry the port the client actually reached — the whole point of the fix.
+      expect(res._body['@odata.context']).toBe('http://localhost:3000/$metadata#Property');
+      expect(res._body['@odata.nextLink']).toContain('http://localhost:3000/Property?');
+    });
+
+    it('reflects an https FQDN behind a proxy (X-Forwarded-Proto via trust proxy)', async () => {
+      const handler = collectionHandler(derivedCtx(makeMockDal(500)));
+      const res = makeRes();
+      await handler(derivedReq('reference-server.reso.org', 'https'), res as unknown as Response, vi.fn());
+      expect(res._body['@odata.nextLink']).toContain('https://reference-server.reso.org/Property?');
     });
   });
 });

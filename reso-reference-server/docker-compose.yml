@@ -14,7 +14,7 @@ services:
       DB_BACKEND: postgres
       DATABASE_URL: postgresql://reso:reso@db:5432/reso_reference
       METADATA_PATH: ./server-metadata.json
-      BASE_URL: http://server:8080
+      # BASE_URL: http://server:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
       ENUM_MODE: string
       ENTITY_EVENT: ${ENTITY_EVENT:-false}
     depends_on:
@@ -98,7 +98,7 @@ services:
       DB_BACKEND: mongodb
       MONGODB_URL: mongodb://mongodb:27017/reso_reference
       METADATA_PATH: ./server-metadata.json
-      BASE_URL: http://server-mongo:8080
+      # BASE_URL: http://server-mongo:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
       ENUM_MODE: string
       ENTITY_EVENT: ${ENTITY_EVENT:-false}
     depends_on:
@@ -152,7 +152,7 @@ services:
       DB_BACKEND: sqlite
       SQLITE_DB_PATH: /data/reso_reference.db
       METADATA_PATH: ./server-metadata.json
-      BASE_URL: http://server-sqlite:8080
+      # BASE_URL: http://server-sqlite:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
       ENUM_MODE: string
       ENTITY_EVENT: ${ENTITY_EVENT:-false}
     volumes:
@@ -342,7 +342,7 @@ services:
       DB_BACKEND: postgres
       DATABASE_URL: postgresql://reso:reso@db-entity-event:5432/reso_entity_event
       METADATA_PATH: ./server-metadata.json
-      BASE_URL: http://server-entity-event:8080
+      # BASE_URL: http://server-entity-event:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
       ENUM_MODE: string
       ENTITY_EVENT: "true"
     depends_on:
@@ -397,7 +397,7 @@ services:
       DB_BACKEND: mongodb
       MONGODB_URL: mongodb://mongodb-entity-event:27017/reso_entity_event
       METADATA_PATH: ./server-metadata.json
-      BASE_URL: http://server-entity-event-mongo:8080
+      # BASE_URL: http://server-entity-event-mongo:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
       ENUM_MODE: string
       ENTITY_EVENT: "true"
     depends_on:
@@ -442,7 +442,7 @@ services:
       DB_BACKEND: sqlite
       SQLITE_DB_PATH: /data/reso_entity_event.db
       METADATA_PATH: ./server-metadata.json
-      BASE_URL: http://server-entity-event-sqlite:8080
+      # BASE_URL: http://server-entity-event-sqlite:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
       ENUM_MODE: string
       ENTITY_EVENT: "true"
     volumes:
@@ -500,7 +500,7 @@ services:
       DB_BACKEND: postgres
       DATABASE_URL: postgresql://reso:reso@db-addedit:5432/reso_addedit
       METADATA_PATH: ./server-metadata.json
-      BASE_URL: http://server-addedit:8080
+      # BASE_URL: http://server-addedit:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
       ENUM_MODE: string
     depends_on:
       db-addedit:
@@ -554,7 +554,7 @@ services:
       DB_BACKEND: mongodb
       MONGODB_URL: mongodb://mongodb-addedit:27017/reso_addedit
       METADATA_PATH: ./server-metadata.json
-      BASE_URL: http://server-addedit-mongo:8080
+      # BASE_URL: http://server-addedit-mongo:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
       ENUM_MODE: string
     depends_on:
       mongodb-addedit:
@@ -598,7 +598,7 @@ services:
       DB_BACKEND: sqlite
       SQLITE_DB_PATH: /data/reso_addedit.db
       METADATA_PATH: ./server-metadata.json
-      BASE_URL: http://server-addedit-sqlite:8080
+      # BASE_URL: http://server-addedit-sqlite:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
       ENUM_MODE: string
     volumes:
       - sqlitedata-addedit:/data

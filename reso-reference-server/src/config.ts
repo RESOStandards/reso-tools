@@ -19,7 +19,14 @@ export interface ServerConfig {
   readonly mongodbUrl: string;
   readonly sqliteDbPath: string;
   readonly metadataPath: string;
+  /** Effective base URL for request-less consumers (OpenAPI `servers`, EntityEvent record URLs, logs). Equals
+   *  {@link baseUrlOverride} when set, else `http://localhost:${port}`. NOT used for per-request OData response
+   *  links — those derive the base from the request (see `resolveBaseUrl`). */
   readonly baseUrl: string;
+  /** The EXPLICIT base-URL override only (BASE_URL env / programmatic), or undefined when unset. When unset,
+   *  per-request response links are derived from the request's Host — so no static config is needed for
+   *  local / Docker / direct-FQDN. Set it only to pin a canonical public URL the container can't observe. */
+  readonly baseUrlOverride?: string;
   /** Root directory for resolving server assets (ui-config.json, field-groups.json, public/). */
   readonly serverRoot: string;
 }
@@ -33,7 +40,10 @@ export const loadConfig = (overrides?: Partial<ServerConfig>): ServerConfig => {
   const mongodbUrl = overrides?.mongodbUrl ?? process.env.MONGODB_URL ?? 'mongodb://localhost:27017/reso_reference';
   const sqliteDbPath = overrides?.sqliteDbPath ?? process.env.SQLITE_DB_PATH ?? resolve(import.meta.dirname, '../reso_reference.db');
   const metadataPath = overrides?.metadataPath ?? process.env.METADATA_PATH ?? resolve(import.meta.dirname, '../server-metadata.json');
-  const baseUrl = overrides?.baseUrl ?? process.env.BASE_URL ?? `http://localhost:${port}`;
+  // Explicit override only (undefined when neither is set) — when undefined, per-request OData links derive
+  // their base from the request Host. `baseUrl` stays as the effective default for request-less consumers.
+  const baseUrlOverride = overrides?.baseUrlOverride ?? overrides?.baseUrl ?? process.env.BASE_URL;
+  const baseUrl = baseUrlOverride ?? `http://localhost:${port}`;
   const entityEvent = overrides?.entityEvent ?? process.env.ENTITY_EVENT === 'true';
   const entityEventResourceRecordUrl = overrides?.entityEventResourceRecordUrl ?? process.env.ENTITY_EVENT_RESOURCE_RECORD_URL === 'true';
   const compactionIntervalMs = overrides?.compactionIntervalMs ?? Number(process.env.COMPACTION_INTERVAL_MS ?? 3600000);
@@ -63,6 +73,7 @@ export const loadConfig = (overrides?: Partial<ServerConfig>): ServerConfig => {
     sqliteDbPath,
     metadataPath,
     baseUrl,
+    ...(baseUrlOverride !== undefined && { baseUrlOverride }),
     serverRoot
   };
 };

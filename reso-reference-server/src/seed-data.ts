@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 import type { DataAccessLayer } from './db/data-access.js';
+import { reconcileLookups } from './metadata/lookup-reconciler.js';
 import { buildResourceContext } from './metadata/resource-context.js';
 import type { ResoMetadata } from './metadata/types.js';
 
@@ -61,7 +62,15 @@ export const applySeedData = async (dal: DataAccessLayer, metadata: ResoMetadata
     for (const record of records) {
       await dal.insert(ctx, record);
     }
-    console.log(`  ${resource}: ${records.length} records`);
+
+    // Reconcile the Lookup Resource with the values this resource actually uses. An OPEN lookup — e.g. City,
+    // whose values are real city names, not a DD enumeration — has no rows from the metadata-driven
+    // `seedLookups`, so a cert run that samples a City from the data can't find it in /Lookup and fails
+    // (RCP-039). `reconcileLookups` inserts the missing values, so the reference server passes certification
+    // from its own seed. (This reconciler was orphaned when the v1.0.0 split replaced the
+    // generate-then-reconcile flow with static seeds; wiring it here restores the guarantee.)
+    const reconciled = await reconcileLookups(dal, metadata, resource, records);
+    console.log(`  ${resource}: ${records.length} records${reconciled ? `, +${reconciled} lookup value(s) reconciled` : ''}`);
     loaded += records.length;
   }
   return { loaded, skipped: false };
