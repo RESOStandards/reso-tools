@@ -36,7 +36,10 @@ const adaptEntityType = (et: CsdlEntityType): EntityType => ({
 /** Convert a CsdlSchema to the test tool's ParsedMetadata. */
 const adaptSchema = (schema: CsdlSchema): ParsedMetadata => ({
   namespace: schema.namespace,
-  entityTypes: schema.entityTypes.map(adaptEntityType)
+  entityTypes: schema.entityTypes.map(adaptEntityType),
+  // Preserve the CSDL enum types (they carry IsFlags + members) so the enum abstraction can classify a
+  // field by its real representation. Previously dropped here, which forced Core's name-shape heuristic.
+  enumTypes: schema.enumTypes
 });
 
 /**

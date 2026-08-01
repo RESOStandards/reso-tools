@@ -111,6 +111,9 @@ export const assertEnumMatch = (
   field: string,
   op: 'has' | 'eq' | 'ne',
   value: string,
+  /** Decode a response value into member names for `has` — a flags enum may serialize as an integer
+   *  bitmask. Omitted for `eq`/`ne`, whose single-member string compares directly. */
+  decode?: (raw: unknown) => ReadonlyArray<string>,
 ): AssertionResult => {
   const failures: string[] = [];
 
@@ -120,7 +123,7 @@ export const assertEnumMatch = (
 
     const actualStr = String(actual);
     const matches = op === 'has'
-      ? actualStr.includes(value)
+      ? (decode ? decode(actual) : actualStr.split(',').map(s => s.trim())).includes(value)
       : op === 'eq'
         ? actualStr === value
         : actualStr !== value;
@@ -144,24 +147,37 @@ export const assertCollectionLambda = (
   field: string,
   op: 'has' | 'any' | 'all',
   values: ReadonlyArray<string>,
+  /** Decode a response value into member names — a flags enum may serialize as an integer bitmask or a
+   *  comma-joined string. Supplied for flags fields so the assertion compares like-for-like; omitted for
+   *  string collections, where the array / comma fallback below is correct. */
+  decode?: (raw: unknown) => ReadonlyArray<string>,
 ): AssertionResult => {
   const failures: string[] = [];
+  // Drop empty / literal-"undefined" values (a retried candidate may have fewer than N distinct values);
+  // comparing against them would false-fail every record.
+  const checkValues = values.filter((v): v is string => typeof v === 'string' && v.length > 0 && v !== 'undefined');
+  if (checkValues.length === 0) {
+    return { passed: false, message: `${op}(): no valid comparison values available` };
+  }
 
   for (const [i, record] of records.entries()) {
     const actual = record[field];
     if (actual == null) continue;
 
-    // Multi-value can be a comma-separated string (IsFlags) or an array (Collection)
-    const items: ReadonlyArray<string> = Array.isArray(actual)
-      ? (actual as unknown[]).map(String)
-      : String(actual).split(',').map(s => s.trim());
+    const items: ReadonlyArray<string> = decode
+      ? decode(actual)
+      : Array.isArray(actual)
+        ? (actual as unknown[]).map(String)
+        : String(actual).split(',').map(s => s.trim());
 
-    const matches = op === 'has' || op === 'any'
-      ? values.some(v => items.includes(v))
-      : values.every(v => items.includes(v)) || items.length === 0; // all() passes on empty
+    const matches = op === 'any'
+      ? checkValues.some(v => items.includes(v)) // any(x: x eq A [or B]) — at least one element is a requested value
+      : op === 'has'
+        ? checkValues.every(v => items.includes(v)) // has A [and has B] — EVERY requested flag must be set (AND)
+        : items.every(item => checkValues.includes(item)); // all(x: x eq A [or B]) — EVERY element is within {values}
 
     if (!matches) {
-      failures.push(`Record ${i}: ${field}=${JSON.stringify(actual)} does not satisfy ${op}(${values.join(', ')})`);
+      failures.push(`Record ${i}: ${field}=${JSON.stringify(actual)} does not satisfy ${op}(${checkValues.join(', ')})`);
     }
   }
 

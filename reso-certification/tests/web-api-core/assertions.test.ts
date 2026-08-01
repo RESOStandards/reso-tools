@@ -138,12 +138,14 @@ describe('assertCollectionLambda', () => {
     expect(assertCollectionLambda(records, 'features', 'any', ['Elevator']).passed).toBe(false);
   });
 
-  it('passes for all() when all records contain value', () => {
-    expect(assertCollectionLambda(records, 'features', 'all', ['Pool']).passed).toBe(true);
+  it('passes for all() when every element of each record is within the requested values', () => {
+    // Field/all(x: x eq A or x eq B …) requires each record's collection to be a SUBSET of {values}.
+    expect(assertCollectionLambda(records, 'features', 'all', ['Pool', 'Garage', 'Fence', 'Deck']).passed).toBe(true);
   });
 
-  it('fails for all() when not all records contain value', () => {
-    expect(assertCollectionLambda(records, 'features', 'all', ['Garage']).passed).toBe(false);
+  it('fails for all() when a record has an element outside the requested values', () => {
+    // ['Pool','Garage','Fence'] is not within {Pool}, so all(x: x eq Pool) is violated.
+    expect(assertCollectionLambda(records, 'features', 'all', ['Pool']).passed).toBe(false);
   });
 
   it('handles comma-separated string values', () => {

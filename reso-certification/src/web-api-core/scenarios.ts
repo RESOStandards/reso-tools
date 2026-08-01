@@ -164,29 +164,32 @@ const structuralScenarios: ReadonlyArray<StructuralScenario> = [
 const integerFilterScenarios: ReadonlyArray<FilterScenario> = [
   { tag: 'filter-int-and', name: 'Integer: and', category: 'filter', dataType: 'integer', op: 'gt', fieldParam: 'integerField', valueParam: 'integerValueLow', compound: { op2: 'lt', valueParam2: 'integerValueHigh', logical: 'and' }, minVersion: '2.0.0' },
   { tag: 'filter-int-or', name: 'Integer: or', category: 'filter', dataType: 'integer', op: 'gt', fieldParam: 'integerField', valueParam: 'integerValueLow', compound: { op2: 'lt', valueParam2: 'integerValueHigh', logical: 'or' }, minVersion: '2.0.0' },
-  { tag: 'filter-int-not', name: 'Integer: not()', category: 'filter', dataType: 'integer', op: 'ne', fieldParam: 'integerField', valueParam: 'integerValueLow', negated: true, minVersion: '2.0.0' },
+  // `not(field le -1)` — the `-1` sentinel (below the non-negative floor) matches every record, so an empty
+  // result is a guaranteed-match defect. Value = integerNotSentinel (−1 for a non-negative field; below the
+  // sampled min for a signed one), computed at sampling time so the guarantee holds for the actual field.
+  { tag: 'filter-int-not', name: 'Integer: not()', category: 'filter', dataType: 'integer', op: 'le', fieldParam: 'integerField', valueParam: 'integerNotSentinel', negated: true, minVersion: '2.0.0' },
   { tag: 'filter-int-eq', name: 'Integer: eq', category: 'filter', dataType: 'integer', op: 'eq', fieldParam: 'integerField', valueParam: 'integerValueLow', minVersion: '2.0.0' },
   { tag: 'filter-int-ne', name: 'Integer: ne', category: 'filter', dataType: 'integer', op: 'ne', fieldParam: 'integerField', valueParam: 'integerValueLow', minVersion: '2.0.0' },
-  { tag: 'filter-int-gt', name: 'Integer: gt', category: 'filter', dataType: 'integer', op: 'gt', fieldParam: 'integerField', valueParam: 'integerValueLow', minVersion: '2.0.0' },
+  { tag: 'filter-int-gt', name: 'Integer: gt', category: 'filter', dataType: 'integer', op: 'gt', fieldParam: 'integerField', valueParam: 'integerValueMin', minVersion: '2.0.0' },
   { tag: 'filter-int-ge', name: 'Integer: ge', category: 'filter', dataType: 'integer', op: 'ge', fieldParam: 'integerField', valueParam: 'integerValueLow', minVersion: '2.0.0' },
-  { tag: 'filter-int-lt', name: 'Integer: lt', category: 'filter', dataType: 'integer', op: 'lt', fieldParam: 'integerField', valueParam: 'integerValueHigh', minVersion: '2.0.0' },
+  { tag: 'filter-int-lt', name: 'Integer: lt', category: 'filter', dataType: 'integer', op: 'lt', fieldParam: 'integerField', valueParam: 'integerValueMax', minVersion: '2.0.0' },
   { tag: 'filter-int-le', name: 'Integer: le', category: 'filter', dataType: 'integer', op: 'le', fieldParam: 'integerField', valueParam: 'integerValueLow', minVersion: '2.0.0' },
 ];
 
 const decimalFilterScenarios: ReadonlyArray<FilterScenario> = [
   { tag: 'filter-decimal-ne', name: 'Decimal: ne', category: 'filter', dataType: 'decimal', op: 'ne', fieldParam: 'decimalField', valueParam: 'decimalValueLow', minVersion: '2.0.0' },
-  { tag: 'filter-decimal-gt', name: 'Decimal: gt', category: 'filter', dataType: 'decimal', op: 'gt', fieldParam: 'decimalField', valueParam: 'decimalValueLow', minVersion: '2.0.0' },
+  { tag: 'filter-decimal-gt', name: 'Decimal: gt', category: 'filter', dataType: 'decimal', op: 'gt', fieldParam: 'decimalField', valueParam: 'decimalValueMin', minVersion: '2.0.0' },
   { tag: 'filter-decimal-ge', name: 'Decimal: ge', category: 'filter', dataType: 'decimal', op: 'ge', fieldParam: 'decimalField', valueParam: 'decimalValueLow', minVersion: '2.0.0' },
-  { tag: 'filter-decimal-lt', name: 'Decimal: lt', category: 'filter', dataType: 'decimal', op: 'lt', fieldParam: 'decimalField', valueParam: 'decimalValueHigh', minVersion: '2.0.0' },
+  { tag: 'filter-decimal-lt', name: 'Decimal: lt', category: 'filter', dataType: 'decimal', op: 'lt', fieldParam: 'decimalField', valueParam: 'decimalValueMax', minVersion: '2.0.0' },
   { tag: 'filter-decimal-le', name: 'Decimal: le', category: 'filter', dataType: 'decimal', op: 'le', fieldParam: 'decimalField', valueParam: 'decimalValueHigh', minVersion: '2.0.0' },
 ];
 
 const dateFilterScenarios: ReadonlyArray<FilterScenario> = [
   { tag: 'filter-date-eq', name: 'Date: eq', category: 'filter', dataType: 'date', op: 'eq', fieldParam: 'dateField', valueParam: 'dateValue', minVersion: '2.0.0' },
   { tag: 'filter-date-ne', name: 'Date: ne', category: 'filter', dataType: 'date', op: 'ne', fieldParam: 'dateField', valueParam: 'dateValue', minVersion: '2.0.0' },
-  { tag: 'filter-date-gt', name: 'Date: gt', category: 'filter', dataType: 'date', op: 'gt', fieldParam: 'dateField', valueParam: 'dateValue', minVersion: '2.0.0' },
+  { tag: 'filter-date-gt', name: 'Date: gt', category: 'filter', dataType: 'date', op: 'gt', fieldParam: 'dateField', valueParam: 'dateValueMin', minVersion: '2.0.0' },
   { tag: 'filter-date-ge', name: 'Date: ge', category: 'filter', dataType: 'date', op: 'ge', fieldParam: 'dateField', valueParam: 'dateValue', minVersion: '2.0.0' },
-  { tag: 'filter-date-lt', name: 'Date: lt', category: 'filter', dataType: 'date', op: 'lt', fieldParam: 'dateField', valueParam: 'dateValue', minVersion: '2.0.0' },
+  { tag: 'filter-date-lt', name: 'Date: lt', category: 'filter', dataType: 'date', op: 'lt', fieldParam: 'dateField', valueParam: 'dateValueMax', minVersion: '2.0.0' },
   { tag: 'filter-date-le', name: 'Date: le', category: 'filter', dataType: 'date', op: 'le', fieldParam: 'dateField', valueParam: 'dateValue', minVersion: '2.0.0' },
 ];
 

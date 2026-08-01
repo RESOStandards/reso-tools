@@ -1,3 +1,5 @@
+import type { CsdlEnumType } from '@reso-standards/reso-metadata-utils';
+
 // ── Authentication ──
 
 /** Authentication configuration: either a pre-fetched bearer token or OAuth2 Client Credentials. */
@@ -50,6 +52,9 @@ export interface EntityType {
 export interface ParsedMetadata {
   readonly namespace: string;
   readonly entityTypes: ReadonlyArray<EntityType>;
+  /** CSDL enum types (with IsFlags + members), preserved so the enum abstraction can classify a field
+   *  by its real representation rather than a name-shape heuristic. */
+  readonly enumTypes: ReadonlyArray<CsdlEnumType>;
 }
 
 // ── Test Results ──

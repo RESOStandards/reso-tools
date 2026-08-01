@@ -7,7 +7,7 @@
  * `references/enumerations.md`.
  */
 
-import { decodeFlagsValue, extractTypeName, getEnumType } from '@reso-standards/reso-metadata-utils';
+import { decodeFlagsValue, extractTypeName } from '@reso-standards/reso-metadata-utils';
 import type { CsdlEnumType, CsdlSchema } from '@reso-standards/reso-metadata-utils';
 
 /** The five metadata shapes an enumeration field may take — two single-valued, three multiple-valued. */
@@ -174,7 +174,7 @@ const makeEnumField = (
  * and synchronous — enum-typed members come from the CSDL schema; string-form members live in the
  * Lookup Resource and are resolved separately (the async lookup resolver).
  */
-export const resolveEnum = (field: EnumFieldInput, schema: CsdlSchema): EnumField | null => {
+export const resolveEnum = (field: EnumFieldInput, schema: Pick<CsdlSchema, 'enumTypes'>): EnumField | null => {
   const collection = isCollection(field.type);
   const inner = unwrap(field.type);
 
@@ -184,8 +184,10 @@ export const resolveEnum = (field: EnumFieldInput, schema: CsdlSchema): EnumFiel
     return makeEnumField(field.name, collection ? 'COLLECTION_STRING' : 'SINGLE_STRING', undefined);
   }
 
-  // Enum-typed lookups: the unwrapped type resolves to a CSDL enum type.
-  const enumType = getEnumType(schema, extractTypeName(field.type));
+  // Enum-typed lookups: the unwrapped type resolves to a CSDL enum type. Only `enumTypes` is needed, so
+  // the param is widened to `Pick<CsdlSchema, 'enumTypes'>` — a full schema or the cert tool's
+  // ParsedMetadata (which carries enumTypes) both satisfy it, with no fabricated schema at the call site.
+  const enumType = schema.enumTypes.find((et) => et.name === extractTypeName(field.type));
   if (enumType === undefined) return null;
   const representation: EnumRepresentation = collection
     ? 'COLLECTION_ENUM'
