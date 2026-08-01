@@ -8,7 +8,7 @@
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, getEntityType, persistMetadataXml } from '../test-runner/metadata.js';
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
-import { resolveTestParams, WELL_KNOWN_RESOURCES } from '../web-api-core/index.js';
+import { buildStandardMap, resolveTestParams, WELL_KNOWN_RESOURCES } from '../web-api-core/index.js';
 import { runCoreResourceScenarios, type ResourceTestReport } from '../web-api-core/test-runner.js';
 import type { BaseTestContext, CoreConfig, PipelineStep, StepResult } from './types.js';
 import { createPipeline } from './pipeline.js';
@@ -100,6 +100,8 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
   run: async (ctx, onProgress) => {
     const metadata = parseMetadataXml(ctx.metadataXml!);
     const version = ctx.version;
+    // Standard map (DD reference) built once per run — field/value membership for standard-first selection.
+    const standardMap = buildStandardMap(version);
     const resourceReports: ResourceTestReport[] = [];
 
     for (const resource of ctx.resources) {
@@ -117,6 +119,8 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         resource,
         entityType,
         ctx.authToken!,
+        metadata.enumTypes,
+        standardMap,
         enumModeOverride,
       );
 

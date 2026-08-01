@@ -46,6 +46,10 @@ const formatFilterValue = (value: string | number | undefined, dataType: string)
   return `'${String(value)}'`;
 };
 
+/** OData string literal: wrap in single quotes, doubling any embedded single quote (OData 4.01). A member
+ *  value with an apostrophe (common in local MLS values) would otherwise emit malformed OData. */
+const odataString = (value: string | number): string => `'${String(value).replace(/'/g, "''")}'`;
+
 // ── Filter URL builders ──
 
 const buildFilterUrl = (
@@ -64,7 +68,9 @@ const buildFilterUrl = (
   let filterExpr: string;
 
   if (scenario.negated) {
-    filterExpr = `not(${field} eq ${formattedValue})`;
+    // Honor the scenario's operator: the `not` test is `not(field le -1)` (the `-1` sentinel), which returns
+    // every non-negative record → guaranteed non-empty, so an empty result is a determinate operator defect.
+    filterExpr = `not(${field} ${scenario.op} ${formattedValue})`;
   } else if (scenario.compound) {
     const value2 = resolveParam(params, scenario.compound.valueParam2);
     if (value2 == null) return undefined;
@@ -116,13 +122,13 @@ const buildEnumUrl = (
   let filterExpr: string;
 
   if (scenario.enumType === 'single') {
-    filterExpr = `${field} ${scenario.op} '${value}'`;
+    filterExpr = `${field} ${scenario.op} ${odataString(value)}`;
   } else if (scenario.valueParam2) {
     const value2 = resolveParam(params, scenario.valueParam2);
     if (value2 == null) return undefined;
-    filterExpr = `${field} has '${value}' and ${field} has '${value2}'`;
+    filterExpr = `${field} has ${odataString(value)} and ${field} has ${odataString(value2)}`;
   } else {
-    filterExpr = `${field} has '${value}'`;
+    filterExpr = `${field} has ${odataString(value)}`;
   }
 
   const url = `${serverUrl}/${resource}?$filter=${encodeURIComponent(filterExpr)}&$select=${selectFields.join(',')}`;
@@ -140,7 +146,7 @@ const buildCollectionUrl = (
   if (!field || value == null) return undefined;
 
   const selectFields = [params.keyField, field];
-  const filterExpr = `${field}/${scenario.lambda}(x:x eq '${value}')`;
+  const filterExpr = `${field}/${scenario.lambda}(x:x eq ${odataString(value)})`;
   const url = `${serverUrl}/${resource}?$filter=${encodeURIComponent(filterExpr)}&$select=${selectFields.join(',')}`;
   return { url, selectFields };
 };
@@ -159,12 +165,12 @@ const buildStringEnumUrl = (
   let filterExpr: string;
 
   if (scenario.enumType === 'single') {
-    filterExpr = `${field} ${scenario.op} '${value}'`;
+    filterExpr = `${field} ${scenario.op} ${odataString(value)}`;
   } else {
     const value2 = scenario.valueParam2 ? resolveParam(params, scenario.valueParam2) : undefined;
     const valExpr = value2
-      ? `x eq '${value}' or x eq '${value2}'`
-      : `x eq '${value}'`;
+      ? `x eq ${odataString(value)} or x eq ${odataString(value2)}`
+      : `x eq ${odataString(value)}`;
     filterExpr = `${field}/${scenario.op}(x:${valExpr})`;
   }
 
@@ -191,7 +197,7 @@ const buildInOperatorUrl = (
   if (values.length < 2) return undefined;
 
   const selectFields = [params.keyField, field];
-  const valueList = values.map(v => `'${v}'`).join(',');
+  const valueList = values.map(odataString).join(',');
   const filterExpr = `${field} in (${valueList})`;
   const url = `${serverUrl}/${resource}?$filter=${encodeURIComponent(filterExpr)}&$select=${selectFields.join(',')}`;
   return { url, selectFields };
@@ -305,7 +311,7 @@ const buildStringFunctionUrl = (
   if (!field || value == null) return undefined;
 
   const selectFields = [params.keyField, field];
-  const filterExpr = `${scenario.func}(${field},'${value}')`;
+  const filterExpr = `${scenario.func}(${field},${odataString(value)})`;
   const url = `${serverUrl}/${resource}?$filter=${encodeURIComponent(filterExpr)}&$select=${selectFields.join(',')}`;
   return { url, selectFields };
 };

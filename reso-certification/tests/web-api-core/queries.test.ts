@@ -10,6 +10,7 @@ const baseParams: TestParams = {
   integerField: 'ListPrice',
   integerValueLow: 200000,
   integerValueHigh: 2147483647,
+  integerNotSentinel: -1,
   decimalField: 'Latitude',
   decimalValueLow: 40.7,
   decimalValueHigh: 40.7,
@@ -22,6 +23,7 @@ const baseParams: TestParams = {
   multiLookupField: 'AccessibilityFeatures',
   multiLookupValue1: 'Pool',
   multiLookupValue2: 'Garage',
+  sampleComplete: true,
   skippedTypes: [],
 };
 
@@ -50,6 +52,14 @@ describe('buildScenarioQuery', () => {
     const scenario: FilterScenario = { tag: 'filter-int-and', name: 'Int and', category: 'filter', dataType: 'integer', op: 'gt', fieldParam: 'integerField', valueParam: 'integerValueLow', compound: { op2: 'lt', valueParam2: 'integerValueHigh', logical: 'and' }, minVersion: '2.0.0' };
     const result = buildScenarioQuery('http://localhost:8080', 'Property', scenario, baseParams);
     expect(result?.url).toContain('and');
+  });
+
+  it('builds the not() filter as not(field <op> <sentinel>) — the -1 sentinel returns every non-negative record', () => {
+    // `not(ListPrice le -1)` = ListPrice > -1 = all records (prices are non-negative) → guaranteed non-empty,
+    // so an empty result is a determinate operator defect. The builder must honor scenario.op (le), not eq.
+    const scenario: FilterScenario = { tag: 'filter-int-not', name: 'Int not()', category: 'filter', dataType: 'integer', op: 'le', fieldParam: 'integerField', valueParam: 'integerNotSentinel', negated: true, minVersion: '2.0.0' };
+    const result = buildScenarioQuery('http://localhost:8080', 'Property', scenario, baseParams);
+    expect(result && decodeURIComponent(result.url)).toContain('not(ListPrice le -1)');
   });
 
   it('builds orderby URL', () => {

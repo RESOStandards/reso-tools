@@ -141,6 +141,7 @@ describe('query builder: string-function scenarios produce the right $filter', (
     multiLookupValue2: 'Garage',
     stringField: 'City',
     stringValue: 'Dallas',
+    sampleComplete: true,
     skippedTypes: [],
   };
   const byTag = (tag: string) => allScenarios.find((s) => s.tag === tag)!;
