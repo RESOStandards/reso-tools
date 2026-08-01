@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
 import {
   checkDisallowedSynonyms, checkClosedEnumValues, checkFieldTypes, checkExpansionStructure, checkSuggestedMaxConstraints,
-  checkLookupResourceFields, checkLookupNameAnnotations, checkLookupNameIntegrity, runDdMetadataChecks,
+  checkLookupResourceFields, checkLookupNameAnnotations, runDdMetadataChecks,
 } from '../../src/metadata/dd-metadata-checks.js';
 import type { DdReference } from '../../src/metadata/dd-metadata-checks.js';
 import { generateReferenceArtifacts } from '../../src/metadata/reference-artifacts.js';
@@ -328,32 +328,31 @@ describe('Lookup Resource checks', () => {
     });
   });
 
-  describe('checkLookupNameIntegrity', () => {
-    const annotated = (value: string) => ({ resourceName: 'Property', fieldName: 'StandardStatus', type: 'Edm.String', annotations: [{ term: LN, value }] });
-
-    it('flags an annotation that does not resolve to the Lookup data', () => {
-      const report = makeReport([annotated('Nonexistent')], [{ lookupName: 'StandardStatus', lookupValue: 'Active', type: 'Edm.String', annotations: [] }]);
-      const findings = checkLookupNameIntegrity(report, reference);
-      expect(findings).toHaveLength(1);
-      expect(findings[0]).toMatchObject({ check: 'lookup-name-integrity', fieldName: 'StandardStatus', severity: 'error' });
-      expect(findings[0].message).toContain('Nonexistent');
-    });
-
-    it('passes when the annotation resolves to a Lookup Resource entry', () => {
-      const report = makeReport([annotated('StandardStatus')], [{ lookupName: 'StandardStatus', lookupValue: 'Active', type: 'Edm.String', annotations: [] }]);
-      expect(checkLookupNameIntegrity(report, reference)).toEqual([]);
-    });
+  it('does NOT fail a DD-standard open-lookup field whose LookupName has zero /Lookup rows (unpopulated)', () => {
+    // BuildingFeatures: a recognized DD enum with no defined values (open), served as the string rep with its
+    // LookupName annotation, and unpopulated → /Lookup legitimately has no rows for it. RCP-032 only requires
+    // the annotation at the metadata phase; value presence is deferred to the schema-validation phase (and
+    // only when the field has data). The removed checkLookupNameIntegrity false-failed exactly this case.
+    const ref: DdReference = {
+      fields: [{ resourceName: 'Property', fieldName: 'BuildingFeatures', type: 'Collection(org.reso.metadata.enums.BuildingFeatures)', isEnumeration: true, isCollection: true }],
+      lookups: [],
+    };
+    const field = { resourceName: 'Property', fieldName: 'BuildingFeatures', type: 'Collection(Edm.String)', isEnumeration: true, isCollection: true, annotations: [{ term: LN, value: 'BuildingFeatures' }] };
+    const findings = runDdMetadataChecks(makeReport([field], []), ref); // /Lookup has no BuildingFeatures rows
+    expect(findings.some((f) => f.message.includes('not present in the Lookup Resource'))).toBe(false);
+    expect(findings.some((f) => f.check === 'lookup-name-annotation')).toBe(false); // annotation present → no RCP-032 flag
   });
 
   // Self-test: the generated string-rep reference is internally consistent — its Lookup resource has
-  // the mandatory fields, every string-enum field carries the LookupName annotation, and every
-  // annotation resolves to the Lookup data.
+  // the mandatory fields and every string-enum field carries the LookupName annotation. (There is no
+  // metadata-phase "LookupName present in the Lookup data" check: per RCP-032 that's only required when
+  // the field is populated, which the schema-validation phase enforces — see the removed
+  // checkLookupNameIntegrity, which false-failed unpopulated open lookups like BuildingFeatures.)
   it('the generated DD 2.1 string-rep reference passes all Lookup Resource checks clean', () => {
     const ref = getReferenceMetadata('2.1') as MetadataReport & DdReference;
     const { metadataReport } = generateReferenceArtifacts(ref, ref.resources as unknown as string[], 'string', '2.1');
     expect(checkLookupResourceFields(metadataReport, ref)).toEqual([]);
     expect(checkLookupNameAnnotations(metadataReport, ref)).toEqual([]);
-    expect(checkLookupNameIntegrity(metadataReport, ref)).toEqual([]);
   });
 });
 
