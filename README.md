@@ -36,7 +36,7 @@ This installs dependencies and builds all 8 packages in the correct order. Takes
 cd reso-reference-server
 docker compose up -d
 docker compose --profile seed up seed
-# Server: http://localhost:8080  UI: http://localhost:5173
+# Server: http://localhost:8080
 ```
 
 ### Desktop Certification App
