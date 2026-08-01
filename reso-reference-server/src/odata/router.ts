@@ -86,7 +86,7 @@ export const buildNavigationBindings = (
 export const createODataRouter = (
   metadata: ResoMetadata,
   dal: DataAccessLayer,
-  baseUrl: string,
+  baseUrlOverride: string | undefined,
   targetResources: ReadonlyArray<string>,
   readOnlyResources: ReadonlySet<string> = new Set()
 ): Router => {
@@ -124,7 +124,7 @@ export const createODataRouter = (
 
     contextMap.set(resource, resourceCtx);
 
-    const ctx = { resourceCtx, dal, baseUrl };
+    const ctx = { resourceCtx, dal, ...(baseUrlOverride !== undefined && { baseUrlOverride }) };
 
     // OData key pattern: /{Resource}('key')
     const keyPattern = new RegExp(`^/${resource}\\('([^']+)'\\)$`);

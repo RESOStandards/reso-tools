@@ -3,6 +3,7 @@ import { ExpandParseError, LexerError, ParseError, parseExpand } from '@reso-sta
 import type { RequestHandler } from 'express';
 import type { CollectionQueryOptions, DataAccessLayer, ResourceContext } from '../db/data-access.js';
 import { buildAnnotations } from './annotations.js';
+import { resolveBaseUrl } from './base-url.js';
 import { buildODataError, buildValidationError } from './errors.js';
 import { setODataHeaders, type ODataHeaderOptions } from './headers.js';
 import { validateRequestBody } from './validation.js';
@@ -39,7 +40,9 @@ const parseMaxPageSize = (prefer: string | undefined): number | undefined => {
 export interface HandlerContext {
   readonly resourceCtx: ResourceContext;
   readonly dal: DataAccessLayer;
-  readonly baseUrl: string;
+  /** Explicit base-URL override (BASE_URL) or undefined. Each handler resolves the effective base per request
+   *  via `resolveBaseUrl(req, ctx.baseUrlOverride)` — so response links are correct without static config. */
+  readonly baseUrlOverride?: string;
 }
 
 /** Creates a POST handler for creating new records. */
@@ -65,7 +68,8 @@ export const createHandler =
 
       const row = await ctx.dal.insert(ctx.resourceCtx, record);
 
-      const locationUrl = `${ctx.baseUrl}/${ctx.resourceCtx.resource}('${key}')`;
+      const baseUrl = resolveBaseUrl(req, ctx.baseUrlOverride);
+      const locationUrl = `${baseUrl}/${ctx.resourceCtx.resource}('${key}')`;
 
       if (prefersMinimal(req.headers.prefer as string | undefined)) {
         setODataHeaders(res, {
@@ -83,7 +87,7 @@ export const createHandler =
         preferenceApplied: 'return=representation'
       });
       res.status(201).json({
-        ...buildAnnotations(ctx.baseUrl, ctx.resourceCtx.resource, key),
+        ...buildAnnotations(baseUrl, ctx.resourceCtx.resource, key),
         ...row
       });
     } catch (err) {
@@ -123,7 +127,7 @@ export const readHandler =
 
       setODataHeaders(res);
       res.status(200).json({
-        ...buildAnnotations(ctx.baseUrl, ctx.resourceCtx.resource, key),
+        ...buildAnnotations(resolveBaseUrl(req, ctx.baseUrlOverride), ctx.resourceCtx.resource, key),
         ...row
       });
     } catch (err) {
@@ -164,7 +168,8 @@ export const updateHandler =
       };
 
       const row = await ctx.dal.update(ctx.resourceCtx, key, updates);
-      const locationUrl = `${ctx.baseUrl}/${ctx.resourceCtx.resource}('${key}')`;
+      const baseUrl = resolveBaseUrl(req, ctx.baseUrlOverride);
+      const locationUrl = `${baseUrl}/${ctx.resourceCtx.resource}('${key}')`;
 
       if (!row) {
         // Record doesn't exist — insert it instead (upsert semantics)
@@ -187,7 +192,7 @@ export const updateHandler =
           preferenceApplied: 'return=representation'
         });
         res.status(200).json({
-          ...buildAnnotations(ctx.baseUrl, ctx.resourceCtx.resource, key),
+          ...buildAnnotations(baseUrl, ctx.resourceCtx.resource, key),
           ...newRow
         });
         return;
@@ -209,7 +214,7 @@ export const updateHandler =
         preferenceApplied: 'return=representation'
       });
       res.status(200).json({
-        ...buildAnnotations(ctx.baseUrl, ctx.resourceCtx.resource, key),
+        ...buildAnnotations(baseUrl, ctx.resourceCtx.resource, key),
         ...row
       });
     } catch (err) {
@@ -316,8 +321,9 @@ export const collectionHandler =
 
       const result = await ctx.dal.queryCollection(ctx.resourceCtx, options);
 
+      const baseUrl = resolveBaseUrl(req, ctx.baseUrlOverride);
       const body: Record<string, unknown> = {
-        '@odata.context': `${ctx.baseUrl}/$metadata#${ctx.resourceCtx.resource}`,
+        '@odata.context': `${baseUrl}/$metadata#${ctx.resourceCtx.resource}`,
         value: result.value
       };
       if (result.count !== undefined) {
@@ -341,7 +347,7 @@ export const collectionHandler =
           $expand: rawExpand
         };
         body['@odata.nextLink'] = buildNextLink(
-          ctx.baseUrl, ctx.resourceCtx.resource, rawParams, fetchLimit, skip, clientTop
+          baseUrl, ctx.resourceCtx.resource, rawParams, fetchLimit, skip, clientTop
         );
       }
 

@@ -22,7 +22,7 @@ describe('buildNavigationBindings', () => {
   it('discovers OpenHouse expansion on Property with direct strategy', async () => {
     const metadata = await loadMetadata(metadataPath);
     const bindings = buildNavigationBindings('Property', metadata, TARGET_RESOURCES);
-    const openHouse = bindings.find(b => b.name === 'OpenHouse');
+    const openHouse = bindings.find(b => b.name === 'OpenHouses');
 
     expect(openHouse).toBeDefined();
     expect(openHouse!.targetResource).toBe('OpenHouse');
@@ -48,7 +48,7 @@ describe('buildNavigationBindings', () => {
   it('discovers GreenBuildingVerification expansion on Property', async () => {
     const metadata = await loadMetadata(metadataPath);
     const bindings = buildNavigationBindings('Property', metadata, TARGET_RESOURCES);
-    const green = bindings.find(b => b.name === 'GreenBuildingVerification');
+    const green = bindings.find(b => b.name === 'GreenBuildingVerifications');
 
     expect(green).toBeDefined();
     expect(green!.targetResource).toBe('PropertyGreenVerification');
@@ -170,9 +170,9 @@ describe('buildNavigationBindings', () => {
       .sort();
 
     expect(collectionNames).toContain('Media');
-    expect(collectionNames).toContain('OpenHouse');
+    expect(collectionNames).toContain('OpenHouses');
     expect(collectionNames).toContain('Rooms');
-    expect(collectionNames).toContain('GreenBuildingVerification');
+    expect(collectionNames).toContain('GreenBuildingVerifications');
     expect(collectionNames).toContain('PowerProduction');
     expect(collectionNames).toContain('UnitTypes');
   });

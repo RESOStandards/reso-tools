@@ -16,6 +16,7 @@ import { getFieldsForResource, getKeyFieldForResource, getLookupsForType, isEnum
 import { seedLookups } from './metadata/lookup-seeder.js';
 import { generateOpenApiSpec } from './metadata/openapi-generator.js';
 import { TARGET_RESOURCES } from './metadata/types.js';
+import { resolveBaseUrl } from './odata/base-url.js';
 import { createODataRouter } from './odata/router.js';
 
 /** Options for creating the server app. */
@@ -183,6 +184,10 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
   // Build Express app
   const app = express();
   app.disable('x-powered-by');
+  // Trust the reverse proxy so req.protocol / req.hostname honor X-Forwarded-Proto / X-Forwarded-Host — lets
+  // response links (@odata.context, @odata.nextLink, …) reflect the PUBLIC origin behind a proxy without any
+  // static base-URL config. See resolveBaseUrl in odata/base-url.ts.
+  app.set('trust proxy', true);
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: false }));
 
@@ -215,7 +220,7 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
       return;
     }
     res.json({
-      '@odata.context': `${config.baseUrl}/$metadata`,
+      '@odata.context': `${resolveBaseUrl(req, config.baseUrlOverride)}/$metadata`,
       value: activeResources.map(name => ({
         name,
         kind: 'EntitySet',
@@ -246,7 +251,7 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
   }
 
   // OData CRUD + collection routes (using DAL instead of direct pool access)
-  const odataRouter = createODataRouter(metadata, dal, config.baseUrl, activeResources, readOnlyResources);
+  const odataRouter = createODataRouter(metadata, dal, config.baseUrlOverride, activeResources, readOnlyResources);
   app.use(odataRouter);
 
   // Admin endpoints (data generator, etc.)
