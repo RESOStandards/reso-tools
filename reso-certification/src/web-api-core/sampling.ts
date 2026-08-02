@@ -140,6 +140,11 @@ const DECIMAL_TYPES = ['Edm.Decimal', 'Edm.Double'];
 const DATE_TYPES = ['Edm.Date'];
 const DATETIME_TYPES = ['Edm.DateTimeOffset'];
 
+// The RESO-required modification timestamp — always <= now, so the safe field to ground the `lt/le now()`
+// scenarios on. Fields ending in this suffix are system modification/event timestamps (likewise always past).
+const MODIFICATION_TIMESTAMP_FIELD = 'ModificationTimestamp';
+const TIMESTAMP_FIELD_SUFFIX = 'Timestamp';
+
 const isIntegerType = (type: string): boolean => INTEGER_TYPES.includes(type);
 const isDecimalType = (type: string): boolean => DECIMAL_TYPES.includes(type);
 const isDateType = (type: string): boolean => DATE_TYPES.includes(type);
@@ -260,14 +265,15 @@ export const selectTimestampField = (
   datetimeFields: ReadonlyArray<string>,
   records: ReadonlyArray<Record<string, unknown>>,
 ): string | undefined => {
-  const isStandardTimestamp = (f: string): boolean => f.endsWith('Timestamp');
+  const isPopulated = (f: string): boolean => records.some(r => r[f] != null);
+  const isStandardTimestamp = (f: string): boolean => f.endsWith(TIMESTAMP_FIELD_SUFFIX);
   return (
-    (datetimeFields.includes('ModificationTimestamp') && records.some(r => r['ModificationTimestamp'] != null)
-      ? 'ModificationTimestamp'
+    (datetimeFields.includes(MODIFICATION_TIMESTAMP_FIELD) && isPopulated(MODIFICATION_TIMESTAMP_FIELD)
+      ? MODIFICATION_TIMESTAMP_FIELD
       : undefined)
-    ?? datetimeFields.filter(isStandardTimestamp).find(f => records.some(r => r[f] != null))
+    ?? datetimeFields.filter(isStandardTimestamp).find(isPopulated)
     ?? findFullyPopulatedTimestamp(datetimeFields, records)
-    ?? datetimeFields.find(f => records.some(r => r[f] != null))
+    ?? datetimeFields.find(isPopulated)
   );
 };
 
