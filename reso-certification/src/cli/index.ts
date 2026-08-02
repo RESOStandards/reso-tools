@@ -31,6 +31,8 @@ import { computeVariationsViaService, updateVariationsViaService, parseVariation
 import { validateSchemaPayload, generateSchemaFromReport, loadSettings } from './schema-command.js';
 import { runMetadataStep } from './metadata-command.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
+import { runReplicate, REPLICATION_STRATEGY_VALUES } from './replicate-command.js';
+import { resolveAuthToken } from '../test-runner/auth.js';
 import { CURRENT_DD_VERSION, CERTIFIABLE_DD_VERSIONS, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
 import { resolveRenderMode, runWithProgress, runConfigEntries } from './render.js';
 
@@ -880,5 +882,105 @@ program
       process.exitCode = 2;
     }
   });
+
+// ── Replicate Subcommand (per-step util: pull data from a live endpoint using a replication strategy) ──
+// Wraps the legacy replication engine. Four strategies (TopAndSkip / TimestampAsc / TimestampDesc / NextLink);
+// single-resource (--resource) or report-driven (--metadata) scope; writes a data-availability report (and,
+// with --save-results, the raw pages) under --output-dir. Auth is pre-resolved to a bearer token here (the
+// engine's own OAuth path hard-exits on failure), and the run uses throwOnError so a failure is our exit code.
+
+program
+  .command('replicate')
+  .description('Replicate data from a resource (or a whole metadata report) using an OData replication strategy')
+  .requiredOption('-u, --url <uri>', 'OData service root URI (no resource name or query)')
+  .requiredOption('-s, --strategy <strategy>', `Replication strategy: ${REPLICATION_STRATEGY_VALUES.join(' | ')}`)
+  .option('-r, --resource <name>', 'Resource to replicate (single-resource mode)')
+  .option('-m, --metadata <path>', 'Metadata report JSON — replicate every resource in it (report-driven mode)')
+  .option('-x, --expansions <list>', 'Comma-separated expansions, e.g. Media,OpenHouse (single-resource mode)')
+  .option('-f, --filter <expr>', 'OData $filter expression')
+  .option('-t, --top <n>', 'OData $top page size')
+  .option('--orderby <expr>', 'OData $orderby expression')
+  .option('--max-page-size <n>', 'odata.maxpagesize preference (NextLink strategy)')
+  .option('-l, --limit <n>', 'Stop after this many total records')
+  .option('--output-dir <dir>', 'Directory for the report and any saved pages (created if missing)', '.')
+  .option('-v, --version <ddVersion>', 'Data Dictionary version', '2.0')
+  .option('--save-results', 'Also write every raw response page to disk')
+  .option('--json-schema-validation', 'Validate each payload against a schema generated from the metadata')
+  .option('--strict', 'Fail on schema-validation errors')
+  .option('--originating-system-name <v>', 'Append OriginatingSystemName eq <v> to every query')
+  .option('--originating-system-id <v>', 'Append OriginatingSystemID eq <v> to every query')
+  .option('--auth-token <token>', 'Bearer token for authorization')
+  .option('--client-id <id>', 'OAuth2 client_id (with --client-secret and --token-url)')
+  .option('--client-secret <secret>', 'OAuth2 client_secret')
+  .option('--token-url <url>', 'OAuth2 token endpoint URL')
+  .action(
+    async (opts: {
+      url: string;
+      strategy: string;
+      resource?: string;
+      metadata?: string;
+      expansions?: string;
+      filter?: string;
+      top?: string;
+      orderby?: string;
+      maxPageSize?: string;
+      limit?: string;
+      outputDir: string;
+      version: string;
+      saveResults?: boolean;
+      jsonSchemaValidation?: boolean;
+      strict?: boolean;
+      originatingSystemName?: string;
+      originatingSystemId?: string;
+      authToken?: string;
+      clientId?: string;
+      clientSecret?: string;
+      tokenUrl?: string;
+    }) => {
+      const toInt = (v?: string): number | undefined => (v == null ? undefined : Number.parseInt(v, 10));
+      try {
+        const auth = resolveCliAuth({
+          authToken: opts.authToken,
+          clientId: opts.clientId,
+          clientSecret: opts.clientSecret,
+          tokenUrl: opts.tokenUrl,
+        });
+        const bearerToken = await resolveAuthToken(auth);
+        const result = await runReplicate({
+          serviceRootUri: opts.url,
+          strategy: opts.strategy,
+          bearerToken,
+          resourceName: opts.resource,
+          expansions: opts.expansions,
+          metadataReportPath: opts.metadata ? resolve(opts.metadata) : undefined,
+          filter: opts.filter,
+          top: toInt(opts.top),
+          orderby: opts.orderby,
+          maxPageSize: toInt(opts.maxPageSize),
+          limit: toInt(opts.limit),
+          outputPath: opts.outputDir,
+          version: opts.version,
+          shouldGenerateReports: !!opts.metadata,
+          jsonSchemaValidation: opts.jsonSchemaValidation || opts.strict,
+          strictMode: opts.strict,
+          shouldSaveResults: opts.saveResults,
+          originatingSystemName: opts.originatingSystemName,
+          originatingSystemId: opts.originatingSystemId,
+          onProgress: (info: Record<string, unknown>) => {
+            const n = Number(info.totalRecordsFetched ?? 0);
+            process.stderr.write(`replicate ${opts.strategy}: ${n.toLocaleString()} records\r`);
+          },
+        });
+        process.stderr.write(
+          `\nreplicate: ${result.strategy} complete — ${result.stats.totalRecordsFetched.toLocaleString()} records, ` +
+            `${result.stats.totalRequests.toLocaleString()} requests → ${result.outputDir}\n`,
+        );
+        process.exitCode = 0;
+      } catch (err) {
+        process.stderr.write(`\nreplicate: ${err instanceof Error ? err.message : String(err)}\n`);
+        process.exitCode = 2;
+      }
+    },
+  );
 
 program.parse();
