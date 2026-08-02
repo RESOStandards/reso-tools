@@ -374,11 +374,17 @@ const replicate = async ({
               break;
             }
           } catch (err) {
+            // With throwOnError, propagate a mid-run error (a strictMode schema-validation throw, or a
+            // parse/scoring failure) to the top-level catch so the caller's exit code reflects it — instead of
+            // the bare `return` that silently ended the run and resolved as success (which defeated --strict).
+            // Log only when swallowing (throwOnError false); on a rethrow the top-level catch logs it once.
+            if (throwOnError) throw err;
             LOG_ERROR(err);
             return;
           }
         }
       } catch (err) {
+        if (throwOnError) throw err;
         LOG_ERROR(err);
         return;
       }
