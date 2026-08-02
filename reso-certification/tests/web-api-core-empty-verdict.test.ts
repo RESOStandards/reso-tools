@@ -51,8 +51,9 @@ describe('emptyVerdict — legitimately-empty operators skip', () => {
   it('enum has A and has B (two values) → skip', () => {
     expect(emptyVerdict(enumS('has', { valueParam2: 'multiLookupValue2' }), NONE)).toBe('skip');
   });
-  it('compound filter (gt X and lt Y) → skip (two conditions, legitimately often empty)', () => {
+  it('compound filter (gt X and/or lt Y) → skip (two conditions, legitimately often empty)', () => {
     expect(emptyVerdict(filter('gt', { compound: { op2: 'lt', valueParam2: 'integerValueHigh', logical: 'and' } }), NONE)).toBe('skip');
+    expect(emptyVerdict(filter('gt', { compound: { op2: 'lt', valueParam2: 'integerValueHigh', logical: 'or' } }), NONE)).toBe('skip'); // same branch — keys on scenario.compound, not the connector
   });
   it('non-filter scenarios (structural, etc.) → skip', () => {
     expect(emptyVerdict(structural(), NONE)).toBe('skip');
