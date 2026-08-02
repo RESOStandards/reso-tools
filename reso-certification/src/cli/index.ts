@@ -29,6 +29,8 @@ import type { AddEditConfig, EntityEventConfig, CoreConfig, DDConfig, PipelineRe
 import { resolveCliAuth, mintOAuth2ClientCredentialsToken } from './auth.js';
 import { computeVariationsViaService, updateVariationsViaService, parseVariationsCsv } from '../variations/index.js';
 import { validateSchemaPayload, generateSchemaFromReport, loadSettings } from './schema-command.js';
+import { runMetadataStep } from './metadata-command.js';
+import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { CURRENT_DD_VERSION, CERTIFIABLE_DD_VERSIONS, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
 import { resolveRenderMode, runWithProgress, runConfigEntries } from './render.js';
 
@@ -757,15 +759,18 @@ metadataReportCmd
 
 // ── Schema Subcommand (per-step util: generate a JSON Schema / validate a payload against it) ──
 
-/** Read a JSON value from a file path, or from stdin when the path is "-". */
-const readJsonInput = async (path: string): Promise<unknown> => {
+/** Read raw text from a file path, or from stdin when the path is "-". */
+const readTextInput = async (path: string): Promise<string> => {
   if (path === '-') {
     const chunks: Buffer[] = [];
     for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
-    return JSON.parse(Buffer.concat(chunks).toString('utf-8'));
+    return Buffer.concat(chunks).toString('utf-8');
   }
-  return JSON.parse(await readFile(resolve(path), 'utf-8'));
+  return readFile(resolve(path), 'utf-8');
 };
+
+/** Read a JSON value from a file path, or from stdin when the path is "-". */
+const readJsonInput = async (path: string): Promise<unknown> => JSON.parse(await readTextInput(path));
 
 /** Write a JSON artifact to stdout when outputDir is "-", else to <outputDir>/<filename> (created if missing). */
 const writeArtifact = async (outputDir: string, filename: string, data: unknown): Promise<string> => {
@@ -834,6 +839,44 @@ schemaCmd
       process.exitCode = 0;
     } catch (err) {
       process.stderr.write(`schema generate: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exitCode = 2;
+    }
+  });
+
+// ── Metadata Subcommand (per-step util: validate OData CSDL + convert it to a RESO Format metadata report) ──
+// The first cert step, and the one that gates the rest: the metadata defines the OData entities and structure,
+// so if it is invalid nothing downstream (schema, variations, sampling) is meaningful. Exit code carries the
+// verdict (0 valid / 1 invalid / 2 IO); the report goes to the artifact, the human summary to stderr.
+
+program
+  .command('metadata')
+  .description('Metadata step — validate OData CSDL/EDMX (XSD + semantic) and convert it to a RESO Format metadata report')
+  .requiredOption('-m, --metadata <path>', 'Path to the CSDL/EDMX XML metadata file, or "-" for stdin')
+  .option('-v, --version <ddVersion>', 'DD version stamped into the generated report', '2.0')
+  .option('--odata-version <version>', 'OData version override for validation (4.0 | 4.01); auto-detected when omitted')
+  .option('--output-dir <path>', 'Directory for metadata-report.json (created if missing); "-" for stdout', '.')
+  .option('--no-report', 'Validate only; do not generate the metadata report')
+  .action(async (opts: { metadata: string; version: string; odataVersion?: string; outputDir: string; report: boolean }) => {
+    try {
+      const metadataXml = await readTextInput(opts.metadata);
+      const result = await runMetadataStep({
+        metadataXml,
+        ddVersion: opts.version,
+        odataVersion: opts.odataVersion as ODataVersion | undefined,
+        emitReport: opts.report,
+      });
+      process.stderr.write(`metadata: ${result.summary}\n`);
+      for (const err of result.errors) process.stderr.write(`  - ${err}\n`);
+      if (opts.report && result.report) {
+        const dest = await writeArtifact(opts.outputDir, 'metadata-report.json', result.report);
+        const { resources, fields, lookups } = result.report;
+        process.stderr.write(
+          `metadata: report → ${dest} (${resources.length} resources, ${fields.length.toLocaleString()} fields, ${lookups.length.toLocaleString()} lookups)\n`,
+        );
+      }
+      process.exitCode = result.passed ? 0 : 1;
+    } catch (err) {
+      process.stderr.write(`metadata: ${err instanceof Error ? err.message : String(err)}\n`);
       process.exitCode = 2;
     }
   });
