@@ -17,7 +17,7 @@
 // like RESO_SERVICES_URL populated when they destructure process.env.
 import './env-bootstrap.js';
 
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Command } from 'commander';
 import { synthesizeResourcesFromFields } from '../metadata/index.js';
@@ -28,6 +28,7 @@ import { loadConfigFile, configEntryToAddEdit, configEntryToEntityEvent } from '
 import type { AddEditConfig, EntityEventConfig, CoreConfig, DDConfig, PipelineResult } from '../sdk/types.js';
 import { resolveCliAuth, mintOAuth2ClientCredentialsToken } from './auth.js';
 import { computeVariationsViaService, updateVariationsViaService, parseVariationsCsv } from '../variations/index.js';
+import { validateSchemaPayload, generateSchemaFromReport, loadSettings } from './schema-command.js';
 import { CURRENT_DD_VERSION, CERTIFIABLE_DD_VERSIONS, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
 import { resolveRenderMode, runWithProgress, runConfigEntries } from './render.js';
 
@@ -750,6 +751,89 @@ metadataReportCmd
       );
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exitCode = 2;
+    }
+  });
+
+// ── Schema Subcommand (per-step util: generate a JSON Schema / validate a payload against it) ──
+
+/** Read a JSON value from a file path, or from stdin when the path is "-". */
+const readJsonInput = async (path: string): Promise<unknown> => {
+  if (path === '-') {
+    const chunks: Buffer[] = [];
+    for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+    return JSON.parse(Buffer.concat(chunks).toString('utf-8'));
+  }
+  return JSON.parse(await readFile(resolve(path), 'utf-8'));
+};
+
+/** Write a JSON artifact to stdout when outputDir is "-", else to <outputDir>/<filename> (created if missing). */
+const writeArtifact = async (outputDir: string, filename: string, data: unknown): Promise<string> => {
+  const json = JSON.stringify(data, null, 2);
+  if (outputDir === '-') {
+    process.stdout.write(`${json}\n`);
+    return '(stdout)';
+  }
+  const dir = resolve(outputDir);
+  await mkdir(dir, { recursive: true });
+  const file = resolve(dir, filename);
+  await writeFile(file, json);
+  return file;
+};
+
+const schemaCmd = program.command('schema').description('Data Dictionary / RESO Common Format JSON Schema tools');
+
+schemaCmd
+  .command('validate')
+  .description("Validate a payload against a metadata report's JSON Schema")
+  .requiredOption('-m, --metadata <file>', 'Metadata report JSON (metadata-report.json), or "-" for stdin')
+  .requiredOption('-p, --payload <file>', 'Payload JSON — an OData collection { value: [...] } or a single record, or "-" for stdin')
+  .option('-v, --version <version>', 'DD version for the schema context (e.g. 2.0)')
+  .option('-r, --resource <name>', 'Resource name (else inferred from the payload @odata.context)')
+  .option('-s, --settings <file>', 'schema-validation-settings.json (else ./ then the pre-baked copy)')
+  .option('-a, --additional-properties', 'Allow fields not present in the metadata (default: reject them)')
+  .option('--output-dir <path>', 'Directory for the report (created if missing); "-" for stdout', '.')
+  .action(async (opts: { metadata: string; payload: string; version?: string; resource?: string; settings?: string; additionalProperties?: boolean; outputDir: string }) => {
+    try {
+      const validationConfig = await loadSettings(opts.settings);
+      const metadataReportJson = await readJsonInput(opts.metadata);
+      const jsonPayload = await readJsonInput(opts.payload);
+      const { totalErrors, report } = await validateSchemaPayload({
+        metadataReportJson,
+        jsonPayload,
+        resourceName: opts.resource,
+        version: opts.version,
+        validationConfig,
+        additionalProperties: opts.additionalProperties,
+      });
+      const dest = await writeArtifact(opts.outputDir, 'schema-validation-report.json', report);
+      process.stderr.write(
+        totalErrors === 0
+          ? `PASS — 0 schema validation errors (report: ${dest})\n`
+          : `FAIL — ${totalErrors} schema validation error(s) (report: ${dest})\n`
+      );
+      process.exitCode = totalErrors > 0 ? 1 : 0;
+    } catch (err) {
+      process.stderr.write(`schema validate: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exitCode = 2;
+    }
+  });
+
+schemaCmd
+  .command('generate')
+  .description('Generate a JSON Schema from a metadata report')
+  .requiredOption('-m, --metadata <file>', 'Metadata report JSON, or "-" for stdin')
+  .option('-a, --additional-properties', 'Allow fields not present in the metadata')
+  .option('--output-dir <path>', 'Directory for the schema (created if missing); "-" for stdout', '.')
+  .action(async (opts: { metadata: string; additionalProperties?: boolean; outputDir: string }) => {
+    try {
+      const metadataReportJson = await readJsonInput(opts.metadata);
+      const schema = await generateSchemaFromReport({ metadataReportJson, additionalProperties: opts.additionalProperties });
+      const dest = await writeArtifact(opts.outputDir, 'schema.json', schema);
+      process.stderr.write(`Schema generated (${dest})\n`);
+      process.exitCode = 0;
+    } catch (err) {
+      process.stderr.write(`schema generate: ${err instanceof Error ? err.message : String(err)}\n`);
       process.exitCode = 2;
     }
   });
