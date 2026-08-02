@@ -57,6 +57,7 @@ const unwrapCollection = (type: string): string => type.slice('Collection('.leng
 
 const SPEC = {
   v4: {
+    entityContainer: 'https://docs.oasis-open.org/odata/odata/v4.0/csd01/part3-csdl/odata-v4.0-csd01-part3-csdl.html#_Toc355092911',
     entityTypeKey: 'https://docs.oasis-open.org/odata/odata/v4.0/csd01/part3-csdl/odata-v4.0-csd01-part3-csdl.html#_Toc355092870',
     entityTypeBaseType: 'https://docs.oasis-open.org/odata/odata/v4.0/csd01/part3-csdl/odata-v4.0-csd01-part3-csdl.html#_Toc355092866',
     complexTypeBaseType: 'https://docs.oasis-open.org/odata/odata/v4.0/csd01/part3-csdl/odata-v4.0-csd01-part3-csdl.html#_Toc355092877',
@@ -67,6 +68,7 @@ const SPEC = {
     referentialConstraint: 'https://docs.oasis-open.org/odata/odata/v4.0/csd01/part3-csdl/odata-v4.0-csd01-part3-csdl.html#_Toc355092861',
   },
   v401: {
+    entityContainer: 'https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_EntityContainer',
     entityTypeKey: 'https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_Key',
     entityTypeBaseType: 'https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_DerivedEntityType',
     complexTypeBaseType: 'https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_DerivedComplexType',
@@ -79,6 +81,7 @@ const SPEC = {
 } as const;
 
 interface SpecUrls {
+  readonly entityContainer: string;
   readonly entityTypeKey: string;
   readonly entityTypeBaseType: string;
   readonly complexTypeBaseType: string;
@@ -93,6 +96,7 @@ interface SpecUrls {
  * Validate a parsed CSDL schema for semantic correctness.
  *
  * Checks (ported from Apache Olingo CsdlTypeValidator):
+ * 0. A single entity container is present (a service metadata document must expose one)
  * 1. Entity types have at least one key property (unless abstract or derived)
  * 2. Entity type BaseType references are resolvable
  * 3. Complex type BaseType references are resolvable
@@ -115,6 +119,21 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
     errors.push({
       path: 'Schema',
       message: 'Schema namespace is missing or empty',
+    });
+  }
+
+  // Require an entity container. A metadata document that describes an OData service must define one (commonly
+  // named "Default") — it declares the entity sets a client can query, so a service without one exposes no
+  // resources. The serializer enforces the same requirement downstream; catching it here gives the provider a
+  // clear reason at the validation step instead of an opaque serialization failure later.
+  if (!schema.entityContainer) {
+    errors.push({
+      path: 'EntityContainer',
+      message:
+        'No EntityContainer was found in the metadata. An OData service metadata document must contain a single ' +
+        'entity container (commonly named "Default") that defines the resources the service exposes. Add a ' +
+        '<Schema> containing an <EntityContainer> whose <EntitySet> entries list your resources (Property, Member, …).',
+      specUrl: spec.entityContainer,
     });
   }
 
