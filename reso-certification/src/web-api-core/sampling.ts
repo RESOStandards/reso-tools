@@ -251,6 +251,26 @@ const findFullyPopulatedTimestamp = (
   return undefined;
 };
 
+/** Choose the field for the timestamp scenarios. The `lt/le now()` scenarios need a field guaranteed to be
+ *  <= now, or a future-dated datetime (OpenHouse start times, Showing appointments) legitimately returns empty
+ *  for `lt now()` and would false-fail a compliant server. Prefer ModificationTimestamp (RESO-required, always
+ *  past); else another standard `*Timestamp` field (system modification/event timestamps, likewise always past);
+ *  else a generic populated datetime (last resort — a resource with no timestamp field is a DD-gate failure). */
+export const selectTimestampField = (
+  datetimeFields: ReadonlyArray<string>,
+  records: ReadonlyArray<Record<string, unknown>>,
+): string | undefined => {
+  const isStandardTimestamp = (f: string): boolean => f.endsWith('Timestamp');
+  return (
+    (datetimeFields.includes('ModificationTimestamp') && records.some(r => r['ModificationTimestamp'] != null)
+      ? 'ModificationTimestamp'
+      : undefined)
+    ?? datetimeFields.filter(isStandardTimestamp).find(f => records.some(r => r[f] != null))
+    ?? findFullyPopulatedTimestamp(datetimeFields, records)
+    ?? datetimeFields.find(f => records.some(r => r[f] != null))
+  );
+};
+
 // ── Main resolver ──
 
 /**
@@ -337,9 +357,7 @@ export const resolveTestParams = async (
 
   // Resolve timestamp field + value (prefer fully populated for orderby). datetimeValue = sampled MIN (feeds
   // gt/ge); the previous first-seen value was the global MAX under a `…DESC` default sort → `gt max` false-fail.
-  const timestampField = findFullyPopulatedTimestamp(datetimeFields, records)
-    ?? datetimeFields.find(f => records.some(r => r[f] != null))
-    ?? (datetimeFields.includes('ModificationTimestamp') ? 'ModificationTimestamp' : undefined);
+  const timestampField = selectTimestampField(datetimeFields, records);
   const tsStats = timestampField ? timestampStats(collectValues(records, timestampField)) : undefined;
   const datetimeValue = tsStats?.min;
   const datetimeDistinctCount = tsStats?.distinct;
