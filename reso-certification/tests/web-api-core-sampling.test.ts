@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dateStats, integerNotSentinelFor, isSampleComplete, numericStats } from '../src/web-api-core/sampling.js';
+import { dateStats, integerNotSentinelFor, isSampleComplete, numericStats, selectTimestampField } from '../src/web-api-core/sampling.js';
 
 // The `ne` empty-verdict may only rule "empty is correct / pass" when the sample WAS the whole resource.
 // Core 2.1.0 signals "more results exist" with a forward @odata.nextLink, so its absence is our completeness proof.
@@ -73,5 +73,40 @@ describe('dateStats — chronological min / max and date-only dedup', () => {
     expect(s.min).toBe('2024-01-01');
     expect(s.max).toBe('2024-12-31');
     expect(s.distinct).toBe(3); // 2024-01-01, 2024-06-15 (both forms collapse), 2024-12-31
+  });
+});
+
+describe('selectTimestampField — grounds the now() scenarios on an always-<=-now field (F1)', () => {
+  it('prefers ModificationTimestamp even when a future-dated datetime is populated first', () => {
+    // OpenHouse-style: a future-dated field leads the datetime list; picking it would false-fail `lt now()`.
+    const datetimeFields = ['OpenHouseStartTime', 'OpenHouseEndTime', 'ModificationTimestamp'];
+    const records = [
+      { OpenHouseStartTime: '2099-06-01T10:00:00Z', OpenHouseEndTime: '2099-06-01T12:00:00Z', ModificationTimestamp: '2026-01-01T00:00:00Z' },
+      { OpenHouseStartTime: '2099-07-01T10:00:00Z', OpenHouseEndTime: '2099-07-01T12:00:00Z', ModificationTimestamp: '2026-02-01T00:00:00Z' },
+    ];
+    expect(selectTimestampField(datetimeFields, records)).toBe('ModificationTimestamp');
+  });
+
+  it('falls back to another standard *Timestamp field when ModificationTimestamp is absent', () => {
+    // ShowingStartTime is future-dated (ends in "Time", not "Timestamp") → excluded; OriginalEntryTimestamp wins.
+    const datetimeFields = ['ShowingStartTime', 'OriginalEntryTimestamp'];
+    const records = [{ ShowingStartTime: '2099-06-01T10:00:00Z', OriginalEntryTimestamp: '2026-01-01T00:00:00Z' }];
+    expect(selectTimestampField(datetimeFields, records)).toBe('OriginalEntryTimestamp');
+  });
+
+  it('falls back to another *Timestamp when ModificationTimestamp is present but unpopulated', () => {
+    const datetimeFields = ['ModificationTimestamp', 'PhotosChangeTimestamp'];
+    const records = [{ ModificationTimestamp: null, PhotosChangeTimestamp: '2026-01-01T00:00:00Z' }];
+    expect(selectTimestampField(datetimeFields, records)).toBe('PhotosChangeTimestamp');
+  });
+
+  it('last resort: a generic populated datetime when the resource has no *Timestamp field', () => {
+    const datetimeFields = ['SomeLocalDateTime'];
+    const records = [{ SomeLocalDateTime: '2026-01-01T00:00:00Z' }];
+    expect(selectTimestampField(datetimeFields, records)).toBe('SomeLocalDateTime');
+  });
+
+  it('returns undefined when no datetime field is populated', () => {
+    expect(selectTimestampField(['ModificationTimestamp'], [{ ModificationTimestamp: null }])).toBeUndefined();
   });
 });
