@@ -148,8 +148,10 @@ const computeLastIsoTimestamp = ({ jsonData = {}, lastIsoTimestamp, strategy, ti
 
   if (strategy === REPLICATION_STRATEGIES.TIMESTAMP_ASC) {
     if (lastIsoTimestamp === maxIsoTimestamp) {
-      //timestamp collision - add a little time to the timestamp
-      return new Date(new Date(maxIsoTimestamp) + 1).toISOString();
+      // Timestamp collision (a whole page shares this timestamp): nudge forward 1ms so the next `ge` page
+      // doesn't re-fetch it. Use getTime() for explicit numeric math — `new Date(dateObj + 1)` coerces the
+      // Date to a string and yields Invalid Date, so .toISOString() throws (the bug this replaced).
+      return new Date(new Date(maxIsoTimestamp).getTime() + 1).toISOString();
     } else {
       return maxIsoTimestamp;
     }
@@ -157,8 +159,8 @@ const computeLastIsoTimestamp = ({ jsonData = {}, lastIsoTimestamp, strategy, ti
 
   if (strategy === REPLICATION_STRATEGIES.TIMESTAMP_DESC) {
     if (lastIsoTimestamp === minIsoTimestamp) {
-      // timestamp collision - subtract a little time from the timestamp
-      return new Date(new Date(minIsoTimestamp) - 1).toISOString();
+      // Timestamp collision: nudge backward 1ms (symmetric to ASC; explicit getTime() for the same reason).
+      return new Date(new Date(minIsoTimestamp).getTime() - 1).toISOString();
     } else {
       return minIsoTimestamp;
     }
@@ -1346,8 +1348,12 @@ const buildRequestUrlString = ({
             .join(' and ')
           : null;
 
+    // `le` (inclusive), symmetric to TimestampAsc's `ge`: re-fetch the boundary record and let scorePayload's
+    // hash dedup drop the repeat, rather than `lt` (exclusive) which silently dropped every record sharing the
+    // page-boundary timestamp when a collision straddled a page. The -1ms nudge in computeLastIsoTimestamp
+    // breaks the stall when a whole page shares the min timestamp.
     return new URL(
-      `?$top=${$top}&$filter=${timestampField} lt ${timestamp}${preparedFilter?.length ? ` and ${preparedFilter}` : ''}${
+      `?$top=${$top}&$filter=${timestampField} le ${timestamp}${preparedFilter?.length ? ` and ${preparedFilter}` : ''}${
         $expand?.length ? `&$expand=${$expand}` : ''
       }&$orderby=${timestampField} desc`,
       baseUri
