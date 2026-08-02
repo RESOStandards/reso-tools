@@ -44,6 +44,21 @@ describe('validateCsdl', () => {
     expect(result.errors).toHaveLength(0);
   });
 
+  it('requires an entity container and links the OData spec', () => {
+    const schema: CsdlSchema = { ...validSchema, entityContainer: undefined };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(false);
+    const containerError = result.errors.find(e => e.path === 'EntityContainer');
+    expect(containerError?.message).toContain('EntityContainer');
+    expect(containerError?.specUrl).toContain('oasis-open.org');
+  });
+
+  it('links the 4.01 EntityContainer section when validating as 4.01', () => {
+    const schema: CsdlSchema = { ...validSchema, entityContainer: undefined };
+    const result = validateCsdl(schema, '4.01');
+    expect(result.errors.find(e => e.path === 'EntityContainer')?.specUrl).toContain('sec_EntityContainer');
+  });
+
   it('detects missing namespace', () => {
     const schema: CsdlSchema = { ...validSchema, namespace: '' };
     const result = validateCsdl(schema);
