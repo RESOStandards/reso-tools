@@ -235,11 +235,13 @@ export const assembleReport = (
       if (ref) {
         const fieldLookups = ref.isLookupField ? ddLookups(ref, values) : [];
         fields.push(ddFieldFromReference(resource, field, ref, fieldLookups.length > 0, nullableByAbsence));
-        lookups.push(...fieldLookups);
+        // Append element-wise, not `push(...fieldLookups)`: a spread of a very large distinct-value
+        // set would overflow the argument-count limit (cf. `maxOf` in aggregate.ts).
+        for (const l of fieldLookups) lookups.push(l);
       } else {
         const built = localFieldAndLookups(resource, field, values, nullableByAbsence);
         fields.push(built.field);
-        lookups.push(...built.lookups);
+        for (const l of built.lookups) lookups.push(l);
       }
     }
   }
