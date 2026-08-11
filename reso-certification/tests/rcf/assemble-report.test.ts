@@ -244,3 +244,54 @@ describe('inferMetadataReport — presence → nullable (jagged data)', () => {
     expect(report.fields.find(f => f.fieldName === 'SometimesHere')?.nullable).toBe(true); // absent from 2 of 3
   });
 });
+
+describe('inferMetadataReport — kind matching (mis-named expansions)', () => {
+  const lookupField = (name: string, values: ReadonlyArray<string>) => ({
+    type: `org.reso.metadata.enums.${name}`,
+    isLookupField: true,
+    lookupValues: Object.fromEntries(values.map(v => [v, { type: 'x', lookupName: name, lookupValue: v }])),
+  });
+  // Six resources so a resource-unique field carries idf ≈ ln(6) ≈ 1.79 — five of them clear the shipped floor.
+  const kmReference: ReferenceMap = {
+    Property: { ListPrice: { type: 'Edm.Decimal' }, City: { type: 'Edm.String' }, ModificationTimestamp: { type: 'Edm.DateTimeOffset' } },
+    Energy: {
+      EnergyRating: { type: 'Edm.String' },
+      EnergyScore: { type: 'Edm.Int32' },
+      EnergyProvider: { type: 'Edm.String' },
+      EnergyYear: { type: 'Edm.Int32' },
+      EnergyType: lookupField('EnergyType', ['Solar', 'Wind']),
+      ModificationTimestamp: { type: 'Edm.DateTimeOffset' },
+    },
+    Media: { MediaKey: { type: 'Edm.String' }, MediaURL: { type: 'Edm.String' }, ModificationTimestamp: { type: 'Edm.DateTimeOffset' } },
+    Member: { MemberKey: { type: 'Edm.String' }, MemberEmail: { type: 'Edm.String' }, ModificationTimestamp: { type: 'Edm.DateTimeOffset' } },
+    Office: { OfficeKey: { type: 'Edm.String' }, OfficeName: { type: 'Edm.String' }, ModificationTimestamp: { type: 'Edm.DateTimeOffset' } },
+    OpenHouse: { OpenHouseKey: { type: 'Edm.String' }, OpenHouseStartTime: { type: 'Edm.DateTimeOffset' }, ModificationTimestamp: { type: 'Edm.DateTimeOffset' } },
+  };
+  const kmRecords = Array.from({ length: 5 }, (_, i) => ({
+    ListPrice: 100000 + i,
+    City: 'Springfield',
+    energy_data: [{ EnergyRating: 'A', EnergyScore: 90 + i, EnergyProvider: 'Acme', EnergyYear: 2020 + i, EnergyType: i % 2 ? 'Solar' : 'Wind' }], // mis-named → Energy
+    address: { street: `${i} Main St`, zip: '00000' }, // provider complex type → no DD resource
+    listing_details: { ListPrice: 100000 + i, City: 'Springfield' }, // parent's own fields → self-flatten
+  }));
+  const report = inferMetadataReport({ recordsByResource: { Property: kmRecords }, referenceMap: kmReference, version: '2.0', generatedOn: '2026-01-01T00:00:00.000Z' });
+
+  it('reverses a mis-named expansion to the matched DD resource (fieldName ≠ typeName)', () => {
+    const f = field(report.fields, 'Property', 'energy_data');
+    expect(f?.isExpansion).toBe(true);
+    expect(f?.typeName).toBe('Energy');
+    expect(report.resources.map(r => r.resourceName)).toContain('Energy');
+  });
+
+  it('types the matched expansion’s nested fields against the DD reference', () => {
+    expect(field(report.fields, 'Energy', 'EnergyScore')?.type).toBe('Edm.Int32'); // recursed under Energy → DD-typed
+  });
+
+  it('keeps a provider complex type local (no DD match → object under its own name)', () => {
+    expect(field(report.fields, 'Property', 'address')?.typeName).toBe('address');
+  });
+
+  it('does not self-match a flattening of the parent’s own fields', () => {
+    expect(field(report.fields, 'Property', 'listing_details')?.typeName).toBe('listing_details');
+  });
+});
