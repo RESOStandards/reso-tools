@@ -27,46 +27,24 @@ import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity
 import { loadConfigFile, configEntryToAddEdit, configEntryToEntityEvent } from '../sdk/config.js';
 import type { AddEditConfig, EntityEventConfig, CoreConfig, DDConfig, PipelineResult } from '../sdk/types.js';
 import { resolveCliAuth, mintOAuth2ClientCredentialsToken } from './auth.js';
-import { computeVariationsViaService, updateVariationsViaService, parseVariationsCsv } from '../variations/index.js';
+import {
+  computeVariationsViaService,
+  updateVariationsViaService,
+  parseVariationsCsv,
+  findVariations,
+  DEFAULT_FUZZINESS,
+  DEFAULT_DD_VERSION,
+  VARIATIONS_REPORT_FILENAME,
+  type VariationsServiceReport,
+} from '../variations/index.js';
 import { validateSchemaPayload, generateSchemaFromReport, loadSettings } from './schema-command.js';
 import { runMetadataStep } from './metadata-command.js';
+import { fetchMetadataReportFromServer } from '../sdk/metadata-source.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { runReplicate, REPLICATION_STRATEGY_VALUES } from './replicate-command.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { CURRENT_DD_VERSION, CERTIFIABLE_DD_VERSIONS, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
 import { resolveRenderMode, runWithProgress, runConfigEntries } from './render.js';
-
-// ── Legacy CJS bridge — lets us call the frozen v3.0.0 findVariations ──
-
-const createRequire = (await import('node:module')).createRequire;
-const requireLegacy = createRequire(import.meta.url);
-
-interface LegacyVariationsOptions {
-  readonly pathToMetadataReportJson: string;
-  readonly fuzziness?: number;
-  readonly version?: string;
-  readonly useSuggestions?: boolean;
-  readonly fromCli?: boolean;
-  readonly bearerToken?: string;
-}
-
-interface LegacyVariationsModule {
-  readonly findVariations: (opts: LegacyVariationsOptions) => Promise<unknown>;
-}
-
-const isLegacyVariationsModule = (m: unknown): m is LegacyVariationsModule =>
-  typeof m === 'object' &&
-  m !== null &&
-  typeof (m as Record<string, unknown>).findVariations === 'function';
-
-const legacyVariationsRaw: unknown = requireLegacy(
-  resolve(import.meta.dirname, '../legacy/lib/variations/index.js')
-);
-if (!isLegacyVariationsModule(legacyVariationsRaw)) {
-  throw new Error('Failed to load legacy variations module — findVariations export missing.');
-}
-const { findVariations: legacyFindVariations } = legacyVariationsRaw;
-
 
 /** Default port for mock OData servers when started via --mock. */
 const DEFAULT_MOCK_PORT = 8800;
@@ -524,120 +502,6 @@ ddCmd.action(
   },
 );
 
-// ── Find Variations Subcommand ──
-//
-// Mirrors `findVariations` from reso-certification-utils. Runs the frozen
-// v3.0.0 variations detection in `src/legacy/lib/variations/` against a
-// metadata-report.json. By default the cloud variations service is called
-// to fetch human-provided suggestions in addition to algorithmic ones;
-// pass --disable-variations-service-check to skip that call and use only
-// the local algorithmic suggestions.
-
-const DEFAULT_FUZZINESS = 0.25;
-const DEFAULT_DD_VERSION = '2.0';
-
-program
-  .command('find-variations')
-  .description('Find DD variations in a metadata report (frozen v3.0.0 detection)')
-  .requiredOption('-p, --metadata <path>', 'Path to metadata-report JSON file')
-  .option(
-    '-f, --fuzziness <float>',
-    `Fuzzy-match threshold (0–1, default ${DEFAULT_FUZZINESS})`,
-    String(DEFAULT_FUZZINESS)
-  )
-  .option(
-    '-v, --version <version>',
-    `Data Dictionary version (default ${DEFAULT_DD_VERSION})`,
-    DEFAULT_DD_VERSION
-  )
-  .option(
-    '--disable-variations-service-check',
-    'Skip the cloud variations service call (use algorithmic suggestions only)'
-  )
-  .action(
-    async (opts: {
-      metadata: string;
-      fuzziness: string;
-      version: string;
-      disableVariationsServiceCheck?: boolean;
-    }) => {
-      try {
-        const fuzziness = Number.parseFloat(opts.fuzziness);
-        if (!Number.isFinite(fuzziness) || fuzziness < 0 || fuzziness > 1) {
-          throw new Error(`--fuzziness must be a number in [0, 1], got '${opts.fuzziness}'`);
-        }
-
-        // Mint a fresh OAuth2 bearer token via client_credentials when the
-        // .env carries TOKEN_URI + CLIENT_ID + CLIENT_SECRET. This avoids
-        // operators having to maintain a long-lived static token. If the
-        // mint fails or env vars are missing, fall through to whatever
-        // findVariations does on its own (its fetchProviderToken path).
-        const bearerToken = opts.disableVariationsServiceCheck
-          ? undefined
-          : await mintOAuth2ClientCredentialsToken();
-
-        await legacyFindVariations({
-          pathToMetadataReportJson: resolve(opts.metadata),
-          fuzziness,
-          version: opts.version,
-          useSuggestions: !opts.disableVariationsServiceCheck,
-          fromCli: true,
-          ...(bearerToken ? { bearerToken } : {}),
-        });
-      } catch (error) {
-        console.error('Error:', error instanceof Error ? error.message : String(error));
-        process.exitCode = 2;
-      }
-    }
-  );
-
-// ── Compute Variations Subcommand ──
-//
-// Standalone variations check against the cloud /compute service for any
-// metadata-report.json — no full cert run. The matcher + the canonical /
-// in-review blend run server-side; this sends the report and prints the
-// variations. CLI auth: an OAuth2 client_credentials token from .env
-// (TOKEN_URI / CLIENT_ID / CLIENT_SECRET); if absent, the service falls back
-// to minting from CERT_AUTH_API_* creds, else it reports how to authenticate.
-
-program
-  .command('compute-variations')
-  .description('Compute DD variations for a metadata report via the cloud Variations Service')
-  .requiredOption('-p, --metadata <path>', 'Path to metadata-report JSON file')
-  .option('-v, --version <version>', `Data Dictionary version (default ${DEFAULT_DD_VERSION})`, DEFAULT_DD_VERSION)
-  .option('-f, --fuzziness <float>', `Fuzzy-match threshold (0–1, default ${DEFAULT_FUZZINESS})`, String(DEFAULT_FUZZINESS))
-  .option('-o, --output <path>', 'Write the variations report here (default: stdout)')
-  .action(async (opts: { metadata: string; version: string; fuzziness: string; output?: string }) => {
-    try {
-      const fuzziness = Number.parseFloat(opts.fuzziness);
-      if (!Number.isFinite(fuzziness) || fuzziness < 0 || fuzziness > 1) {
-        throw new Error(`--fuzziness must be a number in [0, 1], got '${opts.fuzziness}'`);
-      }
-
-      const metadataReportJson = JSON.parse(await readFile(resolve(opts.metadata), 'utf-8')) as unknown;
-      const bearerToken = await mintOAuth2ClientCredentialsToken();
-
-      const report = await computeVariationsViaService({
-        metadataReportJson,
-        version: opts.version,
-        fuzziness,
-        fromCli: true,
-        ...(bearerToken ? { bearerToken } : {}),
-      });
-
-      const out = JSON.stringify(report, null, 2);
-      if (opts.output) {
-        await writeFile(resolve(opts.output), out);
-        console.log(`Variations report written to ${resolve(opts.output)}`);
-      } else {
-        console.log(out);
-      }
-    } catch (error) {
-      console.error('Error:', error instanceof Error ? error.message : String(error));
-      process.exitCode = 2;
-    }
-  });
-
 // ── Update Variations Subcommand (Admin) ──
 //
 // Submit human-reviewed variation suggestions from a CSV to the v2 admin
@@ -978,6 +842,136 @@ program
         process.exitCode = 0;
       } catch (err) {
         process.stderr.write(`\nreplicate: ${err instanceof Error ? err.message : String(err)}\n`);
+        process.exitCode = 2;
+      }
+    },
+  );
+
+// ── Find Variations Subcommand (per-step util: DD variations review via the v2 Variations Service) ──
+//
+// The cert variations step: compute a metadata report's DD variations through the v2 Variations
+// Service (`/compute`) and emit the canonical data-dictionary-variations.json. The metadata source
+// is either a local report (--metadata, or "-" for stdin) or a live endpoint (--from-server --url,
+// whose $metadata is fetched + serialized in memory). `--output-dir -` prints the raw report to
+// stdout instead of writing the artifact. computeVariationsViaService is the engine; this command
+// is the cert wrapper around it (source resolution + canonical artifact + run summary).
+//
+// Two independent auth contexts: the provider-endpoint auth flags (--auth-token / --client-id …)
+// authenticate the --from-server $metadata fetch, while the /compute call authenticates to the
+// RESO Variations Service with .env service credentials (minted inside the service when omitted).
+
+/** Count non-empty variation categories in a service report, for the run summary. */
+const summarizeVariations = (report: VariationsServiceReport): { total: number; detail: string } => {
+  const counts = Object.entries(report.variations ?? {}).map(
+    ([key, value]) => [key, Array.isArray(value) ? value.length : 0] as const,
+  );
+  const total = counts.reduce((sum, [, n]) => sum + n, 0);
+  const detail = counts
+    .filter(([, n]) => n > 0)
+    .map(([key, n]) => `${key}: ${n}`)
+    .join(', ');
+  return { total, detail };
+};
+
+program
+  .command('find-variations')
+  .description('DD variations review for a metadata report via the v2 Variations Service')
+  .option('-m, --metadata <file>', 'Metadata report JSON (metadata-report.json), or "-" for stdin')
+  .option('--from-server', 'Fetch metadata from a live OData endpoint instead of a file (requires --url)')
+  .option('-u, --url <url>', 'OData service root URL (with --from-server)')
+  .option('-f, --fuzziness <float>', `Fuzzy-match threshold (0–1, default ${DEFAULT_FUZZINESS})`, String(DEFAULT_FUZZINESS))
+  .option('-v, --version <version>', `Data Dictionary version (default ${DEFAULT_DD_VERSION})`, DEFAULT_DD_VERSION)
+  .option('--output-dir <path>', 'Directory for data-dictionary-variations.json (created if missing); "-" for stdout', '.')
+  .option('--auth-token <token>', 'Bearer token for the --from-server endpoint')
+  .option('--client-id <id>', 'OAuth2 client_id for the --from-server endpoint (with --client-secret and --token-url)')
+  .option('--client-secret <secret>', 'OAuth2 client_secret for the --from-server endpoint')
+  .option('--token-url <url>', 'OAuth2 token endpoint URL for the --from-server endpoint')
+  .action(
+    async (opts: {
+      metadata?: string;
+      fromServer?: boolean;
+      url?: string;
+      fuzziness: string;
+      version: string;
+      outputDir: string;
+      authToken?: string;
+      clientId?: string;
+      clientSecret?: string;
+      tokenUrl?: string;
+    }) => {
+      try {
+        // Exactly one metadata source.
+        if (opts.fromServer && opts.metadata) {
+          throw new Error('--metadata and --from-server are mutually exclusive. Choose one metadata source.');
+        }
+        if (!opts.fromServer && !opts.metadata) {
+          throw new Error('Provide a metadata source: --metadata <file> (or "-" for stdin), or --from-server --url <url>.');
+        }
+
+        const fuzziness = Number.parseFloat(opts.fuzziness);
+        if (!Number.isFinite(fuzziness) || fuzziness < 0 || fuzziness > 1) {
+          throw new Error(`--fuzziness must be a number in [0, 1], got '${opts.fuzziness}'`);
+        }
+        const { version } = opts;
+
+        // Resolve the metadata report to an in-memory object. --from-server fetches the endpoint's
+        // $metadata (authenticated with the provider-endpoint auth flags) and serializes it;
+        // --metadata reads a local report (or stdin). No temporary file is written either way.
+        const resolveMetadataReport = async (): Promise<unknown> => {
+          if (opts.fromServer) {
+            const url = opts.url;
+            if (!url) throw new Error('--from-server requires --url <url> (the OData service root).');
+            const bearerToken = await resolveAuthToken(
+              resolveCliAuth({
+                authToken: opts.authToken,
+                clientId: opts.clientId,
+                clientSecret: opts.clientSecret,
+                tokenUrl: opts.tokenUrl,
+              }),
+            );
+            return fetchMetadataReportFromServer({ url, bearerToken, version });
+          }
+          const metadataPath = opts.metadata;
+          if (!metadataPath) {
+            throw new Error('Provide a metadata source: --metadata <file> (or "-" for stdin), or --from-server --url <url>.');
+          }
+          return readJsonInput(metadataPath);
+        };
+        const metadataReportJson = await resolveMetadataReport();
+
+        // The /compute token authenticates to the RESO Variations Service; minted from .env service
+        // credentials. When absent, the service mints its own (CERT_AUTH_API_*) or reports how to auth.
+        const computeToken = await mintOAuth2ClientCredentialsToken();
+
+        if (opts.outputDir === '-') {
+          // Raw report to stdout — no canonical artifact written.
+          const report = await computeVariationsViaService({
+            metadataReportJson,
+            version,
+            fuzziness,
+            fromCli: true,
+            ...(computeToken ? { bearerToken: computeToken } : {}),
+          });
+          process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+        } else {
+          const report = await findVariations({
+            metadataReportJson,
+            version,
+            fuzziness,
+            fromCli: true,
+            outputPath: resolve(opts.outputDir),
+            ...(computeToken ? { bearerToken: computeToken } : {}),
+          });
+          const { total, detail } = summarizeVariations(report);
+          process.stderr.write(
+            total > 0
+              ? `find-variations: ${total} variation(s) [${detail}] → ${resolve(opts.outputDir, VARIATIONS_REPORT_FILENAME)}\n`
+              : 'find-variations: no variations found\n',
+          );
+        }
+        process.exitCode = 0;
+      } catch (err) {
+        process.stderr.write(`find-variations: ${err instanceof Error ? err.message : String(err)}\n`);
         process.exitCode = 2;
       }
     },

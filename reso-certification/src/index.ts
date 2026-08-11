@@ -137,6 +137,11 @@ export type {
   FindVariationsInput,
 } from './variations/index.js';
 
+// ── Metadata source (--from-server: fetch $metadata from a live endpoint + serialize) ──
+
+export { fetchMetadataReportFromServer } from './sdk/metadata-source.js';
+export type { FetchMetadataReportFromServerInput } from './sdk/metadata-source.js';
+
 // ── Metadata Report ──
 // The serializer (serializeMetadataReport/generateMetadataReport + MetadataReport*) moved to
 // @reso-standards/reso-metadata-utils (reso-tools #221). Import from there directly.
