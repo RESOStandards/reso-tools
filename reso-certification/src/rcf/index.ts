@@ -31,3 +31,11 @@ export {
   type PayloadCache,
   type InferMetadataReportInput,
 } from './assemble-report.js';
+export {
+  buildKindMatcher,
+  DEFAULT_KIND_MATCH_OPTIONS,
+  type KindMatcher,
+  type KindMatch,
+  type KindMatchInput,
+  type KindMatchOptions,
+} from './kind-match.js';
