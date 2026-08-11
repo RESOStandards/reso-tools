@@ -31,6 +31,10 @@ const INT_WIDTH: Readonly<Record<string, number>> = { 'Edm.Int16': 1, 'Edm.Int32
 const widestInt = (types: ReadonlyArray<string>): string =>
   types.reduce((widest, t) => ((INT_WIDTH[t] ?? 0) > (INT_WIDTH[widest] ?? 0) ? t : widest), 'Edm.Int16');
 
+// Max of a numeric list by reduction, NOT `Math.max(0, ...nums)`: a collection field flattens to its
+// element values, which can exceed the argument-count limit (~125k in V8) and overflow the call stack.
+const maxOf = (nums: ReadonlyArray<number>): number => nums.reduce((m, n) => (n > m ? n : m), 0);
+
 const withNullable = (base: AggregatedFieldType, nullable: boolean): AggregatedFieldType =>
   nullable ? { ...base, nullable: true } : base;
 
@@ -64,11 +68,11 @@ export const aggregateFieldType = (values: ReadonlyArray<unknown>): AggregatedFi
     return withNullable({ type: widestInt(types) }, nullable);
   }
   if (types.every(t => t in INT_WIDTH || t === 'Edm.Decimal')) {
-    const scale = Math.max(0, ...inferred.map(t => t.scale ?? 0));
+    const scale = maxOf(inferred.map(t => t.scale ?? 0));
     // precision must cover the widest integer part PLUS the deepest fractional part — taking
     // independent maxes (and letting integers contribute 0) under-counts, e.g. [12345, 1.5]
     // would give precision 2, which cannot hold 12345.
-    const intDigits = Math.max(0, ...valid.map(v => (typeof v === 'number' ? Math.abs(Math.trunc(v)).toString().length : 0)));
+    const intDigits = maxOf(valid.map(v => (typeof v === 'number' ? Math.abs(Math.trunc(v)).toString().length : 0)));
     const precision = intDigits + scale;
     return withNullable(
       { type: 'Edm.Decimal', ...(scale ? { scale } : {}), ...(precision ? { precision } : {}) },
@@ -82,7 +86,7 @@ export const aggregateFieldType = (values: ReadonlyArray<unknown>): AggregatedFi
     return withNullable({ type: types[0] }, nullable);
   }
   if (types.every(t => t === 'Edm.String' || t === 'Edm.Date' || t === 'Edm.DateTimeOffset')) {
-    const maxLength = Math.max(0, ...valid.map(v => (typeof v === 'string' ? v.length : 0)));
+    const maxLength = maxOf(valid.map(v => (typeof v === 'string' ? v.length : 0)));
     return withNullable({ type: 'Edm.String', ...(maxLength ? { maxLength } : {}) }, nullable);
   }
 

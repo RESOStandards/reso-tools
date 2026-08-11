@@ -37,6 +37,13 @@ describe('aggregateFieldType', () => {
     expect(aggregateFieldType([['A', 'BB'], ['CCC']])).toEqual({ type: 'Edm.String', maxLength: 3, isCollection: true });
   });
 
+  it('handles a large collection without overflowing the call stack (regression)', () => {
+    // A collection whose flattened element count exceeds V8's argument-count limit (~125k):
+    // `Math.max(0, ...elements)` overflowed here on a real 58k-record payload; `maxOf` reduces instead.
+    const bigCollection = [Array.from({ length: 200_000 }, (_, i) => (i === 0 ? 'longeststring' : 'x'))];
+    expect(aggregateFieldType(bigCollection)).toEqual({ type: 'Edm.String', maxLength: 13, isCollection: true });
+  });
+
   it('detects nested objects as an expansion / custom type', () => {
     expect(aggregateFieldType([{ a: 1 }, { a: 2 }])).toEqual({ type: 'Custom Type', isExpansion: true });
   });
