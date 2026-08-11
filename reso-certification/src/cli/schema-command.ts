@@ -112,3 +112,43 @@ export const generateSchemaFromReport = async (opts: {
     metadataReportJson: opts.metadataReportJson,
     additionalProperties: opts.additionalProperties ?? false,
   });
+
+export interface DdSchemaValidator {
+  /** Validate one payload, folding its errors into `errorMap` (shared across a stream). */
+  readonly validate: (
+    jsonPayload: unknown,
+    resourceName?: string,
+    version?: string,
+    errorMap?: Record<string, unknown>,
+  ) => Record<string, unknown>;
+  /** Total + combine an accumulated error map into a report. */
+  readonly combine: (errorMap: Record<string, unknown>) => { readonly totalErrors: number; readonly report: Record<string, unknown> };
+}
+
+/**
+ * Build a reusable validator: generate the JSON Schema ONCE from a metadata report, then
+ * validate many payloads against it. Errors fold into a caller-owned `errorMap` so a whole
+ * RCF stream collapses into one report; `combine` totals it. This avoids the per-payload
+ * schema regeneration `validateSchemaPayload` does — essential when streaming thousands of files.
+ */
+export const createDdSchemaValidator = async (opts: {
+  readonly metadataReportJson: unknown;
+  readonly additionalProperties?: boolean;
+  readonly validationConfig?: unknown;
+}): Promise<DdSchemaValidator> => {
+  const mod = loadSchemaModule();
+  const jsonSchema = await mod.generateJsonSchema({
+    metadataReportJson: opts.metadataReportJson,
+    additionalProperties: opts.additionalProperties ?? false,
+  });
+  return {
+    validate: (jsonPayload, resourceName, version, errorMap = {}) =>
+      mod.validate({ jsonSchema, jsonPayload, resourceName, version, validationConfig: opts.validationConfig ?? {}, errorMap }),
+    combine: errorMap => {
+      // A payload whose resource isn't in the schema leaves the error map without `stats`; default it
+      // so combineErrors doesn't dereference `stats.totalErrors` on undefined (an existing `stats` wins).
+      const combined = mod.combineErrors({ stats: { totalErrors: 0, totalWarnings: 0 }, ...errorMap });
+      return { totalErrors: combined.totalErrors ?? 0, report: combined };
+    },
+  };
+};
