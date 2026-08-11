@@ -2,6 +2,48 @@
 
 ---
 
+## v1.0.0 – "First Light"
+
+The first stable release. RESO Tools splits into a **public, npm-published core** and a private application tier, so any project can consume the RESO libraries and the certification runner without the monorepo.
+
+### Public/private split + npm publishing
+
+- **Seven public packages now publish to npm** via per-package Trusted-Publishing (OIDC) CI: `reso-common`, `reso-metadata-utils`, `reso-client`, `odata-expression-parser`, `reso-validation`, `reso-certification`, and `reso-reference-server`. Consumers install them from the registry with `^` version ranges – no monorepo required.
+- **The application tier moved to `reso-tools-private`:** the browser UI, the Electron desktop client, the CORS proxy, and the test-data generator. The public reference server switches to committed static seeds; the desktop app is still built and published here as a downloadable release.
+- **npm workspaces** replace the bootstrap script – `npm install` links every package once and `npm run build` builds in dependency order (#230).
+- Pre-publish package audit plus LICENSE / `publishConfig` / `files` readiness across the public set (#220).
+
+### New shared metadata packages (the metadata split, #221)
+
+- **`reso-common`** – the universal, zero-dependency RESO metadata model, projections and EDMX generator, and the single source of truth for the metadata shape: `buildMetadataMap`, the variations-matching helpers, and the DD reference metadata are all consolidated here. Runs unchanged in the browser and on the server.
+- **`reso-metadata-utils`** – the dependency-requiring side: CSDL parsing and validation (CSDL/XSD), EDMX → metadata-report serialization, and live metadata fetching, migrated out of `reso-client`.
+- Cut the legacy `@reso/reso-certification-etl` tarball dependency – the in-package v2 ETL now supplies the DD reference and stats engine.
+
+### `reso-cert` – per-step certification CLI (#251)
+
+Each certification step is now a standalone `reso-cert` command, so vendors can run any step in CI:
+
+- **`schema`** – validate a payload against DD JSON Schema, or generate the schema from a metadata report.
+- **`metadata`** – validate CSDL metadata (now requiring an `EntityContainer`) and convert it to a RESO metadata report.
+- **`replicate`** – sample a resource via all four replication strategies (TopSkip, Timestamp Asc/Desc, NextLink), with `--strict`.
+- **`find-variations`** – run DD value variations over the v2 Variations Service, from a `--metadata` file or `--from-server`.
+
+These join the existing `add-edit`, `entity-event`, `core`, and `dd` commands.
+
+### Certification correctness
+
+- **Web API Core enum handling (IsFlags):** a shared enum-value decoder, the `resolveEnum` / `EnumField` abstraction, and correct IsFlags / collection / string-enum value selection, with adversarial fixes.
+- **Fail-closed schema validation** for enum values a server serves but does not advertise.
+- **DD metadata gate** wired into the pipeline – disallowed synonyms, closed-enum membership, field-type mapping, Lookup Resource sentinels, and finding severity + SHOULD warnings.
+- CSDL semantic validation now requires an `EntityContainer`.
+
+### Security
+
+- Cleared npm vulnerabilities across all packages; removed the unused legacy cert-utils and the `xlsx` dependency; bumped Vitest to 4.
+- Recorded the v1.0.0 pre-publish security audit.
+
+---
+
 ## v0.11 – "Elevenses"
 
 ### Saved Configs and Connection Manager
