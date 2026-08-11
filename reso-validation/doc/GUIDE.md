@@ -18,7 +18,7 @@ If you are *just* querying a server, the **[RESO Client SDK](../reso-client/)** 
 
 ## Install
 
-This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+This package is not on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
 
 ```bash
 git clone https://github.com/RESOStandards/reso-tools.git
@@ -26,7 +26,7 @@ cd reso-tools/reso-validation
 npm install
 ```
 
-This package has no sibling dependencies — `npm install` just runs. To bootstrap every package at once, run `npm run bootstrap` from the repo root instead. To consume the SDK from another project, link it locally with `npm link` or use a `file:` dependency.
+This package has no sibling dependencies – `npm install` just runs. To bootstrap every package at once, run `npm run bootstrap` from the repo root instead. To consume the SDK from another project, link it locally with `npm link` or use a `file:` dependency.
 
 Zero runtime dependencies. Isomorphic – runs identically in Node.js 22 or later, in any modern browser bundle and in any edge runtime that supports ESM.
 

@@ -4,13 +4,13 @@ A metadata-driven OData 4.01 reference server for the [RESO Data Dictionary](htt
 
 > **[User Guide](doc/GUIDE.md)** – a task-oriented walkthrough with realistic examples.
 
-> **Use it as a package.** Also published to npm as `@reso-standards/reso-reference-server` — import `createApp`, `startServer` and `loadConfig` to embed a RESO OData server in your own Node process (handy for test harnesses). Running the server directly from the package (`npx`, no clone or Docker) is tracked in [#238](https://github.com/RESOStandards/reso-tools/issues/238).
+> **Use it as a package.** Also published to npm as `@reso-standards/reso-reference-server` – import `createApp`, `startServer` and `loadConfig` to embed a RESO OData server in your own Node process (handy for test harnesses). Running the server directly from the package (`npx`, no clone or Docker) is tracked in [#238](https://github.com/RESOStandards/reso-tools/issues/238).
 
 ## Quick Start (Docker)
 
 The server supports three database backends: **PostgreSQL** (default), **MongoDB**, and **SQLite**. Each has its own Docker Compose profile.
 
-### PostgreSQL (default)
+### PostgreSQL (Default)
 
 ```bash
 cd reso-reference-server
@@ -102,9 +102,9 @@ curl -X POST http://localhost:8080/Property \
   -d '{"ListPrice": 250000, "City": "Austin", "StateOrProvince": "TX", "PostalCode": "78701", "Country": "US", "BedroomsTotal": 3}'
 ```
 
-Seeding loads a committed static dataset (`seed-data/seed.json.gz`) via `POST /admin/seed`. The server inserts it through the DAL with FK links preserved: Office (17), Member (39), OUID (2), Teams (5), Property (50), plus child collections (Media, OpenHouse, Showing, Rooms, etc.) — 948 records total. The call is idempotent — it is a no-op once the server is already seeded.
+Seeding loads a committed static dataset (`seed-data/seed.json.gz`) via `POST /admin/seed`. The server inserts it through the DAL with FK links preserved: Office (17), Member (39), OUID (2), Teams (5), Property (50), plus child collections (Media, OpenHouse, Showing, Rooms, etc.) – 948 records total. The call is idempotent – it is a no-op once the server is already seeded.
 
-### Reseed (drop existing data)
+### Reseed (Drop Existing Data)
 
 ```bash
 docker compose down -v        # or: docker compose --profile mongodb down -v
@@ -199,7 +199,7 @@ Both modes pass all Web API Core 2.0.0 compliance tests.
 
 ## Compliance Testing
 
-The server includes Docker-based compliance testing against RESO certification tools and a custom Add/Edit test runner. Tests run against seeded data and validate OData protocol compliance, metadata structure, field mappings, and query behavior.
+The server includes Docker-based compliance testing against RESO Certification tools and a custom Add/Edit test runner. Tests run against seeded data and validate OData protocol compliance, metadata structure, field mappings, and query behavior.
 
 ### Web API Core 2.0.0
 
@@ -272,7 +272,7 @@ Compliance tests run automatically on push to `main` and on pull requests via Gi
 
 ## Development
 
-This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+This package is not on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
 
 ```bash
 git clone https://github.com/RESOStandards/reso-tools.git

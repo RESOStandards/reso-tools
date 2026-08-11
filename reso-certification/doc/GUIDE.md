@@ -19,7 +19,7 @@ The package covers four endorsements: **Add/Edit (RCP-010)**, **EntityEvent (RCP
 
 ## Install
 
-This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+This package is not on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
 
 ```bash
 git clone https://github.com/RESOStandards/reso-tools.git

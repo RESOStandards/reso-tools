@@ -137,7 +137,7 @@ For the rest of the guide, assume the Client Credentials shape above is implicit
 > }
 > ```
 >
-> The `RESO.OData.Metadata.LookupName` annotation is the bridge between a string field and the Lookup resource – it tells you which `LookupName` to filter by when you want the allowed values for this field. We'll use it in §2.1.
+> The `RESO.OData.Metadata.LookupName` annotation is the bridge between a string field and the Lookup resource – it tells you which `LookupName` to filter by when you want the allowed values for this field. We will use it in §2.1.
 >
 > A plain decimal field looks like this:
 >
@@ -318,7 +318,7 @@ For the rest of the guide, assume the Client Credentials shape above is implicit
 > }
 > ```
 >
-> Notice that `StandardStatus` and `PropertyType` come back as plain strings (`"Active"`, `"Commercial Sale"`) – these are the `LookupValue`s that correspond to entries in the `Lookup` resource. To translate them back to their canonical labels you'd join on `LookupName eq 'StandardStatus'` or `'PropertyType'` using the same pattern from §2.1.
+> Notice that `StandardStatus` and `PropertyType` come back as plain strings (`"Active"`, `"Commercial Sale"`) – these are the `LookupValue`s that correspond to entries in the `Lookup` resource. To translate them back to their canonical labels you would join on `LookupName eq 'StandardStatus'` or `'PropertyType'` using the same pattern from §2.1.
 
 ---
 
@@ -401,9 +401,9 @@ Section 2 used `$filter` for the simplest possible cases – equality and a sing
 > }
 > ```
 >
-> The same family includes `startswith(City, 'spring')` for prefix matches and `endswith(StreetName, 'Avenue')` for suffix matches. They all work on any `Edm.String` field. For exact matching against an enumerated set of values use `in` instead – `City in ('Austin', 'Dallas', 'Houston')` is much cheaper than three `contains()` calls OR'd together.
+> The same family includes `startswith(City, 'spring')` for prefix matches and `endswith(StreetName, 'Avenue')` for suffix matches. They all work on any `Edm.String` field. For exact matching against an enumerated set of values use `in` instead – `City in ('Austin', 'Dallas', 'Houston')` is much cheaper than three `contains()` calls combined with OR.
 
-### 3.3 Multi-Value Lookup Fields – Homes With an ENERGY STAR Fridge
+### 3.3 Multi-Value Lookup Fields – Homes with an ENERGY STAR Fridge
 
 > **User:** Find listings whose `Appliances` includes an ENERGY STAR refrigerator.
 >
@@ -449,7 +449,7 @@ Section 2 used `$filter` for the simplest possible cases – equality and a sing
 > - **The variable name (`a`) is arbitrary** – use whatever reads well. `Appliances/any(appliance: appliance eq '…')` is identical.
 > - **`all(...)` is the dual of `any(...)`** when you want every element to satisfy the predicate. Less common in real searches, but it shows up in negative filters: `not Appliances/any(a: a eq 'Trash Compactor')` is the way to ask for "no trash compactor."
 
-### 3.4 Sanity-Checking a Complex Filter With `parse-filter`
+### 3.4 Sanity-Checking a Complex Filter with `parse-filter`
 
 > **User:** Before I run this, can you confirm I built the filter correctly? `StandardStatus eq 'Active' and ListPrice ge 300000 and ListPrice le 600000 and contains(City, 'spring')`
 >
@@ -527,7 +527,7 @@ Section 2 used `$filter` for the simplest possible cases – equality and a sing
 > }
 > ```
 >
-> Notice that all three results have nearly identical timestamps in early April 2026 – that is the moment the seed step ran, not the moment the listings were "actually" modified. This is what you'd expect from a freshly bulk-loaded database: every record's `ModificationTimestamp` reflects the load, and the *real* incremental-sync story starts when the next mutation happens. Sections 4 and 5 cover both sides of that: making changes (Add/Edit) and tracking them (EntityEvent).
+> Notice that all three results have nearly identical timestamps in early April 2026 – that is the moment the seed step ran, not the moment the listings were "actually" modified. This is what you would expect from a freshly bulk-loaded database: every record's `ModificationTimestamp` reflects the load, and the *real* incremental-sync story starts when the next mutation happens. Sections 4 and 5 cover both sides of that: making changes (Add/Edit) and tracking them (EntityEvent).
 >
 > Two things worth knowing about timestamp filters:
 >
@@ -758,7 +758,7 @@ Reading data is half the story. The other half is making changes – creating li
 
 The happy path is the easy part. What separates a usable AI integration from a frustrating one is how it walks the user through *errors* – and RESO Add/Edit servers return them in a structured way the assistant can translate into plain language.
 
-#### Missing required fields (HTTP 400)
+#### Missing Required Fields (HTTP 400)
 
 We already hit this in §4.1 – the first `create` attempt left out `PostalCode` and `Country`. The error shape is worth understanding:
 
@@ -784,7 +784,7 @@ Three things make this useful for AI-assisted Add/Edit:
 
 The recovery pattern: parse the structured error, summarize it in plain language, propose a concrete fix, retry with consent. No raw JSON in the user-facing dialogue unless the user asks for it.
 
-#### Record not found (HTTP 404)
+#### Record Not Found (HTTP 404)
 
 > **User:** Delete listing `does-not-exist-12345`.
 >
@@ -818,7 +818,7 @@ The recovery pattern: parse the structured error, summarize it in plain language
 >
 > The server does not have a record with that key, so the DELETE failed with a 404. No EntityEvent is generated – failed writes do not produce events. If you were treating this as part of a sync loop, the right response is "the record was already gone, my local cache is consistent, move on."
 
-#### The silent failure: when the server accepts bad data
+#### The Silent Failure: When the Server Accepts Bad Data
 
 This is the trap nobody warns you about. The user asks for a status change to a value that is not in the lookup and the server returns **HTTP 200** instead of a 400.
 
@@ -833,7 +833,7 @@ This is the trap nobody warns you about. The user asks for a status change to a 
 > - **Not every server enforces lookup membership on PATCH.** This server validates required fields but does not validate that lookup-backed string fields contain values from the corresponding `Lookup` resource. Different servers make different choices about write-path validation.
 > - **An AI assistant should not treat HTTP 200 as proof of correctness.** "The server accepted my call" and "the value I sent was valid" are not the same statement. The right pattern is: warn before sending if the assistant suspects the value is wrong, and sanity-check constrained fields after a successful response.
 
-#### Putting the three patterns together
+#### Putting the Three Patterns Together
 
 | Server response | What it means | Recovery |
 |---|---|---|
@@ -950,7 +950,7 @@ Reading data is half the story. Tracking *other people's* changes – and knowin
 >
 > **User:** Yeah, set `PurchaseContractDate` to today.
 >
-> **Assistant:** OK, here is what I'm about to send. Confirm and I will run it.
+> **Assistant:** OK, here is what I am about to send. Confirm and I will run it.
 >
 > ```jsonc
 > { "StandardStatus": "Pending", "PurchaseContractDate": "2026-04-06" }
@@ -1222,7 +1222,7 @@ Sections 4.4–4.7 were about *making* writes. Now let us flip the perspective: 
 > }
 > ```
 >
-> One new event, sequence 6, for a key I've never seen before. Per the rules in §5.1: **unknown key + record exists on follow-up fetch = create**. Let me verify by fetching the record:
+> One new event, sequence 6, for a key I have never seen before. Per the rules in §5.1: **unknown key + record exists on follow-up fetch = create**. Let me verify by fetching the record:
 >
 > <details><summary>Tool call – <code>mcp__reso__query</code></summary>
 >
@@ -1250,7 +1250,7 @@ Sections 4.4–4.7 were about *making* writes. Now let us flip the perspective: 
 >
 > Confirmed – record exists, this is a create. I add it to my local cache and advance my cursor to sequence 6.
 >
-> Now let's delete the record on the server side and watch what happens to the consumer.
+> Now let us delete the record on the server side and watch what happens to the consumer.
 >
 > <details><summary>Tool call – <code>mcp__reso__delete</code></summary>
 >
@@ -1506,7 +1506,7 @@ The cloud server makes the OData request on your behalf and returns the results.
 
 Some RESO servers support OAuth2 Client Credentials. The cloud MCP server handles both patterns:
 
-**Bearer token** — if you already have a token, pass it directly as `authToken` in any tool call:
+**Bearer token** – if you already have a token, pass it directly as `authToken` in any tool call:
 
 ```json
 "arguments": {
@@ -1516,7 +1516,7 @@ Some RESO servers support OAuth2 Client Credentials. The cloud MCP server handle
 }
 ```
 
-**Client Credentials** — if the server requires OAuth2, use the `authenticate` tool first to obtain a token:
+**Client Credentials** – if the server requires OAuth2, use the `authenticate` tool first to obtain a token:
 
 ```json
 {
@@ -1534,7 +1534,7 @@ Some RESO servers support OAuth2 Client Credentials. The cloud MCP server handle
 }
 ```
 
-The server returns a bearer token. Use that token as `authToken` in subsequent calls. You can also skip the `authenticate` step and pass `clientId`, `clientSecret`, and `tokenUrl` directly on any tool call — the cloud server will obtain the token automatically before making the request.
+The server returns a bearer token. Use that token as `authToken` in subsequent calls. You can also skip the `authenticate` step and pass `clientId`, `clientSecret`, and `tokenUrl` directly on any tool call – the cloud server will obtain the token automatically before making the request.
 
 ### 6.6 Cloud vs. Local
 

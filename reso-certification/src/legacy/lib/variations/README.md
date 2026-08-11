@@ -22,7 +22,7 @@ Note that if `useSuggestions` is true, the `.env` file must contain auth informa
 For information on how to obtain auth info, please contact [dev@reso.org](mailto:dev@reso.org).
 
 # Update Variations (Admin)
-There's also an admin function to update variations, but this isn't available for normal users. 
+There is also an admin function to update variations, but this is not available for normal users. 
 
 ```
 $ reso-certification-utils updateVariations --help

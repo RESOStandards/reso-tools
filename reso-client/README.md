@@ -6,7 +6,7 @@ OData 4.01 client SDK for TypeScript. Provides URI building, CRUD helpers, CSDL 
 
 ## Install
 
-This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+This package is not on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
 
 ```bash
 git clone https://github.com/RESOStandards/reso-tools.git
@@ -298,7 +298,7 @@ if (isODataError(response.body)) {
 const allEntities = await followAllPages(client, firstResponse);
 ```
 
-### Filter Parser (re-exported)
+### Filter Parser (Re-exported)
 
 The `parseFilter` function and AST types from [`@reso-standards/odata-expression-parser`](../odata-expression-parser/) are re-exported for convenience.
 

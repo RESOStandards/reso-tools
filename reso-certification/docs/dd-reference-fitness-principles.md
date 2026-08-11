@@ -1,10 +1,10 @@
 # DD Reference Metadata Fitness Principles
 
-What makes a generated `dd-{ver}.json` payload fit for use as RESO certification reference data.
+What makes a generated `dd-{ver}.json` payload fit for use as RESO Certification reference data.
 
 These are the invariants every regenerated DD reference payload must satisfy before it is promoted (committed to `reso-certification/reference-metadata/`, copied into `reso-certification/src/etl/reference-metadata/`, or published to the `reso-dd-reference` Lambda layer in `reso-certification-backend`).
 
-## Authority hierarchy
+## Authority Hierarchy
 
 ```
 DD XLSX (transport/references/dd/) ── canonical source of truth
@@ -25,35 +25,35 @@ Lambda layer copy (reso-dd-reference/data/dd-{ver}.json)
 Cert runtime consumers (validateBatch, getReferenceMetadata, pre-publish adversarial review)
 ```
 
-The XLSX is sensitive to error in the upstream sense: an error here cascades to every downstream consumer. Treat XLSX mutations with maximum care — back-up before edit, openpyxl-only writes, linter pass after, diff against prior state before commit, audit deltas against the source ticket.
+The XLSX is sensitive to error in the upstream sense: an error here cascades to every downstream consumer. Treat XLSX mutations with maximum care – back-up before edit, openpyxl-only writes, linter pass after, diff against prior state before commit, audit deltas against the source ticket.
 
 ## Principles
 
-### 1. Generator is a pure projector
+### 1. Generator Is a Pure Projector
 
 The generator must not fabricate values to fill gaps in XLSX. If a structural field is undeterminable from XLSX, the generator must emit it as `undefined` and let downstream invariants fail loudly.
 
-A silently-helpful fallback (e.g., `sourceResource = fieldName` when the XLSX cell is empty) satisfies some downstream tests with fabricated values that don't match XLSX intent — and the test then reports green when the underlying data is wrong. This is worse than no fix because it masks the original authoring gap.
+A silently-helpful fallback (e.g., `sourceResource = fieldName` when the XLSX cell is empty) satisfies some downstream tests with fabricated values that do not match XLSX intent – and the test then reports green when the underlying data is wrong. This is worse than no fix because it masks the original authoring gap.
 
-If a generator-side fallback is genuinely needed, it must include a companion invariant that errors when the fallback value isn't structurally valid (e.g., "fallback target must exist in the resource list").
+If a generator-side fallback is genuinely needed, it must include a companion invariant that errors when the fallback value is not structurally valid (e.g., "fallback target must exist in the resource list").
 
-### 2. Resource list is complete given fields
+### 2. Resource List Is Complete Given Fields
 
-Every distinct `field.resourceName` must appear in `resources[]`. A field referencing a resource not in the resource list is a structural violation — it means the generator ingested rows but didn't populate the resource set, or the resource set was hand-edited.
+Every distinct `field.resourceName` must appear in `resources[]`. A field referencing a resource not in the resource list is a structural violation – it means the generator ingested rows but did not populate the resource set, or the resource set was hand-edited.
 
-### 3. Every expansion field has type, typeName, and sourceResource
+### 3. Every Expansion Field Has type, typeName, and sourceResource
 
 Expansion fields (`isExpansion: true`) must have non-empty `type`, `typeName`, and `sourceResource`. A partial expansion shape indicates either (a) XLSX `SourceResource` is blank, or (b) the generator dropped a value. Both are bugs.
 
 Note: `typeName` and `type` on expansion fields are **derived from `sourceResource`**. When `sourceResource` is missing, `typeName` and `type` also become incorrect (the generator falls back to `fieldName`, which for foreign-key navigation fields is wrong). So a missing `sourceResource` creates a cascading inconsistency on three fields, not one.
 
-### 4. Every sourceResource resolves to a known resource
+### 4. Every sourceResource Resolves to a Known Resource
 
 Every `field.sourceResource` (on expansion fields) must appear in `resources[]`. No orphan navigation targets.
 
-This is what catches silent FK-navigation errors like `OpenHouse.Listing → Listing` (Listing isn't a resource; the target is `Property`).
+This is what catches silent FK-navigation errors like `OpenHouse.Listing → Listing` (Listing is not a resource; the target is `Property`).
 
-### 5. Every non-Edm type on a field resolves to a lookup or expansion target
+### 5. Every non-Edm type on a Field Resolves to a Lookup or Expansion Target
 
 Fields whose `type` is not an OData primitive (`Edm.*`) must reference either:
 
@@ -64,23 +64,23 @@ Fields whose `type` is not an OData primitive (`Edm.*`) must reference either:
 
 **Exclusion:** Future DD 2.2 complex types. When the DD payload starts shipping a top-level `complexTypes` array, extend this check to also accept names found there.
 
-### 6. Every lookup has lookupName and lookupValue
+### 6. Every Lookup Has lookupName and lookupValue
 
 No empty lookup entries. `lookupName` and `lookupValue` must both be non-empty strings.
 
-### 7. Cross-version FK consistency
+### 7. Cross-Version FK Consistency
 
 If a field with the same `(resourceName, fieldName)` exists across multiple DD versions and points at an expansion target, `sourceResource` should match across versions unless a documented version-rename happened (e.g., resource consolidation between 1.7 and 2.0).
 
-Cross-version drift on FK targets is an audit-flag — verify against the version's PR description before accepting.
+Cross-version drift on FK targets is an audit-flag – verify against the version's PR description before accepting.
 
-### 8. Counts move only by amounts justified in the source-XLSX changelog
+### 8. Counts Move Only by Amounts Justified in the Source-XLSX Changelog
 
 Unaccounted resource/field/lookup deltas between consecutive XLSX revisions of the same version are a lint-fail. The `transport/references/dd/CHANGELOG.md` entry for the revision must list the row-level deltas; the JSON diff after regeneration must match.
 
 Silent field removals not listed in the PR changelog deserve a callout back to whoever updated the sheet.
 
-### 9. Canonical URL shapes on WikiPageUrl
+### 9. Canonical URL Shapes on WikiPageUrl
 
 `WikiPageUrl` cells and hyperlinks must match the canonical `dd.reso.org` shape:
 
@@ -91,36 +91,36 @@ Silent field removals not listed in the PR changelog deserve a callout back to w
 
 Enforced at XLSX time by `lint-dd-sheet.py`. The JSON projection just inherits these as annotations; if the XLSX is canonical, the JSON is too.
 
-### 10. Version header matches filename
+### 10. Version Header Matches Filename
 
 Top-level `"version"` field matches the version segment in the filename. A `dd-1.7.json` with `"version": "2.0"` is a packaging error.
 
-## What is NOT projected to JSON (intentional)
+## What Is NOT Projected to JSON (Intentional)
 
 The JSON is a subset projection of XLSX. The following XLSX columns are intentionally not surfaced in the current generator output:
 
-- **`PropertyTypes`** (Fields tab) — XLSX-only metadata for now. Changes (e.g., the 2026-06-01 `Property.CapRate` narrowing to commercial-only) live in XLSX as source of truth but don't appear in JSON diffs. A future generator iteration may surface this.
-- **`WikiPageTitle`** (Fields and Lookups tabs) — XLSX bookkeeping.
-- **`LegacyODataValue`** (Lookups tab) — surfaced as a per-lookup annotation only; not used as the lookup's structural identifier.
+- **`PropertyTypes`** (Fields tab) – XLSX-only metadata for now. Changes (e.g., the 2026-06-01 `Property.CapRate` narrowing to commercial-only) live in XLSX as source of truth but do not appear in JSON diffs. A future generator iteration may surface this.
+- **`WikiPageTitle`** (Fields and Lookups tabs) – XLSX bookkeeping.
+- **`LegacyODataValue`** (Lookups tab) – surfaced as a per-lookup annotation only; not used as the lookup's structural identifier.
 
 Any XLSX edit to a non-projected column will not show in the JSON diff. The XLSX diff (via `diff-dd-sheet.py`) is the source of truth for "what changed" in that case.
 
-## Where principles are enforced
+## Where Principles Are Enforced
 
 | Principle | XLSX-time | JSON-time (reso-tools) | Layer-time (cert-backend) | Pre-publish review |
 |---|---|---|---|---|
-| 1. Pure projector | — | `check-dd-reference-fitness.js` | — | ✓ |
-| 2. Resource completeness | — | `check-dd-reference-fitness.js` | PR #118 test #3 | — |
-| 3. Expansion shape | — | `check-dd-reference-fitness.js` | PR #118 test #5a | — |
-| 4. sourceResource resolves | — | `check-dd-reference-fitness.js` | PR #118 test #5b | ✓ |
-| 5. Non-Edm resolves | — | `check-dd-reference-fitness.js` | PR #118 test #4 | — |
-| 6. Lookup completeness | — | `check-dd-reference-fitness.js` | PR #118 test #1 (schema) | — |
-| 7. Cross-version FK | — | `check-dd-reference-fitness.js` | — | ✓ |
-| 8. Count delta justified | — | (operator audit) | — | ✓ |
-| 9. Canonical URLs | `lint-dd-sheet.py` | — | — | — |
-| 10. Version header match | — | `check-dd-reference-fitness.js` | PR #118 test #2 | — |
+| 1. Pure projector | – | `check-dd-reference-fitness.js` | – | ✓ |
+| 2. Resource completeness | – | `check-dd-reference-fitness.js` | PR #118 test #3 | – |
+| 3. Expansion shape | – | `check-dd-reference-fitness.js` | PR #118 test #5a | – |
+| 4. sourceResource resolves | – | `check-dd-reference-fitness.js` | PR #118 test #5b | ✓ |
+| 5. Non-Edm resolves | – | `check-dd-reference-fitness.js` | PR #118 test #4 | – |
+| 6. Lookup completeness | – | `check-dd-reference-fitness.js` | PR #118 test #1 (schema) | – |
+| 7. Cross-version FK | – | `check-dd-reference-fitness.js` | – | ✓ |
+| 8. Count delta justified | – | (operator audit) | – | ✓ |
+| 9. Canonical URLs | `lint-dd-sheet.py` | – | – | – |
+| 10. Version header match | – | `check-dd-reference-fitness.js` | PR #118 test #2 | – |
 
-## Adding a new principle
+## Adding a New Principle
 
 1. Append the principle to this document with rationale.
 2. Codify it as a check in `reso-certification/utils/check-dd-reference-fitness.js` (reso-tools-side, runs after generation).

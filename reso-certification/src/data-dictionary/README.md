@@ -62,7 +62,7 @@ GET /Property?$expand=PropertyRooms
 
 This is the safer approach – each response is manageable in size, and a failure on one expansion does not affect others.
 
-### `--batch-expand`: All expansions in a single request
+### `--batch-expand`: All Expansions in a Single Request
 
 All navigation properties for a resource are batched into one request:
 ```
@@ -186,7 +186,7 @@ ln -s .reso-cert results
 | File | Description |
 |------|-------------|
 | `metadata.xml` | Raw EDMX XML downloaded from `/$metadata` |
-| `metadata-report.json` | Canonical metadata report — merged with Lookup Resource data when available, base (EDMX-serialized) report otherwise |
+| `metadata-report.json` | Canonical metadata report – merged with Lookup Resource data when available, base (EDMX-serialized) report otherwise |
 | `metadata-report.raw.json` | Pre-merge base report from EDMX, written only when a Lookup Resource merge occurred |
 | `lookup-resource-lookup-metadata.json` | Raw Lookup Resource records (LookupName, LookupValue, StandardLookupValue, LegacyODataValue) |
 | `data-availability-report.json` | Field coverage, record counts, and data availability statistics per resource |
