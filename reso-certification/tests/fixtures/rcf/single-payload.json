@@ -1,0 +1,7 @@
+{
+  "@reso.context": "urn:reso:metadata:2.0:resource:property",
+  "value": [
+    { "ListingKey": "1", "PropertyType": "Residential", "City": "Fairfax" },
+    { "ListingKey": "2", "PropertyType": "Residential Income", "City": "Reston" }
+  ]
+}

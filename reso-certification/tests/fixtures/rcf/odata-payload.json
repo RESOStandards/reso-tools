@@ -1,0 +1,7 @@
+{
+  "@odata.context": "https://api.example.com/reso/odata/$metadata#Property",
+  "value": [
+    { "ListingKey": "o1", "PropertyType": "Residential", "City": "Boston" },
+    { "ListingKey": "o2", "PropertyType": "Residential", "City": "Cambridge" }
+  ]
+}

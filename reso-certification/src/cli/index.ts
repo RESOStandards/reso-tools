@@ -40,6 +40,7 @@ import {
 import { validateSchemaPayload, generateSchemaFromReport, loadSettings } from './schema-command.js';
 import { runMetadataStep } from './metadata-command.js';
 import { fetchMetadataReportFromServer } from '../sdk/metadata-source.js';
+import { runRcf } from './rcf-command.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { runReplicate, REPLICATION_STRATEGY_VALUES } from './replicate-command.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
@@ -975,6 +976,83 @@ program
       } catch (err) {
         process.stderr.write(`find-variations: ${err instanceof Error ? err.message : String(err)}\n`);
         process.exitCode = 2;
+      }
+    },
+  );
+
+// ── RCF Subcommand (per-step util: RESO Common Format certification) ──
+// RCF providers deliver data, not a schema — a .json/.zip/directory of payloads or records. This
+// streams the input, optionally schema-validates it against the DD (strict / -a), reverse-infers a
+// DD-2.0 metadata report + a data-availability report, and runs the variations service on the
+// inferred report — the same two artifacts as a DD 2.0 run, plus the variations report.
+
+program
+  .command('rcf')
+  .description('RESO Common Format — infer a DD-2.0 metadata report from RCF data and run variations')
+  .requiredOption('-i, --input <path>', 'RCF input: a .json file, a .zip, or a directory of payloads/records')
+  .option('-v, --version <ver>', 'DD version (default: from the payload @reso.context, else 2.0)')
+  .option('-f, --fuzziness <float>', `Variations fuzzy-match threshold (0–1, default ${DEFAULT_FUZZINESS})`, String(DEFAULT_FUZZINESS))
+  .option('--output-dir <path>', 'Directory for the reports (created if missing)', '.')
+  .option('--schema-validate', 'Schema-validate each payload against the DD before inferring')
+  .option('-a, --additional-properties', 'Allow fields not in the DD (extensions) during schema validation')
+  .option('--strict', 'Fail fast on the first schema-validation error (with --schema-validate)')
+  .option('--no-variations', 'Skip the variations service call (infer + reports only)')
+  .action(
+    async (opts: {
+      input: string;
+      version?: string;
+      fuzziness: string;
+      outputDir: string;
+      schemaValidate?: boolean;
+      additionalProperties?: boolean;
+      strict?: boolean;
+      variations: boolean;
+    }) => {
+      try {
+        const fuzziness = Number.parseFloat(opts.fuzziness);
+        if (!Number.isFinite(fuzziness) || fuzziness < 0 || fuzziness > 1) {
+          throw new Error(`--fuzziness must be a number in [0, 1], got '${opts.fuzziness}'`);
+        }
+        // The /compute token for the variations service (from .env; the service mints its own if absent).
+        const bearerToken = opts.variations ? await mintOAuth2ClientCredentialsToken() : undefined;
+
+        const result = await runRcf({
+          input: resolve(opts.input),
+          version: opts.version,
+          fuzziness,
+          additionalProperties: opts.additionalProperties,
+          strict: opts.strict,
+          schemaValidate: opts.schemaValidate,
+          generatedOn: new Date().toISOString(),
+          runVariations: opts.variations,
+          ...(bearerToken ? { bearerToken } : {}),
+        });
+
+        const dir = resolve(opts.outputDir);
+        await mkdir(dir, { recursive: true });
+        await writeFile(resolve(dir, 'metadata-report.json'), JSON.stringify(result.metadataReport, null, 2));
+        await writeFile(resolve(dir, 'data-availability-report.json'), JSON.stringify(result.dataAvailabilityReport, null, 2));
+        if (result.variations) {
+          await writeFile(resolve(dir, VARIATIONS_REPORT_FILENAME), JSON.stringify(result.variations, null, 2));
+        }
+
+        const s = result.stats;
+        process.stderr.write(
+          `rcf: DD${result.version} — ${s.totalRecords.toLocaleString()} records → ${s.resources} resources, ` +
+            `${s.fields.toLocaleString()} fields, ${s.lookups.toLocaleString()} lookups` +
+            (opts.schemaValidate ? `; ${s.schemaErrors} schema error(s)` : '') +
+            (s.variationsTotal !== undefined ? `; ${s.variationsTotal} variation(s)` : '') +
+            ` → ${dir}\n`,
+        );
+        if (result.variationsError) {
+          process.stderr.write(`rcf: variations skipped — ${result.variationsError} (reports still written)\n`);
+        }
+        // Non-zero when variations was requested but degraded, so a partial run never reads as clean success.
+        process.exitCode = s.schemaErrors > 0 ? 1 : result.variationsError ? 2 : 0;
+      } catch (err) {
+        const schemaFailure = (err as { schemaFailure?: boolean }).schemaFailure === true;
+        process.stderr.write(`rcf: ${err instanceof Error ? err.message : String(err)}\n`);
+        process.exitCode = schemaFailure ? 1 : 2;
       }
     },
   );
