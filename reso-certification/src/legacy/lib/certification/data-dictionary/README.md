@@ -10,7 +10,7 @@ $ git clone https://github.com/RESOStandards/web-api-commander.git
 
 JDK 11 or later is required. The recommendation is to use [OpenJDK 17](https://openjdk.org/projects/jdk/17/) or later. You may also use [Oracle JDKs](https://www.oracle.com/java/technologies/downloads/) but they may be subject to additional licensing requirements.
 
-Create a `.env` file (if you don't have one already) and add `WEB_API_COMMANDER_PATH`, pointing to the path where you downloaded the Commander. 
+Create a `.env` file (if you do not have one already) and add `WEB_API_COMMANDER_PATH`, pointing to the path where you downloaded the Commander. 
 See: [sample.env](/sample.env) for an example.
 
 
@@ -33,7 +33,7 @@ Options:
 **Notes**
 * The `-p` argument is required. This will be the path to the JSON DD testing config. See [`sample-dd-config.json`](/lib/certification/sample-dd-config.json)
 * The limit (`-l` or `--limit`) can be changed in pre-testing, but the default will be used for certification
-* The tests are fast-fail, meaning that if the metadata tests don't succeed, data sampling won't be done since the output of the first step is required by others. Once the metadata tests pass, each subsequent test can be run individually
+* The tests are fast-fail, meaning that if the metadata tests do not succeed, data sampling will not be done since the output of the first step is required by others. Once the metadata tests pass, each subsequent test can be run individually
 
 
 # Data Dictionary 1.7
@@ -75,7 +75,7 @@ The following tests are run:
 
 # Sampling
 
-In all cases, up to 100,000 records per resource / strategy / expansion will be run for Certification by default.
+In all cases, up to 100,000 records per resource / strategy / expansion will be run for certification by default.
 
 This means that for Data Dictionary 2.0, if the Property Resource has a Media and OpenHouse expansion, sampling will be as follows:
 * Property Resource with TimestampDesc
@@ -90,12 +90,12 @@ This means that for Data Dictionary 2.0, if the Property Resource has a Media an
 
 Records are deduplicated, but assuming 100,000 distinct Property records were fetched in each pass above, that would mean 900,000 records. for DD 1.7 there would be up to 300,000 unique Property records.
 
-Records are hashed in memory, without anything being written to disk, for a large sample run this could still add up. It's roughly 32MB for 1M hashes.
+Records are hashed in memory, without anything being written to disk, for a large sample run this could still add up. It is roughly 32MB for 1M hashes.
 
 ## Sampling Parameters
-There are parameters used internally that are designed to help with "polite behavior" so the client doesn't get rate limited, since waiting makes the process go slower. 
+There are parameters used internally that are designed to help with "polite behavior" so the client does not get rate limited, since waiting makes the process go slower. 
 
-What seems to work best so far is a 1s delay between requests and a 60m delay if the client encounters an HTTP 429 status code. Please see the [`replicate` option](/lib/replication/README.md) if that's something you're interested in experimenting with. 
+What seems to work best so far is a 1s delay between requests and a 60m delay if the client encounters an HTTP 429 status code. Please see the [`replicate` option](/lib/replication/README.md) if that is something you are interested in experimenting with. 
 
 
 # Report Files
@@ -150,16 +150,16 @@ Suggested mappings are outputted to the `data-dictionary-variations.json` file. 
 * **Substring** - case-insensitive substring matching (with special characters removed).
 * **Edit Distance** - [**Levenshtein distance**](https://en.wikipedia.org/wiki/Levenshtein_distance), which flags similar Data Dictionary terms that vary by up to 25% of the word length. For example, if a term is four characters, anything is found within one character of an existing Data Dictionary element it would be flagged.
 
-Machine suggestions only apply to terms that are greater than three characters in length. RESO expects some false positives for machine-based matching. Similar to a spelling checker, these items can be ignored by RESO staff and won't be flagged again once they are.
+Machine suggestions only apply to terms that are greater than three characters in length. RESO expects some false positives for machine-based matching. Similar to a spelling checker, these items can be ignored by RESO staff and will not be flagged again once they are.
 
 **Close and Exact Matches**
 Machine suggestions will also classify items as Close or Exact Matches, which are case-insensitive with all special characters removed.
-* **Close Matches** - elements that match what's in the Data Dictionary within one character.
+* **Close Matches** - elements that match what is in the Data Dictionary within one character.
   * Example: DD has Canceled but provider has Cancelled.
-* **Exact Matches** - elements that only vary by what's in the Data Dictionary by a space or special character.
+* **Exact Matches** - elements that only vary by what is in the Data Dictionary by a space or special character.
   * Example: DD has Built-in Gas Oven but provider has Built In Gas Oven.
  
-Close or Exact Matches MUST be resolved. If providers disagree with the suggestions with either of these matches, it's usually a result of something needing further review in the Data Dictionary and needs to be surfaced with that workgroup. 
+Close or Exact Matches MUST be resolved. If providers disagree with the suggestions with either of these matches, it is usually a result of something needing further review in the Data Dictionary and needs to be surfaced with that workgroup. 
 
 ## Human Suggestions
 * **Admin Review** - existing or new suggestions provided by RESO staff. 

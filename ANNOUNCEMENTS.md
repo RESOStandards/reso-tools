@@ -50,7 +50,7 @@
 
 ### The MCP Strikes Back
 
-**All four RESO certification endorsements now run natively in TypeScript.** Add/Edit, EntityEvent, Web API Core, and Data Dictionary testing no longer requires Java, Gradle, or the Commander. Just `npm install` and `reso-cert <endorsement>`. Test parameters are auto-configured from live server data.
+**All four RESO Certification endorsements now run natively in TypeScript.** Add/Edit, EntityEvent, Web API Core, and Data Dictionary testing no longer requires Java, Gradle, or the Commander. Just `npm install` and `reso-cert <endorsement>`. Test parameters are auto-configured from live server data.
 
 **Data Dictionary 2.1 support is here.** The new DD version brings 3 new resources (Building, Model, RelatedLookup), 425 new fields, and 566 new lookups. [DD 2.1 documentation](https://dd.reso.org/DD2.1/) is live on dd.reso.org. The desktop client lets you switch between DD 2.0 and 2.1 from the Server menu.
 
@@ -70,7 +70,7 @@
 
 ### Getting Ready for Certification
 
-**Packages restructured for compliance testing.** The `validation`, `data-generator`, and `certification` packages have been renamed to `reso-validation`, `reso-data-generator`, and `reso-certification` for consistency. The RESO certification SDK (`reso-certification-utils@3.0.0`) has been integrated as a dependency, laying the groundwork for DD testing, replication, schema validation, and more.
+**Packages restructured for compliance testing.** The `validation`, `data-generator`, and `certification` packages have been renamed to `reso-validation`, `reso-data-generator`, and `reso-certification` for consistency. The RESO Certification SDK (`reso-certification-utils@3.0.0`) has been integrated as a dependency, laying the groundwork for DD testing, replication, schema validation, and more.
 
 **Desktop client polished.** The app now shows a RESO-branded splash screen while the server starts, remembers your dark/light mode preference across sessions, checks for updates on launch, and no longer flashes white on startup or crashes on shutdown. The Help menu links to release notes, announcements, and the security audit on tools.reso.org.
 
@@ -100,7 +100,7 @@
 
 ## v0.2 – 2026-03-10
 
-### The "There is an App for That" Release
+### The "There Is an App for That" Release
 
 **RESO has a desktop app.** The reference server now runs as a native application on macOS, Windows, and Linux – no terminal, no Docker, no database setup. Just launch it and start exploring RESO data. Native menus, keyboard shortcuts, trackpad gestures, and RESO-branded icons included.
 

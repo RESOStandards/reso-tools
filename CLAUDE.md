@@ -12,7 +12,7 @@ Open-source monorepo for building and testing RESO-compliant OData servers. Incl
 | `odata-expression-parser/` | `$filter` and `$expand` expression parser |
 | `reso-validation/` | Field and business-rule validation for RESO Data Dictionary |
 | `reso-reference-server/` | Metadata-driven OData reference server (PostgreSQL, MongoDB, SQLite) |
-| `reso-certification/` | RESO certification CLI + SDK (Add/Edit, EntityEvent, Web API Core, DD) |
+| `reso-certification/` | RESO Certification CLI + SDK (Add/Edit, EntityEvent, Web API Core, DD) |
 | `reso-mcp-server/` | MCP server for AI agents (query, metadata, validate, compliance) |
 | `.github/pages/` | GitHub Pages site including DD documentation generator |
 

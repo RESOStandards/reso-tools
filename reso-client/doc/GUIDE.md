@@ -12,7 +12,7 @@ Developers building applications that consume RESO-compliant OData servers – l
 
 ## Install
 
-This package isn't on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+This package is not on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
 
 ```bash
 git clone https://github.com/RESOStandards/reso-tools.git
@@ -169,7 +169,7 @@ const url = buildUri('http://localhost:8080', 'OrderItem')
 
 ### Page Through a Large Result Set
 
-Server-side paging in OData uses `@odata.nextLink`. The server controls the page size — the client does not set `$top` to control paging. Instead, the client issues a request and follows the `@odata.nextLink` chain until the server stops providing one.
+Server-side paging in OData uses `@odata.nextLink`. The server controls the page size – the client does not set `$top` to control paging. Instead, the client issues a request and follows the `@odata.nextLink` chain until the server stops providing one.
 
 The SDK has a helper that does this for you:
 

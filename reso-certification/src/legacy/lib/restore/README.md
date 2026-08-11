@@ -36,7 +36,7 @@ The following directory structure is assumed:
   + providerUoiN-providerUsiN
 ``` 
 
-If the required files don't exist for a given Organization, it will be skipped. 
+If the required files do not exist for a given Organization, it will be skipped. 
 
 Example:
     

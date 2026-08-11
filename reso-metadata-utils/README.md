@@ -1,6 +1,6 @@
 # @reso-standards/reso-metadata-utils
 
-RESO OData metadata processing utilities: CSDL parsing, validation, EDMX → metadata-report serialization, and live metadata fetching. This is the dependency-requiring side of the RESO metadata split ([reso-tools #221](https://github.com/RESOStandards/reso-tools)) — a sibling to [`@reso-standards/reso-common`](../reso-common/), which holds the zero-dependency metadata model and EDMX generation. Nothing here imports reso-common; the two are meant to be used together.
+RESO OData metadata processing utilities: CSDL parsing, validation, EDMX → metadata-report serialization, and live metadata fetching. This is the dependency-requiring side of the RESO metadata split ([reso-tools #221](https://github.com/RESOStandards/reso-tools)) – a sibling to [`@reso-standards/reso-common`](../reso-common/), which holds the zero-dependency metadata model and EDMX generation. Nothing here imports reso-common; the two are meant to be used together.
 
 Its one runtime dependency is [`fast-xml-parser`](https://www.npmjs.com/package/fast-xml-parser).
 
@@ -17,11 +17,11 @@ git clone https://github.com/RESOStandards/reso-tools.git
 cd reso-tools && npm install
 ```
 
-## What it does
+## What It Does
 
 Four capabilities, all exported from the package root.
 
-### 1. Parse and inspect CSDL
+### 1. Parse and Inspect CSDL
 
 Turn an OData 4.01 `$metadata` (CSDL/EDMX) document into a typed `CsdlSchema`, then walk it.
 
@@ -51,7 +51,7 @@ if (!result.valid) console.error(result.errors);
 
 XSD validation lands later under a Node-only subpath.
 
-### 3. Serialize to a metadata report
+### 3. Serialize to a Metadata Report
 
 Produce the canonical RESO `metadata-report.json` shape from EDMX XML or an already-parsed schema.
 
@@ -93,4 +93,4 @@ npm test
 
 ## License
 
-See [LICENSE](./LICENSE) — the RESO End-user License Agreement.
+See [LICENSE](./LICENSE) – the RESO End-user License Agreement.

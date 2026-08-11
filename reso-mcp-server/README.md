@@ -8,7 +8,7 @@ Works with any MCP client: Claude, Cursor, Windsurf, VS Code, or your own applic
 
 ## Install
 
-This package isn't on npm yet. Build from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+This package is not on npm yet. Build from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
 
 ```bash
 git clone https://github.com/RESOStandards/reso-tools.git
@@ -17,7 +17,7 @@ npm install      # preinstall hook builds sibling deps automatically
 npm run build
 ```
 
-The built binary lives at `reso-tools/reso-mcp-server/dist/index.js`. Note its absolute path — you'll point your MCP client at it below.
+The built binary lives at `reso-tools/reso-mcp-server/dist/index.js`. Note its absolute path – you will point your MCP client at it below.
 
 ## Quick Start
 
@@ -118,7 +118,7 @@ parse-filter({ filter })
 
 ### run-compliance
 
-Run RESO certification compliance tests. Supports Add/Edit (RCP-010), EntityEvent (RCP-027), and Web API Core.
+Run RESO Certification compliance tests. Supports Add/Edit (RCP-010), EntityEvent (RCP-027), and Web API Core.
 
 ```
 run-compliance({ endorsement, url, authToken, resource?, version?, mode?, resources? })
@@ -163,7 +163,7 @@ npm run build
 npm run dev    # Watch mode
 ```
 
-### Testing locally
+### Testing Locally
 
 ```bash
 # Start the reference server
