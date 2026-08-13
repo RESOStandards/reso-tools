@@ -37,6 +37,8 @@ reso-cert entity-event --url https://api.example.com --auth-token TOKEN
 reso-cert core --url https://api.example.com --auth-token TOKEN
 ```
 
+> **[Full CLI reference](src/cli/README.md)** — every command and option, including the per-step utilities (`metadata`, `schema`, `replicate`, `find-variations`) and the `update-variations` admin command.
+
 ## Authentication
 
 Auth is resolved automatically from the first available source:
