@@ -2,7 +2,7 @@
 
 ---
 
-## v1.0.0 – "First Light"
+## v1.0.0 – "Luna"
 
 The first stable release. RESO Tools splits into a **public, npm-published core** and a private application tier, so any project can consume the RESO libraries and the certification runner without the monorepo.
 
