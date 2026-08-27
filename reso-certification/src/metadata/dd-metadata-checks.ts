@@ -29,6 +29,15 @@
  * this metadata gate. Enforcing value presence here false-fails conformant open lookups (e.g. City,
  * BuildingFeatures) that are simply unpopulated.
  *
+ * Provenance for the deferral: the Commander removed the equivalent `And ... MUST have a LookupName in
+ * the Lookup Resource` presence step from lookup-resource-tests.feature in web-api-commander commit
+ * 83718410 (PR #187, closing issue #186) per the January 2024 Transport meeting — a field may be
+ * present in metadata yet always null (single enum) or an empty list (multi). reso-tools briefly
+ * carried an equivalent `lookup-name-integrity` check and removed it for the same reason in commit
+ * a4b6dab ("fail-closed schema validation for unadvertised enum values"); value presence is now a
+ * fail-closed schema-validation concern that honors the ignore list. Removal is DD 2.0+; DD 1.7
+ * retained it. Do not re-introduce without a Transport WG decision.
+ *
  * Intentionally NOT implemented: `"X" MUST contain at least one standard lookup` — latent in the
  * Commander (0 uses in the v1.7/v2.0 generated features) and incompatible with open enums that
  * carry no standard values; `When "X" exists` and `MAY contain` are non-failing guards/info.
