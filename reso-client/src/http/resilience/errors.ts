@@ -98,3 +98,25 @@ export const classifyThrown = (err: unknown): FailureClassification => {
   }
   return { kind: 'network', retryable: true, fatal: false, code, message: message || 'Network error' };
 };
+
+/** The kind of an unrecoverable failure the resilient send surfaces by throwing. */
+export type ResilienceErrorKind = 'fatal-auth' | 'exhausted' | 'circuit-open' | 'retry-wait-exceeded';
+
+/**
+ * A thrown error the resilient send could not recover from. It is a plain `Error`
+ * with marker fields rather than a subclass (this codebase does not use classes),
+ * so consumers narrow with `isResilienceError` and branch on `resilienceKind`.
+ */
+export interface ResilienceError extends Error {
+  readonly resilienceKind: ResilienceErrorKind;
+  readonly classification?: FailureClassification;
+}
+
+export const resilienceError = (
+  resilienceKind: ResilienceErrorKind,
+  message: string,
+  classification?: FailureClassification
+): ResilienceError => Object.assign(new Error(message), { resilienceKind, classification });
+
+export const isResilienceError = (err: unknown): err is ResilienceError =>
+  err instanceof Error && typeof (err as { resilienceKind?: unknown }).resilienceKind === 'string';

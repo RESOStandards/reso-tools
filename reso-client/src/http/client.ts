@@ -6,8 +6,21 @@
 import type { ClientConfig, ODataClient, ODataResponse } from '../types.js';
 import { SDK_VERSION } from '../version.js';
 import { createTokenProvider } from './auth.js';
+import { resilientSend } from './resilience/resilient-send.js';
+import { createResilienceSession } from './resilience/session.js';
 
 const HTTP_UNAUTHORIZED = 401;
+
+/** Derives the governor/breaker key from a request URL: `host|resource`. */
+const resilienceKey = (url: string): string => {
+  try {
+    const parsed = new URL(url);
+    const firstSegment = parsed.pathname.split('/').filter(Boolean)[0] ?? '';
+    return `${parsed.host}|${firstSegment.split('(')[0]}`;
+  } catch {
+    return url;
+  }
+};
 
 /**
  * Parse a fetch Response into a normalized ODataResponse.
@@ -59,7 +72,8 @@ export const createClient = async (config: ClientConfig): Promise<ODataClient> =
     options?: {
       readonly body?: unknown;
       readonly headers?: Readonly<Record<string, string>>;
-    }
+    },
+    signal?: AbortSignal
   ): Promise<Response> => {
     const headers: Record<string, string> = {
       Accept: 'application/json',
@@ -93,8 +107,11 @@ export const createClient = async (config: ClientConfig): Promise<ODataClient> =
       headers,
       body: options?.body ? JSON.stringify(options.body) : undefined,
       keepalive: true,
+      signal
     });
   };
+
+  const session = config.session ?? createResilienceSession(config.resilience);
 
   const request = async (
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
@@ -104,22 +121,25 @@ export const createClient = async (config: ClientConfig): Promise<ODataClient> =
       readonly headers?: Readonly<Record<string, string>>;
     }
   ): Promise<ODataResponse> => {
-    const token = await tokenProvider();
-    const response = await doFetch(method, url, token, options);
-
-    if (response.status === HTTP_UNAUTHORIZED) {
-      const freshToken = await tokenProvider(true);
-      if (freshToken !== token) {
-        const retryResponse = await doFetch(method, url, freshToken, options);
-        return parseResponse(retryResponse);
+    // One physical attempt: token -> fetch -> one-shot 401 refresh -> normalized response.
+    // The resilient send layers timeout, pacing, retry/backoff, and the breaker around it.
+    const send = async (signal: AbortSignal): Promise<ODataResponse> => {
+      const token = await tokenProvider();
+      const response = await doFetch(method, url, token, options, signal);
+      if (response.status === HTTP_UNAUTHORIZED) {
+        const freshToken = await tokenProvider(true);
+        if (freshToken !== token) {
+          return parseResponse(await doFetch(method, url, freshToken, options, signal));
+        }
       }
-    }
+      return parseResponse(response);
+    };
 
-    return parseResponse(response);
+    return resilientSend(send, method, resilienceKey(url), session);
   };
 
   return {
     baseUrl: config.baseUrl,
-    request,
+    request
   };
 };
