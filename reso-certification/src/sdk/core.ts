@@ -159,6 +159,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           metadata.enumTypes,
           standardMap,
           enumModeOverride,
+          requester,
         );
 
         if (params.skippedTypes.length > 0) {

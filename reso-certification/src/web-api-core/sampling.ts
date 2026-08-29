@@ -9,7 +9,7 @@
 
 import type { EnumRepresentation } from '@reso-standards/reso-client';
 import type { CsdlEnumType } from '@reso-standards/reso-metadata-utils';
-import { odataRequest, buildResourceUrl } from '../test-runner/index.js';
+import { type ODataRequester, buildResourceUrl, webRequester } from '../test-runner/index.js';
 import type { EntityType } from '../test-runner/types.js';
 import { type EnumCandidate, isMultiRep, isSingleRep, selectEnumCandidates } from './enum-selection.js';
 import type { StandardMap } from './standard-map.js';
@@ -294,6 +294,7 @@ export const resolveTestParams = async (
   enumTypes: ReadonlyArray<CsdlEnumType>,
   standardMap: StandardMap,
   enumModeOverride?: EnumMode,
+  requester: ODataRequester = webRequester,
 ): Promise<TestParams> => {
   // enumMode is retained as an informational/coverage field only — selection and gating are now per-field
   // (resolveEnum), so the `--enumMode` override no longer steers field choice. Vestigial; a candidate for removal.
@@ -304,7 +305,7 @@ export const resolveTestParams = async (
   // Fetch sample records. 1000 (up from 100) gives far better field/value coverage for enum selection —
   // more fields are populated across the wider sample — while staying a single fast request.
   const url = `${buildResourceUrl(serverUrl, resource)}?$top=${SAMPLE_TOP}`;
-  const response = await odataRequest({ method: 'GET', url, authToken });
+  const response = await requester.request({ method: 'GET', url, authToken });
   const body = response.body as { value?: ReadonlyArray<Record<string, unknown>> } | null;
   const records = body?.value ?? [];
   // Was this page the COMPLETE resource? Drives the ne/gt/lt empty-verdict's pass-vs-skip split. A full page
