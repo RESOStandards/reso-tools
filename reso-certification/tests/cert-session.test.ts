@@ -34,7 +34,16 @@ describe('createCertSession — cert resilience configuration', () => {
     expect(breaker.canProceed(COLLAPSED_KEY)).toBe(false);
   });
 
-  it('retries at most once ("try again or move on"), not the SDK default of five', () => {
-    expect(createCertSession().config.backoff.maxRetries).toBe(1);
+  it('does not retry ("record the result and move on"), unlike the SDK default of five', () => {
+    // A re-send in cert only risks a block (5xx is the server's verdict; 429 wants pacing,
+    // not a retry) or balloons the run (a re-sent 15-min timeout). One request per scenario.
+    expect(createCertSession().config.backoff.maxRetries).toBe(0);
+  });
+
+  it('keeps a 15-minute per-request timeout — the one retained protection, declared explicitly', () => {
+    // Stated independently of the source constant so an accidental change to cert's own
+    // timeout (or a regression to inheriting a shorter SDK default) turns this red rather
+    // than silently timing out a legitimately slow paged read as a false FAIL.
+    expect(createCertSession().config.timeoutMs).toBe(15 * 60_000);
   });
 });
