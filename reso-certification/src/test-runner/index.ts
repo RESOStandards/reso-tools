@@ -37,7 +37,7 @@ export { formatConsoleReport, formatJsonReport } from './reporter.js';
 export { odataRequest, buildResourceUrl } from './client.js';
 
 // Injectable request seam (containers — #125)
-export { webRequester } from './requester.js';
+export { webRequester, createSessionRequester } from './requester.js';
 export type { ODataRequester } from './requester.js';
 
 // Auth

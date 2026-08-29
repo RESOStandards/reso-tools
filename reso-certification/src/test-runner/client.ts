@@ -5,7 +5,7 @@
  * so that certification test scenarios require no changes.
  */
 
-import { buildUri, createClient } from '@reso-standards/reso-client';
+import { buildUri, createClient, type ResilienceSession } from '@reso-standards/reso-client';
 import type { ODataResponse } from './types.js';
 
 /** Options for making an OData HTTP request. */
@@ -23,16 +23,21 @@ export interface RequestOptions {
  * Uses @reso-standards/reso-client's createClient under the hood. Creates a lightweight
  * client per call since the auth token may vary between requests.
  */
-export const odataRequest = async (options: RequestOptions & { readonly odataVersion?: string }): Promise<ODataResponse> => {
+export const odataRequest = async (
+  options: RequestOptions & { readonly odataVersion?: string; readonly session?: ResilienceSession }
+): Promise<ODataResponse> => {
   const defaultHeaders: Record<string, string> = {};
   if (options.odataVersion) {
     defaultHeaders['OData-Version'] = options.odataVersion;
   }
 
+  // A shared session (created once per run) makes pacing + the circuit breaker persist across
+  // the run's requests; omitted → a per-call default, i.e. today's behavior.
   const client = await createClient({
     baseUrl: '',
     auth: { mode: 'token', authToken: options.authToken },
     defaultHeaders,
+    session: options.session,
   });
 
   return client.request(options.method, options.url, {
