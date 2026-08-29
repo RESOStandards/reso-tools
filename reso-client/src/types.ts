@@ -5,6 +5,8 @@
  * TypeScript with discriminated unions and immutable interfaces.
  */
 
+import type { ResilienceConfig, ResilienceSession } from './http/resilience/session.js';
+
 // ---------------------------------------------------------------------------
 // Query options
 // ---------------------------------------------------------------------------
@@ -132,6 +134,14 @@ export interface ClientConfig {
   readonly baseUrl: string;
   readonly auth: AuthConfig;
   readonly defaultHeaders?: Readonly<Record<string, string>>;
+  /** Resilience tunables (per-request timeout, retry/backoff, pacing, circuit breaker). Safe defaults apply when omitted. */
+  readonly resilience?: ResilienceConfig;
+  /**
+   * A shared resilience session to inject. Create one per run and pass it to every
+   * client so per-call clients share pacing and breaker state (and, later, parallel
+   * fetchers share one budget). When omitted, a per-client session is created.
+   */
+  readonly session?: ResilienceSession;
 }
 
 /** Prefer header options for write operations. */
