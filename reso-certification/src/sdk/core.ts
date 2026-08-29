@@ -10,8 +10,8 @@ import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, getEntityType, p
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
 import { buildStandardMap, resolveTestParams, WELL_KNOWN_RESOURCES } from '../web-api-core/index.js';
 import { runCoreResourceScenarios, type ResourceTestReport } from '../web-api-core/test-runner.js';
-import { createResilienceSession, runSettled } from '@reso-standards/reso-client';
-import { createSessionRequester } from '../test-runner/requester.js';
+import { runSettled } from '@reso-standards/reso-client';
+import { createCertSession, createSessionRequester } from '../test-runner/requester.js';
 import type { BaseTestContext, CoreConfig, PipelineStep, StepResult } from './types.js';
 import { createPipeline } from './pipeline.js';
 import { coreReportGenerators, writeReports, prepareOutputDir } from './reports.js';
@@ -130,11 +130,12 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     const version = ctx.version;
     // Standard map (DD reference) built once per run — field/value membership for standard-first selection.
     const standardMap = buildStandardMap(version);
-    // A shared resilience session for the whole run: the circuit breaker + retries persist across
-    // requests, so a consistently-dead endpoint fails fast rather than being re-hit per scenario.
-    // Pacing is off for cert — a bounded run should stay fast; the ~1 rps floor is a replication
-    // concern. Tune the governor rate here if a picky vendor rate-limits a Core run.
-    const session = createResilienceSession({ governor: { ratePerSec: 0, burst: 0 } });
+    // One resilience session shared across the whole run (see createCertSession for the full
+    // rationale): retries + timeout + Retry-After stay on; the circuit breaker and pacing governor
+    // are configured inert for cert. Every response is a result to record, and "endpoint
+    // unreachable" is handled by sampling → SKIPPED — not by a breaker that would false-fail
+    // scenarios the server actually handles once a burst on one resource trips it open.
+    const session = createCertSession();
     const requester = createSessionRequester(session);
     // Continue-on-error across resources: one bad resource (e.g. a sampling network
     // failure) is captured and the run keeps going, so a walk-away run still yields a
