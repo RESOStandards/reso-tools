@@ -131,10 +131,10 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // Standard map (DD reference) built once per run — field/value membership for standard-first selection.
     const standardMap = buildStandardMap(version);
     // One resilience session shared across the whole run (see createCertSession for the full
-    // rationale): retries + timeout + Retry-After stay on; the circuit breaker and pacing governor
-    // are configured inert for cert. Every response is a result to record, and "endpoint
-    // unreachable" is handled by sampling → SKIPPED — not by a breaker that would false-fail
-    // scenarios the server actually handles once a burst on one resource trips it open.
+    // rationale): cert makes one request per scenario, records the result, and moves on — no
+    // retries, no breaker, no pacing, just the 15-min per-request timeout. Every response is a
+    // result to record, and "endpoint unreachable" is handled by sampling → SKIPPED, not by a
+    // breaker that would false-fail scenarios the server actually handles.
     const session = createCertSession();
     const requester = createSessionRequester(session);
     // Continue-on-error across resources: one bad resource (e.g. a sampling network
