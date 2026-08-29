@@ -121,3 +121,29 @@ export type { VariationCsvRow, ParseVariationsCsvResult, ParseVariationsCsvError
 // Utilities — variation key (composite identifier)
 export { VARIATION_KEY_SEP, buildVariationKey, parseVariationKey } from './utils/variation-key.js';
 export type { ParsedVariationKey } from './utils/variation-key.js';
+
+// Resilience — per-request timeout, retry/backoff+jitter, Retry-After, pacing governor,
+// circuit breaker, and continue-on-error. See reso-tools #270.
+export {
+  createResilienceSession,
+  DEFAULT_TIMEOUT_MS,
+  DEFAULT_RETRY_WAIT_MS,
+  MAX_RETRY_WAIT_MS
+} from './http/resilience/session.js';
+export type { ResilienceConfig, ResilienceSession, ResolvedResilienceConfig } from './http/resilience/session.js';
+export { DEFAULT_GOVERNOR } from './http/resilience/rate-governor.js';
+export type { GovernorConfig } from './http/resilience/rate-governor.js';
+export { DEFAULT_BREAKER } from './http/resilience/circuit-breaker.js';
+export type { BreakerConfig, BreakerState } from './http/resilience/circuit-breaker.js';
+export { DEFAULT_BACKOFF } from './http/resilience/backoff.js';
+export type { BackoffConfig } from './http/resilience/backoff.js';
+export { isResilienceError } from './http/resilience/errors.js';
+export type { FailureClassification, FailureKind, ResilienceError, ResilienceErrorKind } from './http/resilience/errors.js';
+export { runSettled, settle, skip } from './http/resilience/continue-on-error.js';
+export type {
+  UnitOutcome,
+  SettledResult,
+  OnError,
+  SettleOptions,
+  RunSettledOptions
+} from './http/resilience/continue-on-error.js';
