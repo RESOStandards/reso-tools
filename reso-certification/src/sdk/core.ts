@@ -10,6 +10,7 @@ import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, getEntityType, p
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
 import { buildStandardMap, resolveTestParams, WELL_KNOWN_RESOURCES } from '../web-api-core/index.js';
 import { runCoreResourceScenarios, type ResourceTestReport } from '../web-api-core/test-runner.js';
+import { runSettled } from '@reso-standards/reso-client';
 import type { BaseTestContext, CoreConfig, PipelineStep, StepResult } from './types.js';
 import { createPipeline } from './pipeline.js';
 import { coreReportGenerators, writeReports, prepareOutputDir } from './reports.js';
@@ -95,6 +96,32 @@ const fetchAndParseMetadata = (config: CoreConfig): PipelineStep<CoreContext> =>
   },
 });
 
+/**
+ * A resource that could not be sampled or tested is reported as SKIPPED, not failed —
+ * the tests couldn't run, so it is inconclusive rather than a compliance failure.
+ * Continue-on-error keeps the run going; this keeps the unsampled resource visible in
+ * the verdict as a skip rather than being silently dropped.
+ */
+export const skippedResourceReport = (resource: string, error: unknown): ResourceTestReport => {
+  const detail = error instanceof Error ? error.message : String(error);
+  return {
+    resource,
+    params: { resource, keyField: '', keyValue: '', enumMode: 'string', integerValueHigh: 0, skippedTypes: [], sampleComplete: false },
+    scenarios: [
+      {
+        tag: 'resource-skipped',
+        name: `${resource} could not be sampled or tested: ${detail}`,
+        passed: false,
+        skipped: true,
+        assertions: [],
+        duration: 0,
+      },
+    ],
+    coverage: [],
+    summary: { total: 1, passed: 0, failed: 0, skipped: 1, optional: { passed: 0, notSupported: 0, notTested: 0 } },
+  };
+};
+
 const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
   name: 'Run Core scenarios',
   run: async (ctx, onProgress) => {
@@ -102,58 +129,86 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     const version = ctx.version;
     // Standard map (DD reference) built once per run — field/value membership for standard-first selection.
     const standardMap = buildStandardMap(version);
-    const resourceReports: ResourceTestReport[] = [];
+    // Continue-on-error across resources: one bad resource (e.g. a sampling network
+    // failure) is captured and the run keeps going, so a walk-away run still yields a
+    // full report. A fatal error (auth revoked) stops the run — surfaced below.
+    const settled = await runSettled(
+      ctx.resources,
+      async (resource): Promise<ResourceTestReport> => {
+        const entityType = getEntityType(metadata, resource)!;
 
-    for (const resource of ctx.resources) {
-      const entityType = getEntityType(metadata, resource)!;
-
-      onProgress({
-        step: 'Run Core scenarios',
-        status: 'running',
-        message: `Sampling ${resource}...`,
-      });
-
-      const enumModeOverride = ctx.enumMode !== 'auto' ? ctx.enumMode as import('../web-api-core/sampling.js').EnumMode : undefined;
-      const params = await resolveTestParams(
-        ctx.serverUrl,
-        resource,
-        entityType,
-        ctx.authToken!,
-        metadata.enumTypes,
-        standardMap,
-        enumModeOverride,
-      );
-
-      if (params.skippedTypes.length > 0) {
         onProgress({
           step: 'Run Core scenarios',
           status: 'running',
-          message: `${resource}: missing types: ${params.skippedTypes.join(', ')} — some scenarios will be skipped`,
+          message: `Sampling ${resource}...`,
         });
-      }
 
-      onProgress({
-        step: 'Run Core scenarios',
-        status: 'running',
-        message: `Testing ${resource}...`,
-      });
+        const enumModeOverride = ctx.enumMode !== 'auto' ? ctx.enumMode as import('../web-api-core/sampling.js').EnumMode : undefined;
+        const params = await resolveTestParams(
+          ctx.serverUrl,
+          resource,
+          entityType,
+          ctx.authToken!,
+          metadata.enumTypes,
+          standardMap,
+          enumModeOverride,
+        );
 
-      const report = await runCoreResourceScenarios(
-        ctx.serverUrl,
-        resource,
-        params,
-        ctx.authToken!,
-        version,
-      );
+        if (params.skippedTypes.length > 0) {
+          onProgress({
+            step: 'Run Core scenarios',
+            status: 'running',
+            message: `${resource}: missing types: ${params.skippedTypes.join(', ')} — some scenarios will be skipped`,
+          });
+        }
 
-      resourceReports.push(report);
+        onProgress({
+          step: 'Run Core scenarios',
+          status: 'running',
+          message: `Testing ${resource}...`,
+        });
 
-      onProgress({
-        step: 'Run Core scenarios',
-        status: 'running',
-        message: `${resource}: ${report.summary.passed} passed, ${report.summary.failed} failed, ${report.summary.skipped} skipped`,
-      });
+        const report = await runCoreResourceScenarios(
+          ctx.serverUrl,
+          resource,
+          params,
+          ctx.authToken!,
+          version,
+        );
+
+        onProgress({
+          step: 'Run Core scenarios',
+          status: 'running',
+          message: `${resource}: ${report.summary.passed} passed, ${report.summary.failed} failed, ${report.summary.skipped} skipped`,
+        });
+
+        return report;
+      },
+      {
+        onError: 'continue',
+        onOutcome: (outcome) => {
+          if (outcome.status === 'failed') {
+            const detail = outcome.error instanceof Error ? outcome.error.message : String(outcome.error);
+            onProgress({
+              step: 'Run Core scenarios',
+              status: 'running',
+              message: `${outcome.item}: skipped (could not sample) — ${detail}`,
+            });
+          }
+        },
+      },
+    );
+
+    if (settled.stoppedEarly && settled.fatalError !== undefined) {
+      throw settled.fatalError; // fatal (e.g. auth revoked) — abort the whole Core run
     }
+
+    // Preserve resource order; a resource we couldn't sample/test is reported as skipped.
+    const resourceReports: ResourceTestReport[] = settled.outcomes.map((outcome): ResourceTestReport =>
+      outcome.status === 'ok'
+        ? outcome.value
+        : skippedResourceReport(outcome.item, outcome.status === 'failed' ? outcome.error : new Error(outcome.reason)),
+    );
 
     // Required scenarios drive the verdict. Optional ("Optional Tests")
     // results are tallied separately and never contribute to `totalFailed`.
