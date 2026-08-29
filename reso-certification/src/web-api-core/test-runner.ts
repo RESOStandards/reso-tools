@@ -781,12 +781,13 @@ const runStructuralScenario = async (
 };
 
 /** Run server-driven paging scenario (v2.1.0). */
-const runPagingScenario = async (
+export const runPagingScenario = async (
   serverUrl: string,
   resource: string,
   params: TestParams,
   authToken: string,
   start: number,
+  requester: ODataRequester = webRequester,
 ): Promise<ScenarioResult> => {
   const assertions: AssertionResult[] = [];
   // Initial paging URL — kept in scope outside the try/while so the
@@ -800,7 +801,7 @@ const runPagingScenario = async (
     const maxPages = 20;
 
     while (url && pages < maxPages) {
-      const response = await odataRequest({ method: 'GET', url, authToken });
+      const response = await requester.request({ method: 'GET', url, authToken });
       if (response.status !== 200) {
         assertions.push({ passed: false, message: `Page ${pages + 1}: HTTP ${response.status}` });
         break;
