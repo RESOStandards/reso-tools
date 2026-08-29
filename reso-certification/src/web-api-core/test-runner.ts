@@ -5,7 +5,7 @@
  * approach: build query → make request → assert results.
  */
 
-import { odataRequest } from '../test-runner/index.js';
+import { type ODataRequester, odataRequest, webRequester } from '../test-runner/index.js';
 import { fetchMetadataWithVersion } from '../test-runner/metadata.js';
 import { MetadataFetchError, decodeFlagsValue } from '@reso-standards/reso-metadata-utils';
 import type { EnumRepresentation } from '@reso-standards/reso-client';
@@ -275,13 +275,14 @@ export const emptyOutcome = (
  * inconclusive 200-empty) so the caller may try another candidate; false on a determinate pass/fail
  * (including a guaranteed-match 200-empty, which is a determinate FAIL).
  */
-const executeStandardScenario = async (
+export const executeStandardScenario = async (
   serverUrl: string,
   resource: string,
   scenario: CoreScenario,
   params: TestParams,
   authToken: string,
   start: number,
+  requester: ODataRequester = webRequester,
 ): Promise<{ readonly result: ScenarioResult; readonly retryable: boolean; readonly rejected: boolean; readonly accepted: boolean }> => {
   const query = buildScenarioQuery(serverUrl, resource, scenario, params);
   if (!query) {
@@ -292,7 +293,7 @@ const executeStandardScenario = async (
   const assertions: AssertionResult[] = [];
   try {
     const reqStart = Date.now();
-    const response = await odataRequest({ method: 'GET', url: query.url, authToken });
+    const response = await requester.request({ method: 'GET', url: query.url, authToken });
     const requestLatency = Date.now() - reqStart;
 
     const responseCheck = assertODataResponse(response, 200);
