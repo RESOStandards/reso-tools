@@ -343,6 +343,7 @@ const runEnumFamilyScenario = async (
   authToken: string,
   start: number,
   op: EnumOp,
+  requester: ODataRequester = webRequester,
 ): Promise<ScenarioResult> => {
   const slot = scenarioSlot(scenario);
   const candidates = (slot === 'multi' ? params.multiLookupCandidates : params.singleLookupCandidates) ?? [];
@@ -358,7 +359,7 @@ const runEnumFamilyScenario = async (
   let anyAccepted = false; // some eligible field returned 200 — the operator ran, so it is not an all-reject gap
   let firstRejection: ScenarioResult | undefined;
   for (const candidate of eligible) {
-    const { result, retryable, rejected, accepted } = await executeStandardScenario(serverUrl, resource, scenario, paramsWithCandidate(params, slot, candidate), authToken, start);
+    const { result, retryable, rejected, accepted } = await executeStandardScenario(serverUrl, resource, scenario, paramsWithCandidate(params, slot, candidate), authToken, start, requester);
     if (!retryable) return result; // determinate pass/fail (incl. a guaranteed-match 200-empty → fail) — done
     if (accepted) anyAccepted = true;
     if (rejected) firstRejection ??= result;
@@ -386,6 +387,7 @@ const runLookupResourceScenario = async (
   params: TestParams,
   authToken: string,
   start: number,
+  requester: ODataRequester = webRequester,
 ): Promise<ScenarioResult> => {
   const stringField = (params.singleLookupCandidates ?? []).find(c => c.representation === 'SINGLE_STRING');
   if (!stringField) {
@@ -405,7 +407,7 @@ const runLookupResourceScenario = async (
   const assertions: AssertionResult[] = [];
   try {
     const reqStart = Date.now();
-    const response = await odataRequest({ method: 'GET', url: query.url, authToken });
+    const response = await requester.request({ method: 'GET', url: query.url, authToken });
     const requestLatency = Date.now() - reqStart;
     const responseCheck = assertODataResponse(response, 200);
     assertions.push(responseCheck);
@@ -421,7 +423,7 @@ const runLookupResourceScenario = async (
     while (nextLink && pages < 25) {
       let pageResp: Awaited<ReturnType<typeof odataRequest>>;
       try {
-        pageResp = await odataRequest({ method: 'GET', url: rebaseNextLink(nextLink, query.url), authToken });
+        pageResp = await requester.request({ method: 'GET', url: rebaseNextLink(nextLink, query.url), authToken });
       } catch {
         break; // a page fetch failed even after re-basing — validate with the rows we already have, don't hard-error
       }
@@ -446,19 +448,20 @@ const runScenario = async (
   scenario: CoreScenario,
   params: TestParams,
   authToken: string,
+  requester: ODataRequester = webRequester,
 ): Promise<ScenarioResult> => {
   const start = Date.now();
 
   // Lookup Resource validation applies only to string (Lookup Resource) lookups.
   if (scenario.category === 'lookup-resource') {
-    return runLookupResourceScenario(serverUrl, resource, scenario, params, authToken, start);
+    return runLookupResourceScenario(serverUrl, resource, scenario, params, authToken, start, requester);
   }
 
   // Enum-family scenarios gate on the selected field's REAL representation and try candidate fields —
   // replacing the resource-wide enumMode skip. A single enum never gets `has`; a flags enum never `eq`.
   const op = enumScenarioOp(scenario);
   if (op !== undefined) {
-    return runEnumFamilyScenario(serverUrl, resource, scenario, params, authToken, start, op);
+    return runEnumFamilyScenario(serverUrl, resource, scenario, params, authToken, start, op, requester);
   }
 
   // Build query — undefined means required params missing, skip.
@@ -469,20 +472,20 @@ const runScenario = async (
 
   try {
     if (scenario.category === 'structural') {
-      return runStructuralScenario(serverUrl, resource, scenario.assertion, query, params, authToken, start);
+      return runStructuralScenario(serverUrl, resource, scenario.assertion, query, params, authToken, start, requester);
     }
     if (scenario.category === 'paging') {
-      return runPagingScenario(serverUrl, resource, params, authToken, start);
+      return runPagingScenario(serverUrl, resource, params, authToken, start, requester);
     }
     if (scenario.category === 'error') {
       const reqStart = Date.now();
-      const response = await odataRequest({ method: 'GET', url: query.url, authToken });
+      const response = await requester.request({ method: 'GET', url: query.url, authToken });
       const requestLatency = Date.now() - reqStart;
       const responseCheck = assertODataResponse(response, scenario.expectedStatus);
       return { tag: scenario.tag, name: scenario.name, passed: responseCheck.passed, skipped: false, assertions: [responseCheck], duration: Date.now() - start, requestLatency, requestUrl: query.url };
     }
     // Other standard scenarios (filter / orderby / expand / lookup-resource): a single execution.
-    const { result } = await executeStandardScenario(serverUrl, resource, scenario, params, authToken, start);
+    const { result } = await executeStandardScenario(serverUrl, resource, scenario, params, authToken, start, requester);
     return result;
   } catch (err) {
     return { tag: scenario.tag, name: scenario.name, passed: false, skipped: false, errored: true, assertions: [{ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` }], duration: Date.now() - start, requestUrl: query.url };
@@ -677,6 +680,7 @@ const runStructuralScenario = async (
   params: TestParams,
   authToken: string,
   start: number,
+  requester: ODataRequester = webRequester,
 ): Promise<ScenarioResult> => {
   const assertions: AssertionResult[] = [];
   const tag = assertion;
@@ -721,12 +725,12 @@ const runStructuralScenario = async (
       }
     } else if (assertion === 'skip') {
       // Skip test requires two requests and comparing results
-      const resp1 = await odataRequest({ method: 'GET', url: query.url, authToken });
+      const resp1 = await requester.request({ method: 'GET', url: query.url, authToken });
       assertions.push(assertODataResponse(resp1, 200));
       const records1 = extractRecords(resp1.body);
 
       const skipUrl = `${query.url}&$skip=5`;
-      const resp2 = await odataRequest({ method: 'GET', url: skipUrl, authToken });
+      const resp2 = await requester.request({ method: 'GET', url: skipUrl, authToken });
       assertions.push(assertODataResponse(resp2, 200));
       const records2 = extractRecords(resp2.body);
 
@@ -739,7 +743,7 @@ const runStructuralScenario = async (
           : { passed: false, message: `$skip overlap: ${overlap.length} keys appear in both pages` }
       );
     } else if (assertion === 'count') {
-      const response = await odataRequest({ method: 'GET', url: query.url, authToken });
+      const response = await requester.request({ method: 'GET', url: query.url, authToken });
       assertions.push(assertODataResponse(response, 200));
       const count = extractCount(response.body);
       const records = extractRecords(response.body);
@@ -749,7 +753,7 @@ const runStructuralScenario = async (
           : { passed: false, message: `@odata.count=${count ?? 'missing'}, results=${records.length}` }
       );
     } else if (assertion === 'top') {
-      const response = await odataRequest({ method: 'GET', url: query.url, authToken });
+      const response = await requester.request({ method: 'GET', url: query.url, authToken });
       assertions.push(assertODataResponse(response, 200));
       const records = extractRecords(response.body);
       assertions.push(
@@ -758,7 +762,7 @@ const runStructuralScenario = async (
           : { passed: false, message: `$top=5 returned ${records.length} records (expected <= 5)` }
       );
     } else if (assertion === 'fetch-by-key') {
-      const response = await odataRequest({ method: 'GET', url: query.url, authToken });
+      const response = await requester.request({ method: 'GET', url: query.url, authToken });
       assertions.push(assertODataResponse(response, 200));
       const body = response.body as Record<string, unknown> | null;
       assertions.push(
@@ -768,7 +772,7 @@ const runStructuralScenario = async (
       );
     } else {
       // service-document, select
-      const response = await odataRequest({ method: 'GET', url: query.url, authToken });
+      const response = await requester.request({ method: 'GET', url: query.url, authToken });
       assertions.push(assertODataResponse(response, 200));
       assertions.push(assertHasResults(response.body));
     }
@@ -848,6 +852,7 @@ export const runCoreResourceScenarios = async (
   params: TestParams,
   authToken: string,
   version: '2.0.0' | '2.1.0' = '2.0.0',
+  requester: ODataRequester = webRequester,
 ): Promise<ResourceTestReport> => {
   const scenarios = scenariosForVersion(version);
   const results: ScenarioResult[] = [];
@@ -887,7 +892,7 @@ export const runCoreResourceScenarios = async (
       continue;
     }
 
-    const result = await runScenario(serverUrl, resource, scenario, params, authToken);
+    const result = await runScenario(serverUrl, resource, scenario, params, authToken, requester);
     results.push({ ...result, optional: scenario.optional });
 
     // Latch state for subsequent iterations.
