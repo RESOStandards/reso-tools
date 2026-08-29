@@ -9,6 +9,7 @@
  * requester — no `vi.mock`, no "test mode" branches.
  */
 
+import type { ResilienceSession } from '@reso-standards/reso-client';
 import { type RequestOptions, odataRequest } from './client.js';
 import type { ODataResponse } from './types.js';
 
@@ -21,3 +22,12 @@ export interface ODataRequester {
 export const webRequester: ODataRequester = {
   request: (options) => odataRequest(options)
 };
+
+/**
+ * A web requester bound to a shared resilience session. Created once per run and injected, it
+ * makes the governor + circuit breaker persist across the run's requests (per-call clients each
+ * see the same session), which is where the shared breaker's fail-fast behavior comes from.
+ */
+export const createSessionRequester = (session: ResilienceSession): ODataRequester => ({
+  request: (options) => odataRequest({ ...options, session })
+});
