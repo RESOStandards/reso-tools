@@ -36,6 +36,10 @@ export { formatConsoleReport, formatJsonReport } from './reporter.js';
 // Client
 export { odataRequest, buildResourceUrl } from './client.js';
 
+// Injectable request seam (containers — #125)
+export { webRequester } from './requester.js';
+export type { ODataRequester } from './requester.js';
+
 // Auth
 export { resolveAuthToken, fetchAccessToken } from './auth.js';
 
