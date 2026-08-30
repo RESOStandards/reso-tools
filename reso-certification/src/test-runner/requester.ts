@@ -35,9 +35,11 @@ export const createSessionRequester = (session: ResilienceSession): ODataRequest
 /**
  * The resilience session for a certification run.
  *
- * Cert deliberately runs with the stateful resilience layers off AND without retries,
- * because cert's job is to *record* how a server behaves, not to protect a workload
- * from it. One request per scenario, record the result, move on:
+ * Cert runs with the stateful resilience layers off and retries limited to the two
+ * statuses that mean "reachable, come back later", because cert's job is to *record*
+ * how a server behaves, not to protect a workload from it. Effectively: one request per
+ * scenario, record the result, and move on — except a 429/503 is retried a couple of
+ * times first:
  *
  *  - **Circuit breaker off.** In cert every HTTP response — a 5xx included — is a
  *    result to record, not a health signal to fail fast on. A shared breaker keyed per
@@ -47,33 +49,53 @@ export const createSessionRequester = (session: ResilienceSession): ODataRequest
  *    onto one key, so a burst on one resource silently blocks testing of the others.
  *    "Endpoint unreachable" is already handled explicitly: sampling gates reachability
  *    and an unsampleable resource is reported SKIPPED, not FAILED.
- *  - **No retries.** A re-send only helps when the first failure wasn't the server's
- *    verdict — but a 5xx *is* the verdict (re-sending gets the same answer and risks a
- *    picky vendor blocking us for duplicate queries), a 429 means we paced too hard (the
- *    lever there is pacing, not a retry that hammers the rate limit), and a timeout
- *    re-sent is how a run balloons to 15 min × N. So cert records the first outcome and
- *    moves on. If rate-limiting shows up with pacing off, the lever is the governor.
+ *  - **Retry only when the server tells us to** (429 / 503), up to twice, honoring
+ *    Retry-After. Those two statuses mean "come back later", so a re-send can genuinely
+ *    succeed. Every other failure is a verdict to record and move on: a 500/502/504 is
+ *    the server's answer (re-sending gets the same one and risks a duplicate-query
+ *    block), and a network drop or timeout is re-sent into the same wall. Two retries
+ *    (down from the SDK default of five) caps the wait; a rate-limit that outlasts even
+ *    that is bounded by the job's own timeout, not by hammering the server.
  *  - **Governor (pacing) off.** A bounded cert run should stay fast; the ~1 rps floor
  *    is a replication concern. Tune the rate here if a picky vendor rate-limits a run.
  *
- * What stays on is the per-request 15-minute timeout — the one protection cert still
- * wants, so a single hung request can't stall the run indefinitely. Cert declares it
- * explicitly (rather than inheriting the SDK default) so the contract is self-owned and
- * a change to the SDK default can't silently shorten it under a legitimately slow read.
+ * What stays on is the per-request 15-minute timeout — so a single hung request can't
+ * stall the run indefinitely — plus the bounded 429/503 retry above. Cert declares the
+ * timeout explicitly (rather than inheriting the SDK default) so the contract is
+ * self-owned and a change to the SDK default can't silently shorten it under a slow read.
  *
  * The shared-session plumbing itself is retained — it is the seam the future parallel
  * fetchers (#271) and the DD 2.2 sampling migration will draw a shared rate budget
- * from, where retries + Retry-After + the breaker all earn their keep; cert just
- * configures those layers inert today. An infinite breaker threshold is a real breaker
- * that provably never opens; maxRetries 0 is a real send path that never re-sends.
+ * from, where full retries + the breaker also earn their keep; cert just configures the
+ * breaker + governor inert today. An infinite breaker threshold is a real breaker that
+ * provably never opens.
+ *
+ * Note: a bare 503 (no Retry-After) retries on the short exponential backoff, while a
+ * 429 falls back to the long `defaultRetryWaitMs` — rate-limit windows are long, a 503
+ * is usually a transient blip. Both honor a Retry-After header when present.
  */
 /** Cert's per-request timeout: 15 min. Some legitimate paged reads run this long (Josh's call). */
 const CERT_REQUEST_TIMEOUT_MS = 15 * 60_000;
 
-export const createCertSession = (): ResilienceSession =>
+/** The two statuses that mean "reachable, come back later" — the only ones cert retries. */
+const CERT_RETRYABLE_STATUSES = [429, 503] as const;
+
+/**
+ * Default total run budget: 55 min. Generous for a normal Core run, and meant to sit UNDER
+ * the job scheduler's own kill (e.g. a 1 h AWS Batch timeout) so the client stops first — it
+ * unwinds gracefully and writes a partial report, where a hard kill would leave none. Override
+ * via `CoreConfig.totalTimeoutMs` to match the actual scheduler timeout.
+ */
+export const DEFAULT_CERT_TOTAL_TIMEOUT_MS = 55 * 60_000;
+
+export const createCertSession = (
+  totalTimeoutMs: number = DEFAULT_CERT_TOTAL_TIMEOUT_MS
+): ResilienceSession =>
   createResilienceSession({
     governor: { ratePerSec: 0, burst: 0 },
     breaker: { threshold: Number.POSITIVE_INFINITY, cooldownMs: 0 },
-    backoff: { ...DEFAULT_BACKOFF, maxRetries: 0 },
-    timeoutMs: CERT_REQUEST_TIMEOUT_MS
+    backoff: { ...DEFAULT_BACKOFF, maxRetries: 2 },
+    retryableStatuses: CERT_RETRYABLE_STATUSES,
+    timeoutMs: CERT_REQUEST_TIMEOUT_MS,
+    totalTimeoutMs
   });

@@ -21,6 +21,7 @@ const statusIcon = (status: StepProgress['status']): string => {
   switch (status) {
     case 'passed': return '\u2713';
     case 'failed': return '\u2717';
+    case 'incomplete': return '\u25D0'; // \u25D0 \u2014 ran out of time; partial results, rest not tested
     case 'skipped': return '-';
     case 'running': return '\u25CB';
     case 'pending': return '\u00B7';
@@ -73,7 +74,7 @@ export const runWithProgress = async (
 
           const passed = pipelineResult.steps.filter(s => s.status === 'passed').length;
           const failed = pipelineResult.steps.filter(s => s.status === 'failed').length;
-          const statusMark = pipelineResult.status === 'passed' ? '\u2713' : '\u2717';
+          const statusMark = pipelineResult.status === 'passed' ? '\u2713' : pipelineResult.status === 'incomplete' ? '\u25d0' : '\u2717';
           task.title = `${statusMark} ${label} \u2014 ${passed} passed, ${failed} failed (${pipelineResult.duration}ms)`;
         },
         rendererOptions: { bottomBar: Infinity },
@@ -112,7 +113,7 @@ export const runConfigEntries = async (
 
         const passed = result.steps.filter(s => s.status === 'passed').length;
         const failed = result.steps.filter(s => s.status === 'failed').length;
-        const statusMark = result.status === 'passed' ? '\u2713' : '\u2717';
+        const statusMark = result.status === 'passed' ? '\u2713' : result.status === 'incomplete' ? '\u25d0' : '\u2717';
         task.title = `${statusMark} ${label} \u2014 ${passed} passed, ${failed} failed (${result.duration}ms)`;
       },
       rendererOptions: { bottomBar: Infinity },

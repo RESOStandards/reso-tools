@@ -3,8 +3,9 @@ import type { DDVersion } from './dd-versions.js';
 
 // ── Pipeline ──
 
-/** Progress status for a pipeline step. */
-export type StepStatus = 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
+/** Progress status for a pipeline step. `incomplete` = the step ran out of its
+ *  total-timeout budget before finishing; results gathered are valid, the rest is not tested. */
+export type StepStatus = 'pending' | 'running' | 'passed' | 'failed' | 'skipped' | 'incomplete';
 
 /** Progress update emitted by each pipeline step. */
 export interface StepProgress {
@@ -151,7 +152,7 @@ export interface StepResult {
 
 /** Result of a completed pipeline execution. */
 export interface PipelineResult<TContext extends PipelineContext = PipelineContext> {
-  readonly status: 'passed' | 'failed';
+  readonly status: 'passed' | 'failed' | 'incomplete';
   readonly endorsement: string;
   readonly steps: ReadonlyArray<StepResult>;
   readonly context: TContext;
@@ -270,6 +271,14 @@ export interface CoreConfig extends BaseComplianceConfig {
   readonly enumMode?: 'auto' | 'isflags' | 'collections' | 'string';
   readonly metadataPath?: string;
   readonly fullCoverage?: boolean;
+  /**
+   * Total wall-clock budget for the whole run, in ms. When it is spent the run stops
+   * gracefully — remaining resources/scenarios are reported NOT TESTED and the verdict is
+   * `incomplete` — rather than hanging or being hard-killed. Defaults to a generous value
+   * (see createCertSession); set it under the job scheduler's own timeout so the client
+   * stops first and still writes a partial report.
+   */
+  readonly totalTimeoutMs?: number;
 }
 
 /** Discriminated union of all endorsement configs. */
