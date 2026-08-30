@@ -53,11 +53,16 @@ const executeStepFunctions = async <TContext extends PipelineContext>(
       (acc, r) => ({ ...acc, ...r.counts }),
       {} as Record<string, number>,
     );
-    const hasFailure = results.some(r => r.status === 'failed');
+    // Merge sub-status with the same precedence as the sequential runner: failed > incomplete > passed.
+    const mergedStatus = results.some(r => r.status === 'failed')
+      ? 'failed' as const
+      : results.some(r => r.status === 'incomplete')
+        ? 'incomplete' as const
+        : 'passed' as const;
 
     return {
       context: mergedContext,
-      status: hasFailure ? 'failed' : 'passed',
+      status: mergedStatus,
       summary: summaries.join('; '),
       errors: errors.length > 0 ? errors : undefined,
       artifacts: artifacts.length > 0 ? artifacts : undefined,
@@ -129,7 +134,8 @@ export const createPipeline = <TContext extends PipelineContext>(
     const startTime = Date.now();
     const stepResults: StepResult[] = [];
     let context = { ...initialContext };
-    let pipelineStatus: 'passed' | 'failed' = 'passed';
+    // Precedence: a real failure outranks an incomplete (deadline) run, which outranks passed.
+    let pipelineStatus: 'passed' | 'failed' | 'incomplete' = 'passed';
 
     for (const step of steps) {
       const stepStart = Date.now();
@@ -173,6 +179,10 @@ export const createPipeline = <TContext extends PipelineContext>(
         if (status === 'failed') {
           pipelineStatus = 'failed';
           if (failFast) break;
+        } else if (status === 'incomplete' && pipelineStatus === 'passed') {
+          // A deadline-truncated step makes the run incomplete unless a real failure outranks it.
+          // Do NOT failFast — finalizer steps (report writing) must still run to persist the partial report.
+          pipelineStatus = 'incomplete';
         }
       } catch (err) {
         const duration = Date.now() - stepStart;

@@ -8,7 +8,7 @@
 import { type ODataRequester, odataRequest, webRequester } from '../test-runner/index.js';
 import { fetchMetadataWithVersion } from '../test-runner/metadata.js';
 import { MetadataFetchError, decodeFlagsValue } from '@reso-standards/reso-metadata-utils';
-import type { EnumRepresentation } from '@reso-standards/reso-client';
+import { type EnumRepresentation, isDeadlineError } from '@reso-standards/reso-client';
 import type { TestParams } from './sampling.js';
 import type { EnumCandidate } from './enum-selection.js';
 import { buildScenarioQuery } from './queries.js';
@@ -69,6 +69,10 @@ export interface ResourceTestReport {
   readonly scenarios: ReadonlyArray<ScenarioResult>;
   readonly coverage: ReadonlyArray<TypeCoverage>;
   readonly summary: CoreSummary;
+  /** True when the run's total-timeout budget was spent before this resource finished:
+   *  the scenarios (or the whole resource) after that point are reported SKIPPED with a
+   *  "run deadline reached" reason, never failed. Drives the run's `incomplete` status. */
+  readonly deadlineReached?: boolean;
 }
 
 /** The three outcomes an Optional Test can render. */
@@ -193,6 +197,19 @@ const skipResult = (scenario: CoreScenario, start: number, message: string): Sce
   skipped: true,
   assertions: [{ passed: true, message: `Skipped: ${message}` }],
   duration: Date.now() - start,
+});
+
+/** A "not tested — run deadline reached" result. Counts as SKIPPED, never failed: the
+ *  scenario was never executed because the run spent its total-timeout budget. Distinct
+ *  from a can't-sample skip by its reason, so a partial run never misreports a vendor. */
+const deadlineSkipResult = (scenario: CoreScenario): ScenarioResult => ({
+  tag: scenario.tag,
+  name: scenario.name,
+  passed: true,
+  skipped: true,
+  assertions: [{ passed: true, message: 'Not tested — run deadline reached' }],
+  duration: 0,
+  optional: scenario.optional,
 });
 
 /**
@@ -322,6 +339,7 @@ export const executeStandardScenario = async (
     const allPassed = assertions.every(a => a.passed);
     return { result: { tag: scenario.tag, name: scenario.name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url }, retryable: false, rejected: false, accepted: true };
   } catch (err) {
+    if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
     // A transport/parse error is indeterminate — UNTESTABLE, neither a rejection nor an acceptance.
     assertions.push({ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` });
     return { result: { tag: scenario.tag, name: scenario.name, passed: false, skipped: false, errored: true, assertions, duration: Date.now() - start, requestUrl: query.url }, retryable: true, rejected: false, accepted: false };
@@ -424,7 +442,8 @@ const runLookupResourceScenario = async (
       let pageResp: Awaited<ReturnType<typeof odataRequest>>;
       try {
         pageResp = await requester.request({ method: 'GET', url: rebaseNextLink(nextLink, query.url), authToken });
-      } catch {
+      } catch (err) {
+        if (isDeadlineError(err)) throw err; // out of run budget — stop the whole run, not just paging
         break; // a page fetch failed even after re-basing — validate with the rows we already have, don't hard-error
       }
       if (!assertODataResponse(pageResp, 200).passed) break;
@@ -437,6 +456,7 @@ const runLookupResourceScenario = async (
     const allPassed = assertions.every(a => a.passed);
     return { tag: scenario.tag, name: scenario.name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url };
   } catch (err) {
+    if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
     return { tag: scenario.tag, name: scenario.name, passed: false, skipped: false, errored: true, assertions: [{ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` }], duration: Date.now() - start, requestUrl: query.url };
   }
 };
@@ -488,6 +508,7 @@ const runScenario = async (
     const { result } = await executeStandardScenario(serverUrl, resource, scenario, params, authToken, start, requester);
     return result;
   } catch (err) {
+    if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
     return { tag: scenario.tag, name: scenario.name, passed: false, skipped: false, errored: true, assertions: [{ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` }], duration: Date.now() - start, requestUrl: query.url };
   }
 };
@@ -777,6 +798,7 @@ const runStructuralScenario = async (
       assertions.push(assertHasResults(response.body));
     }
   } catch (err) {
+    if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
     assertions.push({ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` });
   }
 
@@ -834,6 +856,7 @@ export const runPagingScenario = async (
       assertions.push({ passed: true, message: 'Final page has no @odata.nextLink' });
     }
   } catch (err) {
+    if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
     assertions.push({ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` });
   }
 
@@ -860,8 +883,9 @@ export const runCoreResourceScenarios = async (
   // Track cross-scenario state for cascade-skip + OData-version gating.
   let lookupResourceFailed = false;
   let detectedODataVersion: string | undefined;
+  let deadlineReached = false;
 
-  for (const scenario of scenarios) {
+  for (const [i, scenario] of scenarios.entries()) {
     // Cascade-skip: dependent string-enum + in-operator scenarios are
     // pointless if the Lookup Resource didn't return the expected
     // LookupName / sample values. Skip them with a clear reason.
@@ -892,15 +916,23 @@ export const runCoreResourceScenarios = async (
       continue;
     }
 
-    const result = await runScenario(serverUrl, resource, scenario, params, authToken, requester);
-    results.push({ ...result, optional: scenario.optional });
+    try {
+      const result = await runScenario(serverUrl, resource, scenario, params, authToken, requester);
+      results.push({ ...result, optional: scenario.optional });
 
-    // Latch state for subsequent iterations.
-    if (scenario.tag === 'lookup-resource-validation' && !result.passed && !result.skipped) {
-      lookupResourceFailed = true;
-    }
-    if (result.odataVersion && !detectedODataVersion) {
-      detectedODataVersion = result.odataVersion;
+      // Latch state for subsequent iterations.
+      if (scenario.tag === 'lookup-resource-validation' && !result.passed && !result.skipped) {
+        lookupResourceFailed = true;
+      }
+      if (result.odataVersion && !detectedODataVersion) {
+        detectedODataVersion = result.odataVersion;
+      }
+    } catch (err) {
+      if (!isDeadlineError(err)) throw err; // runners swallow ordinary errors; only a deadline reaches here
+      // Out of run budget: this scenario and every one after it are NOT TESTED, not failed.
+      for (const remaining of scenarios.slice(i)) results.push(deadlineSkipResult(remaining));
+      deadlineReached = true;
+      break;
     }
   }
 
@@ -910,5 +942,6 @@ export const runCoreResourceScenarios = async (
     coverage: buildCoverage(params),
     scenarios: results,
     summary: summarizeScenarios(results),
+    ...(deadlineReached ? { deadlineReached: true } : {}),
   };
 };

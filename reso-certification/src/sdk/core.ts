@@ -10,7 +10,7 @@ import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, getEntityType, p
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
 import { buildStandardMap, resolveTestParams, WELL_KNOWN_RESOURCES } from '../web-api-core/index.js';
 import { runCoreResourceScenarios, type ResourceTestReport } from '../web-api-core/test-runner.js';
-import { runSettled } from '@reso-standards/reso-client';
+import { isDeadlineError, runSettled } from '@reso-standards/reso-client';
 import { createCertSession, createSessionRequester } from '../test-runner/requester.js';
 import type { BaseTestContext, CoreConfig, PipelineStep, StepResult } from './types.js';
 import { createPipeline } from './pipeline.js';
@@ -123,6 +123,75 @@ export const skippedResourceReport = (resource: string, error: unknown): Resourc
   };
 };
 
+/**
+ * A resource we never reached because the run's total-timeout budget was already spent —
+ * reported as SKIPPED (not failed) with a deadline reason, and flagged so the run's verdict
+ * becomes `incomplete`. Distinct from skippedResourceReport, which means "could not sample".
+ */
+export const deadlineResourceReport = (resource: string): ResourceTestReport => ({
+  resource,
+  params: { resource, keyField: '', keyValue: '', enumMode: 'string', integerValueHigh: 0, skippedTypes: [], sampleComplete: false },
+  scenarios: [
+    {
+      tag: 'resource-not-tested',
+      name: `${resource} not tested — run deadline reached`,
+      passed: true,
+      skipped: true,
+      assertions: [{ passed: true, message: 'Not tested — run deadline reached' }],
+      duration: 0,
+    },
+  ],
+  coverage: [],
+  summary: { total: 1, passed: 0, failed: 0, skipped: 1, optional: { passed: 0, notSupported: 0, notTested: 0 } },
+  deadlineReached: true,
+});
+
+/**
+ * The Core run verdict from the aggregate counts — the single source of truth for the run's
+ * status, used by both the test step and the report writer so they can never diverge.
+ *
+ * Precedence: a real failure (a failed required scenario OR a failed coverage gate) is
+ * DEFINITIVE and outranks an `incomplete` (deadline-truncated) run, which outranks `passed`.
+ * Running out of time AFTER observing a real failure does not soften it to "incomplete"; and
+ * not-tested work (skipped) is never a failure. Mirrors the pipeline's failed > incomplete > passed.
+ */
+export const coreVerdict = (args: {
+  readonly totalFailed: number;
+  readonly coverageFailed: boolean;
+  readonly deadlineReached: boolean;
+}): 'passed' | 'failed' | 'incomplete' =>
+  args.totalFailed > 0 || args.coverageFailed
+    ? 'failed'
+    : args.deadlineReached
+      ? 'incomplete'
+      : 'passed';
+
+/**
+ * The report's HEADLINE outcome — coreVerdict plus the "the run did not complete cleanly"
+ * signals the testing counts alone can't see, so a certification report never reads as a clean
+ * PASS for a run whose process verdict is 'failed':
+ *   - `priorStepFailed` — a failed upstream step (service check, metadata validation) that a
+ *     non-failFast run continued past;
+ *   - `testingAborted` — the testing phase produced no results at all (e.g. a fatal-auth abort
+ *     mid-run), so there is nothing to certify.
+ * Either forces 'failed'; otherwise the testing verdict stands. A normal run trips neither and
+ * behaves exactly as coreVerdict.
+ */
+export const reportVerdict = (args: {
+  readonly priorStepFailed: boolean;
+  readonly testingAborted: boolean;
+  readonly totalFailed: number;
+  readonly coverageFailed: boolean;
+  readonly deadlineReached: boolean;
+}): 'passed' | 'failed' | 'incomplete' =>
+  args.priorStepFailed || args.testingAborted
+    ? 'failed'
+    : coreVerdict({
+        totalFailed: args.totalFailed,
+        coverageFailed: args.coverageFailed,
+        deadlineReached: args.deadlineReached
+      });
+
 const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
   name: 'Run Core scenarios',
   run: async (ctx, onProgress) => {
@@ -131,11 +200,11 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // Standard map (DD reference) built once per run — field/value membership for standard-first selection.
     const standardMap = buildStandardMap(version);
     // One resilience session shared across the whole run (see createCertSession for the full
-    // rationale): cert makes one request per scenario, records the result, and moves on — no
-    // retries, no breaker, no pacing, just the 15-min per-request timeout. Every response is a
-    // result to record, and "endpoint unreachable" is handled by sampling → SKIPPED, not by a
-    // breaker that would false-fail scenarios the server actually handles.
-    const session = createCertSession();
+    // rationale): cert retries only 429/503 (twice), records every other response and moves on,
+    // with no breaker or pacing and a 15-min per-request timeout. A total run budget bounds the
+    // whole run; when it is spent the run stops gracefully and remaining work is marked NOT TESTED
+    // (status → incomplete), so a partial report is still written rather than the process being killed.
+    const session = createCertSession(config.totalTimeoutMs);
     const requester = createSessionRequester(session);
     // Continue-on-error across resources: one bad resource (e.g. a sampling network
     // failure) is captured and the run keeps going, so a walk-away run still yields a
@@ -152,6 +221,9 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         });
 
         const enumModeOverride = ctx.enumMode !== 'auto' ? ctx.enumMode as import('../web-api-core/sampling.js').EnumMode : undefined;
+        // Sampling issues requests, so it can hit the run deadline; if it does, this resource is
+        // "not tested" (ran out of time), NOT "could not sample". A deadline reached mid-scenarios
+        // is handled inside runCoreResourceScenarios, which returns a partial report.
         const params = await resolveTestParams(
           ctx.serverUrl,
           resource,
@@ -161,7 +233,11 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           standardMap,
           enumModeOverride,
           requester,
-        );
+        ).catch((err: unknown) => {
+          if (isDeadlineError(err)) return null;
+          throw err;
+        });
+        if (params === null) return deadlineResourceReport(resource);
 
         if (params.skippedTypes.length > 0) {
           onProgress({
@@ -242,17 +318,23 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // In --full-coverage mode, fail if any types are missing
     const requireFullCoverage = config.fullCoverage ?? false;
     const coverageFailed = requireFullCoverage && !fullCoverage;
-    const status = (totalFailed > 0 || coverageFailed) ? 'failed' as const : 'passed' as const;
+    // Verdict precedence (see coreVerdict): a real failure (scenario or coverage gate) is
+    // definitive and outranks an incomplete (deadline-truncated) run, which outranks passed.
+    // A run that ran out of time is `incomplete` only if it observed no real failure.
+    const deadlineReached = resourceReports.some(r => r.deadlineReached);
+    const status = coreVerdict({ totalFailed, coverageFailed, deadlineReached });
 
     const coverageMsg = fullCoverage
       ? 'Full type coverage achieved'
       : `Missing coverage: ${missingTypes.join(', ')}`;
     const modeMsg = requireFullCoverage ? ' (--full-coverage enabled)' : '';
+    const incompleteMsg = deadlineReached ? 'INCOMPLETE — run deadline reached; remaining resources/scenarios not tested. ' : '';
 
     return {
       context: { ...ctx, resourceReports, coverageMatrix: { coveredTypes, missingTypes, fullCoverage } },
       status,
-      summary: `${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped`
+      summary: incompleteMsg
+        + `${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped`
         + (optTotal > 0 ? `; optional: ${optPassed} passed, ${optNotSupported} not supported, ${optNotTested} not tested` : '')
         + ` (${totalScenarios} scenarios across ${resourceReports.length} resources). ${coverageMsg}${modeMsg}`,
       counts: {
@@ -280,9 +362,26 @@ const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> =
 
     const resourceReports = ctx.resourceReports as ReadonlyArray<ResourceTestReport> ?? [];
     const totalFailed = resourceReports.reduce((sum, r) => sum + r.summary.failed, 0);
+    // The report's headline outcome must agree with the run's process verdict (and CLI exit
+    // code), so it is derived via reportVerdict (see there). It folds the TESTING result
+    // (coreVerdict on scenario/coverage/deadline) together with two "the run did not complete
+    // cleanly" signals, so a certification report can never read as a clean PASS for a run that
+    // actually failed:
+    //   - a failed UPSTREAM step (service check, metadata validation) that a non-failFast run
+    //     continued past — such a step lands in ctx.pipelineSteps;
+    //   - a testing phase that produced NO results at all — e.g. a fatal-auth abort mid-run,
+    //     where sampleAndTest threw and never threaded resourceReports onto the context.
+    // The coverage gate is a run-level check that never shows up in totalFailed, so it is
+    // carried explicitly.
+    const deadlineReached = resourceReports.some(r => r.deadlineReached);
+    const coverageMatrix = ctx.coverageMatrix as { readonly fullCoverage?: boolean } | undefined;
+    const coverageFailed = (config.fullCoverage ?? false) && !(coverageMatrix?.fullCoverage ?? true);
+    const priorSteps = ctx.pipelineSteps as ReadonlyArray<StepResult> ?? [];
+    const priorStepFailed = priorSteps.some(s => s.status === 'failed');
+    const testingAborted = (ctx.resources?.length ?? 0) > 0 && resourceReports.length === 0;
 
     const pipelineResult = {
-      status: totalFailed > 0 ? 'failed' as const : 'passed' as const,
+      status: reportVerdict({ priorStepFailed, testingAborted, totalFailed, coverageFailed, deadlineReached }),
       endorsement: 'core',
       steps: ctx.pipelineSteps as ReadonlyArray<StepResult> ?? [],
       context: ctx,

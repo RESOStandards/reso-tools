@@ -59,9 +59,11 @@ const loadDefaultMetadata = async (): Promise<string> => {
 const formatResultJson = (results: ReadonlyArray<PipelineResult>): string =>
   JSON.stringify(results.length === 1 ? results[0] : results, null, 2);
 
-/** Determine exit code from pipeline results. */
+/** Determine exit code from pipeline results. A run cut short by its total-timeout budget
+ *  is `incomplete` — not a clean pass, so it exits non-zero (like a failure) rather than
+ *  letting a truncated run read as success; the report distinguishes incomplete from failed. */
 const resolveExitCode = (results: ReadonlyArray<PipelineResult>): number =>
-  results.some(r => r.status === 'failed') ? 1 : 0;
+  results.some(r => r.status === 'failed' || r.status === 'incomplete') ? 1 : 0;
 
 // ── Program ──
 
