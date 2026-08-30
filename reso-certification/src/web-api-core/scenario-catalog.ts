@@ -95,7 +95,7 @@ export const generateScenarioCatalog = (): string => {
   const lines: string[] = [
     '## Web API Core Scenario Catalog',
     '',
-    "This catalog is generated from the RESO certification tool's scenario definitions and is the canonical list of Web API Core test scenarios. Each Testing Query in Section 3.5 links to its entry here by a stable `scenario-<id>` anchor. It is generated – do not edit by hand; regenerate when the scenario set changes.",
+    'This catalog is the canonical list of Web API Core test scenarios. Each Testing Query in Section 3.5 links to its entry here by a stable `scenario-<id>` anchor.',
     ''
   ];
   for (const { key, label, note } of CATEGORY_ORDER) {
