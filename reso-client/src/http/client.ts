@@ -11,12 +11,21 @@ import { createResilienceSession } from './resilience/session.js';
 
 const HTTP_UNAUTHORIZED = 401;
 
-/** Derives the governor/breaker key from a request URL: `host|resource`. */
-const resilienceKey = (url: string): string => {
+/**
+ * Derives the governor/breaker key from a request URL: `host|resource-path`.
+ *
+ * The whole path is used (minus any key predicate and query), NOT just the first
+ * segment: a path-prefixed service root — `https://host/odata/Property`,
+ * `https://host/odata/Member` — must not collapse every resource onto one
+ * `host|odata` key, or a burst on one resource would pace/trip the breaker for all
+ * of them. Key predicates are stripped wherever they appear, so `Property('123')`
+ * shares the `Property` collection's key (same resource), while a navigation segment
+ * like `Property('1')/Media` keeps its own — it is a different resource.
+ */
+export const resilienceKey = (url: string): string => {
   try {
     const parsed = new URL(url);
-    const firstSegment = parsed.pathname.split('/').filter(Boolean)[0] ?? '';
-    return `${parsed.host}|${firstSegment.split('(')[0]}`;
+    return `${parsed.host}|${parsed.pathname.replace(/\([^)]*\)/g, '')}`;
   } catch {
     return url;
   }

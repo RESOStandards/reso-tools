@@ -1,18 +1,19 @@
 /**
  * Per-key circuit breaker.
  *
- * Keyed by `host|resource` (same as the governor), so one unhealthy resource
+ * Keyed by `host|resource` (same as the governor), so one unreachable resource
  * trips only its own breaker, not the whole host. After `threshold` CONSECUTIVE
- * health-relevant failures the breaker opens and requests fail fast; after
- * `cooldownMs` it half-opens to admit a single probe, which closes it on success
- * or re-opens it on failure.
+ * failures the breaker opens and requests fail fast; after `cooldownMs` it
+ * half-opens to admit a single probe, which closes it on success or re-opens it
+ * on failure.
  *
  * The counter is CONSECUTIVE (reset on any success) — the legacy client's was
  * cumulative, so a handful of scattered blips over a long healthy run would kill
- * it. The caller feeds only health-relevant outcomes: a 2xx is a success; a
- * transient-5xx / network / timeout / exhausted-throttle is a failure. Terminal
- * client errors (4xx) and fatal auth are NOT fed here — they say nothing about
- * host health.
+ * it. The breaker tracks REACHABILITY, so the caller (see resilient-send) feeds it
+ * that way: any HTTP response — 2xx, 4xx, or 5xx — is a success (the endpoint
+ * answered), and ONLY a transport death with no response (a network drop or a
+ * timeout that exhausts retries) is a failure. A server that responds with errors
+ * is reachable and must not trip the breaker.
  *
  * `now` is injectable so cooldown transitions are deterministic in tests.
  */
