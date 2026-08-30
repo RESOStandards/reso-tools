@@ -20,7 +20,7 @@ describe('scenario definitions', () => {
   it('v2.0.0 returns only 2.0.0 scenarios', () => {
     const v200 = scenariosForVersion('2.0.0');
     expect(v200.every(s => s.minVersion === '2.0.0')).toBe(true);
-    expect(v200.length).toBe(45);
+    expect(v200.length).toBe(48); // 45 + the 3 restored fixed-value datetime ne/lt/le tests (RCP-039 reconciliation)
   });
 
   it('v2.1.0 returns all scenarios', () => {
@@ -84,8 +84,9 @@ describe('scenario definitions', () => {
     expect(dateFilters.length).toBe(6);
   });
 
-  it('has 5 datetime filter scenarios', () => {
+  it('has 8 datetime filter scenarios', () => {
+    // gt, ge, the 3 restored fixed-value ne/lt/le, plus the 3 now() variants (lt/le/ne).
     const dtFilters = allScenarios.filter(s => s.category === 'filter' && 'dataType' in s && s.dataType === 'datetime');
-    expect(dtFilters.length).toBe(5);
+    expect(dtFilters.length).toBe(8);
   });
 });

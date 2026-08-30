@@ -1,5 +1,5 @@
 /**
- * Web API Core scenario definitions — all 45+ scenarios as typed data.
+ * Web API Core scenario definitions — all Web API Core scenarios as typed data.
  *
  * Each scenario maps to one OData operation + one assertion primitive.
  * A single generic runner executes them all.
@@ -149,7 +149,7 @@ export type CoreScenario =
   | InOperatorScenario
   | LookupResourceValidationScenario;
 
-// ── v2.0.0 Scenarios (45 total) ──
+// ── v2.0.0 Scenarios (48 total) ──
 
 const structuralScenarios: ReadonlyArray<StructuralScenario> = [
   { tag: 'metadata-validation', name: 'Validate server metadata', category: 'structural', assertion: 'metadata', minVersion: '2.0.0' },
@@ -196,6 +196,12 @@ const dateFilterScenarios: ReadonlyArray<FilterScenario> = [
 const datetimeFilterScenarios: ReadonlyArray<FilterScenario> = [
   { tag: 'filter-datetime-gt', name: 'Timestamp: gt', category: 'filter', dataType: 'datetime', op: 'gt', fieldParam: 'timestampField', valueParam: 'datetimeValue', minVersion: '2.0.0' },
   { tag: 'filter-datetime-ge', name: 'Timestamp: ge', category: 'filter', dataType: 'datetime', op: 'ge', fieldParam: 'timestampField', valueParam: 'datetimeValue', minVersion: '2.0.0' },
+  // Fixed-value ne/lt/le against a sampled existing timestamp (mirrors the date ne/lt/le tests): `ne` and `le`
+  // filter the sampled MIN (`le min` returns the min record — non-empty), `lt` filters the sampled MAX (records
+  // below the max exist iff distinct > 1). These are the plain non-now() comparisons restored per RCP-039.
+  { tag: 'filter-datetime-ne', name: 'Timestamp: ne', category: 'filter', dataType: 'datetime', op: 'ne', fieldParam: 'timestampField', valueParam: 'datetimeValue', minVersion: '2.0.0' },
+  { tag: 'filter-datetime-lt', name: 'Timestamp: lt', category: 'filter', dataType: 'datetime', op: 'lt', fieldParam: 'timestampField', valueParam: 'datetimeValueMax', minVersion: '2.0.0' },
+  { tag: 'filter-datetime-le', name: 'Timestamp: le', category: 'filter', dataType: 'datetime', op: 'le', fieldParam: 'timestampField', valueParam: 'datetimeValue', minVersion: '2.0.0' },
   { tag: 'filter-datetime-lt-now', name: 'Timestamp: lt now()', category: 'filter', dataType: 'datetime', op: 'lt', fieldParam: 'timestampField', valueParam: 'now', minVersion: '2.0.0' },
   { tag: 'filter-datetime-le-now', name: 'Timestamp: le now()', category: 'filter', dataType: 'datetime', op: 'le', fieldParam: 'timestampField', valueParam: 'now', minVersion: '2.0.0' },
   { tag: 'filter-datetime-ne-now', name: 'Timestamp: ne now()', category: 'filter', dataType: 'datetime', op: 'ne', fieldParam: 'timestampField', valueParam: 'now', minVersion: '2.0.0' },
