@@ -125,3 +125,11 @@ export const resilienceError = (
 
 export const isResilienceError = (err: unknown): err is ResilienceError =>
   err instanceof Error && typeof (err as { resilienceKind?: unknown }).resilienceKind === 'string';
+
+/**
+ * True when `err` is the resilient send giving up because the run's total-timeout
+ * budget is spent. Consumers use it to distinguish "we ran out of time" (stop
+ * gracefully, mark the rest not-tested) from an ordinary request failure.
+ */
+export const isDeadlineError = (err: unknown): boolean =>
+  isResilienceError(err) && err.resilienceKind === 'deadline-exceeded';
