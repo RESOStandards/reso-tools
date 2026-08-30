@@ -137,7 +137,7 @@ export { DEFAULT_BREAKER } from './http/resilience/circuit-breaker.js';
 export type { BreakerConfig, BreakerState } from './http/resilience/circuit-breaker.js';
 export { DEFAULT_BACKOFF } from './http/resilience/backoff.js';
 export type { BackoffConfig } from './http/resilience/backoff.js';
-export { isResilienceError } from './http/resilience/errors.js';
+export { isDeadlineError, isResilienceError } from './http/resilience/errors.js';
 export type { FailureClassification, FailureKind, ResilienceError, ResilienceErrorKind } from './http/resilience/errors.js';
 export { runSettled, settle, skip } from './http/resilience/continue-on-error.js';
 export type {
