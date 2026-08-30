@@ -49,6 +49,8 @@ export interface TestParams {
   /** The sampled MIN timestamp — used for `gt` / `ge`. `gt min` is gated on {@link datetimeDistinctCount};
    *  the previous first-seen value was the global MAX under a `…DESC` default sort, making `gt max` a false fail. */
   readonly datetimeValue?: string;
+  /** The sampled MAX timestamp — used for `lt` (records below the max exist iff distinct > 1). Mirrors dateValueMax. */
+  readonly datetimeValueMax?: string;
   readonly singleLookupField?: string;
   readonly singleLookupValue?: string;
   readonly multiLookupField?: string;
@@ -202,10 +204,10 @@ export const dateStats = (
   return dates.length === 0 ? undefined : { min: dates[0], median: dates[Math.floor(dates.length / 2)], max: dates[dates.length - 1], distinct: dates.length };
 };
 
-/** Min timestamp + distinct count of a field's sampled full-timestamp values (ISO sorts chronologically). */
-const timestampStats = (values: ReadonlyArray<unknown>): { readonly min: string; readonly distinct: number } | undefined => {
+/** Min + max timestamp + distinct count of a field's sampled full-timestamp values (ISO sorts chronologically). */
+const timestampStats = (values: ReadonlyArray<unknown>): { readonly min: string; readonly max: string; readonly distinct: number } | undefined => {
   const stamps = [...new Set(values.map(v => String(v)))].sort();
-  return stamps.length === 0 ? undefined : { min: stamps[0], distinct: stamps.length };
+  return stamps.length === 0 ? undefined : { min: stamps[0], max: stamps[stamps.length - 1], distinct: stamps.length };
 };
 
 /** Collect all non-null distinct values for a field across records. */
@@ -366,6 +368,7 @@ export const resolveTestParams = async (
   const timestampField = selectTimestampField(datetimeFields, records);
   const tsStats = timestampField ? timestampStats(collectValues(records, timestampField)) : undefined;
   const datetimeValue = tsStats?.min;
+  const datetimeValueMax = tsStats?.max;
   const datetimeDistinctCount = tsStats?.distinct;
   if (!timestampField) skippedTypes.push('timestamp');
 
@@ -429,6 +432,7 @@ export const resolveTestParams = async (
     dateValueMax,
     timestampField,
     datetimeValue,
+    datetimeValueMax,
     sampleComplete,
     // Distinct value counts (NUMERICALLY deduped for numerics — see numericStats) — the ne/gt/lt verdict's gate.
     integerDistinctCount,
