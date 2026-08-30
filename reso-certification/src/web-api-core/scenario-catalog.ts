@@ -1,5 +1,5 @@
 /**
- * Generates the **Scenario Catalog** — a canonical, machine-generated index of every Web API
+ * Generates the **Scenario Catalog** – a canonical, machine-generated index of every Web API
  * Core test scenario, one stable anchor (`scenario-<tag>`) per scenario, for the published
  * spec's appendix. Section 3.5's per-test `[Source]` links deep-link into it (replacing the
  * retired web-api-commander `.feature` links). Generated from `scenarios.ts` so the spec and the
@@ -9,7 +9,7 @@
 
 import { type CoreScenario, allScenarios } from './scenarios.js';
 
-/** The stable in-document anchor for a scenario — the target of §3.5 `[Source]` links. */
+/** The stable in-document anchor for a scenario – the target of §3.5 `[Source]` links. */
 export const scenarioAnchor = (tag: string): string => `scenario-${tag}`;
 
 const versionTag = (s: CoreScenario): string => `${s.minVersion} · ${s.optional ? 'Optional' : 'Required'}`;
@@ -55,13 +55,13 @@ export const describeScenario = (s: CoreScenario): string => {
     case 'string-enum':
       return `\`$filter\` on a string-backed ${s.enumType}-valued enumeration: \`${s.op}\`.`;
     case 'string-function':
-      return `\`$filter\` string function \`${s.func}()\` — Optional Test, not required for Core certification.`;
+      return `\`$filter\` string function \`${s.func}()\` – Optional Test, not required for Core certification.`;
     case 'paging':
       return 'Server-driven paging via `@odata.nextLink`; `$top=1` MUST NOT return a nextLink.';
     case 'expand':
       return '`$expand` a navigation property and validate the expanded data set.';
     case 'in-operator':
-      return "`$filter … in ('a','b','c')` on a single-valued enumeration — OData 4.01, gated on the server advertising `OData-Version: 4.01`.";
+      return "`$filter … in ('a','b','c')` on a single-valued enumeration – OData 4.01, gated on the server advertising `OData-Version: 4.01`.";
     case 'lookup-resource':
       return 'Fetch the Lookup Resource by `LookupName` and validate the declared name and sample values are present.';
   }
@@ -83,7 +83,7 @@ const CATEGORY_ORDER: ReadonlyArray<{ readonly key: CoreScenario['category']; re
   {
     key: 'string-function',
     label: 'String Functions (Optional)',
-    note: 'These string comparison operators are **not required** for Web API Core certification. They are exercised as OData functions because some providers support them, and we want to recognize that support — a failure here is only ever reported as "Not Supported" and never affects the Core verdict.'
+    note: 'These string comparison operators are **not required** for Web API Core certification. They are exercised as OData functions because some providers support them, and we want to recognize that support – a failure here is only ever reported as "Not Supported" and never affects the Core verdict.'
   },
 ];
 
@@ -95,7 +95,7 @@ export const generateScenarioCatalog = (): string => {
   const lines: string[] = [
     '## Web API Core Scenario Catalog',
     '',
-    "This catalog is generated from the RESO certification tool's scenario definitions and is the canonical list of Web API Core test scenarios. Each Testing Query in Section 3.5 links to its entry here by a stable `scenario-<id>` anchor. It is generated — do not edit by hand; regenerate when the scenario set changes.",
+    "This catalog is generated from the RESO certification tool's scenario definitions and is the canonical list of Web API Core test scenarios. Each Testing Query in Section 3.5 links to its entry here by a stable `scenario-<id>` anchor. It is generated – do not edit by hand; regenerate when the scenario set changes.",
     ''
   ];
   for (const { key, label, note } of CATEGORY_ORDER) {
@@ -106,7 +106,7 @@ export const generateScenarioCatalog = (): string => {
     lines.push('| Scenario | Version | What it checks |', '| --- | --- | --- |');
     for (const s of rows) {
       lines.push(
-        `| <a id="${scenarioAnchor(s.tag)}"></a>**\`${s.tag}\`** — ${s.name} | ${versionTag(s)} | ${describeScenario(s)} |`
+        `| <a id="${scenarioAnchor(s.tag)}"></a>**\`${s.tag}\`** – ${s.name} | ${versionTag(s)} | ${describeScenario(s)} |`
       );
     }
     lines.push('');
