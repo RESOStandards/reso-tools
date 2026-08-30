@@ -67,8 +67,8 @@ export const describeScenario = (s: CoreScenario): string => {
   }
 };
 
-/** Category grouping + display order for the catalog. */
-const CATEGORY_ORDER: ReadonlyArray<{ readonly key: CoreScenario['category']; readonly label: string }> = [
+/** Category grouping + display order for the catalog. An optional `note` prints under the heading. */
+const CATEGORY_ORDER: ReadonlyArray<{ readonly key: CoreScenario['category']; readonly label: string; readonly note?: string }> = [
   { key: 'structural', label: 'Structural' },
   { key: 'filter', label: 'Filter (scalar comparisons)' },
   { key: 'orderby', label: 'Order By' },
@@ -80,7 +80,11 @@ const CATEGORY_ORDER: ReadonlyArray<{ readonly key: CoreScenario['category']; re
   { key: 'in-operator', label: '`in` Operator (2.1.0)' },
   { key: 'paging', label: 'Server-Driven Paging (2.1.0)' },
   { key: 'expand', label: 'Expand (2.1.0)' },
-  { key: 'string-function', label: 'String Functions (Optional)' },
+  {
+    key: 'string-function',
+    label: 'String Functions (Optional)',
+    note: 'These string comparison operators are **not required** for Web API Core certification. They are exercised as OData functions because some providers support them, and we want to recognize that support — a failure here is only ever reported as "Not Supported" and never affects the Core verdict.'
+  },
 ];
 
 /**
@@ -94,10 +98,12 @@ export const generateScenarioCatalog = (): string => {
     "This catalog is generated from the RESO certification tool's scenario definitions and is the canonical list of Web API Core test scenarios. Each Testing Query in Section 3.5 links to its entry here by a stable `scenario-<id>` anchor. It is generated — do not edit by hand; regenerate when the scenario set changes.",
     ''
   ];
-  for (const { key, label } of CATEGORY_ORDER) {
+  for (const { key, label, note } of CATEGORY_ORDER) {
     const rows = allScenarios.filter(s => s.category === key);
     if (rows.length === 0) continue;
-    lines.push(`## ${label}`, '', '| Scenario | Version | What it checks |', '| --- | --- | --- |');
+    lines.push(`## ${label}`, '');
+    if (note) lines.push(note, '');
+    lines.push('| Scenario | Version | What it checks |', '| --- | --- | --- |');
     for (const s of rows) {
       lines.push(
         `| <a id="${scenarioAnchor(s.tag)}"></a>**\`${s.tag}\`** — ${s.name} | ${versionTag(s)} | ${describeScenario(s)} |`
