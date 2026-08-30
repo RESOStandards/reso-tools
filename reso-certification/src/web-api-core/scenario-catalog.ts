@@ -93,7 +93,7 @@ const CATEGORY_ORDER: ReadonlyArray<{ readonly key: CoreScenario['category']; re
  */
 export const generateScenarioCatalog = (): string => {
   const lines: string[] = [
-    '# Appendix A: Web API Core Scenario Catalog',
+    '## Web API Core Scenario Catalog',
     '',
     "This catalog is generated from the RESO certification tool's scenario definitions and is the canonical list of Web API Core test scenarios. Each Testing Query in Section 3.5 links to its entry here by a stable `scenario-<id>` anchor. It is generated — do not edit by hand; regenerate when the scenario set changes.",
     ''
@@ -101,7 +101,7 @@ export const generateScenarioCatalog = (): string => {
   for (const { key, label, note } of CATEGORY_ORDER) {
     const rows = allScenarios.filter(s => s.category === key);
     if (rows.length === 0) continue;
-    lines.push(`## ${label}`, '');
+    lines.push(`### ${label}`, '');
     if (note) lines.push(note, '');
     lines.push('| Scenario | Version | What it checks |', '| --- | --- | --- |');
     for (const s of rows) {
