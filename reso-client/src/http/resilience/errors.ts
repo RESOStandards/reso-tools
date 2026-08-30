@@ -100,7 +100,12 @@ export const classifyThrown = (err: unknown): FailureClassification => {
 };
 
 /** The kind of an unrecoverable failure the resilient send surfaces by throwing. */
-export type ResilienceErrorKind = 'fatal-auth' | 'exhausted' | 'circuit-open' | 'retry-wait-exceeded';
+export type ResilienceErrorKind =
+  | 'fatal-auth'
+  | 'exhausted'
+  | 'circuit-open'
+  | 'retry-wait-exceeded'
+  | 'deadline-exceeded'; // the run's total-timeout budget is spent — stop rather than wait/retry further
 
 /**
  * A thrown error the resilient send could not recover from. It is a plain `Error`
