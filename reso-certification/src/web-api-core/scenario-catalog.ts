@@ -50,8 +50,13 @@ export const describeScenario = (s: CoreScenario): string => {
       return `\`$filter\` on a ${s.enumType}-valued enumeration: \`${s.op}\`.`;
     case 'collection':
       return `\`$filter\` with the \`${s.lambda}()\` lambda over a multi-valued collection.`;
-    case 'error':
-      return `A malformed query MUST return HTTP ${s.expectedStatus}.`;
+    case 'error': {
+      const cause =
+        s.expectedStatus === 400 ? 'A malformed query'
+        : s.expectedStatus === 404 ? 'A request for a resource that does not exist'
+        : 'An invalid request';
+      return `${cause} MUST return HTTP ${s.expectedStatus}.`;
+    }
     case 'string-enum':
       return `\`$filter\` on a string-backed ${s.enumType}-valued enumeration: \`${s.op}\`.`;
     case 'string-function':
