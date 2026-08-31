@@ -42,6 +42,7 @@ import { runMetadataStep } from './metadata-command.js';
 import { fetchMetadataReportFromServer } from '../sdk/metadata-source.js';
 import { runRcf, resolveRcfExitCode } from './rcf-command.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
+import { addAuthOptions, addOutputOptions } from './shared-options.js';
 import { runReplicate, REPLICATION_STRATEGY_VALUES } from './replicate-command.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { CURRENT_DD_VERSION, CERTIFIABLE_DD_VERSIONS, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
@@ -72,22 +73,10 @@ const program = new Command();
 
 program.name('reso-cert').description('RESO certification compliance testing tools').version('0.5.0');
 
-// ── Shared auth options ──
-
-const addAuthOptions = (cmd: Command): Command =>
-  cmd
-    .option('--auth-token <token>', 'Pre-fetched bearer token')
-    .option('--client-id <id>', 'OAuth2 client ID')
-    .option('--client-secret <secret>', 'OAuth2 client secret')
-    .option('--token-url <url>', 'OAuth2 token endpoint URL');
-
-// ── Shared output options ──
-
-const addOutputOptions = (cmd: Command): Command =>
-  cmd
-    .option('--verbose', 'Detailed line-by-line output')
-    .option('--output <format>', 'Output format: console or json', 'console')
-    .option('--output-dir <path>', 'Directory for compliance reports');
+// ── Shared option builders live in ./shared-options.ts ──
+// addAuthOptions (OAuth2/bearer cluster) and addOutputOptions (compliance-report
+// output bundle) are imported above, alongside addServerUrlOption / addReportDirOption
+// for standardizing the universal flags across commands.
 
 // ── Add/Edit Subcommand ──
 
