@@ -19,7 +19,7 @@
  * meant to be calibrated against real RCF samples during the e2e phase.
  */
 
-import { isValidValue } from './values.js';
+import { isValidValue, isNumericToken } from './values.js';
 
 /** Minimum observed values before a verdict is trustworthy — never decide on a tiny sample. */
 export const ENUM_MIN_SAMPLE = 30;
@@ -36,14 +36,19 @@ export interface StringFieldStats {
 }
 
 /**
- * Reduce a field's raw sampled values to enum-detection stats: keep non-blank
- * strings, drop numeric-looking strings (those are numbers-as-strings, not enum
- * members), and count total vs distinct.
+ * Reduce a field's raw sampled values to enum-detection stats: flatten collection
+ * (multi-value) observations so their elements count, keep non-blank strings, drop
+ * canonical numeric literals (numbers-as-strings, not enum members — but zero-padded
+ * codes like "01" are kept), and count total vs distinct.
+ *
+ * The flatten mirrors the emission path (`distinctStrings`): without it, a local
+ * multi-value string enumeration (whose observations are arrays) reduces to zero
+ * usable strings and is misread as free text, emitting no lookups.
  */
 export const stringFieldStats = (values: ReadonlyArray<unknown>): StringFieldStats => {
-  const usable = values.filter(
-    (v): v is string => typeof v === 'string' && isValidValue(v) && Number.isNaN(Number(v)),
-  );
+  const usable = values
+    .flatMap(v => (Array.isArray(v) ? v : [v]))
+    .filter((v): v is string => typeof v === 'string' && isValidValue(v) && !isNumericToken(v));
   return { total: usable.length, distinct: new Set(usable).size };
 };
 

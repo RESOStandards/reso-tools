@@ -58,9 +58,14 @@ describe('isValidIsoDateTimeOffset', () => {
     '2023-01-15T10:30:00', // no offset
     '2023-01-15', // date only
     '2023-13-15T10:30:00Z', // invalid month → NaN
+    '2023-02-30T10:30:00Z', // impossible calendar date — Date.parse silently rolls Feb 30 over
+    '2023-04-31T10:30:00Z', // April has 30 days
     'not-a-date',
   ])('rejects %s', s => {
     expect(isValidIsoDateTimeOffset(s)).toBe(false);
+  });
+  it('does not mis-type an impossible-calendar datetime as Edm.DateTimeOffset', () => {
+    expect(inferType('2023-02-30T10:30:00Z')).toEqual({ type: 'Edm.String' });
   });
 });
 
