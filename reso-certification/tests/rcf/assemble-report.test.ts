@@ -295,3 +295,24 @@ describe('inferMetadataReport — kind matching (mis-named expansions)', () => {
     expect(field(report.fields, 'Property', 'listing_details')?.typeName).toBe('listing_details');
   });
 });
+
+describe('inferMetadataReport — LOCAL collection (multi-value) enum', () => {
+  it('detects a local multi-value string field as an enumeration and emits its distinct values', () => {
+    // A non-DD field whose observations are arrays. 30 observations of a bounded set → enum.
+    const records = Array.from({ length: 20 }, (_, i) => ({
+      ListingKey: `k${i}`,
+      LocalFeatures: i % 2 === 0 ? ['Pool', 'Spa'] : ['Pool'],
+    }));
+    const report = inferMetadataReport({
+      recordsByResource: { Property: records },
+      referenceMap: { Property: {} }, // no DD reference → LocalFeatures is a local field
+      version: '2.0.0',
+      generatedOn: '2026-01-01T00:00:00.000Z',
+    });
+    const featLookups = report.lookups.filter(l => l.lookupName === 'Property.LocalFeatures');
+    expect(featLookups.map(l => l.lookupValue).sort()).toEqual(['Pool', 'Spa']);
+    const local = report.fields.find(f => f.fieldName === 'LocalFeatures');
+    expect(local?.type).toBe('Property.LocalFeatures');
+    expect(local?.isCollection).toBe(true);
+  });
+});

@@ -48,8 +48,13 @@ export const isValidIsoDate = (value: string): boolean => {
 };
 
 /** A strict ISO 8601 date-time with a timezone offset that is also a real instant. */
-export const isValidIsoDateTimeOffset = (value: string): boolean =>
-  ISO_DATETIME_OFFSET.test(value) && !Number.isNaN(Date.parse(value));
+export const isValidIsoDateTimeOffset = (value: string): boolean => {
+  if (!ISO_DATETIME_OFFSET.test(value)) return false;
+  // Validate the calendar date part the same way isValidIsoDate does — Date.parse alone
+  // silently rolls impossible dates over ("2023-02-30T…" → Mar 2), mis-typing a bad field.
+  if (!isValidIsoDate(value.slice(0, 10))) return false;
+  return !Number.isNaN(Date.parse(value));
+};
 
 /**
  * Classify a JS number: integers narrow to the smallest Edm integer that holds

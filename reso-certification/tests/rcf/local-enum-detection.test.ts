@@ -8,8 +8,17 @@ describe('stringFieldStats', () => {
   it('drops null, undefined, and blank/whitespace strings', () => {
     expect(stringFieldStats(['A', 'A', '', '   ', null, undefined])).toEqual({ total: 2, distinct: 1 });
   });
-  it('drops numeric-looking strings (numbers-as-strings are not enum members)', () => {
+  it('drops canonical numeric-looking strings (numbers-as-strings are not enum members)', () => {
     expect(stringFieldStats(['1', '2', 'Residential', '3.5'])).toEqual({ total: 1, distinct: 1 });
+  });
+  it('keeps zero-padded / leading-zero codes (legitimate string enum values)', () => {
+    // "01" does not round-trip through Number, so it is a code, not a number-as-string
+    expect(stringFieldStats(['01', '02', '01', '03'])).toEqual({ total: 4, distinct: 3 });
+    expect(stringFieldStats(['1', '01'])).toEqual({ total: 1, distinct: 1 }); // "1" dropped, "01" kept
+  });
+  it('flattens collection (multi-value) observations so their elements count', () => {
+    // a local multi-value enum: each record carries an array of values
+    expect(stringFieldStats([['Pool', 'Spa'], ['Pool'], ['Spa'], ['Pool', 'Spa']])).toEqual({ total: 6, distinct: 2 });
   });
   it('ignores non-string values entirely', () => {
     expect(stringFieldStats([1, 2, true, 'Active', { a: 1 }])).toEqual({ total: 1, distinct: 1 });
