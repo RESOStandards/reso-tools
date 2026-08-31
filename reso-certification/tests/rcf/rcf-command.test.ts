@@ -70,8 +70,9 @@ describe('runRcf (offline)', () => {
     expect(result.variations).toBeUndefined();
     expect(result.stats.totalRecords).toBe(2);
     expect(result.metadataReport.fields.length).toBeGreaterThan(0);
-    const da = result.dataAvailabilityReport as { resources: ReadonlyArray<{ resourceName: string }> };
-    expect(da.resources.some(r => r.resourceName === 'Property')).toBe(true);
+    const da = result.dataAvailabilityReport as { type: string; fields: ReadonlyArray<{ resourceName: string; fieldName: string }> };
+    expect(da.type).toBe('data_availability'); // canonical RESO Data Availability Report shape
+    expect(da.fields.some(f => f.resourceName === 'Property')).toBe(true);
   });
 
   // Real DD validator (not a mock): guards the two crashes the mock tests couldn't see.
@@ -97,6 +98,20 @@ describe('runRcf (offline)', () => {
       runVariations: false,
     });
     expect(result.stats.schemaErrors).toBeGreaterThanOrEqual(0); // combine defaulted stats instead of dereferencing undefined
+  });
+
+  // Negative cert path with the REAL validator: a genuine DD violation must surface as schemaErrors
+  // and drive a non-zero exit — proving real validation fails closed, not just the mock plumbing.
+  it('a real DD violation yields schemaErrors > 0 and a non-zero (exit 1) result', async () => {
+    const result = await runRcf({
+      input: resolve(fixtures, 'dd-violation.json'), // ListPrice/BedroomsTotal carry non-numeric strings
+      version: '2.0',
+      schemaValidate: true,
+      generatedOn: '2026-01-01T00:00:00.000Z',
+      runVariations: false,
+    });
+    expect(result.stats.schemaErrors).toBeGreaterThan(0);
+    expect(resolveRcfExitCode(result)).toBe(1);
   });
 
   // Data-loss guard: a variations failure must never discard the already-computed reports.

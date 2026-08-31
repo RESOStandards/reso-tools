@@ -1,0 +1,7 @@
+{
+  "@reso.context": "urn:reso:metadata:2.0:resource:property",
+  "value": [
+    { "ListingKey": "1", "PropertyType": "Residential", "ListPrice": 250000, "BedroomsTotal": 3 },
+    { "ListingKey": "2", "PropertyType": "Residential", "ListPrice": "not-a-number", "BedroomsTotal": "three" }
+  ]
+}

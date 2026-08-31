@@ -123,15 +123,18 @@ const buildDataAvailabilityReport = (
   description: 'RESO Data Availability Report (inferred from RESO Common Format samples)',
   version,
   generatedOn,
-  resources: Object.entries(availability).map(([resourceName, a]) => ({
-    resourceName,
-    recordCount: a.recordCount,
-    fields: Object.entries(a.fields).map(([fieldName, frequency]) => ({
+  type: 'data_availability',
+  // Flat `fields[]` carrying (resourceName, fieldName, frequency, availability) — the canonical RESO
+  // Data Availability Report shape (cf. src/etl/process-data-availability). A divergent nested shape
+  // under this canonical filename would be silently mis-consumed (report.fields → undefined → empty).
+  fields: Object.entries(availability).flatMap(([resourceName, a]) =>
+    Object.entries(a.fields).map(([fieldName, frequency]) => ({
+      resourceName,
       fieldName,
       frequency,
       availability: a.recordCount > 0 ? Number((frequency / a.recordCount).toFixed(4)) : 0,
     })),
-  })),
+  ),
 });
 
 /** Peek the first payload's DD version without draining the stream (used to build the DD schema/reference). */
