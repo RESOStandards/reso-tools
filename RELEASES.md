@@ -2,6 +2,25 @@
 
 ---
 
+## reso-client 0.2.2 · reso-certification 0.10.2 – 2026-08-30
+
+A targeted post-Luna patch to two published packages – no monorepo release. Consumers on `^` ranges pick these up automatically (`reso-certification` resolves the new `reso-client` through its `^0.2.0` range).
+
+### `reso-client` 0.2.2 – resilient HTTP client (#273)
+
+- **Retry with capped backoff** on transient `429` / `503` responses, so a certification run survives provider rate-limiting instead of failing on the first throttle. A shared `createResilienceSession` wraps the client with this behavior.
+- **Graceful deadline stop:** when a run's time budget is spent, remaining checks report NOT TESTED (the run is `incomplete`) rather than failing. `isDeadlineError` lets callers propagate the stop cleanly without discarding already-collected results.
+
+### `reso-certification` 0.10.2 – `reso-cert rcf` + hardening
+
+- **New `reso-cert rcf` command** – RESO Common Format certification. It infers a DD-2.0 metadata report from RCF payload data, then runs DD schema validation and variations against the inferred report.
+- **Inference correctness:** detect payload-local collection enums, keep leading-zero codes (`01`, `007`) as string values rather than numbers, and reject impossible calendar datetimes (`2023-02-30T…`) instead of mis-typing them as `Edm.DateTimeOffset`.
+- **Recover mis-named expansions by shape,** including depth-≥2 nested renames (kind matching).
+- **Canonical RESO Data Availability Report** shape from the `rcf` command, and a fail-closed non-zero exit on a zero-record submission so an empty or unreadable payload never reads as a clean pass.
+- Adopts the `reso-client` resilience layer for graceful deadline handling.
+
+---
+
 ## v1.0.0 – "Luna"
 
 The first stable release. RESO Tools splits into a **public, npm-published core** and a private application tier, so any project can consume the RESO libraries and the certification runner without the monorepo.
