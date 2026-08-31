@@ -158,6 +158,25 @@ export interface RcfResult {
 }
 
 /**
+ * Maps a completed rcf run to a process exit code. Extracted from the CLI action so the
+ * highest-stakes decision — whether a certification run reads as pass or fail — is
+ * unit-testable rather than an untested inline expression.
+ *
+ * - `totalRecords === 0` → 2: an empty or unreadable submission (no RCF entries, an
+ *   unrecognized context, an all-non-RCF bundle) ingested nothing certifiable. It MUST NOT
+ *   read as a clean pass, or CI would treat a submission it could not parse as certified.
+ * - `schemaErrors > 0` → 1: schema/certification failures.
+ * - `variationsError` → 2: a requested variations pass degraded and did not complete.
+ * - otherwise → 0.
+ */
+export const resolveRcfExitCode = (result: Pick<RcfResult, 'stats' | 'variationsError'>): number => {
+  if (result.stats.totalRecords === 0) return 2;
+  if (result.stats.schemaErrors > 0) return 1;
+  if (result.variationsError) return 2;
+  return 0;
+};
+
+/**
  * Run the RCF step: ingest → (optional) schema-validate → infer metadata report + data-availability
  * report → (optional) variations. `version` is taken from the input's context unless overridden.
  */
