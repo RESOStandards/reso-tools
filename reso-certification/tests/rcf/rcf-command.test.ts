@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { processRcfStream, runRcf } from '../../src/cli/rcf-command.js';
+import { processRcfStream, runRcf, resolveRcfExitCode, type RcfResult } from '../../src/cli/rcf-command.js';
 import type { RcfPayload } from '../../src/cli/rcf-input.js';
 import type { DdSchemaValidator } from '../../src/cli/schema-command.js';
 import { computeVariationsViaService } from '../../src/variations/index.js';
@@ -124,5 +124,43 @@ describe('runRcf (offline)', () => {
         bearerToken: 'test-token',
       }),
     ).rejects.toThrow(/invalid client credentials/);
+  });
+});
+
+describe('resolveRcfExitCode', () => {
+  const stats = (over: Partial<RcfResult['stats']>): RcfResult['stats'] => ({
+    totalRecords: 5,
+    resources: 1,
+    fields: 1,
+    lookups: 0,
+    schemaErrors: 0,
+    ...over,
+  });
+  const result = (
+    over: Partial<RcfResult['stats']>,
+    variationsError?: string,
+  ): Pick<RcfResult, 'stats' | 'variationsError'> => ({
+    stats: stats(over),
+    ...(variationsError ? { variationsError } : {}),
+  });
+
+  it('exits 2 when zero records were ingested — an empty/unreadable submission must not read as a clean pass', () => {
+    expect(resolveRcfExitCode(result({ totalRecords: 0 }))).toBe(2);
+  });
+
+  it('zero records takes precedence over an otherwise-clean run', () => {
+    expect(resolveRcfExitCode(result({ totalRecords: 0, schemaErrors: 0 }))).toBe(2);
+  });
+
+  it('exits 1 when there are schema errors', () => {
+    expect(resolveRcfExitCode(result({ schemaErrors: 3 }))).toBe(1);
+  });
+
+  it('exits 2 when a requested variations pass degraded', () => {
+    expect(resolveRcfExitCode(result({}, 'service unavailable'))).toBe(2);
+  });
+
+  it('exits 0 on a clean run with records and no errors', () => {
+    expect(resolveRcfExitCode(result({}))).toBe(0);
   });
 });

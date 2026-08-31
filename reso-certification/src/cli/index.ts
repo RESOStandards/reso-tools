@@ -40,7 +40,7 @@ import {
 import { validateSchemaPayload, generateSchemaFromReport, loadSettings } from './schema-command.js';
 import { runMetadataStep } from './metadata-command.js';
 import { fetchMetadataReportFromServer } from '../sdk/metadata-source.js';
-import { runRcf } from './rcf-command.js';
+import { runRcf, resolveRcfExitCode } from './rcf-command.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { runReplicate, REPLICATION_STRATEGY_VALUES } from './replicate-command.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
@@ -1047,8 +1047,11 @@ program
         if (result.variationsError) {
           process.stderr.write(`rcf: variations skipped — ${result.variationsError} (reports still written)\n`);
         }
-        // Non-zero when variations was requested but degraded, so a partial run never reads as clean success.
-        process.exitCode = s.schemaErrors > 0 ? 1 : result.variationsError ? 2 : 0;
+        if (s.totalRecords === 0) {
+          process.stderr.write(`rcf: no certifiable records were ingested from ${resolve(opts.input)} — nothing to certify\n`);
+        }
+        // Zero-record (empty/unreadable) submissions and degraded variations runs must not read as a clean pass.
+        process.exitCode = resolveRcfExitCode(result);
       } catch (err) {
         const schemaFailure = (err as { schemaFailure?: boolean }).schemaFailure === true;
         process.stderr.write(`rcf: ${err instanceof Error ? err.message : String(err)}\n`);
