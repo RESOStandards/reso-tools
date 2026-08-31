@@ -294,6 +294,38 @@ describe('inferMetadataReport — kind matching (mis-named expansions)', () => {
   it('does not self-match a flattening of the parent’s own fields', () => {
     expect(field(report.fields, 'Property', 'listing_details')?.typeName).toBe('listing_details');
   });
+
+  it('recovers a depth-2 mis-named expansion nested inside a resolved rename', () => {
+    const ref: ReferenceMap = {
+      Property: { ListPrice: { type: 'Edm.Decimal' }, City: { type: 'Edm.String' } },
+      Energy: {
+        EnergyRating: { type: 'Edm.String' }, EnergyScore: { type: 'Edm.Int32' }, EnergyProvider: { type: 'Edm.String' },
+        EnergyYear: { type: 'Edm.Int32' }, EnergyType: { type: 'Edm.String' },
+      },
+      Solar: {
+        SolarPanelKey: { type: 'Edm.String' }, SolarCapacity: { type: 'Edm.Decimal' }, SolarInverter: { type: 'Edm.String' },
+        SolarOrientation: { type: 'Edm.String' }, SolarWattage: { type: 'Edm.Int32' },
+      },
+      Media: { MediaKey: { type: 'Edm.String' }, MediaURL: { type: 'Edm.String' } },
+      Member: { MemberKey: { type: 'Edm.String' }, MemberEmail: { type: 'Edm.String' } },
+      Office: { OfficeKey: { type: 'Edm.String' }, OfficeName: { type: 'Edm.String' } },
+    };
+    const records = Array.from({ length: 5 }, (_, i) => ({
+      ListPrice: 100000 + i,
+      City: 'Springfield',
+      power_data: [
+        {
+          // mis-named → Energy (depth 1)
+          EnergyRating: 'A', EnergyScore: 90 + i, EnergyProvider: 'Acme', EnergyYear: 2020 + i, EnergyType: 'Solar',
+          // mis-named → Solar, nested inside the resolved Energy expansion (depth 2)
+          panels: { SolarPanelKey: `p${i}`, SolarCapacity: 5.5, SolarInverter: 'Acme', SolarOrientation: 'South', SolarWattage: 400 },
+        },
+      ],
+    }));
+    const nested = inferMetadataReport({ recordsByResource: { Property: records }, referenceMap: ref, version: '2.0', generatedOn: '2026-01-01T00:00:00.000Z' });
+    expect(field(nested.fields, 'Property', 'power_data')?.typeName).toBe('Energy'); // depth 1
+    expect(field(nested.fields, 'Energy', 'panels')?.typeName).toBe('Solar'); // depth 2 — was silently unrecovered before the key-context fix
+  });
 });
 
 describe('inferMetadataReport — LOCAL collection (multi-value) enum', () => {
