@@ -13,7 +13,7 @@ import type { TestParams } from './sampling.js';
 import type { EnumCandidate } from './enum-selection.js';
 import { buildScenarioQuery } from './queries.js';
 import { emptyVerdict, type EmptyContext, type EmptyVerdict } from './empty-verdict.js';
-import { scenariosForVersion, type ComparisonOp, type CoreScenario } from './scenarios.js';
+import { scenariosForVersion, type ComparisonOp, type CoreScenario, type ExpandScenario } from './scenarios.js';
 import { parseServiceDocument } from './serving.js';
 import {
   assertODataResponse,
@@ -54,6 +54,11 @@ export interface ScenarioResult {
    *  than an assertion failing. For optional scenarios this maps to
    *  "Not Tested", never "Not Supported". */
   readonly errored?: boolean;
+  /** Non-gating advisory notes for this scenario — surfaced in the report JSON but NEVER read by the verdict
+   *  logic ({@link summarizeScenarios} / `coreVerdict`) or any pass/fail count. Currently the $expand RRK
+   *  expanded-item warning (see {@link expandRrkWarnings}). "Warning now, fail later": it rides alongside a
+   *  still-`passed:true` result, so a warning can never flip a compliant server's verdict. */
+  readonly warnings?: ReadonlyArray<string>;
 }
 
 /** Coverage of a data type category for a resource. */
@@ -293,6 +298,49 @@ export const emptyOutcome = (
   }
 };
 
+/** The field carried on each expanded child item that should echo the parent record's primary key. */
+const RESOURCE_RECORD_KEY_FIELD = 'ResourceRecordKey';
+
+/**
+ * RRK expanded-item warning (WG-approved — transport#22 / RCP-039). In an `$expand` response, each expanded
+ * child item's `ResourceRecordKey` SHOULD equal the primary-key value of the PARENT record it was expanded
+ * into — e.g. an expanded Media's `ResourceRecordKey` should match the parent Property's `ListingKey`. A
+ * mismatch yields a NON-GATING warning ("warning now, fail later"): it instruments a suspected pain point
+ * without failing anyone, so it rides on {@link ScenarioResult.warnings} and never touches `passed` or any
+ * assertion — a compliant server's verdict can't move because of it.
+ *
+ * Scope is strictly a PRESENT-BUT-MISMATCHED value. These deliberately produce NO warning:
+ *   - the expanded value is absent / empty / not an array (nothing expanded to check);
+ *   - a child item with no `ResourceRecordKey` at all (a DIFFERENT concern — absence, not mismatch);
+ *   - a parent record with no primary-key value (nothing to compare against).
+ * Keys are compared as strings. Returns `[]` for a non-expand scenario or when the field/key can't resolve.
+ */
+export const expandRrkWarnings = (
+  records: ReadonlyArray<Record<string, unknown>>,
+  scenario: ExpandScenario,
+  params: TestParams,
+): ReadonlyArray<string> => {
+  const expandField = (params as unknown as Record<string, string | undefined>)[scenario.fieldParam];
+  const keyField = params.keyField;
+  if (!expandField || !keyField) return [];
+
+  return records.flatMap((record) => {
+    const parentKey = record[keyField];
+    if (parentKey == null) return []; // parent has no primary-key value — nothing to compare against
+    const expanded = record[expandField];
+    if (!Array.isArray(expanded)) return []; // absent / single object / scalar — not a child collection to check
+    const items: ReadonlyArray<unknown> = expanded; // narrowed to any[]; re-bind to keep `unknown` element typing
+    return items.flatMap((child) => {
+      if (child == null || typeof child !== 'object') return [];
+      const rrk = (child as Record<string, unknown>)[RESOURCE_RECORD_KEY_FIELD];
+      if (rrk == null) return []; // no ResourceRecordKey present — absence is out of scope (a different concern)
+      return String(rrk) === String(parentKey)
+        ? []
+        : [`Expanded ${expandField} item ${RESOURCE_RECORD_KEY_FIELD} ${JSON.stringify(String(rrk))} does not match the parent ${keyField} ${JSON.stringify(String(parentKey))} it was expanded into — an expanded item's ${RESOURCE_RECORD_KEY_FIELD} should equal the parent record's primary key (RCP-039 / transport#22)`];
+    });
+  });
+};
+
 /**
  * Execute the standard request→validate→assert flow for one scenario against `params`. Returns the
  * result plus `retryable`: true when the field couldn't be assessed (missing params, non-200, or an
@@ -344,7 +392,11 @@ export const executeStandardScenario = async (
     const dataAssertion = assertData(records, scenario, params);
     if (dataAssertion) assertions.push(dataAssertion);
     const allPassed = assertions.every(a => a.passed);
-    return { result: { tag: scenario.tag, name: scenario.name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url }, retryable: false, rejected: false, accepted: true };
+    // Non-gating RRK expanded-item warning (WG/RCP-039): computed ONLY for the $expand scenario and carried on
+    // ScenarioResult.warnings — never on `passed` or an assertion — so it can't flip a compliant server. `[]`
+    // for every other category, so the spread adds nothing outside expand.
+    const warnings = scenario.category === 'expand' ? expandRrkWarnings(records, scenario, params) : [];
+    return { result: { tag: scenario.tag, name: scenario.name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url, ...(warnings.length > 0 ? { warnings } : {}) }, retryable: false, rejected: false, accepted: true };
   } catch (err) {
     if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
     // A transport/parse error is indeterminate — UNTESTABLE, neither a rejection nor an acceptance.
