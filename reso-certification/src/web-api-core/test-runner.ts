@@ -14,6 +14,7 @@ import type { EnumCandidate } from './enum-selection.js';
 import { buildScenarioQuery } from './queries.js';
 import { emptyVerdict, type EmptyContext, type EmptyVerdict } from './empty-verdict.js';
 import { scenariosForVersion, type ComparisonOp, type CoreScenario } from './scenarios.js';
+import { parseServiceDocument } from './serving.js';
 import {
   assertODataResponse,
   assertHasResults,
@@ -130,6 +131,12 @@ export const summarizeScenarios = (
     },
   };
 };
+
+/** The two structural scenarios that describe the PROVIDER, not a resource — `metadata-validation`
+ *  ($metadata) and `service-document` (the service root). They are hoisted to run ONCE per provider
+ *  (see {@link runProviderScenarios}); the per-resource runner excludes them so they don't re-run N times. */
+export const isProviderWideScenario = (scenario: CoreScenario): boolean =>
+  scenario.category === 'structural' && (scenario.assertion === 'metadata' || scenario.assertion === 'service-document');
 
 /** Build coverage matrix from resolved test params. */
 const buildCoverage = (params: TestParams): ReadonlyArray<TypeCoverage> => [
@@ -864,7 +871,115 @@ export const runPagingScenario = async (
   return { tag: 'server-driven-paging', name: 'Server-driven paging', passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestUrl: initialUrl };
 };
 
+// ── Provider-wide pass ──
+
+/** The outcome of the once-per-provider structural pass. */
+export interface ProviderScenariosResult {
+  /** The `metadata-validation` + `service-document` scenario results (in that order), to fold into the report. */
+  readonly scenarios: ReadonlyArray<ScenarioResult>;
+  /** The OData-Version detected from the `$metadata` response — threaded into the per-resource 4.01 gate. */
+  readonly odataVersion: string | undefined;
+  /** Served top-level EntitySet names from a TRUSTWORTHY service document, else undefined (INDETERMINATE).
+   *  Surface 1 of the serving detection. */
+  readonly servedEntitySets: ReadonlySet<string> | undefined;
+  /** True when the run's total-timeout budget was spent during the provider pass. */
+  readonly deadlineReached: boolean;
+}
+
+/** A minimal params stub for the provider-wide structural scenarios (they ignore per-resource params). */
+const providerParamsStub: TestParams = {
+  resource: '', keyField: '', keyValue: '', enumMode: 'string', integerValueHigh: 0, skippedTypes: [], sampleComplete: false,
+};
+
+/**
+ * GET the service document once. Returns the `service-document` scenario result (mirroring the structural
+ * runner's else-branch: 200 + non-empty) AND the parsed served EntitySet set (Surface 1). A non-2xx / bad
+ * shape yields `served: undefined` (INDETERMINATE) so the detection can never mask on a doubtful doc.
+ */
+const runServiceDocumentProbe = async (
+  serverUrl: string,
+  authToken: string,
+  start: number,
+  requester: ODataRequester,
+): Promise<{ readonly result: ScenarioResult; readonly served: ReadonlySet<string> | undefined }> => {
+  const url = serverUrl;
+  const assertions: AssertionResult[] = [];
+  try {
+    const response = await requester.request({ method: 'GET', url, authToken });
+    assertions.push(assertODataResponse(response, 200));
+    assertions.push(assertHasResults(response.body));
+    // Only a determinately GOOD service doc (200 shape) feeds the detection surface; a failed response
+    // leaves the surface INDETERMINATE (undefined), never a false "absent".
+    const served = assertions.every(a => a.passed) ? parseServiceDocument(response.body) : undefined;
+    return { result: { tag: 'service-document', name: 'service-document', passed: assertions.every(a => a.passed), skipped: false, assertions, duration: Date.now() - start, requestUrl: url }, served };
+  } catch (err) {
+    if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
+    assertions.push({ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` });
+    return { result: { tag: 'service-document', name: 'service-document', passed: false, skipped: false, assertions, duration: Date.now() - start, requestUrl: url }, served: undefined };
+  }
+};
+
+/**
+ * Run the provider-wide structural scenarios ONCE for the whole provider: `metadata-validation` (which also
+ * detects the OData version) and `service-document` (which also yields Surface 1 of the serving detection).
+ * Hoisted out of the per-resource loop so they are always recorded — even when every resource is masked.
+ *
+ * A run-deadline during the pass is handled gracefully: the not-yet-run provider scenarios are recorded as
+ * NOT-TESTED (deadline skips, never failed) and `deadlineReached` is set so the run becomes `incomplete`.
+ */
+export const runProviderScenarios = async (
+  serverUrl: string,
+  authToken: string,
+  version: '2.0.0' | '2.1.0' = '2.0.0',
+  requester: ODataRequester = webRequester,
+): Promise<ProviderScenariosResult> => {
+  const provWide = scenariosForVersion(version).filter(isProviderWideScenario);
+  const metaScenario = provWide.find(s => s.category === 'structural' && s.assertion === 'metadata');
+  const svcScenario = provWide.find(s => s.category === 'structural' && s.assertion === 'service-document');
+  const scenarios: ScenarioResult[] = [];
+  let odataVersion: string | undefined;
+
+  // metadata-validation (delegates the fetch + version detection to the shared structural runner).
+  try {
+    if (metaScenario) {
+      const start = Date.now();
+      const result = await runStructuralScenario(serverUrl, '', 'metadata', { url: `${serverUrl}/$metadata`, selectFields: [] }, providerParamsStub, authToken, start, requester);
+      scenarios.push(result);
+      odataVersion = result.odataVersion;
+    }
+  } catch (err) {
+    if (!isDeadlineError(err)) throw err;
+    for (const s of provWide) scenarios.push(deadlineSkipResult(s));
+    return { scenarios, odataVersion: undefined, servedEntitySets: undefined, deadlineReached: true };
+  }
+
+  // service-document (also parses Surface 1 of the serving detection).
+  try {
+    if (svcScenario) {
+      const start = Date.now();
+      const { result, served } = await runServiceDocumentProbe(serverUrl, authToken, start, requester);
+      scenarios.push(result);
+      return { scenarios, odataVersion, servedEntitySets: served, deadlineReached: false };
+    }
+    return { scenarios, odataVersion, servedEntitySets: undefined, deadlineReached: false };
+  } catch (err) {
+    if (!isDeadlineError(err)) throw err;
+    if (svcScenario) scenarios.push(deadlineSkipResult(svcScenario));
+    return { scenarios, odataVersion, servedEntitySets: undefined, deadlineReached: true };
+  }
+};
+
 // ── Main runner ──
+
+/** Options for {@link runCoreResourceScenarios} — used by the SDK to thread the provider pass in. */
+export interface CoreResourceScenarioOptions {
+  /** The OData-Version detected once in the provider pass — seeds the 4.01 `in`-operator gate so it no
+   *  longer depends on a per-resource metadata scenario. */
+  readonly odataVersion?: string;
+  /** Skip the provider-wide scenarios (`metadata-validation` + `service-document`) — they run ONCE in the
+   *  provider pass instead. Left off, they run inline as before (backward-compatible for direct callers). */
+  readonly excludeProviderWide?: boolean;
+}
 
 /**
  * Run all applicable Web API Core scenarios for a single resource.
@@ -876,13 +991,16 @@ export const runCoreResourceScenarios = async (
   authToken: string,
   version: '2.0.0' | '2.1.0' = '2.0.0',
   requester: ODataRequester = webRequester,
+  options?: CoreResourceScenarioOptions,
 ): Promise<ResourceTestReport> => {
-  const scenarios = scenariosForVersion(version);
+  const scenarios = scenariosForVersion(version)
+    .filter(s => (options?.excludeProviderWide ? !isProviderWideScenario(s) : true));
   const results: ScenarioResult[] = [];
 
-  // Track cross-scenario state for cascade-skip + OData-version gating.
+  // Track cross-scenario state for cascade-skip + OData-version gating. The version is pre-seeded from the
+  // provider pass when the provider-wide scenarios are hoisted out (else the inline metadata scenario sets it).
   let lookupResourceFailed = false;
-  let detectedODataVersion: string | undefined;
+  let detectedODataVersion: string | undefined = options?.odataVersion;
   let deadlineReached = false;
 
   for (const [i, scenario] of scenarios.entries()) {

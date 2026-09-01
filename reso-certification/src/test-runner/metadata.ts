@@ -11,7 +11,7 @@ import { fetchRawMetadata, fetchRawMetadataWithVersion, parseCsdlXml } from '@re
 // cert callers import it from there directly — no pass-through re-export here.
 import type { CsdlEntityType, CsdlProperty, CsdlSchema } from '@reso-standards/reso-metadata-utils';
 import { type ResoField, type ValidationFailure, validateRecord } from '@reso-standards/reso-validation';
-import type { EntityProperty, EntityType, ParsedMetadata } from './types.js';
+import type { EntityProperty, EntityType, ParsedEntitySet, ParsedMetadata } from './types.js';
 
 // ── Type adapters (CsdlEntityType → EntityType) ──
 
@@ -33,13 +33,27 @@ const adaptEntityType = (et: CsdlEntityType): EntityType => ({
   properties: et.properties.map(adaptProperty)
 });
 
+/** The unqualified type name from a (possibly namespaced) CSDL type reference — `org.reso.metadata.Property`
+ *  → `Property`. An EntitySet's EntityType is never a Collection(), so a plain last-segment split suffices. */
+const unqualifiedTypeName = (fqType: string): string => fqType.split('.').pop() ?? fqType;
+
+/** Convert an EntityContainer's EntitySets to the test tool's ParsedEntitySet[] (name → underlying type). */
+const adaptEntitySet = (es: { readonly name: string; readonly entityType: string }): ParsedEntitySet => ({
+  name: es.name,
+  entityType: unqualifiedTypeName(es.entityType)
+});
+
 /** Convert a CsdlSchema to the test tool's ParsedMetadata. */
 const adaptSchema = (schema: CsdlSchema): ParsedMetadata => ({
   namespace: schema.namespace,
   entityTypes: schema.entityTypes.map(adaptEntityType),
   // Preserve the CSDL enum types (they carry IsFlags + members) so the enum abstraction can classify a
   // field by its real representation. Previously dropped here, which forced Core's name-shape heuristic.
-  enumTypes: schema.enumTypes
+  enumTypes: schema.enumTypes,
+  // Preserve the EntityContainer's EntitySet declarations (also previously dropped) so the serving
+  // detection can resolve top-level membership through each set's EntityType. Absent container ⇒ undefined
+  // (INDETERMINATE); a container with zero sets stays an empty array (likewise INDETERMINATE downstream).
+  ...(schema.entityContainer && { entitySets: schema.entityContainer.entitySets.map(adaptEntitySet) })
 });
 
 /**
