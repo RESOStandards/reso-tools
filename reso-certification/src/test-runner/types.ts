@@ -47,6 +47,11 @@ export interface EntityType {
   readonly name: string;
   readonly keyProperties: ReadonlyArray<string>;
   readonly properties: ReadonlyArray<EntityProperty>;
+  /** Navigation properties ($expand targets) preserved from the CSDL entity type. Optional: present only when
+   *  the source entity type declared at least one (omitted otherwise). `targetType` is the unqualified target
+   *  entity type name. Consumed by the Web API Core sampler to select an expansion for the 2.1.0 $expand
+   *  scenario; a missing field simply means the scenario has nothing to expand and skips. */
+  readonly navigationProperties?: ReadonlyArray<{ readonly name: string; readonly isCollection: boolean; readonly targetType: string }>;
 }
 
 /** A top-level EntitySet declared in the EDMX EntityContainer, resolved to its underlying EntityType. */

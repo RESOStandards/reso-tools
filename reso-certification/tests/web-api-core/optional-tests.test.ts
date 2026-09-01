@@ -111,10 +111,20 @@ describe('classification: string functions optional, Core required', () => {
     }
   });
 
-  it('only string-function scenarios carry optional', () => {
+  it('only string-function and $expand scenarios carry optional', () => {
+    // $expand is optional (non-gating): it fires to activate the RRK expanded-item warning, but a server
+    // that doesn't support expanding the chosen nav renders "Not Supported" rather than failing the cert.
     for (const s of allScenarios) {
-      if (s.optional) expect(s.category).toBe('string-function');
+      if (s.optional) expect(['string-function', 'expand']).toContain(s.category);
     }
+  });
+
+  it('a failed $expand scenario is non-gating — Not Supported, contributes 0 to the failed count', () => {
+    // A server that returns non-200 for the chosen expansion must NOT fail Core cert: as an optional
+    // scenario, a determinate expand failure renders "Not Supported" and adds nothing to the failed tally.
+    const expandFailed = r({ tag: 'expand', passed: false, skipped: false, optional: true });
+    expect(optionalOutcome(expandFailed)).toBe('Not Supported');
+    expect(summarizeScenarios([expandFailed]).failed).toBe(0);
   });
 });
 

@@ -407,6 +407,12 @@ export const resolveTestParams = async (
   const stringField = stringSample?.field;
   const stringValue = stringSample?.value;
 
+  // Select an expansion for the 2.1.0 $expand scenario: the FIRST COLLECTION navigation property in
+  // declaration order. Deterministic (declaration order) so tests stay stable; a collection is what `$top=5`
+  // and the RRK child-collection check expect. No collection nav (or no navigation properties at all) ⇒
+  // expandField stays undefined ⇒ the $expand scenario skips gracefully, exactly as before.
+  const expandField = entityType.navigationProperties?.find(np => np.isCollection)?.name;
+
   // LookupName per candidate field (from the RESO.OData.Metadata.LookupName annotation — string lookups
   // only; enum-typed fields have no Lookup Resource) for the Lookup Resource validation scenario.
   const lookupNameByField: Record<string, string> = {};
@@ -463,6 +469,7 @@ export const resolveTestParams = async (
     multiLookupCandidates,
     stringField,
     stringValue,
+    expandField,
     lookupNameByField: Object.keys(lookupNameByField).length ? lookupNameByField : undefined,
     skippedTypes,
   };

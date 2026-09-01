@@ -30,7 +30,18 @@ const adaptProperty = (prop: CsdlProperty): EntityProperty => ({
 const adaptEntityType = (et: CsdlEntityType): EntityType => ({
   name: et.name,
   keyProperties: [...et.key],
-  properties: et.properties.map(adaptProperty)
+  properties: et.properties.map(adaptProperty),
+  // Preserve the CSDL navigation properties (also previously dropped) so the Web API Core sampler can pick an
+  // expansion for the 2.1.0 $expand scenario. `targetType` is the unqualified target entity type name. Omitted
+  // when the entity type declares no navigation properties — the scenario then has nothing to expand and skips.
+  ...(et.navigationProperties &&
+    et.navigationProperties.length > 0 && {
+      navigationProperties: et.navigationProperties.map(np => ({
+        name: np.name,
+        isCollection: np.isCollection,
+        targetType: np.entityTypeName
+      }))
+    })
 });
 
 /** The unqualified type name from a (possibly namespaced) CSDL type reference — `org.reso.metadata.Property`
