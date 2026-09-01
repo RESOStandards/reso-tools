@@ -49,12 +49,26 @@ export interface EntityType {
   readonly properties: ReadonlyArray<EntityProperty>;
 }
 
+/** A top-level EntitySet declared in the EDMX EntityContainer, resolved to its underlying EntityType. */
+export interface ParsedEntitySet {
+  /** The EntitySet name (the segment a client GETs at the service root, e.g. `Property`). */
+  readonly name: string;
+  /** The unqualified EntityType name the set exposes (namespace stripped, e.g. `Property`). */
+  readonly entityType: string;
+}
+
 export interface ParsedMetadata {
   readonly namespace: string;
   readonly entityTypes: ReadonlyArray<EntityType>;
   /** CSDL enum types (with IsFlags + members), preserved so the enum abstraction can classify a field
    *  by its real representation rather than a name-shape heuristic. */
   readonly enumTypes: ReadonlyArray<CsdlEnumType>;
+  /** Top-level EntitySet declarations from the EDMX `<EntityContainer>` (name → underlying EntityType).
+   *  Preserved so the serving detection can tell a resource that is DECLARED as a top-level set from one
+   *  that only has an EntityType (declared shape) but no set. `undefined` when the document has no
+   *  `<EntityContainer>`; an empty array when a container is present but declares no sets. Both are treated
+   *  as INDETERMINATE by the detection (it can't prove absence from a surface that says nothing). */
+  readonly entitySets?: ReadonlyArray<ParsedEntitySet>;
 }
 
 // ── Test Results ──

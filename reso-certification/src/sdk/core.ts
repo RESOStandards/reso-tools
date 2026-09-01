@@ -9,7 +9,8 @@ import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, getEntityType, persistMetadataXml } from '../test-runner/metadata.js';
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
 import { buildStandardMap, resolveTestParams, WELL_KNOWN_RESOURCES } from '../web-api-core/index.js';
-import { runCoreResourceScenarios, type ResourceTestReport } from '../web-api-core/test-runner.js';
+import { runCoreResourceScenarios, runProviderScenarios, summarizeScenarios, type ResourceTestReport } from '../web-api-core/test-runner.js';
+import { resolveServingDecision } from '../web-api-core/serving.js';
 import { isDeadlineError, runSettled } from '@reso-standards/reso-client';
 import { createCertSession, createSessionRequester } from '../test-runner/requester.js';
 import type { BaseTestContext, CoreConfig, PipelineStep, StepResult } from './types.js';
@@ -146,6 +147,59 @@ export const deadlineResourceReport = (resource: string): ResourceTestReport => 
   deadlineReached: true,
 });
 
+/** The synthetic resource label under which the once-per-provider structural scenarios are reported. */
+export const PROVIDER_WIDE_LABEL = 'Service (provider-wide)';
+
+/** A minimal params stub for a report that never sampled (masked / provider-wide). */
+const stubParams = (resource: string): ResourceTestReport['params'] =>
+  ({ resource, keyField: '', keyValue: '', enumMode: 'string', integerValueHigh: 0, skippedTypes: [], sampleComplete: false });
+
+/**
+ * A REQUIRED resource (Property/Member/Office/Field/Lookup) that is determinately declared-but-not-served at
+ * the top level (Core 2.1.0 carve-out). One clean FAIL — NOT a 40-scenario 404 cascade — and no sampling
+ * request was issued. The single failed scenario drives the Core verdict to `failed`; it never sets
+ * `deadlineReached`.
+ */
+export const requiredResourceNotServedReport = (resource: string): ResourceTestReport => ({
+  resource,
+  params: stubParams(resource),
+  scenarios: [
+    {
+      tag: 'required-resource-not-served',
+      name: `${resource} is declared in $metadata but not served as a top-level resource`,
+      passed: false,
+      skipped: false,
+      assertions: [{ passed: false, message: `Required resource not served top level — ${resource} is declared in the metadata but is absent from both the service document and the served EntitySets, so it cannot be queried at the top level` }],
+      duration: 0,
+    },
+  ],
+  coverage: [],
+  summary: { total: 1, passed: 0, failed: 1, skipped: 0, optional: { passed: 0, notSupported: 0, notTested: 0 } },
+});
+
+/**
+ * A non-required well-known resource (Media, OpenHouse, Showing, …) that is determinately declared-but-not-
+ * served at the top level (Core 2.1.0 carve-out). Reported Not Applicable — a single SKIPPED scenario with a
+ * passed:true assertion (the clean-render skip pattern, so it shows as NA, not a failure). No sampling request
+ * was issued; it counts 0 failed and never sets `deadlineReached`.
+ */
+export const notServedNotApplicableReport = (resource: string): ResourceTestReport => ({
+  resource,
+  params: stubParams(resource),
+  scenarios: [
+    {
+      tag: 'resource-not-applicable',
+      name: `${resource} declared but not served at the top level — Not Applicable`,
+      passed: true,
+      skipped: true,
+      assertions: [{ passed: true, message: `Not Applicable — ${resource} is declared in the metadata but not served as a top-level resource; per the Core 2.1.0 carve-out this is permitted (it may be available only via $expand)` }],
+      duration: 0,
+    },
+  ],
+  coverage: [],
+  summary: { total: 1, passed: 0, failed: 0, skipped: 1, optional: { passed: 0, notSupported: 0, notTested: 0 } },
+});
+
 /**
  * The Core run verdict from the aggregate counts — the single source of truth for the run's
  * status, used by both the test step and the report writer so they can never diverge.
@@ -206,6 +260,13 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // (status → incomplete), so a partial report is still written rather than the process being killed.
     const session = createCertSession(config.totalTimeoutMs);
     const requester = createSessionRequester(session);
+
+    // Provider-wide structural pass — run ONCE for the whole provider, BEFORE the per-resource gate, so the
+    // metadata + service-document scenarios are always recorded even if every resource ends up masked. The
+    // service document doubles as Surface 1 of the serving detection, and the metadata response gives the
+    // OData version threaded into each resource's 4.01 gate.
+    const provider = await runProviderScenarios(ctx.serverUrl, ctx.authToken!, version, requester);
+
     // Continue-on-error across resources: one bad resource (e.g. a sampling network
     // failure) is captured and the run keeps going, so a walk-away run still yields a
     // full report. A fatal error (auth revoked) stops the run — surfaced below.
@@ -213,6 +274,25 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
       ctx.resources,
       async (resource): Promise<ResourceTestReport> => {
         const entityType = getEntityType(metadata, resource)!;
+
+        // Core 2.1.0 declared-but-not-served carve-out. Decide from the two authoritative surfaces BEFORE
+        // sampling — a masked resource issues NO sampling request. `run` (the default on any doubt) falls
+        // through to the normal sample-and-test path below.
+        const decision = resolveServingDecision({
+          resource,
+          entityType,
+          version,
+          servedEntitySets: provider.servedEntitySets,
+          declaredEntitySets: metadata.entitySets,
+        });
+        if (decision === 'fail') {
+          onProgress({ step: 'Run Core scenarios', status: 'running', message: `${resource}: required resource declared but not served top level — one clean failure` });
+          return requiredResourceNotServedReport(resource);
+        }
+        if (decision === 'na') {
+          onProgress({ step: 'Run Core scenarios', status: 'running', message: `${resource}: declared but not served top level — Not Applicable (may be expansion-only)` });
+          return notServedNotApplicableReport(resource);
+        }
 
         onProgress({
           step: 'Run Core scenarios',
@@ -260,6 +340,8 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           ctx.authToken!,
           version,
           requester,
+          // Provider-wide scenarios already ran once above; thread the detected version for the 4.01 gate.
+          { excludeProviderWide: true, odataVersion: provider.odataVersion },
         );
 
         onProgress({
@@ -289,12 +371,28 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
       throw settled.fatalError; // fatal (e.g. auth revoked) — abort the whole Core run
     }
 
+    // The provider-wide scenarios (metadata + service document) fold into the report as a synthetic
+    // provider entry, PREPENDED so they read first and are counted exactly once. They survive an all-masked
+    // provider (they ran before the per-resource gate). A failed service document is a real Core failure and
+    // is counted here.
+    const providerReport: ResourceTestReport = {
+      resource: PROVIDER_WIDE_LABEL,
+      params: stubParams(PROVIDER_WIDE_LABEL),
+      scenarios: provider.scenarios,
+      coverage: [],
+      summary: summarizeScenarios(provider.scenarios),
+      ...(provider.deadlineReached ? { deadlineReached: true } : {}),
+    };
+
     // Preserve resource order; a resource we couldn't sample/test is reported as skipped.
-    const resourceReports: ResourceTestReport[] = settled.outcomes.map((outcome): ResourceTestReport =>
-      outcome.status === 'ok'
-        ? outcome.value
-        : skippedResourceReport(outcome.item, outcome.status === 'failed' ? outcome.error : new Error(outcome.reason)),
-    );
+    const resourceReports: ResourceTestReport[] = [
+      providerReport,
+      ...settled.outcomes.map((outcome): ResourceTestReport =>
+        outcome.status === 'ok'
+          ? outcome.value
+          : skippedResourceReport(outcome.item, outcome.status === 'failed' ? outcome.error : new Error(outcome.reason)),
+      ),
+    ];
 
     // Required scenarios drive the verdict. Optional ("Optional Tests")
     // results are tallied separately and never contribute to `totalFailed`.

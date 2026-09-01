@@ -132,8 +132,14 @@ export const WELL_KNOWN_RESOURCES: ReadonlyArray<{ readonly resource: string; re
   { resource: 'Showing', keyField: 'ShowingKey' },
 ];
 
-/** Required resources for v2.1.0 compliance. */
-export const REQUIRED_RESOURCES_V21 = ['Property', 'Member', 'Office', 'Field', 'Lookup'];
+/**
+ * Resources that MUST be available at the top level for Core 2.1.0 — if a provider declares one, it MUST be
+ * served there (it MAY also be expanded). The original core standard resources (Property/Member/Office), the
+ * metadata resources (Field can replace OData `$metadata`; Lookup carries enumerations; Field → Lookup), and
+ * EntityEvent (change tracking). Drives the declared-but-not-served carve-out (see serving.ts): a resource in
+ * this set that is determinately declared-but-not-served is a clean FAIL; anything else is Not Applicable.
+ */
+export const REQUIRED_RESOURCES_V21 = ['Property', 'Member', 'Office', 'Field', 'Lookup', 'EntityEvent'];
 
 // ── Type matchers ──
 
