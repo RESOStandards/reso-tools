@@ -255,7 +255,10 @@ const pagingScenarios: ReadonlyArray<PagingScenario> = [
 ];
 
 const expandScenarios: ReadonlyArray<ExpandScenario> = [
-  { tag: 'expand', name: '$expand navigation property', category: 'expand', fieldParam: 'expandField', minVersion: '2.1.0' },
+  // Non-gating (optional): $expand fires when the resource has a collection nav (activating the RRK
+  // expanded-item warning), but a server that doesn't support expanding the chosen nav renders "Not
+  // Supported" rather than a hard failure — a specific unsupported expansion must not fail a compliant server.
+  { tag: 'expand', name: '$expand navigation property', category: 'expand', fieldParam: 'expandField', minVersion: '2.1.0', optional: true },
 ];
 
 // Runs first among string-enum tests; cascade-skip applies to dependent

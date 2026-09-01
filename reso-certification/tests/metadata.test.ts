@@ -74,6 +74,45 @@ describe('getEntityType', () => {
   });
 });
 
+// adaptEntityType (via parseMetadataXml) must PRESERVE navigation properties — previously dropped — so the
+// Web API Core sampler can pick an expansion for the 2.1.0 $expand scenario.
+describe('parseMetadataXml — navigation property preservation', () => {
+  const navXml = `<?xml version="1.0" encoding="UTF-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:DataServices>
+    <Schema Namespace="org.reso.metadata" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityType Name="Property">
+        <Key><PropertyRef Name="ListingKey"/></Key>
+        <Property Name="ListingKey" Type="Edm.String"/>
+        <NavigationProperty Name="Media" Type="Collection(org.reso.metadata.Media)"/>
+        <NavigationProperty Name="ListOffice" Type="org.reso.metadata.Office"/>
+      </EntityType>
+      <EntityType Name="Media">
+        <Key><PropertyRef Name="MediaKey"/></Key>
+        <Property Name="MediaKey" Type="Edm.String"/>
+      </EntityType>
+      <EntityType Name="Lookup">
+        <Key><PropertyRef Name="LookupKey"/></Key>
+        <Property Name="LookupKey" Type="Edm.String"/>
+      </EntityType>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>`;
+
+  it('preserves navigation properties with name, isCollection, and targetType (incl. a Collection() nav)', () => {
+    const property = getEntityType(parseMetadataXml(navXml), 'Property')!;
+    expect(property.navigationProperties).toEqual([
+      { name: 'Media', isCollection: true, targetType: 'Media' },
+      { name: 'ListOffice', isCollection: false, targetType: 'Office' },
+    ]);
+  });
+
+  it('omits navigationProperties on an entity type that declares none', () => {
+    const lookup = getEntityType(parseMetadataXml(navXml), 'Lookup')!;
+    expect(lookup.navigationProperties).toBeUndefined();
+  });
+});
+
 describe('validatePayloadAgainstMetadata', () => {
   const metadata = parseMetadataXml(sampleXml);
   const entityType = getEntityType(metadata, 'Property')!;
