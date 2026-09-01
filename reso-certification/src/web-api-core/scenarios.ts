@@ -255,10 +255,14 @@ const pagingScenarios: ReadonlyArray<PagingScenario> = [
 ];
 
 const expandScenarios: ReadonlyArray<ExpandScenario> = [
-  // Non-gating (optional): $expand fires when the resource has a collection nav (activating the RRK
-  // expanded-item warning), but a server that doesn't support expanding the chosen nav renders "Not
-  // Supported" rather than a hard failure — a specific unsupported expansion must not fail a compliant server.
-  { tag: 'expand', name: '$expand navigation property', category: 'expand', fieldParam: 'expandField', minVersion: '2.1.0', optional: true },
+  // GATING, tested PER declared COLLECTION navigation property (Core 2.1.0). The runner fans this single
+  // catalog entry out to one result per collection nav on the resource: each is GET {resource}?$expand={nav}
+  // &$top=5, and a declared nav that either cannot be expanded (non-200) OR returns a schema-invalid expanded
+  // item FAILS — the parallel of the declared-but-not-served rule (declare a nav and it must be expandable).
+  // A resource that declares NO collection nav has nothing to expand ⇒ the scenario SKIPs (N/A, never a fail;
+  // buildExpandUrl already returns undefined when there is no expand target). The non-gating RRK expanded-item
+  // warning still rides alongside each expanded nav.
+  { tag: 'expand', name: '$expand navigation property', category: 'expand', fieldParam: 'expandField', minVersion: '2.1.0' },
 ];
 
 // Runs first among string-enum tests; cascade-skip applies to dependent

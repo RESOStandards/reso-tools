@@ -341,6 +341,151 @@ export const expandRrkWarnings = (
   });
 };
 
+// ── $expand gating (Core 2.1.0): tested per declared collection nav ──
+
+/** The outcome of schema-validating one expanded child item against its target entity type. */
+export interface ExpandItemValidation {
+  readonly valid: boolean;
+  /** Human-readable validation error messages when invalid; empty when valid. */
+  readonly errors: ReadonlyArray<string>;
+}
+
+/**
+ * Validates an expanded child item against its target entity type's schema. INJECTED by the SDK (built once
+ * per run from the provider's metadata report via the legacy JSON-schema validator — see
+ * `src/sdk/expand-schema.ts`). The Web API Core runner stays free of the schema machinery — it only calls this
+ * interface — so a validator that couldn't be built is simply not passed, and each $expand nav then gates on
+ * the 200 response alone (never a false fail).
+ */
+export interface ExpandItemValidator {
+  readonly validate: (item: Record<string, unknown>, targetType: string) => ExpandItemValidation;
+}
+
+/** Collect every expanded child OBJECT under `navName` across the sampled parent records. A collection nav
+ *  serializes as an array, so a non-array / absent value contributes nothing (there is simply nothing to
+ *  validate); null / non-object array elements are dropped (only real items are schema-validated). */
+const collectExpandedItems = (
+  records: ReadonlyArray<Record<string, unknown>>,
+  navName: string,
+): ReadonlyArray<Record<string, unknown>> =>
+  records.flatMap((record) => {
+    const expanded = record[navName];
+    return Array.isArray(expanded)
+      ? expanded.filter((x): x is Record<string, unknown> => x != null && typeof x === 'object')
+      : [];
+  });
+
+/**
+ * Schema-validate every expanded child item under ONE collection nav against its target entity type — the
+ * DATA check the $expand gate exists for ("validate the data, not just that a 200 came back"). A schema-invalid
+ * item is a determinate FAIL. No validator (couldn't be built for this run) or no expanded items ⇒ PASS: the
+ * nav already returned 200 and there is nothing we can determinately fault, and a compliant server must never
+ * false-fail.
+ */
+export const validateExpandedItems = (
+  records: ReadonlyArray<Record<string, unknown>>,
+  nav: { readonly name: string; readonly targetType: string },
+  validator: ExpandItemValidator | undefined,
+): AssertionResult => {
+  if (!validator) {
+    return { passed: true, message: `$expand ${nav.name}: expansion returned 200; schema validation unavailable for this run (no validator built)` };
+  }
+  const items = collectExpandedItems(records, nav.name);
+  if (items.length === 0) {
+    return { passed: true, message: `$expand ${nav.name}: 200 received; no expanded ${nav.targetType} item to schema-validate` };
+  }
+  const invalid = items.flatMap((item, index) => {
+    const { valid, errors } = validator.validate(item, nav.targetType);
+    return valid ? [] : [{ index, errors }];
+  });
+  if (invalid.length === 0) {
+    return { passed: true, message: `$expand ${nav.name}: all ${items.length} expanded ${nav.targetType} item(s) valid against the target entity type` };
+  }
+  const first = invalid[0];
+  const detail = first.errors.slice(0, 3).join('; ') || 'schema validation failed';
+  return { passed: false, message: `$expand ${nav.name}: ${invalid.length}/${items.length} expanded ${nav.targetType} item(s) schema-invalid against ${nav.targetType} — item ${first.index}: ${detail}` };
+};
+
+/**
+ * Execute the $expand test for ONE declared collection nav (Core 2.1.0, GATING). GET
+ * {resource}?$expand={nav}&$top=5, then:
+ *   - non-200 → FAIL (a declared nav that cannot be expanded — the parallel of declared-but-not-served);
+ *   - 200 → schema-validate every expanded child item against `nav.targetType`; a schema-invalid item FAILS;
+ *   - a transport/parse error (no determinate server response) → SKIPPED + errored (indeterminate, NOT a
+ *     failure) so a network blip can't false-fail a compliant server.
+ * The non-gating RRK expanded-item warning rides alongside on `warnings`, computed for this nav's field.
+ * Reuses buildExpandUrl by substituting the nav name into `expandField`.
+ */
+const runOneExpandNav = async (
+  serverUrl: string,
+  resource: string,
+  scenario: ExpandScenario,
+  params: TestParams,
+  nav: { readonly name: string; readonly targetType: string },
+  authToken: string,
+  requester: ODataRequester,
+  validator: ExpandItemValidator | undefined,
+): Promise<ScenarioResult> => {
+  const start = Date.now();
+  const tag = `expand-${nav.name}`;
+  const name = `$expand ${nav.name}`;
+  const navParams: TestParams = { ...params, expandField: nav.name };
+  const query = buildScenarioQuery(serverUrl, resource, scenario, navParams);
+  if (!query) {
+    // nav.name is always defined, so buildExpandUrl resolves — defensive only: an unbuildable query is
+    // UNTESTABLE (a skip), never a failure.
+    return skipResult(scenario, start, `could not build the $expand query for ${nav.name}`);
+  }
+  const assertions: AssertionResult[] = [];
+  try {
+    const reqStart = Date.now();
+    const response = await requester.request({ method: 'GET', url: query.url, authToken });
+    const requestLatency = Date.now() - reqStart;
+    const responseCheck = assertODataResponse(response, 200);
+    assertions.push(responseCheck);
+    if (!responseCheck.passed) {
+      // A declared collection nav that non-200s cannot be expanded → determinate FAIL.
+      return { tag, name, passed: false, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url };
+    }
+    const records = extractRecords(response.body);
+    assertions.push(validateExpandedItems(records, nav, validator));
+    const allPassed = assertions.every(a => a.passed);
+    const warnings = expandRrkWarnings(records, scenario, navParams);
+    return { tag, name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url, ...(warnings.length > 0 ? { warnings } : {}) };
+  } catch (err) {
+    if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
+    // A transport/parse error is INDETERMINATE (no server response to fault) — SKIPPED + errored, so it never
+    // counts as a failure. Correctness rule: a compliant server must never false-fail on our network blip.
+    return { tag, name, passed: false, skipped: true, errored: true, assertions: [...assertions, { passed: false, message: `Skipped: $expand ${nav.name} errored — ${err instanceof Error ? err.message : String(err)}` }], duration: Date.now() - start, requestUrl: query.url };
+  }
+};
+
+/**
+ * Fan the single $expand catalog scenario out to one GATING result PER declared collection nav (Core 2.1.0).
+ * No collection nav on the resource ⇒ one SKIPPED result (N/A — a resource that declares no nav has nothing to
+ * expand and must never fail for it). Each nav is tested independently, so "several navs, one bad" fails
+ * exactly that nav and leaves the others passing. A run-deadline propagates to the caller's deadline handling.
+ */
+export const runExpandNavScenarios = async (
+  serverUrl: string,
+  resource: string,
+  scenario: ExpandScenario,
+  params: TestParams,
+  authToken: string,
+  requester: ODataRequester = webRequester,
+  validator?: ExpandItemValidator,
+): Promise<ReadonlyArray<ScenarioResult>> => {
+  const navs = params.expandNavs ?? [];
+  if (navs.length === 0) {
+    return [skipResult(scenario, Date.now(), 'resource declares no collection navigation property — nothing to expand (N/A)')];
+  }
+  const results: ScenarioResult[] = [];
+  for (const nav of navs) {
+    results.push(await runOneExpandNav(serverUrl, resource, scenario, params, nav, authToken, requester, validator));
+  }
+  return results;
+};
+
 /**
  * Execute the standard request→validate→assert flow for one scenario against `params`. Returns the
  * result plus `retryable`: true when the field couldn't be assessed (missing params, non-200, or an
@@ -744,6 +889,9 @@ const assertData = (
     }
 
     case 'expand':
+      // Reached only via the single-field executeStandardScenario path (kept for the RRK-warning unit tests):
+      // it asserts the 200 alone. The MAIN runner routes $expand through runExpandNavScenarios, which tests
+      // each declared collection nav and schema-validates every expanded child item against its target type.
       return { passed: true, message: 'Expand response received' };
 
     default:
@@ -1031,6 +1179,11 @@ export interface CoreResourceScenarioOptions {
   /** Skip the provider-wide scenarios (`metadata-validation` + `service-document`) — they run ONCE in the
    *  provider pass instead. Left off, they run inline as before (backward-compatible for direct callers). */
   readonly excludeProviderWide?: boolean;
+  /** Validates each expanded child item against its target entity type for the GATING 2.1.0 $expand test.
+   *  Built once per run by the SDK from the provider's metadata report (see `src/sdk/expand-schema.ts`).
+   *  Omitted when it couldn't be built — a $expand nav then gates on the 200 response alone (never a false
+   *  fail). Unused at 2.0.0 (the $expand scenario is 2.1.0-only). */
+  readonly expandValidator?: ExpandItemValidator;
 }
 
 /**
@@ -1083,6 +1236,22 @@ export const runCoreResourceScenarios = async (
         duration: 0,
         optional: scenario.optional,
       });
+      continue;
+    }
+
+    // $expand (Core 2.1.0) is GATING and tested PER declared collection nav — fan the single catalog scenario
+    // out to one result per nav (or a single N/A skip when the resource declares none). Handled here rather
+    // than inside runScenario because it yields MANY results; the run-deadline handling mirrors the generic path.
+    if (scenario.category === 'expand') {
+      try {
+        const expandResults = await runExpandNavScenarios(serverUrl, resource, scenario, params, authToken, requester, options?.expandValidator);
+        results.push(...expandResults);
+      } catch (err) {
+        if (!isDeadlineError(err)) throw err;
+        for (const remaining of scenarios.slice(i)) results.push(deadlineSkipResult(remaining));
+        deadlineReached = true;
+        break;
+      }
       continue;
     }
 
