@@ -2,6 +2,20 @@
 
 ---
 
+## reso-certification 0.10.3 – 2026-09-01
+
+A published-package patch to `reso-certification` – no monorepo release. Consumers on `^0.10.0` pick it up automatically; no other package changed (`reso-client` stays 0.2.2, `reso-common` 0.2.1).
+
+### `reso-certification` 0.10.3 – Web API Core 2.1.0 `$expand` + served-resource gating
+
+- **Declared-but-not-served carve-out for top-level resources.** A required 2.1.0 resource (Property, Member, Office plus Field, Lookup) that is declared in the metadata but absent from the service document now resolves to Not Applicable under the 2.1.0 carve-out instead of hard-failing as in 2.0.0. Backed by a new service-document parser and a run/fail/na serving decision, masking only on positive determinate agreement across both authoritative surfaces.
+- **`$expand` per-item schema-validation gate.** Each expanded child item is validated against its target entity type in DD/Core mode (strict: unadvertised field, wrong type, over-length value, and null collection all fail), and a declared collection navigation is gated on that validation – a schema-invalid expanded item fails Core. New `expand-schema` SDK module; the validator degrades conservatively (gates on the 200 alone) if it cannot be built.
+- **Non-gating related-record-key warning.** When an expanded item's `ResourceRecordKey` does not match the parent key, the run emits a non-gating warning – instrumenting the pain point per the cert-warnings convention rather than gating on it.
+- **CLI:** shared option builders (auth, server URL, output, report directory) centralized in `shared-options.ts` – an internal refactor standardizing universal flags across commands, no behavior change.
+- **Tests:** 8 new or expanded test files covering serving decisions, `$expand` gating, the RRK warning, and `$expand` sampling. Full monorepo suite now 1,944 passing across 8 packages.
+
+---
+
 ## reso-client 0.2.2 · reso-certification 0.10.2 – 2026-08-30
 
 A targeted post-Luna patch to two published packages – no monorepo release. Consumers on `^` ranges pick these up automatically (`reso-certification` resolves the new `reso-client` through its `^0.2.0` range).
