@@ -84,6 +84,13 @@ export interface TestParams {
    *  metadata at test-setup time. Falls back to the field name if absent. */
   readonly lookupNameByField?: Readonly<Record<string, string>>;
   readonly expandField?: string;
+  /** ALL collection navigation properties declared on the resource, each with its unqualified target entity
+   *  type name. Core 2.1.0 tests $expand PER collection nav (GATING) — the runner fans one expand result out
+   *  per entry (GET {resource}?$expand={name}&$top=5, then schema-validate each expanded child against
+   *  {targetType}). Empty / absent ⇒ the resource declares no collection nav ⇒ the $expand scenario is N/A
+   *  (skip). {@link expandField} above stays the FIRST of these — kept for the RRK warning's default field
+   *  resolution and the single-field query path. */
+  readonly expandNavs?: ReadonlyArray<{ readonly name: string; readonly targetType: string }>;
   /** True when the $top=1000 sample was the COMPLETE resource (no forward `@odata.nextLink`). The `ne`
    *  empty-verdict needs this to distinguish "the field genuinely holds one value across the whole resource"
    *  (empty is correct → pass) from "our sample only saw one value" (unknowable → skip). */
@@ -407,11 +414,15 @@ export const resolveTestParams = async (
   const stringField = stringSample?.field;
   const stringValue = stringSample?.value;
 
-  // Select an expansion for the 2.1.0 $expand scenario: the FIRST COLLECTION navigation property in
-  // declaration order. Deterministic (declaration order) so tests stay stable; a collection is what `$top=5`
-  // and the RRK child-collection check expect. No collection nav (or no navigation properties at all) ⇒
-  // expandField stays undefined ⇒ the $expand scenario skips gracefully, exactly as before.
-  const expandField = entityType.navigationProperties?.find(np => np.isCollection)?.name;
+  // Collection navigation properties drive the 2.1.0 $expand scenario, now tested PER nav (GATING). Selection
+  // is declaration order (deterministic, so tests stay stable); a collection is what `$top=5` and the RRK
+  // child-collection check expect. `expandField` = the FIRST collection nav (kept for the RRK warning's default
+  // field resolution + the single-field query path); `expandNavs` = ALL of them with their unqualified target
+  // entity type names, so the runner can test each declared collection nav one at a time. No collection nav (or
+  // no navigation properties at all) ⇒ both stay empty ⇒ the $expand scenario skips gracefully (N/A).
+  const collectionNavs = (entityType.navigationProperties ?? []).filter(np => np.isCollection);
+  const expandField = collectionNavs[0]?.name;
+  const expandNavs = collectionNavs.map(np => ({ name: np.name, targetType: np.targetType }));
 
   // LookupName per candidate field (from the RESO.OData.Metadata.LookupName annotation — string lookups
   // only; enum-typed fields have no Lookup Resource) for the Lookup Resource validation scenario.
@@ -470,6 +481,7 @@ export const resolveTestParams = async (
     stringField,
     stringValue,
     expandField,
+    expandNavs,
     lookupNameByField: Object.keys(lookupNameByField).length ? lookupNameByField : undefined,
     skippedTypes,
   };

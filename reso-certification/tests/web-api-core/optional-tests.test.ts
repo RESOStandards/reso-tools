@@ -111,20 +111,24 @@ describe('classification: string functions optional, Core required', () => {
     }
   });
 
-  it('only string-function and $expand scenarios carry optional', () => {
-    // $expand is optional (non-gating): it fires to activate the RRK expanded-item warning, but a server
-    // that doesn't support expanding the chosen nav renders "Not Supported" rather than failing the cert.
+  it('$expand is NOT optional — it is GATING per declared collection nav (Core 2.1.0)', () => {
+    // Reworked: $expand no longer renders "Not Supported". A declared collection nav that cannot be expanded
+    // (or returns a schema-invalid expanded item) is a real Core failure; a resource with no collection nav
+    // simply skips. So the catalog entry carries no `optional` flag.
+    expect(byTag('expand')?.optional).toBeFalsy();
+  });
+
+  it('only string-function scenarios carry optional', () => {
     for (const s of allScenarios) {
-      if (s.optional) expect(['string-function', 'expand']).toContain(s.category);
+      if (s.optional) expect(s.category).toBe('string-function');
     }
   });
 
-  it('a failed $expand scenario is non-gating — Not Supported, contributes 0 to the failed count', () => {
-    // A server that returns non-200 for the chosen expansion must NOT fail Core cert: as an optional
-    // scenario, a determinate expand failure renders "Not Supported" and adds nothing to the failed tally.
-    const expandFailed = r({ tag: 'expand', passed: false, skipped: false, optional: true });
-    expect(optionalOutcome(expandFailed)).toBe('Not Supported');
-    expect(summarizeScenarios([expandFailed]).failed).toBe(0);
+  it('a failed $expand nav is GATING — a determinate failure contributes to the failed count', () => {
+    // A declared collection nav that non-200s or returns a schema-invalid expanded item MUST fail Core: the
+    // per-nav result carries no `optional` flag, so summarizeScenarios counts it as a real (required) failure.
+    const expandFailed = r({ tag: 'expand-Media', passed: false, skipped: false });
+    expect(summarizeScenarios([expandFailed]).failed).toBe(1);
   });
 });
 

@@ -11,6 +11,8 @@ import { validateMetadata, formatValidationSummary, collectValidationErrors } fr
 import { buildStandardMap, resolveTestParams, WELL_KNOWN_RESOURCES } from '../web-api-core/index.js';
 import { runCoreResourceScenarios, runProviderScenarios, summarizeScenarios, type ResourceTestReport } from '../web-api-core/test-runner.js';
 import { resolveServingDecision } from '../web-api-core/serving.js';
+import { createExpandSchemaValidator } from './expand-schema.js';
+import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import { isDeadlineError, runSettled } from '@reso-standards/reso-client';
 import { createCertSession, createSessionRequester } from '../test-runner/requester.js';
 import type { BaseTestContext, CoreConfig, PipelineStep, StepResult } from './types.js';
@@ -261,6 +263,22 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     const session = createCertSession(config.totalTimeoutMs);
     const requester = createSessionRequester(session);
 
+    // Core 2.1.0 $expand is GATING and schema-validates each expanded child item against its target entity
+    // type. Build the validator ONCE per run from the provider's metadata report (generated from the EDMX we
+    // already fetched — no extra request). Best-effort: report generation OR schema build can throw on wonky
+    // metadata; either way the run continues and each $expand nav gates on the 200 response alone (a compliant
+    // server never false-fails). 2.0.0 has no $expand scenario, so the validator is only built for 2.1.0.
+    const buildExpandValidator = async (): Promise<import('../web-api-core/index.js').ExpandItemValidator | undefined> => {
+      try {
+        const metadataReport = generateMetadataReport(ctx.metadataXml!, version);
+        return await createExpandSchemaValidator({ metadataReport, version });
+      } catch (err) {
+        onProgress({ step: 'Run Core scenarios', status: 'running', message: `$expand schema validation unavailable — ${err instanceof Error ? err.message : String(err)}` });
+        return undefined;
+      }
+    };
+    const expandValidator = version === '2.1.0' ? await buildExpandValidator() : undefined;
+
     // Provider-wide structural pass — run ONCE for the whole provider, BEFORE the per-resource gate, so the
     // metadata + service-document scenarios are always recorded even if every resource ends up masked. The
     // service document doubles as Surface 1 of the serving detection, and the metadata response gives the
@@ -340,8 +358,9 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           ctx.authToken!,
           version,
           requester,
-          // Provider-wide scenarios already ran once above; thread the detected version for the 4.01 gate.
-          { excludeProviderWide: true, odataVersion: provider.odataVersion },
+          // Provider-wide scenarios already ran once above; thread the detected version for the 4.01 gate and
+          // the once-per-run $expand schema validator (undefined at 2.0.0 / if it couldn't be built).
+          { excludeProviderWide: true, odataVersion: provider.odataVersion, ...(expandValidator ? { expandValidator } : {}) },
         );
 
         onProgress({
