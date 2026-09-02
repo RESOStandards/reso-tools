@@ -2,6 +2,20 @@
 
 ---
 
+## reso-certification 0.10.4 – 2026-09-02
+
+A published-package patch to `reso-certification` – no monorepo release. Consumers on `^0.10.0` pick it up automatically; no other package changed (`reso-client` stays 0.2.2, `reso-common` 0.2.1).
+
+### `reso-certification` 0.10.4 – Web API Core 2.1.0 Lookup Resource certification
+
+- **Exhaustive `/Lookup` fetch by `LookupName`.** The served Lookup Resource is paged all the way through for each queried `LookupName` (`@odata.nextLink` followed with no page cap), so value presence reflects the provider's entire catalogue rather than the first page – there is no server-side value filter on `/Lookup` yet. A per-run cache keyed by `LookupName` dedupes the fetch across fields that share an enumeration.
+- **Value presence across all three wire forms.** A served value is matched against the union of `LookupValue`, `StandardLookupValue`, and `LegacyODataValue`, so a provider serving any legal form of a catalogued value is not false-failed.
+- **Gating StandardLookupValue validity.** Each declared `StandardLookupValue` is validated against the Data Dictionary standard set for the field's DD type – never the provider's arbitrary `LookupName` – with an any-DD-enum fallback for open enumerations that carry no standard set. A non-standard declared value fails Core.
+- **Both gates honor `ignoreEnumerations`.** The committee-approved `schema-validation-settings.json` exemption (keyed by DD major.minor version) is threaded into both the presence and validity checks, so an exempt open or local field is never false-failed.
+- **Tests:** new coverage for exhaustive paging, the tri-form presence union, the field-type DD-standard join, and the ignore-list exemption. Full monorepo suite now 1,963 passing across 8 packages.
+
+---
+
 ## reso-certification 0.10.3 – 2026-09-01
 
 A published-package patch to `reso-certification` – no monorepo release. Consumers on `^0.10.0` pick it up automatically; no other package changed (`reso-client` stays 0.2.2, `reso-common` 0.2.1).
