@@ -96,7 +96,7 @@ const resolveSettingsPath = (): string | undefined => {
 };
 
 /** Load the exemptions (`ignoreEnumerations`) config; `{}` (no exemptions) when the file is absent/unreadable. */
-const loadValidationConfig = async (): Promise<Record<string, unknown>> => {
+export const loadValidationConfig = async (): Promise<Record<string, unknown>> => {
   const path = resolveSettingsPath();
   if (!path) return {};
   try {
@@ -104,6 +104,28 @@ const loadValidationConfig = async (): Promise<Record<string, unknown>> => {
   } catch {
     return {};
   }
+};
+
+/** Narrow `unknown` to a plain object for safe nested lookups (no `any`). */
+const asRecord = (v: unknown): Record<string, unknown> | undefined =>
+  typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : undefined;
+
+/**
+ * True when a resource+field is on the committee-approved ignore-enumerations list (a closed enum whose
+ * unadvertised/local values are permitted). The committed `schema-validation-settings.json` is keyed
+ * DD-major.minor → resource → field → `{ ignoreEnumerations: true }`, so the endorsement's full semver
+ * (`2.1.0`) is normalized to `2.1` before the lookup. `config` is the object {@link loadValidationConfig}
+ * returns — pass it once per run and bind the predicate.
+ */
+export const isEnumerationIgnored = (
+  config: Readonly<Record<string, unknown>>,
+  version: string,
+  resource: string,
+  field: string,
+): boolean => {
+  const ddVersion = toDataDictionaryVersion(version);
+  const fieldNode = asRecord(asRecord(asRecord(config[ddVersion])?.[resource])?.[field]);
+  return fieldNode?.ignoreEnumerations === true;
 };
 
 /** A `Collection(...)` type in the metadata report (e.g. `Collection(org.reso.metadata.enums.Feature)`). */

@@ -8,10 +8,10 @@
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, getEntityType, persistMetadataXml } from '../test-runner/metadata.js';
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
-import { buildStandardMap, resolveTestParams, WELL_KNOWN_RESOURCES } from '../web-api-core/index.js';
+import { buildStandardMap, createLookupCache, resolveTestParams, WELL_KNOWN_RESOURCES } from '../web-api-core/index.js';
 import { runCoreResourceScenarios, runProviderScenarios, summarizeScenarios, type ResourceTestReport } from '../web-api-core/test-runner.js';
 import { resolveServingDecision } from '../web-api-core/serving.js';
-import { createExpandSchemaValidator } from './expand-schema.js';
+import { createExpandSchemaValidator, isEnumerationIgnored, loadValidationConfig } from './expand-schema.js';
 import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import { isDeadlineError, runSettled } from '@reso-standards/reso-client';
 import { createCertSession, createSessionRequester } from '../test-runner/requester.js';
@@ -255,6 +255,19 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     const version = ctx.version;
     // Standard map (DD reference) built once per run — field/value membership for standard-first selection.
     const standardMap = buildStandardMap(version);
+
+    // Lookup Resource validation dependencies, built ONCE per run and shared across resources:
+    //   - a cache keyed by LookupName so a LookupName referenced by several fields is fetched/paged once;
+    //   - the committee-approved ignore-enumerations predicate (schema-validation-settings.json).
+    // The cache resolves a (resource, field) to its provider LookupName off a per-resource registry populated
+    // from each resource's sampled `lookupNameByField` as params resolve below — never a module-level global.
+    const lookupNamesByResource = new Map<string, Readonly<Record<string, string>>>();
+    const lookupCache = createLookupCache({
+      lookupNameFor: (resource, field) => lookupNamesByResource.get(resource)?.[field],
+    });
+    const validationConfig = await loadValidationConfig();
+    const isEnumIgnored = (resource: string, field: string): boolean =>
+      isEnumerationIgnored(validationConfig, version, resource, field);
     // One resilience session shared across the whole run (see createCertSession for the full
     // rationale): cert retries only 429/503 (twice), records every other response and moves on,
     // with no breaker or pacing and a 15-min per-request timeout. A total run budget bounds the
@@ -337,6 +350,10 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         });
         if (params === null) return deadlineResourceReport(resource);
 
+        // Register this resource's field → provider LookupName map so the shared cache can resolve
+        // (resource, field) → LookupName for the Lookup Resource presence + SLV-validity checks.
+        lookupNamesByResource.set(resource, params.lookupNameByField ?? {});
+
         if (params.skippedTypes.length > 0) {
           onProgress({
             step: 'Run Core scenarios',
@@ -358,9 +375,10 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           ctx.authToken!,
           version,
           requester,
-          // Provider-wide scenarios already ran once above; thread the detected version for the 4.01 gate and
-          // the once-per-run $expand schema validator (undefined at 2.0.0 / if it couldn't be built).
-          { excludeProviderWide: true, odataVersion: provider.odataVersion, ...(expandValidator ? { expandValidator } : {}) },
+          // Provider-wide scenarios already ran once above; thread the detected version for the 4.01 gate, the
+          // once-per-run $expand schema validator (undefined at 2.0.0 / if it couldn't be built), and the
+          // shared Lookup Resource cache + standard map + ignore predicate.
+          { excludeProviderWide: true, odataVersion: provider.odataVersion, ...(expandValidator ? { expandValidator } : {}), lookupCache, standardMap, isEnumerationIgnored: isEnumIgnored },
         );
 
         onProgress({

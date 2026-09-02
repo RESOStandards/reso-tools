@@ -35,6 +35,15 @@ describe('buildStandardMapFrom — membership tests', () => {
     expect([...map.standardValues('org.reso.metadata.enums.StandardStatus')].sort()).toEqual(['Active', 'Pending']);
     expect(map.standardValues('org.reso.metadata.enums.DoesNotExist').size).toBe(0);
   });
+
+  it('standardValuesForField: joins a field to its DD enum via the field type', () => {
+    // The enum field resolves to its own enum's values (via its `type`, not a wire LookupName).
+    expect([...(map.standardValuesForField('Property', 'StandardStatus') ?? [])].sort()).toEqual(['Active', 'Pending']);
+    // A non-enum field's type (Edm.Decimal) is not a lookup name → undefined → caller falls back to isStandardValue.
+    expect(map.standardValuesForField('Property', 'ListPrice')).toBeUndefined();
+    // An unknown field → undefined.
+    expect(map.standardValuesForField('Property', 'ZZZLocalField')).toBeUndefined();
+  });
 });
 
 describe('buildStandardMap — loads the real dd-2.1 reference', () => {
