@@ -11,12 +11,14 @@ export { resolveTestParams, detectEnumMode, WELL_KNOWN_RESOURCES, REQUIRED_RESOU
 export type { TestParams, EnumMode } from './sampling.js';
 export { buildStandardMap, buildStandardMapFrom } from './standard-map.js';
 export type { StandardMap } from './standard-map.js';
+export { createLookupCache } from './lookup-cache.js';
+export type { LookupCache } from './lookup-cache.js';
 export { selectEnumCandidates, isSingleRep, isMultiRep } from './enum-selection.js';
 export type { EnumCandidate } from './enum-selection.js';
 export { buildScenarioQuery } from './queries.js';
 export type { QuerySpec } from './queries.js';
-export { runCoreResourceScenarios, runProviderScenarios, isProviderWideScenario, summarizeScenarios, runExpandNavScenarios, validateExpandedItems } from './test-runner.js';
-export type { ScenarioResult, ResourceTestReport, TypeCoverage, ProviderScenariosResult, CoreResourceScenarioOptions, ExpandItemValidator, ExpandItemValidation } from './test-runner.js';
+export { runCoreResourceScenarios, runProviderScenarios, isProviderWideScenario, summarizeScenarios, runExpandNavScenarios, validateExpandedItems, lookupResourcePresence, lookupResourceSlvValidity } from './test-runner.js';
+export type { ScenarioResult, ResourceTestReport, TypeCoverage, ProviderScenariosResult, CoreResourceScenarioOptions, ExpandItemValidator, ExpandItemValidation, LookupResourceContext } from './test-runner.js';
 export { parseServiceDocument, servedPresence, declaredPresence, resolveServingDecision } from './serving.js';
 export type { Presence, ServingDecision } from './serving.js';
 export {

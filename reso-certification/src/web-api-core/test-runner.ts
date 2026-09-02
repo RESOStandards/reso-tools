@@ -11,6 +11,8 @@ import { MetadataFetchError, decodeFlagsValue } from '@reso-standards/reso-metad
 import { type EnumRepresentation, isDeadlineError } from '@reso-standards/reso-client';
 import type { TestParams } from './sampling.js';
 import type { EnumCandidate } from './enum-selection.js';
+import { buildStandardMap, type StandardMap } from './standard-map.js';
+import { createLookupCache, type LookupCache } from './lookup-cache.js';
 import { buildScenarioQuery } from './queries.js';
 import { emptyVerdict, type EmptyContext, type EmptyVerdict } from './empty-verdict.js';
 import { scenariosForVersion, type ComparisonOp, type CoreScenario, type ExpandScenario } from './scenarios.js';
@@ -596,13 +598,101 @@ const runEnumFamilyScenario = async (
 };
 
 /**
+ * Per-run dependencies the Lookup Resource scenario needs, bundled so the plumbing threads ONE param:
+ *   - `cache` — the row cache keyed by LookupName, shared across resources so a LookupName referenced by
+ *     several fields is fetched (and paged) at most once (the cache-hit win);
+ *   - `standardMap` — the DD standard map, for the SLV-validity join (field → DD enum via the field's DD type);
+ *   - `isEnumerationIgnored` — the committee-approved ignore-enumerations predicate.
+ */
+export interface LookupResourceContext {
+  readonly cache: LookupCache;
+  readonly standardMap: StandardMap;
+  readonly isEnumerationIgnored: (resource: string, field: string) => boolean;
+}
+
+/**
+ * PRESENCE assertion for the Lookup Resource scenario. The query filters by LookupName, so the returned rows
+ * prove the declared LookupName resolves. Determinate FAIL when NO row came back, or a row carries the WRONG
+ * LookupName (the query didn't resolve as declared). Then every provider-sampled value must be published: it
+ * PASSES iff the field is on the committee-approved ignore-enumerations list (its unadvertised/local values are
+ * permitted) OR the value appears on a cached row under ANY of the three legal wire forms — LookupValue,
+ * StandardLookupValue, LegacyODataValue — via {@link LookupCache.has}, which unions all three. This closes the
+ * two false-fail holes in the old union: it never counted LegacyODataValue and never consulted the ignore list.
+ */
+export const lookupResourcePresence = (
+  rows: ReadonlyArray<Record<string, unknown>>,
+  effParams: TestParams,
+  field: string,
+  expectedLookupName: string,
+  cache: LookupCache,
+  isEnumerationIgnored: (resource: string, field: string) => boolean,
+): AssertionResult => {
+  const resource = effParams.resource;
+  if (rows.length === 0) {
+    return { passed: false, message: `Lookup Resource returned no rows for LookupName '${expectedLookupName}'` };
+  }
+  const wrongName = rows.find(r => r.LookupName != null && String(r.LookupName) !== expectedLookupName);
+  if (wrongName) {
+    return { passed: false, message: `Lookup Resource returned a row with LookupName=${JSON.stringify(wrongName.LookupName)}, expected '${expectedLookupName}'` };
+  }
+  if (isEnumerationIgnored(resource, field)) {
+    return { passed: true, message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} is on the committee-approved ignore-enumerations list — value presence not enforced` };
+  }
+  const sampleValues = [effParams.singleLookupValue, effParams.singleLookupValue2, effParams.singleLookupValue3]
+    .filter((v): v is string => typeof v === 'string' && v.length > 0);
+  const missing = sampleValues.filter(v => !cache.has(resource, field, v));
+  if (missing.length > 0) {
+    return { passed: false, message: `Lookup Resource missing sample value(s): ${missing.map(v => `'${v}'`).join(', ')} for LookupName '${expectedLookupName}'` };
+  }
+  return { passed: true, message: `Lookup Resource validated: LookupName '${expectedLookupName}' with ${sampleValues.length} sample value(s) present` };
+};
+
+/**
+ * SLV-VALIDITY assertion (GATING, alongside presence). For each cached /Lookup row under this LookupName, UNLESS
+ * the field is ignore-listed, the row's declared `StandardLookupValue` MUST be a DD-standard value for the
+ * FIELD'S DD enum — joined via the field's DD type ({@link StandardMap.standardValuesForField}), NEVER the
+ * provider's arbitrary wire LookupName. A declared StandardLookupValue that is not DD-standard is a bad remap
+ * that breaks downstream consumers → a determinate FAIL. When the field can't be resolved to a precise DD enum,
+ * fall back to "is it standard in ANY DD enum" ({@link StandardMap.isStandardValue}) rather than crash.
+ */
+export const lookupResourceSlvValidity = (
+  rows: ReadonlyArray<Record<string, unknown>>,
+  resource: string,
+  field: string,
+  expectedLookupName: string,
+  standardMap: StandardMap,
+  isEnumerationIgnored: (resource: string, field: string) => boolean,
+): AssertionResult => {
+  if (isEnumerationIgnored(resource, field)) {
+    return { passed: true, message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} is on the ignore-enumerations list — StandardLookupValue validity not enforced` };
+  }
+  // Prefer the precise per-field DD set (joined on the field's DD type); fall back to "any DD enum" only when
+  // the field can't be resolved to a DD enum, so an unresolvable field degrades to a laxer check, never a crash.
+  const perFieldSet = standardMap.standardValuesForField(resource, field);
+  const isDdStandard = (slv: string): boolean => (perFieldSet ? perFieldSet.has(slv) : standardMap.isStandardValue(slv));
+  const declared = rows.flatMap(r => {
+    const slv = r.StandardLookupValue;
+    return slv != null && String(slv).length > 0 ? [String(slv)] : [];
+  });
+  const invalid = [...new Set(declared.filter(slv => !isDdStandard(slv)))];
+  if (invalid.length > 0) {
+    return { passed: false, message: `Lookup Resource '${expectedLookupName}': ${invalid.length} declared StandardLookupValue(s) not DD-standard for ${resource}.${field} — e.g. ${invalid.slice(0, 5).map(v => `'${v}'`).join(', ')} (a non-standard remap breaks downstream consumers)` };
+  }
+  return { passed: true, message: `Lookup Resource '${expectedLookupName}': all ${declared.length} declared StandardLookupValue(s) are DD-standard for ${resource}.${field}` };
+};
+
+/**
  * Run the Lookup Resource validation scenario. The Lookup Resource (RCP-032/039) is the *string*-lookup
  * mechanism, so this validates against a `SINGLE_STRING` field; enum-typed providers have no Lookup
  * Resource and the scenario simply doesn't apply → skip. Unlike the generic flow, an empty Lookup Resource
- * is a FAILURE not a skip — the scenario exists to prove the declared LookupName is present, and its
- * `assertData` case turns 0 rows into a fail.
+ * is a FAILURE not a skip — the scenario exists to prove the declared LookupName is present.
+ *
+ * Every `/Lookup` row for the field's LookupName is fetched (paged all the way through, no cap) and cached by
+ * LookupName. A later field that references an ALREADY-cached LookupName reuses those rows and skips the fetch
+ * entirely — the 200 was verified when the cache was first filled — so the whole enum is paged at most once per
+ * run. The presence + SLV-validity assertions are computed off those rows (see the helpers above).
  */
-const runLookupResourceScenario = async (
+export const runLookupResourceScenario = async (
   serverUrl: string,
   resource: string,
   scenario: CoreScenario,
@@ -610,6 +700,7 @@ const runLookupResourceScenario = async (
   authToken: string,
   start: number,
   requester: ODataRequester = webRequester,
+  lookupCtx: LookupResourceContext,
 ): Promise<ScenarioResult> => {
   const stringField = (params.singleLookupCandidates ?? []).find(c => c.representation === 'SINGLE_STRING');
   if (!stringField) {
@@ -626,6 +717,27 @@ const runLookupResourceScenario = async (
   };
   const query = buildScenarioQuery(serverUrl, resource, scenario, effParams);
   if (!query) return skipResult(scenario, start, 'required test parameters not available for the Lookup Resource scenario');
+  const tag = scenario.tag;
+  const name = scenario.name;
+  const field = stringField.field;
+  const expectedLookupName = effParams.lookupNameByField?.[field] ?? field;
+
+  // The gating data assertions over the (fetched or cached) /Lookup rows — presence + SLV-validity, side by
+  // side. Both consult the ignore list; presence unions all three value forms via the cache, SLV-validity joins
+  // each row's StandardLookupValue against the field's own DD enum.
+  const validate = (rows: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<AssertionResult> => [
+    lookupResourcePresence(rows, effParams, field, expectedLookupName, lookupCtx.cache, lookupCtx.isEnumerationIgnored),
+    lookupResourceSlvValidity(rows, resource, field, expectedLookupName, lookupCtx.standardMap, lookupCtx.isEnumerationIgnored),
+  ];
+
+  // CACHE HIT: another field already fetched (and 200-verified) every row for this LookupName. Reuse them and
+  // skip the fetch — validate against the cached rows so the result is still a valid, gating ScenarioResult.
+  const cachedRows = lookupCtx.cache.rowsFor(resource, field);
+  if (cachedRows) {
+    const assertions = validate(cachedRows);
+    return { tag, name, passed: assertions.every(a => a.passed), skipped: false, assertions, duration: Date.now() - start, requestUrl: query.url };
+  }
+
   const assertions: AssertionResult[] = [];
   try {
     const reqStart = Date.now();
@@ -634,15 +746,16 @@ const runLookupResourceScenario = async (
     const responseCheck = assertODataResponse(response, 200);
     assertions.push(responseCheck);
     if (!responseCheck.passed) {
-      return { tag: scenario.tag, name: scenario.name, passed: false, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url };
+      return { tag, name, passed: false, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url };
     }
-    // Collect ALL /Lookup rows for this LookupName across pages: a published value can sit beyond page 1
-    // under server-driven paging, and the local (rarely-populated) value we test here is especially likely
-    // to. Reading only page 1 would falsely report it missing and FALSE-FAIL a conformant provider.
+    // Fetch EVERY /Lookup row for this LookupName by paging all the way through, with NO page cap. A published
+    // value can sit arbitrarily deep under server-driven paging, and RESO has no value-filter on /Lookup yet
+    // (RCP-039 mandates only the LookupName filter), so a fixed cap would false-fail a conformant provider by
+    // reporting a present value as missing. The large pull is on-demand and rare (most LookupNames are small);
+    // the run deadline is the only global stop.
     const records: Record<string, unknown>[] = [...extractRecords(response.body)];
     let nextLink = extractNextLink(response.body);
-    let pages = 1;
-    while (nextLink && pages < 25) {
+    while (nextLink) {
       let pageResp: Awaited<ReturnType<typeof odataRequest>>;
       try {
         pageResp = await requester.request({ method: 'GET', url: rebaseNextLink(nextLink, query.url), authToken });
@@ -653,15 +766,16 @@ const runLookupResourceScenario = async (
       if (!assertODataResponse(pageResp, 200).passed) break;
       records.push(...extractRecords(pageResp.body));
       nextLink = extractNextLink(pageResp.body);
-      pages += 1;
     }
-    const dataAssertion = assertData(records, scenario, effParams); // handles 0 rows / wrong name / missing values → fail
-    if (dataAssertion) assertions.push(dataAssertion);
+    // Cache the fully-paged rows under this LookupName so later fields referencing it skip the fetch. Put BEFORE
+    // validating so the presence check's cache.has sees this LookupName's rows.
+    lookupCtx.cache.put(expectedLookupName, records);
+    assertions.push(...validate(records)); // 0 rows / wrong name / missing values → fail
     const allPassed = assertions.every(a => a.passed);
-    return { tag: scenario.tag, name: scenario.name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url };
+    return { tag, name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url };
   } catch (err) {
     if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
-    return { tag: scenario.tag, name: scenario.name, passed: false, skipped: false, errored: true, assertions: [{ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` }], duration: Date.now() - start, requestUrl: query.url };
+    return { tag, name, passed: false, skipped: false, errored: true, assertions: [{ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` }], duration: Date.now() - start, requestUrl: query.url };
   }
 };
 
@@ -673,12 +787,13 @@ const runScenario = async (
   params: TestParams,
   authToken: string,
   requester: ODataRequester = webRequester,
+  lookupCtx: LookupResourceContext,
 ): Promise<ScenarioResult> => {
   const start = Date.now();
 
   // Lookup Resource validation applies only to string (Lookup Resource) lookups.
   if (scenario.category === 'lookup-resource') {
-    return runLookupResourceScenario(serverUrl, resource, scenario, params, authToken, start, requester);
+    return runLookupResourceScenario(serverUrl, resource, scenario, params, authToken, start, requester, lookupCtx);
   }
 
   // Enum-family scenarios gate on the selected field's REAL representation and try candidate fields —
@@ -856,37 +971,9 @@ const assertData = (
         : { passed: false, message: `${failures.length} records failed: ${failures[0]}` };
     }
 
-    case 'lookup-resource': {
-      // The fetched payload is the Lookup Resource filtered by LookupName.
-      // Validate (1) at least one row came back, (2) every returned row's
-      // LookupName matches what we asked for, and (3) the provider's
-      // declared sample lookup values appear in the returned set.
-      const field = resolveField(scenario.fieldParam);
-      const expectedLookupName = params.lookupNameByField?.[field] ?? field;
-      const sampleValues = [
-        params.singleLookupValue,
-        params.singleLookupValue2,
-        params.singleLookupValue3,
-      ].filter((v): v is string => typeof v === 'string' && v.length > 0);
-
-      if (records.length === 0) {
-        return { passed: false, message: `Lookup Resource returned no rows for LookupName '${expectedLookupName}'` };
-      }
-      const wrongName = records.find(r => r.LookupName != null && String(r.LookupName) !== expectedLookupName);
-      if (wrongName) {
-        return { passed: false, message: `Lookup Resource returned a row with LookupName=${JSON.stringify(wrongName.LookupName)}, expected '${expectedLookupName}'` };
-      }
-      const returnedValues = new Set(records.flatMap(r => {
-        const a = r.StandardLookupValue != null ? [String(r.StandardLookupValue)] : [];
-        const b = r.LookupValue != null ? [String(r.LookupValue)] : [];
-        return [...a, ...b];
-      }));
-      const missing = sampleValues.filter(v => !returnedValues.has(v));
-      if (missing.length > 0) {
-        return { passed: false, message: `Lookup Resource missing sample value(s): ${missing.map(v => `'${v}'`).join(', ')} for LookupName '${expectedLookupName}'` };
-      }
-      return { passed: true, message: `Lookup Resource validated: LookupName '${expectedLookupName}' with ${sampleValues.length} sample value(s) present` };
-    }
+    // 'lookup-resource' is NOT handled here — runScenario routes it to runLookupResourceScenario, which fetches
+    // (and caches) every /Lookup row for the LookupName and validates via lookupResourcePresence +
+    // lookupResourceSlvValidity (all-three-forms membership + the ignore list + StandardLookupValue validity).
 
     case 'expand':
       // Reached only via the single-field executeStandardScenario path (kept for the RRK-warning unit tests):
@@ -1184,6 +1271,14 @@ export interface CoreResourceScenarioOptions {
    *  Omitted when it couldn't be built — a $expand nav then gates on the 200 response alone (never a false
    *  fail). Unused at 2.0.0 (the $expand scenario is 2.1.0-only). */
   readonly expandValidator?: ExpandItemValidator;
+  /** Per-run Lookup Resource cache, keyed by LookupName and SHARED across resources so a LookupName referenced
+   *  by several fields is fetched/paged once. Omitted by direct callers → a per-resource fallback is built. */
+  readonly lookupCache?: LookupCache;
+  /** The DD standard map for the Lookup Resource SLV-validity join. Omitted → built per resource as a fallback. */
+  readonly standardMap?: StandardMap;
+  /** Committee-approved ignore-enumerations predicate (from schema-validation-settings.json). Omitted → no
+   *  exemptions (every field's enumerations are enforced). */
+  readonly isEnumerationIgnored?: (resource: string, field: string) => boolean;
 }
 
 /**
@@ -1201,6 +1296,15 @@ export const runCoreResourceScenarios = async (
   const scenarios = scenariosForVersion(version)
     .filter(s => (options?.excludeProviderWide ? !isProviderWideScenario(s) : true));
   const results: ScenarioResult[] = [];
+
+  // Lookup Resource dependencies. The SDK threads a run-wide cache + standard map + ignore predicate; a direct
+  // caller (e.g. a focused test) gets a per-resource fallback so the scenario still works in isolation. The
+  // fallback cache resolves LookupNames off THIS resource's params (it only ever tests one resource).
+  const lookupCtx: LookupResourceContext = {
+    cache: options?.lookupCache ?? createLookupCache({ lookupNameFor: (res, fld) => (res === resource ? params.lookupNameByField?.[fld] : undefined) }),
+    standardMap: options?.standardMap ?? buildStandardMap(version),
+    isEnumerationIgnored: options?.isEnumerationIgnored ?? (() => false),
+  };
 
   // Track cross-scenario state for cascade-skip + OData-version gating. The version is pre-seeded from the
   // provider pass when the provider-wide scenarios are hoisted out (else the inline metadata scenario sets it).
@@ -1256,7 +1360,7 @@ export const runCoreResourceScenarios = async (
     }
 
     try {
-      const result = await runScenario(serverUrl, resource, scenario, params, authToken, requester);
+      const result = await runScenario(serverUrl, resource, scenario, params, authToken, requester, lookupCtx);
       results.push({ ...result, optional: scenario.optional });
 
       // Latch state for subsequent iterations.
