@@ -100,3 +100,46 @@ describe('buildScenarioQuery', () => {
     expect(result?.url).toContain('$count=true');
   });
 });
+
+describe('buildScenarioQuery — OriginatingSystem (OSN/OSID) scoping', () => {
+  const filterScenario: FilterScenario = { tag: 'filter-int-gt', name: 'Int gt', category: 'filter', dataType: 'integer', op: 'gt', fieldParam: 'integerField', valueParam: 'integerValueLow', minVersion: '2.0.0' };
+  const osnParams: TestParams = { ...baseParams, originatingSystemName: 'MyMLS' };
+  const query = (scenario: CoreScenario, params: TestParams): string =>
+    decodeURIComponent(buildScenarioQuery('http://localhost:8080', 'Property', scenario, params)?.url ?? '');
+
+  it('ANDs OriginatingSystemName into a resource-data filter query (original predicate preserved)', () => {
+    const decoded = query(filterScenario, osnParams);
+    expect(decoded).toContain('(ListPrice gt 200000) and OriginatingSystemName eq \'MyMLS\'');
+  });
+
+  it('is inert when no OriginatingSystem is configured (zero behavior change)', () => {
+    const without = query(filterScenario, baseParams);
+    expect(without).not.toContain('OriginatingSystem');
+    expect(query(filterScenario, osnParams)).not.toEqual(without);
+  });
+
+  it('uses OriginatingSystemID when only OSID is set; OSN takes precedence when both are set', () => {
+    expect(query(filterScenario, { ...baseParams, originatingSystemId: 'MLS-42' })).toContain('OriginatingSystemID eq \'MLS-42\'');
+    const both = query(filterScenario, { ...baseParams, originatingSystemName: 'MyMLS', originatingSystemId: 'MLS-42' });
+    expect(both).toContain('OriginatingSystemName eq \'MyMLS\'');
+    expect(both).not.toContain('OriginatingSystemID');
+  });
+
+  it('does NOT scope a non-resource-data category (fetch-by-key / structural, /Lookup, error)', () => {
+    const fetch: StructuralScenario = { tag: 'fetch-by-key', name: 'Fetch', category: 'structural', assertion: 'fetch-by-key', minVersion: '2.0.0' };
+    const err: ErrorScenario = { tag: 'response-code-404', name: '404', category: 'error', expectedStatus: 404, minVersion: '2.0.0' };
+    expect(query(fetch, osnParams)).not.toContain('OriginatingSystem');
+    expect(query(err, osnParams)).not.toContain('OriginatingSystem');
+  });
+
+  it('adds a $filter when the scoped query has none (orderby without a filter)', () => {
+    const scenario: OrderByScenario = { tag: 'orderby-timestamp-asc', name: 'Orderby', category: 'orderby', fieldParam: 'timestampField', direction: 'asc', minVersion: '2.0.0' };
+    const decoded = query(scenario, osnParams);
+    expect(decoded).toContain('$orderby=ModificationTimestamp asc');
+    expect(decoded).toContain('$filter=OriginatingSystemName eq \'MyMLS\'');
+  });
+
+  it('escapes single quotes in the OriginatingSystem value (OData string literal)', () => {
+    expect(query(filterScenario, { ...baseParams, originatingSystemName: 'O\'Brien MLS' })).toContain('OriginatingSystemName eq \'O\'\'Brien MLS\'');
+  });
+});
