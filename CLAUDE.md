@@ -138,6 +138,7 @@ here because it applies to any repo in the org.
 
 ### Version Branches
 - All work done in version branches named `vX.Y` (e.g., `v0.5`)
+- **⚠️ TEMPORARY (2026-09-03): the effective mainline is `v1.0.0-pre`, NOT `main`.** Base every branch/PR off `v1.0.0-pre` — the current Core 2.1.0 / cert 0.10.x code lives there and published releases (0.10.5, beta.10) came off it. `main` is the old pre-split stable: stale and partly incorrect. Branching off `main` gives divergent code (e.g. `test-runner.ts` differs by ~500 lines). **REMOVE this note once `v1.0.0-pre` → `v1.0.0` → new `main` lands.**
 - GitHub milestones match the branch version
 - **Release tags**: Use short-form tags (`v0.8`, `v0.9`) until real patch releases ship in production. Package.json versions use full SemVer (`0.8.0`), but Git tags and GitHub Releases use short form so `/releases/tag/v0.8` works.
 
