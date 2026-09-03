@@ -94,7 +94,7 @@ describe('serializeCoreRemarks', () => {
   it('includes all count categories', () => {
     const result = makeResult({
       steps: [
-        makeStep({ counts: { total: 45, passed: 42, failed: 0, skipped: 3 } }),
+        makeStep({ name: 'Run Core scenarios', counts: { total: 45, passed: 42, failed: 0, skipped: 3 } }),
       ],
     });
 
@@ -109,6 +109,7 @@ describe('serializeCoreRemarks', () => {
     const result = makeResult({
       steps: [
         makeStep({
+          name: 'Run Core scenarios',
           counts: {
             total: 10, passed: 6, failed: 0, skipped: 1,
             optionalPassed: 1, optionalNotSupported: 1, optionalNotTested: 1,
@@ -128,9 +129,32 @@ describe('serializeCoreRemarks', () => {
 
   it('omits the optional clause when there are no optional tests', () => {
     const result = makeResult({
-      steps: [makeStep({ counts: { total: 5, passed: 5, failed: 0, skipped: 0 } })],
+      steps: [makeStep({ name: 'Run Core scenarios', counts: { total: 5, passed: 5, failed: 0, skipped: 0 } })],
     });
     expect(serializeCoreRemarks(result)).not.toContain('Optional:');
+  });
+
+  it('reads the scenario step, not the earlier "Fetch metadata" step whose counts carry no pass/fail (counts-bug regression)', () => {
+    // The real Core pipeline emits a "Fetch metadata" step with counts {entityTypes, resources}
+    // BEFORE the "Run Core scenarios" step. serializeCoreRemarks previously used find(s => s.counts),
+    // which matched Fetch metadata first — its counts have no passed/failed/skipped — so every tally
+    // defaulted to 0 and the persisted report always read "0 passed, 0 failed, 0 skipped out of 0
+    // required tests", regardless of the run's real result (observed on the CDL/Cotality runs).
+    const result = makeResult({
+      status: 'failed',
+      steps: [
+        makeStep({ name: 'Fetch metadata', counts: { entityTypes: 14, resources: 5 } }),
+        makeStep({
+          name: 'Run Core scenarios', status: 'failed',
+          counts: { total: 305, passed: 193, failed: 7, skipped: 90, optionalPassed: 6, optionalNotSupported: 0, optionalNotTested: 9 },
+        }),
+      ],
+    });
+
+    const remarks = serializeCoreRemarks(result);
+
+    expect(remarks).toContain('193 passed, 7 failed, 90 skipped out of 290 required tests.');
+    expect(remarks).not.toContain('0 passed, 0 failed, 0 skipped out of 0 required tests.');
   });
 });
 
