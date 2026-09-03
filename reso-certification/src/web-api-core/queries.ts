@@ -364,6 +364,10 @@ const buildQueryForCategory = (
 // STATUS: query-layer only + config-gated (inert until params carry an OriginatingSystem). The run-config →
 // resolveTestParams → CLI plumbing and the exact scoped-category set are deliberately NOT finalized here —
 // validate them against a real multi-tenant provider's captured error body first (OSN/OSID open item).
+// WIRING NOTE (adversarial review): the plumbing MUST be resource-aware. Only set the OSN/OSID params for
+// resources whose METADATA actually carries an OriginatingSystemName/ID field — category scoping alone would
+// AND the clause into resources that lack it (e.g. PropertyGreenVerification, ContactListings, Showing) and
+// FALSE-FAIL them with a 400. Do the field-presence check in resolveTestParams when wiring.
 
 /** Resource-data filter categories that must be OriginatingSystem-scoped. Excludes `lookup-resource`
  *  (/Lookup has no OriginatingSystem field), `error` (deliberate 404), `expand`, `structural` (key/metadata),

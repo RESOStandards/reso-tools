@@ -119,18 +119,19 @@ const asRecord = (v: unknown): Record<string, unknown> | undefined =>
   typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : undefined;
 
 /**
- * Flatten the legacy validator's errorCache into field-qualified messages ("<Field>: <message>") so a
- * schema-invalid expanded item NAMES the offending field, not just the generic rule. The errorCache is keyed
- * by message; each value nests resources → fields, so one message can name several fields. Falls back to the
- * bare message when no field is attributed. Exported for direct unit testing.
+ * Turn the legacy validator's errorCache into ONE message per failing RULE, each naming its offending
+ * field(s): "<message> (fields: A, B)". A schema-invalid expanded item then names the field, not just the
+ * generic rule — while keeping one entry per rule so a truncated inline preview (validateExpandedItems shows
+ * only the first few) never crowds out a distinct second rule. The errorCache is keyed by message; each value
+ * nests resources → fields. Falls back to the bare message when no field is attributed. Exported for testing.
  */
 export const errorMessagesFromCache = (errorCache: Record<string, unknown> | undefined): ReadonlyArray<string> =>
-  Object.entries(errorCache ?? {}).flatMap(([message, entry]) => {
+  Object.entries(errorCache ?? {}).map(([message, entry]) => {
     const resources = asRecord(asRecord(entry)?.resources);
     const fields = resources
       ? [...new Set(Object.values(resources).flatMap((r) => Object.keys(asRecord(asRecord(r)?.fields) ?? {})))]
       : [];
-    return fields.length > 0 ? fields.map((f) => `${f}: ${message}`) : [message];
+    return fields.length > 0 ? `${message} (field${fields.length === 1 ? '' : 's'}: ${fields.join(', ')})` : message;
   });
 
 /**

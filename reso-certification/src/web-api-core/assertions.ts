@@ -189,9 +189,11 @@ export const assertCollectionLambda = (
 /** Cap on how much server-error detail we surface in an assertion message. */
 const MAX_ERROR_DETAIL = 300;
 
-/** Collapse whitespace and cap length so a captured server error stays a single readable line. */
+/** Collapse whitespace and cap length so a captured server error stays a single readable line. Slices a
+ *  bounded prefix BEFORE collapsing: a misbehaving server can return a multi-MB error body and we only ever
+ *  keep MAX_ERROR_DETAIL chars, so this never scans the whole body. */
 const truncateErrorDetail = (s: string): string => {
-  const t = s.trim().replace(/\s+/g, ' ');
+  const t = s.slice(0, MAX_ERROR_DETAIL * 4).trim().replace(/\s+/g, ' ');
   return t.length > MAX_ERROR_DETAIL ? `${t.slice(0, MAX_ERROR_DETAIL)}…` : t;
 };
 
