@@ -12,6 +12,7 @@ import { buildStandardMap, createLookupCache, resolveTestParams, WELL_KNOWN_RESO
 import { runCoreResourceScenarios, runProviderScenarios, summarizeScenarios, type ResourceTestReport } from '../web-api-core/test-runner.js';
 import { resolveServingDecision } from '../web-api-core/serving.js';
 import { createExpandSchemaValidator, isEnumerationIgnored, loadValidationConfig } from './expand-schema.js';
+import { RUN_CORE_SCENARIOS } from './step-names.js';
 import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import { isDeadlineError, runSettled } from '@reso-standards/reso-client';
 import { createCertSession, createSessionRequester } from '../test-runner/requester.js';
@@ -249,7 +250,7 @@ export const reportVerdict = (args: {
       });
 
 const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
-  name: 'Run Core scenarios',
+  name: RUN_CORE_SCENARIOS,
   run: async (ctx, onProgress) => {
     const metadata = parseMetadataXml(ctx.metadataXml!);
     const version = ctx.version;
@@ -286,7 +287,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         const metadataReport = generateMetadataReport(ctx.metadataXml!, version);
         return await createExpandSchemaValidator({ metadataReport, version });
       } catch (err) {
-        onProgress({ step: 'Run Core scenarios', status: 'running', message: `$expand schema validation unavailable — ${err instanceof Error ? err.message : String(err)}` });
+        onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `$expand schema validation unavailable — ${err instanceof Error ? err.message : String(err)}` });
         return undefined;
       }
     };
@@ -317,16 +318,16 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           declaredEntitySets: metadata.entitySets,
         });
         if (decision === 'fail') {
-          onProgress({ step: 'Run Core scenarios', status: 'running', message: `${resource}: required resource declared but not served top level — one clean failure` });
+          onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `${resource}: required resource declared but not served top level — one clean failure` });
           return requiredResourceNotServedReport(resource);
         }
         if (decision === 'na') {
-          onProgress({ step: 'Run Core scenarios', status: 'running', message: `${resource}: declared but not served top level — Not Applicable (may be expansion-only)` });
+          onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `${resource}: declared but not served top level — Not Applicable (may be expansion-only)` });
           return notServedNotApplicableReport(resource);
         }
 
         onProgress({
-          step: 'Run Core scenarios',
+          step: RUN_CORE_SCENARIOS,
           status: 'running',
           message: `Sampling ${resource}...`,
         });
@@ -359,14 +360,14 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
 
         if (params.skippedTypes.length > 0) {
           onProgress({
-            step: 'Run Core scenarios',
+            step: RUN_CORE_SCENARIOS,
             status: 'running',
             message: `${resource}: missing types: ${params.skippedTypes.join(', ')} — some scenarios will be skipped`,
           });
         }
 
         onProgress({
-          step: 'Run Core scenarios',
+          step: RUN_CORE_SCENARIOS,
           status: 'running',
           message: `Testing ${resource}...`,
         });
@@ -385,7 +386,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         );
 
         onProgress({
-          step: 'Run Core scenarios',
+          step: RUN_CORE_SCENARIOS,
           status: 'running',
           message: `${resource}: ${report.summary.passed} passed, ${report.summary.failed} failed, ${report.summary.skipped} skipped`,
         });
@@ -398,7 +399,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           if (outcome.status === 'failed') {
             const detail = outcome.error instanceof Error ? outcome.error.message : String(outcome.error);
             onProgress({
-              step: 'Run Core scenarios',
+              step: RUN_CORE_SCENARIOS,
               status: 'running',
               message: `${outcome.item}: skipped (could not sample) — ${detail}`,
             });
