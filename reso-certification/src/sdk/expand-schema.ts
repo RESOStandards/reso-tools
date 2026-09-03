@@ -6,10 +6,12 @@
  * target entity type. The Web API Core runner consumes it through the {@link ExpandItemValidator} interface and
  * never touches the schema machinery itself.
  *
- * The legacy module is loaded via `createRequire` because it is CommonJS (and pulls in ajv + the ETL reference
- * bridge) — the same interop pattern `src/cli/schema-command.ts` uses. We call the legacy utilities DIRECTLY
- * (`generateJsonSchema` / `validate`) rather than the CLI's typed wrappers to avoid an sdk → cli layering
- * inversion (cli already depends on sdk).
+ * The legacy module is loaded lazily via a dynamic `import()` with a LITERAL specifier so the esbuild
+ * cert-worker bundle inlines it — a computed `createRequire` path escapes static analysis and fails to load
+ * in the packaged app (reso-tools-private #102); the lazy `import()` also defers the ajv + ETL-reference cost
+ * until the $expand path actually runs. We call the legacy utilities DIRECTLY (`generateJsonSchema` /
+ * `validate`) rather than the CLI's typed wrappers to avoid an sdk → cli layering inversion (cli already
+ * depends on sdk).
  *
  * ── Validation policy (mirrors DD/Core testing exactly — NOT RCF mode) ──
  *  - `additionalProperties: false` when generating the schema: a field on the expanded item that the provider's
@@ -28,13 +30,10 @@
 
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { MetadataReport, MetadataReportField } from '@reso-standards/reso-metadata-utils';
 import type { ExpandItemValidator } from '../web-api-core/test-runner.js';
-
-const requireLegacy = createRequire(import.meta.url);
 
 /** The committed, committee-approved exemptions file (never modified). Keyed by DD major.minor. */
 const SETTINGS_FILE = 'schema-validation-settings.json';
@@ -61,8 +60,17 @@ const isLegacySchemaModule = (m: unknown): m is LegacySchemaModule =>
   typeof (m as Record<string, unknown>).generateJsonSchema === 'function' &&
   typeof (m as Record<string, unknown>).validate === 'function';
 
-const loadLegacySchemaModule = (): LegacySchemaModule => {
-  const raw: unknown = requireLegacy(resolve(dirname(fileURLToPath(import.meta.url)), '../legacy/lib/schema/index.js'));
+const loadLegacySchemaModule = async (): Promise<LegacySchemaModule> => {
+  // Static specifier so esbuild bundles the legacy module (+ its graph) into the cert-worker bundle;
+  // a computed createRequire path escapes static analysis and fails in the packaged app (reso-tools-private #102).
+  // Dynamic import() keeps the load lazy — the legacy module pulls in ajv + the DD reference, loaded only
+  // when the $expand schema path actually runs, not at SDK import.
+  // The specifier MUST stay a literal in the call so esbuild statically follows + inlines the module
+  // (a variable specifier would escape the bundle — the very bug this fixes). `as string` only widens
+  // the literal's type so tsc treats it as a runtime dynamic import of the untyped legacy CJS module
+  // (no implicit-any TS7016); the assertion is erased in the emitted JS. Shape runtime-guarded below.
+  const mod: unknown = await import('../legacy/lib/schema/index.js' as string);
+  const raw = (mod as { readonly default?: unknown }).default ?? mod;
   if (!isLegacySchemaModule(raw)) {
     throw new Error('Failed to load the legacy schema module — expected generateJsonSchema / validate exports.');
   }
@@ -223,7 +231,7 @@ const buildExpandSchema = async (
 export const createExpandSchemaValidator = async (
   input: CreateExpandSchemaValidatorInput,
 ): Promise<ExpandItemValidator | undefined> => {
-  const mod = loadLegacySchemaModule();
+  const mod = await loadLegacySchemaModule();
   const ddVersion = toDataDictionaryVersion(input.version);
   const validationConfig = input.validationConfig ?? (await loadValidationConfig());
 
