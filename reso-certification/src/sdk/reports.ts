@@ -155,7 +155,12 @@ export const serializeEntityEventRemarks = (result: PipelineResult): string => {
 
 /** Serialize Web API Core pipeline results into a human-readable remarks string. */
 export const serializeCoreRemarks = (result: PipelineResult): string => {
-  const testStep = result.steps.find(s => s.counts);
+  // Target the scenario step by name, as the Add/Edit and EntityEvent serializers do. The prior
+  // `find(s => s.counts)` matched the earlier "Fetch metadata" step first — its counts are
+  // {entityTypes, resources}, with no passed/failed/skipped — so every tally defaulted to 0 and
+  // the persisted report's remarks always read "0 passed, 0 failed, 0 skipped out of 0 required
+  // tests", regardless of the run's real result.
+  const testStep = result.steps.find(s => s.name === 'Run Core scenarios');
   if (!testStep?.counts) return `Web API Core compliance test ${result.status}.`;
 
   const { passed = 0, failed = 0, skipped = 0, optionalPassed = 0, optionalNotSupported = 0, optionalNotTested = 0 } = testStep.counts;
