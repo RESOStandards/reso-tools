@@ -279,6 +279,11 @@ export interface CoreConfig extends BaseComplianceConfig {
    * stops first and still writes a partial report.
    */
   readonly totalTimeoutMs?: number;
+  /** Optional filter — scopes resource-data queries to `OriginatingSystemName eq '<value>'` on resources that
+   *  carry the field (multi-tenant providers). Mirrors DDConfig; threaded resource-aware via resolveTestParams. */
+  readonly originatingSystemName?: string;
+  /** Optional filter — `OriginatingSystemID eq '<value>'` when no name is provided (OSN takes precedence). */
+  readonly originatingSystemId?: string;
 }
 
 /** Discriminated union of all endorsement configs. */

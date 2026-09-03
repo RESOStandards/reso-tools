@@ -38,6 +38,11 @@ interface ConfigEntry extends ConfigAuth {
   readonly mode?: 'observe' | 'full';
   readonly writableResource?: string;
   readonly version?: string;
+  /** OriginatingSystemName scope for a multi-tenant recipient — carried by the reso-certification-utils config
+   *  format; threaded into DD replication + Core scenario queries (resource-aware). OSN takes precedence over OSID. */
+  readonly originatingSystemName?: string;
+  /** OriginatingSystemID scope — used when no OriginatingSystemName is provided. */
+  readonly originatingSystemId?: string;
 }
 
 /** Top-level config file shape (matches reso-certification-utils format). */
@@ -118,6 +123,8 @@ export const configEntryToCore = (entry: ConfigEntry, providerUoi: string): Core
     auth: resolveAuthFromEntry(entry),
   },
   version: (entry.version as '2.0.0' | '2.1.0') ?? '2.0.0',
+  ...(entry.originatingSystemName ? { originatingSystemName: entry.originatingSystemName } : {}),
+  ...(entry.originatingSystemId ? { originatingSystemId: entry.originatingSystemId } : {}),
   options: {
     outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/core`,
   },
@@ -131,6 +138,8 @@ export const configEntryToDD = (entry: ConfigEntry, providerUoi: string): DDConf
     auth: resolveAuthFromEntry(entry),
   },
   version: coerceDDVersion(entry.version),
+  ...(entry.originatingSystemName ? { originatingSystemName: entry.originatingSystemName } : {}),
+  ...(entry.originatingSystemId ? { originatingSystemId: entry.originatingSystemId } : {}),
   options: {
     outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/dd`,
   },

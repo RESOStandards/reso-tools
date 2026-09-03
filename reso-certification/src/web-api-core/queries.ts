@@ -361,13 +361,17 @@ const buildQueryForCategory = (
 // OriginatingSystemName filter and 400 without it. Certifying a recipient org must therefore scope resource
 // queries to that org rather than reading "from the top" (huge, slow, and validating the wrong data). DD
 // replication already does this via prepareFilterExpression; this mirrors it for Core.
-// STATUS: query-layer only + config-gated (inert until params carry an OriginatingSystem). The run-config →
-// resolveTestParams → CLI plumbing and the exact scoped-category set are deliberately NOT finalized here —
-// validate them against a real multi-tenant provider's captured error body first (OSN/OSID open item).
-// WIRING NOTE (adversarial review): the plumbing MUST be resource-aware. Only set the OSN/OSID params for
-// resources whose METADATA actually carries an OriginatingSystemName/ID field — category scoping alone would
-// AND the clause into resources that lack it (e.g. PropertyGreenVerification, ContactListings, Showing) and
-// FALSE-FAIL them with a 400. Do the field-presence check in resolveTestParams when wiring.
+// WIRED (resource-aware): the run config (originatingSystemName/Id, from the CLI `--config` / flags) flows
+// through resolveTestParams, which sets the OSN/OSID params ONLY for resources whose metadata actually carries
+// the field — so the clause is never ANDed into a resource that lacks it (e.g. PropertyGreenVerification,
+// ContactListings, Showing), which would false-fail with a 400. resolveTestParams also scopes its own sample
+// fetch with the same clause, so a provider that REQUIRES the filter can be sampled at all. Inert when no
+// OriginatingSystem is configured. The scoped-category set below stays provisional pending live validation.
+
+/** The metadata field names carrying the originating system on a resource — used both to build the filter
+ *  clause and (in resolveTestParams) for the resource-aware field-presence check. */
+export const ORIGINATING_SYSTEM_NAME_FIELD = 'OriginatingSystemName';
+export const ORIGINATING_SYSTEM_ID_FIELD = 'OriginatingSystemID';
 
 /** Resource-data filter categories that must be OriginatingSystem-scoped. Excludes `lookup-resource`
  *  (/Lookup has no OriginatingSystem field), `error` (deliberate 404), `expand`, `structural` (key/metadata),
@@ -376,17 +380,18 @@ const ORIGINATING_SYSTEM_SCOPED_CATEGORIES: ReadonlySet<string> = new Set([
   'filter', 'orderby', 'enum', 'collection', 'string-enum', 'string-function', 'in-operator',
 ]);
 
-/** The OriginatingSystemName (preferred) or OriginatingSystemID clause for the run, or '' when neither is
- *  configured — mirroring the DD replication precedence. */
-const originatingSystemClause = (params: TestParams): string => {
-  if (params.originatingSystemName && params.originatingSystemName.length > 0) {
-    return `OriginatingSystemName eq ${odataString(params.originatingSystemName)}`;
-  }
-  if (params.originatingSystemId && params.originatingSystemId.length > 0) {
-    return `OriginatingSystemID eq ${odataString(params.originatingSystemId)}`;
-  }
+/** The OriginatingSystemName (preferred) or OriginatingSystemID `$filter` clause for raw values, or '' when
+ *  neither is set — the single source of the OSN-over-OSID precedence, shared by the scenario-query scoping
+ *  ({@link originatingSystemClause}) and resolveTestParams' sample-fetch scoping. */
+export const originatingSystemFilterClause = (name?: string, id?: string): string => {
+  if (name && name.length > 0) return `${ORIGINATING_SYSTEM_NAME_FIELD} eq ${odataString(name)}`;
+  if (id && id.length > 0) return `${ORIGINATING_SYSTEM_ID_FIELD} eq ${odataString(id)}`;
   return '';
 };
+
+/** The OriginatingSystem clause for a run's resolved params (delegates to {@link originatingSystemFilterClause}). */
+const originatingSystemClause = (params: TestParams): string =>
+  originatingSystemFilterClause(params.originatingSystemName, params.originatingSystemId);
 
 /** AND a clause into a URL's existing `$filter` (wrapping the original in parens), or add `$filter` when the
  *  URL has none. Operates on the built URL so it applies uniformly regardless of which builder produced it. */

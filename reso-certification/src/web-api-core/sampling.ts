@@ -12,6 +12,7 @@ import type { CsdlEnumType } from '@reso-standards/reso-metadata-utils';
 import { type ODataRequester, buildResourceUrl, webRequester } from '../test-runner/index.js';
 import type { EntityType } from '../test-runner/types.js';
 import { type EnumCandidate, isMultiRep, isSingleRep, selectEnumCandidates } from './enum-selection.js';
+import { ORIGINATING_SYSTEM_ID_FIELD, ORIGINATING_SYSTEM_NAME_FIELD, originatingSystemFilterClause } from './queries.js';
 import type { StandardMap } from './standard-map.js';
 
 /** Resolved test parameters for one resource. */
@@ -22,7 +23,8 @@ export interface TestParams {
   /** Optional OriginatingSystemName / OriginatingSystemID scope. When set, every resource-data filter query is
    *  AND-scoped to it (mirrors the DD replication `prepareFilterExpression`), so a multi-tenant provider is
    *  certified against the recipient org's own rows rather than reading "from the top". OSN takes precedence
-   *  over OSID. NOT YET WIRED from the run config / CLI — see the OSN/OSID plumbing TODO in queries.ts. */
+   *  over OSID. Set by resolveTestParams ONLY when the resource's metadata carries the field (resource-aware),
+   *  from the run config (`--config` / `--originating-system-name|id`). */
   readonly originatingSystemName?: string;
   readonly originatingSystemId?: string;
   readonly enumMode: EnumMode;
@@ -316,6 +318,7 @@ export const resolveTestParams = async (
   standardMap: StandardMap,
   enumModeOverride?: EnumMode,
   requester: ODataRequester = webRequester,
+  originatingSystem?: { readonly name?: string; readonly id?: string },
 ): Promise<TestParams> => {
   // enumMode is retained as an informational/coverage field only — selection and gating are now per-field
   // (resolveEnum), so the `--enumMode` override no longer steers field choice. Vestigial; a candidate for removal.
@@ -323,9 +326,24 @@ export const resolveTestParams = async (
   const keyField = entityType.keyProperties[0] ?? 'ListingKey';
   const skippedTypes: string[] = [];
 
+  // Resource-aware OriginatingSystem (OSN/OSID) scope: apply the recipient-org filter ONLY when this resource's
+  // metadata actually carries the field, else the clause would 400 a field-less resource (see queries.ts). OSN
+  // takes precedence over OSID. The same clause scopes both the sample fetch below (so a provider that REQUIRES
+  // the filter can be sampled at all) and — via `osParams` on the returned object — every resource-data
+  // scenario query (buildScenarioQuery). Inert when no OriginatingSystem is configured.
+  const hasField = (name: string): boolean => entityType.properties.some(p => p.name === name);
+  const scopedOsn = originatingSystem?.name && hasField(ORIGINATING_SYSTEM_NAME_FIELD) ? originatingSystem.name : undefined;
+  const scopedOsid = originatingSystem?.id && hasField(ORIGINATING_SYSTEM_ID_FIELD) ? originatingSystem.id : undefined;
+  const osScopeClause = originatingSystemFilterClause(scopedOsn, scopedOsid);
+  const osParams: Pick<TestParams, 'originatingSystemName' | 'originatingSystemId'> = {
+    ...(scopedOsn ? { originatingSystemName: scopedOsn } : {}),
+    ...(scopedOsid ? { originatingSystemId: scopedOsid } : {}),
+  };
+
   // Fetch sample records. 1000 (up from 100) gives far better field/value coverage for enum selection —
-  // more fields are populated across the wider sample — while staying a single fast request.
-  const url = `${buildResourceUrl(serverUrl, resource)}?$top=${SAMPLE_TOP}`;
+  // more fields are populated across the wider sample — while staying a single fast request. Scoped to the
+  // recipient org when OSN/OSID applies to this resource (above), matching the scenario queries.
+  const url = `${buildResourceUrl(serverUrl, resource)}?$top=${SAMPLE_TOP}${osScopeClause ? `&$filter=${encodeURIComponent(osScopeClause)}` : ''}`;
   const response = await requester.request({ method: 'GET', url, authToken });
   const body = response.body as { value?: ReadonlyArray<Record<string, unknown>> } | null;
   const records = body?.value ?? [];
@@ -334,7 +352,7 @@ export const resolveTestParams = async (
   const sampleComplete = isSampleComplete(body) && records.length < SAMPLE_TOP;
 
   if (records.length === 0) {
-    return { resource, keyField, keyValue: '', enumMode, integerValueHigh: 2147483647, sampleComplete, skippedTypes: ['all — no records found'] };
+    return { resource, keyField, keyValue: '', enumMode, integerValueHigh: 2147483647, sampleComplete, skippedTypes: ['all — no records found'], ...osParams };
   }
 
   const keyValue = String(records[0][keyField] ?? '');
@@ -445,6 +463,7 @@ export const resolveTestParams = async (
     keyField,
     keyValue,
     enumMode,
+    ...osParams,
     integerField,
     integerValueLow,
     integerValueHigh: 2147483647,

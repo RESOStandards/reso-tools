@@ -128,6 +128,32 @@ describe('configEntryToCore', () => {
     expect(config.endorsement).toBe('core');
     expect(config.version).toBe('2.0.0');
   });
+
+  it('threads OriginatingSystemName/ID from the entry (reso-certification-utils format)', () => {
+    const config = configEntryToCore({
+      serviceRootUri: 'https://api.example.com',
+      recipientUoi: 'R001',
+      providerUsi: 'S001',
+      token: 'test-token',
+      originatingSystemName: 'MyMLS',
+      originatingSystemId: 'MLS-42',
+    }, 'P001');
+
+    expect(config.originatingSystemName).toBe('MyMLS');
+    expect(config.originatingSystemId).toBe('MLS-42');
+  });
+
+  it('omits OriginatingSystem fields when the entry carries none', () => {
+    const config = configEntryToCore({
+      serviceRootUri: 'https://api.example.com',
+      recipientUoi: 'R001',
+      providerUsi: 'S001',
+      token: 'test-token',
+    }, 'P001');
+
+    expect(config.originatingSystemName).toBeUndefined();
+    expect(config.originatingSystemId).toBeUndefined();
+  });
 });
 
 describe('configEntryToDD', () => {
@@ -142,6 +168,20 @@ describe('configEntryToDD', () => {
     expect(config.endorsement).toBe('dd');
     // An entry with no version coerces to the current DD version.
     expect(config.version).toBe(CURRENT_DD_VERSION);
+  });
+
+  it('threads OriginatingSystemName/ID from the entry into the DD replication config', () => {
+    const config = configEntryToDD({
+      serviceRootUri: 'https://api.example.com',
+      recipientUoi: 'R001',
+      providerUsi: 'S001',
+      token: 'test-token',
+      originatingSystemName: 'MyMLS',
+      originatingSystemId: 'MLS-42',
+    }, 'P001');
+
+    expect(config.originatingSystemName).toBe('MyMLS');
+    expect(config.originatingSystemId).toBe('MLS-42');
   });
 });
 

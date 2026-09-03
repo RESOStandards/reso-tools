@@ -344,6 +344,9 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           standardMap,
           enumModeOverride,
           requester,
+          // Resource-aware OriginatingSystem scope (multi-tenant): resolveTestParams applies it only to
+          // resources whose metadata carries the field, and to its own sample fetch. Inert when unset.
+          { name: config.originatingSystemName, id: config.originatingSystemId },
         ).catch((err: unknown) => {
           if (isDeadlineError(err)) return null;
           throw err;
