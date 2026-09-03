@@ -7,6 +7,8 @@ const mockRef: DdReference = {
     { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus' },
     { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' },
     { resourceName: 'Member', fieldName: 'MemberKey', type: 'Edm.String' },
+    // City: a nominal enum the DD defines with ZERO standard values (no City lookups below) → purely open.
+    { resourceName: 'Property', fieldName: 'City', type: 'org.reso.metadata.enums.City' },
   ],
   lookups: [
     { lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Active' },
@@ -44,6 +46,14 @@ describe('buildStandardMapFrom — membership tests', () => {
     // An unknown field → undefined.
     expect(map.standardValuesForField('Property', 'ZZZLocalField')).toBeUndefined();
   });
+
+  it('isPurelyOpenEnumField: nominal enum with zero DD-standard values → true; enum-with-members / primitive / unknown → false', () => {
+    expect(map.isPurelyOpenEnumField('Property', 'City')).toBe(true); // nominal enum, no members in the DD
+    expect(map.isPurelyOpenEnumField('Property', 'StandardStatus')).toBe(false); // has members (Active/Pending)
+    expect(map.isPurelyOpenEnumField('Property', 'ListPrice')).toBe(false); // primitive Edm.Decimal
+    expect(map.isPurelyOpenEnumField('Member', 'MemberKey')).toBe(false); // primitive Edm.String
+    expect(map.isPurelyOpenEnumField('Property', 'ZZZUnknown')).toBe(false); // unknown field
+  });
 });
 
 describe('buildStandardMap — loads the real dd-2.1 reference', () => {
@@ -71,5 +81,12 @@ describe('buildStandardMap — loads the real dd-2.1 reference', () => {
     const future = buildStandardMap('9.9.9');
     expect(future.isStandardField('Property', 'ListPrice')).toBe(true); // resolved against the latest DD
     expect(future.isStandardValue('Active')).toBe(true);
+  });
+
+  it('isPurelyOpenEnumField against the real DD: City / CountyOrParish are purely-open, StandardStatus is not', () => {
+    // These fields are enumerations the DD defines with ZERO standard values — advertising is their only gate.
+    expect(map.isPurelyOpenEnumField('Property', 'City')).toBe(true);
+    expect(map.isPurelyOpenEnumField('Property', 'CountyOrParish')).toBe(true);
+    expect(map.isPurelyOpenEnumField('Property', 'StandardStatus')).toBe(false); // 11 standard members
   });
 });

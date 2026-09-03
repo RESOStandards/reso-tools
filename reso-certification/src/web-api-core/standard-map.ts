@@ -33,9 +33,19 @@ export interface StandardMap {
    *  back to {@link isStandardValue}. This is the precise per-FIELD join — it never uses a provider's arbitrary
    *  wire LookupName, only the field's DD type. */
   readonly standardValuesForField: (resource: string, field: string) => ReadonlySet<string> | undefined;
+  /** True when the field's DD `type` is a nominal enumeration carrying ZERO DD-standard values — a
+   *  "purely open" enum (e.g. `City`, `CountyOrParish`), where the DD defines no members at all. There is
+   *  nothing a StandardLookupValue could be validated against, so SLV-validity is not applicable and the only
+   *  rule is advertising. False for a primitive/unknown field and for any enum that HAS standard values
+   *  (closed, or open-with-enumerations). Only consulted for lookup fields (the SLV-validity call site). */
+  readonly isPurelyOpenEnumField: (resource: string, field: string) => boolean;
 }
 
 const fieldKey = (resource: string, field: string): string => `${resource}/${field}`;
+
+/** Unwrap `Collection(<type>)` to its element type; a non-collection type is returned unchanged. */
+const unwrapCollection = (type: string): string =>
+  type.startsWith('Collection(') && type.endsWith(')') ? type.slice('Collection('.length, -1) : type;
 
 /** Build a {@link StandardMap} from an already-loaded DD reference. Pure — the unit-test seam. */
 export const buildStandardMapFrom = (ref: DdReference): StandardMap => {
@@ -69,6 +79,14 @@ export const buildStandardMapFrom = (ref: DdReference): StandardMap => {
       const type = fieldTypes.get(fieldKey(resource, field));
       return type ? byLookup.get(type) : undefined; // undefined for an unknown field or a non-enum type
     },
+    isPurelyOpenEnumField: (resource, field) => {
+      const type = fieldTypes.get(fieldKey(resource, field));
+      if (type == null) return false; // unknown field — let the standard checks handle it
+      const enumName = unwrapCollection(type);
+      if (enumName.startsWith('Edm.')) return false; // primitive type — not an enumeration
+      const members = byLookup.get(enumName); // the enum's DD-standard values, if any
+      return members == null || members.size === 0; // nominal enum with zero members = purely open
+    },
   };
 };
 
@@ -80,6 +98,7 @@ const EMPTY_STANDARD_MAP: StandardMap = {
   isStandardValue: () => false,
   standardValues: () => new Set<string>(),
   standardValuesForField: () => undefined,
+  isPurelyOpenEnumField: () => false,
 };
 
 const isValidRef = (ref: DdReference | null): ref is DdReference =>
