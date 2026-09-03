@@ -2,6 +2,18 @@
 
 ---
 
+## reso-certification 0.10.5 – 2026-09-02
+
+A published-package patch to `reso-certification` – no monorepo release. Consumers on `^0.10.0` pick it up automatically; behavior-preserving for the CLI and cert-backend (no test-count change), and no other package changed.
+
+### `reso-certification` 0.10.5 – bundle-static legacy-schema + DD-reference loads (reso-tools-private #102)
+
+- **Desktop cert-worker fix.** The legacy JSON-schema module and the DD reference JSON were loaded via a computed `createRequire` path and a template-literal `require()`, which esbuild could not statically follow — so in the packaged desktop app they did not load, and Web API Core 2.1.0 `$expand` per-item schema validation silently degraded to "unavailable" (the nav gated on the HTTP 200 alone). Both loads are now bundle-static: a lazy dynamic `import()` with a literal specifier for the legacy module, and a per-version `switch` for the DD reference JSON, so esbuild inlines them into the cert-worker bundle.
+- **Behavior-preserving** for the CLI and cert-backend (they run from `dist`, where the old paths resolved); full cert suite green (1,064 passed / 2 expected-fail). The desktop bundle now inlines the legacy schema and all three DD JSONs, verified by a new runtime load smoke in the bundler (reso-tools-private).
+- Unsupported-version metadata lookups now **fail loud** (log) instead of silently returning empty.
+
+---
+
 ## reso-certification 0.10.4 – 2026-09-02
 
 A published-package patch to `reso-certification` – no monorepo release. Consumers on `^0.10.0` pick it up automatically; no other package changed (`reso-client` stays 0.2.2, `reso-common` 0.2.1).
