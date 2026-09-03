@@ -51,6 +51,15 @@ const defaultRendererOptions: ListrDefaultRendererOptions = {
   timer: PRESET_TIMER,
 };
 
+/** Interactive spinner title on a *running* update: prefer the step's live message (e.g. "Sampling Property…",
+ *  "Testing Member…") so a long-running step shows WHAT is currently running, not just its name. Falls back to
+ *  the step name, and ignores structured JSON detail messages (e.g. DD replication-progress) so they don't
+ *  render raw. */
+const runningTitle = (label: string, progress: StepProgress): string => {
+  const msg = progress.message?.trim();
+  return msg && !msg.startsWith('{') ? `${label}: ${msg}` : `${label}: ${progress.step}...`;
+};
+
 /** Run a single pipeline with listr2 progress rendering. */
 export const runWithProgress = async (
   config: ComplianceConfig,
@@ -66,7 +75,7 @@ export const runWithProgress = async (
         task: async (_ctx, task) => {
           pipelineResult = await runComplianceTests(config, (progress: StepProgress) => {
             if (progress.status === 'running') {
-              task.title = `${label}: ${progress.step}...`;
+              task.title = runningTitle(label, progress);
             } else if (progress.status !== 'pending') {
               task.output = formatStep(progress);
             }
@@ -103,7 +112,7 @@ export const runConfigEntries = async (
       task: async (_ctx: unknown, task: { title: string; output: string }) => {
         const result = await runComplianceTests(config, (progress: StepProgress) => {
           if (progress.status === 'running') {
-            task.title = `${label}: ${progress.step}...`;
+            task.title = runningTitle(label, progress);
           } else if (progress.status !== 'pending') {
             task.output = formatStep(progress);
           }
