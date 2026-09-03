@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { CURRENT_DD_VERSION } from '../../src/sdk/dd-versions.js';
 import {
   loadConfigFile,
+  normalizeConfigFile,
   generateLocalUoi,
   configEntryToAddEdit,
   configEntryToEntityEvent,
@@ -10,6 +11,58 @@ import {
   configEntryToDD,
   resolvePayloadKeys,
 } from '../../src/sdk/config.js';
+
+describe('normalizeConfigFile — accept legacy / desktop / single shapes', () => {
+  it('passes the legacy { providerUoi, configs } format through', () => {
+    const cf = normalizeConfigFile({
+      providerUoi: 'P001',
+      configs: [{ serviceRootUri: 'https://api.example.com', recipientUoi: 'R1', providerUsi: 'S1', token: 't', version: '2.1.0' }],
+    });
+    expect(cf.providerUoi).toBe('P001');
+    expect(cf.configs).toHaveLength(1);
+    expect(cf.configs[0].token).toBe('t');
+    expect(cf.configs[0].version).toBe('2.1.0');
+  });
+
+  it('normalizes the desktop { providerUoi, recipients } format with nested token auth (OSN carried through)', () => {
+    const cf = normalizeConfigFile({
+      providerUoi: 'P001',
+      recipients: [{
+        serviceRootUri: 'https://api.example.com', recipientUoi: 'R1', providerUsi: 'S1',
+        auth: { mode: 'token', authToken: 'abc' },
+        originatingSystemName: 'MyMLS',
+        ddOptions: { version: '2.1.0' },
+      }],
+    });
+    expect(cf.configs).toHaveLength(1);
+    expect(cf.configs[0].token).toBe('abc');
+    expect(cf.configs[0].originatingSystemName).toBe('MyMLS');
+    expect(cf.configs[0].version).toBe('2.1.0'); // from ddOptions.version
+  });
+
+  it('maps nested client_credentials auth, tokenUrl → tokenUri', () => {
+    const cf = normalizeConfigFile({
+      providerUoi: 'P001',
+      recipients: [{
+        serviceRootUri: 'https://api.example.com', recipientUoi: 'R1', providerUsi: 'S1',
+        auth: { mode: 'client_credentials', clientId: 'id', clientSecret: 'secret', tokenUrl: 'https://auth/token', scope: 'sc' },
+      }],
+    });
+    expect(cf.configs[0].clientCredentials).toEqual({ clientId: 'id', clientSecret: 'secret', tokenUri: 'https://auth/token', scope: 'sc' });
+    expect(cf.configs[0].token).toBeUndefined();
+  });
+
+  it('accepts a single-entry config and supplies a placeholder providerUoi', () => {
+    const cf = normalizeConfigFile({ serviceRootUri: 'https://api.example.com', recipientUoi: 'R1', providerUsi: 'S1', auth: { mode: 'token', authToken: 't' } });
+    expect(cf.providerUoi).toMatch(/^LOCAL-/);
+    expect(cf.configs).toHaveLength(1);
+    expect(cf.configs[0].token).toBe('t');
+  });
+
+  it('throws on an unrecognized shape', () => {
+    expect(() => normalizeConfigFile({ foo: 'bar' })).toThrow(/no entries/);
+  });
+});
 
 describe('loadConfigFile', () => {
   const sampleConfigPath = resolve(import.meta.dirname, '../../sample-configs/add-edit-config.json');

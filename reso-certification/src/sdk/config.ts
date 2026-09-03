@@ -69,17 +69,91 @@ const resolveAuthFromEntry = (entry: ConfigEntry): AuthConfig => {
   throw new Error('Config entry must have either "token" or "clientCredentials"');
 };
 
-// ── Config File Loading ──
+// ── Config File Loading & Normalization ──
 
-/** Load and parse a config file from disk. */
+/** A recipient/config entry as it may appear in ANY supported input shape (before normalization). Mirrors
+ *  reso-web-client's config-import: the legacy CLI shape carries auth at the top level (`token` /
+ *  `clientCredentials`), while the desktop export nests it under `auth` (with `tokenUrl`, not `tokenUri`). */
+interface RawConfigEntry {
+  readonly serviceRootUri?: string;
+  readonly recipientUoi?: string;
+  readonly providerUsi?: string;
+  readonly resource?: string;
+  readonly description?: string;
+  readonly payloads?: ConfigPayloads;
+  readonly payloadsDir?: string;
+  readonly mode?: 'observe' | 'full';
+  readonly writableResource?: string;
+  readonly version?: string;
+  readonly originatingSystemName?: string;
+  readonly originatingSystemId?: string;
+  /** Legacy top-level auth. */
+  readonly token?: string;
+  readonly clientCredentials?: ConfigAuth['clientCredentials'];
+  /** Desktop-export nested auth. */
+  readonly auth?: {
+    readonly mode?: 'token' | 'client_credentials';
+    readonly authToken?: string;
+    readonly clientId?: string;
+    readonly clientSecret?: string;
+    readonly tokenUrl?: string;
+    readonly scope?: string;
+  };
+  /** Desktop per-endorsement options; only `version` is threaded (the rest are per-command CLI flags). */
+  readonly ddOptions?: { readonly version?: string };
+}
+
+/** Normalize one raw entry (either auth shape) to a canonical ConfigEntry. */
+const normalizeConfigEntry = (raw: RawConfigEntry): ConfigEntry => {
+  const version = raw.version ?? raw.ddOptions?.version;
+  // Auth: prefer the desktop's nested `auth`, else the legacy top-level `token` / `clientCredentials`.
+  const auth: ConfigAuth = raw.auth
+    ? raw.auth.mode === 'client_credentials' || (!!raw.auth.clientId && !!raw.auth.clientSecret)
+      ? { clientCredentials: { clientId: raw.auth.clientId ?? '', clientSecret: raw.auth.clientSecret ?? '', tokenUri: raw.auth.tokenUrl ?? '', ...(raw.auth.scope ? { scope: raw.auth.scope } : {}) } }
+      : { token: raw.auth.authToken }
+    : raw.clientCredentials
+      ? { clientCredentials: raw.clientCredentials }
+      : { token: raw.token };
+  return {
+    serviceRootUri: raw.serviceRootUri ?? '',
+    recipientUoi: raw.recipientUoi ?? '',
+    providerUsi: raw.providerUsi ?? '',
+    ...auth,
+    ...(raw.resource ? { resource: raw.resource } : {}),
+    ...(raw.description ? { description: raw.description } : {}),
+    ...(raw.payloads ? { payloads: raw.payloads } : {}),
+    ...(raw.payloadsDir ? { payloadsDir: raw.payloadsDir } : {}),
+    ...(raw.mode ? { mode: raw.mode } : {}),
+    ...(raw.writableResource ? { writableResource: raw.writableResource } : {}),
+    ...(version ? { version } : {}),
+    ...(raw.originatingSystemName ? { originatingSystemName: raw.originatingSystemName } : {}),
+    ...(raw.originatingSystemId ? { originatingSystemId: raw.originatingSystemId } : {}),
+  };
+};
+
+/** Normalize any recognized config shape to the canonical `{ providerUoi, configs }`. Accepts the legacy CLI
+ *  format (`{ providerUoi, configs: [...] }`), the desktop export (`{ providerUoi, recipients: [...] }` with
+ *  nested `auth`), and a single-entry config (`{ serviceRootUri, auth, ... }`) — so a downloaded desktop config
+ *  runs unmodified. Mirrors reso-web-client's config-import. */
+export const normalizeConfigFile = (raw: Record<string, unknown>): CertConfigFile => {
+  const rawEntries: ReadonlyArray<RawConfigEntry> =
+    Array.isArray(raw.configs) ? (raw.configs as ReadonlyArray<RawConfigEntry>)
+      : Array.isArray(raw.recipients) ? (raw.recipients as ReadonlyArray<RawConfigEntry>)
+        : (raw.serviceRootUri || raw.recipientUoi) ? [raw as RawConfigEntry]
+          : [];
+
+  if (rawEntries.length === 0) {
+    throw new Error('Config file has no entries — expected a "configs" or "recipients" array (or a single entry with "serviceRootUri").');
+  }
+
+  const providerUoi = typeof raw.providerUoi === 'string' && raw.providerUoi ? raw.providerUoi : generateLocalUoi();
+  return { providerUoi, configs: rawEntries.map(normalizeConfigEntry) };
+};
+
+/** Load and normalize a config file from disk (any supported shape → canonical `{ providerUoi, configs }`). */
 export const loadConfigFile = async (path: string): Promise<CertConfigFile> => {
   const content = await readFile(path, 'utf-8');
-  const parsed = JSON.parse(content) as CertConfigFile;
-
-  if (!parsed.providerUoi) throw new Error('Config file missing "providerUoi"');
-  if (!parsed.configs?.length) throw new Error('Config file missing "configs" array');
-
-  return parsed;
+  return normalizeConfigFile(JSON.parse(content) as Record<string, unknown>);
 };
 
 /** Generate a local placeholder UOI for testing. */
