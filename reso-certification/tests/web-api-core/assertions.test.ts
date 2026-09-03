@@ -175,6 +175,33 @@ describe('assertODataResponse', () => {
     expect(assertODataResponse(makeResponse({ headers: { 'odata-version': '4.0' } }), 200).passed).toBe(true);
     expect(assertODataResponse(makeResponse({ headers: { 'odata-version': '4.01' } }), 200).passed).toBe(true);
   });
+
+  it('captures the OData error.message on a status mismatch (self-diagnosing failure)', () => {
+    const res = assertODataResponse(
+      makeResponse({
+        status: 400,
+        body: { error: { code: '', message: 'OriginatingSystemName is required.' } },
+        rawBody: '{"error":{"message":"OriginatingSystemName is required."}}',
+      }),
+      200,
+    );
+    expect(res.passed).toBe(false);
+    expect(res.message).toContain('got 400');
+    expect(res.message).toContain('OriginatingSystemName is required.');
+  });
+
+  it('falls back to the raw body when there is no OData error.message', () => {
+    const res = assertODataResponse(makeResponse({ status: 400, body: null, rawBody: 'Bad Request: invalid filter clause' }), 200);
+    expect(res.passed).toBe(false);
+    expect(res.message).toContain('invalid filter clause');
+  });
+
+  it('truncates an oversized error body to keep the message a single readable line', () => {
+    const res = assertODataResponse(makeResponse({ status: 400, body: null, rawBody: 'x'.repeat(500) }), 200);
+    expect(res.passed).toBe(false);
+    expect(res.message).toContain('…');
+    expect(res.message.length).toBeLessThan(400);
+  });
 });
 
 describe('assertHasResults', () => {

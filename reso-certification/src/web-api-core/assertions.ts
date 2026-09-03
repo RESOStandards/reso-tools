@@ -186,6 +186,33 @@ export const assertCollectionLambda = (
     : { passed: false, message: `${failures.length} records failed: ${failures[0]}` };
 };
 
+/** Cap on how much server-error detail we surface in an assertion message. */
+const MAX_ERROR_DETAIL = 300;
+
+/** Collapse whitespace and cap length so a captured server error stays a single readable line. */
+const truncateErrorDetail = (s: string): string => {
+  const t = s.trim().replace(/\s+/g, ' ');
+  return t.length > MAX_ERROR_DETAIL ? `${t.slice(0, MAX_ERROR_DETAIL)}…` : t;
+};
+
+/**
+ * Extract a concise reason from a non-2xx OData response — the OData `error.message` when the body carries
+ * one, else a trimmed slice of the raw body — so a failure names WHY the server rejected the request, not
+ * just the status code. Returns '' when nothing useful is available.
+ */
+const describeErrorBody = (response: ODataResponse): string => {
+  const body = response.body;
+  if (typeof body === 'object' && body !== null) {
+    const err = (body as { readonly error?: unknown }).error;
+    if (typeof err === 'string' && err.trim().length > 0) return truncateErrorDetail(err);
+    if (typeof err === 'object' && err !== null) {
+      const message = (err as { readonly message?: unknown }).message;
+      if (typeof message === 'string' && message.trim().length > 0) return truncateErrorDetail(message);
+    }
+  }
+  return truncateErrorDetail(response.rawBody ?? '');
+};
+
 /**
  * Assert structural OData response properties.
  * Checks status code, OData-Version header, and valid JSON.
@@ -195,7 +222,11 @@ export const assertODataResponse = (
   expectedStatus: number,
 ): AssertionResult => {
   if (response.status !== expectedStatus) {
-    return { passed: false, message: `Expected HTTP ${expectedStatus}, got ${response.status}` };
+    // Capture the server's error detail (OData error.message, else the raw body) so a non-2xx failure is
+    // self-diagnosing — e.g. a provider that requires an OriginatingSystemName filter, or a genuine
+    // rejection — rather than an opaque "got 400". Previously only the status code was recorded.
+    const detail = describeErrorBody(response);
+    return { passed: false, message: `Expected HTTP ${expectedStatus}, got ${response.status}${detail ? ` — ${detail}` : ''}` };
   }
 
   if (expectedStatus >= 400) {
