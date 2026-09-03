@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { BaseComplianceConfig, PipelineResult, PipelineContext, ProgressCallback } from './types.js';
 import { optionalOutcome } from '../web-api-core/test-runner.js';
+import { RUN_CORE_SCENARIOS } from './step-names.js';
 
 // ── Software version ──
 
@@ -160,7 +161,7 @@ export const serializeCoreRemarks = (result: PipelineResult): string => {
   // {entityTypes, resources}, with no passed/failed/skipped — so every tally defaulted to 0 and
   // the persisted report's remarks always read "0 passed, 0 failed, 0 skipped out of 0 required
   // tests", regardless of the run's real result.
-  const testStep = result.steps.find(s => s.name === 'Run Core scenarios');
+  const testStep = result.steps.find(s => s.name === RUN_CORE_SCENARIOS);
   if (!testStep?.counts) return `Web API Core compliance test ${result.status}.`;
 
   const { passed = 0, failed = 0, skipped = 0, optionalPassed = 0, optionalNotSupported = 0, optionalNotTested = 0 } = testStep.counts;
