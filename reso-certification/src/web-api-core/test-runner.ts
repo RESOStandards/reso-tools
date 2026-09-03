@@ -997,6 +997,31 @@ const assertData = (
   }
 };
 
+// Authoritative source for the $skip unique-pages grounding (OData 4.0 = OASIS errata03).
+const ODATA_SKIP_SPEC_URL = 'https://docs.oasis-open.org/odata/odata/v4.0/errata03/';
+
+/**
+ * Failure message for the $skip "unique pages" assertion, grounded in the OData stable-ordering requirement so
+ * a provider can see WHY consecutive pages must be disjoint (cert_errors_cite_sources). Absent $orderby, OData
+ * requires the service to impose a stable ordering across requests that include $top/$skip — verbatim in BOTH
+ * OData 4.0 ($top §11.2.5.3, $skip §11.2.5.4) and 4.01 (§11.2.6.3–.4) — so `$top=5` then `$skip=5` return
+ * different records. A rare overlap can still surface on a fast-changing resource (records shifting between the
+ * two requests); RESO Web API Core notes a compliant server is not required to guarantee consistent results
+ * between requests, so that case is a data-change artifact rather than an ordering defect.
+ */
+export const describeSkipOverlap = (overlap: number): string => {
+  const keys = `${overlap} key${overlap === 1 ? '' : 's'}`;
+  const verb = overlap === 1 ? 'appears' : 'appear';
+  return (
+    `$skip overlap: ${keys} ${verb} in both pages — consecutive pages must be disjoint. ` +
+    `Absent $orderby, OData 4.0 §11.2.5.4 ($skip; §11.2.5.3 $top) — 4.01 §11.2.6.3–.4 — requires the service ` +
+    `to impose a stable ordering across requests, so $top=5 then $skip=5 must return different records. ` +
+    `A rare overlap can occur on a fast-changing resource as records shift between the two requests ` +
+    `(RESO Web API Core: a compliant server is not required to guarantee consistent results between requests). ` +
+    `See ${ODATA_SKIP_SPEC_URL}`
+  );
+};
+
 /** Run structural scenarios (metadata, service-document, fetch-by-key, select, top, skip, count). */
 const runStructuralScenario = async (
   serverUrl: string,
@@ -1066,7 +1091,7 @@ const runStructuralScenario = async (
       assertions.push(
         overlap.length === 0
           ? { passed: true, message: `$skip produced different records (${records1.length} vs ${records2.length})` }
-          : { passed: false, message: `$skip overlap: ${overlap.length} keys appear in both pages` }
+          : { passed: false, message: describeSkipOverlap(overlap.length) }
       );
     } else if (assertion === 'count') {
       const response = await requester.request({ method: 'GET', url: query.url, authToken });
