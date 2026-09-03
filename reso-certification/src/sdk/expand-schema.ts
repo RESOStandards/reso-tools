@@ -119,6 +119,21 @@ const asRecord = (v: unknown): Record<string, unknown> | undefined =>
   typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : undefined;
 
 /**
+ * Flatten the legacy validator's errorCache into field-qualified messages ("<Field>: <message>") so a
+ * schema-invalid expanded item NAMES the offending field, not just the generic rule. The errorCache is keyed
+ * by message; each value nests resources → fields, so one message can name several fields. Falls back to the
+ * bare message when no field is attributed. Exported for direct unit testing.
+ */
+export const errorMessagesFromCache = (errorCache: Record<string, unknown> | undefined): ReadonlyArray<string> =>
+  Object.entries(errorCache ?? {}).flatMap(([message, entry]) => {
+    const resources = asRecord(asRecord(entry)?.resources);
+    const fields = resources
+      ? [...new Set(Object.values(resources).flatMap((r) => Object.keys(asRecord(asRecord(r)?.fields) ?? {})))]
+      : [];
+    return fields.length > 0 ? fields.map((f) => `${f}: ${message}`) : [message];
+  });
+
+/**
  * True when a resource+field is on the committee-approved ignore-enumerations list (a closed enum whose
  * unadvertised/local values are permitted). The committed `schema-validation-settings.json` is keyed
  * DD-major.minor → resource → field → `{ ignoreEnumerations: true }`, so the endorsement's full semver
@@ -250,7 +265,9 @@ export const createExpandSchemaValidator = async (
           errorMap: {},
         }) as LegacyValidateResult;
         const totalErrors = result.stats?.totalErrors ?? 0;
-        const errors = Object.keys(result.errorCache ?? {});
+        // Field-qualified messages so a schema-invalid expanded item names the offending field(s) — the
+        // errorCache already carries them; the old Object.keys(errorCache) surfaced only the generic rule.
+        const errors = errorMessagesFromCache(result.errorCache);
         return { valid: totalErrors === 0, errors };
       } catch {
         // The schema COMPILED at construction (buildExpandSchema warmed it up), so a throw HERE is a genuinely
