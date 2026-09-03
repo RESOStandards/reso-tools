@@ -19,6 +19,12 @@ export interface TestParams {
   readonly resource: string;
   readonly keyField: string;
   readonly keyValue: string;
+  /** Optional OriginatingSystemName / OriginatingSystemID scope. When set, every resource-data filter query is
+   *  AND-scoped to it (mirrors the DD replication `prepareFilterExpression`), so a multi-tenant provider is
+   *  certified against the recipient org's own rows rather than reading "from the top". OSN takes precedence
+   *  over OSID. NOT YET WIRED from the run config / CLI — see the OSN/OSID plumbing TODO in queries.ts. */
+  readonly originatingSystemName?: string;
+  readonly originatingSystemId?: string;
   readonly enumMode: EnumMode;
   readonly integerField?: string;
   /** Median sampled value — for eq / ge / le / ne (the value's own record satisfies eq/ge/le; ne is gated). */

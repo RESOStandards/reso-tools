@@ -322,7 +322,7 @@ const buildStringFunctionUrl = (
  * Build the OData query URL for a scenario.
  * Returns undefined if required test params are missing (scenario should be skipped).
  */
-export const buildScenarioQuery = (
+const buildQueryForCategory = (
   serverUrl: string,
   resource: string,
   scenario: CoreScenario,
@@ -355,3 +355,69 @@ export const buildScenarioQuery = (
       return { url: `${serverUrl}/${resource}?$top=1&$count=true`, selectFields: [params.keyField] };
   }
 };
+
+// ── OriginatingSystem (OSN/OSID) scoping ──
+// Multi-tenant providers (e.g. MLS Grid) commingle many orgs behind one endpoint; some also REQUIRE an
+// OriginatingSystemName filter and 400 without it. Certifying a recipient org must therefore scope resource
+// queries to that org rather than reading "from the top" (huge, slow, and validating the wrong data). DD
+// replication already does this via prepareFilterExpression; this mirrors it for Core.
+// STATUS: query-layer only + config-gated (inert until params carry an OriginatingSystem). The run-config →
+// resolveTestParams → CLI plumbing and the exact scoped-category set are deliberately NOT finalized here —
+// validate them against a real multi-tenant provider's captured error body first (OSN/OSID open item).
+
+/** Resource-data filter categories that must be OriginatingSystem-scoped. Excludes `lookup-resource`
+ *  (/Lookup has no OriginatingSystem field), `error` (deliberate 404), `expand`, `structural` (key/metadata),
+ *  and `paging`. PROVISIONAL — confirm fetch-by-key / count / paging against a real provider before finalizing. */
+const ORIGINATING_SYSTEM_SCOPED_CATEGORIES: ReadonlySet<string> = new Set([
+  'filter', 'orderby', 'enum', 'collection', 'string-enum', 'string-function', 'in-operator',
+]);
+
+/** The OriginatingSystemName (preferred) or OriginatingSystemID clause for the run, or '' when neither is
+ *  configured — mirroring the DD replication precedence. */
+const originatingSystemClause = (params: TestParams): string => {
+  if (params.originatingSystemName && params.originatingSystemName.length > 0) {
+    return `OriginatingSystemName eq ${odataString(params.originatingSystemName)}`;
+  }
+  if (params.originatingSystemId && params.originatingSystemId.length > 0) {
+    return `OriginatingSystemID eq ${odataString(params.originatingSystemId)}`;
+  }
+  return '';
+};
+
+/** AND a clause into a URL's existing `$filter` (wrapping the original in parens), or add `$filter` when the
+ *  URL has none. Operates on the built URL so it applies uniformly regardless of which builder produced it. */
+const andUrlFilter = (url: string, clause: string): string => {
+  const [base, query = ''] = url.split('?');
+  const parts = query ? query.split('&') : [];
+  const idx = parts.findIndex(p => p.startsWith('$filter='));
+  if (idx === -1) {
+    return `${base}?${[`$filter=${encodeURIComponent(clause)}`, ...parts].join('&')}`;
+  }
+  const existing = decodeURIComponent(parts[idx].slice('$filter='.length));
+  parts[idx] = `$filter=${encodeURIComponent(`(${existing}) and ${clause}`)}`;
+  return `${base}?${parts.join('&')}`;
+};
+
+/** Scope a resource-data query to the recipient's OriginatingSystem when one is configured; a no-op for the
+ *  non-scoped categories and when no OriginatingSystem is set (inert until wired from the run config). */
+const scopeToOriginatingSystem = (
+  spec: QuerySpec | undefined,
+  scenario: CoreScenario,
+  params: TestParams,
+): QuerySpec | undefined => {
+  if (!spec || !ORIGINATING_SYSTEM_SCOPED_CATEGORIES.has(scenario.category)) return spec;
+  const clause = originatingSystemClause(params);
+  return clause ? { ...spec, url: andUrlFilter(spec.url, clause) } : spec;
+};
+
+/**
+ * Build the OData URL for a Core scenario, then scope resource-data queries to the recipient's
+ * OriginatingSystem (multi-tenant correctness). Inert until an OriginatingSystem is set on the params.
+ */
+export const buildScenarioQuery = (
+  serverUrl: string,
+  resource: string,
+  scenario: CoreScenario,
+  params: TestParams,
+): QuerySpec | undefined =>
+  scopeToOriginatingSystem(buildQueryForCategory(serverUrl, resource, scenario, params), scenario, params);
