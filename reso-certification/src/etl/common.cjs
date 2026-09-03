@@ -68,7 +68,21 @@ const getSimpleDataType = (type, isCollection) => {
  * @param {String} version the version of the metadata to fetch, for example "1.7" (current default)
  * @returns the latest copy of the metadata file at the URL in the description
  */
-const getMetadata = (version = CURRENT_DD_VERSION) => require(`@reso-standards/reso-common/reference-metadata/dd-${version}.json`) || {};
+const getMetadata = (version = CURRENT_DD_VERSION) => {
+  // STATIC specifiers (one literal require per version) so the esbuild cert-worker bundle inlines each
+  // reference JSON — a template-literal require escapes static analysis and fails in the packaged app
+  // (reso-tools-private #102). Add a case when a new DD version lands.
+  switch (version) {
+    case '1.7': return require('@reso-standards/reso-common/reference-metadata/dd-1.7.json') || {};
+    case '2.0': return require('@reso-standards/reso-common/reference-metadata/dd-2.0.json') || {};
+    case '2.1': return require('@reso-standards/reso-common/reference-metadata/dd-2.1.json') || {};
+    default:
+      // Fail LOUD (match getReferenceMetadata): an unsupported/unmapped version returning empty would read
+      // downstream as "no reference data" and silently misclassify every provider value as non-standard.
+      console.error(`Cannot load metadata for version '${version}'! Unsupported version — no reference data.`);
+      return {};
+  }
+};
 
 /**
  *
