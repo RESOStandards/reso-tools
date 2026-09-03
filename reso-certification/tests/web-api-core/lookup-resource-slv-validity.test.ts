@@ -9,6 +9,8 @@ import { lookupResourceSlvValidity } from '../../src/web-api-core/test-runner.js
 const ref: DdReference = {
   fields: [
     { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus' },
+    // City is a nominal enum the DD defines with ZERO standard values (no City lookups below) → purely open.
+    { resourceName: 'Property', fieldName: 'City', type: 'org.reso.metadata.enums.City' },
   ],
   lookups: [
     { lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Active', annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Active' }] },
@@ -53,5 +55,19 @@ describe('lookupResourceSlvValidity', () => {
     expect(good.passed).toBe(true); // 'Active' is standard in some enum
     const bad = lookupResourceSlvValidity([row('CompletelyMadeUp')], 'Property', 'UnknownField', 'UnknownField', standardMap, never);
     expect(bad.passed).toBe(false);
+  });
+
+  it('a purely-open enum (no DD-standard values, e.g. City) short-circuits to PASS — advertising is its only gate', () => {
+    // City is a nominal DD enum with zero standard members: there is nothing to validate a StandardLookupValue
+    // against, so SLV-validity is not applicable and every local value is legitimate once advertised.
+    const res = lookupResourceSlvValidity([row('Spanish Fork'), row('Simsboro')], 'Property', 'City', 'City', standardMap, never);
+    expect(res.passed).toBe(true);
+    expect(res.message).toContain('purely-open');
+  });
+
+  it('the purely-open short-circuit does NOT leak to a closed enum — a bogus StandardStatus value still fails', () => {
+    // StandardStatus HAS standard members, so it is not purely-open; the existing gating check still applies.
+    const res = lookupResourceSlvValidity([row('CompletelyMadeUp')], 'Property', 'StandardStatus', 'StandardStatus', standardMap, never);
+    expect(res.passed).toBe(false);
   });
 });

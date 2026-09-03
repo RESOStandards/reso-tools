@@ -654,6 +654,10 @@ export const lookupResourcePresence = (
  * provider's arbitrary wire LookupName. A declared StandardLookupValue that is not DD-standard is a bad remap
  * that breaks downstream consumers → a determinate FAIL. When the field can't be resolved to a precise DD enum,
  * fall back to "is it standard in ANY DD enum" ({@link StandardMap.isStandardValue}) rather than crash.
+ * A PURELY-OPEN enum — a nominal enumeration the DD defines with ZERO standard values (City, CountyOrParish) —
+ * short-circuits to PASS: there is no standard set to validate against, so advertising
+ * ({@link lookupResourcePresence}) is its only applicable gate. Enforcing SLV-validity there would false-fail
+ * every conformant provider.
  */
 export const lookupResourceSlvValidity = (
   rows: ReadonlyArray<Record<string, unknown>>,
@@ -665,6 +669,13 @@ export const lookupResourceSlvValidity = (
 ): AssertionResult => {
   if (isEnumerationIgnored(resource, field)) {
     return { passed: true, message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} is on the ignore-enumerations list — StandardLookupValue validity not enforced` };
+  }
+  // A purely-open enum (City, CountyOrParish, …) carries NO DD-standard values, so there is nothing a
+  // StandardLookupValue could be validated against — advertising (presence) is its only applicable gate.
+  // Enforcing SLV-validity would false-fail every conformant provider. (Closed enums and
+  // open-with-enumerations still carry a standard set and are validated below.)
+  if (standardMap.isPurelyOpenEnumField(resource, field)) {
+    return { passed: true, message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} is a purely-open enumeration with no DD-standard values — StandardLookupValue validity not applicable (advertising is the only gate)` };
   }
   // Prefer the precise per-field DD set (joined on the field's DD type); fall back to "any DD enum" only when
   // the field can't be resolved to a DD enum, so an unresolvable field degrades to a laxer check, never a crash.
