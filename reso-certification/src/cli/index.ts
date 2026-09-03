@@ -24,7 +24,7 @@ import { synthesizeResourcesFromFields } from '../metadata/index.js';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { startMockServer, stopMockServer } from '../add-edit/mock/server.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
-import { loadConfigFile, configEntryToAddEdit, configEntryToEntityEvent } from '../sdk/config.js';
+import { loadConfigFile, configEntryToAddEdit, configEntryToEntityEvent, configEntryToCore, configEntryToDD } from '../sdk/config.js';
 import type { AddEditConfig, EntityEventConfig, CoreConfig, DDConfig, PipelineResult } from '../sdk/types.js';
 import { resolveCliAuth, mintOAuth2ClientCredentialsToken } from './auth.js';
 import {
@@ -353,22 +353,28 @@ entityEventCmd.action(
 const coreCmd = program
   .command('core')
   .description('Web API Core 2.0.0/2.1.0 compliance testing')
-  .requiredOption('--url <url>', 'Server base URL')
+  .option('--url <url>', 'Server base URL (mutually exclusive with --config)')
+  .option('--config <path>', 'Path to a config file — runs every entry (mutually exclusive with --url)')
   .option('--resources <list>', 'Comma-separated resource names (default: well-known list)')
   .option('--version <version>', 'Spec version: 2.0.0 or 2.1.0', '2.0.0')
   .option('--enum-mode <mode>', 'Enum mode: auto, string, collections, or isflags (default: auto-detect)', 'auto')
-  .option('--full-coverage', 'Fail if any data type category has no coverage across all resources');
+  .option('--full-coverage', 'Fail if any data type category has no coverage across all resources')
+  .option('--originating-system-name <v>', 'Scope resource queries to OriginatingSystemName eq <v> (multi-tenant providers)')
+  .option('--originating-system-id <v>', 'Scope resource queries to OriginatingSystemID eq <v> (used when no name; OSN takes precedence)');
 
 addAuthOptions(coreCmd);
 addOutputOptions(coreCmd);
 
 coreCmd.action(
   async (opts: {
-    url: string;
+    url?: string;
+    config?: string;
     resources?: string;
     version: string;
     enumMode: string;
     fullCoverage?: boolean;
+    originatingSystemName?: string;
+    originatingSystemId?: string;
     authToken?: string;
     clientId?: string;
     clientSecret?: string;
@@ -378,6 +384,13 @@ coreCmd.action(
     outputDir?: string;
   }) => {
     try {
+      if (opts.url && opts.config) {
+        throw new Error('--url and --config are mutually exclusive. Use one or the other.');
+      }
+      if (!opts.url && !opts.config) {
+        throw new Error('Provide --url or --config.');
+      }
+
       const specVersion = opts.version as '2.0.0' | '2.1.0';
       if (specVersion !== '2.0.0' && specVersion !== '2.1.0') {
         throw new Error(`Invalid version "${opts.version}". Must be "2.0.0" or "2.1.0".`);
@@ -389,34 +402,66 @@ coreCmd.action(
       }
 
       const renderMode = resolveRenderMode(opts);
-      const auth = resolveCliAuth({
-        authToken: opts.authToken,
-        clientId: opts.clientId,
-        clientSecret: opts.clientSecret,
-        tokenUrl: opts.tokenUrl,
-      });
-
       const resources = opts.resources?.split(',').map(r => r.trim());
 
-      const config: CoreConfig = {
-        endorsement: 'core',
-        server: { url: opts.url, auth },
-        version: specVersion,
-        enumMode,
-        fullCoverage: opts.fullCoverage,
-        resources,
-        options: {
-          ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {}),
-        },
-      };
+      let results: ReadonlyArray<PipelineResult>;
 
-      const result = await runWithProgress(config, `Web API Core ${specVersion}`, renderMode);
+      if (opts.config) {
+        // Config-file mode — run every entry. The entry supplies server/auth/version/OSN (reso-certification-utils
+        // format); CLI flags apply run-level knobs (resources / enum-mode / coverage) and can override auth/OSN.
+        const configFile = await loadConfigFile(resolve(opts.config));
+        const authFlags = { authToken: opts.authToken, clientId: opts.clientId, clientSecret: opts.clientSecret, tokenUrl: opts.tokenUrl };
 
-      if (opts.output === 'json') {
-        console.log(formatResultJson([result]));
+        const entries = configFile.configs.map(entry => {
+          const baseConfig = configEntryToCore(entry, configFile.providerUoi);
+          const auth = resolveCliAuth(authFlags, baseConfig.server.auth);
+
+          const config: CoreConfig = {
+            ...baseConfig,
+            server: { ...baseConfig.server, auth },
+            enumMode,
+            ...(resources ? { resources } : {}),
+            ...(opts.fullCoverage ? { fullCoverage: true } : {}),
+            ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
+            ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
+            ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {}),
+          };
+
+          return { config, label: entry.description ?? `${entry.recipientUoi}-${entry.providerUsi}` };
+        });
+
+        results = await runConfigEntries(entries, renderMode);
+      } else {
+        const auth = resolveCliAuth({
+          authToken: opts.authToken,
+          clientId: opts.clientId,
+          clientSecret: opts.clientSecret,
+          tokenUrl: opts.tokenUrl,
+        });
+
+        const config: CoreConfig = {
+          endorsement: 'core',
+          server: { url: opts.url!, auth },
+          version: specVersion,
+          enumMode,
+          fullCoverage: opts.fullCoverage,
+          resources,
+          ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
+          ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
+          options: {
+            ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {}),
+          },
+        };
+
+        const result = await runWithProgress(config, `Web API Core ${specVersion}`, renderMode);
+        results = [result];
       }
 
-      process.exitCode = resolveExitCode([result]);
+      if (opts.output === 'json') {
+        console.log(formatResultJson(results));
+      }
+
+      process.exitCode = resolveExitCode(results);
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : String(error));
       process.exitCode = 2;
@@ -429,22 +474,28 @@ coreCmd.action(
 const ddCmd = program
   .command('dd')
   .description('Data Dictionary compliance testing')
-  .requiredOption('--url <url>', 'Server base URL')
+  .option('--url <url>', 'Server base URL (mutually exclusive with --config)')
+  .option('--config <path>', 'Path to a config file — runs every entry (mutually exclusive with --url)')
   .option('--dd-version <version>', `DD version (${CERTIFIABLE_DD_VERSIONS.join(' or ')})`, CURRENT_DD_VERSION)
   .option('--limit <n>', 'Max records to replicate per resource', '100000')
   .option('--strict', 'Strict mode: fail on variations and enforce JSON schema validation')
-  .option('--batch-expand', 'Batch all expansions per resource into a single $expand request');
+  .option('--batch-expand', 'Batch all expansions per resource into a single $expand request')
+  .option('--originating-system-name <v>', 'Append OriginatingSystemName eq <v> to every replication query (multi-tenant providers)')
+  .option('--originating-system-id <v>', 'Append OriginatingSystemID eq <v> to every replication query (used when no name; OSN takes precedence)');
 
 addAuthOptions(ddCmd);
 addOutputOptions(ddCmd);
 
 ddCmd.action(
   async (opts: {
-    url: string;
+    url?: string;
+    config?: string;
     ddVersion: string;
     limit: string;
     strict?: boolean;
     batchExpand?: boolean;
+    originatingSystemName?: string;
+    originatingSystemId?: string;
     authToken?: string;
     clientId?: string;
     clientSecret?: string;
@@ -454,39 +505,81 @@ ddCmd.action(
     outputDir?: string;
   }) => {
     try {
+      if (opts.url && opts.config) {
+        throw new Error('--url and --config are mutually exclusive. Use one or the other.');
+      }
+      if (!opts.url && !opts.config) {
+        throw new Error('Provide --url or --config.');
+      }
+
       const ddVersion = normalizeDDVersion(opts.ddVersion);
       if (!isCertifiableDDVersion(ddVersion)) {
         throw new Error(`Invalid version "${opts.ddVersion}". RESO certification requires DD ${CERTIFIABLE_DD_VERSIONS.join(' or ')}.`);
       }
 
       const renderMode = resolveRenderMode(opts);
-      const auth = resolveCliAuth({
-        authToken: opts.authToken,
-        clientId: opts.clientId,
-        clientSecret: opts.clientSecret,
-        tokenUrl: opts.tokenUrl,
-      });
 
-      const config: DDConfig = {
-        endorsement: 'dd',
-        fromCli: true,
-        server: { url: opts.url, auth },
-        version: ddVersion,
-        limit: Number(opts.limit),
-        strictMode: opts.strict,
-        batchExpand: opts.batchExpand,
-        options: {
-          ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {}),
-        },
-      };
+      let results: ReadonlyArray<PipelineResult>;
 
-      const result = await runWithProgress(config, `Data Dictionary ${ddVersion}`, renderMode);
+      if (opts.config) {
+        // Config-file mode — run every entry. The entry supplies server/auth/version/OSN (reso-certification-utils
+        // format); CLI flags apply run-level knobs (limit / strict / batch-expand) and can override auth/OSN. Entry
+        // version wins (parallel to add-edit/entity-event); --dd-version applies only in direct mode below.
+        const configFile = await loadConfigFile(resolve(opts.config));
+        const authFlags = { authToken: opts.authToken, clientId: opts.clientId, clientSecret: opts.clientSecret, tokenUrl: opts.tokenUrl };
 
-      if (opts.output === 'json') {
-        console.log(formatResultJson([result]));
+        const entries = configFile.configs.map(entry => {
+          const baseConfig = configEntryToDD(entry, configFile.providerUoi);
+          const auth = resolveCliAuth(authFlags, baseConfig.server.auth);
+
+          const config: DDConfig = {
+            ...baseConfig,
+            fromCli: true,
+            server: { ...baseConfig.server, auth },
+            limit: Number(opts.limit),
+            ...(opts.strict ? { strictMode: true } : {}),
+            ...(opts.batchExpand ? { batchExpand: true } : {}),
+            ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
+            ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
+            ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {}),
+          };
+
+          return { config, label: entry.description ?? `${entry.recipientUoi}-${entry.providerUsi}` };
+        });
+
+        results = await runConfigEntries(entries, renderMode);
+      } else {
+        const auth = resolveCliAuth({
+          authToken: opts.authToken,
+          clientId: opts.clientId,
+          clientSecret: opts.clientSecret,
+          tokenUrl: opts.tokenUrl,
+        });
+
+        const config: DDConfig = {
+          endorsement: 'dd',
+          fromCli: true,
+          server: { url: opts.url!, auth },
+          version: ddVersion,
+          limit: Number(opts.limit),
+          strictMode: opts.strict,
+          batchExpand: opts.batchExpand,
+          ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
+          ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
+          options: {
+            ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {}),
+          },
+        };
+
+        const result = await runWithProgress(config, `Data Dictionary ${ddVersion}`, renderMode);
+        results = [result];
       }
 
-      process.exitCode = resolveExitCode([result]);
+      if (opts.output === 'json') {
+        console.log(formatResultJson(results));
+      }
+
+      process.exitCode = resolveExitCode(results);
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : String(error));
       process.exitCode = 2;

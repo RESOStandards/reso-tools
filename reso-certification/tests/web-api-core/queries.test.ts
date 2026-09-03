@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildScenarioQuery } from '../../src/web-api-core/queries.js';
+import { buildScenarioQuery, originatingSystemFilterClause } from '../../src/web-api-core/queries.js';
 import type { TestParams } from '../../src/web-api-core/sampling.js';
 import type { CoreScenario, FilterScenario, OrderByScenario, ErrorScenario, StructuralScenario } from '../../src/web-api-core/scenarios.js';
 
@@ -141,5 +141,18 @@ describe('buildScenarioQuery — OriginatingSystem (OSN/OSID) scoping', () => {
 
   it('escapes single quotes in the OriginatingSystem value (OData string literal)', () => {
     expect(query(filterScenario, { ...baseParams, originatingSystemName: 'O\'Brien MLS' })).toContain('OriginatingSystemName eq \'O\'\'Brien MLS\'');
+  });
+});
+
+describe('originatingSystemFilterClause — shared OSN/OSID clause builder', () => {
+  it('prefers OSN over OSID, falls back to OSID, and is empty when neither is set', () => {
+    expect(originatingSystemFilterClause('MyMLS', 'MLS-42')).toBe("OriginatingSystemName eq 'MyMLS'");
+    expect(originatingSystemFilterClause(undefined, 'MLS-42')).toBe("OriginatingSystemID eq 'MLS-42'");
+    expect(originatingSystemFilterClause(undefined, undefined)).toBe('');
+    expect(originatingSystemFilterClause('', '')).toBe('');
+  });
+
+  it('escapes single quotes (OData 4.01 string literal)', () => {
+    expect(originatingSystemFilterClause("O'Brien MLS")).toBe("OriginatingSystemName eq 'O''Brien MLS'");
   });
 });
