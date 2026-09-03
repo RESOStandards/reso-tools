@@ -126,7 +126,13 @@ export const serializeAddEditRemarks = (result: PipelineResult): string => {
   const fieldCount = metadataStep?.counts?.fields ?? 0;
   const resource = (result.context as Record<string, unknown>).resource ?? 'Property';
 
-  const parts = [`${passed} of ${total} scenarios ${result.status}`];
+  // Pair the count with the matching word — a failed run reports its FAILED count, otherwise the passed
+  // count (#258: the remark previously read "<passed> of <total> scenarios failed", using the passed count
+  // with the run's status word).
+  const headline = failed > 0
+    ? `${failed} of ${total} scenarios failed`
+    : `${passed} of ${total} scenarios passed`;
+  const parts = [headline];
   if (fieldCount > 0) parts.push(`${fieldCount} fields validated against ${resource} metadata`);
   if (failed > 0) {
     const errors = testStep.errors ?? [];

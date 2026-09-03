@@ -44,12 +44,12 @@ describe('serializeAddEditRemarks', () => {
 
     const remarks = serializeAddEditRemarks(result);
 
-    expect(remarks).toContain('8 of 8');
+    expect(remarks).toContain('8 of 8 scenarios passed');
     expect(remarks).toContain('632 fields');
     expect(remarks).toContain('Property');
   });
 
-  it('includes failure info when tests fail', () => {
+  it('pairs the FAILED count with the "failed" word when tests fail (#258 regression)', () => {
     const result = makeResult({
       status: 'failed',
       context: { resource: 'Property' },
@@ -60,7 +60,9 @@ describe('serializeAddEditRemarks', () => {
 
     const remarks = serializeAddEditRemarks(result);
 
-    expect(remarks).toContain('6 of 8');
+    // #258: report the FAILED count with "failed" — never the passed count paired with "failed".
+    expect(remarks).toContain('2 of 8 scenarios failed');
+    expect(remarks).not.toContain('6 of 8 scenarios failed');
     expect(remarks).toContain('create failed');
   });
 
