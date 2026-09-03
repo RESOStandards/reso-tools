@@ -5,15 +5,14 @@ import { errorMessagesFromCache } from '../../src/sdk/expand-schema.js';
 // metadata") — not WHICH field. The legacy validator's errorCache already nests the offending field under
 // resources → fields; errorMessagesFromCache lifts it into the message so the failure is self-diagnosing.
 describe('errorMessagesFromCache — field-qualified expand errors', () => {
-  it('names the offending field(s) for each message', () => {
+  it('names the offending field(s) in ONE entry per rule', () => {
     const errorCache = {
       'MUST be advertised in the metadata': {
         resources: { Media: { fields: { PhotoUrl: { count: 1 }, ImageOf: { count: 2 } }, count: 3 } },
       },
     };
     const msgs = errorMessagesFromCache(errorCache);
-    expect(msgs).toContain('PhotoUrl: MUST be advertised in the metadata');
-    expect(msgs).toContain('ImageOf: MUST be advertised in the metadata');
+    expect(msgs).toEqual(['MUST be advertised in the metadata (fields: PhotoUrl, ImageOf)']);
   });
 
   it('falls back to the bare message when no field is attributed', () => {
@@ -35,6 +34,18 @@ describe('errorMessagesFromCache — field-qualified expand errors', () => {
       },
     };
     const msgs = errorMessagesFromCache(errorCache);
-    expect(msgs.filter((m) => m.startsWith('MobileWidth:'))).toHaveLength(1);
+    expect(msgs).toEqual(['MUST be integer or null but found decimal (field: MobileWidth)']);
+  });
+
+  // Adversarial-review regression: fanning out per FIELD let one message's fields crowd distinct RULES out
+  // of validateExpandedItems' first.errors.slice(0,3) preview. One entry per message keeps both rules.
+  it('keeps distinct rules as separate entries so a truncated preview never drops a second rule', () => {
+    const errorCache = {
+      'Fields MUST be advertised in the metadata': { resources: { Media: { fields: { A: {}, B: {}, C: {}, D: {} } } } },
+      'MUST have a maximum advertised length': { resources: { Media: { fields: { LongText: {} } } } },
+    };
+    const msgs = errorMessagesFromCache(errorCache);
+    expect(msgs).toHaveLength(2);
+    expect(msgs.some((m) => m.startsWith('MUST have a maximum advertised length'))).toBe(true);
   });
 });
