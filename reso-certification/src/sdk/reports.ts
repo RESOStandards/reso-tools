@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { BaseComplianceConfig, PipelineResult, PipelineContext, ProgressCallback } from './types.js';
 import { optionalOutcome } from '../web-api-core/test-runner.js';
-import { RUN_CORE_SCENARIOS } from './step-names.js';
+import { FETCH_METADATA, RUN_ADD_EDIT_SCENARIOS, RUN_CORE_SCENARIOS, RUN_ENTITY_EVENT_SCENARIOS } from './step-names.js';
 
 // ── Software version ──
 
@@ -118,12 +118,12 @@ export interface ReportGenerator<TContext extends PipelineContext = PipelineCont
 
 /** Serialize Add/Edit pipeline results into a human-readable remarks string. */
 export const serializeAddEditRemarks = (result: PipelineResult): string => {
-  const testStep = result.steps.find(s => s.name === 'Run Add/Edit scenarios');
+  const testStep = result.steps.find(s => s.name === RUN_ADD_EDIT_SCENARIOS);
   if (!testStep?.counts) return `Add/Edit compliance test ${result.status}.`;
 
   const { total = 0, passed = 0, failed = 0 } = testStep.counts;
 
-  const metadataStep = result.steps.find(s => s.name === 'Fetch metadata');
+  const metadataStep = result.steps.find(s => s.name === FETCH_METADATA);
   const fieldCount = metadataStep?.counts?.fields ?? 0;
   const resource = (result.context as Record<string, unknown>).resource ?? 'Property';
 
@@ -145,7 +145,7 @@ export const serializeAddEditRemarks = (result: PipelineResult): string => {
 
 /** Serialize EntityEvent pipeline results into a human-readable remarks string. */
 export const serializeEntityEventRemarks = (result: PipelineResult): string => {
-  const testStep = result.steps.find(s => s.name === 'Run EntityEvent scenarios');
+  const testStep = result.steps.find(s => s.name === RUN_ENTITY_EVENT_SCENARIOS);
   if (!testStep?.counts) return `EntityEvent compliance test ${result.status}.`;
 
   const { total = 0, passed = 0 } = testStep.counts;

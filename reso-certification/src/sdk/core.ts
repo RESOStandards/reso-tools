@@ -12,7 +12,7 @@ import { buildStandardMap, createLookupCache, resolveTestParams, WELL_KNOWN_RESO
 import { runCoreResourceScenarios, runProviderScenarios, summarizeScenarios, type ResourceTestReport } from '../web-api-core/test-runner.js';
 import { resolveServingDecision } from '../web-api-core/serving.js';
 import { createExpandSchemaValidator, isEnumerationIgnored, loadValidationConfig } from './expand-schema.js';
-import { RUN_CORE_SCENARIOS } from './step-names.js';
+import { FETCH_METADATA, RUN_CORE_SCENARIOS } from './step-names.js';
 import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import { isDeadlineError, runSettled } from '@reso-standards/reso-client';
 import { createCertSession, createSessionRequester } from '../test-runner/requester.js';
@@ -64,9 +64,9 @@ const resolveAuth = (config: CoreConfig): PipelineStep<CoreContext> => ({
 });
 
 const fetchAndParseMetadata = (config: CoreConfig): PipelineStep<CoreContext> => ({
-  name: 'Fetch metadata',
+  name: FETCH_METADATA,
   run: async (ctx, onProgress) => {
-    onProgress({ step: 'Fetch metadata', status: 'running', message: 'Fetching $metadata...' });
+    onProgress({ step: FETCH_METADATA, status: 'running', message: 'Fetching $metadata...' });
     const metadataXml = config.metadataPath
       ? await loadMetadataFromFile(config.metadataPath)
       : await fetchMetadata(ctx.serverUrl, ctx.authToken!);
