@@ -129,7 +129,10 @@ export const createCoreProgressView = () => {
     });
     const grid = lines.join('\n');
     // The current request sits one line below the grid, led by its HTTP verb (reusable for GET/PATCH/POST/…).
-    return currentUrl ? `${grid}\n\n${chalk.gray(`→ ${currentMethod} ${currentUrl}`)}` : grid;
+    // listr2 filters empty and whitespace-only output lines, so a plain blank line vanishes — a zero-width space
+    // (U+200B) is not whitespace, so the separator survives and still renders invisibly as a blank line.
+    const gap = '\u200B'; // U+200B zero-width space
+    return currentUrl ? `${grid}\n${gap}\n${chalk.gray(`→ ${currentMethod} ${currentUrl}`)}` : grid;
   };
 
   return { apply, render, hasData: (): boolean => order.length > 0 };
