@@ -9,6 +9,7 @@ import { createPipeline } from './pipeline.js';
 import { entityEventReportGenerators, writeReports, prepareOutputDir } from './reports.js';
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
 import type { StepResult } from './types.js';
+import { FETCH_METADATA, RUN_ENTITY_EVENT_SCENARIOS } from './step-names.js';
 
 // ── Pipeline Context ──
 
@@ -69,9 +70,9 @@ const resolveAuth = (config: EntityEventConfig): PipelineStep<EntityEventContext
 
 /** Fetch and parse OData $metadata to verify EntityEvent exists. */
 const fetchAndParseMetadata = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
-  name: 'Fetch metadata',
+  name: FETCH_METADATA,
   run: async (ctx, onProgress) => {
-    onProgress({ step: 'Fetch metadata', status: 'running', message: 'Fetching $metadata...' });
+    onProgress({ step: FETCH_METADATA, status: 'running', message: 'Fetching $metadata...' });
     const metadataXml = config.payloadsDir
       ? await loadMetadataFromFile(config.payloadsDir)
       : await fetchMetadata(ctx.serverUrl, ctx.authToken!);
@@ -143,7 +144,7 @@ const generatePayloads = (config: EntityEventConfig): PipelineStep<EntityEventCo
 
 /** Run all EntityEvent compliance scenarios. */
 const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
-  name: 'Run EntityEvent scenarios',
+  name: RUN_ENTITY_EVENT_SCENARIOS,
   run: async (ctx, onProgress) => {
     const runnerConfig: EERunnerConfig = {
       serverUrl: ctx.serverUrl,
@@ -159,7 +160,7 @@ const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> =
     };
 
     const testReport = await runAllEntityEventScenarios(runnerConfig, (message) => {
-      onProgress({ step: 'Run EntityEvent scenarios', status: 'running', message });
+      onProgress({ step: RUN_ENTITY_EVENT_SCENARIOS, status: 'running', message });
     });
     const { passed, failed } = testReport.summary;
     const status = failed > 0 ? 'failed' as const : 'passed' as const;

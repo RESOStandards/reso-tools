@@ -16,6 +16,7 @@ import { createPipeline } from './pipeline.js';
 import { addEditReportGenerators, writeReports, prepareOutputDir } from './reports.js';
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
 import type { BaseTestContext } from './types.js';
+import { FETCH_METADATA, RUN_ADD_EDIT_SCENARIOS } from './step-names.js';
 
 // ── Pipeline Context ──
 
@@ -65,9 +66,9 @@ const resolveAuth = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
 
 /** Fetch and parse OData $metadata from the server or a local file. */
 const fetchAndParseMetadata = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
-  name: 'Fetch metadata',
+  name: FETCH_METADATA,
   run: async (ctx, onProgress) => {
-    onProgress({ step: 'Fetch metadata', status: 'running', message: 'Fetching $metadata...' });
+    onProgress({ step: FETCH_METADATA, status: 'running', message: 'Fetching $metadata...' });
     const metadataXml = config.metadataPath
       ? await loadMetadataFromFile(config.metadataPath)
       : await fetchMetadata(ctx.serverUrl, ctx.authToken!);
@@ -229,7 +230,7 @@ const generatePayloads = (config: AddEditConfig): PipelineStep<AddEditContext> =
 
 /** Run all 8 Add/Edit certification scenarios. */
 const runTests = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
-  name: 'Run Add/Edit scenarios',
+  name: RUN_ADD_EDIT_SCENARIOS,
   run: async (ctx, _onProgress) => {
     const testReport = await runAllScenarios({
       serverUrl: ctx.serverUrl,
