@@ -7,6 +7,35 @@ import type { DDVersion } from './dd-versions.js';
  *  total-timeout budget before finishing; results gathered are valid, the rest is not tested. */
 export type StepStatus = 'pending' | 'running' | 'passed' | 'failed' | 'skipped' | 'incomplete';
 
+/** Per-resource lifecycle phase for the Web API Core scenarios step — drives the interactive resource tree. */
+export type CoreResourcePhase = 'queued' | 'sampling' | 'testing' | 'done';
+
+/**
+ * Structured detail for a Web API Core per-resource progress event. The human-readable `message` on the
+ * enclosing StepProgress stays authoritative for consumers that don't parse this (e.g. the desktop client's
+ * current progress line); richer renderers (the interactive CLI resource tree) read `detail`. Mirrors the
+ * `replication-progress` JSON pattern already used for DD, but as a typed field rather than a message string
+ * so it never has to be parsed back out of prose.
+ */
+export interface CoreProgressDetail {
+  readonly kind: 'core-progress';
+  /** 'init' seeds the full resource list (all rows start queued); 'phase' updates one resource; 'request'
+   *  reports the URL of the request currently being issued (for the live "what's being tested" line). */
+  readonly event: 'init' | 'phase' | 'request';
+  /** Present on 'init' — every resource that will be tested, in order. */
+  readonly resources?: ReadonlyArray<string>;
+  /** Present on 'phase' and 'request' — the resource this event is about. */
+  readonly resource?: string;
+  readonly phase?: CoreResourcePhase;
+  /** Present when phase is 'done'. */
+  readonly outcome?: 'passed' | 'failed' | 'skipped' | 'not-applicable';
+  readonly counts?: { readonly passed: number; readonly failed: number; readonly skipped: number };
+  /** Short reason for a non-count outcome (skipped/NA/not-served). */
+  readonly note?: string;
+  /** Present on 'request' — the URL currently being requested. */
+  readonly url?: string;
+}
+
 /** Progress update emitted by each pipeline step. */
 export interface StepProgress {
   readonly step: string;
@@ -14,6 +43,8 @@ export interface StepProgress {
   readonly message?: string;
   readonly duration?: number;
   readonly artifacts?: ReadonlyArray<{ readonly label: string; readonly path: string }>;
+  /** Optional structured detail for rich rendering (Core per-resource tree). See {@link CoreProgressDetail}. */
+  readonly detail?: CoreProgressDetail;
 }
 
 /** Callback for receiving step progress updates. */
