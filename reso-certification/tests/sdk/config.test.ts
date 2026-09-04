@@ -62,6 +62,18 @@ describe('normalizeConfigFile — accept legacy / desktop / single shapes', () =
   it('throws on an unrecognized shape', () => {
     expect(() => normalizeConfigFile({ foo: 'bar' })).toThrow(/no entries/);
   });
+
+  it('rejects a serviceRootUri that is not a valid absolute http(s) URL (catch-all)', () => {
+    // A desktop placeholder the CLI does not resolve — the exact case that crashed mid-metadata before.
+    expect(() => normalizeConfigFile({ providerUoi: 'P001', configs: [{ serviceRootUri: 'LOCAL_SERVER', recipientUoi: 'R1', providerUsi: 'S1', token: 't' }] }))
+      .toThrow(/serviceRootUri "LOCAL_SERVER" is not a valid URL/);
+    // A missing scheme is caught too.
+    expect(() => normalizeConfigFile({ serviceRootUri: 'api.example.com', recipientUoi: 'R1', providerUsi: 'S1', auth: { mode: 'token', authToken: 't' } }))
+      .toThrow(/not a valid URL/);
+    // A real absolute URL passes.
+    expect(() => normalizeConfigFile({ providerUoi: 'P001', configs: [{ serviceRootUri: 'https://api.example.com', recipientUoi: 'R1', providerUsi: 'S1', token: 't' }] }))
+      .not.toThrow();
+  });
 });
 
 describe('loadConfigFile', () => {
