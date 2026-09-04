@@ -93,4 +93,25 @@ describe('createCoreProgressView', () => {
     expect(v.hasData()).toBe(true);
     expect(v.render()).toContain('LateResource');
   });
+
+  it('the provider-wide row, emitted before init, lands first and is a first-class grid row', () => {
+    const v = createCoreProgressView();
+    // The engine emits the provider-wide (Service) done event BEFORE seeding the per-resource init, so its row
+    // reads first — matching the report, where the provider-wide report is prepended — and its tally counts
+    // into the grid so the rows reconcile with the run-header total.
+    v.apply(d({ resource: 'Service (provider-wide)', phase: 'done', outcome: 'passed', counts: { passed: 2, failed: 0, skipped: 0 } }));
+    v.apply(d({ event: 'init', resources: ['Property', 'Member'] }));
+    v.apply(d({ resource: 'Property', phase: 'done', outcome: 'passed', counts: { passed: 55, failed: 0, skipped: 4 } }));
+    v.apply(d({ resource: 'Member', phase: 'done', outcome: 'passed', counts: { passed: 45, failed: 0, skipped: 9 } }));
+    const out = v.render();
+    expect(out).toContain('Service (provider-wide)');
+    // first, ahead of the data resources
+    expect(out.indexOf('Service (provider-wide)')).toBeLessThan(out.indexOf('Property'));
+    expect(out.indexOf('Property')).toBeLessThan(out.indexOf('Member'));
+    // it is a real tally row (not a note), and its '/' aligns with the data-resource rows
+    const tallyLines = out.split('\n').filter(l => l.includes('/'));
+    expect(tallyLines).toHaveLength(3);
+    expect(tallyLines[0]).toContain('Service (provider-wide)');
+    expect(new Set(tallyLines.map(l => l.indexOf('/'))).size).toBe(1);
+  });
 });

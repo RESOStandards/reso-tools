@@ -120,3 +120,27 @@ export const resolveServingDecision = (args: {
   // Determinately declared-but-not-served: required resources are a clean FAIL; others are Not Applicable.
   return REQUIRED_RESOURCES_V21.includes(resource) ? 'fail' : 'na';
 };
+
+/**
+ * Post-sampling availability routing — the "Media rule". A resource whose top-level sample page returned no
+ * records is not queryable at the top level, whatever its EntitySet declared: declaring an EntitySet does NOT
+ * guarantee records (it can be empty, access-denied, or randomly gated). So availability is decided by whether
+ * records actually came back, not by the declaration:
+ *
+ * - records present, OR Core 2.0.0 → `'run'`: the caller proceeds with the normal top-level scenarios. The
+ *   carve-out is 2.1.0+ only; 2.0.0 samples and runs a resource exactly as before, records or not.
+ * - no records, 2.1.0+ → a REQUIRED resource (P/M/O/F/L/EntityEvent) `'fail'`s with one clean failure (an empty
+ *   required resource can't certify Core — a GUARANTEED fail, not a reliance on individual scenarios erroring);
+ *   a non-required resource is `'na'` (Not Applicable — carried by `$expand`).
+ *
+ * The required-list gate is what keeps this loosening from opening a false-pass: only expansion-class resources
+ * become NA on an empty top level; a required resource always fails.
+ */
+export const resolveNoRecordsOutcome = (
+  resource: string,
+  version: '2.0.0' | '2.1.0',
+  hasTopLevelRecords: boolean,
+): ServingDecision => {
+  if (hasTopLevelRecords || version === '2.0.0') return 'run';
+  return REQUIRED_RESOURCES_V21.includes(resource) ? 'fail' : 'na';
+};

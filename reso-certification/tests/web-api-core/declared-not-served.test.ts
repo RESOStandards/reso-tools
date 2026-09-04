@@ -160,9 +160,11 @@ describe('Core 2.1.0 declared-but-not-served carve-out (end-to-end)', () => {
     expect(result.status).toBe('failed');
   });
 
-  it('2.1.0: DECLARED as an EntitySet but 404ing + omitted from the service doc (surfaces DISAGREE) → runs + fails for real, never masked', async () => {
-    // The anti-false-PASS guard: Property is a declared EntitySet (Surface 2 present) but the service doc
-    // omits it (Surface 1 absent) and a GET 404s. It must stay in the run and fail for real.
+  it('2.1.0: DECLARED as an EntitySet but 404ing (no records) → sampled, then ONE clean failure, never masked', async () => {
+    // The anti-false-PASS guard, now keyed on RECORDS rather than the EntitySet surface (the "Media rule"):
+    // Property is a declared EntitySet (Surface 2 present) but the service doc omits it (Surface 1 absent) and a
+    // GET 404s, so no records come back. A REQUIRED resource with no top-level records is a GUARANTEED clean
+    // failure — sampled first, real failure, never masked/NA. (A non-required resource here would be NA instead.)
     mock = installMock({
       edmx: buildEdmx([['Property', 'ListingKey'], ['Member', 'MemberKey']], [['Property', 'Property']]),
       serviceDoc: serviceDoc(['Member']),
@@ -172,11 +174,12 @@ describe('Core 2.1.0 declared-but-not-served carve-out (end-to-end)', () => {
     const result = await runCoreCompliance(makeConfig(outputDir, { version: '2.1.0', resources: ['Property'] }));
 
     const property = reportFor(result, 'Property');
-    // It ran the full scenario set (not a 1-scenario masked stub) and produced real failures.
-    expect(property?.scenarios.length ?? 0).toBeGreaterThan(1);
-    expect(property?.scenarios.some(s => s.tag === 'resource-not-applicable' || s.tag === 'required-resource-not-served')).toBe(false);
+    // One clean failure (not a 40-scenario 404 cascade, and not a masked NA stub). It WAS sampled first.
+    expect(property?.scenarios).toHaveLength(1);
+    expect(property?.scenarios[0].tag).toBe('required-resource-not-served');
+    expect(property?.scenarios[0].passed).toBe(false);
     expect(property?.summary.failed ?? 0).toBeGreaterThan(0);
-    expect(sampledResources(mock.calls)).toContain('Property'); // it WAS sampled — not masked
+    expect(sampledResources(mock.calls)).toContain('Property'); // sampled — records were checked at runtime, not masked
     expect(result.status).toBe('failed');
   });
 
