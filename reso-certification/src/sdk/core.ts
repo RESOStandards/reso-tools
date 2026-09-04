@@ -15,7 +15,7 @@ import { createExpandSchemaValidator, isEnumerationIgnored, loadValidationConfig
 import { FETCH_METADATA, RUN_CORE_SCENARIOS } from './step-names.js';
 import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import { isDeadlineError, runSettled } from '@reso-standards/reso-client';
-import { createCertSession, createSessionRequester } from '../test-runner/requester.js';
+import { createCertSession, createSessionRequester, type ODataRequester } from '../test-runner/requester.js';
 import type { BaseTestContext, CoreConfig, PipelineStep, StepResult } from './types.js';
 import { createPipeline } from './pipeline.js';
 import { coreReportGenerators, writeReports, prepareOutputDir } from './reports.js';
@@ -275,7 +275,15 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // whole run; when it is spent the run stops gracefully and remaining work is marked NOT TESTED
     // (status → incomplete), so a partial report is still written rather than the process being killed.
     const session = createCertSession(config.totalTimeoutMs);
-    const requester = createSessionRequester(session);
+    // Wrap the run's requester so every request emits its URL as a structured progress detail — the CLI shows
+    // it (dimmed) as the "currently testing" line. Report-only; the request itself is unchanged.
+    const baseRequester = createSessionRequester(session);
+    const requester: ODataRequester = {
+      request: (options) => {
+        onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: '', detail: { kind: 'core-progress', event: 'request', url: options.url } });
+        return baseRequester.request(options);
+      },
+    };
 
     // Core 2.1.0 $expand is GATING and schema-validates each expanded child item against its target entity
     // type. Build the validator ONCE per run from the provider's metadata report (generated from the EDMX we
@@ -299,6 +307,9 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // OData version threaded into each resource's 4.01 gate.
     const provider = await runProviderScenarios(ctx.serverUrl, ctx.authToken!, version, requester);
 
+    // Seed the interactive per-resource view — every resource starts queued.
+    onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `Testing ${ctx.resources.length} resource(s)...`, detail: { kind: 'core-progress', event: 'init', resources: ctx.resources } });
+
     // Continue-on-error across resources: one bad resource (e.g. a sampling network
     // failure) is captured and the run keeps going, so a walk-away run still yields a
     // full report. A fatal error (auth revoked) stops the run — surfaced below.
@@ -318,11 +329,11 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           declaredEntitySets: metadata.entitySets,
         });
         if (decision === 'fail') {
-          onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `${resource}: required resource declared but not served top level — one clean failure` });
+          onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `${resource}: required resource declared but not served top level — one clean failure`, detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'failed', note: 'declared but not served' } });
           return requiredResourceNotServedReport(resource);
         }
         if (decision === 'na') {
-          onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `${resource}: declared but not served top level — Not Applicable (may be expansion-only)` });
+          onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `${resource}: declared but not served top level — Not Applicable (may be expansion-only)`, detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'not-applicable', note: 'not served (expansion-only)' } });
           return notServedNotApplicableReport(resource);
         }
 
@@ -330,6 +341,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           step: RUN_CORE_SCENARIOS,
           status: 'running',
           message: `Sampling ${resource}...`,
+          detail: { kind: 'core-progress', event: 'phase', resource, phase: 'sampling' },
         });
 
         const enumModeOverride = ctx.enumMode !== 'auto' ? ctx.enumMode as import('../web-api-core/sampling.js').EnumMode : undefined;
@@ -352,7 +364,10 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           if (isDeadlineError(err)) return null;
           throw err;
         });
-        if (params === null) return deadlineResourceReport(resource);
+        if (params === null) {
+          onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `${resource}: not tested (ran out of time)`, detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'skipped', note: 'ran out of time' } });
+          return deadlineResourceReport(resource);
+        }
 
         // Register this resource's field → provider LookupName map so the shared cache can resolve
         // (resource, field) → LookupName for the Lookup Resource presence + SLV-validity checks.
@@ -370,6 +385,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           step: RUN_CORE_SCENARIOS,
           status: 'running',
           message: `Testing ${resource}...`,
+          detail: { kind: 'core-progress', event: 'phase', resource, phase: 'testing' },
         });
 
         const report = await runCoreResourceScenarios(
@@ -389,6 +405,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           step: RUN_CORE_SCENARIOS,
           status: 'running',
           message: `${resource}: ${report.summary.passed} passed, ${report.summary.failed} failed, ${report.summary.skipped} skipped`,
+          detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: report.summary.failed > 0 ? 'failed' : 'passed', counts: report.summary },
         });
 
         return report;
@@ -397,11 +414,12 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         onError: 'continue',
         onOutcome: (outcome) => {
           if (outcome.status === 'failed') {
-            const detail = outcome.error instanceof Error ? outcome.error.message : String(outcome.error);
+            const reason = outcome.error instanceof Error ? outcome.error.message : String(outcome.error);
             onProgress({
               step: RUN_CORE_SCENARIOS,
               status: 'running',
-              message: `${outcome.item}: skipped (could not sample) — ${detail}`,
+              message: `${outcome.item}: skipped (could not sample) — ${reason}`,
+              detail: { kind: 'core-progress', event: 'phase', resource: outcome.item, phase: 'done', outcome: 'skipped', note: 'could not sample' },
             });
           }
         },

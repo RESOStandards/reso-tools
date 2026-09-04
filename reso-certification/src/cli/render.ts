@@ -2,9 +2,10 @@
  * Progress rendering bridge — maps SDK ProgressCallback to listr2 tasks.
  */
 
+import chalk from 'chalk';
 import { Listr, PRESET_TIMER, type ListrDefaultRendererOptions } from 'listr2';
 import { runComplianceTests } from '../sdk/index.js';
-import type { ComplianceConfig, PipelineResult, StepProgress } from '../sdk/types.js';
+import type { ComplianceConfig, CoreProgressDetail, CoreResourcePhase, PipelineResult, StepProgress } from '../sdk/types.js';
 
 /** Rendering mode derived from CLI flags. */
 export type RenderMode = 'default' | 'verbose' | 'silent';
@@ -46,6 +47,72 @@ const formatStep = (progress: StepProgress): string => {
   return `${icon} ${progress.step}${message}${duration}`;
 };
 
+interface CoreResourceState {
+  readonly phase: CoreResourcePhase;
+  readonly counts?: { readonly passed: number; readonly failed: number; readonly skipped: number };
+  readonly outcome?: 'passed' | 'failed' | 'skipped' | 'not-applicable';
+  readonly note?: string;
+}
+
+/** A live per-resource view for the Web API Core scenarios step — the CLI-friendly mirror of the DD run
+ *  display. Pure state: `apply` folds {@link CoreProgressDetail} events, `render` returns the current
+ *  multi-line block (one line per resource + a grey "currently requesting" line). Sequential run, so one
+ *  resource is sampling/testing at a time; the rest are queued or done. */
+export const createCoreProgressView = () => {
+  const order: string[] = [];
+  const state = new Map<string, CoreResourceState>();
+  let currentUrl: string | undefined;
+
+  const apply = (d: CoreProgressDetail): void => {
+    if (d.event === 'init') {
+      for (const r of d.resources ?? []) if (!state.has(r)) { order.push(r); state.set(r, { phase: 'queued' }); }
+    } else if (d.event === 'phase' && d.resource) {
+      if (!state.has(d.resource)) order.push(d.resource);
+      state.set(d.resource, { phase: d.phase ?? 'queued', counts: d.counts, outcome: d.outcome, note: d.note });
+      if (d.phase === 'done') currentUrl = undefined; // a finished resource clears the stale request line
+    } else if (d.event === 'request' && d.url) {
+      currentUrl = d.url;
+    }
+  };
+
+  const icon = (s: CoreResourceState): string => {
+    if (s.phase !== 'done') return s.phase === 'queued' ? chalk.dim('·') : chalk.cyan('○');
+    switch (s.outcome) {
+      case 'failed': return chalk.red('✗');
+      case 'skipped': return chalk.yellow('-');
+      case 'not-applicable': return chalk.dim('·');
+      default: return chalk.green('✓');
+    }
+  };
+
+  const detail = (s: CoreResourceState): string => {
+    if (s.phase === 'queued') return chalk.dim('queued');
+    if (s.phase === 'sampling') return chalk.cyan('sampling…');
+    if (s.phase === 'testing') return chalk.cyan('testing…');
+    if (s.counts) { // done, with a scenario tally
+      const total = s.counts.passed + s.counts.failed + s.counts.skipped;
+      const parts = [`${s.counts.passed}/${total}`];
+      if (s.counts.failed > 0) parts.push(chalk.red(`${s.counts.failed} failed`));
+      if (s.counts.skipped > 0) parts.push(chalk.dim(`${s.counts.skipped} skipped`));
+      return parts.join('  ');
+    }
+    return s.note ? chalk.dim(s.note) : ''; // done with no counts (masked / skipped / not-applicable)
+  };
+
+  const render = (): string => {
+    if (order.length === 0) return '';
+    const width = Math.min(24, Math.max(...order.map(r => r.length)));
+    const lines = order.map(r => {
+      const s = state.get(r)!;
+      return `  ${icon(s)} ${r.padEnd(width)}  ${detail(s)}`;
+    });
+    if (currentUrl) lines.push(chalk.gray(`  → ${currentUrl}`));
+    return lines.join('\n');
+  };
+
+  return { apply, render, hasData: (): boolean => order.length > 0 };
+};
+
 /** Select listr2 renderer based on render mode. */
 const resolveRenderer = (mode: RenderMode): 'default' | 'verbose' | 'silent' => {
   switch (mode) {
@@ -68,6 +135,45 @@ const defaultRendererOptions: ListrDefaultRendererOptions = {
 const runningTitle = (label: string, progress: StepProgress): string => {
   const msg = progress.message?.trim();
   return msg && !msg.startsWith('{') ? `${label}: ${msg}` : `${label}: ${progress.step}...`;
+};
+
+/** Shared progress → listr2 handler. Renders the Web API Core per-resource tree (default mode) or clean
+ *  per-resource log lines (verbose) from {@link CoreProgressDetail}, and falls back to the step-line
+ *  rendering for the other endorsements and the pre-scenario steps. */
+const handleProgress = (
+  task: { title: string; output: string },
+  label: string,
+  renderMode: RenderMode,
+  view: ReturnType<typeof createCoreProgressView>,
+) => (progress: StepProgress): void => {
+  const d = progress.detail;
+  if (d?.kind === 'core-progress') {
+    view.apply(d);
+    task.title = runningTitle(label, progress);
+    if (renderMode === 'verbose') {
+      // A scrolling log can't show a live tree, so emit the meaningful transitions: a resource finishing, and
+      // (dimmed) the request currently in flight so you can see what's being tested.
+      if (d.event === 'phase' && d.resource && d.phase === 'done') {
+        const c = d.counts;
+        const tally = c ? ` — ${c.passed}/${c.passed + c.failed + c.skipped}${c.failed ? `, ${c.failed} failed` : ''}` : d.note ? ` — ${d.note}` : '';
+        task.output = `○ ${d.resource}${tally}`;
+      } else if (d.event === 'request' && d.url) {
+        task.output = chalk.gray(`  → ${d.url}`);
+      }
+    } else {
+      task.output = view.render();
+    }
+    return;
+  }
+  if (progress.status === 'running') {
+    task.title = runningTitle(label, progress);
+    const msg = progress.message?.trim();
+    if (renderMode === 'verbose' && msg && !msg.startsWith('{')) task.output = `○ ${msg}`;
+  } else if (progress.status !== 'pending') {
+    // Once the resource tree is up (Core scenarios started), keep it in default mode — its final state is the
+    // summary; otherwise show the completing step line (auth / service / metadata).
+    task.output = renderMode === 'default' && view.hasData() ? view.render() : formatStep(progress);
+  }
 };
 
 /** Collect a concise per-scenario failure list from a completed run: `Resource · scenario: message`. Reads the
@@ -132,24 +238,15 @@ export const runWithProgress = async (
       {
         title: label,
         task: async (_ctx, task) => {
-          pipelineResult = await runComplianceTests(config, (progress: StepProgress) => {
-            if (progress.status === 'running') {
-              task.title = runningTitle(label, progress);
-              const msg = progress.message?.trim();
-              // Batch (--verbose): also emit the per-resource message as a log line so the long scenarios
-              // step isn't silent for minutes (the interactive spinner shows it via the title instead).
-              if (renderMode === 'verbose' && msg && !msg.startsWith('{')) task.output = `\u25cb ${msg}`;
-            } else if (progress.status !== 'pending') {
-              task.output = formatStep(progress);
-            }
-          });
+          const view = createCoreProgressView();
+          pipelineResult = await runComplianceTests(config, handleProgress(task, label, renderMode, view));
 
           const passed = pipelineResult.steps.filter(s => s.status === 'passed').length;
           const failed = pipelineResult.steps.filter(s => s.status === 'failed').length;
           const statusMark = pipelineResult.status === 'passed' ? '\u2713' : pipelineResult.status === 'incomplete' ? '\u25d0' : '\u2717';
           task.title = `${statusMark} ${label} \u2014 ${passed} passed, ${failed} failed (${humanizeDuration(pipelineResult.duration)})`;
         },
-        rendererOptions: { bottomBar: Infinity },
+        rendererOptions: { persistentOutput: true },
       },
     ],
     {
@@ -174,15 +271,8 @@ export const runConfigEntries = async (
     entries.map(({ config, label }) => ({
       title: label,
       task: async (_ctx: unknown, task: { title: string; output: string }) => {
-        const result = await runComplianceTests(config, (progress: StepProgress) => {
-          if (progress.status === 'running') {
-            task.title = runningTitle(label, progress);
-            const msg = progress.message?.trim();
-            if (renderMode === 'verbose' && msg && !msg.startsWith('{')) task.output = `\u25cb ${msg}`;
-          } else if (progress.status !== 'pending') {
-            task.output = formatStep(progress);
-          }
-        });
+        const view = createCoreProgressView();
+        const result = await runComplianceTests(config, handleProgress(task, label, renderMode, view));
 
         results.push(result);
 
@@ -191,7 +281,7 @@ export const runConfigEntries = async (
         const statusMark = result.status === 'passed' ? '\u2713' : result.status === 'incomplete' ? '\u25d0' : '\u2717';
         task.title = `${statusMark} ${label} \u2014 ${passed} passed, ${failed} failed (${humanizeDuration(result.duration)})`;
       },
-      rendererOptions: { bottomBar: Infinity },
+      rendererOptions: { persistentOutput: true },
     })),
     {
       concurrent: false,
