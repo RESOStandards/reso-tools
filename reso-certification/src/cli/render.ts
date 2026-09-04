@@ -157,9 +157,11 @@ class ResoSpinner extends Spinner {
 
 /** Shared renderer options for the default renderer. */
 const defaultRendererOptions: ListrDefaultRendererOptions = {
-  collapseErrors: false,
   timer: PRESET_TIMER,
   spinner: new ResoSpinner(),
+  // A non-passing run throws to flip the parent task glyph to ✗; keep the "N passed, M failed" title and
+  // suppress the raw error text — the concise failure list is printed by printRunSummary instead.
+  showErrorMessage: false,
 };
 
 /** Interactive spinner title on a *running* update: prefer the step's live message (e.g. "Sampling Property…",
@@ -277,19 +279,22 @@ export const runWithProgress = async (
 
           const passed = pipelineResult.steps.filter(s => s.status === 'passed').length;
           const failed = pipelineResult.steps.filter(s => s.status === 'failed').length;
-          const statusMark = pipelineResult.status === 'passed' ? '\u2713' : pipelineResult.status === 'incomplete' ? '\u25d0' : '\u2717';
-          task.title = `${statusMark} ${label} \u2014 ${passed} passed, ${failed} failed (${humanizeDuration(pipelineResult.duration)})`;
+          task.title = `${label} \u2014 ${passed} passed, ${failed} failed (${humanizeDuration(pipelineResult.duration)})`;
+          // Reflect the verdict in the PARENT task glyph: a non-passing run throws so listr2 marks it \u2717
+          // (a green \u2713 over failed resources was misleading). listr2's own glyph is the single status indicator.
+          if (pipelineResult.status !== 'passed') throw new Error(`${failed} failed`);
         },
         rendererOptions: { persistentOutput: true },
       },
     ],
     {
+      exitOnError: false,
       renderer: resolveRenderer(renderMode),
       rendererOptions: defaultRendererOptions,
     },
   );
 
-  await tasks.run();
+  try { await tasks.run(); } catch { /* the failing run throws to mark the task \u2717; the verdict is in pipelineResult */ }
   printRunSummary(pipelineResult!, renderMode);
   return pipelineResult!;
 };
@@ -312,19 +317,20 @@ export const runConfigEntries = async (
 
         const passed = result.steps.filter(s => s.status === 'passed').length;
         const failed = result.steps.filter(s => s.status === 'failed').length;
-        const statusMark = result.status === 'passed' ? '\u2713' : result.status === 'incomplete' ? '\u25d0' : '\u2717';
-        task.title = `${statusMark} ${label} \u2014 ${passed} passed, ${failed} failed (${humanizeDuration(result.duration)})`;
+        task.title = `${label} \u2014 ${passed} passed, ${failed} failed (${humanizeDuration(result.duration)})`;
+        if (result.status !== 'passed') throw new Error(`${failed} failed`); // parent glyph \u2192 \u2717 (see runWithProgress)
       },
       rendererOptions: { persistentOutput: true },
     })),
     {
       concurrent: false,
+      exitOnError: false,
       renderer: resolveRenderer(renderMode),
       rendererOptions: defaultRendererOptions,
     },
   );
 
-  await tasks.run();
+  try { await tasks.run(); } catch { /* failing runs throw to mark their tasks \u2717; verdicts are in results */ }
   for (const result of results) printRunSummary(result, renderMode);
   return results;
 };
