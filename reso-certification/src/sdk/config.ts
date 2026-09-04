@@ -103,6 +103,20 @@ interface RawConfigEntry {
   readonly ddOptions?: { readonly version?: string };
 }
 
+/** Validate a config entry's serviceRootUri is a real absolute http(s) URL — the catch-all that turns an
+ *  unusable address into a clear, actionable failure at config load instead of a raw crash mid-run. Catches
+ *  the common cases: a desktop placeholder the CLI can't resolve (e.g. `LOCAL_SERVER` — a desktop-internal
+ *  handle for its reference server; export a config with the real address), a missing scheme, or a typo. */
+const validateServiceRootUri = (uri: string, recipientUoi: string): string => {
+  const value = uri.trim();
+  const where = recipientUoi ? ` for recipient ${recipientUoi}` : '';
+  const parsed = ((): URL | undefined => { try { return new URL(value); } catch { return undefined; } })();
+  if (!parsed || (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')) {
+    throw new Error(`Config${where}: serviceRootUri ${JSON.stringify(value)} is not a valid URL — set an absolute http(s) server address. The CLI does not resolve placeholder shortcuts like "LOCAL_SERVER"; export a config with the real server address.`);
+  }
+  return value;
+};
+
 /** Normalize one raw entry (either auth shape) to a canonical ConfigEntry. */
 const normalizeConfigEntry = (raw: RawConfigEntry): ConfigEntry => {
   const version = raw.version ?? raw.ddOptions?.version;
@@ -115,7 +129,7 @@ const normalizeConfigEntry = (raw: RawConfigEntry): ConfigEntry => {
       ? { clientCredentials: raw.clientCredentials }
       : { token: raw.token };
   return {
-    serviceRootUri: raw.serviceRootUri ?? '',
+    serviceRootUri: validateServiceRootUri(raw.serviceRootUri ?? '', raw.recipientUoi ?? ''),
     recipientUoi: raw.recipientUoi ?? '',
     providerUsi: raw.providerUsi ?? '',
     ...auth,

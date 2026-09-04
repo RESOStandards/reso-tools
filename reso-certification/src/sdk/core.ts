@@ -252,7 +252,13 @@ export const reportVerdict = (args: {
 const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
   name: RUN_CORE_SCENARIOS,
   run: async (ctx, onProgress) => {
-    const metadata = parseMetadataXml(ctx.metadataXml!);
+    // Backstop: if metadata never loaded (e.g. a valid but unreachable serviceRootUri — the Fetch metadata
+    // step already reported the real failure), fail cleanly instead of parsing `undefined` and surfacing a raw
+    // "Cannot read properties of undefined (reading 'toString')" from the XML parser.
+    if (!ctx.metadataXml) {
+      throw new Error('metadata unavailable — the server did not return a valid $metadata document (see the Fetch metadata failure above); cannot run Core scenarios');
+    }
+    const metadata = parseMetadataXml(ctx.metadataXml);
     const version = ctx.version;
     // Standard map (DD reference) built once per run — field/value membership for standard-first selection.
     const standardMap = buildStandardMap(version);
