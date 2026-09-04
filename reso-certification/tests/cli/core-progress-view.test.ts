@@ -49,13 +49,30 @@ describe('createCoreProgressView', () => {
     expect(out).toContain('5 failed');
   });
 
-  it('a request event surfaces the current URL; the resource finishing clears the stale line', () => {
+  it('a request event surfaces the method + URL one line below the grid; the verb is reusable; done clears it', () => {
     const v = createCoreProgressView();
     v.apply(d({ event: 'init', resources: ['Property'] }));
-    v.apply(d({ event: 'request', url: 'https://api.example.com/Property?$top=1' }));
-    expect(v.render()).toContain('https://api.example.com/Property?$top=1');
+    v.apply(d({ event: 'request', method: 'GET', url: 'https://api.example.com/Property?$top=1' }));
+    const out = v.render();
+    expect(out).toContain('→ GET https://api.example.com/Property?$top=1');
+    expect(out).toMatch(/\n\n.*→ GET/); // dropped one line below the grid
+    // a different verb is shown verbatim — reused for PATCH/POST/DELETE
+    v.apply(d({ event: 'request', method: 'PATCH', url: 'https://api.example.com/Property(1)' }));
+    expect(v.render()).toContain('→ PATCH https://api.example.com/Property(1)');
     v.apply(d({ resource: 'Property', phase: 'done', outcome: 'passed', counts: { passed: 1, failed: 0, skipped: 0 } }));
-    expect(v.render()).not.toContain('https://api.example.com/Property?$top=1');
+    expect(v.render()).not.toContain('→ '); // cleared on done
+  });
+
+  it('lays the results out as an aligned grid — passed/total and failed columns line up across resources', () => {
+    const v = createCoreProgressView();
+    v.apply(d({ event: 'init', resources: ['Property', 'Media'] }));
+    v.apply(d({ resource: 'Property', phase: 'done', outcome: 'failed', counts: { passed: 65, failed: 3, skipped: 4 } }));
+    v.apply(d({ resource: 'Media', phase: 'done', outcome: 'failed', counts: { passed: 8, failed: 1, skipped: 2 } }));
+    const lines = v.render().split('\n').filter(l => l.includes('/')); // the two tally rows
+    // The '/' in each tally sits at the same column — grid alignment (Property total 72 vs Media total 11 both
+    // right-padded to width 2, and passed 65 vs 8 right-padded to width 2).
+    expect(lines).toHaveLength(2);
+    expect(lines[0].indexOf('/')).toBe(lines[1].indexOf('/'));
   });
 
   it('a masked resource (not-applicable / could-not-sample) shows its note, no counts', () => {

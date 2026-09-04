@@ -286,7 +286,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     const baseRequester = createSessionRequester(session);
     const requester: ODataRequester = {
       request: (options) => {
-        onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: '', detail: { kind: 'core-progress', event: 'request', url: options.url } });
+        onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: '', detail: { kind: 'core-progress', event: 'request', method: options.method, url: options.url } });
         return baseRequester.request(options);
       },
     };

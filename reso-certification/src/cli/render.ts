@@ -62,6 +62,7 @@ export const createCoreProgressView = () => {
   const order: string[] = [];
   const state = new Map<string, CoreResourceState>();
   let currentUrl: string | undefined;
+  let currentMethod = 'GET';
 
   const apply = (d: CoreProgressDetail): void => {
     if (d.event === 'init') {
@@ -72,6 +73,7 @@ export const createCoreProgressView = () => {
       if (d.phase === 'done') currentUrl = undefined; // a finished resource clears the stale request line
     } else if (d.event === 'request' && d.url) {
       currentUrl = d.url;
+      currentMethod = d.method ?? 'GET';
     }
   };
 
@@ -85,29 +87,49 @@ export const createCoreProgressView = () => {
     }
   };
 
-  const detail = (s: CoreResourceState): string => {
+  const phaseWord = (s: CoreResourceState): string => {
     if (s.phase === 'queued') return chalk.dim('queued');
     if (s.phase === 'sampling') return chalk.cyan('sampling…');
     if (s.phase === 'testing') return chalk.cyan('testing…');
-    if (s.counts) { // done, with a scenario tally
-      const total = s.counts.passed + s.counts.failed + s.counts.skipped;
-      const parts = [`${s.counts.passed}/${total}`];
-      if (s.counts.failed > 0) parts.push(chalk.red(`${s.counts.failed} failed`));
-      if (s.counts.skipped > 0) parts.push(chalk.dim(`${s.counts.skipped} skipped`));
-      return parts.join('  ');
-    }
-    return s.note ? chalk.dim(s.note) : ''; // done with no counts (masked / skipped / not-applicable)
+    return s.note ? chalk.dim(s.note) : ''; // done with no counts (masked / not-applicable / skipped)
   };
 
+  // The resources are siblings (top level, NOT expansions), so lay them out as an aligned GRID — name, then
+  // passed/total, then failed, then skipped, each column lined up. Indentation/nesting is reserved for actual
+  // expansions later. Widths are computed off plain text; chalk color is applied after padding so ANSI codes
+  // never throw off the alignment.
   const render = (): string => {
     if (order.length === 0) return '';
-    const width = Math.min(24, Math.max(...order.map(r => r.length)));
-    const lines = order.map(r => {
-      const s = state.get(r)!;
-      return `  ${icon(s)} ${r.padEnd(width)}  ${detail(s)}`;
+    const rows = order.map(r => ({ r, s: state.get(r)! }));
+    const nameW = Math.max(...rows.map(x => x.r.length));
+    const counts = rows.filter(x => x.s.phase === 'done' && x.s.counts).map(x => x.s.counts!);
+    const numW = (
+      pick: (c: { passed: number; failed: number; skipped: number }) => number,
+      only?: (c: { passed: number; failed: number; skipped: number }) => boolean,
+    ): number => {
+      const arr = (only ? counts.filter(only) : counts).map(pick);
+      return arr.length ? Math.max(...arr.map(n => String(n).length)) : 0;
+    };
+    const pW = numW(c => c.passed);
+    const tW = numW(c => c.passed + c.failed + c.skipped);
+    const fW = numW(c => c.failed, c => c.failed > 0);
+    const sW = numW(c => c.skipped, c => c.skipped > 0);
+    // A fixed-width count cell: colored "N unit" when N>0, else blank of the same width so the next column aligns.
+    const cell = (n: number, unit: string, width: number, color: (t: string) => string): string =>
+      width === 0 ? '' : n > 0 ? color(`${String(n).padStart(width)} ${unit}`) : ' '.repeat(width + 1 + unit.length);
+
+    const lines = rows.map(({ r, s }) => {
+      const head = `${icon(s)} ${r.padEnd(nameW)}`;
+      if (s.phase === 'done' && s.counts) {
+        const c = s.counts;
+        const tally = `${String(c.passed).padStart(pW)}/${String(c.passed + c.failed + c.skipped).padStart(tW)}`;
+        return `${head}   ${tally}   ${cell(c.failed, 'failed', fW, chalk.red)}  ${cell(c.skipped, 'skipped', sW, chalk.dim)}`.replace(/\s+$/, '');
+      }
+      return `${head}   ${phaseWord(s)}`.replace(/\s+$/, '');
     });
-    if (currentUrl) lines.push(chalk.gray(`  → ${currentUrl}`));
-    return lines.join('\n');
+    const grid = lines.join('\n');
+    // The current request sits one line below the grid, led by its HTTP verb (reusable for GET/PATCH/POST/…).
+    return currentUrl ? `${grid}\n\n${chalk.gray(`→ ${currentMethod} ${currentUrl}`)}` : grid;
   };
 
   return { apply, render, hasData: (): boolean => order.length > 0 };
@@ -158,7 +180,7 @@ const handleProgress = (
         const tally = c ? ` — ${c.passed}/${c.passed + c.failed + c.skipped}${c.failed ? `, ${c.failed} failed` : ''}` : d.note ? ` — ${d.note}` : '';
         task.output = `○ ${d.resource}${tally}`;
       } else if (d.event === 'request' && d.url) {
-        task.output = chalk.gray(`  → ${d.url}`);
+        task.output = chalk.gray(`  → ${d.method ?? 'GET'} ${d.url}`);
       }
     } else {
       task.output = view.render();

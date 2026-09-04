@@ -32,7 +32,8 @@ export interface CoreProgressDetail {
   readonly counts?: { readonly passed: number; readonly failed: number; readonly skipped: number };
   /** Short reason for a non-count outcome (skipped/NA/not-served). */
   readonly note?: string;
-  /** Present on 'request' — the URL currently being requested. */
+  /** Present on 'request' — the HTTP method and URL currently being requested. */
+  readonly method?: string;
   readonly url?: string;
 }
 
