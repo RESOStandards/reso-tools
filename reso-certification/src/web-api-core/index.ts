@@ -7,7 +7,7 @@
 
 export { allScenarios, scenariosForVersion } from './scenarios.js';
 export type { CoreScenario } from './scenarios.js';
-export { resolveTestParams, detectEnumMode, WELL_KNOWN_RESOURCES, REQUIRED_RESOURCES_V21 } from './sampling.js';
+export { resolveTestParams, detectEnumMode, WELL_KNOWN_RESOURCES, REQUIRED_RESOURCES_V21, NO_RECORDS_SAMPLED } from './sampling.js';
 export type { TestParams, EnumMode } from './sampling.js';
 export { buildStandardMap, buildStandardMapFrom } from './standard-map.js';
 export type { StandardMap } from './standard-map.js';
@@ -19,7 +19,7 @@ export { buildScenarioQuery } from './queries.js';
 export type { QuerySpec } from './queries.js';
 export { runCoreResourceScenarios, runProviderScenarios, isProviderWideScenario, summarizeScenarios, runExpandNavScenarios, validateExpandedItems, lookupResourcePresence, lookupResourceValueReport } from './test-runner.js';
 export type { ScenarioResult, ResourceTestReport, TypeCoverage, ProviderScenariosResult, CoreResourceScenarioOptions, ExpandItemValidator, ExpandItemValidation, LookupResourceContext } from './test-runner.js';
-export { parseServiceDocument, servedPresence, declaredPresence, resolveServingDecision } from './serving.js';
+export { parseServiceDocument, servedPresence, declaredPresence, resolveServingDecision, resolveNoRecordsOutcome } from './serving.js';
 export type { Presence, ServingDecision } from './serving.js';
 export {
   assertScalarComparison,

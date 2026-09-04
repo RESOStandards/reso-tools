@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   declaredPresence,
   parseServiceDocument,
+  resolveNoRecordsOutcome,
   resolveServingDecision,
   servedPresence,
 } from '../../src/web-api-core/serving.js';
@@ -145,5 +146,33 @@ describe('resolveServingDecision', () => {
 
   it('both surfaces PRESENT → run (the normal served resource)', () => {
     expect(decide('Property', '2.1.0', served('Property'), sets(['Property', 'Property']))).toBe('run');
+  });
+});
+
+describe('resolveNoRecordsOutcome — the "Media rule" (runtime top-level availability)', () => {
+  // The no-false-pass property: at 2.1.0, an empty top level makes a NON-required resource Not Applicable, but a
+  // REQUIRED resource still FAILS. The loosening is surgical to expansion-class resources; the required list is
+  // the guard. At 2.0.0 the carve-out is off — a resource is sampled and run as before, records or not.
+  it('records present → run, for any resource (required or not), at any version', () => {
+    expect(resolveNoRecordsOutcome('Media', '2.1.0', true)).toBe('run');
+    expect(resolveNoRecordsOutcome('Property', '2.1.0', true)).toBe('run');
+    expect(resolveNoRecordsOutcome('Media', '2.0.0', true)).toBe('run');
+  });
+
+  it('2.1.0 + no records + NON-required resource → na (declared-but-empty is fine; carried by $expand)', () => {
+    expect(resolveNoRecordsOutcome('Media', '2.1.0', false)).toBe('na');
+    expect(resolveNoRecordsOutcome('OpenHouse', '2.1.0', false)).toBe('na');
+    expect(resolveNoRecordsOutcome('Showing', '2.1.0', false)).toBe('na');
+  });
+
+  it('2.1.0 + no records + REQUIRED resource → fail (no free pass for an empty required resource)', () => {
+    for (const required of ['Property', 'Member', 'Office', 'Field', 'Lookup', 'EntityEvent']) {
+      expect(resolveNoRecordsOutcome(required, '2.1.0', false)).toBe('fail');
+    }
+  });
+
+  it('2.0.0 + no records → run for ALL resources (carve-out is 2.1.0+; behavior unchanged)', () => {
+    expect(resolveNoRecordsOutcome('Media', '2.0.0', false)).toBe('run');
+    expect(resolveNoRecordsOutcome('Property', '2.0.0', false)).toBe('run');
   });
 });

@@ -8,9 +8,9 @@
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, getEntityType, persistMetadataXml } from '../test-runner/metadata.js';
 import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
-import { buildStandardMap, createLookupCache, resolveTestParams, WELL_KNOWN_RESOURCES } from '../web-api-core/index.js';
+import { buildStandardMap, createLookupCache, resolveTestParams, WELL_KNOWN_RESOURCES, NO_RECORDS_SAMPLED } from '../web-api-core/index.js';
 import { runCoreResourceScenarios, runProviderScenarios, summarizeScenarios, type ResourceTestReport } from '../web-api-core/test-runner.js';
-import { resolveServingDecision } from '../web-api-core/serving.js';
+import { resolveNoRecordsOutcome, resolveServingDecision } from '../web-api-core/serving.js';
 import { createExpandSchemaValidator, isEnumerationIgnored, loadValidationConfig } from './expand-schema.js';
 import { FETCH_METADATA, RUN_CORE_SCENARIOS } from './step-names.js';
 import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
@@ -313,6 +313,17 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // OData version threaded into each resource's 4.01 gate.
     const provider = await runProviderScenarios(ctx.serverUrl, ctx.authToken!, version, requester);
 
+    // Surface the provider-wide structural pass as its own grid row (it folds into the report below as a
+    // prepended synthetic resource). Emit it BEFORE the init seed so it reads first, matching report order,
+    // and so the grid's passed/total columns reconcile with the run-header tally.
+    const providerSummary = summarizeScenarios(provider.scenarios);
+    onProgress({
+      step: RUN_CORE_SCENARIOS,
+      status: 'running',
+      message: `${PROVIDER_WIDE_LABEL}: ${providerSummary.passed} passed, ${providerSummary.failed} failed, ${providerSummary.skipped} skipped`,
+      detail: { kind: 'core-progress', event: 'phase', resource: PROVIDER_WIDE_LABEL, phase: 'done', outcome: providerSummary.failed > 0 ? 'failed' : 'passed', counts: providerSummary },
+    });
+
     // Seed the interactive per-resource view — every resource starts queued.
     onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `Testing ${ctx.resources.length} resource(s)...`, detail: { kind: 'core-progress', event: 'init', resources: ctx.resources } });
 
@@ -373,6 +384,20 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         if (params === null) {
           onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `${resource}: not tested (ran out of time)`, detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'skipped', note: 'ran out of time' } });
           return deadlineResourceReport(resource);
+        }
+
+        // Runtime top-level availability — the "Media rule". If the sample page came back with no records, this
+        // resource isn't queryable at the top level whatever its EntitySet declared. A non-required resource is
+        // Not Applicable (carried by $expand); a REQUIRED one fails (an empty required resource can't certify).
+        // Records present → 'run', and the normal sample-and-test path below continues.
+        const availability = resolveNoRecordsOutcome(resource, version, !params.skippedTypes.includes(NO_RECORDS_SAMPLED));
+        if (availability === 'fail') {
+          onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `${resource}: required resource returned no records at the top level — failure`, detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'failed', note: 'no top-level records' } });
+          return requiredResourceNotServedReport(resource);
+        }
+        if (availability === 'na') {
+          onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `${resource}: no records at the top level — Not Applicable (carried by $expand)`, detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'not-applicable', note: 'no top-level records' } });
+          return notServedNotApplicableReport(resource);
         }
 
         // Register this resource's field → provider LookupName map so the shared cache can resolve
@@ -445,7 +470,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
       params: stubParams(PROVIDER_WIDE_LABEL),
       scenarios: provider.scenarios,
       coverage: [],
-      summary: summarizeScenarios(provider.scenarios),
+      summary: providerSummary,
       ...(provider.deadlineReached ? { deadlineReached: true } : {}),
     };
 

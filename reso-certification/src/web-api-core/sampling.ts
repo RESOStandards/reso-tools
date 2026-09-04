@@ -156,6 +156,14 @@ export const WELL_KNOWN_RESOURCES: ReadonlyArray<{ readonly resource: string; re
  */
 export const REQUIRED_RESOURCES_V21 = ['Property', 'Member', 'Office', 'Field', 'Lookup', 'EntityEvent'];
 
+/**
+ * Marker pushed into a resource's `skippedTypes` when its top-level sample page returned ZERO records — the
+ * runtime "not queryable at the top level" signal, independent of what the EntitySet declared (a declared set
+ * may be empty, access-denied, or randomly gated). The Core pipeline routes on it (see `resolveNoRecordsOutcome`
+ * in serving.ts): a non-required resource is Not Applicable (carried by `$expand`); a required one fails.
+ */
+export const NO_RECORDS_SAMPLED = 'all — no records found';
+
 // ── Type matchers ──
 
 const INTEGER_TYPES = ['Edm.Int16', 'Edm.Int32', 'Edm.Int64'];
@@ -352,7 +360,7 @@ export const resolveTestParams = async (
   const sampleComplete = isSampleComplete(body) && records.length < SAMPLE_TOP;
 
   if (records.length === 0) {
-    return { resource, keyField, keyValue: '', enumMode, integerValueHigh: 2147483647, sampleComplete, skippedTypes: ['all — no records found'], ...osParams };
+    return { resource, keyField, keyValue: '', enumMode, integerValueHigh: 2147483647, sampleComplete, skippedTypes: [NO_RECORDS_SAMPLED], ...osParams };
   }
 
   const keyValue = String(records[0][keyField] ?? '');
