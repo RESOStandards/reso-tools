@@ -3,8 +3,18 @@
  */
 
 import chalk from 'chalk';
-import { Listr, PRESET_TIMER, Spinner, type ListrDefaultRendererOptions } from 'listr2';
+import {
+  LISTR_LOGGER_STDERR_LEVELS,
+  Listr,
+  ListrLogLevels,
+  ListrLogger,
+  PRESET_TIMER,
+  Spinner,
+  type ListrDefaultRendererOptions,
+  type ListrVerboseRendererOptions,
+} from 'listr2';
 import { runComplianceTests } from '../sdk/index.js';
+import { RUN_ADD_EDIT_SCENARIOS, RUN_CORE_SCENARIOS, RUN_ENTITY_EVENT_SCENARIOS } from '../sdk/step-names.js';
 import type { ComplianceConfig, CoreProgressDetail, CoreResourcePhase, PipelineResult, StepProgress } from '../sdk/types.js';
 
 /** Rendering mode derived from CLI flags. */
@@ -164,6 +174,21 @@ const defaultRendererOptions: ListrDefaultRendererOptions = {
   showErrorMessage: false,
 };
 
+/** Options for the verbose (non-TTY, `--verbose`) renderer. listr2's stock verbose logger prefixes every line
+ *  with a bracketed level label ([OUTPUT], [STARTED], …); the OUTPUT lines dominate a run and their label is
+ *  noise. Replace that slot with a dim ISO-8601 timestamp — far more useful for timing a slow server. The
+ *  task-output lines already carry their own ✓/✗/○/→ glyph, so we blank listr2's OUTPUT marker (useIcons +
+ *  an empty OUTPUT icon) and let the line read "[<iso>] <message>". Lifecycle levels keep their glyph. */
+const verboseRendererOptions: ListrVerboseRendererOptions = {
+  logger: new ListrLogger({ useIcons: true, toStderr: LISTR_LOGGER_STDERR_LEVELS }),
+  timestamp: { condition: true, field: () => new Date().toISOString(), format: () => chalk.dim },
+  icon: { [ListrLogLevels.OUTPUT]: '' },
+};
+
+/** Renderer options per mode: verbose gets the timestamped logger; default/silent keep the interactive set. */
+const resolveRendererOptions = (mode: RenderMode): ListrDefaultRendererOptions | ListrVerboseRendererOptions =>
+  mode === 'verbose' ? verboseRendererOptions : defaultRendererOptions;
+
 /** Interactive spinner title on a *running* update: prefer the step's live message (e.g. "Sampling Property…",
  *  "Testing Member…") so a long-running step shows WHAT is currently running, not just its name. Falls back to
  *  the step name, and ignores structured JSON detail messages (e.g. DD replication-progress) so they don't
@@ -212,36 +237,42 @@ const handleProgress = (
   }
 };
 
-/** Collect a concise per-scenario failure list from a completed run: `Resource · scenario: message`. Reads the
- *  per-resource reports on the context (Core / Add-Edit / EntityEvent) and falls back to step-level errors. */
-export const collectFailures = (result: PipelineResult): ReadonlyArray<string> => {
-  const ctx = result.context as Record<string, unknown>;
-  const reports = ctx.resourceReports as ReadonlyArray<{
-    readonly resource?: string;
-    readonly scenarios?: ReadonlyArray<{
-      readonly name?: string; readonly tag?: string; readonly passed?: boolean; readonly skipped?: boolean;
-      readonly assertions?: ReadonlyArray<{ readonly passed?: boolean; readonly message?: string; readonly description?: string }>;
-    }>;
-  }> | undefined;
+/** Shape of the per-resource scenario data the failure collectors read off the run context. */
+interface ReportScenario {
+  readonly name?: string;
+  readonly tag?: string;
+  readonly passed?: boolean;
+  readonly skipped?: boolean;
+  /** Optional-test scenarios (contains/startswith/endswith, …) never fail Core; kept out of the failure list. */
+  readonly optional?: boolean;
+  readonly assertions?: ReadonlyArray<{ readonly passed?: boolean; readonly message?: string; readonly description?: string }>;
+}
 
-  const fromReports: string[] = [];
-  if (Array.isArray(reports)) {
-    for (const r of reports) {
-      for (const s of r.scenarios ?? []) {
-        if (s.passed !== false || s.skipped) continue;
-        const assertions = (s.assertions ?? []) as ReadonlyArray<{ readonly passed?: boolean; readonly message?: string; readonly description?: string }>;
-        const msgs = assertions
+/** `Resource · scenario: message` lines for failed, non-skipped scenarios matching `include`. */
+const scenarioFailureLines = (result: PipelineResult, include: (s: ReportScenario) => boolean): ReadonlyArray<string> => {
+  const reports = (result.context as Record<string, unknown>).resourceReports as
+    | ReadonlyArray<{ readonly resource?: string; readonly scenarios?: ReadonlyArray<ReportScenario> }>
+    | undefined;
+  return (reports ?? []).flatMap(r =>
+    (r.scenarios ?? [])
+      .filter(s => s.passed === false && !s.skipped && include(s))
+      .map(s => {
+        const msgs = (s.assertions ?? [])
           .filter(a => a.passed === false)
           .map(a => a.description ?? a.message)
           .filter((m): m is string => !!m);
         const detail = msgs.length ? `: ${msgs.slice(0, 2).join('; ')}` : '';
-        fromReports.push(`${r.resource ?? 'Resource'} · ${s.name ?? s.tag ?? 'scenario'}${detail}`);
-      }
-    }
-  }
-  if (fromReports.length > 0) return fromReports;
+        return `${r.resource ?? 'Resource'} · ${s.name ?? s.tag ?? 'scenario'}${detail}`;
+      }),
+  );
+};
 
-  // Fallback: step-level errors (a failed metadata/service step, or endorsements without resource reports).
+/** Concise REQUIRED-failure list from a completed run: `Resource · scenario: message`. Optional-test failures
+ *  are excluded — they never fail Core (see {@link collectOptionalUnsupported}). Falls back to step-level errors
+ *  (a failed metadata/service step, or endorsements without resource reports). */
+export const collectFailures = (result: PipelineResult): ReadonlyArray<string> => {
+  const fromReports = scenarioFailureLines(result, s => s.optional !== true);
+  if (fromReports.length > 0) return fromReports;
   const fromSteps: string[] = [];
   for (const step of result.steps) {
     if (step.status === 'failed') for (const e of step.errors ?? []) fromSteps.push(`${step.name}: ${e}`);
@@ -249,16 +280,44 @@ export const collectFailures = (result: PipelineResult): ReadonlyArray<string> =
   return fromSteps;
 };
 
+/** Optional-test scenarios that did NOT pass — "Not Supported" / "Not Tested" (e.g. contains/startswith/endswith
+ *  on a server that doesn't implement them). These never affect the Core verdict, so they're surfaced in their
+ *  own section rather than mixed into {@link collectFailures}, where they read as real failures. */
+export const collectOptionalUnsupported = (result: PipelineResult): ReadonlyArray<string> =>
+  scenarioFailureLines(result, s => s.optional === true);
+
 /** After the live render, print the reports location and — on a non-passing run — a concise failure summary. */
 const printRunSummary = (result: PipelineResult, renderMode: RenderMode): void => {
   if (renderMode === 'silent') return;
   const outputPath = (result.context as Record<string, unknown>).outputPath;
   if (typeof outputPath === 'string') console.log(`Reports → ${outputPath}`);
-  if (result.status === 'passed') return;
-  const failures = collectFailures(result);
-  if (failures.length === 0) return;
-  console.log(`Failures (${failures.length}):`);
-  for (const f of failures) console.log(`  ✗ ${f}`);
+  if (result.status !== 'passed') {
+    const failures = collectFailures(result);
+    if (failures.length > 0) {
+      console.log(`Failures (${failures.length}):`);
+      for (const f of failures) console.log(`  ✗ ${f}`);
+    }
+  }
+  // Optional-test scenarios that weren't supported get their own section (distinct `·` marker + header) so they
+  // never read as real Core failures. Shown on passing runs too — they're informational, not part of the verdict.
+  const optionalUnsupported = collectOptionalUnsupported(result);
+  if (optionalUnsupported.length > 0) {
+    console.log(`Optional — not supported (${optionalUnsupported.length}):`);
+    for (const f of optionalUnsupported) console.log(`  · ${f}`);
+  }
+};
+
+/** Run-header summary: the scenario tally (passed/failed/skipped) from the scenario-running step, so the header
+ *  matches the resource grid beneath it rather than counting pipeline steps. Falls back to the step tally when a
+ *  run failed before scenarios ran (auth/service/metadata). */
+const SCENARIO_STEP_NAMES: ReadonlyArray<string> = [RUN_CORE_SCENARIOS, RUN_ADD_EDIT_SCENARIOS, RUN_ENTITY_EVENT_SCENARIOS];
+export const runHeaderSummary = (result: PipelineResult): string => {
+  const c = result.steps.find(s => SCENARIO_STEP_NAMES.includes(s.name))?.counts as
+    | { passed?: number; failed?: number; skipped?: number }
+    | undefined;
+  return c
+    ? `${c.passed ?? 0} passed, ${c.failed ?? 0} failed, ${c.skipped ?? 0} skipped`
+    : `${result.steps.filter(s => s.status === 'passed').length} passed, ${result.steps.filter(s => s.status === 'failed').length} failed`;
 };
 
 /** Run a single pipeline with listr2 progress rendering. */
@@ -277,12 +336,10 @@ export const runWithProgress = async (
           const view = createCoreProgressView();
           pipelineResult = await runComplianceTests(config, handleProgress(task, label, renderMode, view));
 
-          const passed = pipelineResult.steps.filter(s => s.status === 'passed').length;
-          const failed = pipelineResult.steps.filter(s => s.status === 'failed').length;
-          task.title = `${label} \u2014 ${passed} passed, ${failed} failed (${humanizeDuration(pipelineResult.duration)})`;
+          task.title = `${label} \u2014 ${runHeaderSummary(pipelineResult)} (${humanizeDuration(pipelineResult.duration)})`;
           // Reflect the verdict in the PARENT task glyph: a non-passing run throws so listr2 marks it \u2717
           // (a green \u2713 over failed resources was misleading). listr2's own glyph is the single status indicator.
-          if (pipelineResult.status !== 'passed') throw new Error(`${failed} failed`);
+          if (pipelineResult.status !== 'passed') throw new Error('non-passing run');
         },
         rendererOptions: { persistentOutput: true },
       },
@@ -290,7 +347,7 @@ export const runWithProgress = async (
     {
       exitOnError: false,
       renderer: resolveRenderer(renderMode),
-      rendererOptions: defaultRendererOptions,
+      rendererOptions: resolveRendererOptions(renderMode),
     },
   );
 
@@ -315,10 +372,8 @@ export const runConfigEntries = async (
 
         results.push(result);
 
-        const passed = result.steps.filter(s => s.status === 'passed').length;
-        const failed = result.steps.filter(s => s.status === 'failed').length;
-        task.title = `${label} \u2014 ${passed} passed, ${failed} failed (${humanizeDuration(result.duration)})`;
-        if (result.status !== 'passed') throw new Error(`${failed} failed`); // parent glyph \u2192 \u2717 (see runWithProgress)
+        task.title = `${label} \u2014 ${runHeaderSummary(result)} (${humanizeDuration(result.duration)})`;
+        if (result.status !== 'passed') throw new Error('non-passing run'); // parent glyph \u2192 \u2717 (see runWithProgress)
       },
       rendererOptions: { persistentOutput: true },
     })),
@@ -326,7 +381,7 @@ export const runConfigEntries = async (
       concurrent: false,
       exitOnError: false,
       renderer: resolveRenderer(renderMode),
-      rendererOptions: defaultRendererOptions,
+      rendererOptions: resolveRendererOptions(renderMode),
     },
   );
 
