@@ -709,7 +709,15 @@ export const lookupResourceValueReport = (
  * LookupName. A later field that references an ALREADY-cached LookupName reuses those rows and skips the fetch
  * entirely — the 200 was verified when the cache was first filled — so the whole enum is paged at most once per
  * run. The presence + value-report assertions are computed off those rows (see the helpers above).
+ *
+ * Page size is requested via the OData `Prefer: odata.maxpagesize` header (server-driven / nextLink paging is
+ * spec-legit in DD 2.1). Without it a server falls back to a tiny default (Cotality returns 10), turning a large
+ * purely-open enum like City into hundreds of round-trips; asking for 1000 collapses that. The server MAY still
+ * return fewer (and echo `Preference-Applied`) — the nextLink loop pages correctly either way.
  */
+const LOOKUP_MAX_PAGE_SIZE = 1000; // DD 2.x max page size
+const LOOKUP_PREFER_HEADER: Readonly<Record<string, string>> = { Prefer: `odata.maxpagesize=${LOOKUP_MAX_PAGE_SIZE}` };
+
 export const runLookupResourceScenario = async (
   serverUrl: string,
   resource: string,
@@ -760,7 +768,7 @@ export const runLookupResourceScenario = async (
   const assertions: AssertionResult[] = [];
   try {
     const reqStart = Date.now();
-    const response = await requester.request({ method: 'GET', url: query.url, authToken });
+    const response = await requester.request({ method: 'GET', url: query.url, authToken, headers: LOOKUP_PREFER_HEADER });
     const requestLatency = Date.now() - reqStart;
     const responseCheck = assertODataResponse(response, 200);
     assertions.push(responseCheck);
@@ -777,7 +785,7 @@ export const runLookupResourceScenario = async (
     while (nextLink) {
       let pageResp: Awaited<ReturnType<typeof odataRequest>>;
       try {
-        pageResp = await requester.request({ method: 'GET', url: rebaseNextLink(nextLink, query.url), authToken });
+        pageResp = await requester.request({ method: 'GET', url: rebaseNextLink(nextLink, query.url), authToken, headers: LOOKUP_PREFER_HEADER });
       } catch (err) {
         if (isDeadlineError(err)) throw err; // out of run budget — stop the whole run, not just paging
         break; // a page fetch failed even after re-basing — validate with the rows we already have, don't hard-error
