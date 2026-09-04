@@ -75,3 +75,29 @@ describe('runLookupResourceScenario — cache hit skips the fetch', () => {
     expect(result.assertions.length).toBe(2); // both gating assertions ran off the cached rows
   });
 });
+
+describe('runLookupResourceScenario — page-size preference', () => {
+  it('requests a larger page via the Prefer: odata.maxpagesize header on the /Lookup fetch', async () => {
+    const cache = createLookupCache({ lookupNameFor: (_res, f) => (f === 'PropertyType' ? 'PropertyType' : undefined) });
+    const captured: { headers?: Readonly<Record<string, string>> } = {};
+    const recordingRequester: ODataRequester = {
+      request: async (options) => {
+        captured.headers = options.headers;
+        return {
+          status: 200,
+          headers: {},
+          body: { value: [{ LookupName: 'PropertyType', LookupValue: 'Residential', StandardLookupValue: 'Residential', LegacyODataValue: 'Residential' }] },
+          rawBody: '',
+        };
+      },
+    };
+    const lookupCtx: LookupResourceContext = { cache, standardMap: buildStandardMapFrom(ref), isEnumerationIgnored: () => false };
+
+    const result = await runLookupResourceScenario('http://server', 'Property', scenario, params, 'tok', 0, recordingRequester, lookupCtx);
+
+    expect(result.skipped).toBe(false);
+    // Ask for up to 1000 rows/page so server-driven (nextLink) paging doesn't crawl a large lookup at the
+    // server's tiny default (e.g. Cotality's 10). The server MAY return fewer and echo Preference-Applied.
+    expect(captured.headers?.Prefer).toBe('odata.maxpagesize=1000');
+  });
+});
