@@ -3,7 +3,7 @@
  */
 
 import chalk from 'chalk';
-import { Listr, PRESET_TIMER, type ListrDefaultRendererOptions } from 'listr2';
+import { Listr, PRESET_TIMER, Spinner, type ListrDefaultRendererOptions } from 'listr2';
 import { runComplianceTests } from '../sdk/index.js';
 import type { ComplianceConfig, CoreProgressDetail, CoreResourcePhase, PipelineResult, StepProgress } from '../sdk/types.js';
 
@@ -147,10 +147,19 @@ const resolveRenderer = (mode: RenderMode): 'default' | 'verbose' | 'silent' => 
   }
 };
 
+/** The running-task spinner: the RESO mark, rotating. A terminal can't rotate a glyph, so we flip a heavy X to
+ *  a heavy plus — the same mark turned 45° — and back. No eight-point star in between (that starburst read as
+ *  the Claude sparkle); this is a crisp X↔+ flip. Each frame is held a couple of ticks so it flips deliberately
+ *  rather than strobing, and the render still refreshes at the spinner's base interval. Settles to ✓/✗ on done. */
+class ResoSpinner extends Spinner {
+  protected readonly spinner = ['✖', '✖', '✚', '✚']; // ✖ heavy-X ↔ ✚ heavy-plus, each held one extra tick
+}
+
 /** Shared renderer options for the default renderer. */
 const defaultRendererOptions: ListrDefaultRendererOptions = {
   collapseErrors: false,
   timer: PRESET_TIMER,
+  spinner: new ResoSpinner(),
 };
 
 /** Interactive spinner title on a *running* update: prefer the step's live message (e.g. "Sampling Property…",
