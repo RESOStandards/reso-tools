@@ -71,7 +71,7 @@ describe('runLookupResourceScenario — cache hit skips the fetch', () => {
     const result = await runLookupResourceScenario('http://server', 'Property', scenario, params, 'tok', 0, throwingRequester, lookupCtx);
 
     expect(result.skipped).toBe(false);
-    expect(result.passed).toBe(true); // presence (Residential present) + SLV-validity (Residential is DD-standard)
+    expect(result.passed).toBe(true); // presence (Residential present) + value report (Residential classifies DD-standard)
     expect(result.assertions.length).toBe(2); // both gating assertions ran off the cached rows
   });
 });

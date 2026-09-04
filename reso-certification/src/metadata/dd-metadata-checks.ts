@@ -164,7 +164,7 @@ const LOOKUP_NAME_ANNOTATION = 'RESO.OData.Metadata.LookupName';
 const STANDARD_NAMES_EXPANSIONS_WG_URL = 'https://github.com/RESOStandards/transport/discussions/166';
 
 /** A field's enum is CLOSED when its DD lookupStatus is "Locked with Enumerations". */
-const isClosedEnum = (lookupStatus: string | undefined): boolean => (lookupStatus ?? '').startsWith('Locked');
+export const isClosedEnum = (lookupStatus: string | undefined): boolean => (lookupStatus ?? '').startsWith('Locked');
 
 /**
  * Closed-enum membership check: for a closed enum ("Locked with Enumerations"), the standard value

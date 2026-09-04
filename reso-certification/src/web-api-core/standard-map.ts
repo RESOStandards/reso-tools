@@ -12,7 +12,7 @@
 
 // @ts-expect-error — legacy CJS (reference metadata loader), no type declarations
 import certUtilsEtl from '../etl/index.cjs';
-import type { DdReference } from '../metadata/dd-metadata-checks.js';
+import { isClosedEnum, type DdReference } from '../metadata/dd-metadata-checks.js';
 
 // getReferenceMetadata returns null when it can't load a version's reference file (it catches + logs), so the
 // type must admit null — the caller MUST guard, or `ref.fields` throws and takes down the whole Core run.
@@ -33,12 +33,12 @@ export interface StandardMap {
    *  back to {@link isStandardValue}. This is the precise per-FIELD join — it never uses a provider's arbitrary
    *  wire LookupName, only the field's DD type. */
   readonly standardValuesForField: (resource: string, field: string) => ReadonlySet<string> | undefined;
-  /** True when the field's DD `type` is a nominal enumeration carrying ZERO DD-standard values — a
-   *  "purely open" enum (e.g. `City`, `CountyOrParish`), where the DD defines no members at all. There is
-   *  nothing a StandardLookupValue could be validated against, so SLV-validity is not applicable and the only
-   *  rule is advertising. False for a primitive/unknown field and for any enum that HAS standard values
-   *  (closed, or open-with-enumerations). Only consulted for lookup fields (the SLV-validity call site). */
-  readonly isPurelyOpenEnumField: (resource: string, field: string) => boolean;
+  /** True when the field's DD enum is CLOSED — its DD `lookupStatus` is "Locked with Enumerations". A closed
+   *  enum admits no local extension, so a value outside its standard set is a Data Dictionary violation. Core
+   *  never gates on this (it reports only); the flag lets the Lookup Resource value report warn that an
+   *  extension of a closed enum would not pass DD testing. False for open / open-with-enumerations enums and
+   *  for a primitive/unknown field. */
+  readonly isClosedEnumField: (resource: string, field: string) => boolean;
 }
 
 const fieldKey = (resource: string, field: string): string => `${resource}/${field}`;
@@ -53,6 +53,9 @@ export const buildStandardMapFrom = (ref: DdReference): StandardMap => {
   // A field's DD `type` is its enum name for an enumeration field (e.g. `org.reso.metadata.enums.StandardStatus`),
   // which is exactly how the lookups below are keyed — so this map is the field → enum-name join.
   const fieldTypes = new Map<string, string>(ref.fields.map((f) => [fieldKey(f.resourceName, f.fieldName), f.type]));
+  // A field's DD `lookupStatus` (e.g. "Locked with Enumerations") — the open/closed designation the value
+  // report reads to decide whether a local value is a permitted extension or a closed-enum violation.
+  const fieldLookupStatus = new Map<string, string | undefined>(ref.fields.map((f) => [fieldKey(f.resourceName, f.fieldName), f.lookupStatus]));
   // A DD lookup value has two legal wire forms (the dual representation): the machine LegacyODataValue —
   // here `lookupValue` — and the human StandardName carried in the RESO.OData.Metadata.StandardName
   // annotation. A provider may serve EITHER, so both must count as standard; keying only on the machine
@@ -77,16 +80,16 @@ export const buildStandardMapFrom = (ref: DdReference): StandardMap => {
     standardValues: (lookupName) => byLookup.get(lookupName) ?? new Set<string>(),
     standardValuesForField: (resource, field) => {
       const type = fieldTypes.get(fieldKey(resource, field));
-      return type ? byLookup.get(type) : undefined; // undefined for an unknown field or a non-enum type
-    },
-    isPurelyOpenEnumField: (resource, field) => {
-      const type = fieldTypes.get(fieldKey(resource, field));
-      if (type == null) return false; // unknown field — let the standard checks handle it
+      if (type == null) return undefined; // unknown field → caller falls back to "standard in ANY DD enum"
       const enumName = unwrapCollection(type);
-      if (enumName.startsWith('Edm.')) return false; // primitive type — not an enumeration
-      const members = byLookup.get(enumName); // the enum's DD-standard values, if any
-      return members == null || members.size === 0; // nominal enum with zero members = purely open
+      if (enumName.startsWith('Edm.')) return undefined; // primitive type → not an enumeration → fallback
+      // A resolvable nominal enum: its DD members, or an EMPTY set for a PURELY-OPEN enum (zero members, e.g.
+      // City, CountyOrParish). Empty — not undefined — so the caller classifies every value LOCAL rather than
+      // falling back to "standard in ANY enum", which would mislabel a purely-open value that happens to
+      // collide with another enum's standard value (e.g. a city named 'Commercial').
+      return byLookup.get(enumName) ?? new Set<string>();
     },
+    isClosedEnumField: (resource, field) => isClosedEnum(fieldLookupStatus.get(fieldKey(resource, field))),
   };
 };
 
@@ -98,7 +101,7 @@ const EMPTY_STANDARD_MAP: StandardMap = {
   isStandardValue: () => false,
   standardValues: () => new Set<string>(),
   standardValuesForField: () => undefined,
-  isPurelyOpenEnumField: () => false,
+  isClosedEnumField: () => false,
 };
 
 const isValidRef = (ref: DdReference | null): ref is DdReference =>
