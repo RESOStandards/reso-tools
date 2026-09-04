@@ -1019,27 +1019,28 @@ const ODATA_SKIP_SPEC_URL = 'https://docs.oasis-open.org/odata/odata/v4.0/errata
 /**
  * Failure message for the $skip "unique pages" assertion, grounded in the OData stable-ordering requirement so
  * a provider can see WHY consecutive pages must be disjoint (cert_errors_cite_sources). Absent $orderby, OData
- * requires the service to impose a stable ordering across requests that include $top/$skip — verbatim in BOTH
+ * REQUIRES the service to impose a stable ordering across requests that include $top/$skip — verbatim in BOTH
  * OData 4.0 ($top §11.2.5.3, $skip §11.2.5.4) and 4.01 (§11.2.6.3–.4) — so `$top=5` then `$skip=5` return
- * different records. A rare overlap can still surface on a fast-changing resource (records shifting between the
- * two requests); RESO Web API Core notes a compliant server is not required to guarantee consistent results
- * between requests, so that case is a data-change artifact rather than an ordering defect.
+ * different records. A stable sort is MANDATORY here: this is the primary-KEY disjointness check, so an overlap
+ * is an ordering defect, full stop. The "a server need not guarantee consistent results across requests" caveat
+ * applies to ModificationTimestamp paging (pigeonhole ties from bulk updates) — NOT here — so it is deliberately
+ * absent from this message. Only ever emitted on the FAILURE path.
  */
 export const describeSkipOverlap = (overlap: number): string => {
   const keys = `${overlap} key${overlap === 1 ? '' : 's'}`;
   const verb = overlap === 1 ? 'appears' : 'appear';
   return (
     `$skip overlap: ${keys} ${verb} in both pages — consecutive pages must be disjoint. ` +
-    `Absent $orderby, OData 4.0 §11.2.5.4 ($skip; §11.2.5.3 $top) — 4.01 §11.2.6.3–.4 — requires the service ` +
-    `to impose a stable ordering across requests, so $top=5 then $skip=5 must return different records. ` +
-    `A rare overlap can occur on a fast-changing resource as records shift between the two requests ` +
-    `(RESO Web API Core: a compliant server is not required to guarantee consistent results between requests). ` +
-    `See ${ODATA_SKIP_SPEC_URL}`
+    `Absent $orderby, OData REQUIRES the service to impose a stable ordering across requests that include ` +
+    `$top/$skip (4.0 §11.2.5.4 [$skip], §11.2.5.3 [$top]; 4.01 §11.2.6.3–.4) — a stable sort is mandatory, so ` +
+    `$top=5 then $skip=5 must return different records. See ${ODATA_SKIP_SPEC_URL}`
   );
 };
 
-/** Run structural scenarios (metadata, service-document, fetch-by-key, select, top, skip, count). */
-const runStructuralScenario = async (
+/** Run structural scenarios (metadata, service-document, fetch-by-key, select, top, skip, count). Exported as a
+ *  test seam (like {@link runPagingScenario}) so the $skip stable-ordering / unique-pages path can be exercised
+ *  with an injected requester. */
+export const runStructuralScenario = async (
   serverUrl: string,
   _resource: string,
   assertion: string,

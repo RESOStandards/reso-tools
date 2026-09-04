@@ -18,9 +18,14 @@ describe('describeSkipOverlap — grounded $skip failure message', () => {
     expect(m).toMatch(/stable ordering across requests/);
   });
 
-  it('includes the churn caveat and the authoritative link', () => {
+  it('states the stable sort is mandatory (never optional), carries the spec grounding, and omits the consistency caveat', () => {
     const m = describeSkipOverlap(1);
-    expect(m).toContain('not required to guarantee consistent results between requests');
+    expect(m).toMatch(/stable sort is mandatory|REQUIRES/); // stable ordering is required, not optional
+    // The "…not required to guarantee consistent results between requests" caveat belongs on ModificationTimestamp
+    // paging (pigeonhole ties from bulk updates), NOT this primary-key check — so an overlap reads as a plain
+    // ordering defect here, with no softening hedge.
+    expect(m).not.toContain('not required to guarantee consistent results');
+    expect(m).not.toMatch(/re-run|fast-changing|data-change|artifact/);
     expect(m).toContain('https://docs.oasis-open.org/odata/odata/v4.0/errata03/');
   });
 });
