@@ -28,6 +28,7 @@ metadata-report*.json
 data-dictionary*.json
 reso-replication-output/
 schema-validation-report.json
+/out/
 reso-variations.json
 upi-validation-report.json
 *.resoscript
