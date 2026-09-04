@@ -55,7 +55,12 @@ describe('createCoreProgressView', () => {
     v.apply(d({ event: 'request', method: 'GET', url: 'https://api.example.com/Property?$top=1' }));
     const out = v.render();
     expect(out).toContain('→ GET https://api.example.com/Property?$top=1');
-    expect(out).toMatch(/\n\n.*→ GET/); // dropped one line below the grid
+    // The request drops one line below the grid: the line directly above it is a blank separator (a U+200B
+    // zero-width space, which listr2 keeps where a plain empty line would be filtered out).
+    const lines = out.split('\n');
+    const reqIdx = lines.findIndex(l => l.includes('→ GET'));
+    expect(reqIdx).toBeGreaterThan(0);
+    expect(lines[reqIdx - 1].replace(/[\s\u200B]/g, '')).toBe('');
     // a different verb is shown verbatim — reused for PATCH/POST/DELETE
     v.apply(d({ event: 'request', method: 'PATCH', url: 'https://api.example.com/Property(1)' }));
     expect(v.render()).toContain('→ PATCH https://api.example.com/Property(1)');
