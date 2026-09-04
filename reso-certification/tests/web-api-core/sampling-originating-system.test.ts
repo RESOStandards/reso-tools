@@ -15,7 +15,7 @@ const noopStandardMap: StandardMap = {
   isStandardValue: () => false,
   standardValues: () => new Set<string>(),
   standardValuesForField: () => undefined,
-  isPurelyOpenEnumField: () => false,
+  isClosedEnumField: () => false,
 };
 
 const sampleResponse: ODataResponse = {

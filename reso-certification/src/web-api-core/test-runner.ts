@@ -601,7 +601,7 @@ const runEnumFamilyScenario = async (
  * Per-run dependencies the Lookup Resource scenario needs, bundled so the plumbing threads ONE param:
  *   - `cache` — the row cache keyed by LookupName, shared across resources so a LookupName referenced by
  *     several fields is fetched (and paged) at most once (the cache-hit win);
- *   - `standardMap` — the DD standard map, for the SLV-validity join (field → DD enum via the field's DD type);
+ *   - `standardMap` — the DD standard map, for the value-report classification join (field → DD enum via the field's DD type);
  *   - `isEnumerationIgnored` — the committee-approved ignore-enumerations predicate.
  */
 export interface LookupResourceContext {
@@ -648,18 +648,18 @@ export const lookupResourcePresence = (
 };
 
 /**
- * SLV-VALIDITY assertion (GATING, alongside presence). For each cached /Lookup row under this LookupName, UNLESS
- * the field is ignore-listed, the row's declared `StandardLookupValue` MUST be a DD-standard value for the
- * FIELD'S DD enum — joined via the field's DD type ({@link StandardMap.standardValuesForField}), NEVER the
- * provider's arbitrary wire LookupName. A declared StandardLookupValue that is not DD-standard is a bad remap
- * that breaks downstream consumers → a determinate FAIL. When the field can't be resolved to a precise DD enum,
- * fall back to "is it standard in ANY DD enum" ({@link StandardMap.isStandardValue}) rather than crash.
- * A PURELY-OPEN enum — a nominal enumeration the DD defines with ZERO standard values (City, CountyOrParish) —
- * short-circuits to PASS: there is no standard set to validate against, so advertising
- * ({@link lookupResourcePresence}) is its only applicable gate. Enforcing SLV-validity there would false-fail
- * every conformant provider.
+ * VALUE REPORT (report-only, NEVER gating). For each cached /Lookup row under this LookupName — unless the
+ * field is ignore-listed — classify the declared `StandardLookupValue` as DD-standard (a member of the FIELD'S
+ * DD enum, joined via the field's DD type {@link StandardMap.standardValuesForField}, NEVER the provider's
+ * arbitrary wire LookupName; fall back to "standard in ANY DD enum" when the field can't be resolved) or LOCAL
+ * (a provider extension). Core does NOT gate on enumeration membership: extending an OPEN enum is permitted,
+ * and a value that should have been standard but was remapped is caught by the Data Dictionary endorsement,
+ * not Core. This assertion always PASSES; it exists to PUBLISH what was found — classified — in the Core report
+ * so a reviewer can still spot an off value. For a CLOSED enum (DD `lookupStatus` "Locked with Enumerations")
+ * it additionally WARNS that a local value would not pass DD testing, since extending a closed enum is a DD
+ * violation — but even then Core reports only, it does not fail.
  */
-export const lookupResourceSlvValidity = (
+export const lookupResourceValueReport = (
   rows: ReadonlyArray<Record<string, unknown>>,
   resource: string,
   field: string,
@@ -668,28 +668,35 @@ export const lookupResourceSlvValidity = (
   isEnumerationIgnored: (resource: string, field: string) => boolean,
 ): AssertionResult => {
   if (isEnumerationIgnored(resource, field)) {
-    return { passed: true, message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} is on the ignore-enumerations list — StandardLookupValue validity not enforced` };
-  }
-  // A purely-open enum (City, CountyOrParish, …) carries NO DD-standard values, so there is nothing a
-  // StandardLookupValue could be validated against — advertising (presence) is its only applicable gate.
-  // Enforcing SLV-validity would false-fail every conformant provider. (Closed enums and
-  // open-with-enumerations still carry a standard set and are validated below.)
-  if (standardMap.isPurelyOpenEnumField(resource, field)) {
-    return { passed: true, message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} is a purely-open enumeration with no DD-standard values — StandardLookupValue validity not applicable (advertising is the only gate)` };
+    return { passed: true, message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} is on the ignore-enumerations list — values not classified` };
   }
   // Prefer the precise per-field DD set (joined on the field's DD type); fall back to "any DD enum" only when
-  // the field can't be resolved to a DD enum, so an unresolvable field degrades to a laxer check, never a crash.
+  // the field can't be resolved to a DD enum, so an unresolvable field degrades to a laxer classification.
   const perFieldSet = standardMap.standardValuesForField(resource, field);
   const isDdStandard = (slv: string): boolean => (perFieldSet ? perFieldSet.has(slv) : standardMap.isStandardValue(slv));
-  const declared = rows.flatMap(r => {
+  const resolved = perFieldSet !== undefined; // the field resolved to a DD enum (vs an unknown / provider-local field)
+  const declared = [...new Set(rows.flatMap(r => {
     const slv = r.StandardLookupValue;
     return slv != null && String(slv).length > 0 ? [String(slv)] : [];
-  });
-  const invalid = [...new Set(declared.filter(slv => !isDdStandard(slv)))];
-  if (invalid.length > 0) {
-    return { passed: false, message: `Lookup Resource '${expectedLookupName}': ${invalid.length} declared StandardLookupValue(s) not DD-standard for ${resource}.${field} — e.g. ${invalid.slice(0, 5).map(v => `'${v}'`).join(', ')} (a non-standard remap breaks downstream consumers)` };
+  }))];
+  if (declared.length === 0) {
+    return { passed: true, message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} — no StandardLookupValue values to classify` };
   }
-  return { passed: true, message: `Lookup Resource '${expectedLookupName}': all ${declared.length} declared StandardLookupValue(s) are DD-standard for ${resource}.${field}` };
+  const local = declared.filter(slv => !isDdStandard(slv));
+  const standardCount = declared.length - local.length;
+  if (local.length === 0) {
+    return { passed: true, message: `Lookup Resource '${expectedLookupName}': tested ${resource}.${field} — all ${declared.length} value(s) are DD-standard` };
+  }
+  const examples = local.slice(0, 5).map(v => `'${v}'`).join(', ') + (local.length > 5 ? `, +${local.length - 5} more` : '');
+  if (standardMap.isClosedEnumField(resource, field)) {
+    return { passed: true, message: `Lookup Resource '${expectedLookupName}': tested ${resource}.${field} — ${standardCount} DD-standard, ${local.length} value(s) extending a closed enumeration (${examples}). Reported only — Core does not gate on enumeration membership, but extending a closed enumeration would not pass Data Dictionary testing.` };
+  }
+  // Resolvable non-closed enum → the openness rationale holds; unresolvable/provider-local field → state only
+  // what is known (reported, not failed), since the field's enum-ness and openness are unknown.
+  const rationale = resolved
+    ? 'Local values are permitted for open enumerations; reported for review, not failed.'
+    : 'Reported for review, not failed — Core does not gate on enumeration membership.';
+  return { passed: true, message: `Lookup Resource '${expectedLookupName}': tested ${resource}.${field} — ${standardCount} DD-standard, ${local.length} local value(s) (${examples}). ${rationale}` };
 };
 
 /**
@@ -701,7 +708,7 @@ export const lookupResourceSlvValidity = (
  * Every `/Lookup` row for the field's LookupName is fetched (paged all the way through, no cap) and cached by
  * LookupName. A later field that references an ALREADY-cached LookupName reuses those rows and skips the fetch
  * entirely — the 200 was verified when the cache was first filled — so the whole enum is paged at most once per
- * run. The presence + SLV-validity assertions are computed off those rows (see the helpers above).
+ * run. The presence + value-report assertions are computed off those rows (see the helpers above).
  */
 export const runLookupResourceScenario = async (
   serverUrl: string,
@@ -733,12 +740,13 @@ export const runLookupResourceScenario = async (
   const field = stringField.field;
   const expectedLookupName = effParams.lookupNameByField?.[field] ?? field;
 
-  // The gating data assertions over the (fetched or cached) /Lookup rows — presence + SLV-validity, side by
-  // side. Both consult the ignore list; presence unions all three value forms via the cache, SLV-validity joins
-  // each row's StandardLookupValue against the field's own DD enum.
+  // The data assertions over the (fetched or cached) /Lookup rows — presence (the gating advertising check) and
+  // the report-only value report, side by side. Both consult the ignore list; presence unions all three value
+  // forms via the cache; the value report classifies each row's StandardLookupValue (DD-standard vs local)
+  // against the field's own DD enum and never gates.
   const validate = (rows: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<AssertionResult> => [
     lookupResourcePresence(rows, effParams, field, expectedLookupName, lookupCtx.cache, lookupCtx.isEnumerationIgnored),
-    lookupResourceSlvValidity(rows, resource, field, expectedLookupName, lookupCtx.standardMap, lookupCtx.isEnumerationIgnored),
+    lookupResourceValueReport(rows, resource, field, expectedLookupName, lookupCtx.standardMap, lookupCtx.isEnumerationIgnored),
   ];
 
   // CACHE HIT: another field already fetched (and 200-verified) every row for this LookupName. Reuse them and
@@ -983,8 +991,8 @@ const assertData = (
     }
 
     // 'lookup-resource' is NOT handled here — runScenario routes it to runLookupResourceScenario, which fetches
-    // (and caches) every /Lookup row for the LookupName and validates via lookupResourcePresence +
-    // lookupResourceSlvValidity (all-three-forms membership + the ignore list + StandardLookupValue validity).
+    // (and caches) every /Lookup row for the LookupName and reports via lookupResourcePresence (advertising
+    // gate) + lookupResourceValueReport (report-only DD-standard/local classification; never gates).
 
     case 'expand':
       // Reached only via the single-field executeStandardScenario path (kept for the RRK-warning unit tests):
@@ -1310,7 +1318,7 @@ export interface CoreResourceScenarioOptions {
   /** Per-run Lookup Resource cache, keyed by LookupName and SHARED across resources so a LookupName referenced
    *  by several fields is fetched/paged once. Omitted by direct callers → a per-resource fallback is built. */
   readonly lookupCache?: LookupCache;
-  /** The DD standard map for the Lookup Resource SLV-validity join. Omitted → built per resource as a fallback. */
+  /** The DD standard map for the Lookup Resource value-report classification join. Omitted → built per resource as a fallback. */
   readonly standardMap?: StandardMap;
   /** Committee-approved ignore-enumerations predicate (from schema-validation-settings.json). Omitted → no
    *  exemptions (every field's enumerations are enforced). */

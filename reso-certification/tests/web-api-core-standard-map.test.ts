@@ -4,11 +4,11 @@ import { buildStandardMap, buildStandardMapFrom } from '../src/web-api-core/stan
 
 const mockRef: DdReference = {
   fields: [
-    { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus' },
+    { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus', lookupStatus: 'Locked with Enumerations' },
     { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' },
     { resourceName: 'Member', fieldName: 'MemberKey', type: 'Edm.String' },
-    // City: a nominal enum the DD defines with ZERO standard values (no City lookups below) → purely open.
-    { resourceName: 'Property', fieldName: 'City', type: 'org.reso.metadata.enums.City' },
+    // City: a nominal enum the DD defines with ZERO standard values (no City lookups below); lookupStatus "Open".
+    { resourceName: 'Property', fieldName: 'City', type: 'org.reso.metadata.enums.City', lookupStatus: 'Open' },
   ],
   lookups: [
     { lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Active' },
@@ -45,14 +45,18 @@ describe('buildStandardMapFrom — membership tests', () => {
     expect(map.standardValuesForField('Property', 'ListPrice')).toBeUndefined();
     // An unknown field → undefined.
     expect(map.standardValuesForField('Property', 'ZZZLocalField')).toBeUndefined();
+    // A resolvable but memberless (purely-open) enum (City) → an EMPTY set, NOT undefined — so its values
+    // classify LOCAL rather than borrowing a colliding standard value from another enum.
+    expect(map.standardValuesForField('Property', 'City')).toBeDefined();
+    expect(map.standardValuesForField('Property', 'City')?.size).toBe(0);
   });
 
-  it('isPurelyOpenEnumField: nominal enum with zero DD-standard values → true; enum-with-members / primitive / unknown → false', () => {
-    expect(map.isPurelyOpenEnumField('Property', 'City')).toBe(true); // nominal enum, no members in the DD
-    expect(map.isPurelyOpenEnumField('Property', 'StandardStatus')).toBe(false); // has members (Active/Pending)
-    expect(map.isPurelyOpenEnumField('Property', 'ListPrice')).toBe(false); // primitive Edm.Decimal
-    expect(map.isPurelyOpenEnumField('Member', 'MemberKey')).toBe(false); // primitive Edm.String
-    expect(map.isPurelyOpenEnumField('Property', 'ZZZUnknown')).toBe(false); // unknown field
+  it('isClosedEnumField: a "Locked" enum → true; open / primitive / unknown → false', () => {
+    expect(map.isClosedEnumField('Property', 'StandardStatus')).toBe(true); // lookupStatus "Locked with Enumerations"
+    expect(map.isClosedEnumField('Property', 'City')).toBe(false); // lookupStatus "Open"
+    expect(map.isClosedEnumField('Property', 'ListPrice')).toBe(false); // primitive, no lookupStatus
+    expect(map.isClosedEnumField('Member', 'MemberKey')).toBe(false); // primitive, no lookupStatus
+    expect(map.isClosedEnumField('Property', 'ZZZUnknown')).toBe(false); // unknown field
   });
 });
 
@@ -83,10 +87,11 @@ describe('buildStandardMap — loads the real dd-2.1 reference', () => {
     expect(future.isStandardValue('Active')).toBe(true);
   });
 
-  it('isPurelyOpenEnumField against the real DD: City / CountyOrParish are purely-open, StandardStatus is not', () => {
-    // These fields are enumerations the DD defines with ZERO standard values — advertising is their only gate.
-    expect(map.isPurelyOpenEnumField('Property', 'City')).toBe(true);
-    expect(map.isPurelyOpenEnumField('Property', 'CountyOrParish')).toBe(true);
-    expect(map.isPurelyOpenEnumField('Property', 'StandardStatus')).toBe(false); // 11 standard members
+  it('isClosedEnumField against the real DD: StandardStatus is Locked (closed); City and OpenHouseStatus are not', () => {
+    // Only "Locked with Enumerations" enums are closed. StandardStatus is locked; City is "Open" and
+    // OpenHouseStatus is "Open with Enumerations" — both permit local extension.
+    expect(map.isClosedEnumField('Property', 'StandardStatus')).toBe(true);
+    expect(map.isClosedEnumField('Property', 'City')).toBe(false);
+    expect(map.isClosedEnumField('OpenHouse', 'OpenHouseStatus')).toBe(false);
   });
 });
