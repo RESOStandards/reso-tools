@@ -13,7 +13,7 @@ import type { TestParams } from './sampling.js';
 import type { EnumCandidate } from './enum-selection.js';
 import { buildStandardMap, type StandardMap } from './standard-map.js';
 import { createLookupCache, type LookupCache } from './lookup-cache.js';
-import { buildScenarioQuery } from './queries.js';
+import { buildLookupUrl, buildScenarioQuery, recordDerivedSet } from './queries.js';
 import { emptyVerdict, type EmptyContext, type EmptyVerdict } from './empty-verdict.js';
 import { scenariosForVersion, type ComparisonOp, type CoreScenario, type ExpandScenario } from './scenarios.js';
 import { parseServiceDocument } from './serving.js';
@@ -21,6 +21,7 @@ import {
   assertODataResponse,
   assertHasResults,
   assertScalarComparison,
+  assertScalarCompoundOr,
   assertSortOrder,
   assertEnumMatch,
   assertCollectionLambda,
@@ -103,6 +104,11 @@ export interface CoreSummary {
   readonly failed: number;
   readonly skipped: number;
   readonly optional: OptionalOutcomeCounts;
+  /** Non-gating warnings surfaced across the scenarios (rides `ScenarioResult.warnings`). Verdict-NEUTRAL —
+   *  never added to `failed`, never affects the exit code. Surfaced in the report + CLI for observe-then-flip
+   *  checks (e.g. single-enum `ne`) and, later, Fast Track / DD 3.0 suggestions. Optional so the synthetic
+   *  summaries (skip / deadline / not-served) need not set it. */
+  readonly warnings?: number;
 }
 
 /** Derive an Optional Test's outcome. A skipped or errored (indeterminate)
@@ -136,6 +142,8 @@ export const summarizeScenarios = (
       notSupported: optional.filter(r => optionalOutcome(r) === 'Not Supported').length,
       notTested: optional.filter(r => optionalOutcome(r) === 'Not Tested').length,
     },
+    // Verdict-neutral: total warnings across ALL scenarios (required + optional), never folded into failed.
+    warnings: results.reduce((n, r) => n + (r.warnings?.length ?? 0), 0),
   };
 };
 
@@ -144,6 +152,17 @@ export const summarizeScenarios = (
  *  (see {@link runProviderScenarios}); the per-resource runner excludes them so they don't re-run N times. */
 export const isProviderWideScenario = (scenario: CoreScenario): boolean =>
   scenario.category === 'structural' && (scenario.assertion === 'metadata' || scenario.assertion === 'service-document');
+
+/**
+ * The `in` operator (Core 2.1.0) is tested ONLY when the server positively advertises `OData-Version: 4.01`.
+ * Fail CLOSED: an `in`-operator scenario is skipped on 4.0 AND on an unknown/undefined version (a missing or
+ * unparseable header). Running it otherwise issues a 4.01-only query against a possibly-4.0 server — a
+ * misattributed false-fail. Returns true when the scenario must be skipped for the detected version.
+ */
+export const isInOperatorSkippedForVersion = (
+  scenario: CoreScenario,
+  detectedODataVersion: string | undefined,
+): boolean => scenario.category === 'in-operator' && detectedODataVersion !== '4.01';
 
 /** Build coverage matrix from resolved test params. */
 const buildCoverage = (params: TestParams): ReadonlyArray<TypeCoverage> => [
@@ -179,6 +198,11 @@ const enumScenarioOp = (scenario: CoreScenario): EnumOp | undefined => {
 const opValidForRep = (op: EnumOp, rep: EnumRepresentation): boolean => {
   switch (rep) {
     case 'SINGLE_ENUM':
+      // `has` is valid on a single-valued Edm.EnumType too — the Commander tests it (`filter-enum-single-has`,
+      // both 2.0.0 and 2.1.0): for a non-flags enum a value has exactly its own flag, so `Field has 'X'` behaves
+      // like `Field eq 'X'`. NOT for SINGLE_STRING — `has` is the enum-flags operator; string enums use eq/ne
+      // (there is no `filter-string-enum-single-has`).
+      return op === 'eq' || op === 'ne' || op === 'in' || op === 'has';
     case 'SINGLE_STRING':
       return op === 'eq' || op === 'ne' || op === 'in';
     case 'FLAGS_ENUM':
@@ -188,6 +212,36 @@ const opValidForRep = (op: EnumOp, rep: EnumRepresentation): boolean => {
       return op === 'any' || op === 'all';
   }
 };
+
+/**
+ * The enumeration representation a scenario is authored to certify, from its category (+ enumType). The catalog
+ * has DISTINCT scenarios per representation — `filter-enum-single-*` (SINGLE_ENUM) vs `filter-string-enum-single-*`
+ * (SINGLE_STRING); `filter-coll-enum-*` (COLLECTION_ENUM) vs `filter-string-enum-multi-*` (COLLECTION_STRING);
+ * `filter-enum-multi-*` (FLAGS_ENUM). Pinning each scenario to its own representation is what certifies EACH
+ * implementation when a provider carries more than one, and stops a `string-enum` (2.1.0) scenario from certifying
+ * an `Edm.EnumType` field — or an `enum` scenario a string field — instead of skipping N/A. `in` is single-valued
+ * either way (spec :110), so it targets both single reps.
+ */
+export const scenarioTargetsRep = (scenario: CoreScenario, rep: EnumRepresentation): boolean => {
+  switch (scenario.category) {
+    case 'enum':
+      return scenario.enumType === 'multi' ? rep === 'FLAGS_ENUM' : rep === 'SINGLE_ENUM';
+    case 'collection':
+      return rep === 'COLLECTION_ENUM';
+    case 'string-enum':
+      return scenario.enumType === 'multi' ? rep === 'COLLECTION_STRING' : rep === 'SINGLE_STRING';
+    case 'in-operator':
+      return rep === 'SINGLE_ENUM' || rep === 'SINGLE_STRING';
+    default:
+      return true; // non-enum-family scenarios never reach the enum runner
+  }
+};
+
+/** The single-valued `ne` enum scenario, whose per-record value check is STRICTER than Core 2.0.0's (the
+ *  Commander's ne scenario asserts only has-results, no value step — feature :499-506). It's a false-pass fix on
+ *  an existing element, so a violation is surfaced as a non-gating WARNING (not a failure) until the WG signs off. */
+const isSingleEnumNe = (scenario: CoreScenario): boolean =>
+  scenario.category === 'enum' && scenario.enumType === 'single' && scenario.op === 'ne';
 
 /** The candidate slot a scenario draws from, by its fieldParam. */
 const scenarioSlot = (scenario: CoreScenario): 'single' | 'multi' =>
@@ -199,7 +253,7 @@ const scenarioSlot = (scenario: CoreScenario): 'single' | 'multi' =>
 const paramsWithCandidate = (params: TestParams, slot: 'single' | 'multi', c: EnumCandidate): TestParams => {
   const lookupNameByField = { ...params.lookupNameByField, ...(c.lookupName ? { [c.field]: c.lookupName } : {}) };
   return slot === 'multi'
-    ? { ...params, multiLookupField: c.field, multiLookupFieldRep: c.representation, multiLookupEnumType: c.enumType, multiLookupValue1: c.values[0], multiLookupValue2: c.values[1], multiLookupDistinctCount: c.distinctValueCount, lookupNameByField }
+    ? { ...params, multiLookupField: c.field, multiLookupFieldRep: c.representation, multiLookupEnumType: c.enumType, multiLookupValue1: c.values[0], multiLookupValue2: c.values[1], multiLookupDistinctCount: c.distinctValueCount, multiLookupSubsetValues: c.subsetSampleValues, lookupNameByField }
     : { ...params, singleLookupField: c.field, singleLookupFieldRep: c.representation, singleLookupEnumType: c.enumType, singleLookupValue: c.values[0], singleLookupValue2: c.values[1], singleLookupValue3: c.values[2], singleLookupDistinctCount: c.distinctValueCount, lookupNameByField };
 };
 
@@ -281,7 +335,10 @@ export const emptyContextFor = (scenario: CoreScenario, params: TestParams): Emp
     }
     return undefined;
   })();
-  return { ...(distinct !== undefined && { distinctValueCount: distinct }), complete: params.sampleComplete };
+  // When the query was built over one record's OWN collection (all() / has-and), an empty result is a
+  // DETERMINATE defect (the guaranteeing record must come back), not the legitimate-empty skip — see emptyVerdict.
+  const derivedSet = recordDerivedSet(scenario, params) !== undefined;
+  return { ...(distinct !== undefined && { distinctValueCount: distinct }), complete: params.sampleComplete, ...(derivedSet && { recordDerivedSet: true }) };
 };
 
 /** Map a 200-empty {@link EmptyVerdict} to the scenario-result flags for the branch. A `fail` and a `pass`
@@ -450,9 +507,59 @@ const runOneExpandNav = async (
       return { tag, name, passed: false, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url };
     }
     const records = extractRecords(response.body);
-    assertions.push(validateExpandedItems(records, nav, validator));
-    const allPassed = assertions.every(a => a.passed);
     const warnings = expandRrkWarnings(records, scenario, navParams);
+    if (!validator) {
+      // The expanded-item schema validator could not be built for this run (the provider's metadata did not
+      // compile into an expand schema). Per-item validation did NOT run → INDETERMINATE: SKIP, never a
+      // determinate PASS on the 200 alone (and never a false-fail — an uncompilable-metadata issue is not the
+      // expanded data's fault). The non-gating RRK warning still rides alongside.
+      return {
+        tag,
+        name,
+        passed: true,
+        skipped: true,
+        assertions: [...assertions, { passed: true, message: `$expand ${nav.name}: 200 received; per-item schema validation unavailable (no validator built) — not validated (skipped)` }],
+        duration: Date.now() - start,
+        requestLatency,
+        requestUrl: query.url,
+        ...(warnings.length > 0 ? { warnings } : {}),
+      };
+    }
+    assertions.push(validateExpandedItems(records, nav, validator));
+
+    // Second leg (web-api-core.md:69, §2.5.10.2): collect a parent key from the $expand response and GET the
+    // navigation-property-path `/{resource}('{key}')/{nav}`. This reaches an expansion-only target (Media needs
+    // no top-level EntitySet) THROUGH the parent key — never a top-level `GET /{target}` — and without re-fetching
+    // the (large) parent record (the key is already in the $expand response). Assert 200 + a schema-valid
+    // collection of the nav target type. An empty $expand response yields no key → the leg can't run (no data,
+    // not a failure).
+    const parentKey = records.map((r) => r[params.keyField]).find((k) => k != null);
+    if (parentKey == null) {
+      assertions.push({ passed: true, message: `$expand ${nav.name}: no parent key in the $expand response — navigation-property-path leg not exercised (no data)` });
+    } else {
+      const navPathUrl = `${serverUrl}/${resource}('${encodeURIComponent(String(parentKey))}')/${nav.name}`;
+      const navResp = await requester.request({ method: 'GET', url: navPathUrl, authToken });
+      const navStatus = assertODataResponse(navResp, 200);
+      assertions.push(
+        navStatus.passed
+          ? { passed: true, message: `Navigation-property-path GET ${resource}('…')/${nav.name} → 200` }
+          : { passed: false, message: `Navigation-property-path GET ${resource}('…')/${nav.name} → HTTP ${navResp.status} (expected 200; a declared collection expansion MUST be reachable via its navigation-property path — web-api-core.md §2.5.10.2)` },
+      );
+      if (navStatus.passed) {
+        const navItems = extractRecords(navResp.body);
+        const invalid = navItems.flatMap((item, index) => {
+          const { valid, errors } = validator.validate(item, nav.targetType);
+          return valid ? [] : [{ index, errors }];
+        });
+        assertions.push(
+          invalid.length === 0
+            ? { passed: true, message: `Navigation-property-path ${nav.name}: ${navItems.length} item(s) valid against ${nav.targetType}` }
+            : { passed: false, message: `Navigation-property-path ${nav.name}: ${invalid.length}/${navItems.length} item(s) schema-invalid against ${nav.targetType} — item ${invalid[0].index}: ${invalid[0].errors.slice(0, 3).join('; ') || 'schema validation failed'}` },
+        );
+      }
+    }
+
+    const allPassed = assertions.every(a => a.passed);
     return { tag, name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url, ...(warnings.length > 0 ? { warnings } : {}) };
   } catch (err) {
     if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
@@ -537,12 +644,22 @@ export const executeStandardScenario = async (
     }
 
     const dataAssertion = assertData(records, scenario, params);
-    if (dataAssertion) assertions.push(dataAssertion);
+    // Non-gating warnings ride ScenarioResult.warnings — never `passed` / the verdict / the exit code. Sources:
+    //  - $expand RRK (WG/RCP-039), computed per nav.
+    //  - single-enum `ne`: its per-record value check is stricter than Core 2.0.0 (a false-pass fix on an existing
+    //    element), so a violation is surfaced as a WARNING pending WG sign-off, not a failure (observe-then-flip).
+    //    Only the non-empty value check converts here; the empty-result path (emptyVerdict, above) matches the
+    //    Commander and stays a determinate fail.
+    const warnings: string[] = scenario.category === 'expand' ? [...expandRrkWarnings(records, scenario, params)] : [];
+    if (dataAssertion) {
+      if (isSingleEnumNe(scenario) && !dataAssertion.passed) {
+        warnings.push(`Single-enumeration ne — stricter than Core 2.0.0; reported as a WARNING pending WG sign-off, not failed: ${dataAssertion.message}`);
+        assertions.push({ passed: true, message: `Single-enumeration ne: reported for review, not failed (see warnings) — ${dataAssertion.message}` });
+      } else {
+        assertions.push(dataAssertion);
+      }
+    }
     const allPassed = assertions.every(a => a.passed);
-    // Non-gating RRK expanded-item warning (WG/RCP-039): computed ONLY for the $expand scenario and carried on
-    // ScenarioResult.warnings — never on `passed` or an assertion — so it can't flip a compliant server. `[]`
-    // for every other category, so the spread adds nothing outside expand.
-    const warnings = scenario.category === 'expand' ? expandRrkWarnings(records, scenario, params) : [];
     return { result: { tag: scenario.tag, name: scenario.name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url, ...(warnings.length > 0 ? { warnings } : {}) }, retryable: false, rejected: false, accepted: true };
   } catch (err) {
     if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
@@ -553,13 +670,16 @@ export const executeStandardScenario = async (
 };
 
 /**
- * Run an enum-family scenario: gate on the selected field's real representation and try candidate fields
- * in order. Only candidates whose representation supports the operator are eligible (flags→has,
- * single→eq/ne/in, collection→any/all); the first that queries cleanly is the verdict. If none is
- * queryable we skip rather than fail on an unlucky pick, and if there's no candidate of the right kind
- * (e.g. the server has no flags field for a `has` scenario) we skip with a reason.
+ * Run an enum-family scenario. Candidates are pinned to the scenario's OWN representation ({@link scenarioTargetsRep})
+ * intersected with the operator that representation supports ({@link opValidForRep}: flags→has, single→eq/ne/in,
+ * collection→any/all). Because the catalog has a distinct scenario per representation, this certifies EACH
+ * implementation a provider carries (a both-reps provider gets both its `Collection(EnumType)` and its
+ * `Collection(String)` fields exercised) and never lets a `string-enum` scenario land on an `Edm.EnumType` field
+ * (or vice-versa). The first eligible candidate that queries cleanly is the verdict; if none is queryable we skip
+ * rather than fail on an unlucky pick, and if the provider has no field of this scenario's representation we skip
+ * with a reason (N/A — not a failure).
  */
-const runEnumFamilyScenario = async (
+export const runEnumFamilyScenario = async (
   serverUrl: string,
   resource: string,
   scenario: CoreScenario,
@@ -575,9 +695,9 @@ const runEnumFamilyScenario = async (
   // determinate result). We deliberately do not cap: a provider may restrict $filter to a subset of its
   // enum fields (returning 400 on the rest), so a queryable field can sit at any rank; a cap could skip it
   // and — worse — leave us reporting one of the 400s. Ranking is uncorrelated with filterability.
-  const eligible = candidates.filter(c => opValidForRep(op, c.representation));
+  const eligible = candidates.filter(c => scenarioTargetsRep(scenario, c.representation) && opValidForRep(op, c.representation));
   if (eligible.length === 0) {
-    return skipResult(scenario, start, `no ${slot}-valued enumeration field supports "${op}" on this server`);
+    return skipResult(scenario, start, `no ${slot}-valued enumeration field of this scenario's representation (category '${scenario.category}') supports "${op}" on this server`);
   }
 
   let anyAccepted = false; // some eligible field returned 200 — the operator ran, so it is not an all-reject gap
@@ -621,13 +741,13 @@ export interface LookupResourceContext {
  */
 export const lookupResourcePresence = (
   rows: ReadonlyArray<Record<string, unknown>>,
-  effParams: TestParams,
+  resource: string,
   field: string,
   expectedLookupName: string,
+  sampleValues: ReadonlyArray<string | undefined>,
   cache: LookupCache,
   isEnumerationIgnored: (resource: string, field: string) => boolean,
 ): AssertionResult => {
-  const resource = effParams.resource;
   if (rows.length === 0) {
     return { passed: false, message: `Lookup Resource returned no rows for LookupName '${expectedLookupName}'` };
   }
@@ -638,13 +758,12 @@ export const lookupResourcePresence = (
   if (isEnumerationIgnored(resource, field)) {
     return { passed: true, message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} is on the committee-approved ignore-enumerations list — value presence not enforced` };
   }
-  const sampleValues = [effParams.singleLookupValue, effParams.singleLookupValue2, effParams.singleLookupValue3]
-    .filter((v): v is string => typeof v === 'string' && v.length > 0);
-  const missing = sampleValues.filter(v => !cache.has(resource, field, v));
+  const present = sampleValues.filter((v): v is string => typeof v === 'string' && v.length > 0);
+  const missing = present.filter(v => !cache.has(resource, field, v));
   if (missing.length > 0) {
     return { passed: false, message: `Lookup Resource missing sample value(s): ${missing.map(v => `'${v}'`).join(', ')} for LookupName '${expectedLookupName}'` };
   }
-  return { passed: true, message: `Lookup Resource validated: LookupName '${expectedLookupName}' with ${sampleValues.length} sample value(s) present` };
+  return { passed: true, message: `Lookup Resource validated: LookupName '${expectedLookupName}' with ${present.length} sample value(s) present` };
 };
 
 /**
@@ -700,92 +819,84 @@ export const lookupResourceValueReport = (
 };
 
 /**
- * Run the Lookup Resource validation scenario. The Lookup Resource (RCP-032/039) is the *string*-lookup
- * mechanism, so this validates against a `SINGLE_STRING` field; enum-typed providers have no Lookup
- * Resource and the scenario simply doesn't apply → skip. Unlike the generic flow, an empty Lookup Resource
- * is a FAILURE not a skip — the scenario exists to prove the declared LookupName is present.
+ * Run the Lookup Resource validation scenario. The Lookup Resource (RCP-032/039) is the *string*-enum
+ * mechanism, so it validates the STRING lookup forms — `SINGLE_STRING` (single-valued) AND `COLLECTION_STRING`
+ * (multi-valued) — whichever the provider declares; the spec supplies both a single- and a multi-valued
+ * LookupName + sample values (web-api-core.md :100-101). Enum-typed forms (`SINGLE_ENUM`, `FLAGS_ENUM`,
+ * `COLLECTION_ENUM`) have no Lookup Resource → not applicable, so with no string form present the scenario skips.
+ * Unlike the generic flow, an empty Lookup Resource is a FAILURE not a skip — the scenario exists to prove each
+ * declared LookupName (and its sample values) is present.
  *
- * Every `/Lookup` row for the field's LookupName is fetched (paged all the way through, no cap) and cached by
- * LookupName. A later field that references an ALREADY-cached LookupName reuses those rows and skips the fetch
- * entirely — the 200 was verified when the cache was first filled — so the whole enum is paged at most once per
- * run. The presence + value-report assertions are computed off those rows (see the helpers above).
+ * Each string candidate has its OWN LookupName; every `/Lookup` row for it is fetched (paged all the way through,
+ * no cap) and cached by LookupName, so a LookupName referenced by several fields is fetched at most once per run.
+ * The presence + value-report assertions are computed off those rows (see the helpers above); the scenario
+ * aggregates the assertions across every declared string form and passes iff all resolve.
  *
  * Page size is requested via the OData `Prefer: odata.maxpagesize` header (server-driven / nextLink paging is
- * spec-legit in DD 2.1). Without it a server falls back to a tiny default (Cotality returns 10), turning a large
- * purely-open enum like City into hundreds of round-trips; asking for 1000 collapses that. The server MAY still
- * return fewer (and echo `Preference-Applied`) — the nextLink loop pages correctly either way.
+ * spec-legit in DD 2.1). Without it a server falls back to a tiny default, turning a large purely-open enum like
+ * City into hundreds of round-trips; asking for 1000 collapses that. The server MAY still return fewer (and echo
+ * `Preference-Applied`) — the nextLink loop pages correctly either way.
  */
 const LOOKUP_MAX_PAGE_SIZE = 1000; // DD 2.x max page size
 const LOOKUP_PREFER_HEADER: Readonly<Record<string, string>> = { Prefer: `odata.maxpagesize=${LOOKUP_MAX_PAGE_SIZE}` };
 
-export const runLookupResourceScenario = async (
+/**
+ * Fetch (or reuse from cache) every `/Lookup` row for ONE string-lookup candidate's LookupName and run the two
+ * data assertions over them — presence (gating) + the report-only value report. Each string candidate has its
+ * OWN LookupName, so each gets its own fetch/cache lookup; {@link runLookupResourceScenario} aggregates the
+ * results. Rethrows a deadline error so the run stops gracefully; any other transport error is reported as an
+ * errored assertion on THIS candidate (it does not abort the sibling).
+ */
+const validateStringLookupCandidate = async (
+  cand: EnumCandidate,
   serverUrl: string,
   resource: string,
-  scenario: CoreScenario,
-  params: TestParams,
   authToken: string,
-  start: number,
-  requester: ODataRequester = webRequester,
+  requester: ODataRequester,
   lookupCtx: LookupResourceContext,
-): Promise<ScenarioResult> => {
-  const stringField = (params.singleLookupCandidates ?? []).find(c => c.representation === 'SINGLE_STRING');
-  if (!stringField) {
-    return skipResult(scenario, start, 'no string (Lookup Resource) lookup field — enum-typed lookups have no Lookup Resource');
-  }
+  lookupNameByField: Readonly<Record<string, string>> | undefined,
+): Promise<{ readonly assertions: ReadonlyArray<AssertionResult>; readonly requestUrl: string; readonly errored: boolean; readonly requestLatency?: number }> => {
+  const field = cand.field;
+  const expectedLookupName = lookupNameByField?.[field] ?? cand.lookupName ?? field;
   // Validate the LOCAL-first sample values — the ones most at risk of being absent from /Lookup — not the
   // standard-first filter values, which would mask an RCP-039 defect (a data value missing from /Lookup).
-  const lv = stringField.lookupSampleValues;
-  const effParams: TestParams = {
-    ...paramsWithCandidate(params, 'single', stringField),
-    singleLookupValue: lv[0],
-    singleLookupValue2: lv[1],
-    singleLookupValue3: lv[2],
-  };
-  const query = buildScenarioQuery(serverUrl, resource, scenario, effParams);
-  if (!query) return skipResult(scenario, start, 'required test parameters not available for the Lookup Resource scenario');
-  const tag = scenario.tag;
-  const name = scenario.name;
-  const field = stringField.field;
-  const expectedLookupName = effParams.lookupNameByField?.[field] ?? field;
+  const sampleValues = cand.lookupSampleValues;
+  const url = buildLookupUrl(serverUrl, expectedLookupName);
 
   // The data assertions over the (fetched or cached) /Lookup rows — presence (the gating advertising check) and
-  // the report-only value report, side by side. Both consult the ignore list; presence unions all three value
-  // forms via the cache; the value report classifies each row's StandardLookupValue (DD-standard vs local)
-  // against the field's own DD enum and never gates.
+  // the report-only value report. Both consult the ignore list; presence unions all three value forms via the
+  // cache; the value report classifies each row's StandardLookupValue against the field's own DD enum, never gating.
   const validate = (rows: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<AssertionResult> => [
-    lookupResourcePresence(rows, effParams, field, expectedLookupName, lookupCtx.cache, lookupCtx.isEnumerationIgnored),
+    lookupResourcePresence(rows, resource, field, expectedLookupName, sampleValues, lookupCtx.cache, lookupCtx.isEnumerationIgnored),
     lookupResourceValueReport(rows, resource, field, expectedLookupName, lookupCtx.standardMap, lookupCtx.isEnumerationIgnored),
   ];
 
-  // CACHE HIT: another field already fetched (and 200-verified) every row for this LookupName. Reuse them and
-  // skip the fetch — validate against the cached rows so the result is still a valid, gating ScenarioResult.
+  // CACHE HIT: another field already fetched (and 200-verified) every row for this LookupName. Reuse and skip the fetch.
   const cachedRows = lookupCtx.cache.rowsFor(resource, field);
   if (cachedRows) {
-    const assertions = validate(cachedRows);
-    return { tag, name, passed: assertions.every(a => a.passed), skipped: false, assertions, duration: Date.now() - start, requestUrl: query.url };
+    return { assertions: validate(cachedRows), requestUrl: url, errored: false };
   }
 
   const assertions: AssertionResult[] = [];
   try {
     const reqStart = Date.now();
-    const response = await requester.request({ method: 'GET', url: query.url, authToken, headers: LOOKUP_PREFER_HEADER });
+    const response = await requester.request({ method: 'GET', url, authToken, headers: LOOKUP_PREFER_HEADER });
     const requestLatency = Date.now() - reqStart;
     const responseCheck = assertODataResponse(response, 200);
     assertions.push(responseCheck);
     if (!responseCheck.passed) {
-      return { tag, name, passed: false, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url };
+      return { assertions, requestUrl: url, errored: false, requestLatency };
     }
     // Fetch EVERY /Lookup row for this LookupName by paging all the way through, with NO page cap. A published
     // value can sit arbitrarily deep under server-driven paging, and RESO has no value-filter on /Lookup yet
     // (RCP-039 mandates only the LookupName filter), so a fixed cap would false-fail a conformant provider by
-    // reporting a present value as missing. The large pull is on-demand and rare (most LookupNames are small);
-    // the run deadline is the only global stop.
+    // reporting a present value as missing. The large pull is on-demand and rare (most LookupNames are small).
     const records: Record<string, unknown>[] = [...extractRecords(response.body)];
     let nextLink = extractNextLink(response.body);
     while (nextLink) {
       let pageResp: Awaited<ReturnType<typeof odataRequest>>;
       try {
-        pageResp = await requester.request({ method: 'GET', url: rebaseNextLink(nextLink, query.url), authToken, headers: LOOKUP_PREFER_HEADER });
+        pageResp = await requester.request({ method: 'GET', url: rebaseNextLink(nextLink, url), authToken, headers: LOOKUP_PREFER_HEADER });
       } catch (err) {
         if (isDeadlineError(err)) throw err; // out of run budget — stop the whole run, not just paging
         break; // a page fetch failed even after re-basing — validate with the rows we already have, don't hard-error
@@ -798,12 +909,59 @@ export const runLookupResourceScenario = async (
     // validating so the presence check's cache.has sees this LookupName's rows.
     lookupCtx.cache.put(expectedLookupName, records);
     assertions.push(...validate(records)); // 0 rows / wrong name / missing values → fail
-    const allPassed = assertions.every(a => a.passed);
-    return { tag, name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url };
+    return { assertions, requestUrl: url, errored: false, requestLatency };
   } catch (err) {
     if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
-    return { tag, name, passed: false, skipped: false, errored: true, assertions: [{ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` }], duration: Date.now() - start, requestUrl: query.url };
+    return { assertions: [{ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` }], requestUrl: url, errored: true };
   }
+};
+
+export const runLookupResourceScenario = async (
+  serverUrl: string,
+  resource: string,
+  scenario: CoreScenario,
+  params: TestParams,
+  authToken: string,
+  start: number,
+  requester: ODataRequester = webRequester,
+  lookupCtx: LookupResourceContext,
+): Promise<ScenarioResult> => {
+  // The Lookup Resource is the STRING enum mechanism, so only string forms have one: SINGLE_STRING (single-valued)
+  // and COLLECTION_STRING (multi-valued). Validate BOTH when present — the spec supplies a single- AND a multi-valued
+  // LookupName + sample values (:100-101), and each declared LookupName must resolve. Enum-typed forms (SINGLE_ENUM,
+  // FLAGS_ENUM, COLLECTION_ENUM) have no Lookup Resource → not applicable.
+  const single = (params.singleLookupCandidates ?? []).find(c => c.representation === 'SINGLE_STRING');
+  const multi = (params.multiLookupCandidates ?? []).find(c => c.representation === 'COLLECTION_STRING');
+  const targets = [single, multi].filter((c): c is EnumCandidate => c != null);
+  if (targets.length === 0) {
+    return skipResult(scenario, start, 'no string (Lookup Resource) lookup field — enum-typed lookups have no Lookup Resource');
+  }
+
+  // Validate each present string form against its own LookupName, sequentially so a LookupName shared across
+  // candidates is fetched at most once (the second sees the first's cached rows). The scenario passes iff every
+  // candidate's LookupName + sample values resolve.
+  const parts: { readonly assertions: ReadonlyArray<AssertionResult>; readonly requestUrl: string; readonly errored: boolean; readonly requestLatency?: number }[] = [];
+  for (const cand of targets) {
+    parts.push(await validateStringLookupCandidate(cand, serverUrl, resource, authToken, requester, lookupCtx, params.lookupNameByField));
+  }
+  const assertions = parts.flatMap(p => p.assertions);
+  const errored = parts.some(p => p.errored);
+  // Sum the per-candidate /Lookup fetch latencies (a cache-hit contributes none) so the scenario keeps its
+  // requestLatency telemetry. It spans the request(s) this scenario made; it is comparable across providers for
+  // the SAME scenario, not between the single- and multi-valued lookup shapes (different request kinds).
+  const latencies = parts.map(p => p.requestLatency).filter((l): l is number => l != null);
+  const requestLatency = latencies.length > 0 ? latencies.reduce((a, b) => a + b, 0) : undefined;
+  return {
+    tag: scenario.tag,
+    name: scenario.name,
+    passed: !errored && assertions.every(a => a.passed),
+    skipped: false,
+    ...(errored ? { errored: true } : {}),
+    assertions,
+    duration: Date.now() - start,
+    requestUrl: parts.map(p => p.requestUrl).join(' , '),
+    ...(requestLatency != null ? { requestLatency } : {}),
+  };
 };
 
 /** Run a single scenario and collect all assertion results. */
@@ -903,8 +1061,10 @@ const assertData = (
             ? { passed: true, message: `Compound AND filter satisfied` }
             : { passed: false, message: `Compound AND failed: ${!check1.passed ? check1.message : check2.message}` };
         }
-        // OR: at least one condition should be true for each record (already implicit in the data)
-        return { passed: true, message: 'Compound OR filter — results valid' };
+        // OR: each record must satisfy at least ONE condition — a genuine per-record disjunction. NOT
+        // `check1.passed || check2.passed`, which is "all records satisfy op1" OR "all satisfy op2" (weaker and
+        // wrong). assertScalarCompoundOr fails on any record satisfying neither (null fields skipped, per convention).
+        return assertScalarCompoundOr(records, field, scenario.op, value, scenario.compound.op2, value2, scenario.dataType);
       }
 
       // A negated filter (`not(field op value)`) returns records satisfying the COMPLEMENT of `op`.
@@ -916,15 +1076,18 @@ const assertData = (
       return assertSortOrder(records, resolveField(scenario.fieldParam), scenario.direction);
 
     case 'enum':
+      // has-and validates each returned record against the SAME set the query used — the record-derived
+      // co-present pair when present (so the guaranteed-match record's collection is what's checked), else the
+      // two sampled values. `recordDerivedSet` is the single source of truth (see queries.ts).
       return scenario.enumType === 'single'
         ? assertEnumMatch(records, resolveField(scenario.fieldParam), scenario.op, String(resolve(scenario.valueParam)), decodeFor(scenario.fieldParam))
         : assertCollectionLambda(
             records,
             resolveField(scenario.fieldParam),
             'has',
-            scenario.valueParam2
+            recordDerivedSet(scenario, params) ?? (scenario.valueParam2
               ? [String(resolve(scenario.valueParam)), String(resolve(scenario.valueParam2))]
-              : [String(resolve(scenario.valueParam))],
+              : [String(resolve(scenario.valueParam))]),
             decodeFor(scenario.fieldParam),
           );
 
@@ -933,7 +1096,7 @@ const assertData = (
         records,
         resolveField(scenario.fieldParam),
         scenario.lambda,
-        [String(resolve(scenario.valueParam))],
+        recordDerivedSet(scenario, params) ?? [String(resolve(scenario.valueParam))],
         decodeFor(scenario.fieldParam),
       );
 
@@ -945,9 +1108,9 @@ const assertData = (
         records,
         resolveField(scenario.fieldParam),
         scenario.op as 'any' | 'all',
-        scenario.valueParam2
+        recordDerivedSet(scenario, params) ?? (scenario.valueParam2
           ? [String(resolve(scenario.valueParam)), String(resolve(scenario.valueParam2))]
-          : [String(resolve(scenario.valueParam))],
+          : [String(resolve(scenario.valueParam))]),
         decodeFor(scenario.fieldParam),
       );
 
@@ -1138,8 +1301,38 @@ export const runStructuralScenario = async (
           ? { passed: true, message: `Key ${params.keyField}=${params.keyValue} returned` }
           : { passed: false, message: `Expected ${params.keyField}=${params.keyValue}, got ${body?.[params.keyField]}` }
       );
+    } else if (assertion === 'select') {
+      const response = await requester.request({ method: 'GET', url: query.url, authToken });
+      assertions.push(assertODataResponse(response, 200));
+      assertions.push(assertHasResults(response.body));
+      // Verify the server HONORED the multi-field projection. The value-independent, false-fail-safe signal is
+      // that no returned record carries a STRUCTURAL field OUTSIDE the $select list — a server that IGNORES $select
+      // returns every field, which this catches, and a key-only 200+has-results check cannot. We deliberately do
+      // NOT fail when a projected field is ABSENT: OData permits a server to omit a null-valued property (§11.2.4.1),
+      // so a legitimately-sparse projected field (null across the returned page) must not false-fail a compliant
+      // server. A projected field that IS present is reported as positive confirmation. (The selected fields are
+      // engine-chosen from the provider's own sampled metadata, so they are declared by construction.)
+      const records = extractRecords(response.body);
+      const projectedDataFields = query.selectFields.filter(f => f !== params.keyField);
+      if (projectedDataFields.length === 0) {
+        assertions.push({ passed: true, message: '$select: no non-key field available to project — multi-field projection not exercised on this resource' });
+      } else {
+        const selected = new Set(query.selectFields);
+        const extraField = records.flatMap(r => Object.keys(r)).find(k => !k.startsWith('@') && !selected.has(k));
+        if (extraField !== undefined) {
+          assertions.push({ passed: false, message: `$select projected {${query.selectFields.join(', ')}} but a returned record also carries unselected field '${extraField}' — the server did not honor the projection (returned fields outside the $select list)` });
+        } else {
+          const confirmed = projectedDataFields.filter(f => records.some(r => f in r));
+          assertions.push({
+            passed: true,
+            message: confirmed.length > 0
+              ? `$select honored: projection narrowed to the selected fields (present: ${confirmed.join(', ')})`
+              : '$select honored: returned records carry only selected fields (projected data field null/omitted on this page — not a defect)',
+          });
+        }
+      }
     } else {
-      // service-document, select
+      // service-document
       const response = await requester.request({ method: 'GET', url: query.url, authToken });
       assertions.push(assertODataResponse(response, 200));
       assertions.push(assertHasResults(response.body));
@@ -1166,6 +1359,25 @@ export const runPagingScenario = async (
   // Initial paging URL — kept in scope outside the try/while so the
   // returned ScenarioResult can surface it in the failure report.
   const initialUrl = `${serverUrl}/${resource}?$top=2&$select=${params.keyField}`;
+
+  // A `$top=1` request MUST NOT return an `@odata.nextLink`: the single requested record is the complete
+  // response to THAT request, so a continuation would return records beyond `$top=1` (web-api-core.md:84;
+  // §6 scenario-server-driven-paging MUST NOT; OData 4.01 §11.2.6.3 "up to but not greater than"). This is the
+  // single normatively-named Core paging criterion — kept separate from the nextLink walk below.
+  try {
+    const topOneUrl = `${serverUrl}/${resource}?$top=1&$select=${params.keyField}`;
+    const topOne = await requester.request({ method: 'GET', url: topOneUrl, authToken });
+    if (topOne.status !== 200) {
+      assertions.push({ passed: false, message: `$top=1 request returned HTTP ${topOne.status} (expected 200)` });
+    } else if (extractNextLink(topOne.body)) {
+      assertions.push({ passed: false, message: '$top=1 MUST NOT return an @odata.nextLink — the single requested record is the complete response to a $top=1 request; a continuation would exceed $top=1 (web-api-core.md Server-Driven Paging §2.5; OData 4.01 §11.2.6.3).' });
+    } else {
+      assertions.push({ passed: true, message: '$top=1 returned no @odata.nextLink (correct — the single requested record is the complete set)' });
+    }
+  } catch (err) {
+    if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
+    assertions.push({ passed: false, message: `$top=1 request error: ${err instanceof Error ? err.message : String(err)}` });
+  }
 
   try {
     let url: string | undefined = initialUrl;
@@ -1382,14 +1594,17 @@ export const runCoreResourceScenarios = async (
       continue;
     }
 
-    // OData 4.01 gate: the `in` operator was introduced in 4.01. Skip on 4.0.
-    if (scenario.category === 'in-operator' && detectedODataVersion && detectedODataVersion !== '4.01') {
+    // OData 4.01 gate: the `in` operator was introduced in 4.01 and is tested ONLY when the server positively
+    // advertises OData-Version 4.01. Fail CLOSED — skip on 4.0 AND on unknown/undefined (a missing/unparseable
+    // version header). Running it otherwise issues a 4.01-only query against a possibly-4.0 server → a
+    // misattributed false-fail.
+    if (isInOperatorSkippedForVersion(scenario, detectedODataVersion)) {
       results.push({
         tag: scenario.tag,
         name: scenario.name,
         passed: false,
         skipped: true,
-        assertions: [{ passed: false, message: `Skipped: 'in' operator requires OData-Version 4.01 (server reports ${detectedODataVersion})` }],
+        assertions: [{ passed: false, message: `Skipped: 'in' operator requires OData-Version 4.01 (server reports ${detectedODataVersion ?? 'no OData-Version'})` }],
         duration: 0,
         optional: scenario.optional,
       });

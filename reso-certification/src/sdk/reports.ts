@@ -164,10 +164,11 @@ export const serializeCoreRemarks = (result: PipelineResult): string => {
   const testStep = result.steps.find(s => s.name === RUN_CORE_SCENARIOS);
   if (!testStep?.counts) return `Web API Core compliance test ${result.status}.`;
 
-  const { passed = 0, failed = 0, skipped = 0, optionalPassed = 0, optionalNotSupported = 0, optionalNotTested = 0 } = testStep.counts;
+  const { passed = 0, failed = 0, skipped = 0, warnings = 0, optionalPassed = 0, optionalNotSupported = 0, optionalNotTested = 0 } = testStep.counts;
   const requiredTotal = passed + failed + skipped;
   const optionalTotal = optionalPassed + optionalNotSupported + optionalNotTested;
-  const base = `${passed} passed, ${failed} failed, ${skipped} skipped out of ${requiredTotal} required tests.`;
+  const warnSuffix = warnings > 0 ? ` ${warnings} warning${warnings === 1 ? '' : 's'} (non-gating).` : '';
+  const base = `${passed} passed, ${failed} failed, ${skipped} skipped out of ${requiredTotal} required tests.${warnSuffix}`;
   return optionalTotal > 0
     ? `${base} Optional: ${optionalPassed} passed, ${optionalNotSupported} not supported, ${optionalNotTested} not tested.`
     : base;
@@ -236,6 +237,9 @@ export const createDetailedReportGenerator = (
             tag: s.tag,
             passed: s.passed,
             skipped: s.skipped ?? false,
+            // Non-gating warnings (single-enum ne, $expand RRK, later Fast Track / DD 3.0 suggestions) — carried so
+            // the CLI and the desktop UI can surface them; they never affect `passed` or the verdict.
+            ...(Array.isArray(s.warnings) && s.warnings.length > 0 ? { warnings: s.warnings } : {}),
             // Optional ("Optional Tests") scenarios carry their rendered
             // outcome (Passed / Not Supported / Not Tested) so the report
             // is self-describing; required scenarios use passed/skipped.

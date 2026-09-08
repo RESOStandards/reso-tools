@@ -60,6 +60,31 @@ describe('emptyVerdict — legitimately-empty operators skip', () => {
   });
 });
 
+describe('emptyVerdict — RECORD-DERIVED all() / has-and flips skip → fail (the guaranteeing record must return)', () => {
+  it('collection all() over a record-derived set → fail on empty (was skip)', () => {
+    expect(emptyVerdict(coll('all'), { recordDerivedSet: true })).toBe('fail');
+    expect(emptyVerdict(coll('all'), NONE)).toBe('skip'); // arbitrary value → still legitimately-empty skip
+  });
+  it('string-enum all() over a record-derived set → fail on empty (was skip)', () => {
+    expect(emptyVerdict(strEnum('all'), { recordDerivedSet: true })).toBe('fail');
+    expect(emptyVerdict(strEnum('all'), NONE)).toBe('skip');
+  });
+  it('enum has A and has B over a record-derived (co-present) pair → fail on empty (was skip)', () => {
+    const hasAnd = enumS('has', { valueParam2: 'multiLookupValue2' });
+    expect(emptyVerdict(hasAnd, { recordDerivedSet: true })).toBe('fail');
+    expect(emptyVerdict(hasAnd, NONE)).toBe('skip');
+  });
+  it('recordDerivedSet does NOT change guaranteed-match operators (any / eq) — they already fail', () => {
+    expect(emptyVerdict(coll('any'), { recordDerivedSet: true })).toBe('fail');
+    expect(emptyVerdict(strEnum('eq'), { recordDerivedSet: true })).toBe('fail');
+    expect(emptyVerdict(enumS('has'), { recordDerivedSet: true })).toBe('fail'); // single has (no valueParam2)
+  });
+  it('recordDerivedSet is inert to ne / scalar / compound (never a record-derived set there)', () => {
+    expect(emptyVerdict(enumS('ne'), { recordDerivedSet: true })).toBe('skip'); // ne with no distinct info → skip
+    expect(emptyVerdict(filter('gt', { compound: { op2: 'lt', valueParam2: 'integerValueHigh', logical: 'and' } }), { recordDerivedSet: true })).toBe('skip');
+  });
+});
+
 describe('emptyVerdict — ne / gt / lt depend on distinct count + completeness', () => {
   it('≥2 distinct → fail (the field provably holds another value beyond the sampled bound)', () => {
     expect(emptyVerdict(filter('ne'), { distinctValueCount: 3 })).toBe('fail');

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildScenarioQuery, originatingSystemFilterClause } from '../../src/web-api-core/queries.js';
+import { buildLookupUrl, buildScenarioQuery, originatingSystemFilterClause } from '../../src/web-api-core/queries.js';
 import type { TestParams } from '../../src/web-api-core/sampling.js';
 import type { CoreScenario, FilterScenario, OrderByScenario, ErrorScenario, StructuralScenario } from '../../src/web-api-core/scenarios.js';
 
@@ -98,6 +98,16 @@ describe('buildScenarioQuery', () => {
     const scenario: StructuralScenario = { tag: 'count', name: 'Count', category: 'structural', assertion: 'count', minVersion: '2.0.0' };
     const result = buildScenarioQuery('http://localhost:8080', 'Property', scenario, baseParams);
     expect(result?.url).toContain('$count=true');
+  });
+
+  it('buildLookupUrl selects ALL columns (no $select) — cannot 400 on an undeclared StandardLookupValue/LegacyODataValue', () => {
+    // Core does not gate on StandardLookupValue (a DD concern); $select-ing an undeclared column 400s the whole
+    // scenario and cascade-skips the dependent string-enum/in tests. Select-all still returns SLV/LegacyODataValue
+    // when present, and can never 400 on their absence. buildLookupUrl is the single source of this shape, used by
+    // the runner's per-candidate presence fetch (`validateStringLookupCandidate`).
+    const decoded = decodeURIComponent(buildLookupUrl('http://localhost:8080', 'StandardStatus'));
+    expect(decoded).toBe("http://localhost:8080/Lookup?$filter=LookupName eq 'StandardStatus'");
+    expect(decoded).not.toContain('$select');
   });
 });
 

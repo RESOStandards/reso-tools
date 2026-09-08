@@ -121,6 +121,28 @@ describe('selectEnumCandidates — multi-valued group', () => {
   it('carries the LookupName for a string-collection field', () => {
     expect(candidates.find((c) => c.field === 'Appliances')?.lookupName).toBe('Appliances');
   });
+
+  it('captures the SMALLEST record collection as subsetSampleValues (a guaranteed all() subset)', () => {
+    // Appliances: record 1 = [Dishwasher, Dryer] (2), record 2 = [Dishwasher] (1). Smallest is record 2's — so an
+    // all() built over exactly {Dishwasher} is guaranteed to return record 2 (its collection ⊆ the set).
+    expect(candidates.find((c) => c.field === 'Appliances')?.subsetSampleValues).toEqual(['Dishwasher']);
+  });
+
+  it('subsetSampleValues decodes a flags record too (both bits of one record, co-present)', () => {
+    // AccessibilityFeatures: both records carry two members (comma form and bitmask 3); the smallest (2) decodes
+    // to the co-present pair — the guaranteed `has A and has B` seed.
+    const flags = candidates.find((c) => c.field === 'AccessibilityFeatures')?.subsetSampleValues;
+    expect(flags).toEqual(expect.arrayContaining(['AccessibleApproachWithRamp', 'AccessibleBedroom']));
+    expect(flags).toHaveLength(2);
+  });
+});
+
+describe('subsetSampleValues — only multi-valued reps carry it (single reps do not do all()/has-and)', () => {
+  it('a SINGLE_ENUM candidate has no subsetSampleValues', () => {
+    const [single] = select(isSingleRep);
+    expect(single.field).toBe('StandardStatus');
+    expect(single.subsetSampleValues).toBeUndefined();
+  });
 });
 
 describe('R2-2 — Lookup Resource sample is local-first, filter values standard-first', () => {

@@ -48,6 +48,7 @@ import type { MetadataReport, MetadataReportField } from '@reso-standards/reso-m
 export type MetadataCheckKind =
   | 'disallowed-synonym'
   | 'closed-enum-value'
+  | 'standard-lookup-value'
   | 'field-type'
   | 'expansion-structure'
   | 'lookup-resource-fields'
@@ -138,8 +139,11 @@ export const checkDisallowedSynonyms = (
   );
 };
 
-/** The annotation term carrying a lookup's human-friendly standard display name. */
+/** The annotation term carrying a lookup's human-friendly standard display name (its StandardLookupValue). */
 const STANDARD_NAME = 'RESO.OData.Metadata.StandardName';
+
+/** The annotation term carrying a lookup's LegacyODataValue (the machine/legacy form of a standard value). */
+const LEGACY_ODATA_VALUE = 'RESO.OData.Metadata.LegacyODataValue';
 
 /** The annotation term tying a string-enumeration field to its Lookup Resource enumeration. */
 const LOOKUP_NAME_ANNOTATION = 'RESO.OData.Metadata.LookupName';
@@ -179,26 +183,47 @@ export const isClosedEnum = (lookupStatus: string | undefined): boolean => (look
  * Commander BDD: `Then "X" MUST contain only standard enumerations` (DataDictionary.java
  * mustContainOnlyStandardEnumerations) — applied dynamically to closed (lookupStatus "Locked") enums.
  */
+/**
+ * Value identities per standard enum, keyed by the reference enum's lookupName (FQDN). A value's identities
+ * are its machine `LookupValue` + its `StandardName` (StandardLookupValue); when `includeLegacy` is set, also
+ * its `LegacyODataValue` (some string servers serve the legacy form). A `Set`, so overlapping forms
+ * (SLV == LODV, e.g. `Active`) collapse to one member — matching one column vs the other is never a distinction.
+ */
+const buildAllowedValues = (reference: DdReference, includeLegacy: boolean): Map<string, Set<string>> =>
+  reference.lookups.reduce((acc, l) => {
+    const set = acc.get(l.lookupName) ?? new Set<string>();
+    set.add(l.lookupValue);
+    const sn = l.annotations?.find((a) => a.term === STANDARD_NAME)?.value;
+    if (sn) set.add(sn);
+    if (includeLegacy) {
+      const lodv = l.annotations?.find((a) => a.term === LEGACY_ODATA_VALUE)?.value;
+      if (lodv) set.add(lodv);
+    }
+    return acc.set(l.lookupName, set);
+  }, new Map<string, Set<string>>());
+
+/** Provider lookups grouped by their lookupName. */
+const groupProviderLookups = (report: MetadataReport): Map<string, MetadataReport['lookups'][number][]> =>
+  report.lookups.reduce((acc, l) => {
+    const arr = acc.get(l.lookupName) ?? [];
+    arr.push(l);
+    return acc.set(l.lookupName, arr);
+  }, new Map<string, MetadataReport['lookups'][number][]>());
+
+/** Provider field types keyed by (resource, field). */
+const mapProviderFieldTypes = (report: MetadataReport): Map<string, string> =>
+  new Map(report.fields.map((f) => [fieldKey(f.resourceName, f.fieldName), f.type]));
+
 export const checkClosedEnumValues = (
   report: MetadataReport,
   reference: DdReference,
 ): ReadonlyArray<MetadataCheckFinding> => {
   // Allowed value identities per standard enum (reference lookupName/FQDN): machine value + StandardName.
-  const allowedByEnum = reference.lookups.reduce((acc, l) => {
-    const set = acc.get(l.lookupName) ?? new Set<string>();
-    set.add(l.lookupValue);
-    const sn = l.annotations?.find((a) => a.term === STANDARD_NAME)?.value;
-    if (sn) set.add(sn);
-    return acc.set(l.lookupName, set);
-  }, new Map<string, Set<string>>());
-
-  // Provider lookups grouped by their lookupName, and provider field types by (resource, field).
-  const providerLookupsByName = report.lookups.reduce((acc, l) => {
-    const arr = acc.get(l.lookupName) ?? [];
-    arr.push(l);
-    return acc.set(l.lookupName, arr);
-  }, new Map<string, MetadataReport['lookups'][number][]>());
-  const providerFieldType = new Map(report.fields.map((f) => [fieldKey(f.resourceName, f.fieldName), f.type]));
+  // (Legacy-value matching is deliberately NOT included here — closed-enum membership is unchanged; the SLV
+  // check below opts into legacy matching. See buildAllowedValues.)
+  const allowedByEnum = buildAllowedValues(reference, false);
+  const providerLookupsByName = groupProviderLookups(report);
+  const providerFieldType = mapProviderFieldTypes(report);
 
   return reference.fields
     .filter((f) => isClosedEnum(f.lookupStatus))
@@ -220,6 +245,62 @@ export const checkClosedEnumValues = (
           resourceName: refField.resourceName,
           fieldName: refField.fieldName,
           message: `"${v.lookupValue}" is not a permitted value of the closed enumeration "${refField.fieldName}" in the "${refField.resourceName}" resource. Closed enumerations may not carry values outside the Data Dictionary.`,
+        }));
+    });
+};
+
+/**
+ * StandardLookupValue presence check (DD Lookup Resource, string representation). A served lookup value that IS
+ * a standard Data Dictionary value for its field — its `LookupValue` (or its `LegacyODataValue`) is a member of
+ * the field's own DD catalog (machine value + StandardName + LegacyODataValue) — MUST declare a
+ * `StandardLookupValue`. Per the DD Lookup Resource field definition, SLV is required whenever a value is a
+ * standard lookup value, regardless of `LookupValue`; purely-local values MAY omit it.
+ *
+ * Value-CONFORMANCE on served rows (like {@link checkClosedEnumValues}), NOT the value-PRESENCE check removed
+ * from this gate per the Transport WG (see the module header note) — this operates on the rows that ARE served.
+ * Scoped per-field with NO any-enum fallback: a field whose DD catalog is empty (a purely-open enum — City,
+ * CountyOrParish) has no standard values, so it never fires. Restricted to the `Edm.String` (Lookup Resource)
+ * representation — `Edm.EnumType` has no StandardLookupValue column, so requiring one there would false-fail.
+ *
+ * Severity is CONFIGURABLE (default `warning`, non-gating — the observe-then-flip rollout); a `warning` never
+ * fails certification (see {@link runDdMetadataChecks}). Web API Core is SILENT on SLV — this is a DD concern.
+ */
+export const checkStandardLookupValuePresent = (
+  report: MetadataReport,
+  reference: DdReference,
+  severity: MetadataCheckSeverity = 'warning',
+): ReadonlyArray<MetadataCheckFinding> => {
+  const allowedByEnum = buildAllowedValues(reference, true); // include the LegacyODataValue form — both ref columns
+  const providerLookupsByName = groupProviderLookups(report);
+  const providerFieldType = mapProviderFieldTypes(report);
+
+  return reference.fields
+    .filter((f) => f.isEnumeration && !f.isExpansion)
+    .flatMap((refField) => {
+      const allowed = allowedByEnum.get(refField.type);
+      const providerType = providerFieldType.get(fieldKey(refField.resourceName, refField.fieldName));
+      // Empty catalog (purely-open enum) → no standard values → never fires (NO any-enum fallback). A field the
+      // provider doesn't declare → nothing to check.
+      if (!allowed || allowed.size === 0 || providerType == null) return [];
+      return (providerLookupsByName.get(providerType) ?? [])
+        .filter((v) => {
+          // String (Lookup Resource) representation only — its rows are typed Edm.String and carry the SLV
+          // column. Edm.EnumType lookups have no StandardLookupValue, so requiring one there would false-fail.
+          // (A string field's field-type is rewritten to its LookupName in the merged report, so the
+          // representation must be read off the lookup ROW's type, not the field's.)
+          if (unwrapCollection(String(v.type ?? '')) !== 'Edm.String') return false;
+          const slv = v.annotations?.find((a) => a.term === STANDARD_NAME)?.value;
+          if (slv != null && String(slv).trim().length > 0) return false; // SLV present ⇒ satisfied
+          const lodv = v.annotations?.find((a) => a.term === LEGACY_ODATA_VALUE)?.value;
+          // Standard (its served value OR its legacy form is a DD-standard value for this field) but no SLV.
+          return allowed.has(v.lookupValue) || (lodv != null && allowed.has(lodv));
+        })
+        .map((v) => ({
+          check: 'standard-lookup-value' as const,
+          severity,
+          resourceName: refField.resourceName,
+          fieldName: refField.fieldName,
+          message: `"${v.lookupValue}" in the "${refField.fieldName}" lookup of the "${refField.resourceName}" resource is a standard Data Dictionary value served without a StandardLookupValue. StandardLookupValue is required for standard lookup values (DD Lookup Resource), regardless of LookupValue.`,
         }));
     });
 };
@@ -482,6 +563,16 @@ export const checkSuggestedMaxConstraints = (
   });
 };
 
+/** Options for the DD metadata gate. */
+export interface DdMetadataCheckOptions {
+  /**
+   * Severity for the StandardLookupValue presence check. Default `warning` (non-gating) for the
+   * observe-then-flip rollout — a standard lookup value served without its StandardLookupValue is surfaced
+   * but does not fail certification. Set to `error` (post-WG) to gate on it.
+   */
+  readonly standardLookupValueSeverity?: MetadataCheckSeverity;
+}
+
 /**
  * Run the full DD metadata gate. Returns the combined findings across all checks; an empty array
  * means the metadata passes. Callers fail certification on `error` findings (before variations) and
@@ -490,9 +581,11 @@ export const checkSuggestedMaxConstraints = (
 export const runDdMetadataChecks = (
   report: MetadataReport,
   reference: DdReference,
+  options: DdMetadataCheckOptions = {},
 ): ReadonlyArray<MetadataCheckFinding> => [
   ...checkDisallowedSynonyms(report, reference),
   ...checkClosedEnumValues(report, reference),
+  ...checkStandardLookupValuePresent(report, reference, options.standardLookupValueSeverity ?? 'warning'),
   ...checkFieldTypes(report, reference),
   ...checkExpansionStructure(report, reference),
   ...checkLookupResourceFields(report, reference),

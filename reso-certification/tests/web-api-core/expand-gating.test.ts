@@ -63,12 +63,24 @@ const status = (code: number): ODataResponse => ({
   rawBody: '{}',
 });
 
-// A requester that dispatches by which nav is being expanded (matches `$expand=<nav>` in the URL).
-const requesterFor = (byNav: Readonly<Record<string, ODataResponse>>): ODataRequester => ({
+// A direct navigation-property-path collection response: /{resource}('{key}')/{nav} → { value: [items] }.
+const navPathResponse = (items: unknown[]): ODataResponse => {
+  const body = { value: items };
+  return { status: 200, headers: { 'odata-version': '4.01' }, body, rawBody: JSON.stringify(body) };
+};
+
+// A requester that dispatches by which nav is being expanded (`$expand=<nav>`) AND the navigation-property-path
+// second leg (`…('key')/<nav>`). The nav-path defaults to a 200 empty collection (schema-valid) unless overridden.
+const requesterFor = (
+  byNav: Readonly<Record<string, ODataResponse>>,
+  navPathByNav: Readonly<Record<string, ODataResponse>> = {},
+): ODataRequester => ({
   request: async ({ url }) => {
-    const nav = Object.keys(byNav).find((n) => url.includes(`$expand=${n}`));
-    if (!nav) throw new Error(`no scripted response for ${url}`);
-    return byNav[nav];
+    const expandNav = Object.keys(byNav).find((n) => url.includes(`$expand=${n}`));
+    if (expandNav) return byNav[expandNav];
+    const navPathNav = Object.keys(byNav).find((n) => new RegExp(`\\)/${n}(\\?|$)`).test(url));
+    if (navPathNav) return navPathByNav[navPathNav] ?? navPathResponse([]);
+    throw new Error(`no scripted response for ${url}`);
   },
 });
 
@@ -133,6 +145,22 @@ describe('runExpandNavScenarios — a declared collection nav is GATING', () => 
   });
 });
 
+describe('runExpandNavScenarios — no validator built → SKIP, not a pass on the 200 alone (A6)', () => {
+  it('200 but the expand validator could not be built → SKIPPED (indeterminate), never a determinate pass', async () => {
+    const req = requesterFor({ Media: okExpand([{ AboveGradeFinishedAreaSource: 'Appraiser' }]) });
+    // validator = undefined: the provider's metadata did not compile into an expand schema → per-item validation
+    // never ran. Must be a skip, not a determinate pass on the 200 alone (and not a false-fail).
+    const results = await runExpandNavScenarios('http://x', 'Property', expandScenario, paramsFor([{ name: 'Media', targetType: 'Property' }]), 'tok', req, undefined);
+    expect(results[0].skipped).toBe(true);
+    expect(results[0].passed).toBe(true); // a skip is passed:true + skipped:true — never counted as a failure
+    expect(results[0].assertions.some((a) => a.message.includes('schema validation unavailable'))).toBe(true);
+    const summary = summarizeScenarios(results);
+    expect(summary.passed).toBe(0); // NOT a determinate pass
+    expect(summary.failed).toBe(0);
+    expect(summary.skipped).toBe(1);
+  });
+});
+
 describe('runExpandNavScenarios — the RRK warning still rides alongside, non-gating', () => {
   it('a mismatched ResourceRecordKey on a schema-valid item → nav STILL passes, warning on .warnings', async () => {
     const validator = await createExpandSchemaValidator({ metadataReport: report, version: '2.0' });
@@ -178,11 +206,67 @@ describe('runExpandNavScenarios — several navs, one bad fails exactly that nav
   });
 });
 
+describe('runExpandNavScenarios — the navigation-property-path second leg (A1)', () => {
+  // web-api-core.md §2.5.10.2: after the inline $expand, a keyed GET /{resource}('{key}')/{nav} must ALSO serve
+  // the collection — reaching an expansion-only target THROUGH the parent key (never a top-level GET /{target}).
+  const oneNav = paramsFor([{ name: 'Media', targetType: 'Property' }]);
+
+  it('200 + a schema-valid nav-path collection → PASS (both legs), with a nav-path assertion', async () => {
+    const validator = await createExpandSchemaValidator({ metadataReport: report, version: '2.0' });
+    const req = requesterFor(
+      { Media: okExpand([{ AboveGradeFinishedAreaSource: 'Appraiser' }]) },
+      { Media: navPathResponse([{ AboveGradeFinishedAreaSource: 'Appraiser' }]) },
+    );
+    const results = await runExpandNavScenarios('http://x', 'Property', expandScenario, oneNav, 'tok', req, validator);
+    expect(results[0].passed).toBe(true);
+    expect(results[0].assertions.some((a) => a.passed && a.message.includes('Navigation-property-path') && a.message.includes('→ 200'))).toBe(true);
+    expect(summarizeScenarios(results).passed).toBe(1);
+  });
+
+  it('the nav-path GET non-200 → FAIL (declared collection expansion not reachable via its navigation-property path)', async () => {
+    const validator = await createExpandSchemaValidator({ metadataReport: report, version: '2.0' });
+    const req = requesterFor(
+      { Media: okExpand([{ AboveGradeFinishedAreaSource: 'Appraiser' }]) }, // inline leg is fine
+      { Media: status(404) },                                              // but the nav-path leg 404s
+    );
+    const results = await runExpandNavScenarios('http://x', 'Property', expandScenario, oneNav, 'tok', req, validator);
+    expect(results[0].passed).toBe(false);
+    expect(results[0].skipped).toBe(false);
+    expect(results[0].assertions.some((a) => !a.passed && a.message.includes('Navigation-property-path') && a.message.includes('404'))).toBe(true);
+    expect(summarizeScenarios(results).failed).toBe(1);
+  });
+
+  it('the nav-path GET 200 but a schema-invalid item → FAIL (the nav-path collection is validated too)', async () => {
+    const validator = await createExpandSchemaValidator({ metadataReport: report, version: '2.0' });
+    const req = requesterFor(
+      { Media: okExpand([{ AboveGradeFinishedAreaSource: 'Appraiser' }]) },        // inline valid
+      { Media: navPathResponse([{ AboveGradeFinishedAreaSource: 'InvalidEnum' }]) }, // nav-path invalid
+    );
+    const results = await runExpandNavScenarios('http://x', 'Property', expandScenario, oneNav, 'tok', req, validator);
+    expect(results[0].passed).toBe(false);
+    expect(results[0].assertions.some((a) => !a.passed && a.message.includes('Navigation-property-path') && a.message.includes('schema-invalid'))).toBe(true);
+    expect(summarizeScenarios(results).failed).toBe(1);
+  });
+
+  it('an empty $expand response yields no parent key → the nav-path leg is not exercised (no data, not a failure)', async () => {
+    const validator = await createExpandSchemaValidator({ metadataReport: report, version: '2.0' });
+    // $expand returns zero parent records → no key to drive the keyed nav-path GET. The nav-path requester below
+    // would throw if reached (it isn't): the leg is skipped with a non-failing note, and the scenario still passes.
+    const req = requesterFor({ Media: navPathResponse([]) });
+    const results = await runExpandNavScenarios('http://x', 'Property', expandScenario, oneNav, 'tok', req, validator);
+    expect(results[0].passed).toBe(true);
+    expect(results[0].assertions.some((a) => a.passed && a.message.includes('no parent key') && a.message.includes('not exercised'))).toBe(true);
+  });
+});
+
 describe('validateExpandedItems — the data-validation unit', () => {
   const nav: Nav = { name: 'Media', targetType: 'Property' };
   const parents = (children: unknown): ReadonlyArray<Record<string, unknown>> => [{ ListingKey: 'P1', Media: children }];
 
-  it('no validator (couldn’t be built this run) → PASS on the 200 alone (never a false fail)', () => {
+  it('no validator (couldn’t be built this run) → the ASSERTION never false-fails; the SCENARIO skips it (A6)', () => {
+    // The low-level assertion is non-failing when no validator was built (never a false-fail). runOneExpandNav
+    // lifts this to a scenario-level SKIP (indeterminate) rather than a determinate pass — see the
+    // "no validator built → SKIP" scenario test above.
     const a = validateExpandedItems(parents([{ AboveGradeFinishedAreaSource: 'InvalidEnum' }]), nav, undefined);
     expect(a.passed).toBe(true);
   });

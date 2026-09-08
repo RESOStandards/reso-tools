@@ -64,6 +64,11 @@ export interface TestParams {
   readonly multiLookupField?: string;
   readonly multiLookupValue1?: string;
   readonly multiLookupValue2?: string;
+  /** One real record's DISTINCT collection (the smallest observed) for the chosen multi-valued field — used to
+   *  build a GUARANTEED-MATCH `all(x: x eq v1 or … or vn)` / FLAGS `has v1 and has v2`, so the operator can be
+   *  demanded to return that record (empty → fail) rather than skipping on an empty result. Absent when no
+   *  sampled record carried a small-enough collection; then all() / has-and keeps its skip-on-empty verdict. */
+  readonly multiLookupSubsetValues?: ReadonlyArray<string>;
   /** A plain (non-lookup) Edm.String field + a sample substring, for the
    *  optional string-function tests (contains/startswith/endswith). */
   readonly stringField?: string;

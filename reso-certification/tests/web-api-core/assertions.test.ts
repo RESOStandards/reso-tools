@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   assertScalarComparison,
+  assertScalarCompoundOr,
   assertSortOrder,
   assertEnumMatch,
   assertCollectionLambda,
@@ -71,6 +72,27 @@ describe('assertScalarComparison', () => {
   it('handles empty records array', () => {
     const result = assertScalarComparison([], 'price', 'gt', 50, 'integer');
     expect(result.passed).toBe(true);
+  });
+});
+
+describe('assertScalarCompoundOr — per-record OR, not the aggregate check1||check2', () => {
+  it('PASSES when each record satisfies at least one condition — even when NEITHER condition holds for ALL records', () => {
+    // `price gt 100 OR price lt 50`: 200 satisfies gt-100, 30 satisfies lt-50. Neither "all gt 100" nor "all lt 50"
+    // is true, so the old aggregate `check1.passed || check2.passed` would WRONGLY fail this; the per-record OR passes.
+    const records = [{ price: 200 }, { price: 30 }];
+    expect(assertScalarCompoundOr(records, 'price', 'gt', 100, 'lt', 50, 'integer').passed).toBe(true);
+  });
+
+  it('FAILS a record that satisfies NEITHER condition (the hole the old hardcoded pass masked)', () => {
+    const records = [{ price: 200 }, { price: 75 }]; // 75 is neither > 100 nor < 50
+    const res = assertScalarCompoundOr(records, 'price', 'gt', 100, 'lt', 50, 'integer');
+    expect(res.passed).toBe(false);
+    expect(res.message).toContain('neither');
+  });
+
+  it('skips null field values (consistent with assertScalarComparison)', () => {
+    const records = [{ price: null }, { price: 200 }];
+    expect(assertScalarCompoundOr(records, 'price', 'gt', 100, 'lt', 50, 'integer').passed).toBe(true);
   });
 });
 
@@ -151,6 +173,22 @@ describe('assertCollectionLambda', () => {
   it('handles comma-separated string values', () => {
     const stringRecords = [{ tags: 'Pool,Garage' }];
     expect(assertCollectionLambda(stringRecords, 'tags', 'any', ['Pool']).passed).toBe(true);
+  });
+
+  it('all() is vacuously TRUE for a record with an empty collection (array, string, or null)', () => {
+    // web-api-core.md:107 — "a record with an empty collection satisfies this vacuously".
+    expect(assertCollectionLambda([{ features: [] }], 'features', 'all', ['Pool']).passed).toBe(true); // empty array
+    expect(assertCollectionLambda([{ features: '' }], 'features', 'all', ['Pool']).passed).toBe(true); // empty string → no members
+    expect(assertCollectionLambda([{ features: null }], 'features', 'all', ['Pool']).passed).toBe(true); // null collection skipped, never a failure
+  });
+
+  it('all() still FAILS a record whose collection has a value outside the set (empty rows do not mask it)', () => {
+    expect(assertCollectionLambda([{ features: ['Elevator'] }, { features: [] }], 'features', 'all', ['Pool']).passed).toBe(false);
+  });
+
+  it('any() is FALSE for a record with an empty collection (nothing to match)', () => {
+    expect(assertCollectionLambda([{ features: [] }], 'features', 'any', ['Pool']).passed).toBe(false);
+    expect(assertCollectionLambda([{ features: '' }], 'features', 'any', ['Pool']).passed).toBe(false);
   });
 });
 
