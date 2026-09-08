@@ -30,7 +30,11 @@ const validSchema: CsdlSchema = {
   functions: [],
   entityContainer: {
     name: 'Default',
-    entitySets: [{ name: 'Property', entityType: 'org.reso.metadata.Property' }],
+    // Keep the base fixture's container empty so a test can override `entityTypes` without the inherited
+    // container dangling an entity-set reference to a type it replaced (the validator now resolves same-namespace
+    // references — see `isUnresolvedLocalType`). Tests that exercise the entity-set / binding rules declare their
+    // own populated container below.
+    entitySets: [],
     singletons: [],
     actionImports: [],
     functionImports: []
@@ -562,6 +566,120 @@ describe('validateCsdl', () => {
           name: 'Member',
           key: ['MemberKey'],
           properties: [{ name: 'MemberKey', type: 'Edm.String' }],
+          navigationProperties: []
+        }
+      ]
+    };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(true);
+  });
+
+  // --- A11: same-namespace type-reference resolution ---
+  // The validator once waved through ANY dotted type name as an "external reference" (a bare `!type.includes('.')`
+  // escape). That masked a `org.reso.metadata.Typo` — a dangling reference to THIS schema's own namespace — as if
+  // it were external. `isUnresolvedLocalType` now resolves same-namespace (and bare) references while still leaving
+  // genuinely external (different-namespace) names unresolved, so real cross-namespace metadata never false-errors.
+
+  it('A11: a navigation target qualified with this schema’s namespace but undeclared → ERROR (previously masked)', () => {
+    const schema: CsdlSchema = {
+      ...validSchema,
+      entityTypes: [
+        {
+          name: 'Property',
+          key: ['ListingKey'],
+          properties: [{ name: 'ListingKey', type: 'Edm.String' }],
+          navigationProperties: [{ name: 'Ghost', type: 'org.reso.metadata.NoSuchType', isCollection: false, entityTypeName: 'NoSuchType' }]
+        }
+      ]
+    };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.message.includes('NoSuchType'))).toBe(true);
+  });
+
+  it('A11: a navigation target in a DIFFERENT (external) namespace is left unresolved — no false error', () => {
+    const schema: CsdlSchema = {
+      ...validSchema,
+      entityTypes: [
+        {
+          name: 'Property',
+          key: ['ListingKey'],
+          properties: [{ name: 'ListingKey', type: 'Edm.String' }],
+          navigationProperties: [{ name: 'Ext', type: 'com.other.ns.Widget', isCollection: false, entityTypeName: 'Widget' }]
+        }
+      ]
+    };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(true);
+  });
+
+  it('A11: a same-namespace navigation target that IS declared resolves cleanly', () => {
+    const schema: CsdlSchema = {
+      ...validSchema,
+      entityTypes: [
+        {
+          name: 'Property',
+          key: ['ListingKey'],
+          properties: [{ name: 'ListingKey', type: 'Edm.String' }],
+          navigationProperties: [{ name: 'Photos', type: 'Collection(org.reso.metadata.Media)', isCollection: true, entityTypeName: 'Media' }]
+        },
+        { name: 'Media', key: ['MediaKey'], properties: [{ name: 'MediaKey', type: 'Edm.String' }], navigationProperties: [] }
+      ]
+    };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(true);
+  });
+
+  it('A11: an entity BaseType in this namespace but undeclared → ERROR (same escape, closed for base types)', () => {
+    const schema: CsdlSchema = {
+      ...validSchema,
+      entityTypes: [
+        { name: 'Derived', key: ['Id'], properties: [{ name: 'Id', type: 'Edm.String' }], navigationProperties: [], baseType: 'org.reso.metadata.NoBase' }
+      ]
+    };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.message.includes('NoBase'))).toBe(true);
+  });
+
+  it('A11: an entity BaseType in an external namespace is left unresolved — no false error', () => {
+    const schema: CsdlSchema = {
+      ...validSchema,
+      entityTypes: [
+        { name: 'Derived', key: ['Id'], properties: [{ name: 'Id', type: 'Edm.String' }], navigationProperties: [], baseType: 'com.other.ns.Base' }
+      ]
+    };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(true);
+  });
+
+  it('A11: an entity-set type in this namespace but undeclared → ERROR (same escape, closed for entity sets)', () => {
+    const schema: CsdlSchema = {
+      ...validSchema,
+      entityContainer: {
+        name: 'Default',
+        entitySets: [{ name: 'Ghosts', entityType: 'org.reso.metadata.Ghost' }],
+        singletons: [],
+        actionImports: [],
+        functionImports: []
+      }
+    };
+    const result = validateCsdl(schema);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.message.includes('Ghost') && e.message.includes('entity type'))).toBe(true);
+  });
+
+  it('A11: a property type in the enums sub-namespace (external to this schema) is left unresolved — mirrors real RESO metadata', () => {
+    const schema: CsdlSchema = {
+      ...validSchema,
+      entityTypes: [
+        {
+          name: 'Property',
+          key: ['ListingKey'],
+          properties: [
+            { name: 'ListingKey', type: 'Edm.String' },
+            { name: 'Status', type: 'org.reso.metadata.enums.StandardStatus' } // different namespace → external → escaped
+          ],
           navigationProperties: []
         }
       ]

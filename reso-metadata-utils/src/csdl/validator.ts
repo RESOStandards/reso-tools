@@ -145,20 +145,34 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
   ]);
 
   /**
+   * A referenced type is an UNRESOLVED LOCAL reference when it names this schema's OWN namespace (or is a bare,
+   * implicitly-local name) yet no such type is declared here. Only a genuinely EXTERNAL name — qualified with a
+   * DIFFERENT namespace, whose schema this validator can't see — is allowed to go unresolved. Previously every
+   * site used a bare `!type.includes('.')` escape, which waved through ANY dotted name, including
+   * `${schema.namespace}.DoesNotExist`; that masked same-namespace dangling references (a typo'd or renamed nav
+   * target, base type, entity-set type, or property type) as if they were external. This resolves them instead.
+   */
+  const isUnresolvedLocalType = (typeName: string): boolean => {
+    if (knownTypeNames.has(typeName)) return false;
+    const lastDot = typeName.lastIndexOf('.');
+    if (lastDot === -1) return true; // bare name → implicitly this schema's namespace → must be declared here
+    return typeName.slice(0, lastDot) === schema.namespace; // same-namespace qualified name → must be declared here
+  };
+
+  /**
    * Check whether a property type is valid: either an Edm primitive,
    * a known schema type, or an externally namespace-qualified type.
    */
   const validatePropertyType = (propType: string, propPath: string): void => {
     const typeToCheck = isCollectionType(propType) ? unwrapCollection(propType) : propType;
 
-    if (!isEdmPrimitive(typeToCheck) && !knownTypeNames.has(typeToCheck)) {
-      // Allow namespace-qualified types we haven't seen (external references)
-      if (!typeToCheck.includes('.')) {
-        errors.push({
-          path: propPath,
-          message: `Property type '${propType}' is not a valid Edm primitive or known type`,
-        });
-      }
+    if (!isEdmPrimitive(typeToCheck) && isUnresolvedLocalType(typeToCheck)) {
+      // A same-namespace (or bare) type that isn't declared here is a dangling local reference; a
+      // different-namespace type is an external reference this validator can't resolve and is allowed.
+      errors.push({
+        path: propPath,
+        message: `Property type '${propType}' is not a valid Edm primitive or known type`,
+      });
     }
   };
 
@@ -193,7 +207,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
 
     for (const navProp of entityType.navigationProperties) {
       const targetType = isCollectionType(navProp.type) ? unwrapCollection(navProp.type) : navProp.type;
-      if (!knownTypeNames.has(targetType) && !targetType.includes('.')) {
+      if (isUnresolvedLocalType(targetType)) {
         errors.push({
           path: `${etPath}/NavigationProperty(${navProp.name})`,
           message: `Navigation property references unknown entity type '${targetType}'`,
@@ -202,14 +216,12 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
       }
     }
 
-    if (entityType.baseType && !knownTypeNames.has(entityType.baseType)) {
-      if (!entityType.baseType.includes('.')) {
-        errors.push({
-          path: etPath,
-          message: `BaseType '${entityType.baseType}' is not a known entity type`,
-          specUrl: spec.entityTypeBaseType,
-        });
-      }
+    if (entityType.baseType && isUnresolvedLocalType(entityType.baseType)) {
+      errors.push({
+        path: etPath,
+        message: `BaseType '${entityType.baseType}' is not a known entity type`,
+        specUrl: spec.entityTypeBaseType,
+      });
     }
   }
 
@@ -217,14 +229,12 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
   for (const complexType of schema.complexTypes) {
     const ctPath = `ComplexType(${complexType.name})`;
 
-    if (complexType.baseType) {
-      if (!knownTypeNames.has(complexType.baseType) && !complexType.baseType.includes('.')) {
-        errors.push({
-          path: ctPath,
-          message: `BaseType '${complexType.baseType}' is not a known complex type`,
-          specUrl: spec.complexTypeBaseType,
-        });
-      }
+    if (complexType.baseType && isUnresolvedLocalType(complexType.baseType)) {
+      errors.push({
+        path: ctPath,
+        message: `BaseType '${complexType.baseType}' is not a known complex type`,
+        specUrl: spec.complexTypeBaseType,
+      });
     }
 
     for (const prop of complexType.properties) {
@@ -233,7 +243,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
 
     for (const navProp of complexType.navigationProperties) {
       const targetType = isCollectionType(navProp.type) ? unwrapCollection(navProp.type) : navProp.type;
-      if (!knownTypeNames.has(targetType) && !targetType.includes('.')) {
+      if (isUnresolvedLocalType(targetType)) {
         errors.push({
           path: `${ctPath}/NavigationProperty(${navProp.name})`,
           message: `Navigation property references unknown entity type '${targetType}'`,
@@ -259,14 +269,12 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
     for (const entitySet of schema.entityContainer.entitySets) {
       const esPath = `EntityContainer/EntitySet(${entitySet.name})`;
 
-      if (!knownTypeNames.has(entitySet.entityType)) {
-        if (!entitySet.entityType.includes('.')) {
-          errors.push({
-            path: esPath,
-            message: `Entity set references unknown entity type '${entitySet.entityType}'`,
-            specUrl: spec.entitySetEntityType,
-          });
-        }
+      if (isUnresolvedLocalType(entitySet.entityType)) {
+        errors.push({
+          path: esPath,
+          message: `Entity set references unknown entity type '${entitySet.entityType}'`,
+          specUrl: spec.entitySetEntityType,
+        });
       }
 
       if (entitySet.navigationPropertyBindings) {
