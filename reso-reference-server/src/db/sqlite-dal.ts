@@ -25,7 +25,7 @@ import type {
 import { MAX_EXPAND_DEPTH } from './data-access.js';
 import { applyExpandSelect } from './expand-select.js';
 import { filterToSqlite } from './filter-to-sqlite.js';
-import { deserializeRow } from './queries.js';
+import { coerceServedInteger, deserializeRow } from './queries.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -40,7 +40,10 @@ const serializeValue = (value: unknown, field: ResoField): unknown => {
   if (field.type === 'Edm.Boolean' && typeof value === 'boolean') {
     return value ? 1 : 0;
   }
-  return value;
+  // Store integer-served fields (Edm.Int*, and scale-0 Decimal/Double advertised as Int64) as true integers — else
+  // SQLite keeps a decimal seed value as a REAL and a `$filter`/`$orderby` on the column disagrees with the served
+  // (truncated) value. Shared rule with the read path (deserializeRow), so stored and served always agree.
+  return coerceServedInteger(value, field);
 };
 
 /**
