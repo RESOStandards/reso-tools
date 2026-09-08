@@ -32,8 +32,10 @@ import type {
   SingleResult
 } from './data-access.js';
 import { MAX_EXPAND_DEPTH } from './data-access.js';
+import type { ResoField } from '../metadata/types.js';
 import { applyMongoExpandSelect } from './expand-select.js';
 import { filterToMongo } from './filter-to-mongo.js';
+import { coerceServedInteger } from './queries.js';
 
 // ---------------------------------------------------------------------------
 // _id suppression helper
@@ -49,6 +51,17 @@ const stripId = (doc: Record<string, unknown>): Record<string, unknown> => {
 const coerceCollections = (doc: Record<string, unknown>, collectionFields: ReadonlySet<string>): Record<string, unknown> => {
   for (const field of collectionFields) {
     if (doc[field] == null) doc[field] = [];
+  }
+  return doc;
+};
+
+/** Coerce integer-served fields (Edm.Int*, and scale-0 Decimal/Double advertised as Int64) to true integers across
+ *  a document — the mongo parallel to the SQLite/pg serialize+deserialize coercion, keyed on the SAME shared rule
+ *  (coerceServedInteger), so a scale-0 seed decimal is stored and served as an integer and a `$filter`/`$orderby`
+ *  agrees with the served value. */
+const coerceServedTypes = (doc: Record<string, unknown>, fields: ReadonlyArray<ResoField>): Record<string, unknown> => {
+  for (const field of fields) {
+    if (field.fieldName in doc) doc[field.fieldName] = coerceServedInteger(doc[field.fieldName], field);
   }
   return doc;
 };
@@ -276,7 +289,7 @@ export const createMongoDal = (db: Db): DataAccessLayer => {
     if (options?.$top !== undefined) cursor = cursor.limit(options.$top);
 
     const collFields = collectionFieldSet(ctx);
-    const docs = ((await cursor.toArray()) as Record<string, unknown>[]).map(d => coerceCollections(d, collFields));
+    const docs = ((await cursor.toArray()) as Record<string, unknown>[]).map(d => coerceServedTypes(coerceCollections(d, collFields), ctx.fields));
 
     // $count — uses the same filter for accurate count
     let count: number | undefined;
@@ -308,7 +321,7 @@ export const createMongoDal = (db: Db): DataAccessLayer => {
     for (const name of expansionNames) readProjection[name] = 0;
     const doc = await collection.findOne({ [ctx.keyField]: keyValue }, { projection: readProjection });
     if (!doc) return undefined;
-    coerceCollections(doc as Record<string, unknown>, collectionFieldSet(ctx));
+    coerceServedTypes(coerceCollections(doc as Record<string, unknown>, collectionFieldSet(ctx)), ctx.fields);
 
     // Apply $select
     let entity: EntityRecord = doc;
@@ -337,9 +350,12 @@ export const createMongoDal = (db: Db): DataAccessLayer => {
 
   const insert = async (ctx: ResourceContext, record: Readonly<Record<string, unknown>>): Promise<EntityRecord> => {
     const collection = db.collection(ctx.resource);
-    await collection.insertOne({ ...record });
+    // Store integer-served fields as true integers (the seed carries scale-0 decimals) so mongo's $filter/$orderby
+    // and the served value agree — the same guarantee the SQLite/pg insert coercion gives.
+    const stored = coerceServedTypes({ ...record }, ctx.fields);
+    await collection.insertOne(stored);
     // Return the record without _id
-    return stripId(record as Record<string, unknown>);
+    return stripId(stored);
   };
 
   const update = async (ctx: ResourceContext, keyValue: string, updates: Readonly<Record<string, unknown>>): Promise<SingleResult> => {

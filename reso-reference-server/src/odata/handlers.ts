@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { ExpandParseError, LexerError, ParseError, parseExpand } from '@reso-standards/odata-expression-parser';
 import type { RequestHandler } from 'express';
-import type { CollectionQueryOptions, DataAccessLayer, ResourceContext } from '../db/data-access.js';
+import type { CollectionQueryOptions, DataAccessLayer, NavigationPropertyBinding, ResourceContext } from '../db/data-access.js';
 import { buildAnnotations } from './annotations.js';
 import { resolveBaseUrl } from './base-url.js';
 import { buildODataError, buildValidationError } from './errors.js';
@@ -129,6 +129,73 @@ export const readHandler =
       res.status(200).json({
         ...buildAnnotations(resolveBaseUrl(req, ctx.baseUrlOverride), ctx.resourceCtx.resource, key),
         ...row
+      });
+    } catch (err) {
+      setODataHeaders(res);
+      res.status(500).json(buildODataError('50000', err instanceof Error ? err.message : 'Internal server error', [], 'Read'));
+    }
+  };
+
+/**
+ * Creates a GET handler for the OData navigation-property-path: `/{Resource}('key')/{NavProp}`.
+ *
+ * Per Web API Core 2.1.0 §2.5.10.2, after collecting a key from the parent, `GET /{Resource}('{key}')/{NavProp}`
+ * returns the related entity(ies). This reuses the existing `$expand` child-resolution end-to-end — it reads the
+ * parent by key with `$expand={NavProp}` and returns the resolved navigation property as a top-level response:
+ * a collection (`{ @odata.context, value: [...] }`) for a collection-valued nav, or the single related entity
+ * otherwise. Because the FK strategies (resource-record-key / direct / parent-fk) live in the DAL's expand path,
+ * a polymorphic child (Media, …) comes back already carrying its ResourceName / ResourceRecordKey back-reference.
+ */
+export const navigationPropertyHandler =
+  (ctx: HandlerContext, binding: NavigationPropertyBinding): RequestHandler =>
+  async (req, res) => {
+    try {
+      const key = extractKey(req.path);
+      if (!key) {
+        setODataHeaders(res);
+        res
+          .status(400)
+          .json(buildValidationError([{ field: 'key', reason: "Missing resource key in URL. Use the format /Resource('key')/NavProp." }], 'Read'));
+        return;
+      }
+
+      // Resolve the parent + its navigation property via the same $expand machinery. A nested $select on the
+      // nav path is passed through to the expansion (so /Property('k')/Media?$select=MediaKey works).
+      const selectParam = req.query.$select as string | undefined;
+      const parent = await ctx.dal.readByKey(ctx.resourceCtx, key, {
+        $expand: [{ property: binding.name, options: selectParam ? { $select: selectParam } : {} }]
+      });
+
+      if (!parent) {
+        setODataHeaders(res);
+        res.status(404).json(buildODataError('40400', `No ${ctx.resourceCtx.resource} record found with key '${key}'.`, [], 'Read'));
+        return;
+      }
+
+      const baseUrl = resolveBaseUrl(req, ctx.baseUrlOverride);
+      const expanded = parent[binding.name];
+
+      if (binding.isCollection) {
+        // A collection nav always returns 200 with a (possibly empty) value array — a parent with no children.
+        const value = Array.isArray(expanded) ? expanded : [];
+        setODataHeaders(res);
+        res.status(200).json({
+          '@odata.context': `${baseUrl}/$metadata#${binding.targetResource}`,
+          value
+        });
+        return;
+      }
+
+      // To-one navigation: the related single entity, or 404 when the relationship is unset.
+      if (expanded == null || typeof expanded !== 'object') {
+        setODataHeaders(res);
+        res.status(404).json(buildODataError('40400', `No ${binding.name} related to ${ctx.resourceCtx.resource}('${key}').`, [], 'Read'));
+        return;
+      }
+      setODataHeaders(res);
+      res.status(200).json({
+        '@odata.context': `${baseUrl}/$metadata#${binding.targetResource}/$entity`,
+        ...(expanded as Record<string, unknown>)
       });
     } catch (err) {
       setODataHeaders(res);

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { DataAccessLayer, NavigationPropertyBinding, ResourceContext } from '../db/data-access.js';
 import { getFieldsForResource, getKeyFieldForResource } from '../metadata/loader.js';
 import type { ResoMetadata } from '../metadata/types.js';
-import { collectionHandler, createHandler, deleteHandler, readHandler, updateHandler } from './handlers.js';
+import { collectionHandler, createHandler, deleteHandler, navigationPropertyHandler, readHandler, updateHandler } from './handlers.js';
 
 /**
  * Build navigation property bindings for a resource from isExpansion metadata.
@@ -136,6 +136,14 @@ export const createODataRouter = (
     router.get(keyPattern, readHandler(ctx));
     if (!isReadOnly) router.patch(keyPattern, updateHandler(ctx));
     if (!isReadOnly) router.delete(keyPattern, deleteHandler(ctx));
+
+    // OData navigation-property-path: /{Resource}('key')/{NavProp} — GET the related entity(ies) via the same
+    // $expand resolution (Web API Core 2.1.0 §2.5.10.2). One route per binding; the pattern is anchored so it
+    // never collides with the keyPattern read route above. Registered read-only (nav-path writes are out of scope).
+    for (const binding of navigationBindings) {
+      const navPattern = new RegExp(`^/${resource}\\('([^']+)'\\)/${binding.name}$`);
+      router.get(navPattern, navigationPropertyHandler(ctx, binding));
+    }
 
     console.log(
       `  Registered routes for ${resource} (${fields.length} fields, key: ${keyField}${isReadOnly ? ', read-only' : ''}, navProps: ${navigationBindings.map(b => b.name).join(', ') || 'none'})`
