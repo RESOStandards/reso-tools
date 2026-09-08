@@ -77,6 +77,36 @@ export const assertScalarComparison = (
 };
 
 /**
+ * Per-record disjunction: each record must satisfy `(field op1 v1)` OR `(field op2 v2)`. This is the CORRECT
+ * semantics for a `field op1 v1 or field op2 v2` filter — it is NOT `assertScalarComparison(op1) || (op2)`, which
+ * would mean "ALL records satisfy op1" OR "ALL records satisfy op2" (a different, weaker claim). Null field values
+ * are skipped, consistent with {@link assertScalarComparison}.
+ */
+export const assertScalarCompoundOr = (
+  records: ReadonlyArray<Record<string, unknown>>,
+  field: string,
+  op1: ComparisonOp,
+  v1: unknown,
+  op2: ComparisonOp,
+  v2: unknown,
+  dataType: DataType,
+): AssertionResult => {
+  const failures: string[] = [];
+
+  for (const [i, record] of records.entries()) {
+    const actual = record[field];
+    if (actual == null) continue;
+    if (!compareValue(actual, op1, v1, dataType) && !compareValue(actual, op2, v2, dataType)) {
+      failures.push(`Record ${i}: ${field}=${JSON.stringify(actual)} satisfies neither ${op1} ${JSON.stringify(v1)} nor ${op2} ${JSON.stringify(v2)}`);
+    }
+  }
+
+  return failures.length === 0
+    ? { passed: true, message: `All ${records.length} records satisfy ${field} ${op1} ${JSON.stringify(v1)} OR ${op2} ${JSON.stringify(v2)}` }
+    : { passed: false, message: `${failures.length}/${records.length} records failed the OR: ${failures[0]}${failures.length > 1 ? ` (and ${failures.length - 1} more)` : ''}` };
+};
+
+/**
  * Assert that field values are monotonically sorted.
  * Covers orderby-timestamp-asc/desc scenarios.
  */
@@ -164,17 +194,23 @@ export const assertCollectionLambda = (
     const actual = record[field];
     if (actual == null) continue;
 
-    const items: ReadonlyArray<string> = decode
+    // Decode the collection into member names, then drop empty / whitespace members: an empty collection
+    // decodes to NO members regardless of how it arrives (an empty array `[]`, an empty string `''` which
+    // `split(',')` yields as `['']`, etc.). With no members, `all()` is VACUOUSLY TRUE and `any()` is false —
+    // the OData empty-collection semantics (web-api-core.md:107 "a record with an empty collection satisfies
+    // this vacuously"; §2.5.9.9.2). Without the filter, an empty-string collection would false-fail `all()`.
+    const items: ReadonlyArray<string> = (decode
       ? decode(actual)
       : Array.isArray(actual)
         ? (actual as unknown[]).map(String)
-        : String(actual).split(',').map(s => s.trim());
+        : String(actual).split(',').map(s => s.trim())
+    ).filter((s) => s.length > 0);
 
     const matches = op === 'any'
-      ? checkValues.some(v => items.includes(v)) // any(x: x eq A [or B]) — at least one element is a requested value
+      ? checkValues.some(v => items.includes(v)) // any(x: x eq A [or B]) — at least one element is a requested value (false for an empty collection)
       : op === 'has'
         ? checkValues.every(v => items.includes(v)) // has A [and has B] — EVERY requested flag must be set (AND)
-        : items.every(item => checkValues.includes(item)); // all(x: x eq A [or B]) — EVERY element is within {values}
+        : items.every(item => checkValues.includes(item)); // all(x: x eq A [or B]) — EVERY element is within {values}; VACUOUSLY TRUE for an empty collection
 
     if (!matches) {
       failures.push(`Record ${i}: ${field}=${JSON.stringify(actual)} does not satisfy ${op}(${checkValues.join(', ')})`);

@@ -246,6 +246,8 @@ interface ReportScenario {
   /** Optional-test scenarios (contains/startswith/endswith, …) never fail Core; kept out of the failure list. */
   readonly optional?: boolean;
   readonly assertions?: ReadonlyArray<{ readonly passed?: boolean; readonly message?: string; readonly description?: string }>;
+  /** Non-gating warnings carried on the scenario (single-enum ne, $expand RRK, later Fast Track / DD 3.0 suggestions). */
+  readonly warnings?: ReadonlyArray<string>;
 }
 
 /** `Resource · scenario: message` lines for failed, non-skipped scenarios matching `include`. */
@@ -286,6 +288,19 @@ export const collectFailures = (result: PipelineResult): ReadonlyArray<string> =
 export const collectOptionalUnsupported = (result: PipelineResult): ReadonlyArray<string> =>
   scenarioFailureLines(result, s => s.optional === true);
 
+/** Non-gating warnings gathered across scenarios (`Resource · scenario: warning`). Verdict-neutral — surfaced on
+ *  passing runs too, since they never affect the Core outcome (single-enum ne, $expand RRK, Fast Track suggestions). */
+export const collectWarnings = (result: PipelineResult): ReadonlyArray<string> => {
+  const reports = (result.context as Record<string, unknown>).resourceReports as
+    | ReadonlyArray<{ readonly resource?: string; readonly scenarios?: ReadonlyArray<ReportScenario> }>
+    | undefined;
+  return (reports ?? []).flatMap(r =>
+    (r.scenarios ?? []).flatMap(s =>
+      (s.warnings ?? []).map(w => `${r.resource ?? 'Resource'} · ${s.name ?? s.tag ?? 'scenario'}: ${w}`),
+    ),
+  );
+};
+
 /** After the live render, print the reports location and — on a non-passing run — a concise failure summary. */
 const printRunSummary = (result: PipelineResult, renderMode: RenderMode): void => {
   if (renderMode === 'silent') return;
@@ -304,6 +319,13 @@ const printRunSummary = (result: PipelineResult, renderMode: RenderMode): void =
   if (optionalUnsupported.length > 0) {
     console.log(`Optional — not supported (${optionalUnsupported.length}):`);
     for (const f of optionalUnsupported) console.log(`  · ${f}`);
+  }
+  // Non-gating warnings — surfaced on EVERY run (they never move the verdict or exit code), so observe-then-flip
+  // checks (single-enum ne) and future Fast Track / DD 3.0 suggestions are visible without failing anyone.
+  const warnings = collectWarnings(result);
+  if (warnings.length > 0) {
+    console.log(`Warnings — non-gating (${warnings.length}):`);
+    for (const w of warnings) console.log(`  ⚠ ${w}`);
   }
 };
 

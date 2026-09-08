@@ -11,7 +11,10 @@
  *   -1)` returns every record): a hit is mandatory, so empty = broken.
  * - **skip** — `all` (the record's whole collection must sit inside the set — legitimately often empty),
  *   `has A and has B` (needs both flags on one record — the two values may come from different records), and
- *   any compound `field op X and/or field op2 Y` filter (two conditions, legitimately often empty).
+ *   any compound `field op X and/or field op2 Y` filter (two conditions, legitimately often empty). BUT when the
+ *   set is RECORD-DERIVED (`ctx.recordDerivedSet` — the query was built over one real record's own collection,
+ *   which the operator is therefore guaranteed to return), that same `all` / `has A and has B` empty is a
+ *   determinate **fail**: the guaranteeing record MUST come back. See {@link EmptyContext.recordDerivedSet}.
  * - **`ne` / `gt` / `lt`** against a value sampled from the field depend on the data (see {@link EmptyContext}).
  *   `ne` empties only if the field is single-valued; `gt`/`lt` compare against the sampled MIN/MAX, so they
  *   match only if a value exists beyond that bound. All three share the rule: ≥2 distinct sampled values →
@@ -23,11 +26,15 @@ import type { CoreScenario } from './scenarios.js';
 
 export type EmptyVerdict = 'fail' | 'pass' | 'skip';
 
-/** Data the `ne` decision needs: distinct value count in the sample, and whether the sample was the COMPLETE
- *  resource (no `@odata.nextLink` past it). */
+/** Data the empty-result decision needs: distinct value count in the sample, whether the sample was the COMPLETE
+ *  resource (no `@odata.nextLink` past it), and whether the operator's value set was RECORD-DERIVED. */
 export interface EmptyContext {
   readonly distinctValueCount?: number;
   readonly complete?: boolean;
+  /** True when an `all()` / `has A and has B` query was built over ONE real record's own collection (see
+   *  queries.ts `recordDerivedSet`). That record is guaranteed to satisfy the filter, so an empty result is a
+   *  determinate operator FAIL rather than the legitimately-empty skip. */
+  readonly recordDerivedSet?: boolean;
 }
 
 export const emptyVerdict = (scenario: CoreScenario, ctx: EmptyContext): EmptyVerdict => {
@@ -51,12 +58,18 @@ export const emptyVerdict = (scenario: CoreScenario, ctx: EmptyContext): EmptyVe
       return scenario.op === 'gt' || scenario.op === 'lt' || scenario.op === 'ne' ? ne() : 'fail';
     case 'enum':
       if (scenario.op === 'ne') return ne();
-      return scenario.valueParam2 !== undefined ? 'skip' : 'fail'; // has-and → skip; has / eq → fail
+      // has-and → skip UNLESS the two flags are record-derived (co-present on one record → guaranteed → fail);
+      // has / eq → fail.
+      return scenario.valueParam2 !== undefined ? (ctx.recordDerivedSet ? 'fail' : 'skip') : 'fail';
     case 'collection':
-      return scenario.lambda === 'any' ? 'fail' : 'skip'; // all → skip
+      // any → fail; all → skip UNLESS record-derived (record's own collection ⊆ the set → guaranteed → fail).
+      if (scenario.lambda === 'any') return 'fail';
+      return ctx.recordDerivedSet ? 'fail' : 'skip';
     case 'string-enum':
       if (scenario.op === 'ne') return ne();
-      return scenario.op === 'all' ? 'skip' : 'fail'; // eq / any → fail
+      // eq / any → fail; all → skip UNLESS record-derived (guaranteed → fail).
+      if (scenario.op === 'all') return ctx.recordDerivedSet ? 'fail' : 'skip';
+      return 'fail';
     case 'in-operator':
       return 'fail';
     default:

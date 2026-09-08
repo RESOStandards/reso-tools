@@ -494,6 +494,9 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     const optNotSupported = resourceReports.reduce((sum, r) => sum + r.summary.optional.notSupported, 0);
     const optNotTested = resourceReports.reduce((sum, r) => sum + r.summary.optional.notTested, 0);
     const optTotal = optPassed + optNotSupported + optNotTested;
+    // Verdict-neutral warning tally (single-enum ne, $expand RRK, later Fast Track / DD 3.0 suggestions) — surfaced,
+    // never folded into totalFailed or the verdict.
+    const totalWarnings = resourceReports.reduce((sum, r) => sum + (r.summary.warnings ?? 0), 0);
 
     // Compute union coverage across all resources
     const allTypes = ['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup'];
@@ -523,6 +526,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
       status,
       summary: incompleteMsg
         + `${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped`
+        + (totalWarnings > 0 ? `, ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}` : '')
         + (optTotal > 0 ? `; optional: ${optPassed} passed, ${optNotSupported} not supported, ${optNotTested} not tested` : '')
         + ` (${totalScenarios} scenarios across ${resourceReports.length} resources). ${coverageMsg}${modeMsg}`,
       counts: {
@@ -530,6 +534,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         passed: totalPassed,
         failed: totalFailed,
         skipped: totalSkipped,
+        warnings: totalWarnings,
         optionalPassed: optPassed,
         optionalNotSupported: optNotSupported,
         optionalNotTested: optNotTested,

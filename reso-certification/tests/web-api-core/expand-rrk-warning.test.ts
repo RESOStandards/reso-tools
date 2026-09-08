@@ -141,10 +141,13 @@ describe('$expand RRK warning is NON-GATING (does not change passed / failed / v
     const mismatchSummary = summarizeScenarios([mismatch]);
     const cleanSummary = summarizeScenarios([clean]);
 
-    // The verdict surface (passed/failed/skipped) is IDENTICAL — the only difference is the advisory warning.
-    expect(mismatchSummary).toEqual(cleanSummary);
+    // The VERDICT surface (passed/failed/skipped/optional) is IDENTICAL — the warning is verdict-neutral. The only
+    // difference is the advisory `warnings` COUNT, which the mismatch run now surfaces (1) and the clean run doesn't (0).
+    expect({ ...mismatchSummary, warnings: 0 }).toEqual({ ...cleanSummary, warnings: 0 });
     expect(mismatchSummary.failed).toBe(0);
     expect(mismatchSummary.passed).toBe(1);
+    expect(mismatchSummary.warnings).toBe(1); // the RRK warning is now SURFACED (still non-gating)
+    expect(cleanSummary.warnings).toBe(0);
 
     // And the run verdict derived from those counts is `passed` in BOTH cases — the warning is inert to it.
     const verdictArgs = (failed: number) => ({ totalFailed: failed, coverageFailed: false, deadlineReached: false });

@@ -50,25 +50,47 @@ export interface EnumCandidate {
   /** The CSDL enum type for enum-typed representations — lets the runner decode an integer-bitmask response
    *  value back to member names when validating a flags field. Absent for string lookups (no bitmask form). */
   readonly enumType?: CsdlEnumType;
+  /** The DISTINCT collection of one real record — the smallest observed — for multi-valued representations
+   *  (COLLECTION_ENUM / COLLECTION_STRING / FLAGS_ENUM). Querying `all(x: x eq v1 or … or x eq vn)` over exactly
+   *  this set is guaranteed to return that record (its members ⊆ the set), so the all() / has-and check can
+   *  demand a NON-empty, logically-correct result instead of skipping when the filter happens to match nothing.
+   *  Absent when no record carried a small-enough collection (see SUBSET_MAX_VALUES) — then the operator keeps
+   *  its prior skip-on-empty verdict. */
+  readonly subsetSampleValues?: ReadonlyArray<string>;
 }
 
 /** Decode a field's sampled raw values, ordering distinct members by FREQUENCY (most-common first) and
  *  counting how many records carry a usable value. Frequency is the drift-resistant choice: a value present
  *  in many records survives edits/deletes on an active feed, so a filter built from it can't empty out. */
+/** Upper bound on a record-derived `all()`/`has-and` value set — a guaranteed-subset query is `all(x: x eq v1 or
+ *  … or x eq vn)`, so a pathologically large record collection would build an unwieldy filter. Beyond this we skip
+ *  the record-derived set (the operator falls back to the skip-on-empty verdict, as before). */
+const SUBSET_MAX_VALUES = 12;
+
 const decodedMembers = (
   records: ReadonlyArray<Record<string, unknown>>,
   field: string,
   decode: (raw: unknown) => ReadonlyArray<string>,
-): { readonly members: ReadonlyArray<string>; readonly fillCount: number } => {
+): { readonly members: ReadonlyArray<string>; readonly fillCount: number; readonly subsetSampleValues?: ReadonlyArray<string> } => {
   const counts = new Map<string, number>(); // Map insertion order = first-seen, a stable tiebreak for equal counts
   let fillCount = 0;
+  // The smallest observed record's DISTINCT collection: querying `all(x: x eq …)` over exactly this set is
+  // guaranteed to return that record (its values are a subset of the set), turning an otherwise-often-empty (→ skip)
+  // all()/has-and into a verifiable non-empty result. Smallest keeps the query tight; capped by SUBSET_MAX_VALUES.
+  let smallestRecordSet: ReadonlyArray<string> | undefined;
   for (const record of records) {
     const decoded = decode(record[field]);
-    if (decoded.length > 0) fillCount += 1;
+    if (decoded.length > 0) {
+      fillCount += 1;
+      const distinct = [...new Set(decoded)];
+      if (distinct.length <= SUBSET_MAX_VALUES && (smallestRecordSet === undefined || distinct.length < smallestRecordSet.length)) {
+        smallestRecordSet = distinct;
+      }
+    }
     for (const member of decoded) counts.set(member, (counts.get(member) ?? 0) + 1);
   }
   const members = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([member]) => member);
-  return { members, fillCount };
+  return { members, fillCount, ...(smallestRecordSet !== undefined && { subsetSampleValues: smallestRecordSet }) };
 };
 
 /** Build a candidate for one property, or undefined if it is not an enum of the wanted group or has no usable value. */
@@ -83,7 +105,7 @@ const buildCandidate = (
   const ef = resolveEnum({ name: prop.name, type: prop.type, ...(prop.annotations && { annotations: prop.annotations }) }, { enumTypes });
   if (!ef || !wantRep(ef.representation)) return undefined;
 
-  const { members, fillCount } = decodedMembers(records, prop.name, ef.decodeValue);
+  const { members, fillCount, subsetSampleValues } = decodedMembers(records, prop.name, ef.decodeValue);
   if (members.length === 0) return undefined; // no sampled value to compare against — not testable
 
   // Values come from the field's own decoded samples (type-correct by construction), already ordered
@@ -106,6 +128,7 @@ const buildCandidate = (
     fillRate: records.length > 0 ? fillCount / records.length : 0,
     ...(lookupName !== undefined && { lookupName }),
     ...(ef.enumType !== undefined && { enumType: ef.enumType }),
+    ...(subsetSampleValues !== undefined && isMultiRep(ef.representation) && { subsetSampleValues }),
   };
 };
 

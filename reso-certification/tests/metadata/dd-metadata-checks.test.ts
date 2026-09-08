@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
 import {
-  checkDisallowedSynonyms, checkClosedEnumValues, checkFieldTypes, checkExpansionStructure, checkSuggestedMaxConstraints,
+  checkDisallowedSynonyms, checkClosedEnumValues, checkStandardLookupValuePresent, checkFieldTypes, checkExpansionStructure, checkSuggestedMaxConstraints,
   checkLookupResourceFields, checkLookupNameAnnotations, runDdMetadataChecks,
 } from '../../src/metadata/dd-metadata-checks.js';
 import type { DdReference } from '../../src/metadata/dd-metadata-checks.js';
@@ -375,5 +375,107 @@ describe('runDdMetadataChecks', () => {
       reference,
     );
     expect(findings.some((f) => f.check === 'expansion-structure' && f.fieldName === 'Media')).toBe(true);
+  });
+});
+
+describe('checkStandardLookupValuePresent', () => {
+  const SS = 'org.reso.metadata.enums.StandardStatus';
+  const OTHER = 'org.reso.metadata.enums.OtherEnum';
+  const CITY = 'org.reso.metadata.enums.City';
+  const LODV = 'RESO.OData.Metadata.LegacyODataValue';
+
+  const reference: DdReference = {
+    fields: [
+      { resourceName: 'Property', fieldName: 'StandardStatus', type: SS, isEnumeration: true, lookupStatus: 'Locked with Enumerations' },
+      { resourceName: 'Property', fieldName: 'OtherEnum', type: OTHER, isEnumeration: true, lookupStatus: 'Open with Enumerations' },
+      { resourceName: 'Property', fieldName: 'City', type: CITY, isEnumeration: true, lookupStatus: 'Open' }, // purely-open: no ref lookups → empty catalog
+    ],
+    lookups: [
+      // 'Active': StandardName == LegacyODataValue == 'Active' (the overlap case → one Set member)
+      { lookupName: SS, lookupValue: 'Active', annotations: [{ term: SN, value: 'Active' }, { term: LODV, value: 'Active' }] },
+      // display "Active Under Contract", legacy machine "ActiveUnderContract"
+      { lookupName: SS, lookupValue: 'ActiveUnderContract', annotations: [{ term: SN, value: 'Active Under Contract' }, { term: LODV, value: 'ActiveUnderContract' }] },
+      // OtherEnum has a DISTINCT standard value (for the cross-enum no-fallback test)
+      { lookupName: OTHER, lookupValue: 'Foo', annotations: [{ term: SN, value: 'Foo' }] },
+    ],
+  };
+
+  // A provider string-enum field: its field-type is rewritten to the (short) LookupName in the merged report;
+  // its Lookup rows are typed Edm.String.
+  const strField = (fieldName: string, lookupName: string) => ({ resourceName: 'Property', fieldName, type: lookupName, isEnumeration: true });
+  const strRow = (lookupName: string, lookupValue: string, annotations: ReadonlyArray<{ term: string; value: string }> = []): MetadataReportLookup => ({ lookupName, lookupValue, type: 'Edm.String', annotations });
+
+  it('lsv.L.1 — flags a standard value served with no StandardLookupValue (default severity warning)', () => {
+    const findings = checkStandardLookupValuePresent(
+      makeReport([strField('StandardStatus', 'StandardStatus')], [strRow('StandardStatus', 'Active')]),
+      reference,
+    );
+    expect(findings.length).toBe(1);
+    expect(findings[0]).toMatchObject({ check: 'standard-lookup-value', severity: 'warning', resourceName: 'Property', fieldName: 'StandardStatus' });
+  });
+
+  it('lsv.L.2 — passes a standard value that declares its StandardLookupValue', () => {
+    expect(checkStandardLookupValuePresent(
+      makeReport([strField('StandardStatus', 'StandardStatus')], [strRow('StandardStatus', 'Active', [{ term: SN, value: 'Active' }])]),
+      reference,
+    )).toEqual([]);
+  });
+
+  it('lsv.F.1 — never fires on a purely-open enum (empty DD catalog, e.g. City)', () => {
+    expect(checkStandardLookupValuePresent(
+      makeReport([strField('City', 'City')], [strRow('City', 'Springfield')]),
+      reference,
+    )).toEqual([]);
+  });
+
+  it('lsv.E.1 — passes a purely-local value (not in the field catalog); SLV optional', () => {
+    expect(checkStandardLookupValuePresent(
+      makeReport([strField('StandardStatus', 'StandardStatus')], [strRow('StandardStatus', 'MyLocalStatus')]),
+      reference,
+    )).toEqual([]);
+  });
+
+  it('lsv.R.1 — exempts the Edm.EnumType representation (no StandardLookupValue column)', () => {
+    const findings = checkStandardLookupValuePresent(
+      makeReport(
+        [{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS, isEnumeration: true }],
+        [{ lookupName: SS, lookupValue: 'Active', type: 'Edm.Int32', annotations: [] }],
+      ),
+      reference,
+    );
+    expect(findings).toEqual([]);
+  });
+
+  it('lsv.L.3 — no any-enum fallback: a value standard for a DIFFERENT enum is not standard here', () => {
+    // 'Active' is standard for StandardStatus but NOT for OtherEnum (catalog {Foo}).
+    expect(checkStandardLookupValuePresent(
+      makeReport([strField('OtherEnum', 'OtherEnum')], [strRow('OtherEnum', 'Active')]),
+      reference,
+    )).toEqual([]);
+  });
+
+  it('matches on the LegacyODataValue form: a value standard via its LODV, no SLV, flags', () => {
+    // Provider serves a local display 'AUC' whose LegacyODataValue is the standard machine form; no SLV declared.
+    const findings = checkStandardLookupValuePresent(
+      makeReport([strField('StandardStatus', 'StandardStatus')], [strRow('StandardStatus', 'AUC', [{ term: LODV, value: 'ActiveUnderContract' }])]),
+      reference,
+    );
+    expect(findings.length).toBe(1);
+    expect(findings[0]).toMatchObject({ check: 'standard-lookup-value', fieldName: 'StandardStatus' });
+  });
+
+  it('lsv.S.1 — severity is configurable to error (the post-WG flip)', () => {
+    const findings = checkStandardLookupValuePresent(
+      makeReport([strField('StandardStatus', 'StandardStatus')], [strRow('StandardStatus', 'Active')]),
+      reference,
+      'error',
+    );
+    expect(findings[0]?.severity).toBe('error');
+  });
+
+  it('runDdMetadataChecks includes it as a warning by default (non-gating); error when configured', () => {
+    const report = makeReport([strField('StandardStatus', 'StandardStatus')], [strRow('StandardStatus', 'Active')]);
+    expect(runDdMetadataChecks(report, reference).some((f) => f.check === 'standard-lookup-value' && f.severity === 'warning')).toBe(true);
+    expect(runDdMetadataChecks(report, reference, { standardLookupValueSeverity: 'error' }).some((f) => f.check === 'standard-lookup-value' && f.severity === 'error')).toBe(true);
   });
 });
