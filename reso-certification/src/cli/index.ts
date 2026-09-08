@@ -46,7 +46,13 @@ import { addAuthOptions, addOutputOptions } from './shared-options.js';
 import { runReplicate, REPLICATION_STRATEGY_VALUES } from './replicate-command.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { CURRENT_DD_VERSION, CERTIFIABLE_DD_VERSIONS, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
+import { CURRENT_CORE_VERSION, SUPPORTED_CORE_VERSIONS, isCoreVersion } from '../sdk/core-versions.js';
 import { resolveRenderMode, runWithProgress, runConfigEntries } from './render.js';
+import { createRequire } from 'node:module';
+
+/** The CLI's own version, from package.json — the single source, so `reso-cert -V` never drifts from the
+ *  published version (dist mirrors src under `tsc`, so `../../package.json` resolves in both dev and dist). */
+const { version: CLI_VERSION } = createRequire(import.meta.url)('../../package.json') as { readonly version: string };
 
 /** Default port for mock OData servers when started via --mock. */
 const DEFAULT_MOCK_PORT = 8800;
@@ -71,7 +77,9 @@ const resolveExitCode = (results: ReadonlyArray<PipelineResult>): number =>
 
 const program = new Command();
 
-program.name('reso-cert').description('RESO certification compliance testing tools').version('0.5.0');
+// `-V` / `--version` (Commander's default flags) report the CLI's own version. Per-command spec versions use
+// their own explicit flags (`core --spec-version`, `dd --dd-version`) so they never collide with this.
+program.name('reso-cert').description('RESO certification compliance testing tools').version(CLI_VERSION);
 
 // ── Shared option builders live in ./shared-options.ts ──
 // addAuthOptions (OAuth2/bearer cluster) and addOutputOptions (compliance-report
@@ -356,7 +364,9 @@ const coreCmd = program
   .option('--url <url>', 'Server base URL (mutually exclusive with --config)')
   .option('--config <path>', 'Path to a config file — runs every entry (mutually exclusive with --url)')
   .option('--resources <list>', 'Comma-separated resource names (default: well-known list)')
-  .option('--version <version>', 'Spec version: 2.0.0 or 2.1.0', '2.0.0')
+  // `--spec-version` (not `--version`, which is reserved for the program's own `-V`). Defaults to the current
+  // minor, so a plain `reso-cert core --url …` certifies the latest Core without the caller passing a version.
+  .option('--spec-version <version>', `Web API Core spec version: ${SUPPORTED_CORE_VERSIONS.join(' or ')}`, CURRENT_CORE_VERSION)
   .option('--enum-mode <mode>', 'Enum mode: auto, string, collections, or isflags (default: auto-detect)', 'auto')
   .option('--full-coverage', 'Fail if any data type category has no coverage across all resources')
   .option('--originating-system-name <v>', 'Scope resource queries to OriginatingSystemName eq <v> (multi-tenant providers)')
@@ -370,7 +380,7 @@ coreCmd.action(
     url?: string;
     config?: string;
     resources?: string;
-    version: string;
+    specVersion: string;
     enumMode: string;
     fullCoverage?: boolean;
     originatingSystemName?: string;
@@ -391,10 +401,10 @@ coreCmd.action(
         throw new Error('Provide --url or --config.');
       }
 
-      const specVersion = opts.version as '2.0.0' | '2.1.0';
-      if (specVersion !== '2.0.0' && specVersion !== '2.1.0') {
-        throw new Error(`Invalid version "${opts.version}". Must be "2.0.0" or "2.1.0".`);
+      if (!isCoreVersion(opts.specVersion)) {
+        throw new Error(`Invalid --spec-version "${opts.specVersion}". Must be one of: ${SUPPORTED_CORE_VERSIONS.join(', ')}.`);
       }
+      const specVersion = opts.specVersion;
 
       const enumMode = opts.enumMode as 'auto' | 'isflags' | 'collections' | 'string';
       if (!['auto', 'isflags', 'collections', 'string'].includes(enumMode)) {
