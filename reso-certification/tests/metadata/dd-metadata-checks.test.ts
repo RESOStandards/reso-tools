@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
 import {
   checkDisallowedSynonyms, checkClosedEnumValues, checkStandardLookupValuePresent, checkFieldTypes, checkExpansionStructure, checkSuggestedMaxConstraints,
-  checkLookupResourceFields, checkLookupNameAnnotations, runDdMetadataChecks,
+  checkLookupResourceFields, checkLookupNameAnnotations, runDdMetadataChecks, LOOKUP_MANDATORY_FIELDS,
 } from '../../src/metadata/dd-metadata-checks.js';
 import type { DdReference } from '../../src/metadata/dd-metadata-checks.js';
 import { generateReferenceArtifacts } from '../../src/metadata/reference-artifacts.js';
@@ -307,6 +307,37 @@ describe('Lookup Resource checks', () => {
       const findings = checkLookupResourceFields(makeReport(fields, []), reference);
       expect(findings).toHaveLength(1);
       expect(findings[0]).toMatchObject({ check: 'lookup-resource-fields', fieldName: 'ModificationTimestamp', severity: 'error' });
+    });
+
+    // F.3 — each mandatory field independently (order-independent; not keyed to ModificationTimestamp)
+    it.each([...LOOKUP_MANDATORY_FIELDS])('flags a missing %s', (missing) => {
+      const fields = LOOKUP_MANDATORY_FIELDS.filter((f) => f !== missing).map((fieldName) => ({ resourceName: 'Lookup', fieldName, type: 'Edm.String' }));
+      const findings = checkLookupResourceFields(makeReport(fields, []), reference);
+      expect(findings).toHaveLength(1);
+      expect(findings[0]).toMatchObject({ check: 'lookup-resource-fields', resourceName: 'Lookup', fieldName: missing, severity: 'error' });
+    });
+
+    // F.4 — multiple missing → one finding per missing field
+    it('emits one finding per missing mandatory field', () => {
+      const fields = ['LookupName', 'LookupValue'].map((fieldName) => ({ resourceName: 'Lookup', fieldName, type: 'Edm.String' })); // LookupKey + ModificationTimestamp absent
+      const findings = checkLookupResourceFields(makeReport(fields, []), reference);
+      expect(findings).toHaveLength(2);
+      expect(new Set(findings.map((f) => f.fieldName))).toEqual(new Set(['LookupKey', 'ModificationTimestamp']));
+      expect(findings.every((f) => f.check === 'lookup-resource-fields' && f.severity === 'error')).toBe(true);
+    });
+
+    // F.5 — the declaration gate must NOT require the optional StandardLookupValue / LegacyODataValue columns
+    // (declaration vs value: SLV's conditional presence is the separate checkStandardLookupValuePresent rule).
+    it('does not require the optional StandardLookupValue / LegacyODataValue columns', () => {
+      const mandatory = LOOKUP_MANDATORY_FIELDS.map((fieldName) => ({ resourceName: 'Lookup', fieldName, type: 'Edm.String' }));
+      expect(checkLookupResourceFields(makeReport(mandatory, []), reference)).toEqual([]);
+      const withOptionals = [...mandatory, ...['StandardLookupValue', 'LegacyODataValue'].map((fieldName) => ({ resourceName: 'Lookup', fieldName, type: 'Edm.String' }))];
+      expect(checkLookupResourceFields(makeReport(withOptionals, []), reference)).toEqual([]);
+    });
+
+    // drift-snapshot — locks the mandatory set against source drift
+    it('locks the mandatory Lookup field set (guards required-set drift)', () => {
+      expect([...LOOKUP_MANDATORY_FIELDS]).toEqual(['LookupKey', 'LookupName', 'LookupValue', 'ModificationTimestamp']);
     });
   });
 
