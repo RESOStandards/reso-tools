@@ -43,13 +43,17 @@ describe('$select — multi-field projection built + the server must honor it', 
     expect(r.assertions.some((a) => a.passed && a.message.includes('present: ModificationTimestamp'))).toBe(true);
   });
 
-  it('FAILS when a returned record carries a field OUTSIDE the $select list — the server ignored the projection', async () => {
+  it('WARNS (non-gating), does NOT fail, when a returned record carries a field OUTSIDE the $select list', async () => {
+    // A server that ignores $select returns every field, including ones never selected (e.g. ListPrice). The
+    // Commander (the oracle for this existing 2.0.0 element) never checks for fields outside the select list, so
+    // this must NOT newly fail a $select-ignoring server that passed the oracle — it rides the warning channel
+    // (observe-then-flip, like single-enum `ne`), pending WG sign-off.
     const q = buildScenarioQuery('http://x', 'Property', selectScenario, baseParams);
-    // A server that ignores $select returns every field, including ones never selected (e.g. ListPrice).
     const req = requesterReturning([{ ListingKey: '1', ModificationTimestamp: '2026-01-01T00:00:00Z', ListPrice: 500000 }]);
     const r = await runStructuralScenario('http://x', 'Property', 'select', q!, baseParams, 'tok', 0, req);
-    expect(r.passed).toBe(false);
-    expect(r.assertions.some((a) => !a.passed && a.message.includes('ListPrice') && a.message.includes('did not honor'))).toBe(true);
+    expect(r.passed).toBe(true); // NON-gating — the beyond-oracle check never fails the provider
+    expect(r.assertions.every((a) => a.passed)).toBe(true);
+    expect(r.warnings?.some((w) => w.includes('ListPrice') && w.toLowerCase().includes('warning'))).toBe(true);
   });
 
   it('does NOT false-fail when the projected field is null/omitted (sparse field or null-omitting server)', async () => {
