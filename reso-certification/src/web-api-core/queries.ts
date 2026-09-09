@@ -389,8 +389,8 @@ const buildQueryForCategory = (
       return buildInOperatorUrl(serverUrl, resource, params, scenario);
     case 'expand':
       return buildExpandUrl(serverUrl, resource, params, scenario);
-    case 'paging':
-      return { url: `${serverUrl}/${resource}?$top=1&$count=true`, selectFields: [params.keyField] };
+    // 'paging' is dispatched in runScenario before buildScenarioQuery (it builds its own URLs), so it is
+    // intentionally omitted here — like 'lookup-resource' — and buildQueryForCategory returns undefined for it.
   }
 };
 
