@@ -12,11 +12,11 @@ Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compl
 |---------|-------------|-------|
 | [`reso-common/`](reso-common/) | Universal (browser + Node) RESO metadata model and projections – the shared `ResoMetadata` shape, pure helpers and EDMX generator (zero runtime dependencies) | 16 |
 | [`reso-metadata-utils/`](reso-metadata-utils/) | RESO OData metadata processing – CSDL parse + validate (CSDL/XSD), EDMX → metadata-report serialization, live metadata fetching (the deps-requiring side of the metadata split) | 108 |
-| [`reso-client/`](reso-client/) | OData 4.01 client SDK -- URI builder, CRUD helpers, CSDL metadata parsing, OAuth2 Client Credentials | 116 |
+| [`reso-client/`](reso-client/) | OData 4.01 client SDK -- URI builder, CRUD helpers, CSDL metadata parsing, OAuth2 Client Credentials | 211 |
 | [`odata-expression-parser/`](odata-expression-parser/) | Zero-dependency `$filter` and `$expand` expression parser | 180 |
 | [`reso-validation/`](reso-validation/) | Isomorphic field and business-rule validation for RESO Data Dictionary records | 98 |
 | [`reso-reference-server/`](reso-reference-server/) | Metadata-driven OData reference server (PostgreSQL, MongoDB, SQLite) | 265 |
-| [`reso-certification/`](reso-certification/) | RESO Certification CLI + SDK – Add/Edit, EntityEvent, Web API Core, Data Dictionary + RCP-010 schema/replicate/variations ([docs](reso-certification/README.md)) | 816 |
+| [`reso-certification/`](reso-certification/) | RESO Certification CLI + SDK – Add/Edit, EntityEvent, Web API Core, Data Dictionary + RCP-010 schema/replicate/variations ([docs](reso-certification/README.md)) | 1064 |
 | [`reso-mcp-server/`](reso-mcp-server/) | MCP server – exposes OData query, write, validation, certification tools for AI agents ([guide](reso-mcp-server/doc/GUIDE.md)) | 21 |
 
 ## Quick Start
