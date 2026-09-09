@@ -1214,6 +1214,7 @@ export const runStructuralScenario = async (
   requester: ODataRequester = webRequester,
 ): Promise<ScenarioResult> => {
   const assertions: AssertionResult[] = [];
+  const warnings: string[] = []; // non-gating, verdict-neutral (see the $select projection-honored check)
   const tag = assertion;
   const name = assertion;
   let odataVersion: string | undefined;
@@ -1305,13 +1306,13 @@ export const runStructuralScenario = async (
       const response = await requester.request({ method: 'GET', url: query.url, authToken });
       assertions.push(assertODataResponse(response, 200));
       assertions.push(assertHasResults(response.body));
-      // Verify the server HONORED the multi-field projection. The value-independent, false-fail-safe signal is
-      // that no returned record carries a STRUCTURAL field OUTSIDE the $select list — a server that IGNORES $select
-      // returns every field, which this catches, and a key-only 200+has-results check cannot. We deliberately do
-      // NOT fail when a projected field is ABSENT: OData permits a server to omit a null-valued property (§11.2.4.1),
-      // so a legitimately-sparse projected field (null across the returned page) must not false-fail a compliant
-      // server. A projected field that IS present is reported as positive confirmation. (The selected fields are
-      // engine-chosen from the provider's own sampled metadata, so they are declared by construction.)
+      // The GATE is oracle parity: 200 + has-results, matching the Commander's $select scenario, which asserts
+      // only that ≥1 selected field carries data (WebAPIServerCore.java `numFieldsWithData > 0`) — it iterates the
+      // select list and never checks for fields OUTSIDE it. So "the server returned a field outside the $select
+      // list" (it ignored the projection) is STRICTER THAN the oracle on an existing Core 2.0.0 element: a
+      // $select-ignoring server that passed the Commander must NOT newly fail here. We surface it as a NON-GATING
+      // WARNING (observe-then-flip, like single-enum `ne`), pending WG sign-off — never a verdict-gating fail. We
+      // also deliberately do not fault an ABSENT projected field (OData permits omitting a null property, §11.2.4.1).
       const records = extractRecords(response.body);
       const projectedDataFields = query.selectFields.filter(f => f !== params.keyField);
       if (projectedDataFields.length === 0) {
@@ -1320,7 +1321,8 @@ export const runStructuralScenario = async (
         const selected = new Set(query.selectFields);
         const extraField = records.flatMap(r => Object.keys(r)).find(k => !k.startsWith('@') && !selected.has(k));
         if (extraField !== undefined) {
-          assertions.push({ passed: false, message: `$select projected {${query.selectFields.join(', ')}} but a returned record also carries unselected field '${extraField}' — the server did not honor the projection (returned fields outside the $select list)` });
+          warnings.push(`$select projected {${query.selectFields.join(', ')}} but a returned record also carries unselected field '${extraField}' — the server did not narrow the projection. Stricter than Core 2.0.0 (the Commander does not check this); reported as a WARNING pending WG sign-off, not failed.`);
+          assertions.push({ passed: true, message: `$select projection: reported for review, not failed (see warnings) — unselected field '${extraField}' returned` });
         } else {
           const confirmed = projectedDataFields.filter(f => records.some(r => f in r));
           assertions.push({
@@ -1343,7 +1345,7 @@ export const runStructuralScenario = async (
   }
 
   const allPassed = assertions.every(a => a.passed);
-  return { tag, name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestUrl: query.url, odataVersion };
+  return { tag, name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestUrl: query.url, odataVersion, ...(warnings.length > 0 ? { warnings } : {}) };
 };
 
 /** Run server-driven paging scenario (v2.1.0). */
