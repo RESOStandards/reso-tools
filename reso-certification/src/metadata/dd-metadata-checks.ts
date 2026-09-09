@@ -465,7 +465,7 @@ export const checkExpansionStructure = (
 
 /** The Lookup Resource (string representation) entity set name and its mandatory metadata fields. */
 const LOOKUP_RESOURCE = 'Lookup';
-const LOOKUP_MANDATORY_FIELDS: ReadonlyArray<string> = ['LookupKey', 'LookupName', 'LookupValue', 'ModificationTimestamp'];
+export const LOOKUP_MANDATORY_FIELDS: ReadonlyArray<string> = ['LookupKey', 'LookupName', 'LookupValue', 'ModificationTimestamp'];
 
 /**
  * Lookup Resource mandatory fields (metadata): when a provider serves the string representation (a
