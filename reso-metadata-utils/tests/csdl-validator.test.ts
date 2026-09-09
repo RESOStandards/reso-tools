@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CsdlSchema } from '../src/csdl/types.js';
 import { validateCsdl } from '../src/csdl/validator.js';
+import { parseCsdlXml } from '../src/csdl/parser.js';
 
 const validSchema: CsdlSchema = {
   namespace: 'org.reso.metadata',
@@ -32,7 +33,7 @@ const validSchema: CsdlSchema = {
     name: 'Default',
     // Keep the base fixture's container empty so a test can override `entityTypes` without the inherited
     // container dangling an entity-set reference to a type it replaced (the validator now resolves same-namespace
-    // references — see `isUnresolvedLocalType`). Tests that exercise the entity-set / binding rules declare their
+    // references — see `isDanglingReference`). Tests that exercise the entity-set / binding rules declare their
     // own populated container below.
     entitySets: [],
     singletons: [],
@@ -577,7 +578,7 @@ describe('validateCsdl', () => {
   // --- A11: same-namespace type-reference resolution ---
   // The validator once waved through ANY dotted type name as an "external reference" (a bare `!type.includes('.')`
   // escape). That masked a `org.reso.metadata.Typo` — a dangling reference to THIS schema's own namespace — as if
-  // it were external. `isUnresolvedLocalType` now resolves same-namespace (and bare) references while still leaving
+  // it were external. `isDanglingReference` now resolves same-namespace (and bare) references while still leaving
   // genuinely external (different-namespace) names unresolved, so real cross-namespace metadata never false-errors.
 
   it('A11: a navigation target qualified with this schema’s namespace but undeclared → ERROR (previously masked)', () => {
@@ -669,22 +670,129 @@ describe('validateCsdl', () => {
     expect(result.errors.some(e => e.message.includes('Ghost') && e.message.includes('entity type'))).toBe(true);
   });
 
-  it('A11: a property type in the enums sub-namespace (external to this schema) is left unresolved — mirrors real RESO metadata', () => {
-    const schema: CsdlSchema = {
-      ...validSchema,
-      entityTypes: [
-        {
-          name: 'Property',
-          key: ['ListingKey'],
-          properties: [
-            { name: 'ListingKey', type: 'Edm.String' },
-            { name: 'Status', type: 'org.reso.metadata.enums.StandardStatus' } // different namespace → external → escaped
-          ],
-          navigationProperties: []
-        }
-      ]
-    };
-    const result = validateCsdl(schema);
-    expect(result.valid).toBe(true);
+  // --- A11b: enum sub-namespace resolution (the org.reso.metadata / .enums split) ---
+  // Real RESO metadata declares enums in their OWN namespace (org.reso.metadata.enums), a sibling
+  // <Schema> in the same EDMX. The validator resolves references into any namespace the schema
+  // actually declares a type in — positively confirming valid enum properties and catching dangling
+  // ones — while still leaving genuinely external (undeclared) namespaces unresolved.
+  const ENUMS_NS = 'org.reso.metadata.enums';
+  const withSplitEnum = (statusType: string): CsdlSchema => ({
+    ...validSchema,
+    entityTypes: [
+      {
+        name: 'Property',
+        key: ['ListingKey'],
+        properties: [
+          { name: 'ListingKey', type: 'Edm.String' },
+          { name: 'Status', type: statusType }
+        ],
+        navigationProperties: []
+      }
+    ],
+    enumTypes: [
+      { name: 'StandardStatus', namespace: ENUMS_NS, members: [{ name: 'Active', value: '0' }, { name: 'Pending', value: '1' }] }
+    ]
+  });
+
+  it('A11b: a property typed as an enum DECLARED in the split enums namespace resolves cleanly (positively resolved, not merely escaped)', () => {
+    expect(validateCsdl(withSplitEnum(`${ENUMS_NS}.StandardStatus`)).valid).toBe(true);
+  });
+
+  it('A11b: a dangling reference into the DECLARED enums namespace → ERROR (previously masked as external)', () => {
+    // The schema declares org.reso.metadata.enums.StandardStatus, so that namespace is local; a typo'd
+    // sibling is a dangling local reference, no longer waved through as "external".
+    const result = validateCsdl(withSplitEnum(`${ENUMS_NS}.StandrdStatus`));
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.message.includes('StandrdStatus'))).toBe(true);
+  });
+
+  it('A11b: a reference into a namespace the schema declares NOTHING in stays external — no false error (resolution is provider-derived)', () => {
+    expect(validateCsdl(withSplitEnum('com.vendor.ext.SomeEnum')).valid).toBe(true);
+  });
+
+  it('A11b: end-to-end — a split-namespace EDMX resolves its enum property through parseCsdlXml → validateCsdl', () => {
+    // Proves the seam: the parser captures each enum's own namespace and the validator resolves against it.
+    const edmx = `<?xml version="1.0" encoding="UTF-8"?>
+<edmx:Edmx Version="4.01" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:DataServices>
+    <Schema Namespace="org.reso.metadata" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityType Name="Property">
+        <Key><PropertyRef Name="ListingKey"/></Key>
+        <Property Name="ListingKey" Type="Edm.String"/>
+        <Property Name="StandardStatus" Type="org.reso.metadata.enums.StandardStatus"/>
+      </EntityType>
+      <EntityContainer Name="Default">
+        <EntitySet Name="Property" EntityType="org.reso.metadata.Property"/>
+      </EntityContainer>
+    </Schema>
+    <Schema Namespace="org.reso.metadata.enums" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EnumType Name="StandardStatus" UnderlyingType="Edm.Int32">
+        <Member Name="Active" Value="0"/>
+        <Member Name="Pending" Value="1"/>
+      </EnumType>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>`;
+    expect(validateCsdl(parseCsdlXml(edmx), '4.01').valid).toBe(true);
+    // A typo in the enum reference is now caught end-to-end (was masked as external before the union).
+    const typo = validateCsdl(parseCsdlXml(edmx.replace('org.reso.metadata.enums.StandardStatus', 'org.reso.metadata.enums.Typo')), '4.01');
+    expect(typo.valid).toBe(false);
+    expect(typo.errors.some(e => e.message.includes('Typo'))).toBe(true);
+  });
+
+  // --- A11c: cross-type namespace resolution (regression guard for the adversarial false-fail) ---
+  // A non-primary namespace may declare an ENTITY or COMPLEX type — not only enums — that other schemas
+  // reference by its true FQDN. Because every declared type (not just enums) is registered under its own
+  // namespace, such a reference RESOLVES instead of false-failing; a typo'd sibling in that same declared
+  // namespace still errors. Both cases run through parseCsdlXml → validateCsdl to prove the parser stamps
+  // the namespace onto entity/complex types and the validator resolves against it.
+
+  it('A11c: a complex type declared in the enums namespace, referenced by a property, resolves (no false-fail)', () => {
+    const edmx = `<?xml version="1.0" encoding="UTF-8"?>
+<edmx:Edmx Version="4.01" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:DataServices>
+    <Schema Namespace="org.reso.metadata" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityType Name="Property">
+        <Key><PropertyRef Name="ListingKey"/></Key>
+        <Property Name="ListingKey" Type="Edm.String"/>
+        <Property Name="Box" Type="org.reso.metadata.enums.GeoBox"/>
+      </EntityType>
+      <EntityContainer Name="Default"><EntitySet Name="Property" EntityType="org.reso.metadata.Property"/></EntityContainer>
+    </Schema>
+    <Schema Namespace="org.reso.metadata.enums" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EnumType Name="StandardStatus" UnderlyingType="Edm.Int32"><Member Name="Active" Value="0"/></EnumType>
+      <ComplexType Name="GeoBox"><Property Name="North" Type="Edm.Double"/></ComplexType>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>`;
+    expect(validateCsdl(parseCsdlXml(edmx), '4.01').valid).toBe(true);
+    const typo = validateCsdl(parseCsdlXml(edmx.replace('enums.GeoBox"', 'enums.GeoBoxTypo"')), '4.01');
+    expect(typo.valid).toBe(false);
+    expect(typo.errors.some(e => e.message.includes('GeoBoxTypo'))).toBe(true);
+  });
+
+  it('A11c: an entity type co-located with an enum in a non-primary namespace, referenced by nav + entity-set, resolves', () => {
+    const edmx = `<?xml version="1.0" encoding="UTF-8"?>
+<edmx:Edmx Version="4.01" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:DataServices>
+    <Schema Namespace="org.reso.metadata" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityType Name="Property">
+        <Key><PropertyRef Name="ListingKey"/></Key>
+        <Property Name="ListingKey" Type="Edm.String"/>
+        <Property Name="LocalStatus" Type="com.vendor.local.LocalStatus"/>
+        <NavigationProperty Name="LocalThings" Type="Collection(com.vendor.local.LocalResource)"/>
+      </EntityType>
+      <EntityContainer Name="Default">
+        <EntitySet Name="Property" EntityType="org.reso.metadata.Property"/>
+        <EntitySet Name="LocalResources" EntityType="com.vendor.local.LocalResource"/>
+      </EntityContainer>
+    </Schema>
+    <Schema Namespace="com.vendor.local" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EnumType Name="LocalStatus" UnderlyingType="Edm.Int32"><Member Name="X" Value="0"/></EnumType>
+      <EntityType Name="LocalResource"><Key><PropertyRef Name="Id"/></Key><Property Name="Id" Type="Edm.String"/></EntityType>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>`;
+    expect(validateCsdl(parseCsdlXml(edmx), '4.01').valid).toBe(true);
   });
 });

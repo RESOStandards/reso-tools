@@ -232,9 +232,12 @@ const parseEntityTypes = (rawEntityTypes: ReadonlyArray<Record<string, unknown>>
 
     const rawProperties = (rawEntity.Property as ReadonlyArray<Record<string, unknown>>) ?? [];
     const rawNavProperties = (rawEntity.NavigationProperty as ReadonlyArray<Record<string, unknown>>) ?? [];
+    // The declaring schema's namespace (injected at flatMap time) — forms this type's FQDN.
+    const namespace = rawEntity.__schemaNamespace as string | undefined;
 
     return {
       name,
+      ...(namespace !== undefined && { namespace }),
       key,
       properties: parseProperties(rawProperties, aliasMap),
       navigationProperties: parseNavigationProperties(rawNavProperties, aliasMap),
@@ -259,9 +262,12 @@ const parseComplexTypes = (rawComplexTypes: ReadonlyArray<Record<string, unknown
 
     const rawProperties = (rawComplex.Property as ReadonlyArray<Record<string, unknown>>) ?? [];
     const rawNavProperties = (rawComplex.NavigationProperty as ReadonlyArray<Record<string, unknown>>) ?? [];
+    // The declaring schema's namespace (injected at flatMap time) — forms this type's FQDN.
+    const namespace = rawComplex.__schemaNamespace as string | undefined;
 
     return {
       name,
+      ...(namespace !== undefined && { namespace }),
       properties: parseProperties(rawProperties, aliasMap),
       navigationProperties: parseNavigationProperties(rawNavProperties, aliasMap),
       ...(rawComplex['@_BaseType'] !== undefined && {
@@ -469,12 +475,18 @@ export const parseCsdlXml = (xml: string): CsdlSchema => {
       .map(s => [s['@_Alias'] as string, s['@_Namespace'] as string])
   );
 
-  // Merge elements from all schemas
-  const rawEntityTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.EntityType as ReadonlyArray<Record<string, unknown>>) ?? []);
+  // Merge elements from all schemas. Each type carries the namespace of the schema it was declared in
+  // (multi-schema EDMX splits types across namespaces — e.g. entities in org.reso.metadata, enums in
+  // org.reso.metadata.enums); the injected __schemaNamespace forms each type's FQDN downstream.
+  const rawEntityTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s =>
+    ((s.EntityType as ReadonlyArray<Record<string, unknown>>) ?? []).map(e => ({ ...e, __schemaNamespace: s['@_Namespace'] }))
+  );
   const rawEnumTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s =>
     ((s.EnumType as ReadonlyArray<Record<string, unknown>>) ?? []).map(e => ({ ...e, __schemaNamespace: s['@_Namespace'] }))
   );
-  const rawComplexTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.ComplexType as ReadonlyArray<Record<string, unknown>>) ?? []);
+  const rawComplexTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s =>
+    ((s.ComplexType as ReadonlyArray<Record<string, unknown>>) ?? []).map(e => ({ ...e, __schemaNamespace: s['@_Namespace'] }))
+  );
   const rawActions: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.Action as ReadonlyArray<Record<string, unknown>>) ?? []);
   const rawFunctions: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.Function as ReadonlyArray<Record<string, unknown>>) ?? []);
   // EntityContainer is typically in one schema — find it
