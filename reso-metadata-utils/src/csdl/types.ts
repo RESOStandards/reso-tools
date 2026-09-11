@@ -48,6 +48,11 @@ export interface CsdlNavigationProperty {
 /** An entity type definition. */
 export interface CsdlEntityType {
   readonly name: string;
+  /**
+   * The namespace the entity type was declared in. Multi-schema EDMX can split types across
+   * namespaces; this forms the type's full FQDN for reference resolution (mirrors CsdlEnumType).
+   */
+  readonly namespace?: string;
   readonly key: ReadonlyArray<string>;
   readonly properties: ReadonlyArray<CsdlProperty>;
   readonly navigationProperties: ReadonlyArray<CsdlNavigationProperty>;
@@ -64,6 +69,11 @@ export interface CsdlEntityType {
 /** A complex type definition (structured type without a key). */
 export interface CsdlComplexType {
   readonly name: string;
+  /**
+   * The namespace the complex type was declared in. Multi-schema EDMX can split types across
+   * namespaces; this forms the type's full FQDN for reference resolution (mirrors CsdlEnumType).
+   */
+  readonly namespace?: string;
   readonly baseType?: string;
   readonly abstract?: boolean;
   readonly openType?: boolean;
