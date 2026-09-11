@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { AuthConfig } from '../test-runner/types.js';
 import type { AddEditConfig, EntityEventConfig, CoreConfig, DDConfig } from './types.js';
+import { coerceCoreVersion } from './core-versions.js';
 import { coerceDDVersion } from './dd-versions.js';
 
 // ── Config File Types ──
@@ -210,7 +211,7 @@ export const configEntryToCore = (entry: ConfigEntry, providerUoi: string): Core
     url: entry.serviceRootUri,
     auth: resolveAuthFromEntry(entry),
   },
-  version: (entry.version as '2.0.0' | '2.1.0') ?? '2.0.0',
+  version: coerceCoreVersion(entry.version),
   ...(entry.originatingSystemName ? { originatingSystemName: entry.originatingSystemName } : {}),
   ...(entry.originatingSystemId ? { originatingSystemId: entry.originatingSystemId } : {}),
   options: {

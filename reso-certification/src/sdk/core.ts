@@ -13,6 +13,7 @@ import { runCoreResourceScenarios, runProviderScenarios, summarizeScenarios, typ
 import { resolveNoRecordsOutcome, resolveServingDecision } from '../web-api-core/serving.js';
 import { createExpandSchemaValidator, isEnumerationIgnored, loadValidationConfig } from './expand-schema.js';
 import { FETCH_METADATA, RUN_CORE_SCENARIOS } from './step-names.js';
+import { coerceCoreVersion, isCore21OrLater } from './core-versions.js';
 import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import { isDeadlineError, runSettled } from '@reso-standards/reso-client';
 import { createCertSession, createSessionRequester, type ODataRequester } from '../test-runner/requester.js';
@@ -305,7 +306,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         return undefined;
       }
     };
-    const expandValidator = version === '2.1.0' ? await buildExpandValidator() : undefined;
+    const expandValidator = isCore21OrLater(version) ? await buildExpandValidator() : undefined;
 
     // Provider-wide structural pass — run ONCE for the whole provider, BEFORE the per-resource gate, so the
     // metadata + service-document scenarios are always recorded even if every resource ends up masked. The
@@ -551,7 +552,7 @@ const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> =
     // outputPath is prepped (built + archived + mkdir'd) by
     // runCoreCompliance before the pipeline starts so the fetch step
     // can persist metadata.xml. Reuse it here instead of rebuilding.
-    const generators = coreReportGenerators(config.version ?? '2.0.0');
+    const generators = coreReportGenerators(coerceCoreVersion(config.version));
 
     const resourceReports = ctx.resourceReports as ReadonlyArray<ResourceTestReport> ?? [];
     const totalFailed = resourceReports.reduce((sum, r) => sum + r.summary.failed, 0);
@@ -608,13 +609,20 @@ export const runCoreCompliance = async (
   config: CoreConfig,
   onProgress?: (progress: import('./types.js').StepProgress) => void,
 ) => {
-  const pipeline = createCorePipeline(config);
-  const resources = config.resources ?? WELL_KNOWN_RESOURCES.map(r => r.resource);
-  const outputPath = await prepareOutputDir('web-api-core', config.version ?? '2.0.0', config);
+  // Normalize the Core version to its canonical CoreVersion at the SDK boundary. Config sources hand it over as
+  // "2.1" as often as "2.1.0", and EVERY version gate downstream (the $expand validator, the serving carve-outs,
+  // scenario selection) plus the output-dir path and the report's version stamp read from this one value. A bare
+  // cast previously let "2.1" through, silently disabling the 2.1.0 gates. coerceCoreVersion is idempotent, so a
+  // caller that already passed a canonical version is unaffected. See core-versions.ts.
+  const version = coerceCoreVersion(config.version);
+  const normalizedConfig: CoreConfig = { ...config, version };
+  const pipeline = createCorePipeline(normalizedConfig);
+  const resources = normalizedConfig.resources ?? WELL_KNOWN_RESOURCES.map(r => r.resource);
+  const outputPath = await prepareOutputDir('web-api-core', version, normalizedConfig);
   const initialContext: CoreContext = {
-    serverUrl: config.server.url,
-    version: config.version ?? '2.0.0',
-    enumMode: config.enumMode ?? 'auto',
+    serverUrl: normalizedConfig.server.url,
+    version,
+    enumMode: normalizedConfig.enumMode ?? 'auto',
     resources,
     outputPath,
   };
