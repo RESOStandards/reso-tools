@@ -674,19 +674,36 @@ export const getFieldsForResource = (schema: CsdlSchema, resourceName: string): 
 
 /**
  * Extract field metadata for all resources in a schema.
- * Returns a record keyed by entity set name.
+ *
+ * Served resources (backed by an EntitySet) are keyed by their EntitySet name. Declared EntityTypes with NO
+ * EntitySet — e.g. a containment-navigation (`ContainsTarget="true"`) target such as a contained Media
+ * collection — are legal OData entities and valid `$expand` targets, so their fields are emitted too, keyed by
+ * type name (which is how a qualified `Collection(Ns.Type)` reference resolves downstream). Without them, JSON
+ * schema generation emits a `$ref` to a definition that was never built. A type already surfaced by an
+ * EntitySet is not repeated.
  */
 export const getAllFields = (schema: CsdlSchema): Readonly<Record<string, ReadonlyArray<FieldInfo>>> => {
   if (!schema.entityContainer) return {};
 
   const entityTypeMap = new Map(schema.entityTypes.map(et => [et.name, et]));
 
-  return Object.fromEntries(
-    schema.entityContainer.entitySets.map(es => {
-      const typeName = extractTypeName(es.entityType);
-      const entityType = entityTypeMap.get(typeName);
-      if (!entityType) return [es.name, []];
-      return [es.name, getFieldsForEntityType(schema, entityType, es.name)];
-    })
-  );
+  // Served resources: one entry per EntitySet, keyed by the EntitySet name (the queryable resource name).
+  const servedEntries = schema.entityContainer.entitySets.map(es => {
+    const entityType = entityTypeMap.get(extractTypeName(es.entityType));
+    return [es.name, entityType ? getFieldsForEntityType(schema, entityType, es.name) : []] as const;
+  });
+
+  // Every declared EntityType ALSO keyed by its TYPE name, so a type-qualified reference — `Collection(Ns.Type)`
+  // on a nav, which downstream JSON-Schema generation resolves as `#/definitions/{TypeName}` — always finds a
+  // definition. This covers both containment-nav targets that have no EntitySet AND served types whose EntitySet
+  // name differs from the type name (either would otherwise dangle). Dedup against the served ENTRY KEYS
+  // (EntitySet names), NOT against type names: keying entries by type name while deduping by type name is what
+  // let a contained type silently clobber an unrelated served resource. For conformant RESO metadata (EntitySet
+  // name == type name) a served type is already keyed under that name, so it is simply skipped here — a no-op.
+  const servedKeys = new Set(servedEntries.map(([key]) => key));
+  const typeEntries = schema.entityTypes
+    .filter(et => !servedKeys.has(et.name))
+    .map(et => [et.name, getFieldsForEntityType(schema, et, et.name)] as const);
+
+  return Object.fromEntries([...servedEntries, ...typeEntries]);
 };

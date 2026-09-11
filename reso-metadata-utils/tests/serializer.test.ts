@@ -157,3 +157,48 @@ describe('error handling', () => {
     expect(() => serializeMetadataReport(schema, '2.0')).toThrow('EntityContainer');
   });
 });
+
+// A resource whose collection nav is a containment navigation (ContainsTarget="true") targets a CONTAINED
+// entity type: it is legally declared as an EntityType but has NO top-level EntitySet (it is addressed
+// through the parent's nav path). Such a type is still a valid $expand target, so its fields MUST appear in
+// the report — otherwise downstream JSON-Schema generation emits a $ref to a definition that was never built.
+// Mirrors the real-world shape (a Property with a contained Media collection) with no vendor data.
+const containedEntityEdmx = `<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:DataServices>
+    <Schema Namespace="org.reso.metadata" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityType Name="Property">
+        <Key><PropertyRef Name="ListingKey"/></Key>
+        <Property Name="ListingKey" Type="Edm.String" Nullable="false"/>
+        <NavigationProperty Name="Media" Type="Collection(org.reso.metadata.Media)" ContainsTarget="true"/>
+      </EntityType>
+      <EntityType Name="Media">
+        <Key><PropertyRef Name="MediaKey"/></Key>
+        <Property Name="MediaKey" Type="Edm.String" Nullable="false"/>
+        <Property Name="MediaURL" Type="Edm.String" Nullable="true"/>
+      </EntityType>
+      <EntityContainer Name="Default">
+        <EntitySet Name="Property" EntityType="org.reso.metadata.Property"/>
+      </EntityContainer>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>`;
+
+describe('serializeMetadataReport — contained (ContainsTarget) entity types', () => {
+  const report = serializeMetadataReport(parseCsdlXml(containedEntityEdmx), '2.0');
+
+  it('keeps resources scoped to served EntitySets (a contained type is not a top-level resource)', () => {
+    // resources[] is legitimately the served set — a contained type must NOT show up here.
+    expect(report.resources.map(r => r.resourceName)).toEqual(['Property']);
+  });
+
+  it('includes fields for a declared-but-unhosted contained EntityType (Media)', () => {
+    const mediaFields = report.fields.filter(f => f.resourceName === 'Media');
+    expect(mediaFields.map(f => f.fieldName).sort()).toEqual(['MediaKey', 'MediaURL']);
+  });
+
+  it("still records Property's containment nav as an expansion field", () => {
+    const nav = report.fields.find(f => f.resourceName === 'Property' && f.fieldName === 'Media');
+    expect(nav?.isExpansion).toBe(true);
+  });
+});
