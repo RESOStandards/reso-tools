@@ -16,6 +16,7 @@
  */
 
 import type { EntityType, ParsedEntitySet } from '../test-runner/types.js';
+import { isCore21OrLater } from '../sdk/core-versions.js';
 import { REQUIRED_RESOURCES_V21, WELL_KNOWN_RESOURCES } from './sampling.js';
 
 /** Whether a resource is PRESENT / ABSENT in a served-top-level surface, or the surface is INDETERMINATE. */
@@ -106,7 +107,7 @@ export const resolveServingDecision = (args: {
   const { resource, entityType, version, servedEntitySets, declaredEntitySets } = args;
 
   // The carve-out is gated to Core 2.1.0+; 2.0.0 behaves exactly as written today (declared ⇒ assumed served).
-  if (version === '2.0.0') return 'run';
+  if (!isCore21OrLater(version)) return 'run';
   // Only recognized (well-known / required) resources are eligible to be masked.
   if (!MASKABLE_RESOURCES.has(resource)) return 'run';
 
@@ -141,6 +142,6 @@ export const resolveNoRecordsOutcome = (
   version: '2.0.0' | '2.1.0',
   hasTopLevelRecords: boolean,
 ): ServingDecision => {
-  if (hasTopLevelRecords || version === '2.0.0') return 'run';
+  if (hasTopLevelRecords || !isCore21OrLater(version)) return 'run';
   return REQUIRED_RESOURCES_V21.includes(resource) ? 'fail' : 'na';
 };
