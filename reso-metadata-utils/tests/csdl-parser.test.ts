@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { discoverResources, getEntityType, getEnumType, parseCsdlXml } from '../src/csdl/parser.js';
+import { discoverResources, getAllFields, getEntityType, getEnumType, parseCsdlXml } from '../src/csdl/parser.js';
 
 // Minimal EDMX for unit tests (includes NavigationProperty)
 const minimalEdmx = `<?xml version="1.0" encoding="utf-8"?>
@@ -623,5 +623,83 @@ describe('parseCsdlXml — sample-metadata.xml compatibility', () => {
     expect(property).toBeDefined();
     expect(property?.key.length).toBeGreaterThan(0);
     expect(property?.properties.length).toBeGreaterThan(0);
+  });
+});
+
+describe('getAllFields — contained (ContainsTarget) entity types', () => {
+  // Property has a containment nav (ContainsTarget="true") to Media, which is declared as an EntityType but
+  // has NO EntitySet — a legal OData contained entity and a valid $expand target. getAllFields must emit its
+  // fields (keyed by type name) so downstream schema generation can define/validate it; otherwise a
+  // Collection(Media) $ref dangles against a missing definition.
+  const containedEntityEdmx = `<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:DataServices>
+    <Schema Namespace="org.reso.metadata" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityType Name="Property">
+        <Key><PropertyRef Name="ListingKey"/></Key>
+        <Property Name="ListingKey" Type="Edm.String" Nullable="false"/>
+        <NavigationProperty Name="Media" Type="Collection(org.reso.metadata.Media)" ContainsTarget="true"/>
+      </EntityType>
+      <EntityType Name="Media">
+        <Key><PropertyRef Name="MediaKey"/></Key>
+        <Property Name="MediaKey" Type="Edm.String" Nullable="false"/>
+        <Property Name="MediaURL" Type="Edm.String" Nullable="true"/>
+      </EntityType>
+      <EntityContainer Name="Default">
+        <EntitySet Name="Property" EntityType="org.reso.metadata.Property"/>
+      </EntityContainer>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>`;
+
+  it('emits fields for a declared EntityType with no EntitySet (keyed by type name)', () => {
+    const all = getAllFields(parseCsdlXml(containedEntityEdmx));
+    expect(Object.keys(all)).toContain('Media');
+    expect(all.Media?.map(f => f.fieldName).sort()).toEqual(['MediaKey', 'MediaURL']);
+  });
+
+  it('still emits the served EntitySet-backed resource', () => {
+    const all = getAllFields(parseCsdlXml(containedEntityEdmx));
+    expect(Object.keys(all)).toContain('Property');
+  });
+});
+
+describe('getAllFields — EntitySet name ≠ type name (key-space alignment)', () => {
+  // EntitySet "Listings" is backed by EntityType "Property" (set name ≠ type name), and a SEPARATE EntityType
+  // "Listings" is declared with no EntitySet — its name collides with the set name. Downstream $refs are keyed
+  // by TYPE name, so the served type must also be reachable by type name (else a `#/definitions/Property` ref
+  // dangles), and the unrelated contained type must never clobber the served resource.
+  const skewedEdmx = `<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:DataServices>
+    <Schema Namespace="org.reso.metadata" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityType Name="Property">
+        <Key><PropertyRef Name="ListingKey"/></Key>
+        <Property Name="ListingKey" Type="Edm.String" Nullable="false"/>
+      </EntityType>
+      <EntityType Name="Listings">
+        <Key><PropertyRef Name="ListingsKey"/></Key>
+        <Property Name="ListingsKey" Type="Edm.String" Nullable="false"/>
+      </EntityType>
+      <EntityContainer Name="Default">
+        <EntitySet Name="Listings" EntityType="org.reso.metadata.Property"/>
+      </EntityContainer>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>`;
+
+  it('emits the served type under its TYPE name too, so a type-qualified $ref resolves (closes the dangling-ref gap)', () => {
+    const all = getAllFields(parseCsdlXml(skewedEdmx));
+    expect(Object.keys(all)).toContain('Listings'); // the served EntitySet key
+    expect(Object.keys(all)).toContain('Property');  // ...and the backing type, keyed by type name
+    expect(all.Property?.map(f => f.fieldName)).toContain('ListingKey');
+  });
+
+  it('never lets a same-named contained type clobber the served resource', () => {
+    const all = getAllFields(parseCsdlXml(skewedEdmx));
+    // The "Listings" entry is the SERVED resource (backed by Property → ListingKey), not the unrelated
+    // contained "Listings" type (which would carry ListingsKey). The served fields survive.
+    expect(all.Listings?.map(f => f.fieldName)).toContain('ListingKey');
+    expect(all.Listings?.map(f => f.fieldName)).not.toContain('ListingsKey');
   });
 });
