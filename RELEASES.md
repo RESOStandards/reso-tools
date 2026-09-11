@@ -2,6 +2,25 @@
 
 ---
 
+## Web API Core 2.1.0 — `$expand` data-validation + version normalization (desktop v1.0.0-beta.12) – 2026-09-11
+
+A coordinated patch across `reso-metadata-utils` (0.1.1 → 0.1.2) and `reso-certification` (0.10.5 → 0.10.6), shipped in desktop **v1.0.0-beta.12**. Consumers on `^0.1.0` / `^0.10.0` pick these up automatically. Three separate bugs let Web API Core 2.1.0 `$expand` per-item schema validation silently skip in real (desktop / config-mode) runs; this closes all three and tightens the `$expand` gate.
+
+### `reso-metadata-utils` 0.1.2 – declared EntityTypes in the metadata report
+
+- **Contained / expansion-only types are no longer dropped.** `getAllFields` keyed the report off the entity container's EntitySets, so a declared EntityType with no EntitySet — an OData containment-navigation target (`ContainsTarget="true"`, e.g. a contained `Media` collection) — was omitted. Downstream JSON-Schema generation then emitted a `$ref` to a definition that was never built, ajv failed to compile, and the whole `$expand` validator degraded to a 200-only gate, so schema-invalid expanded data went uncaught (a false-pass). Every declared EntityType is now emitted, keyed by type name so a `Collection(Ns.Type)` reference always resolves; deduped against the served entry keys so a contained type can never clobber a served resource. No-op for conformant RESO metadata (EntitySet name == type name).
+
+### `reso-certification` 0.10.6 – `$expand` gating + Core version normalization
+
+- **Config-mode version normalization.** Config sources supply the Core version as `"2.1"` (two-part) while the gates compared against the literal `"2.1.0"`; a bare cast let `"2.1"` through, so the `$expand` schema-validator gate read false in config-file mode — the data-validation half never ran on desktop / config-mode runs (a false-pass). Versions are normalized once at the SDK boundary (`coerceCoreVersion`), and an unknown/newer version clamps **up** to the current minor rather than down to the oldest baseline.
+- **The `$expand` gate enforces the data.** A present expansion must be a Collection of the target EntityType (a JSON array of entity objects; a malformed 200 envelope fails). Non-2xx (403/501) skips — expansion is optional, and not-accessible ≠ non-conformant. A collection navigation-property-path returning 204 fails: a collection returns 200 with an empty result set, never 204 (OData §11.2.7 / web-api-core §2.5.10.2, §2.6.1).
+- **`$expand` and the navigation-property-path form must be data-consistent (OData §11.2.7).** Both resolve the same relationship on the same entity, so they must agree on whether related entities exist; a records↔empty disagreement is a determinate fail. Both legs treat an empty page + `@odata.nextLink` as has-records, so server-driven paging never false-fails.
+- **`$select` may return additional fields** (OData 4.01 §11.2.5.1 — a service may return more than requested): the prior extra-field warning is dropped.
+
+**Tests:** Full monorepo suite now 2,181 passing across 8 packages.
+
+---
+
 ## reso-certification 0.10.5 – 2026-09-02
 
 A published-package patch to `reso-certification` – no monorepo release. Consumers on `^0.10.0` pick it up automatically; behavior-preserving for the CLI and cert-backend (no test-count change), and no other package changed.
