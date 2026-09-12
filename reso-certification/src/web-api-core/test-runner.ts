@@ -13,7 +13,7 @@ import type { TestParams } from './sampling.js';
 import type { EnumCandidate } from './enum-selection.js';
 import { buildStandardMap, type StandardMap } from './standard-map.js';
 import { createLookupCache, type LookupCache } from './lookup-cache.js';
-import { buildLookupUrl, buildScenarioQuery, recordDerivedSet } from './queries.js';
+import { buildLookupUrl, buildScenarioQuery, recordDerivedSet, originatingSystemFilterClause } from './queries.js';
 import { emptyVerdict, type EmptyContext, type EmptyVerdict } from './empty-verdict.js';
 import { scenariosForVersion, type ComparisonOp, type CoreScenario, type ExpandScenario } from './scenarios.js';
 import { parseServiceDocument } from './serving.js';
@@ -1444,7 +1444,21 @@ export const runStructuralScenario = async (
   return { tag, name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestUrl: query.url, odataVersion, ...(warnings.length > 0 ? { warnings } : {}) };
 };
 
-/** Run server-driven paging scenario (v2.1.0). */
+// Server-driven-paging walk (Check B) knobs. Page size is REQUESTED via Prefer: odata.maxpagesize — a SHOULD,
+// not a MUST (web-api-core.md:699 "Servers MAY respond with a page size different than the one requested";
+// OData 4.01 server-driven paging), so the walk never fails a server for the page size it returns. The $top
+// bound IS hard (OData 4.01 §11.2.6.3 "up to but not greater than n"): the walk bounds itself so it reaches an
+// end to check termination, and a server that pages past the bound is a $top over-run. $top is kept modest (500,
+// paged at 100 → ~5 pages) so it sits under providers' own $top caps: a provider SHOULD cap-and-return an
+// over-large $top (indicating Preference-Applied), NOT 400 — informing a provider that 400s on $top is tracked
+// separately. The page cap protects against a server that ignores maxpagesize and drips small pages.
+const PAGING_WALK_MAX_PAGE_SIZE = 100;
+const PAGING_WALK_PREFER_HEADER: Readonly<Record<string, string>> = { Prefer: `odata.maxpagesize=${PAGING_WALK_MAX_PAGE_SIZE}` };
+const PAGING_WALK_TOP_BOUND = 500;
+const PAGING_WALK_MAX_PAGES = 25;
+
+/** Run server-driven paging scenario (v2.1.0). `walkBound` (default {@link PAGING_WALK_TOP_BOUND}) is the `$top`
+ *  cap on the Check-B walk — a test seam so the $top over-run path can be exercised without 2000 rows. */
 export const runPagingScenario = async (
   serverUrl: string,
   resource: string,
@@ -1452,73 +1466,99 @@ export const runPagingScenario = async (
   authToken: string,
   start: number,
   requester: ODataRequester = webRequester,
+  walkBound = PAGING_WALK_TOP_BOUND,
 ): Promise<ScenarioResult> => {
   const assertions: AssertionResult[] = [];
-  // Initial paging URL — kept in scope outside the try/while so the
-  // returned ScenarioResult can surface it in the failure report.
-  const initialUrl = `${serverUrl}/${resource}?$top=2&$select=${params.keyField}`;
+  // The report surfaces whichever request FAILED: a `$top=1` failure must show the `$top=1` GET, not the walk.
+  const topOneUrl = `${serverUrl}/${resource}?$top=1&$select=${params.keyField}`; // the normative $top=1 check
 
   // A `$top=1` request MUST NOT return an `@odata.nextLink`: the single requested record is the complete
   // response to THAT request, so a continuation would return records beyond `$top=1` (web-api-core.md:84;
   // §6 scenario-server-driven-paging MUST NOT; OData 4.01 §11.2.6.3 "up to but not greater than"). This is the
-  // single normatively-named Core paging criterion — kept separate from the nextLink walk below.
+  // single normatively-named Core paging criterion — kept separate from the nextLink walk below. Its assertions
+  // are collected locally so the report URL can point at THIS request when it is the one that failed.
+  const topOneAssertions: AssertionResult[] = [];
   try {
-    const topOneUrl = `${serverUrl}/${resource}?$top=1&$select=${params.keyField}`;
     const topOne = await requester.request({ method: 'GET', url: topOneUrl, authToken });
     if (topOne.status !== 200) {
-      assertions.push({ passed: false, message: `$top=1 request returned HTTP ${topOne.status} (expected 200)` });
+      topOneAssertions.push({ passed: false, message: `$top=1 request returned HTTP ${topOne.status} (expected 200)` });
     } else if (extractNextLink(topOne.body)) {
-      assertions.push({ passed: false, message: '$top=1 MUST NOT return an @odata.nextLink — the single requested record is the complete response to a $top=1 request; a continuation would exceed $top=1 (web-api-core.md Server-Driven Paging §2.5; OData 4.01 §11.2.6.3).' });
+      topOneAssertions.push({ passed: false, message: '$top=1 MUST NOT return an @odata.nextLink — the single requested record is the complete response to a $top=1 request; a continuation would exceed $top=1 (web-api-core.md Server-Driven Paging §2.5; OData 4.01 §11.2.6.3).' });
     } else {
-      assertions.push({ passed: true, message: '$top=1 returned no @odata.nextLink (correct — the single requested record is the complete set)' });
+      topOneAssertions.push({ passed: true, message: '$top=1 returned no @odata.nextLink (correct — the single requested record is the complete set)' });
     }
   } catch (err) {
     if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
-    assertions.push({ passed: false, message: `$top=1 request error: ${err instanceof Error ? err.message : String(err)}` });
+    topOneAssertions.push({ passed: false, message: `$top=1 request error: ${err instanceof Error ? err.message : String(err)}` });
   }
+  assertions.push(...topOneAssertions);
+  const topOneFailed = topOneAssertions.some(a => !a.passed);
 
-  try {
-    let url: string | undefined = initialUrl;
-    const allKeys = new Set<string>();
-    let pages = 0;
-    const maxPages = 20;
+  // Check B — the forward server-driven-paging walk (web-api-core.md:85/87). Prove the server actually pages a
+  // real result set via `@odata.nextLink` (not merely suppressing the nextLink on $top=1 to game Check A), that
+  // pages do not repeat records, and that it terminates without exceeding the `$top` bound. Uses the sampled
+  // timestamp field's MIN as the `gt` target (a large, always-returning set), OSN/OSID-scoped like every data
+  // query. Skipped when there is no timestamp field with ≥2 distinct sampled values (no returning filter to walk).
+  const tsField = params.timestampField;
+  const gtTarget = params.datetimeValue;
+  const canWalk = !!tsField && !!gtTarget && (params.datetimeDistinctCount ?? 0) >= 2;
+  const osnClause = originatingSystemFilterClause(params.originatingSystemName, params.originatingSystemId);
+  const walkFilter = osnClause ? `(${tsField} gt ${gtTarget}) and ${osnClause}` : `${tsField} gt ${gtTarget}`;
+  const walkUrl = canWalk
+    ? `${serverUrl}/${resource}?$filter=${encodeURIComponent(walkFilter)}&$orderby=${tsField}&$select=${params.keyField},${tsField}&$top=${walkBound}`
+    : undefined;
 
-    while (url && pages < maxPages) {
-      const response = await requester.request({ method: 'GET', url, authToken });
-      if (response.status !== 200) {
-        assertions.push({ passed: false, message: `Page ${pages + 1}: HTTP ${response.status}` });
-        break;
+  if (!walkUrl) {
+    assertions.push({ passed: true, message: 'Server-driven paging walk skipped — no timestamp field with ≥2 distinct sampled values to page through' });
+  } else {
+    const seen = new Set<string>();
+    let url: string | undefined = walkUrl;
+    let pages = 0, total = 0, dup = false, lastHadNext = false, brokePage = false;
+    try {
+      while (url && pages < PAGING_WALK_MAX_PAGES) {
+        const resp = await requester.request({ method: 'GET', url, authToken, headers: PAGING_WALK_PREFER_HEADER });
+        if (resp.status !== 200) {
+          assertions.push({ passed: false, message: `Server-driven paging walk page ${pages + 1}: HTTP ${resp.status} (expected 200)` });
+          brokePage = true;
+          break;
+        }
+        const records = extractRecords(resp.body);
+        for (const r of records) {
+          const k = String(r[params.keyField]);
+          if (seen.has(k)) dup = true;
+          seen.add(k);
+        }
+        total += records.length;
+        const rawNext = extractNextLink(resp.body);
+        lastHadNext = rawNext != null;
+        url = rawNext ? rebaseNextLink(rawNext, walkUrl) : undefined; // tolerate a proxy/wrong-host base URL
+        pages++;
+        if (total >= walkBound) break; // reached the $top bound — the check below decides pass vs over-run
       }
-
-      const records = extractRecords(response.body);
-      for (const r of records) allKeys.add(String(r[params.keyField]));
-
-      const rawNext = extractNextLink(response.body);
-      url = rawNext ? rebaseNextLink(rawNext, initialUrl) : undefined; // tolerate a proxy/wrong-host base URL
-      pages++;
+      if (!brokePage) {
+        if (dup) {
+          assertions.push({ passed: false, message: 'Server-driven paging: a record key repeated across pages — each page MUST return records not already seen on a previous page (web-api-core.md Server-Driven Paging).' });
+        } else if (total > walkBound || (total >= walkBound && lastHadNext)) {
+          assertions.push({ passed: false, message: `Server-driven paging: server returned ${total} records for $top=${walkBound}${lastHadNext ? ' and still offered an @odata.nextLink' : ''} — must be up to but not greater than $top (OData 4.01 §11.2.6.3).` });
+        } else if (pages > 1 && !lastHadNext) {
+          assertions.push({ passed: true, message: `Server-driven paging: ${pages} pages, ${seen.size} unique records, clean termination (no @odata.nextLink on the final page)` });
+        } else if (pages === 1 && !lastHadNext) {
+          assertions.push({ passed: true, message: `Server-driven paging: whole filtered set returned in one page (${seen.size} records), no @odata.nextLink — valid (page size is the server's choice)` });
+        } else if (pages >= PAGING_WALK_MAX_PAGES && lastHadNext) {
+          assertions.push({ passed: true, message: `Server-driven paging: ${pages} pages walked (page cap), ${seen.size} unique records, no overlap — paging works; the server did not honor the requested page size, so termination was not reached within the cap` });
+        }
+      }
+    } catch (err) {
+      if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
+      assertions.push({ passed: false, message: `Server-driven paging walk error: ${err instanceof Error ? err.message : String(err)}` });
     }
-
-    if (pages > 1) {
-      assertions.push({ passed: true, message: `Server-driven paging: ${pages} pages, ${allKeys.size} unique records` });
-    } else if (pages === 1 && !url) {
-      // Single page with no nextLink is valid — the server has fewer records
-      // than the page size, so there's nothing to paginate.
-      assertions.push({ passed: true, message: `Single page returned (${allKeys.size} records), no @odata.nextLink — valid` });
-    } else {
-      assertions.push({ passed: false, message: `Expected @odata.nextLink on page with $top=2 but none was returned (${allKeys.size} records across ${pages} pages)` });
-    }
-
-    // Final page should have no nextLink
-    if (pages > 1 && !url) {
-      assertions.push({ passed: true, message: 'Final page has no @odata.nextLink' });
-    }
-  } catch (err) {
-    if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
-    assertions.push({ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` });
   }
 
   const allPassed = assertions.every(a => a.passed);
-  return { tag: 'server-driven-paging', name: 'Server-driven paging', passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestUrl: initialUrl };
+  // Point the report at the request that failed: the $top=1 normative check when it failed, else the walk URL
+  // (also the URL shown when everything passes); fall back to $top=1 when the walk was skipped.
+  const requestUrl = topOneFailed ? topOneUrl : (walkUrl ?? topOneUrl);
+  return { tag: 'server-driven-paging', name: 'Server-driven paging', passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestUrl };
 };
 
 // ── Provider-wide pass ──
