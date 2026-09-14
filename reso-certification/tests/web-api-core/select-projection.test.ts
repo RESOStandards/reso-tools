@@ -40,20 +40,21 @@ describe('$select — multi-field projection built + the server must honor it', 
     const req = requesterReturning([{ ListingKey: '1', ModificationTimestamp: '2026-01-01T00:00:00Z' }]);
     const r = await runStructuralScenario('http://x', 'Property', 'select', q!, baseParams, 'tok', 0, req);
     expect(r.passed).toBe(true);
-    expect(r.assertions.some((a) => a.passed && a.message.includes('present: ModificationTimestamp'))).toBe(true);
+    expect(r.assertions.some((a) => a.passed && a.message.includes('projected fields present') && a.message.includes('ModificationTimestamp'))).toBe(true);
   });
 
-  it('WARNS (non-gating), does NOT fail, when a returned record carries a field OUTSIDE the $select list', async () => {
-    // A server that ignores $select returns every field, including ones never selected (e.g. ListPrice). The
-    // Commander (the oracle for this existing 2.0.0 element) never checks for fields outside the select list, so
-    // this must NOT newly fail a $select-ignoring server that passed the oracle — it rides the warning channel
-    // (observe-then-flip, like single-enum `ne`), pending WG sign-off.
+  it('PERMITS a field OUTSIDE the $select list — no fail, no warning (OData 4.01 §11.2.5.1 allows returning more)', async () => {
+    // OData 4.01 §11.2.5.1: $select "requests that the service return only the properties … and MAY return
+    // additional information." Returning fields beyond the select list is EXPLICITLY PERMITTED — not a defect and
+    // not even warning-worthy (which is also why the Commander, the oracle for this 2.0.0 element, never checked
+    // it). A $select-ignoring server that carries the projected field simply passes, no warning.
     const q = buildScenarioQuery('http://x', 'Property', selectScenario, baseParams);
     const req = requesterReturning([{ ListingKey: '1', ModificationTimestamp: '2026-01-01T00:00:00Z', ListPrice: 500000 }]);
     const r = await runStructuralScenario('http://x', 'Property', 'select', q!, baseParams, 'tok', 0, req);
-    expect(r.passed).toBe(true); // NON-gating — the beyond-oracle check never fails the provider
+    expect(r.passed).toBe(true);
     expect(r.assertions.every((a) => a.passed)).toBe(true);
-    expect(r.warnings?.some((w) => w.includes('ListPrice') && w.toLowerCase().includes('warning'))).toBe(true);
+    expect(r.warnings ?? []).toHaveLength(0); // the extra field is spec-permitted → NOT flagged at all
+    expect(r.assertions.some((a) => a.message.includes('projected fields present'))).toBe(true);
   });
 
   it('does NOT false-fail when the projected field is null/omitted (sparse field or null-omitting server)', async () => {

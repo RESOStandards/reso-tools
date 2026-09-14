@@ -13,7 +13,7 @@ import type { TestParams } from './sampling.js';
 import type { EnumCandidate } from './enum-selection.js';
 import { buildStandardMap, type StandardMap } from './standard-map.js';
 import { createLookupCache, type LookupCache } from './lookup-cache.js';
-import { buildLookupUrl, buildScenarioQuery, recordDerivedSet } from './queries.js';
+import { buildLookupUrl, buildScenarioQuery, recordDerivedSet, originatingSystemFilterClause } from './queries.js';
 import { emptyVerdict, type EmptyContext, type EmptyVerdict } from './empty-verdict.js';
 import { scenariosForVersion, type ComparisonOp, type CoreScenario, type ExpandScenario } from './scenarios.js';
 import { parseServiceDocument } from './serving.js';
@@ -428,11 +428,27 @@ const collectExpandedItems = (
   navName: string,
 ): ReadonlyArray<Record<string, unknown>> =>
   records.flatMap((record) => {
+    if (record == null || typeof record !== 'object') return []; // null-safe: a null/non-object parent yields nothing
     const expanded = record[navName];
     return Array.isArray(expanded)
       ? expanded.filter((x): x is Record<string, unknown> => x != null && typeof x === 'object')
       : [];
   });
+
+/** Shape-check a PRESENT expanded / navigation-property-path collection VALUE: it MUST be a JSON array (`[]` when
+ *  empty, else a Collection of entity objects). Returns an error phrase when malformed — not an array, or an array
+ *  carrying a non-entity element (null, a scalar, a nested array) — else null. The objects' SCHEMA validity is
+ *  checked separately (validateExpandedItems); this is the shape gate the "must be a Collection of the target
+ *  EntityType" rule needs, so a garbage collection (Media:[null], {value:null}) can't pass with zero validation. */
+const collectionShapeError = (value: unknown): string | null => {
+  if (!Array.isArray(value)) {
+    return `value is ${value === null ? 'null' : typeof value}, not a JSON array`;
+  }
+  const badIdx = value.findIndex((el) => el === null || typeof el !== 'object' || Array.isArray(el));
+  return badIdx === -1
+    ? null
+    : `element ${badIdx} is ${value[badIdx] === null ? 'null' : Array.isArray(value[badIdx]) ? 'an array' : typeof value[badIdx]}, not an entity object`;
+};
 
 /**
  * Schema-validate every expanded child item under ONE collection nav against its target entity type — the
@@ -468,7 +484,10 @@ export const validateExpandedItems = (
 /**
  * Execute the $expand test for ONE declared collection nav (Core 2.1.0, GATING). GET
  * {resource}?$expand={nav}&$top=5, then:
- *   - non-200 → FAIL (a declared nav that cannot be expanded — the parallel of declared-but-not-served);
+ *   - non-2xx → SKIP (expansion not available to this client, e.g. 403 — an access/permission boundary,
+ *     OData 4.01 §11.2.5 "not available … not returned"; NOT a Core failure);
+ *   - 200 with an explicit `null` collection value → FAIL (a collection-valued property is a JSON array,
+ *     empty at most, never null);
  *   - 200 → schema-validate every expanded child item against `nav.targetType`; a schema-invalid item FAILS;
  *   - a transport/parse error (no determinate server response) → SKIPPED + errored (indeterminate, NOT a
  *     failure) so a network blip can't false-fail a compliant server.
@@ -501,12 +520,54 @@ const runOneExpandNav = async (
     const response = await requester.request({ method: 'GET', url: query.url, authToken });
     const requestLatency = Date.now() - reqStart;
     const responseCheck = assertODataResponse(response, 200);
+    // Gate the SKIP on the STATUS, not on assertODataResponse. $expand is OPTIONAL (RESO Core: "providers who
+    // support expand"; OData Intermediate conformance does not require it), so a NON-2xx is the spec-conformant
+    // "not supported / not authorised / no data" decline (OData §9.3.1 501 Not Implemented; §11.2 unsupported
+    // option MUST-fail-and-SHOULD-501; §11.2.5 permissions) → SKIP and report the status, never a determinate
+    // FAIL. A 200 whose OData envelope is malformed (missing/invalid OData-Version, null body) ALSO fails
+    // responseCheck — but that is a served-but-broken response, which we DO fault (below).
+    if (response.status < 200 || response.status >= 300) {
+      return {
+        tag,
+        name,
+        passed: true,
+        skipped: true,
+        assertions: [{ passed: true, message: `$expand ${nav.name}: HTTP ${response.status} — expansion not supported / not accessible for this client (optional per RESO Core; OData §9.3.1/§11.2); skipped, status reported` }],
+        duration: Date.now() - start,
+        requestLatency,
+        requestUrl: query.url,
+      };
+    }
     assertions.push(responseCheck);
     if (!responseCheck.passed) {
-      // A declared collection nav that non-200s cannot be expanded → determinate FAIL.
+      // Status IS 200 but the OData envelope is malformed (missing/invalid OData-Version, null body) — a
+      // served-but-broken expansion response ("we saw it, tested it, it outright fails") → determinate FAIL.
       return { tag, name, passed: false, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url };
     }
-    const records = extractRecords(response.body);
+    // Null/non-object parent entries (a malformed `{value:[null]}` base collection) are filtered out once here so
+    // NO downstream access (`nav.name in r`, `r[keyField]`, collectExpandedItems) can throw on a null record — a
+    // served-but-broken parent list must never surface as an indeterminate transport-error skip.
+    const records = extractRecords(response.body).filter((r): r is Record<string, unknown> => r != null && typeof r === 'object');
+    // A 2xx expansion MUST return a JSON array — `[]` when empty, else a Collection of ${nav.targetType} entities
+    // (RESO Core). Shape-check every parent's PRESENT nav value: a non-array (null/object/scalar) OR an array
+    // carrying a non-entity element is malformed → determinate FAIL. (An ABSENT nav is left to pass — open Q with
+    // Josh: must a 2xx expand of an advertised nav carry it as `[]`?) Parent records are null-guarded.
+    const shapeErr = records
+      .filter((r): r is Record<string, unknown> => r != null && typeof r === 'object' && nav.name in r && r[nav.name] !== undefined)
+      .map((r) => collectionShapeError(r[nav.name]))
+      .find((e): e is string => e !== null);
+    if (shapeErr) {
+      return {
+        tag,
+        name,
+        passed: false,
+        skipped: false,
+        assertions: [...assertions, { passed: false, message: `$expand ${nav.name}: expanded collection ${shapeErr} — a 2xx expansion must return an array ([] when empty, else a Collection of ${nav.targetType}); OData 4.01 JSON Format collection representation` }],
+        duration: Date.now() - start,
+        requestLatency,
+        requestUrl: query.url,
+      };
+    }
     const warnings = expandRrkWarnings(records, scenario, navParams);
     if (!validator) {
       // The expanded-item schema validator could not be built for this run (the provider's metadata did not
@@ -533,29 +594,67 @@ const runOneExpandNav = async (
     // the (large) parent record (the key is already in the $expand response). Assert 200 + a schema-valid
     // collection of the nav target type. An empty $expand response yields no key → the leg can't run (no data,
     // not a failure).
-    const parentKey = records.map((r) => r[params.keyField]).find((k) => k != null);
-    if (parentKey == null) {
+    // Prefer a "witness" parent whose $expand response returned items, so the has-records leg of the dual is
+    // exercised on real data; fall back to the first parent with a key (drives the empty↔empty comparison).
+    const parentItemsOf = (r: Record<string, unknown>): ReadonlyArray<unknown> => {
+      const value = r[nav.name];
+      return Array.isArray(value) ? value.filter((x) => x != null && typeof x === 'object') : [];
+    };
+    const chosenParent =
+      records.find((r) => r[params.keyField] != null && parentItemsOf(r).length > 0) ??
+      records.find((r) => r[params.keyField] != null);
+    if (chosenParent == null) {
       assertions.push({ passed: true, message: `$expand ${nav.name}: no parent key in the $expand response — navigation-property-path leg not exercised (no data)` });
     } else {
+      const parentKey = chosenParent[params.keyField];
+      const expandItemCount = parentItemsOf(chosenParent).length;
+      // A paged inline expansion can return an empty page for this parent alongside a `{nav}@odata.nextLink`
+      // sibling — related entities exist, just not on this page — so count that as has-records too (OData JSON
+      // Format §4.5.5). The same tolerance is applied to the nav-path leg below; without it, an empty-first-page
+      // server would false-fail the has-records dual.
+      const expandHasRecords = expandItemCount > 0 || chosenParent[`${nav.name}@odata.nextLink`] != null;
       const navPathUrl = `${serverUrl}/${resource}('${encodeURIComponent(String(parentKey))}')/${nav.name}`;
       const navResp = await requester.request({ method: 'GET', url: navPathUrl, authToken });
       const navStatus = assertODataResponse(navResp, 200);
-      assertions.push(
-        navStatus.passed
-          ? { passed: true, message: `Navigation-property-path GET ${resource}('…')/${nav.name} → 200` }
-          : { passed: false, message: `Navigation-property-path GET ${resource}('…')/${nav.name} → HTTP ${navResp.status} (expected 200; a declared collection expansion MUST be reachable via its navigation-property path — web-api-core.md §2.5.10.2)` },
-      );
-      if (navStatus.passed) {
-        const navItems = extractRecords(navResp.body);
-        const invalid = navItems.flatMap((item, index) => {
-          const { valid, errors } = validator.validate(item, nav.targetType);
-          return valid ? [] : [{ index, errors }];
-        });
-        assertions.push(
-          invalid.length === 0
-            ? { passed: true, message: `Navigation-property-path ${nav.name}: ${navItems.length} item(s) valid against ${nav.targetType}` }
-            : { passed: false, message: `Navigation-property-path ${nav.name}: ${invalid.length}/${navItems.length} item(s) schema-invalid against ${nav.targetType} — item ${invalid[0].index}: ${invalid[0].errors.slice(0, 3).join('; ') || 'schema validation failed'}` },
-        );
+      if (navResp.status < 200 || navResp.status >= 300) {
+        // Non-2xx nav-property-path GET → the expansion isn't served here (not supported / not accessible / no
+        // data); $expand is optional → not faulted, status reported (same rule as the primary leg). This is a
+        // "can't access" boundary, not a records comparison.
+        assertions.push({ passed: true, message: `Navigation-property-path GET ${resource}('…')/${nav.name} → HTTP ${navResp.status} — not supported / not accessible for this client (OData §9.3.1/§11.2); not faulted, status reported` });
+      } else if (!navStatus.passed) {
+        // A 2xx that is not 200 (e.g. 204 No Content) is the wrong code for a COLLECTION navigation-property-path:
+        // OData §11.2.7 requires the collection of related entities, empty ONLY as a 200 empty result set — a
+        // collection is never represented as 204 (204 is for a null single-valued nav). Served-but-wrong → FAIL.
+        assertions.push({ passed: false, message: `Navigation-property-path GET ${resource}('…')/${nav.name} → HTTP 200 expected but got a malformed/wrong-code response (${navStatus.message}) — a collection navigation-property-path returns 200 with an empty result set when none, never 204 (OData §11.2.7; web-api-core.md §2.5.10.2/§2.6.1)` });
+      } else {
+        // The nav-path collection value MUST be a JSON array of entity objects too (same rule as the inline leg —
+        // symmetry: `{value:null}` / a non-array / an array of non-entities is malformed, not a vacuous pass).
+        const navShapeErr = collectionShapeError((navResp.body as Record<string, unknown> | null)?.value);
+        if (navShapeErr) {
+          assertions.push({ passed: false, message: `Navigation-property-path ${nav.name}: collection ${navShapeErr} — a collection navigation-property-path must return a JSON array of ${nav.targetType} entities (web-api-core.md §2.5.10.2)` });
+        } else {
+          const navItems = extractRecords(navResp.body);
+          const navHasRecords = navItems.length > 0 || extractNextLink(navResp.body) != null;
+          // Data-consistency of the dual (OData §11.2.7): `$expand=X` and `Resource('key')/X` resolve the SAME
+          // relationship on the SAME entity, so they MUST agree on whether related entities exist — a collection
+          // nav-path is empty ONLY when none are related. If the $expand returned items for this parent but the
+          // nav-path is empty (or vice versa), the server contradicts itself on one relationship → determinate FAIL.
+          // (Both sides tolerate an empty page + @odata.nextLink as has-records, so paging never false-fails.)
+          if (expandHasRecords !== navHasRecords) {
+            assertions.push({ passed: false, message: `Navigation-property-path ${nav.name}: $expand=${nav.name} returned ${expandItemCount} item(s) for this ${params.keyField} but ${resource}('…')/${nav.name} returned ${navItems.length} — the $expand and navigation-property-path forms resolve the same relationship and MUST agree on whether related entities exist (OData §11.2.7; web-api-core.md §2.5.10.2)` });
+          } else {
+            assertions.push({ passed: true, message: `Navigation-property-path GET ${resource}('…')/${nav.name} → 200 (${navItems.length} item(s), consistent with $expand)` });
+            const invalid = navItems.flatMap((item, index) => {
+              const { valid, errors } = validator.validate(item, nav.targetType);
+              return valid ? [] : [{ index, errors }];
+            });
+            if (invalid.length > 0) {
+              assertions.push({ passed: false, message: `Navigation-property-path ${nav.name}: ${invalid.length}/${navItems.length} item(s) schema-invalid against ${nav.targetType} — item ${invalid[0].index}: ${invalid[0].errors.slice(0, 3).join('; ') || 'schema validation failed'}` });
+            } else if (navItems.length > 0) {
+              assertions.push({ passed: true, message: `Navigation-property-path ${nav.name}: ${navItems.length} item(s) valid against ${nav.targetType}` });
+            }
+          }
+        }
       }
     }
 
@@ -988,6 +1087,12 @@ const runScenario = async (
     return runEnumFamilyScenario(serverUrl, resource, scenario, params, authToken, start, op, requester);
   }
 
+  // Paging builds and walks its own URLs ($top=2 then $top=1), so it does not route through
+  // buildScenarioQuery — dispatch it before the skip-gate so it is never skipped for a "missing query".
+  if (scenario.category === 'paging') {
+    return runPagingScenario(serverUrl, resource, params, authToken, start, requester);
+  }
+
   // Build query — undefined means required params missing, skip.
   const query = buildScenarioQuery(serverUrl, resource, scenario, params);
   if (!query) {
@@ -997,9 +1102,6 @@ const runScenario = async (
   try {
     if (scenario.category === 'structural') {
       return runStructuralScenario(serverUrl, resource, scenario.assertion, query, params, authToken, start, requester);
-    }
-    if (scenario.category === 'paging') {
-      return runPagingScenario(serverUrl, resource, params, authToken, start, requester);
     }
     if (scenario.category === 'error') {
       const reqStart = Date.now();
@@ -1310,28 +1412,22 @@ export const runStructuralScenario = async (
       // only that ≥1 selected field carries data (WebAPIServerCore.java `numFieldsWithData > 0`) — it iterates the
       // select list and never checks for fields OUTSIDE it. So "the server returned a field outside the $select
       // list" (it ignored the projection) is STRICTER THAN the oracle on an existing Core 2.0.0 element: a
-      // $select-ignoring server that passed the Commander must NOT newly fail here. We surface it as a NON-GATING
-      // WARNING (observe-then-flip, like single-enum `ne`), pending WG sign-off — never a verdict-gating fail. We
-      // also deliberately do not fault an ABSENT projected field (OData permits omitting a null property, §11.2.4.1).
+      // $select-ignoring server that passed the Commander must NOT newly fail here — and OData 4.01 §11.2.5.1
+      // settles it: $select "requests that the service return only the properties … and MAY return additional
+      // information", so returning fields outside the list is PERMITTED, not a defect. We therefore do not flag it.
+      // An ABSENT projected field is likewise not faulted (content returned "if available", §11.2.5.1).
       const records = extractRecords(response.body);
       const projectedDataFields = query.selectFields.filter(f => f !== params.keyField);
       if (projectedDataFields.length === 0) {
         assertions.push({ passed: true, message: '$select: no non-key field available to project — multi-field projection not exercised on this resource' });
       } else {
-        const selected = new Set(query.selectFields);
-        const extraField = records.flatMap(r => Object.keys(r)).find(k => !k.startsWith('@') && !selected.has(k));
-        if (extraField !== undefined) {
-          warnings.push(`$select projected {${query.selectFields.join(', ')}} but a returned record also carries unselected field '${extraField}' — the server did not narrow the projection. Stricter than Core 2.0.0 (the Commander does not check this); reported as a WARNING pending WG sign-off, not failed.`);
-          assertions.push({ passed: true, message: `$select projection: reported for review, not failed (see warnings) — unselected field '${extraField}' returned` });
-        } else {
-          const confirmed = projectedDataFields.filter(f => records.some(r => f in r));
-          assertions.push({
-            passed: true,
-            message: confirmed.length > 0
-              ? `$select honored: projection narrowed to the selected fields (present: ${confirmed.join(', ')})`
-              : '$select honored: returned records carry only selected fields (projected data field null/omitted on this page — not a defect)',
-          });
-        }
+        const confirmed = projectedDataFields.filter(f => records.some(r => f in r));
+        assertions.push({
+          passed: true,
+          message: confirmed.length > 0
+            ? `$select: projected fields present (${confirmed.join(', ')}); additional properties permitted (OData 4.01 §11.2.5.1)`
+            : '$select: projected data field null/omitted on this page — not a defect (OData 4.01 §11.2.5.1)',
+        });
       }
     } else {
       // service-document
@@ -1348,7 +1444,21 @@ export const runStructuralScenario = async (
   return { tag, name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestUrl: query.url, odataVersion, ...(warnings.length > 0 ? { warnings } : {}) };
 };
 
-/** Run server-driven paging scenario (v2.1.0). */
+// Server-driven-paging walk (Check B) knobs. Page size is REQUESTED via Prefer: odata.maxpagesize — a SHOULD,
+// not a MUST (web-api-core.md:699 "Servers MAY respond with a page size different than the one requested";
+// OData 4.01 server-driven paging), so the walk never fails a server for the page size it returns. The $top
+// bound IS hard (OData 4.01 §11.2.6.3 "up to but not greater than n"): the walk bounds itself so it reaches an
+// end to check termination, and a server that pages past the bound is a $top over-run. $top is kept modest (500,
+// paged at 100 → ~5 pages) so it sits under providers' own $top caps: a provider SHOULD cap-and-return an
+// over-large $top (indicating Preference-Applied), NOT 400 — informing a provider that 400s on $top is tracked
+// separately. The page cap protects against a server that ignores maxpagesize and drips small pages.
+const PAGING_WALK_MAX_PAGE_SIZE = 100;
+const PAGING_WALK_PREFER_HEADER: Readonly<Record<string, string>> = { Prefer: `odata.maxpagesize=${PAGING_WALK_MAX_PAGE_SIZE}` };
+const PAGING_WALK_TOP_BOUND = 500;
+const PAGING_WALK_MAX_PAGES = 25;
+
+/** Run server-driven paging scenario (v2.1.0). `walkBound` (default {@link PAGING_WALK_TOP_BOUND}) is the `$top`
+ *  cap on the Check-B walk — a test seam so the $top over-run path can be exercised without 2000 rows. */
 export const runPagingScenario = async (
   serverUrl: string,
   resource: string,
@@ -1356,73 +1466,99 @@ export const runPagingScenario = async (
   authToken: string,
   start: number,
   requester: ODataRequester = webRequester,
+  walkBound = PAGING_WALK_TOP_BOUND,
 ): Promise<ScenarioResult> => {
   const assertions: AssertionResult[] = [];
-  // Initial paging URL — kept in scope outside the try/while so the
-  // returned ScenarioResult can surface it in the failure report.
-  const initialUrl = `${serverUrl}/${resource}?$top=2&$select=${params.keyField}`;
+  // The report surfaces whichever request FAILED: a `$top=1` failure must show the `$top=1` GET, not the walk.
+  const topOneUrl = `${serverUrl}/${resource}?$top=1&$select=${params.keyField}`; // the normative $top=1 check
 
   // A `$top=1` request MUST NOT return an `@odata.nextLink`: the single requested record is the complete
   // response to THAT request, so a continuation would return records beyond `$top=1` (web-api-core.md:84;
   // §6 scenario-server-driven-paging MUST NOT; OData 4.01 §11.2.6.3 "up to but not greater than"). This is the
-  // single normatively-named Core paging criterion — kept separate from the nextLink walk below.
+  // single normatively-named Core paging criterion — kept separate from the nextLink walk below. Its assertions
+  // are collected locally so the report URL can point at THIS request when it is the one that failed.
+  const topOneAssertions: AssertionResult[] = [];
   try {
-    const topOneUrl = `${serverUrl}/${resource}?$top=1&$select=${params.keyField}`;
     const topOne = await requester.request({ method: 'GET', url: topOneUrl, authToken });
     if (topOne.status !== 200) {
-      assertions.push({ passed: false, message: `$top=1 request returned HTTP ${topOne.status} (expected 200)` });
+      topOneAssertions.push({ passed: false, message: `$top=1 request returned HTTP ${topOne.status} (expected 200)` });
     } else if (extractNextLink(topOne.body)) {
-      assertions.push({ passed: false, message: '$top=1 MUST NOT return an @odata.nextLink — the single requested record is the complete response to a $top=1 request; a continuation would exceed $top=1 (web-api-core.md Server-Driven Paging §2.5; OData 4.01 §11.2.6.3).' });
+      topOneAssertions.push({ passed: false, message: '$top=1 MUST NOT return an @odata.nextLink — the single requested record is the complete response to a $top=1 request; a continuation would exceed $top=1 (web-api-core.md Server-Driven Paging §2.5; OData 4.01 §11.2.6.3).' });
     } else {
-      assertions.push({ passed: true, message: '$top=1 returned no @odata.nextLink (correct — the single requested record is the complete set)' });
+      topOneAssertions.push({ passed: true, message: '$top=1 returned no @odata.nextLink (correct — the single requested record is the complete set)' });
     }
   } catch (err) {
     if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
-    assertions.push({ passed: false, message: `$top=1 request error: ${err instanceof Error ? err.message : String(err)}` });
+    topOneAssertions.push({ passed: false, message: `$top=1 request error: ${err instanceof Error ? err.message : String(err)}` });
   }
+  assertions.push(...topOneAssertions);
+  const topOneFailed = topOneAssertions.some(a => !a.passed);
 
-  try {
-    let url: string | undefined = initialUrl;
-    const allKeys = new Set<string>();
-    let pages = 0;
-    const maxPages = 20;
+  // Check B — the forward server-driven-paging walk (web-api-core.md:85/87). Prove the server actually pages a
+  // real result set via `@odata.nextLink` (not merely suppressing the nextLink on $top=1 to game Check A), that
+  // pages do not repeat records, and that it terminates without exceeding the `$top` bound. Uses the sampled
+  // timestamp field's MIN as the `gt` target (a large, always-returning set), OSN/OSID-scoped like every data
+  // query. Skipped when there is no timestamp field with ≥2 distinct sampled values (no returning filter to walk).
+  const tsField = params.timestampField;
+  const gtTarget = params.datetimeValue;
+  const canWalk = !!tsField && !!gtTarget && (params.datetimeDistinctCount ?? 0) >= 2;
+  const osnClause = originatingSystemFilterClause(params.originatingSystemName, params.originatingSystemId);
+  const walkFilter = osnClause ? `(${tsField} gt ${gtTarget}) and ${osnClause}` : `${tsField} gt ${gtTarget}`;
+  const walkUrl = canWalk
+    ? `${serverUrl}/${resource}?$filter=${encodeURIComponent(walkFilter)}&$orderby=${tsField}&$select=${params.keyField},${tsField}&$top=${walkBound}`
+    : undefined;
 
-    while (url && pages < maxPages) {
-      const response = await requester.request({ method: 'GET', url, authToken });
-      if (response.status !== 200) {
-        assertions.push({ passed: false, message: `Page ${pages + 1}: HTTP ${response.status}` });
-        break;
+  if (!walkUrl) {
+    assertions.push({ passed: true, message: 'Server-driven paging walk skipped — no timestamp field with ≥2 distinct sampled values to page through' });
+  } else {
+    const seen = new Set<string>();
+    let url: string | undefined = walkUrl;
+    let pages = 0, total = 0, dup = false, lastHadNext = false, brokePage = false;
+    try {
+      while (url && pages < PAGING_WALK_MAX_PAGES) {
+        const resp = await requester.request({ method: 'GET', url, authToken, headers: PAGING_WALK_PREFER_HEADER });
+        if (resp.status !== 200) {
+          assertions.push({ passed: false, message: `Server-driven paging walk page ${pages + 1}: HTTP ${resp.status} (expected 200)` });
+          brokePage = true;
+          break;
+        }
+        const records = extractRecords(resp.body);
+        for (const r of records) {
+          const k = String(r[params.keyField]);
+          if (seen.has(k)) dup = true;
+          seen.add(k);
+        }
+        total += records.length;
+        const rawNext = extractNextLink(resp.body);
+        lastHadNext = rawNext != null;
+        url = rawNext ? rebaseNextLink(rawNext, walkUrl) : undefined; // tolerate a proxy/wrong-host base URL
+        pages++;
+        if (total >= walkBound) break; // reached the $top bound — the check below decides pass vs over-run
       }
-
-      const records = extractRecords(response.body);
-      for (const r of records) allKeys.add(String(r[params.keyField]));
-
-      const rawNext = extractNextLink(response.body);
-      url = rawNext ? rebaseNextLink(rawNext, initialUrl) : undefined; // tolerate a proxy/wrong-host base URL
-      pages++;
+      if (!brokePage) {
+        if (dup) {
+          assertions.push({ passed: false, message: 'Server-driven paging: a record key repeated across pages — each page MUST return records not already seen on a previous page (web-api-core.md Server-Driven Paging).' });
+        } else if (total > walkBound || (total >= walkBound && lastHadNext)) {
+          assertions.push({ passed: false, message: `Server-driven paging: server returned ${total} records for $top=${walkBound}${lastHadNext ? ' and still offered an @odata.nextLink' : ''} — must be up to but not greater than $top (OData 4.01 §11.2.6.3).` });
+        } else if (pages > 1 && !lastHadNext) {
+          assertions.push({ passed: true, message: `Server-driven paging: ${pages} pages, ${seen.size} unique records, clean termination (no @odata.nextLink on the final page)` });
+        } else if (pages === 1 && !lastHadNext) {
+          assertions.push({ passed: true, message: `Server-driven paging: whole filtered set returned in one page (${seen.size} records), no @odata.nextLink — valid (page size is the server's choice)` });
+        } else if (pages >= PAGING_WALK_MAX_PAGES && lastHadNext) {
+          assertions.push({ passed: true, message: `Server-driven paging: ${pages} pages walked (page cap), ${seen.size} unique records, no overlap — paging works; the server did not honor the requested page size, so termination was not reached within the cap` });
+        }
+      }
+    } catch (err) {
+      if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
+      assertions.push({ passed: false, message: `Server-driven paging walk error: ${err instanceof Error ? err.message : String(err)}` });
     }
-
-    if (pages > 1) {
-      assertions.push({ passed: true, message: `Server-driven paging: ${pages} pages, ${allKeys.size} unique records` });
-    } else if (pages === 1 && !url) {
-      // Single page with no nextLink is valid — the server has fewer records
-      // than the page size, so there's nothing to paginate.
-      assertions.push({ passed: true, message: `Single page returned (${allKeys.size} records), no @odata.nextLink — valid` });
-    } else {
-      assertions.push({ passed: false, message: `Expected @odata.nextLink on page with $top=2 but none was returned (${allKeys.size} records across ${pages} pages)` });
-    }
-
-    // Final page should have no nextLink
-    if (pages > 1 && !url) {
-      assertions.push({ passed: true, message: 'Final page has no @odata.nextLink' });
-    }
-  } catch (err) {
-    if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
-    assertions.push({ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` });
   }
 
   const allPassed = assertions.every(a => a.passed);
-  return { tag: 'server-driven-paging', name: 'Server-driven paging', passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestUrl: initialUrl };
+  // Point the report at the request that failed: the $top=1 normative check when it failed, else the walk URL
+  // (also the URL shown when everything passes); fall back to $top=1 when the walk was skipped.
+  const requestUrl = topOneFailed ? topOneUrl : (walkUrl ?? topOneUrl);
+  return { tag: 'server-driven-paging', name: 'Server-driven paging', passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestUrl };
 };
 
 // ── Provider-wide pass ──

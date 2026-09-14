@@ -137,26 +137,50 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
     });
   }
 
-  // Build set of known type names for reference checking
-  const knownTypeNames = new Set([
-    ...schema.entityTypes.map(et => `${schema.namespace}.${et.name}`),
-    ...schema.enumTypes.map(et => `${schema.namespace}.${et.name}`),
-    ...schema.complexTypes.map(ct => `${schema.namespace}.${ct.name}`)
+  // The FQDN a declared type is registered under: its OWN namespace when it carries one (multi-schema
+  // EDMX splits types across namespaces — a provider may put enums in a separate namespace, e.g.
+  // org.reso.metadata.enums distinct from org.reso.metadata), else the schema namespace (a
+  // single-namespace document). The namespace strings are provider-chosen; RESO fixes no vocabulary of
+  // FQDNs — an FQDN is just the key that links a reference to its declaration.
+  const fqdn = (t: { readonly name: string; readonly namespace?: string }): string => `${t.namespace ?? schema.namespace}.${t.name}`;
+
+  // Every type this document declares — entity, enum, complex — registered under its true FQDN. This
+  // drives a referential-integrity check, NOT a check against any known/blessed FQDN set (there is none
+  // for RESO): a reference is valid iff it links to a declaration here. Registering all kinds
+  // symmetrically under their own namespace keeps this set consistent with declaredNamespaces below.
+  const declaredTypeFqdns = new Set([
+    ...schema.entityTypes.map(fqdn),
+    ...schema.enumTypes.map(fqdn),
+    ...schema.complexTypes.map(fqdn)
+  ]);
+
+  // The namespaces this document actually declares a type in — the primary namespace plus every distinct
+  // namespace any entity, enum, or complex type is declared in. A reference qualified with one of these
+  // SHOULD link to a declaration here; if it links to nothing it's dangling — a broken internal link. A
+  // reference in any OTHER namespace is external — declared in some schema this document doesn't contain,
+  // which the validator can't see — so it's left alone. Building this from ALL type kinds (not enums
+  // alone) is what keeps a conformant provider that co-locates, say, a complex type with its enums in a
+  // non-primary namespace from false-failing.
+  const declaredNamespaces = new Set<string>([
+    schema.namespace,
+    ...schema.entityTypes.map(et => et.namespace ?? schema.namespace),
+    ...schema.enumTypes.map(et => et.namespace ?? schema.namespace),
+    ...schema.complexTypes.map(ct => ct.namespace ?? schema.namespace)
   ]);
 
   /**
-   * A referenced type is an UNRESOLVED LOCAL reference when it names this schema's OWN namespace (or is a bare,
-   * implicitly-local name) yet no such type is declared here. Only a genuinely EXTERNAL name — qualified with a
-   * DIFFERENT namespace, whose schema this validator can't see — is allowed to go unresolved. Previously every
-   * site used a bare `!type.includes('.')` escape, which waved through ANY dotted name, including
-   * `${schema.namespace}.DoesNotExist`; that masked same-namespace dangling references (a typo'd or renamed nav
-   * target, base type, entity-set type, or property type) as if they were external. This resolves them instead.
+   * A type reference is a DANGLING reference when it points into a namespace this document declares
+   * types in (or is a bare, implicitly-primary name) yet links to no type declared here — a broken
+   * internal link (a typo'd or renamed target). A reference into a namespace this document declares
+   * NOTHING in is EXTERNAL — resolved by some schema this validator can't see — and is left alone. This
+   * is internal referential integrity, not conformance to any canonical FQDN: the FQDN is only the
+   * provider-chosen key that links a reference to its declaration.
    */
-  const isUnresolvedLocalType = (typeName: string): boolean => {
-    if (knownTypeNames.has(typeName)) return false;
+  const isDanglingReference = (typeName: string): boolean => {
+    if (declaredTypeFqdns.has(typeName)) return false; // links to a type declared here
     const lastDot = typeName.lastIndexOf('.');
-    if (lastDot === -1) return true; // bare name → implicitly this schema's namespace → must be declared here
-    return typeName.slice(0, lastDot) === schema.namespace; // same-namespace qualified name → must be declared here
+    if (lastDot === -1) return true; // bare name → implicitly the primary namespace → must be declared here
+    return declaredNamespaces.has(typeName.slice(0, lastDot)); // a declared namespace but no such type → broken link
   };
 
   /**
@@ -166,9 +190,9 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
   const validatePropertyType = (propType: string, propPath: string): void => {
     const typeToCheck = isCollectionType(propType) ? unwrapCollection(propType) : propType;
 
-    if (!isEdmPrimitive(typeToCheck) && isUnresolvedLocalType(typeToCheck)) {
-      // A same-namespace (or bare) type that isn't declared here is a dangling local reference; a
-      // different-namespace type is an external reference this validator can't resolve and is allowed.
+    if (!isEdmPrimitive(typeToCheck) && isDanglingReference(typeToCheck)) {
+      // A reference into a declared namespace that links to no type here is dangling (a broken link); a
+      // reference into a namespace this document doesn't declare is external, and this validator allows it.
       errors.push({
         path: propPath,
         message: `Property type '${propType}' is not a valid Edm primitive or known type`,
@@ -207,7 +231,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
 
     for (const navProp of entityType.navigationProperties) {
       const targetType = isCollectionType(navProp.type) ? unwrapCollection(navProp.type) : navProp.type;
-      if (isUnresolvedLocalType(targetType)) {
+      if (isDanglingReference(targetType)) {
         errors.push({
           path: `${etPath}/NavigationProperty(${navProp.name})`,
           message: `Navigation property references unknown entity type '${targetType}'`,
@@ -216,7 +240,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
       }
     }
 
-    if (entityType.baseType && isUnresolvedLocalType(entityType.baseType)) {
+    if (entityType.baseType && isDanglingReference(entityType.baseType)) {
       errors.push({
         path: etPath,
         message: `BaseType '${entityType.baseType}' is not a known entity type`,
@@ -229,7 +253,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
   for (const complexType of schema.complexTypes) {
     const ctPath = `ComplexType(${complexType.name})`;
 
-    if (complexType.baseType && isUnresolvedLocalType(complexType.baseType)) {
+    if (complexType.baseType && isDanglingReference(complexType.baseType)) {
       errors.push({
         path: ctPath,
         message: `BaseType '${complexType.baseType}' is not a known complex type`,
@@ -243,7 +267,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
 
     for (const navProp of complexType.navigationProperties) {
       const targetType = isCollectionType(navProp.type) ? unwrapCollection(navProp.type) : navProp.type;
-      if (isUnresolvedLocalType(targetType)) {
+      if (isDanglingReference(targetType)) {
         errors.push({
           path: `${ctPath}/NavigationProperty(${navProp.name})`,
           message: `Navigation property references unknown entity type '${targetType}'`,
@@ -253,9 +277,10 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
     }
   }
 
-  // Build lookup maps for entity container validation
+  // Build lookup maps for entity container validation (keyed by each entity's true FQDN, so a binding
+  // or referential-constraint reference into a non-primary namespace resolves to the declared type).
   const entityTypeMap = new Map(
-    schema.entityTypes.map(et => [`${schema.namespace}.${et.name}`, et])
+    schema.entityTypes.map(et => [fqdn(et), et])
   );
   const entitySetMap = schema.entityContainer
     ? new Map(schema.entityContainer.entitySets.map(es => [es.name, es]))
@@ -269,7 +294,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
     for (const entitySet of schema.entityContainer.entitySets) {
       const esPath = `EntityContainer/EntitySet(${entitySet.name})`;
 
-      if (isUnresolvedLocalType(entitySet.entityType)) {
+      if (isDanglingReference(entitySet.entityType)) {
         errors.push({
           path: esPath,
           message: `Entity set references unknown entity type '${entitySet.entityType}'`,

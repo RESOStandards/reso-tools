@@ -5,6 +5,8 @@
  * A single generic runner executes them all.
  */
 
+import { coreVersionGte } from '../sdk/core-versions.js';
+
 /** Comparison operators for scalar filters. */
 export type ComparisonOp = 'eq' | 'ne' | 'gt' | 'ge' | 'lt' | 'le';
 
@@ -298,8 +300,8 @@ export const allScenarios: ReadonlyArray<CoreScenario> = [
   ...expandScenarios,
 ];
 
-/** Get scenarios applicable to a given version. */
+/** Get scenarios applicable to a given version: a scenario is included when the run version is at or above the
+ *  scenario's own `minVersion`. Data-driven off each scenario's declared minimum rather than a hardcoded version
+ *  branch, so a new version line (2.2.0) picks up 2.1.0 scenarios automatically. */
 export const scenariosForVersion = (version: '2.0.0' | '2.1.0'): ReadonlyArray<CoreScenario> =>
-  version === '2.0.0'
-    ? allScenarios.filter(s => s.minVersion === '2.0.0')
-    : allScenarios;
+  allScenarios.filter(s => coreVersionGte(version, s.minVersion));

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
 import { CURRENT_DD_VERSION } from '../../src/sdk/dd-versions.js';
+import { CURRENT_CORE_VERSION } from '../../src/sdk/core-versions.js';
 import {
   loadConfigFile,
   normalizeConfigFile,
@@ -182,7 +183,9 @@ describe('configEntryToEntityEvent', () => {
 });
 
 describe('configEntryToCore', () => {
-  it('converts with default version', () => {
+  it('converts an entry with no version to the current Core minor', () => {
+    // An absent version resolves to CURRENT_CORE_VERSION (the current minor), not the 2.0.0 baseline — an
+    // unknown version certifies under the strictest known profile rather than silently downgrading.
     const config = configEntryToCore({
       serviceRootUri: 'https://api.example.com',
       recipientUoi: 'R001',
@@ -191,7 +194,34 @@ describe('configEntryToCore', () => {
     }, 'P001');
 
     expect(config.endorsement).toBe('core');
-    expect(config.version).toBe('2.0.0');
+    expect(config.version).toBe(CURRENT_CORE_VERSION);
+  });
+
+  it('normalizes a two-part config version ("2.1") to the canonical Core literal ("2.1.0")', () => {
+    // The config-mode bug: reso-certification-utils supplies the Core version as "2.1", and the old bare
+    // `as CoreVersion` cast passed it straight through — so `version === '2.1.0'` gates (the $expand schema
+    // validator) never fired. The entry must resolve to the exact canonical literal.
+    const config = configEntryToCore({
+      serviceRootUri: 'https://api.example.com',
+      recipientUoi: 'R001',
+      providerUsi: 'S001',
+      token: 'test-token',
+      version: '2.1',
+    }, 'P001');
+
+    expect(config.version).toBe('2.1.0');
+  });
+
+  it('passes an already-canonical config version through unchanged', () => {
+    const config = configEntryToCore({
+      serviceRootUri: 'https://api.example.com',
+      recipientUoi: 'R001',
+      providerUsi: 'S001',
+      token: 'test-token',
+      version: '2.1.0',
+    }, 'P001');
+
+    expect(config.version).toBe('2.1.0');
   });
 
   it('threads OriginatingSystemName/ID from the entry (reso-certification-utils format)', () => {

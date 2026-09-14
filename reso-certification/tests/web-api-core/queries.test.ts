@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildLookupUrl, buildScenarioQuery, originatingSystemFilterClause } from '../../src/web-api-core/queries.js';
 import type { TestParams } from '../../src/web-api-core/sampling.js';
-import type { CoreScenario, FilterScenario, OrderByScenario, ErrorScenario, StructuralScenario } from '../../src/web-api-core/scenarios.js';
+import type { CoreScenario, FilterScenario, OrderByScenario, ErrorScenario, StructuralScenario, PagingScenario } from '../../src/web-api-core/scenarios.js';
 
 const baseParams: TestParams = {
   resource: 'Property',
@@ -32,6 +32,13 @@ describe('buildScenarioQuery', () => {
     const scenario: StructuralScenario = { tag: 'metadata-validation', name: 'Metadata', category: 'structural', assertion: 'metadata', minVersion: '2.0.0' };
     const result = buildScenarioQuery('http://localhost:8080', 'Property', scenario, baseParams);
     expect(result?.url).toBe('http://localhost:8080/$metadata');
+  });
+
+  // paging is dispatched in runScenario (it builds its own $top=2 / $top=1 URLs), so buildScenarioQuery
+  // intentionally returns undefined for it — locks the removal of the old dead paging case.
+  it('returns undefined for a paging scenario (paging builds its own URLs)', () => {
+    const scenario: PagingScenario = { tag: 'server-driven-paging', name: 'Server-driven paging (nextLink)', category: 'paging', assertion: 'nextLink', minVersion: '2.1.0' };
+    expect(buildScenarioQuery('http://localhost:8080', 'Property', scenario, baseParams)).toBeUndefined();
   });
 
   it('builds fetch-by-key URL', () => {
