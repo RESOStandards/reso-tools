@@ -254,8 +254,17 @@ export const createExpandSchemaValidator = async (
   const built = await buildExpandSchema(mod, input.metadataReport, ddVersion, validationConfig);
   if (!built) return undefined;
 
+  const definitions = (built.jsonSchema as { readonly definitions?: Record<string, unknown> } | null)?.definitions ?? {};
+  const hasDefinition = (targetType: string): boolean => Object.hasOwn(definitions, targetType);
+
   return {
     validate: (item, targetType) => {
+      // An unknown target type is INDETERMINATE, not valid: the legacy validate() logs "Found invalid resource",
+      // records a payload error and returns the caller's empty error map, so its `totalErrors` would read 0
+      // (#297, route 2). Decide here, from the schema, before the legacy call.
+      if (!hasDefinition(targetType)) {
+        return { valid: false, indeterminate: true, errors: [], reason: `no schema definition for target type ${targetType}` };
+      }
       try {
         const result = mod.validate({
           jsonSchema: built.jsonSchema,
@@ -270,12 +279,15 @@ export const createExpandSchemaValidator = async (
         // errorCache already carries them; the old Object.keys(errorCache) surfaced only the generic rule.
         const errors = errorMessagesFromCache(result.errorCache);
         return { valid: totalErrors === 0, errors };
-      } catch {
-        // The schema COMPILED at construction (buildExpandSchema warmed it up), so a throw HERE is a genuinely
-        // unexpected per-item failure (an odd item shape / unknown target), not a systematic compile failure.
-        // Treat THIS item as indeterminate — never a false fail — while a real compile failure was already
-        // caught at construction (→ undefined validator), so it can never masquerade as "all valid".
-        return { valid: true, errors: [] };
+      } catch (err) {
+        // The warm-up compiled ONE resource at construction; ajv compiles lazily per resource-specific root, so a
+        // throw here is usually a compile failure isolated to THIS target type (e.g. a navigation whose target has
+        // no definition — the 494d9be shape) on a non-warm-up resource. That is INDETERMINATE: the item was not
+        // evaluated. It was reported as `{ valid: true }` before #297, which the consumer rendered as "all N items
+        // valid" — a fabricated pass whose occurrence depended on EntitySet declaration order. Never a false fail
+        // either: the consumer reports the navigation as skipped with this reason.
+        const message = err instanceof Error ? err.message : String(err);
+        return { valid: false, indeterminate: true, errors: [], reason: `validator could not evaluate a ${targetType} item: ${message}` };
       }
     },
   };

@@ -12,6 +12,9 @@ import type { ComparisonOp, DataType, SortDirection } from './scenarios.js';
 export interface AssertionResult {
   readonly passed: boolean;
   readonly message: string;
+  /** The assertion could not be evaluated (e.g. the schema validator could not evaluate an item). Counts as
+   *  not-failed for `passed`, but a scenario carrying one is reported SKIPPED, never a determinate PASS. */
+  readonly indeterminate?: boolean;
 }
 
 // ── Comparison operators ──
