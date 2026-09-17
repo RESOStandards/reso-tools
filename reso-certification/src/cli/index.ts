@@ -218,13 +218,13 @@ const entityEventCmd = program
   .description('RCP-027 EntityEvent change tracking compliance testing')
   .option('--url <url>', 'Service root URL')
   .option('--config <path>', 'Path to config file (mutually exclusive with --url)')
-  .option('--mode <mode>', 'Testing mode: observe or full', 'observe')
+  .option('--mode <mode>', 'Testing mode: observe or full (default: observe, or the config entry\'s entityEventOptions.mode)')
   .option('--writable-resource <name>', 'Canary resource for full mode', 'Property')
   .option('--payloads-dir <dir>', 'Payloads directory for full mode canary writes')
-  .option('--max-events <n>', 'Max EntityEvent records to validate', '1000')
-  .option('--batch-size <n>', 'Keys per batch fetch request', '100')
-  .option('--poll-interval <ms>', 'Time between incremental sync checks (ms)', '5000')
-  .option('--poll-timeout <ms>', 'Max time to wait for new events (ms)', '30000')
+  .option('--max-events <n>', 'Max EntityEvent records to validate (default: 1000)')
+  .option('--batch-size <n>', 'Keys per batch fetch request (default: 100)')
+  .option('--poll-interval <ms>', 'Time between incremental sync checks (ms) (default: 5000)')
+  .option('--poll-timeout <ms>', 'Max time to wait for new events (ms) (default: 30000)')
   .option('--metadata <path>', 'Path to local XML metadata file')
   .option('--mock', 'Start a mock OData server');
 
@@ -263,10 +263,12 @@ entityEventCmd.action(
         throw new Error('Provide --url, --config, or --mock.');
       }
 
-      const mode = opts.mode as 'observe' | 'full';
-      if (mode !== 'observe' && mode !== 'full') {
+      // Flags apply only when given: a config entry's entityEventOptions block is the next source, then the defaults.
+      const mode = opts.mode as 'observe' | 'full' | undefined;
+      if (mode !== undefined && mode !== 'observe' && mode !== 'full') {
         throw new Error(`Invalid mode "${opts.mode}". Must be "observe" or "full".`);
       }
+      const numFlag = (v: string | undefined, fallback: number): number => (v !== undefined ? Number(v) : fallback);
 
       const renderMode = resolveRenderMode(opts);
 
@@ -298,7 +300,11 @@ entityEventCmd.action(
           const config: EntityEventConfig = {
             ...baseConfig,
             server: { ...baseConfig.server, auth },
-            mode: entry.mode ?? mode,
+            mode: mode ?? baseConfig.mode ?? 'observe',
+            maxEvents: numFlag(opts.maxEvents, baseConfig.maxEvents ?? 1000),
+            batchSize: numFlag(opts.batchSize, baseConfig.batchSize ?? 100),
+            pollInterval: numFlag(opts.pollInterval, baseConfig.pollInterval ?? 5000),
+            pollTimeout: numFlag(opts.pollTimeout, baseConfig.pollTimeout ?? 30000),
             ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {}),
           };
 
@@ -322,13 +328,13 @@ entityEventCmd.action(
         const config: EntityEventConfig = {
           endorsement: 'entity-event',
           server: { url: serverUrl, auth },
-          mode,
+          mode: mode ?? 'observe',
           writableResource: opts.writableResource,
           payloadsDir: opts.payloadsDir ? resolve(opts.payloadsDir) : undefined,
-          maxEvents: Number(opts.maxEvents),
-          batchSize: Number(opts.batchSize),
-          pollInterval: Number(opts.pollInterval),
-          pollTimeout: Number(opts.pollTimeout),
+          maxEvents: numFlag(opts.maxEvents, 1000),
+          batchSize: numFlag(opts.batchSize, 100),
+          pollInterval: numFlag(opts.pollInterval, 5000),
+          pollTimeout: numFlag(opts.pollTimeout, 30000),
           options: {
             skipHealthCheck: opts.mock,
             ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {}),
@@ -367,7 +373,7 @@ const coreCmd = program
   // `--spec-version` (not `--version`, which is reserved for the program's own `-V`). Defaults to the current
   // minor, so a plain `reso-cert core --url …` certifies the latest Core without the caller passing a version.
   .option('--spec-version <version>', `Web API Core spec version: ${SUPPORTED_CORE_VERSIONS.join(' or ')}`, CURRENT_CORE_VERSION)
-  .option('--enum-mode <mode>', 'Enum mode: auto, string, collections, or isflags (default: auto-detect)', 'auto')
+  .option('--enum-mode <mode>', 'Enum mode: auto, string, collections, or isflags (default: the config entry\'s coreOptions.enumMode, else auto-detect)')
   .option('--full-coverage', 'Fail if any data type category has no coverage across all resources')
   .option('--originating-system-name <v>', 'Scope resource queries to OriginatingSystemName eq <v> (multi-tenant providers)')
   .option('--originating-system-id <v>', 'Scope resource queries to OriginatingSystemID eq <v> (used when no name; OSN takes precedence)');
@@ -381,7 +387,7 @@ coreCmd.action(
     config?: string;
     resources?: string;
     specVersion: string;
-    enumMode: string;
+    enumMode?: string;
     fullCoverage?: boolean;
     originatingSystemName?: string;
     originatingSystemId?: string;
@@ -406,8 +412,9 @@ coreCmd.action(
       }
       const specVersion = opts.specVersion;
 
-      const enumMode = opts.enumMode as 'auto' | 'isflags' | 'collections' | 'string';
-      if (!['auto', 'isflags', 'collections', 'string'].includes(enumMode)) {
+      // Flags apply only when given: a config entry's coreOptions block is the next source, then auto-detect.
+      const enumModeFlag = opts.enumMode as 'auto' | 'isflags' | 'collections' | 'string' | undefined;
+      if (enumModeFlag !== undefined && !['auto', 'isflags', 'collections', 'string'].includes(enumModeFlag)) {
         throw new Error(`Invalid enum mode "${opts.enumMode}". Must be "auto", "string", "collections", or "isflags".`);
       }
 
@@ -429,9 +436,9 @@ coreCmd.action(
           const config: CoreConfig = {
             ...baseConfig,
             server: { ...baseConfig.server, auth },
-            enumMode,
-            ...(resources ? { resources } : {}),
-            ...(opts.fullCoverage ? { fullCoverage: true } : {}),
+            enumMode: enumModeFlag ?? baseConfig.enumMode ?? 'auto',
+            ...(resources ?? baseConfig.resources ? { resources: resources ?? baseConfig.resources } : {}),
+            ...(opts.fullCoverage || baseConfig.fullCoverage ? { fullCoverage: true } : {}),
             ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
             ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
             ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {}),
@@ -453,7 +460,7 @@ coreCmd.action(
           endorsement: 'core',
           server: { url: opts.url!, auth },
           version: specVersion,
-          enumMode,
+          enumMode: enumModeFlag ?? 'auto',
           fullCoverage: opts.fullCoverage,
           resources,
           ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
@@ -487,7 +494,7 @@ const ddCmd = program
   .option('--url <url>', 'Server base URL (mutually exclusive with --config)')
   .option('--config <path>', 'Path to a config file — runs every entry (mutually exclusive with --url)')
   .option('--dd-version <version>', `DD version (${CERTIFIABLE_DD_VERSIONS.join(' or ')})`, CURRENT_DD_VERSION)
-  .option('--limit <n>', 'Max records to replicate per resource', '100000')
+  .option('--limit <n>', 'Max records to replicate per resource (default: the config entry\'s ddOptions.limit, else 100000)')
   .option('--strict', 'Strict mode: fail on variations and enforce JSON schema validation')
   .option('--batch-expand', 'Batch all expansions per resource into a single $expand request')
   .option('--originating-system-name <v>', 'Append OriginatingSystemName eq <v> to every replication query (multi-tenant providers)')
@@ -546,7 +553,7 @@ ddCmd.action(
             ...baseConfig,
             fromCli: true,
             server: { ...baseConfig.server, auth },
-            limit: Number(opts.limit),
+            limit: opts.limit !== undefined ? Number(opts.limit) : (baseConfig.limit ?? 100000),
             ...(opts.strict ? { strictMode: true } : {}),
             ...(opts.batchExpand ? { batchExpand: true } : {}),
             ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
@@ -571,7 +578,7 @@ ddCmd.action(
           fromCli: true,
           server: { url: opts.url!, auth },
           version: ddVersion,
-          limit: Number(opts.limit),
+          limit: opts.limit !== undefined ? Number(opts.limit) : 100000,
           strictMode: opts.strict,
           batchExpand: opts.batchExpand,
           ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
