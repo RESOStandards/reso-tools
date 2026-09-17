@@ -407,6 +407,11 @@ export interface ExpandItemValidation {
   readonly valid: boolean;
   /** Human-readable validation error messages when invalid; empty when valid. */
   readonly errors: ReadonlyArray<string>;
+  /** The validator could not evaluate this item (its target type has no schema definition, or the
+   *  resource-specific compile failed). `valid` is false, `errors` is empty, `reason` says why. An
+   *  indeterminate item is never counted as valid AND never as a schema failure (#297). */
+  readonly indeterminate?: boolean;
+  readonly reason?: string;
 }
 
 /**
@@ -457,6 +462,34 @@ const collectionShapeError = (value: unknown): string | null => {
  * nav already returned 200 and there is nothing we can determinately fault, and a compliant server must never
  * false-fail.
  */
+/**
+ * Three-way per-item verdict over a set of items (#297): every item evaluated and clean → PASS; any item
+ * evaluated and invalid → FAIL naming the first errors (an indeterminate count, if any, rides in the message so
+ * it is not lost); no invalid item but at least one the validator could not evaluate → INDETERMINATE (passed for
+ * roll-up purposes, flagged so the scenario reports SKIPPED, never "all N valid"). `label` prefixes the message
+ * (the inline `$expand` leg or the navigation-property-path leg).
+ */
+const summarizeItemValidation = (
+  items: ReadonlyArray<Record<string, unknown>>,
+  targetType: string,
+  validator: ExpandItemValidator,
+  label: string,
+): AssertionResult => {
+  const verdicts = items.map((item, index) => ({ index, ...validator.validate(item, targetType) }));
+  const invalid = verdicts.filter((v) => !v.valid && !v.indeterminate);
+  const indeterminate = verdicts.filter((v) => v.indeterminate);
+  const notEvaluated = indeterminate.length > 0 ? ` (${indeterminate.length}/${items.length} not evaluated — ${indeterminate[0].reason ?? 'validator could not evaluate the item'})` : '';
+  if (invalid.length > 0) {
+    const first = invalid[0];
+    const detail = first.errors.slice(0, 3).join('; ') || 'schema validation failed';
+    return { passed: false, message: `${label}: ${invalid.length}/${items.length} item(s) schema-invalid against ${targetType} — item ${first.index}: ${detail}${notEvaluated}` };
+  }
+  if (indeterminate.length > 0) {
+    return { passed: true, indeterminate: true, message: `${label}: ${indeterminate.length}/${items.length} ${targetType} item(s) not evaluated — ${indeterminate[0].reason ?? 'validator could not evaluate the item'} — not validated (indeterminate)` };
+  }
+  return { passed: true, message: `${label}: all ${items.length} ${targetType} item(s) valid against ${targetType}` };
+};
+
 export const validateExpandedItems = (
   records: ReadonlyArray<Record<string, unknown>>,
   nav: { readonly name: string; readonly targetType: string },
@@ -469,16 +502,7 @@ export const validateExpandedItems = (
   if (items.length === 0) {
     return { passed: true, message: `$expand ${nav.name}: 200 received; no expanded ${nav.targetType} item to schema-validate` };
   }
-  const invalid = items.flatMap((item, index) => {
-    const { valid, errors } = validator.validate(item, nav.targetType);
-    return valid ? [] : [{ index, errors }];
-  });
-  if (invalid.length === 0) {
-    return { passed: true, message: `$expand ${nav.name}: all ${items.length} expanded ${nav.targetType} item(s) valid against the target entity type` };
-  }
-  const first = invalid[0];
-  const detail = first.errors.slice(0, 3).join('; ') || 'schema validation failed';
-  return { passed: false, message: `$expand ${nav.name}: ${invalid.length}/${items.length} expanded ${nav.targetType} item(s) schema-invalid against ${nav.targetType} — item ${first.index}: ${detail}` };
+  return summarizeItemValidation(items, nav.targetType, validator, `$expand ${nav.name}`);
 };
 
 /**
@@ -644,14 +668,8 @@ const runOneExpandNav = async (
             assertions.push({ passed: false, message: `Navigation-property-path ${nav.name}: $expand=${nav.name} returned ${expandItemCount} item(s) for this ${params.keyField} but ${resource}('…')/${nav.name} returned ${navItems.length} — the $expand and navigation-property-path forms resolve the same relationship and MUST agree on whether related entities exist (OData §11.2.7; web-api-core.md §2.5.10.2)` });
           } else {
             assertions.push({ passed: true, message: `Navigation-property-path GET ${resource}('…')/${nav.name} → 200 (${navItems.length} item(s), consistent with $expand)` });
-            const invalid = navItems.flatMap((item, index) => {
-              const { valid, errors } = validator.validate(item, nav.targetType);
-              return valid ? [] : [{ index, errors }];
-            });
-            if (invalid.length > 0) {
-              assertions.push({ passed: false, message: `Navigation-property-path ${nav.name}: ${invalid.length}/${navItems.length} item(s) schema-invalid against ${nav.targetType} — item ${invalid[0].index}: ${invalid[0].errors.slice(0, 3).join('; ') || 'schema validation failed'}` });
-            } else if (navItems.length > 0) {
-              assertions.push({ passed: true, message: `Navigation-property-path ${nav.name}: ${navItems.length} item(s) valid against ${nav.targetType}` });
+            if (navItems.length > 0) {
+              assertions.push(summarizeItemValidation(navItems, nav.targetType, validator, `Navigation-property-path ${nav.name}`));
             }
           }
         }
@@ -659,7 +677,11 @@ const runOneExpandNav = async (
     }
 
     const allPassed = assertions.every(a => a.passed);
-    return { tag, name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url, ...(warnings.length > 0 ? { warnings } : {}) };
+    // An indeterminate assertion (an item the validator could not evaluate) with nothing failed is a SKIP for the
+    // scenario — the honest indeterminate outcome, never a determinate PASS on the 200 alone (#297). Both legs
+    // still ran, so a determinate failure anywhere still fails.
+    const indeterminate = allPassed && assertions.some(a => a.indeterminate === true);
+    return { tag, name, passed: allPassed, skipped: indeterminate, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url, ...(warnings.length > 0 ? { warnings } : {}) };
   } catch (err) {
     if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
     // A transport/parse error is INDETERMINATE (no server response to fault) — SKIPPED + errored, so it never

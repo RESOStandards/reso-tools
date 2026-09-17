@@ -543,9 +543,13 @@ describe('createExpandSchemaValidator — the legacy-backed item validator', () 
     expect(bad.errors.some((e) => e.includes('advertised in the metadata'))).toBe(true);
   });
 
-  it('an unknown target type → treated VALID (indeterminate, never a false fail)', async () => {
+  it('an unknown target type → INDETERMINATE (never a false fail, and — since #297 — never a fabricated valid)', async () => {
     const v = await createExpandSchemaValidator({ metadataReport: report, version: '2.0' });
-    expect(v!.validate({ Anything: 'x' }, 'NoSuchResourceType').valid).toBe(true);
+    const r = v!.validate({ Anything: 'x' }, 'NoSuchResourceType');
+    expect(r.valid).toBe(false);
+    expect(r.indeterminate).toBe(true);
+    expect(r.errors).toEqual([]);
+    expect(r.reason).toMatch(/NoSuchResourceType/);
   });
 });
 
