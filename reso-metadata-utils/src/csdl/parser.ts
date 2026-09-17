@@ -96,9 +96,21 @@ export const extractTypeName = (type: string): string => {
  * interchangeably (e.g. `WEBAPI.Office` == `reso.web.api.Office`). Canonicalizing to the namespace
  * form lets downstream FQDN comparisons (enum detection, expansion) match regardless of which
  * spelling a provider used. No-op for Edm primitives, unqualified names, and any prefix that is
- * not a declared alias. Handles Collection(...) wrappers.
+ * not a declared alias. Handles Collection(...) wrappers. Applied to every qualified-name attribute the parser
+ * reads as a TYPE or operation reference — property, navigation, base, parameter and return types; entity-set and
+ * singleton types; action and function import references — so the validator's namespace-keyed maps see one
+ * spelling (reso-tools #300). Not applied to: Annotation/@Term and Annotations/@Target (vocabulary paths, never
+ * resolved here), NavigationPropertyBinding/@Path and @Target, and import @EntitySet (paths, not types). The alias
+ * map is built from the document's own <Schema> elements only; aliases declared by edmx:Reference/edmx:Include
+ * are not read (no reference schemas are parsed) — a type reference through an Include alias stays as written.
  */
+/** Alias values CSDL XML 4.01 §3.4 forbids — never treated as an alias. */
+const RESERVED_ALIASES: ReadonlySet<string> = new Set(['Edm', 'odata', 'System', 'Transient']);
+
 const canonicalizeType = (type: string, aliasMap: Readonly<Record<string, string>>): string => {
+  // A missing attribute (malformed CSDL) passes through untouched, exactly as it did before canonicalization
+  // reached every qualified-name attribute — the validator, not the parser, reports it.
+  if (typeof type !== 'string') return type;
   const inner = isCollectionType(type) ? unwrapCollectionType(type) : type;
   const dot = inner.lastIndexOf('.');
   if (dot < 0) return type;
@@ -324,10 +336,10 @@ const parseNavigationPropertyBindings = (
 /**
  * Parse Parameter elements from an Action or Function.
  */
-const parseParameters = (rawParams: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<CsdlParameter> =>
+const parseParameters = (rawParams: ReadonlyArray<Record<string, unknown>>, aliasMap: Readonly<Record<string, string>>): ReadonlyArray<CsdlParameter> =>
   rawParams.map(p => ({
     name: p['@_Name'] as string,
-    type: p['@_Type'] as string,
+    type: canonicalizeType(p['@_Type'] as string, aliasMap),
     ...(p['@_Nullable'] !== undefined && {
       nullable: p['@_Nullable'] === 'true'
     })
@@ -336,17 +348,17 @@ const parseParameters = (rawParams: ReadonlyArray<Record<string, unknown>>): Rea
 /**
  * Parse a ReturnType element from an Action or Function.
  */
-const parseReturnType = (rawReturn: Record<string, unknown> | undefined): CsdlReturnType | undefined => {
+const parseReturnType = (rawReturn: Record<string, unknown> | undefined, aliasMap: Readonly<Record<string, string>>): CsdlReturnType | undefined => {
   if (!rawReturn) return undefined;
   return {
-    type: rawReturn['@_Type'] as string,
+    type: canonicalizeType(rawReturn['@_Type'] as string, aliasMap),
     ...(rawReturn['@_Nullable'] !== undefined && {
       nullable: rawReturn['@_Nullable'] === 'true'
     })
   };
 };
 
-const parseActions = (rawActions: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<CsdlAction> =>
+const parseActions = (rawActions: ReadonlyArray<Record<string, unknown>>, aliasMap: Readonly<Record<string, string>>): ReadonlyArray<CsdlAction> =>
   rawActions.map(rawAction => {
     const rawParams = (rawAction.Parameter as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
     const rawReturn = rawAction.ReturnType as Record<string, unknown> | undefined;
@@ -359,14 +371,14 @@ const parseActions = (rawActions: ReadonlyArray<Record<string, unknown>>): Reado
       ...(rawAction['@_EntitySetPath'] !== undefined && {
         entitySetPath: rawAction['@_EntitySetPath'] as string
       }),
-      parameters: parseParameters(rawParams),
+      parameters: parseParameters(rawParams, aliasMap),
       ...(rawReturn !== undefined && {
-        returnType: parseReturnType(rawReturn) as CsdlReturnType
+        returnType: parseReturnType(rawReturn, aliasMap) as CsdlReturnType
       })
     };
   });
 
-const parseFunctions = (rawFunctions: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<CsdlFunction> =>
+const parseFunctions = (rawFunctions: ReadonlyArray<Record<string, unknown>>, aliasMap: Readonly<Record<string, string>>): ReadonlyArray<CsdlFunction> =>
   rawFunctions.map(rawFunc => {
     const rawParams = (rawFunc.Parameter as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
     const rawReturn = rawFunc.ReturnType as Record<string, unknown> | undefined;
@@ -382,12 +394,12 @@ const parseFunctions = (rawFunctions: ReadonlyArray<Record<string, unknown>>): R
       ...(rawFunc['@_EntitySetPath'] !== undefined && {
         entitySetPath: rawFunc['@_EntitySetPath'] as string
       }),
-      parameters: parseParameters(rawParams),
-      returnType: parseReturnType(rawReturn) as CsdlReturnType
+      parameters: parseParameters(rawParams, aliasMap),
+      returnType: parseReturnType(rawReturn, aliasMap) as CsdlReturnType
     };
   });
 
-const parseEntityContainer = (rawContainer: Record<string, unknown> | undefined): CsdlEntityContainer | undefined => {
+const parseEntityContainer = (rawContainer: Record<string, unknown> | undefined, aliasMap: Readonly<Record<string, string>>): CsdlEntityContainer | undefined => {
   if (!rawContainer) return undefined;
 
   const name = (rawContainer['@_Name'] as string) ?? 'Default';
@@ -398,7 +410,7 @@ const parseEntityContainer = (rawContainer: Record<string, unknown> | undefined)
     const rawBindings = (es.NavigationPropertyBinding as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
     return {
       name: es['@_Name'] as string,
-      entityType: es['@_EntityType'] as string,
+      entityType: canonicalizeType(es['@_EntityType'] as string, aliasMap),
       ...(rawBindings.length > 0 && {
         navigationPropertyBindings: parseNavigationPropertyBindings(rawBindings)
       })
@@ -411,7 +423,7 @@ const parseEntityContainer = (rawContainer: Record<string, unknown> | undefined)
     const rawBindings = (s.NavigationPropertyBinding as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
     return {
       name: s['@_Name'] as string,
-      type: s['@_Type'] as string,
+      type: canonicalizeType(s['@_Type'] as string, aliasMap),
       ...(rawBindings.length > 0 && {
         navigationPropertyBindings: parseNavigationPropertyBindings(rawBindings)
       })
@@ -422,7 +434,7 @@ const parseEntityContainer = (rawContainer: Record<string, unknown> | undefined)
   const rawActionImports = (rawContainer.ActionImport as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
   const actionImports: ReadonlyArray<CsdlActionImport> = rawActionImports.map(ai => ({
     name: ai['@_Name'] as string,
-    action: ai['@_Action'] as string,
+    action: canonicalizeType(ai['@_Action'] as string, aliasMap),
     ...(ai['@_EntitySet'] !== undefined && {
       entitySet: ai['@_EntitySet'] as string
     })
@@ -432,7 +444,7 @@ const parseEntityContainer = (rawContainer: Record<string, unknown> | undefined)
   const rawFunctionImports = (rawContainer.FunctionImport as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
   const functionImports: ReadonlyArray<CsdlFunctionImport> = rawFunctionImports.map(fi => ({
     name: fi['@_Name'] as string,
-    function: fi['@_Function'] as string,
+    function: canonicalizeType(fi['@_Function'] as string, aliasMap),
     ...(fi['@_EntitySet'] !== undefined && {
       entitySet: fi['@_EntitySet'] as string
     })
@@ -468,10 +480,23 @@ export const parseCsdlXml = (xml: string): CsdlSchema => {
 
   // CSDL allows a schema Alias as a shorthand for its Namespace; qualified type references may use
   // the alias or the namespace interchangeably. Map alias -> namespace so canonicalizeType can
-  // normalize every qualified type reference (field/nav/base types) before downstream FQDN matching.
+  // normalize every qualified type reference before downstream FQDN matching.
+  // CSDL XML 4.01 §3.4 MUSTs: an alias is unique within the document, differs from every schema namespace,
+  // and is none of Edm / odata / System / Transient. An alias that breaks one of them is NOT mapped — mapping a
+  // duplicate would pick one schema arbitrarily, and mapping an alias that equals a namespace would rewrite the
+  // NAMESPACE spelling of another schema's type. References through an unmapped alias stay as written
+  // (reporting the violation itself is the validator's job — see reso-tools #300 follow-ups).
+  const declaredNamespaceSet = new Set(schemas.map(s => s['@_Namespace']).filter((n): n is string => typeof n === 'string'));
+  const aliasCounts = schemas.reduce<Record<string, number>>((acc, s) => {
+    const alias = s['@_Alias'];
+    return typeof alias === 'string' ? { ...acc, [alias]: (acc[alias] ?? 0) + 1 } : acc;
+  }, {});
   const aliasMap: Readonly<Record<string, string>> = Object.fromEntries(
     schemas
-      .filter(s => s['@_Alias'] && s['@_Namespace'])
+      .filter(s => typeof s['@_Alias'] === 'string' && typeof s['@_Namespace'] === 'string')
+      .filter(s => aliasCounts[s['@_Alias'] as string] === 1)
+      .filter(s => !declaredNamespaceSet.has(s['@_Alias'] as string))
+      .filter(s => !RESERVED_ALIASES.has(s['@_Alias'] as string))
       .map(s => [s['@_Alias'] as string, s['@_Namespace'] as string])
   );
 
@@ -500,9 +525,9 @@ export const parseCsdlXml = (xml: string): CsdlSchema => {
     entityTypes: parseEntityTypes(rawEntityTypes, aliasMap),
     enumTypes: parseEnumTypes(rawEnumTypes),
     complexTypes: parseComplexTypes(rawComplexTypes, aliasMap),
-    actions: parseActions(rawActions),
-    functions: parseFunctions(rawFunctions),
-    entityContainer: parseEntityContainer(rawContainer)
+    actions: parseActions(rawActions, aliasMap),
+    functions: parseFunctions(rawFunctions, aliasMap),
+    entityContainer: parseEntityContainer(rawContainer, aliasMap)
   };
 };
 
