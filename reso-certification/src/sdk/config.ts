@@ -27,6 +27,40 @@ interface ConfigPayloads {
   readonly deleteFails?: Record<string, unknown>;
 }
 
+/** Per-endorsement option blocks as the desktop client exports them (reso-web-client config-builder
+ *  RecipientConfig). Carried through normalization so a downloaded config runs unmodified; each converter
+ *  reads its own block first, then the flat entry-level keys (legacy CLI format), then the defaults. */
+interface ConfigDDOptions {
+  readonly version?: string;
+  readonly originatingSystemName?: string;
+  readonly originatingSystemId?: string;
+  readonly limit?: number;
+  readonly strictMode?: boolean;
+  readonly batchExpand?: boolean;
+  readonly requestDelay?: number;
+  readonly rateLimitWait?: number;
+}
+interface ConfigCoreOptions {
+  readonly version?: string;
+  readonly resources?: string | ReadonlyArray<string>;
+  readonly enumMode?: 'auto' | 'isflags' | 'collections' | 'string';
+  readonly fullCoverage?: boolean;
+  readonly originatingSystemName?: string;
+  readonly originatingSystemId?: string;
+}
+interface ConfigAddEditOptions {
+  readonly resource?: string;
+  readonly specVersion?: string;
+  readonly payloadsDir?: string;
+}
+interface ConfigEntityEventOptions {
+  readonly mode?: 'observe' | 'full';
+  readonly writableResource?: string;
+  readonly maxEvents?: number;
+  readonly pollInterval?: number;
+  readonly pollTimeout?: number;
+}
+
 /** A single config entry (one recipient/system combination). */
 interface ConfigEntry extends ConfigAuth {
   readonly description?: string;
@@ -44,6 +78,10 @@ interface ConfigEntry extends ConfigAuth {
   readonly originatingSystemName?: string;
   /** OriginatingSystemID scope — used when no OriginatingSystemName is provided. */
   readonly originatingSystemId?: string;
+  readonly ddOptions?: ConfigDDOptions;
+  readonly coreOptions?: ConfigCoreOptions;
+  readonly addEditOptions?: ConfigAddEditOptions;
+  readonly entityEventOptions?: ConfigEntityEventOptions;
 }
 
 /** Top-level config file shape (matches reso-certification-utils format). */
@@ -100,8 +138,11 @@ interface RawConfigEntry {
     readonly tokenUrl?: string;
     readonly scope?: string;
   };
-  /** Desktop per-endorsement options; only `version` is threaded (the rest are per-command CLI flags). */
-  readonly ddOptions?: { readonly version?: string };
+  /** Desktop per-endorsement option blocks — threaded whole (see ConfigEntry). */
+  readonly ddOptions?: ConfigDDOptions;
+  readonly coreOptions?: ConfigCoreOptions;
+  readonly addEditOptions?: ConfigAddEditOptions;
+  readonly entityEventOptions?: ConfigEntityEventOptions;
 }
 
 /** Validate a config entry's serviceRootUri is a real absolute http(s) URL — the catch-all that turns an
@@ -121,6 +162,8 @@ const validateServiceRootUri = (uri: string, recipientUoi: string): string => {
 /** Normalize one raw entry (either auth shape) to a canonical ConfigEntry. */
 const normalizeConfigEntry = (raw: RawConfigEntry): ConfigEntry => {
   const version = raw.version ?? raw.ddOptions?.version;
+  const originatingSystemName = raw.originatingSystemName ?? raw.coreOptions?.originatingSystemName ?? raw.ddOptions?.originatingSystemName;
+  const originatingSystemId = raw.originatingSystemId ?? raw.coreOptions?.originatingSystemId ?? raw.ddOptions?.originatingSystemId;
   // Auth: prefer the desktop's nested `auth`, else the legacy top-level `token` / `clientCredentials`.
   const auth: ConfigAuth = raw.auth
     ? raw.auth.mode === 'client_credentials' || (!!raw.auth.clientId && !!raw.auth.clientSecret)
@@ -141,8 +184,15 @@ const normalizeConfigEntry = (raw: RawConfigEntry): ConfigEntry => {
     ...(raw.mode ? { mode: raw.mode } : {}),
     ...(raw.writableResource ? { writableResource: raw.writableResource } : {}),
     ...(version ? { version } : {}),
-    ...(raw.originatingSystemName ? { originatingSystemName: raw.originatingSystemName } : {}),
-    ...(raw.originatingSystemId ? { originatingSystemId: raw.originatingSystemId } : {}),
+    // Flat OSN/OSID: the entry-level key, else whichever block declares one — one recipient is one scope, so a
+    // value entered under DD applies to a Core run of the same recipient (and vice versa) unless that
+    // endorsement's own block says otherwise (the converters read their block first).
+    ...(originatingSystemName ? { originatingSystemName } : {}),
+    ...(originatingSystemId ? { originatingSystemId } : {}),
+    ...(raw.ddOptions ? { ddOptions: raw.ddOptions } : {}),
+    ...(raw.coreOptions ? { coreOptions: raw.coreOptions } : {}),
+    ...(raw.addEditOptions ? { addEditOptions: raw.addEditOptions } : {}),
+    ...(raw.entityEventOptions ? { entityEventOptions: raw.entityEventOptions } : {}),
   };
 };
 
@@ -176,6 +226,20 @@ export const generateLocalUoi = (): string => `LOCAL-${Date.now()}`;
 
 // ── Config to ComplianceConfig Conversion ──
 
+/** An endorsement's OSN: its own block first, then the flat entry-level value (which normalization already
+ *  filled from whichever block declared one). */
+const osn = (block: { readonly originatingSystemName?: string } | undefined, entry: ConfigEntry): string | undefined =>
+  block?.originatingSystemName ?? entry.originatingSystemName;
+const osid = (block: { readonly originatingSystemId?: string } | undefined, entry: ConfigEntry): string | undefined =>
+  block?.originatingSystemId ?? entry.originatingSystemId;
+
+/** Core `resources` as the desktop writes it (a comma-separated string) or as a list. */
+const coreResources = (value: string | ReadonlyArray<string> | undefined): ReadonlyArray<string> | undefined => {
+  if (value === undefined) return undefined;
+  const list = (typeof value === 'string' ? value.split(',') : value).map((r) => r.trim()).filter(Boolean);
+  return list.length > 0 ? list : undefined;
+};
+
 /** Convert an Add/Edit config entry to a ComplianceConfig. */
 export const configEntryToAddEdit = (entry: ConfigEntry, providerUoi: string): AddEditConfig => ({
   endorsement: 'add-edit',
@@ -183,8 +247,9 @@ export const configEntryToAddEdit = (entry: ConfigEntry, providerUoi: string): A
     url: entry.serviceRootUri,
     auth: resolveAuthFromEntry(entry),
   },
-  resource: entry.resource ?? 'Property',
-  specVersion: entry.version ?? '2.0.0',
+  resource: entry.addEditOptions?.resource ?? entry.resource ?? 'Property',
+  specVersion: entry.addEditOptions?.specVersion ?? entry.version ?? '2.0.0',
+  ...(entry.addEditOptions?.payloadsDir ?? entry.payloadsDir ? { payloadsDir: entry.addEditOptions?.payloadsDir ?? entry.payloadsDir } : {}),
   options: {
     outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/add-edit`,
   },
@@ -197,8 +262,11 @@ export const configEntryToEntityEvent = (entry: ConfigEntry, providerUoi: string
     url: entry.serviceRootUri,
     auth: resolveAuthFromEntry(entry),
   },
-  mode: entry.mode ?? 'observe',
-  writableResource: entry.writableResource ?? entry.resource ?? 'Property',
+  mode: entry.entityEventOptions?.mode ?? entry.mode ?? 'observe',
+  writableResource: entry.entityEventOptions?.writableResource ?? entry.writableResource ?? entry.resource ?? 'Property',
+  ...(entry.entityEventOptions?.maxEvents !== undefined ? { maxEvents: entry.entityEventOptions.maxEvents } : {}),
+  ...(entry.entityEventOptions?.pollInterval !== undefined ? { pollInterval: entry.entityEventOptions.pollInterval } : {}),
+  ...(entry.entityEventOptions?.pollTimeout !== undefined ? { pollTimeout: entry.entityEventOptions.pollTimeout } : {}),
   options: {
     outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/entity-event`,
   },
@@ -211,9 +279,12 @@ export const configEntryToCore = (entry: ConfigEntry, providerUoi: string): Core
     url: entry.serviceRootUri,
     auth: resolveAuthFromEntry(entry),
   },
-  version: coerceCoreVersion(entry.version),
-  ...(entry.originatingSystemName ? { originatingSystemName: entry.originatingSystemName } : {}),
-  ...(entry.originatingSystemId ? { originatingSystemId: entry.originatingSystemId } : {}),
+  version: coerceCoreVersion(entry.coreOptions?.version ?? entry.version),
+  ...(entry.coreOptions?.enumMode ? { enumMode: entry.coreOptions.enumMode } : {}),
+  ...(coreResources(entry.coreOptions?.resources) ? { resources: coreResources(entry.coreOptions?.resources) } : {}),
+  ...(entry.coreOptions?.fullCoverage ? { fullCoverage: true } : {}),
+  ...(osn(entry.coreOptions, entry) ? { originatingSystemName: osn(entry.coreOptions, entry) } : {}),
+  ...(osid(entry.coreOptions, entry) ? { originatingSystemId: osid(entry.coreOptions, entry) } : {}),
   options: {
     outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/core`,
   },
@@ -226,9 +297,14 @@ export const configEntryToDD = (entry: ConfigEntry, providerUoi: string): DDConf
     url: entry.serviceRootUri,
     auth: resolveAuthFromEntry(entry),
   },
-  version: coerceDDVersion(entry.version),
-  ...(entry.originatingSystemName ? { originatingSystemName: entry.originatingSystemName } : {}),
-  ...(entry.originatingSystemId ? { originatingSystemId: entry.originatingSystemId } : {}),
+  version: coerceDDVersion(entry.ddOptions?.version ?? entry.version),
+  ...(entry.ddOptions?.limit !== undefined ? { limit: entry.ddOptions.limit } : {}),
+  ...(entry.ddOptions?.strictMode ? { strictMode: true } : {}),
+  ...(entry.ddOptions?.batchExpand ? { batchExpand: true } : {}),
+  ...(entry.ddOptions?.requestDelay !== undefined ? { requestDelay: entry.ddOptions.requestDelay } : {}),
+  ...(entry.ddOptions?.rateLimitWait !== undefined ? { rateLimitWait: entry.ddOptions.rateLimitWait } : {}),
+  ...(osn(entry.ddOptions, entry) ? { originatingSystemName: osn(entry.ddOptions, entry) } : {}),
+  ...(osid(entry.ddOptions, entry) ? { originatingSystemId: osid(entry.ddOptions, entry) } : {}),
   options: {
     outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/dd`,
   },
