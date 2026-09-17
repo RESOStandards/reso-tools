@@ -240,11 +240,17 @@ const validatePayloadAndGenerateResults = async ({
   }
 };
 
+const { checkResoContext, parsePayloadContext, RESO_CONTEXT_MESSAGES, CONTEXT_REQUIRED_FROM_DD_VERSION } = require('./reso-context');
+
 module.exports = {
   schema,
   generateJsonSchema,
   validate,
   combineErrors,
+  checkResoContext,
+  parsePayloadContext,
+  RESO_CONTEXT_MESSAGES,
+  CONTEXT_REQUIRED_FROM_DD_VERSION,
   VALIDATION_ERROR_MESSAGES,
   VALIDATION_CONFIG_FILE
 };

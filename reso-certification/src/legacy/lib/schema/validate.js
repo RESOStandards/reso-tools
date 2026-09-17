@@ -24,6 +24,7 @@ const {
   chunkPayload
 } = require('./utils');
 const { validationContext } = require('./context');
+const { checkResoContext } = require('./reso-context');
 
 /**
  * @typedef {import('ajv').ValidateFunction} ValidateFunction
@@ -56,6 +57,11 @@ const ORIGINAL_SCHEMA = 'original_schema';
  * @param {Object} obj.validationConfig
  * @param {boolean} obj.disableKeys
  * @param {boolean} obj.chunk
+ * @param {'transport'|'rcf'=} obj.acquisition  how the payload was obtained (#298): 'transport' = a Web API Core page,
+ *   a DD run replicated over the provider's Web API, an $expand child → DD/Core rules (maxLength is a MUST), the
+ *   context optional until DD 3.0 and validated when present (warnings until 3.0); 'rcf' = a RESO Common Format
+ *   payload → advisory length, the context REQUIRED and validated (errors). Omitted → the legacy presence
+ *   heuristic (mode = !!payload['@reso.context']) for callers that have not declared a path.
  *
  * @returns Intermediate error and warning caches along with stats. Can be combined later using `combineErrors`
  */
@@ -69,7 +75,8 @@ const validate = ({
   isResoDataDictionarySchema = false /*CLI only */,
   validationConfig = {},
   disableKeys,
-  chunk = false
+  chunk = false,
+  acquisition
 } = {}) => {
   const { stats = { totalErrors: 0, totalWarnings: 0 }, errorCache = {}, warningsCache = {}, payloadErrors = {} } = errorMap;
 
@@ -91,9 +98,30 @@ const validate = ({
 
   validationContext.setActiveResource(formattedResourceName || contextData?.resource);
   validationContext.setVersion(version || contextData.version);
-  validationContext.setRCF(!!payload['@reso.context']);
+  // Severity follows the acquisition path, not the annotation's presence (#298). Legacy callers that pass no
+  // path keep the presence heuristic.
+  const isRCF = acquisition === 'rcf' ? true : acquisition === 'transport' ? false : !!payload['@reso.context'];
+  validationContext.setRCF(isRCF);
 
   const ddVersion = validationContext.getVersion();
+
+  // Validate the context itself when a path is declared: shape (RCF §3.4.1(a), lowercase resource name,
+  // additional trailing parameters allowed), version against the run's declared version, resource against the
+  // requested resource. RCF → errors; transport → warnings until DD 3.0, then errors and required.
+  if (acquisition === 'rcf' || acquisition === 'transport') {
+    const { findings } = checkResoContext({ context: payload['@reso.context'], resource: resourceName, version, mode: acquisition });
+    findings.forEach(({ severity, message }) =>
+      updateCacheAndStats({
+        cache: severity === 'warning' ? warningsCache : errorCache,
+        resourceName: resourceName ?? '_INVALID_',
+        failedItemName: '@reso.context',
+        message,
+        fileName,
+        stats,
+        isWarning: severity === 'warning'
+      })
+    );
+  }
 
   /**
    * Step 1 - Analyze the payload and parse out the relevant data like the version, resourceName, etc.

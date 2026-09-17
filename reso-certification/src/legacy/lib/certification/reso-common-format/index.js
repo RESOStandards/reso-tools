@@ -38,7 +38,8 @@ const runRcfTests = async ({
       errorMap,
       jsonSchema: schema,
       resourceName: 'Property',
-      disableKeys: true
+      disableKeys: true,
+      acquisition: 'rcf'
     });
 
     const errorReport = combineErrors(errorMap);

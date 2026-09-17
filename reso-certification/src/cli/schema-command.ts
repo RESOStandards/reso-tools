@@ -27,6 +27,7 @@ interface SchemaModule {
     readonly validationConfig?: unknown;
     readonly isResoDataDictionarySchema?: boolean;
     readonly errorMap?: Record<string, unknown>;
+    readonly acquisition?: 'transport' | 'rcf';
   }) => Record<string, unknown>;
   readonly combineErrors: (errorMap: Record<string, unknown>) => { readonly totalErrors?: number; readonly [k: string]: unknown };
 }
@@ -135,6 +136,10 @@ export const createDdSchemaValidator = async (opts: {
   readonly metadataReportJson: unknown;
   readonly additionalProperties?: boolean;
   readonly validationConfig?: unknown;
+  /** How the payloads were obtained (#298). 'rcf' — RESO Common Format files: advisory length, `@reso.context`
+   *  required and validated. 'transport' — Web API pages: MUST length, context optional until DD 3.0 and
+   *  validated when present. Omitted — the legacy presence heuristic. */
+  readonly acquisition?: 'transport' | 'rcf';
 }): Promise<DdSchemaValidator> => {
   const mod = loadSchemaModule();
   const jsonSchema = await mod.generateJsonSchema({
@@ -143,7 +148,7 @@ export const createDdSchemaValidator = async (opts: {
   });
   return {
     validate: (jsonPayload, resourceName, version, errorMap = {}) =>
-      mod.validate({ jsonSchema, jsonPayload, resourceName, version, validationConfig: opts.validationConfig ?? {}, errorMap }),
+      mod.validate({ jsonSchema, jsonPayload, resourceName, version, validationConfig: opts.validationConfig ?? {}, errorMap, ...(opts.acquisition ? { acquisition: opts.acquisition } : {}) }),
     combine: errorMap => {
       // A payload whose resource isn't in the schema leaves the error map without `stats`; default it
       // so combineErrors doesn't dereference `stats.totalErrors` on undefined (an existing `stats` wins).
