@@ -89,6 +89,32 @@ describe('runRcf (offline)', () => {
     expect(result.stats.schemaErrors).toBeGreaterThanOrEqual(0); // it validated without throwing
   });
 
+  // #298: an RCF payload's context is required and validated. The @odata.context form carries no @reso.context,
+  // so under RCF rules it is a schema ERROR (the context is the only model identifier an RCF payload has); a
+  // well-formed @reso.context on the same records is clean. The severity here is the RCF column of the rule.
+  it('an RCF payload without @reso.context (the @odata.context form) reports the REQUIRED context error', async () => {
+    const result = await runRcf({
+      input: resolve(fixtures, 'odata-payload.json'),
+      version: '2.0',
+      schemaValidate: true,
+      generatedOn: '2026-01-01T00:00:00.000Z',
+      runVariations: false,
+    });
+    expect(result.stats.schemaErrors).toBeGreaterThanOrEqual(1);
+    expect(JSON.stringify(result.schemaReport ?? result)).toMatch(/@reso\.context/);
+  });
+
+  it('an RCF payload with a well-formed, matching @reso.context reports no context finding', async () => {
+    const result = await runRcf({
+      input: resolve(fixtures, 'single-payload.json'), // urn:reso:metadata:2.0:resource:property
+      version: '2.0',
+      schemaValidate: true,
+      generatedOn: '2026-01-01T00:00:00.000Z',
+      runVariations: false,
+    });
+    expect(JSON.stringify(result.schemaReport ?? result)).not.toMatch(/@reso\.context" (value|version|resource)|MUST carry/);
+  });
+
   it('schema-validates a non-DD resource without crashing on combine (empty error map has no stats)', async () => {
     const result = await runRcf({
       input: resolve(fixtures, 'unknown-resource.json'), // resource absent from the DD schema

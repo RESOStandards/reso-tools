@@ -45,6 +45,9 @@ export interface RcfPayload {
   readonly resource: string;
   /** DD version from the context; absent for the `@odata.context` form (caller supplies a default). */
   readonly version?: string;
+  /** The raw `@reso.context` value, when the payload carried one — forwarded to schema validation so the
+   *  context itself is validated (#298: required on an RCF payload; shape / version / resource checked). */
+  readonly context?: string;
 }
 
 const capitalize = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -69,7 +72,8 @@ const toPayload = (parsed: unknown, source: string): RcfPayload | null => {
   if (!ctx) return null;
   const records = Array.isArray(parsed.value) ? parsed.value : [parsed];
   if (records.length === 0) return null;
-  return { source, records, resource: ctx.resource, ...(ctx.version ? { version: ctx.version } : {}) };
+  const context = typeof parsed['@reso.context'] === 'string' ? parsed['@reso.context'] : undefined;
+  return { source, records, resource: ctx.resource, ...(ctx.version ? { version: ctx.version } : {}), ...(context ? { context } : {}) };
 };
 
 const readEntryContent = (zip: ZipFile, entry: ZipEntry): Promise<string> =>

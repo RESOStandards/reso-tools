@@ -82,7 +82,9 @@ export const processRcfStream = async (
     if (opts.validator) {
       // Fall back to the caller-resolved version: an @odata.context ($metadata#) collection carries no
       // version in its context, and the legacy validator requires one (else "Version is required").
-      errorMap = opts.validator.validate({ value: records }, resource, payload.version ?? opts.version, errorMap);
+      // Forward the payload's own context so it is validated too (#298): on an RCF payload it is required, and
+      // its shape / version / resource are checked against the run.
+      errorMap = opts.validator.validate({ ...(payload.context ? { '@reso.context': payload.context } : {}), value: records }, resource, payload.version ?? opts.version, errorMap);
       if (opts.strict && opts.validator.combine(errorMap).totalErrors > 0) {
         throw Object.assign(new Error(`Schema validation failed (strict) at ${payload.source}.`), { schemaFailure: true });
       }
@@ -150,6 +152,8 @@ export interface RcfResult {
   readonly variations?: VariationsServiceReport;
   /** Set when variations was requested but degraded (non-auth service failure); reports still produced. */
   readonly variationsError?: string;
+  /** The combined schema-validation report (errors / warnings by message) when schema validation ran. */
+  readonly schemaReport?: Record<string, unknown>;
   readonly stats: {
     readonly totalRecords: number;
     readonly resources: number;
@@ -205,6 +209,7 @@ export const runRcf = async (opts: {
         metadataReportJson: getReferenceMetadata(version),
         additionalProperties: opts.additionalProperties,
         validationConfig: opts.validationConfig,
+        acquisition: 'rcf',
       })
     : undefined;
 
@@ -256,6 +261,7 @@ export const runRcf = async (opts: {
     dataAvailabilityReport,
     ...(variations ? { variations } : {}),
     ...(variationsError ? { variationsError } : {}),
+    ...(opts.schemaValidate ? { schemaReport: stream.schemaReport } : {}),
     stats: {
       totalRecords: stream.totalRecords,
       resources: metadataReport.resources.length,

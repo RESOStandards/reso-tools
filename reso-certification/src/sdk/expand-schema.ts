@@ -51,6 +51,8 @@ interface LegacySchemaModule {
     readonly version?: string;
     readonly validationConfig?: unknown;
     readonly errorMap?: Record<string, unknown>;
+    /** How the payload was obtained (#298): transport rules vs RCF rules; omitted = legacy presence heuristic. */
+    readonly acquisition?: 'transport' | 'rcf';
   }) => Record<string, unknown>;
 }
 
@@ -227,7 +229,7 @@ const buildExpandSchema = async (
     // catch degrades that item to the 200-gate rather than fabricating a fail.
     const warmupResource = normalized.fields[0]?.resourceName;
     if (warmupResource) {
-      mod.validate({ jsonSchema, jsonPayload: {}, resourceName: warmupResource, version: ddVersion, validationConfig, errorMap: {} });
+      mod.validate({ jsonSchema, jsonPayload: {}, resourceName: warmupResource, version: ddVersion, validationConfig, errorMap: {}, acquisition: 'transport' });
     }
     return { jsonSchema };
   } catch {
@@ -273,6 +275,8 @@ export const createExpandSchemaValidator = async (
           version: ddVersion,
           validationConfig,
           errorMap: {},
+          // an $expand child item is transport-acquired (#298): DD/Core rules, never the advisory RCF mode
+          acquisition: 'transport',
         }) as LegacyValidateResult;
         const totalErrors = result.stats?.totalErrors ?? 0;
         // Field-qualified messages so a schema-invalid expanded item names the offending field(s) — the

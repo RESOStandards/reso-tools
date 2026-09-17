@@ -322,7 +322,10 @@ const replicate = async ({
                     errorMap: schemaValidationResults,
                     jsonSchema: generatedSchema,
                     resourceName,
-                    validationConfig
+                    validationConfig,
+                    // replicated over the provider's Web API → transport rules (#298): maxLength is a MUST
+                    // whether or not the page carries @reso.context; the context is validated when present.
+                    acquisition: 'transport'
                   }) ?? {};
 
                 const {
