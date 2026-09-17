@@ -47,3 +47,8 @@ upi-validation-report.json
 
 # pack:all output — tarballs for linking into reso-tools-private (never committed)
 .packs/
+
+# local cert run logs (provider data — never committed)
+*-core.log
+*.verbose.log
+vendor-logs/
