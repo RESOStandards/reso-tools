@@ -2,7 +2,7 @@
 
 What makes a generated `dd-{ver}.json` payload fit for use as RESO Certification reference data.
 
-These are the invariants every regenerated DD reference payload must satisfy before it is promoted (committed to `reso-certification/reference-metadata/`, copied into `reso-certification/src/etl/reference-metadata/`, or published to the `reso-dd-reference` Lambda layer in `reso-certification-backend`).
+These are the invariants every regenerated DD reference payload must satisfy before it is promoted (committed to `reso-common/reference-metadata/`, the single source the cert pipeline and the desktop client read, or published to the `reso-dd-reference` Lambda layer in `reso-certification-backend`).
 
 ## Authority Hierarchy
 

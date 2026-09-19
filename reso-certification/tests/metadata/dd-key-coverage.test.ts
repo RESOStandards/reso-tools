@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { getKeyFieldForResource } from '@reso-standards/reso-common';
 
 /**
@@ -21,8 +20,10 @@ interface DdShape {
   readonly fields: ReadonlyArray<{ readonly resourceName: string; readonly fieldName: string }>;
 }
 
+// The shipped reference data lives in reso-common (its `reference-metadata/*` subpath export).
+const requireDd = createRequire(import.meta.url);
 const loadDd = (version: string): DdShape =>
-  JSON.parse(readFileSync(fileURLToPath(new URL(`../../reference-metadata/dd-${version}.json`, import.meta.url)), 'utf8'));
+  requireDd(`@reso-standards/reso-common/reference-metadata/dd-${version}.json`);
 
 const resourceNameOf = (r: string | { readonly resourceName: string }): string =>
   typeof r === 'string' ? r : r.resourceName;

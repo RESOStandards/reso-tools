@@ -173,7 +173,7 @@ The GitHub repo merges PRs with **Rebase and merge** — the trunk stays linear,
 ### File Naming
 - `schema-validation-settings.json` – committee-approved, NEVER modify
 - `server-metadata.json` – generated from DD XLSX, do not hand-edit
-- Reference metadata in `reso-certification/reference-metadata/dd-{version}.json`
+- Reference metadata in `reso-common/reference-metadata/dd-{version}.json` (single source; the cert pipeline, its tests and the desktop client all read it from reso-common)
 
 ## Important Patterns
 
@@ -191,7 +191,7 @@ The GitHub repo merges PRs with **Rebase and merge** — the trunk stays linear,
 > npm run update:dd-reference   # fetch dd-{ver}.json from transport main, then run the cert tests
 > ```
 >
-> That runs `reso-certification/utils/fetch-dd-reference.mjs`, which writes **`reso-common/reference-metadata/`** — the single source of truth. The cert pipeline (the `getReferenceMetadata`/`getMetadata` chokepoints in `src/etl`, feeding the DD gate, variations, ETL, schema and legacy) reads it via reso-common's `reference-metadata/*` subpath export (kept out of reso-common's browser-facing main index so the web client isn't bloated). The fetch also writes a synced copy at `reso-certification/reference-metadata/` still read by the desktop client (electron-builder `extraResources` + dev path) and two cert tests — retire that copy once they repoint to reso-common (the Phase A tail; see reso-tools #217 for the ref-server Phase B). NOTE: the ref server's `reso-reference-server/server-metadata.json` is a *separate* DD-2.0 served-schema artifact, not updated here. The historical reso-tools-side generation workflow below is retained for reference; the live tooling is in transport.
+> That runs `reso-certification/utils/fetch-dd-reference.mjs`, which writes **`reso-common/reference-metadata/`** — the single source of truth. The cert pipeline (the `getReferenceMetadata`/`getMetadata` chokepoints in `src/etl`, feeding the DD gate, variations, ETL, schema and legacy) reads it via reso-common's `reference-metadata/*` subpath export (kept out of reso-common's browser-facing main index so the web client isn't bloated); the two cert tests that read the files off disk resolve the same subpath, and the desktop client packages `dd-2.0.json` / `dd-2.1.json` from the published reso-common (electron-builder `extraResources` in reso-tools-private). The former synced copy at `reso-certification/reference-metadata/` was retired in the DD 2.1 refresh of 2026-09-19 (Phase A tail closed; #217 remains for the ref server's Phase B). NOTE: the ref server's `reso-reference-server/server-metadata.json` is a *separate* DD-2.0 served-schema artifact, not updated here. The historical reso-tools-side generation workflow below is retained for reference; the live tooling is in transport.
 
 When DD sheets get a new revision, **transport** regenerates `dd-{ver}.json` (its `generate-dd-json` workflow) and reso-tools pulls the result via `npm run update:dd-reference` (above). Generation, linting, and fitness checks all run in transport now — the subsections below describe that workflow (which moved out of reso-tools) and how reso-tools consumes its output. This happens roughly once per DD update.
 
@@ -242,10 +242,10 @@ The DD update workflow has two scripted steps that run on every refresh, on any 
 2. **Generate reference-metadata JSON** — `reso-certification/utils/generate-reference-metadata.js` reads the linted XLSX and writes the same JSON shape as the Commander's MetadataReport (`resources`, `models`, `fields`, `lookups`, `actions`, `functions`). It is the source for the validation refs consumed across the cert stack.
 
    ```bash
-   node reso-certification/utils/generate-reference-metadata.js path/to/dd-{ver}.xlsx {ver} reso-certification/reference-metadata/dd-{ver}.json
+   node reso-certification/utils/generate-reference-metadata.js path/to/dd-{ver}.xlsx {ver} reso-common/reference-metadata/dd-{ver}.json
    ```
 
-   Repeat for each version. Also copy/regenerate into `reso-certification/src/etl/reference-metadata/` — both locations are read by different consumers.
+   Repeat for each version. (Historical: this step once also copied into `reso-certification/src/etl/reference-metadata/`, removed in Phase A; today every consumer reads `reso-common/reference-metadata/`.)
 
 After both steps, open a PR on `RESOStandards/transport` with the linted XLSX files committed to `references/dd/`. The dd-docs site picks them up via `repository_dispatch` from transport and rebuilds.
 
@@ -274,7 +274,8 @@ Watch for:
 |---|---|---|
 | **Single source** | `reso-common/reference-metadata/dd-{ver}.json` | Written by `fetch-dd-reference.mjs`; the cert pipeline reads it via reso-common's `reference-metadata/*` subpath export |
 | reso-tools cert runner + ETL | *(via the reso-common subpath)* | `getReferenceMetadata`/`getMetadata` in `src/etl` resolve to reso-common; feed the DD gate, variations, ETL, schema, legacy |
-| Desktop client + 2 cert tests | `reso-certification/reference-metadata/dd-{ver}.json` | Synced copy (electron-builder `extraResources` + dev path); retire after the Phase A tail (#217) |
+| Desktop client (reso-tools-private) | `node_modules/@reso-standards/reso-common/reference-metadata/dd-{2.0,2.1}.json` | Packaged by electron-builder `extraResources` from the published reso-common; takes effect on the next reso-common publish + desktop build |
+| 2 cert tests (`dd-versions`, `dd-key-coverage`) | *(via the reso-common subpath)* | Read the files off disk through `createRequire(...).resolve` on the subpath export |
 | Ref server | `reso-reference-server/server-metadata.json` | *Separate* DD-2.0 served-schema artifact — NOT updated here (Phase B, #217) |
 | Cert backend `validateBatch` | `reso-certification-backend/aws/lambda-layers/reso-dd-reference/data/dd-{ver}.json` | Independent; needs a separate layer publish to take effect on QA/prod |
 | Legacy `getReferenceMetadata` lambda | `aws/lambda-functions/getReferenceMetadata/reference-metadata/dd-{ver}.json` | Independent; update if still in active use |
@@ -283,7 +284,7 @@ The backend layer copies are independent of this repo — bumping refs here does
 
 ## Pre-publish review
 
-Non-trivial PRs against the DD reference data path — `reso-certification/utils/generate-reference-metadata.js`, the `dd-{ver}.json` files in `reference-metadata/` and `src/etl/reference-metadata/`, the principles doc at `reso-certification/docs/dd-reference-fitness-principles.md`, or the fitness checker at `reso-certification/utils/check-dd-reference-fitness.js` — are reviewed against codified invariants before they reach the cert backend's publish gate. The review applies refute-by-default precision against a private library of review patterns. The patterns themselves are RESO review IP and live in a separate private location; this CLAUDE.md does not reproduce them.
+Non-trivial PRs against the DD reference data path — `reso-certification/utils/generate-reference-metadata.js`, the `dd-{ver}.json` files in `reso-common/reference-metadata/`, the principles doc at `reso-certification/docs/dd-reference-fitness-principles.md`, or the fitness checker at `reso-certification/utils/check-dd-reference-fitness.js` — are reviewed against codified invariants before they reach the cert backend's publish gate. The review applies refute-by-default precision against a private library of review patterns. The patterns themselves are RESO review IP and live in a separate private location; this CLAUDE.md does not reproduce them.
 
 PR authors don't need to invoke the review themselves; it runs on the maintainer side before merge. The **most useful upstream signal** the review benefits from is a clear PR body that:
 

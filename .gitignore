@@ -1,6 +1,8 @@
 .vscode
 .DS_Store
 node_modules/
+# a symlinked node_modules is a file to git, so the directory rule above does not cover it
+node_modules
 dist/
 coverage/
 results.*

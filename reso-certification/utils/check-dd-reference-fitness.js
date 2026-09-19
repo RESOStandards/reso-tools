@@ -128,12 +128,9 @@ const checks = [
 ];
 
 const DEFAULT_PATHS = [
-  'reso-certification/reference-metadata/dd-1.7.json',
-  'reso-certification/reference-metadata/dd-2.0.json',
-  'reso-certification/reference-metadata/dd-2.1.json',
-  'reso-certification/src/etl/reference-metadata/dd-1.7.json',
-  'reso-certification/src/etl/reference-metadata/dd-2.0.json',
-  'reso-certification/src/etl/reference-metadata/dd-2.1.json',
+  'reso-common/reference-metadata/dd-1.7.json',
+  'reso-common/reference-metadata/dd-2.0.json',
+  'reso-common/reference-metadata/dd-2.1.json',
 ];
 
 const argPaths = process.argv.slice(2);
