@@ -456,13 +456,6 @@ const collectionShapeError = (value: unknown): string | null => {
 };
 
 /**
- * Schema-validate every expanded child item under ONE collection nav against its target entity type — the
- * DATA check the $expand gate exists for ("validate the data, not just that a 200 came back"). A schema-invalid
- * item is a determinate FAIL. No validator (couldn't be built for this run) or no expanded items ⇒ PASS: the
- * nav already returned 200 and there is nothing we can determinately fault, and a compliant server must never
- * false-fail.
- */
-/**
  * Three-way per-item verdict over a set of items (#297): every item evaluated and clean → PASS; any item
  * evaluated and invalid → FAIL naming the first errors (an indeterminate count, if any, rides in the message so
  * it is not lost); no invalid item but at least one the validator could not evaluate → INDETERMINATE (passed for
@@ -490,6 +483,13 @@ const summarizeItemValidation = (
   return { passed: true, message: `${label}: all ${items.length} ${targetType} item(s) valid against ${targetType}` };
 };
 
+/**
+ * Schema-validate every expanded child item under ONE collection nav against its target entity type — the
+ * DATA check the $expand gate exists for ("validate the data, not just that a 200 came back"). The verdict is
+ * the three-way summary above: a schema-invalid item is a determinate FAIL; an item the validator could not
+ * evaluate makes the assertion indeterminate (the scenario reports SKIPPED); no validator for this run or no
+ * expanded items ⇒ PASS, since the nav returned 200 and nothing can be determinately faulted.
+ */
 export const validateExpandedItems = (
   records: ReadonlyArray<Record<string, unknown>>,
   nav: { readonly name: string; readonly targetType: string },

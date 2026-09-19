@@ -16,10 +16,11 @@
  * ── Validation policy (mirrors DD/Core testing exactly — NOT RCF mode) ──
  *  - `additionalProperties: false` when generating the schema: a field on the expanded item that the provider's
  *    metadata does not advertise is an ERROR (`Fields MUST be advertised in the metadata`).
- *  - `isRCF` is DERIVED by the legacy validator from `payload['@reso.context']` (`validate.js`). An expanded
- *    child item never carries `@reso.context`, so `isRCF()` is `false` → DD/Core mode: a value exceeding the
- *    provider's declared `maxLength` is a hard ERROR (`MUST have a maximum advertised length …`), not the RCF
- *    `SHOULD have a maximum suggested length` warning.
+ *  - The severity mode follows the ACQUISITION PATH (#298): every expanded child item is validated with
+ *    `acquisition: 'transport'` → DD/Core mode whether or not it carries `@reso.context`: a value exceeding the
+ *    provider's declared `maxLength` is a hard ERROR (`MUST have a maximum advertised length …`), never the RCF
+ *    `SHOULD have a maximum suggested length` warning. An item is `embedded` in its page, so an absent context
+ *    on the item is never a finding; a present one is checked.
  *  - The committed `schema-validation-settings.json` exemptions are threaded as `validationConfig`, so the
  *    `ignoreEnumerations` fields (Property MLS-area/school, Media ImageSizeDescription) downgrade an
  *    unadvertised-enum ERROR to a WARNING — exactly as the DD/schema path does. The settings are keyed by DD
@@ -53,6 +54,8 @@ interface LegacySchemaModule {
     readonly errorMap?: Record<string, unknown>;
     /** How the payload was obtained (#298): transport rules vs RCF rules; omitted = legacy presence heuristic. */
     readonly acquisition?: 'transport' | 'rcf';
+    /** The payload is an item embedded in a page: an absent context on it is never a finding (#298). */
+    readonly embedded?: boolean;
   }) => Record<string, unknown>;
 }
 
@@ -224,9 +227,10 @@ const buildExpandSchema = async (
     // do NOT warm every distinct resource: the legacy validate() compiles a resource-specific schema per call
     // (it mutates `oneOf` per resource before `ajv.compile`), so warming all of them is O(resources) compiles
     // at construction — 41 for the full DD reference, seconds of work on a CI runner. A compile failure isolated
-    // to a single OTHER resource is not reachable through generateMetadataReport anyway (the generator emits
-    // compilable schemas — even a dangling enum ref compiles, verified), and were it ever to occur the per-item
-    // catch degrades that item to the 200-gate rather than fabricating a fail.
+    // to a single OTHER resource (a navigation whose target type has no definition, the 494d9be shape) is
+    // reached per item instead: that item is INDETERMINATE (#297), and because validate() restores the shared
+    // schema on every exit, the failure leaves nothing behind for the next resource, so every other target type
+    // is evaluated exactly as it would have been in any other order.
     const warmupResource = normalized.fields[0]?.resourceName;
     if (warmupResource) {
       mod.validate({ jsonSchema, jsonPayload: {}, resourceName: warmupResource, version: ddVersion, validationConfig, errorMap: {}, acquisition: 'transport' });
@@ -275,8 +279,10 @@ export const createExpandSchemaValidator = async (
           version: ddVersion,
           validationConfig,
           errorMap: {},
-          // an $expand child item is transport-acquired (#298): DD/Core rules, never the advisory RCF mode
+          // an $expand child item is transport-acquired (#298): DD/Core rules, never the advisory RCF mode; it is
+          // embedded in the page, so an absent context on the item itself is never a finding (even from DD 3.0)
           acquisition: 'transport',
+          embedded: true,
         }) as LegacyValidateResult;
         const totalErrors = result.stats?.totalErrors ?? 0;
         // Field-qualified messages so a schema-invalid expanded item names the offending field(s) — the
@@ -289,7 +295,8 @@ export const createExpandSchemaValidator = async (
         // no definition — the 494d9be shape) on a non-warm-up resource. That is INDETERMINATE: the item was not
         // evaluated. It was reported as `{ valid: true }` before #297, which the consumer rendered as "all N items
         // valid" — a fabricated pass whose occurrence depended on EntitySet declaration order. Never a false fail
-        // either: the consumer reports the navigation as skipped with this reason.
+        // either: the consumer reports the navigation as skipped with this reason. The throw is confined to this
+        // type: validate() restores the schema it mutated, so later types compile from a clean root.
         const message = err instanceof Error ? err.message : String(err);
         return { valid: false, indeterminate: true, errors: [], reason: `validator could not evaluate a ${targetType} item: ${message}` };
       }
