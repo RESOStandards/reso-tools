@@ -133,4 +133,20 @@ describe('#297 — per-item validator failure is INDETERMINATE, never "all N ite
     expect(officeAfter.valid).toBe(false);
     expect(officeAfter.errors.length).toBeGreaterThan(0);
   });
+
+  it('T8 the uncompilable resource declared FIRST: a validator is still built, its own items are indeterminate, a grossly invalid Office item still FAILS', async () => {
+    // before: the single warm-up on the first-declared resource threw, no validator was built, and every
+    // navigation was skipped — including one whose expanded data was genuinely schema-invalid
+    const memberFirstThree = reportWith([...memberFields, ...propertyFields, ...officeFields]);
+    const validator = await createExpandSchemaValidator({ metadataReport: memberFirstThree, version: '2.1.0', validationConfig: {} });
+    expect(validator).toBeDefined();
+    const member = validator!.validate(badMember, 'Member');
+    expect(member.indeterminate).toBe(true);
+    expect(member.reason).toMatch(/could not be compiled/);
+    const office = validator!.validate(badOffice, 'Office');
+    expect(office.indeterminate).toBeFalsy();
+    expect(office.valid).toBe(false);
+    const assertion = validateExpandedItems([{ ListingKey: 'P1', Offices: [badOffice] }], { name: 'Offices', targetType: 'Office' }, validator);
+    expect(assertion.passed).toBe(false);
+  });
 });

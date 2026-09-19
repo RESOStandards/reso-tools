@@ -86,6 +86,9 @@ const loadLegacySchemaModule = async (): Promise<LegacySchemaModule> => {
 interface LegacyValidateResult {
   readonly stats?: { readonly totalErrors?: number };
   readonly errorCache?: Record<string, unknown>;
+  /** Payload-level failures the legacy validator records outside the error tally (an invalid resource, a
+   *  schema-selection failure): the item was not evaluated, so a non-empty map is indeterminate, never valid. */
+  readonly payloadErrors?: Record<string, unknown>;
 }
 
 /**
@@ -199,6 +202,9 @@ export interface CreateExpandSchemaValidatorInput {
 /** A compiled schema handle — present only when construction AND the ajv compile both succeeded. */
 interface BuiltSchema {
   readonly jsonSchema: unknown;
+  /** Resource types whose resource-specific schema failed to compile during warm-up: every item of such a type
+   *  is indeterminate, decided here so the verdict never depends on which resource came first in the report. */
+  readonly undeterminable: ReadonlySet<string>;
 }
 
 /**
@@ -231,11 +237,22 @@ const buildExpandSchema = async (
     // reached per item instead: that item is INDETERMINATE (#297), and because validate() restores the shared
     // schema on every exit, the failure leaves nothing behind for the next resource, so every other target type
     // is evaluated exactly as it would have been in any other order.
-    const warmupResource = normalized.fields[0]?.resourceName;
-    if (warmupResource) {
-      mod.validate({ jsonSchema, jsonPayload: {}, resourceName: warmupResource, version: ddVersion, validationConfig, errorMap: {}, acquisition: 'transport' });
+    // Warm-up walks the report's resources in declaration order until ONE compiles. A resource whose own schema
+    // throws is recorded as undeterminable (its items are indeterminate, #297) and the next resource is tried, so
+    // the outcome no longer depends on whether the uncompilable resource happened to be declared first: before,
+    // a first-declared uncompilable resource failed the whole build and every navigation, compilable or not, was
+    // skipped. Only when no resource compiles is the failure wholesale → undefined → the nav gates on the 200.
+    const undeterminable = new Set<string>();
+    const resources = [...new Set(normalized.fields.map((field) => field.resourceName))];
+    for (const resourceName of resources) {
+      try {
+        mod.validate({ jsonSchema, jsonPayload: {}, resourceName, version: ddVersion, validationConfig, errorMap: {}, acquisition: 'transport' });
+        return { jsonSchema, undeterminable };
+      } catch {
+        undeterminable.add(resourceName);
+      }
     }
-    return { jsonSchema };
+    return undefined;
   } catch {
     return undefined;
   }
@@ -271,6 +288,9 @@ export const createExpandSchemaValidator = async (
       if (!hasDefinition(targetType)) {
         return { valid: false, indeterminate: true, errors: [], reason: `no schema definition for target type ${targetType}` };
       }
+      if (built.undeterminable.has(targetType)) {
+        return { valid: false, indeterminate: true, errors: [], reason: `the schema for target type ${targetType} could not be compiled` };
+      }
       try {
         const result = mod.validate({
           jsonSchema: built.jsonSchema,
@@ -285,6 +305,13 @@ export const createExpandSchemaValidator = async (
           embedded: true,
         }) as LegacyValidateResult;
         const totalErrors = result.stats?.totalErrors ?? 0;
+        // A payload-level failure (recorded outside the tally) means the item was not evaluated: indeterminate,
+        // never "valid" read off a zero tally (the third route #297 closes; unreachable through the generator
+        // today, since such a failure fails the warm-up, and guarded here so it stays closed).
+        const payloadErrors = Object.keys(result.payloadErrors ?? {});
+        if (payloadErrors.length > 0) {
+          return { valid: false, indeterminate: true, errors: [], reason: `validator recorded a payload error for a ${targetType} item: ${payloadErrors.join(', ')}` };
+        }
         // Field-qualified messages so a schema-invalid expanded item names the offending field(s) — the
         // errorCache already carries them; the old Object.keys(errorCache) surfaced only the generic rule.
         const errors = errorMessagesFromCache(result.errorCache);
