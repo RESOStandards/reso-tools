@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { processRcfStream, runRcf, resolveRcfExitCode, type RcfResult } from '../../src/cli/rcf-command.js';
 import type { RcfPayload } from '../../src/cli/rcf-input.js';
 import type { DdSchemaValidator } from '../../src/cli/schema-command.js';
@@ -115,15 +117,59 @@ describe('runRcf (offline)', () => {
     expect(JSON.stringify(result.schemaReport ?? result)).not.toMatch(/@reso\.context" (value|version|resource)|MUST carry/);
   });
 
-  it('schema-validates a non-DD resource without crashing on combine (empty error map has no stats)', async () => {
+  it('a context naming a resource absent from the DD schema, in a non-lowercase form: no crash, and the malformed context is REPORTED (exit 1)', async () => {
+    // The fixture's context is urn:reso:metadata:2.0:resource:NotADdResource — mixed case, so malformed under the
+    // lowercase rule. Before the review this test asserted schemaErrors >= 0, which pinned the hole: the unknown
+    // resource made validate() return the caller's empty accumulator and the MALFORMED error was lost.
     const result = await runRcf({
-      input: resolve(fixtures, 'unknown-resource.json'), // resource absent from the DD schema
+      input: resolve(fixtures, 'unknown-resource.json'),
       version: '2.0',
       schemaValidate: true,
       generatedOn: '2026-01-01T00:00:00.000Z',
       runVariations: false,
     });
-    expect(result.stats.schemaErrors).toBeGreaterThanOrEqual(0); // combine defaulted stats instead of dereferencing undefined
+    expect(result.stats.schemaErrors).toBeGreaterThanOrEqual(1);
+    expect(JSON.stringify(result.schemaReport)).toMatch(/@reso\.context/);
+    expect(resolveRcfExitCode(result)).toBe(1);
+  });
+
+  const tempDirWith = (files: Record<string, unknown>): string => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'rcf-review-'));
+    for (const [name, body] of Object.entries(files)) writeFileSync(resolve(dir, name), JSON.stringify(body));
+    return dir;
+  };
+  const goodRecord = { ListingKey: 'P1', ListPrice: 100000 };
+
+  it('a 1.7 context under --version 2.0 is a VERSION MISMATCH error (the declared run version is authoritative, never the context compared with itself)', async () => {
+    const dir = tempDirWith({ 'a.json': { '@reso.context': 'urn:reso:metadata:1.7:resource:property', value: [goodRecord] } });
+    const result = await runRcf({ input: dir, version: '2.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    expect(result.stats.schemaErrors).toBeGreaterThanOrEqual(1);
+    expect(JSON.stringify(result.schemaReport)).toMatch(/version does not match/);
+    expect(resolveRcfExitCode(result)).toBe(1);
+  });
+
+  it('a context naming a Data Dictionary version with no reference (3.0) fails loud with the version named, never a null dereference', async () => {
+    const dir = tempDirWith({ 'a.json': { '@reso.context': 'urn:reso:metadata:3.0:resource:property', value: [goodRecord] } });
+    await expect(runRcf({ input: dir, schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false })).rejects.toThrow(/Unsupported Data Dictionary version "3\.0"/);
+  });
+
+  it('--version 2.0.0 (the Core form) is accepted as 2.0 on the rcf path', async () => {
+    const dir = tempDirWith({ 'a.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:property', value: [goodRecord] } });
+    const result = await runRcf({ input: dir, version: '2.0.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    expect(result.version).toBe('2.0');
+    expect(result.stats.schemaErrors).toBe(0);
+  });
+
+  it('a file whose @reso.context is present but unparseable is INGESTED and reported malformed, not silently dropped from a mixed directory', async () => {
+    const dir = tempDirWith({
+      'good.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:property', value: [goodRecord] },
+      'bad.json': { '@reso.context': 'urn:reso:metadata:2.0', value: [goodRecord, goodRecord] },
+    });
+    const result = await runRcf({ input: dir, version: '2.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    expect(result.stats.totalRecords).toBe(3); // before: bad.json was dropped as "not an RCF payload" and the run certified on good.json alone
+    expect(result.stats.schemaErrors).toBeGreaterThanOrEqual(1);
+    expect(JSON.stringify(result.schemaReport)).toMatch(/@reso\.context/);
+    expect(resolveRcfExitCode(result)).toBe(1);
   });
 
   // Negative cert path with the REAL validator: a genuine DD violation must surface as schemaErrors

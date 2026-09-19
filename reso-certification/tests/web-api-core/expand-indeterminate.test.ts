@@ -110,4 +110,27 @@ describe('#297 — per-item validator failure is INDETERMINATE, never "all N ite
     expect(results[0].skipped).toBe(true);
     expect(results[0].passed).toBe(true);
   });
+
+  // A third resource whose schema compiles: its verdict must not depend on whether an uncompilable resource was
+  // evaluated before it. The legacy validate() mutates the shared schema's oneOf before ajv.compile and restored it
+  // only on the success path, so one compile throw left a dangling $ref that every later not-yet-compiled resource
+  // inherited: a grossly invalid Office item FAILED when validated before Member and SKIPPED after it.
+  const officeFields = [f('Office', 'OfficeKey', 'Edm.String', { nullable: false }), f('Office', 'OfficeName', 'Edm.String', { maxLength: 5 })];
+  const badOffice = { OfficeKey: 'o1', OfficeName: 'waytoolongvalue', TotallyUndeclared: 1 };
+  const threeResources = reportWith([...propertyFields, ...memberFields, ...officeFields]);
+
+  it('T7 no residue from a compile failure: a compilable resource validated AFTER the uncompilable one is still evaluated (FAIL), same as before it', async () => {
+    const before = await createExpandSchemaValidator({ metadataReport: threeResources, version: '2.1.0', validationConfig: {} });
+    const officeFirst = before!.validate(badOffice, 'Office');
+    expect(officeFirst.indeterminate).toBeFalsy();
+    expect(officeFirst.valid).toBe(false);
+
+    const after = await createExpandSchemaValidator({ metadataReport: threeResources, version: '2.1.0', validationConfig: {} });
+    const member = after!.validate(badMember, 'Member');
+    expect(member.indeterminate).toBe(true);
+    const officeAfter = after!.validate(badOffice, 'Office');
+    expect(officeAfter.indeterminate).toBeFalsy(); // was: indeterminate — Member's compile throw poisoned the shared schema
+    expect(officeAfter.valid).toBe(false);
+    expect(officeAfter.errors.length).toBeGreaterThan(0);
+  });
 });

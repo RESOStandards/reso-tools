@@ -62,6 +62,10 @@ const ORIGINAL_SCHEMA = 'original_schema';
  *   context optional until DD 3.0 and validated when present (warnings until 3.0); 'rcf' = a RESO Common Format
  *   payload → advisory length, the context REQUIRED and validated (errors). Omitted → the legacy presence
  *   heuristic (mode = !!payload['@reso.context']) for callers that have not declared a path.
+ *   On 'transport' the REQUESTED resource and the run's version select the schema; a present context is a
+ *   consistency signal, never the switch. On 'rcf' the context is the payload's model identifier and selects.
+ * @param {boolean=} obj.embedded  the payload is an item embedded in a page (an $expand child): its context, when
+ *   present, is checked, but an absent one is never a finding (the page carries it).
  *
  * @returns Intermediate error and warning caches along with stats. Can be combined later using `combineErrors`
  */
@@ -76,23 +80,34 @@ const validate = ({
   validationConfig = {},
   disableKeys,
   chunk = false,
-  acquisition
+  acquisition,
+  embedded = false
 } = {}) => {
   const { stats = { totalErrors: 0, totalWarnings: 0 }, errorCache = {}, warningsCache = {}, payloadErrors = {} } = errorMap;
 
   const oldOneOf = structuredClone(schema.oneOf);
   let schemaId;
 
+  // Every exit below hands back the merged caches, so a finding recorded on a fresh accumulator (a context
+  // finding, a payload error) reaches the caller, and a caller that destructures `stats` never sees an empty map.
+  const result = extra => ({ ...errorMap, stats, errorCache, warningsCache, payloadErrors, ...extra });
+
   validationContext.setValidationConfig(validationConfig);
   validationContext.setSchema(schema);
   validationContext.setPayloadType(payload.value ? 'MULTI' : 'SINGLE');
   validationContext.setKeysDisabled(disableKeys);
 
-  const contextData = getResourceAndVersion({
-    payload,
-    resource: resourceName,
-    version
-  });
+  // Transport: the requested resource is authoritative for schema selection and the run's version for the
+  // version; the context, when present, only supplies a version the caller did not (a consistency signal, never
+  // the switch). RCF and the legacy presence heuristic: the context is the model identifier and selects.
+  const contextData =
+    acquisition === 'transport'
+      ? { resource: resourceName, version: version || getResourceAndVersion({ payload, resource: resourceName, version }).version }
+      : getResourceAndVersion({
+          payload,
+          resource: resourceName,
+          version
+        });
 
   const formattedResourceName = Object.keys(schema?.definitions ?? {}).find(r => r.toLowerCase() === contextData?.resource?.toLowerCase());
 
@@ -105,11 +120,12 @@ const validate = ({
 
   const ddVersion = validationContext.getVersion();
 
-  // Validate the context itself when a path is declared: shape (RCF §3.4.1(a), lowercase resource name,
+  // Validate the context itself when a path is declared: shape (RCF "Context" / the IANA `reso` URN registration
+  // §3.4.1(a), lowercase resource name,
   // additional trailing parameters allowed), version against the run's declared version, resource against the
   // requested resource. RCF → errors; transport → warnings until DD 3.0, then errors and required.
   if (acquisition === 'rcf' || acquisition === 'transport') {
-    const { findings } = checkResoContext({ context: payload['@reso.context'], resource: resourceName, version, mode: acquisition });
+    const { findings } = checkResoContext({ context: payload['@reso.context'], resource: resourceName, version, mode: acquisition, embedded });
     findings.forEach(({ severity, message }) =>
       updateCacheAndStats({
         cache: severity === 'warning' ? warningsCache : errorCache,
@@ -123,112 +139,104 @@ const validate = ({
     );
   }
 
-  /**
-   * Step 1 - Analyze the payload and parse out the relevant data like the version, resourceName, etc.
-   *
-   * Using this additional info we can improve our generated schema by providing a resource against which
-   * the payload should be validated.
-   */
-  let validPayload = true;
-  if (!payload['@reso.context']) {
-    if (!ddVersion) {
-      validPayload = false;
-      throw new Error('Version is required for payloads without "@reso.context" property');
-    }
-  }
-
   try {
-    const { definitions } = schema;
-    const singleValueSchema = schema?.oneOf?.find(s => !s.properties.value);
-    const multiValueSchema = schema?.oneOf?.find(s => s.properties.value);
-
-    if (!formattedResourceName) {
-      console.log(`Found invalid resource: ${formattedResourceName}`);
-      addPayloadError(formattedResourceName, fileName, 'Invalid resource', payloadErrors);
-      return errorMap;
+    /**
+     * Step 1 - Analyze the payload and parse out the relevant data like the version, resourceName, etc.
+     *
+     * Using this additional info we can improve our generated schema by providing a resource against which
+     * the payload should be validated.
+     */
+    let validPayload = true;
+    if (!payload['@reso.context']) {
+      if (!ddVersion) {
+        validPayload = false;
+        throw new Error('Version is required for payloads without "@reso.context" property');
+      }
     }
-    resourceName = formattedResourceName;
-    if (!payload.value) {
-      schema.oneOf = [singleValueSchema];
-      schemaId = `single-${formattedResourceName}`;
-      // extend the generated schema with new info from the specific payload
-      Object.assign(singleValueSchema.properties, definitions[formattedResourceName].properties);
-    } else {
-      schema.oneOf = [multiValueSchema];
-      multiValueSchema.properties.value.items = {
-        $ref: `#/definitions/${formattedResourceName}`
-      };
-      schemaId = `multi-${formattedResourceName}`;
+
+    try {
+      const { definitions } = schema;
+      const singleValueSchema = schema?.oneOf?.find(s => !s.properties.value);
+      const multiValueSchema = schema?.oneOf?.find(s => s.properties.value);
+
+      if (!formattedResourceName) {
+        console.log(`Found invalid resource: ${contextData?.resource}`);
+        addPayloadError(contextData?.resource ?? resourceName, fileName, 'Invalid resource', payloadErrors);
+        return result();
+      }
+      resourceName = formattedResourceName;
+      if (!payload.value) {
+        schema.oneOf = [singleValueSchema];
+        schemaId = `single-${formattedResourceName}`;
+        // extend the generated schema with new info from the specific payload
+        Object.assign(singleValueSchema.properties, definitions[formattedResourceName].properties);
+      } else {
+        schema.oneOf = [multiValueSchema];
+        multiValueSchema.properties.value.items = {
+          $ref: `#/definitions/${formattedResourceName}`
+        };
+        schemaId = `multi-${formattedResourceName}`;
+      }
+    } catch (error) {
+      validPayload = false;
+      console.error('ERROR: ' + error.message);
+      addPayloadError(resourceName, fileName, error.message, payloadErrors);
     }
-  } catch (error) {
-    validPayload = false;
-    console.error('ERROR: ' + error.message);
-    addPayloadError(resourceName, fileName, error.message, payloadErrors);
-  }
 
-  if (!validPayload)
-    return {
-      stats,
-      errorCache,
-      warningsCache,
-      payloadErrors
-    };
+    if (!validPayload) return result();
 
-  // Step 2 - Validate with AJV and generate error report
-  const [selectedSchema] = schema.oneOf;
-  const additionalPropertiesAllowed = selectedSchema.properties.value
-    ? schema.definitions[Object.keys(schema.definitions)[0]].additionalProperties
-    : selectedSchema.additionalProperties;
+    // Step 2 - Validate with AJV and generate error report
+    const [selectedSchema] = schema.oneOf;
+    const additionalPropertiesAllowed = selectedSchema.properties.value
+      ? schema.definitions[Object.keys(schema.definitions)[0]].additionalProperties
+      : selectedSchema.additionalProperties;
 
-  const originalSchema = schemaCache.get(ORIGINAL_SCHEMA);
-  if (originalSchema !== schema) {
-    schemaCache.clear();
-    schemaCache.set(ORIGINAL_SCHEMA, schema);
-  }
+    const originalSchema = schemaCache.get(ORIGINAL_SCHEMA);
+    if (originalSchema !== schema) {
+      schemaCache.clear();
+      schemaCache.set(ORIGINAL_SCHEMA, schema);
+    }
 
-  let cachedSchema = schemaCache.get(schemaId);
-  if (!cachedSchema) {
-    cachedSchema = { ...schema };
-    schemaCache.set(schemaId, cachedSchema);
-  }
+    let cachedSchema = schemaCache.get(schemaId);
+    if (!cachedSchema) {
+      cachedSchema = { ...schema };
+      schemaCache.set(schemaId, cachedSchema);
+    }
 
-  const validate = ajv.compile(cachedSchema);
+    const validate = ajv.compile(cachedSchema);
 
-  let chunkedPayload = [payload];
-  if (chunk) {
-    chunkedPayload = chunkPayload(payload);
-  }
+    let chunkedPayload = [payload];
+    if (chunk) {
+      chunkedPayload = chunkPayload(payload);
+    }
   
-  for (const p of chunkedPayload) {
-    const valid = validate(p);
-    if (!valid) {
-      generateErrorReport({
-        validate,
-        json: p,
-        additionalPropertiesAllowed,
-        resourceName,
-        errorCache,
-        warningsCache,
-        stats,
-        fileName,
-        isResoDataDictionarySchema,
-        version: ddVersion,
-        isRCF: validationContext.isRCF(),
-        metadataMap: schema?.definitions?.MetadataMap || {}
-      });
+    for (const p of chunkedPayload) {
+      const valid = validate(p);
+      if (!valid) {
+        generateErrorReport({
+          validate,
+          json: p,
+          additionalPropertiesAllowed,
+          resourceName,
+          errorCache,
+          warningsCache,
+          stats,
+          fileName,
+          isResoDataDictionarySchema,
+          version: ddVersion,
+          isRCF: validationContext.isRCF(),
+          metadataMap: schema?.definitions?.MetadataMap || {}
+        });
+      }
     }
+    return result({ version: ddVersion });
+  } finally {
+    // The schema's oneOf is mutated per resource above and ajv compiles lazily: a throw on any path (a compile
+    // failure for one resource's schema, a payload error) must leave no residue for the next resource, and the
+    // module-level validation context must not leak into the next call.
+    schema.oneOf = oldOneOf;
+    validationContext.reset();
   }
-
-  schema.oneOf = oldOneOf;
-  validationContext.reset();
-  return {
-    ...errorMap,
-    errorCache,
-    warningsCache,
-    stats,
-    payloadErrors,
-    version: ddVersion
-  };
 };
 
 /**

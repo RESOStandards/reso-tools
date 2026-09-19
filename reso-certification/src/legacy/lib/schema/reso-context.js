@@ -3,7 +3,8 @@
 /**
  * `@reso.context` validation (reso-tools #298).
  *
- * RESO Common Format §3.4.1(a) and the IANA `reso` URN assignment define the payload context as
+ * RESO Common Format (its "Context" section, quoting §3.4.1(a) of the IANA `reso` URN registration) and that
+ * registration define the payload context as
  *   urn:reso:metadata:{version}:resource:{resource-name}
  * with a lowercase resource name (every example in the assignment is lowercase; RFC 8141 leaves the NSS
  * case-sensitive unless the namespace says otherwise). RCF adds: "Additional parameters may be added to the
@@ -20,8 +21,17 @@
  */
 
 const CONTEXT_REQUIRED_FROM_DD_VERSION = '3.0';
-const KNOWN_DD_VERSIONS = Object.freeze(['1.7', '2.0', '2.1', '3.0']);
+// The Data Dictionary versions a context may name when no run version is declared. Kept equal to the SDK's
+// SUPPORTED_DD_VERSIONS (src/sdk/dd-versions.ts) by tests/sdk/dd-versions.test.ts; 3.0 joins when a reference
+// ships for it — until then a 3.0 context with no run version is not a Data Dictionary version this engine knows.
+const KNOWN_DD_VERSIONS = Object.freeze(['1.7', '2.0', '2.1']);
 const RESOURCE_NAME_RE = /^[a-z][a-z0-9_]*$/;
+
+/** major.minor of a version string in any of its forms ('2.1', '2.1.0', 'v2.1'); undefined when it has none. */
+const majorMinor = version => {
+  const m = /^v?(\d+)\.(\d+)/.exec(String(version ?? '').trim());
+  return m ? `${Number(m[1])}.${Number(m[2])}` : undefined;
+};
 
 // Messages start with "The" / "RCF" on purpose: the legacy cache upper-cases the first word of any message that
 // does not start with "The" (warnings) / "Fields" (errors) to emphasise a modal — a message starting with the
@@ -34,7 +44,7 @@ const RESO_CONTEXT_MESSAGES = Object.freeze({
 });
 
 const versionAtLeast = (version, floor) => {
-  const [a, b] = String(version ?? '').split('.').map(Number);
+  const [a, b] = (majorMinor(version) ?? '').split('.').map(Number);
   const [fa, fb] = floor.split('.').map(Number);
   return Number.isFinite(a) && Number.isFinite(b) && (a > fa || (a === fa && b >= fb));
 };
@@ -62,16 +72,18 @@ const parsePayloadContext = context => {
  * @param {string=} obj.resource      the resource the payload was requested/declared for (compared lowercase)
  * @param {string=} obj.version       the run's declared DD version (authoritative on a transport run)
  * @param {'rcf'|'transport'} obj.mode the acquisition path
+ * @param {boolean=} obj.embedded  the payload is an item embedded in a page (an $expand child): the context lives
+ *   on the page, so an absent context on the item is never a finding; a present one is still checked
  * @param {ReadonlyArray<string>=} obj.knownVersions
  * @returns {{ findings: Array<{ severity: 'error'|'warning', message: string }>, parsed: object|null }}
  */
-const checkResoContext = ({ context, resource, version, mode = 'transport', knownVersions = KNOWN_DD_VERSIONS } = {}) => {
+const checkResoContext = ({ context, resource, version, mode = 'transport', embedded = false, knownVersions = KNOWN_DD_VERSIONS } = {}) => {
   const strict = mode === 'rcf' || versionAtLeast(version, CONTEXT_REQUIRED_FROM_DD_VERSION);
   const severity = strict ? 'error' : 'warning';
   const findings = [];
 
   if (context === undefined || context === null) {
-    if (strict) findings.push({ severity: 'error', message: RESO_CONTEXT_MESSAGES.REQUIRED });
+    if (strict && !embedded) findings.push({ severity: 'error', message: RESO_CONTEXT_MESSAGES.REQUIRED });
     return { findings, parsed: null };
   }
 
@@ -82,7 +94,9 @@ const checkResoContext = ({ context, resource, version, mode = 'transport', know
   }
 
   if (version !== undefined && version !== null && version !== '') {
-    if (parsed.version !== String(version)) {
+    // the run version arrives in whichever form the caller holds ('2.1' from a DD run, '2.1.0' from a Core run
+    // or the replicate command); the context carries major.minor, so that is what is compared
+    if (parsed.version !== majorMinor(version)) {
       findings.push({ severity, message: `${RESO_CONTEXT_MESSAGES.VERSION_MISMATCH}: context "${parsed.version}", run "${version}"` });
     }
   } else if (!knownVersions.includes(parsed.version)) {
@@ -96,4 +110,4 @@ const checkResoContext = ({ context, resource, version, mode = 'transport', know
   return { findings, parsed };
 };
 
-module.exports = { checkResoContext, parsePayloadContext, RESO_CONTEXT_MESSAGES, CONTEXT_REQUIRED_FROM_DD_VERSION, KNOWN_DD_VERSIONS };
+module.exports = { checkResoContext, parsePayloadContext, majorMinor, RESO_CONTEXT_MESSAGES, CONTEXT_REQUIRED_FROM_DD_VERSION, KNOWN_DD_VERSIONS };

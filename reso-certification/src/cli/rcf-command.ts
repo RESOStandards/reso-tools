@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { inferMetadataReport, type ReferenceMap } from '../rcf/index.js';
 import { createDdSchemaValidator, type DdSchemaValidator } from './schema-command.js';
+import { SUPPORTED_DD_VERSIONS, isSupportedDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
 import { computeVariationsViaService, isVariationsAuthError, type VariationsServiceReport } from '../variations/index.js';
 import { readRcfPayloads, type RcfPayload } from './rcf-input.js';
 
@@ -80,16 +81,22 @@ export const processRcfStream = async (
     const { resource, records } = payload;
 
     if (opts.validator) {
-      // Fall back to the caller-resolved version: an @odata.context ($metadata#) collection carries no
-      // version in its context, and the legacy validator requires one (else "Version is required").
-      // Forward the payload's own context so it is validated too (#298): on an RCF payload it is required, and
-      // its shape / version / resource are checked against the run.
-      errorMap = opts.validator.validate({ ...(payload.context ? { '@reso.context': payload.context } : {}), value: records }, resource, payload.version ?? opts.version, errorMap);
+      // The caller-resolved run version is authoritative (declared with --version, or peeked from the first
+      // payload): the payload's own context is checked AGAINST it (#298), so a file whose context names another
+      // version is a mismatch, not a version the run silently adopts. Only when the caller resolved none (an
+      // @odata.context collection carries no version, and the legacy validator requires one) does the payload's
+      // version stand in. Forward the raw context so its shape / version / resource are validated too.
+      errorMap = opts.validator.validate({ ...(payload.context !== undefined ? { '@reso.context': payload.context } : {}), value: records }, resource, opts.version ?? payload.version, errorMap);
       if (opts.strict && opts.validator.combine(errorMap).totalErrors > 0) {
         throw Object.assign(new Error(`Schema validation failed (strict) at ${payload.source}.`), { schemaFailure: true });
       }
     }
 
+    if (payload.invalidContext) {
+      // counted as ingested (the file is part of the submission), reported by validation above, never inferred from
+      totalRecords += records.length;
+      continue;
+    }
     const acc = (recordsByResource[resource] ??= []);
     const av = (availability[resource] ??= { recordCount: 0, fields: {} });
     for (const record of records) {
@@ -200,7 +207,14 @@ export const runRcf = async (opts: {
   readonly bearerToken?: string;
   readonly validationConfig?: unknown;
 }): Promise<RcfResult> => {
-  const version = opts.version ?? (await peekVersion(opts.input)) ?? DEFAULT_VERSION;
+  // The run version: declared (--version), else the first payload's context, else the default — normalized to
+  // the Data Dictionary form (2.1.0 → 2.1) and refused when no reference ships for it. Before this guard a
+  // context naming 3.0 or 2.00 passed the shape check and the run died on a null reference deep inside.
+  const requested = opts.version ?? (await peekVersion(opts.input)) ?? DEFAULT_VERSION;
+  if (!isSupportedDDVersion(requested)) {
+    throw new Error(`Unsupported Data Dictionary version "${requested}" (from ${opts.version ? '--version' : "the input's @reso.context"}); supported: ${SUPPORTED_DD_VERSIONS.join(', ')}`);
+  }
+  const version = normalizeDDVersion(requested);
   const referenceMap = buildMetadataMap(getReferenceMetadata(version)).metadataMap;
 
   // Schema-validate against the DD (strict / -a), generating the DD schema once up front.

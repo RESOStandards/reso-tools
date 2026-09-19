@@ -19,6 +19,7 @@ const {
   scorePayload,
   writeAnalyticsReports,
   writeSchemaValidationErrorReport,
+  writeSchemaValidationWarningsReport,
   getSystemRuntimeInfo,
   prepareRequests,
   buildOutputFilePath
@@ -398,6 +399,9 @@ const replicate = async ({
         if (jsonSchemaValidation && schemaValidationResults?.stats?.totalErrors > 0) {
           await writeSchemaValidationErrorReport({ outputPath, errorMap: schemaValidationResults });
         } else {
+          // no errors: the analytics reports, plus the warnings file when the run collected any (#298 — the
+          // transport-path context findings are warnings until DD 3.0 and were otherwise invisible)
+          if (jsonSchemaValidation) await writeSchemaValidationWarningsReport({ outputPath, errorMap: schemaValidationResults });
           await writeAnalyticsReports({
             outputPath,
             version,

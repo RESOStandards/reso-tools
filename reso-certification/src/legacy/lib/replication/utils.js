@@ -14,7 +14,8 @@ const { combineErrors } = require('../schema');
 const REPLICATION_DIRECTORY_NAME = 'reso-replication-output',
   AVAILABILITY_REPORT_FILENAME = 'data-availability-report.json',
   AVAILABILITY_RESPONSES_FILENAME = 'data-availability-responses.json',
-  SCHEMA_VALIDATION_REPORT_FILENAME = 'data-availability-schema-validation-errors.json';
+  SCHEMA_VALIDATION_REPORT_FILENAME = 'data-availability-schema-validation-errors.json',
+  SCHEMA_VALIDATION_WARNINGS_FILENAME = 'data-availability-schema-validation-warnings.json';
 
 const REPLICATION_STRATEGIES = Object.freeze({
   TOP_AND_SKIP: 'TopAndSkip',
@@ -799,6 +800,29 @@ const writeSchemaValidationErrorReport = async ({ outputPath, errorMap = {} }) =
 };
 
 /**
+ * Writes the schema-validation WARNINGS of a run that produced no errors (#298: on the transport path a
+ * malformed or disagreeing `@reso.context` is a warning until DD 3.0; before this file existed such a run
+ * left no trace of them, since the errors report is written only when totalErrors > 0 and in place of the
+ * analytics reports). A separate file, written beside the analytics reports, so no existing reader's
+ * meaning changes: the presence of the errors report still means the run had errors.
+ *
+ * @param {{outputPath: string, errorMap?: {stats?: {totalErrors?: number, totalWarnings?: number}}}} params
+ * @returns {Promise<string|undefined>} the path written, when warnings were present without errors
+ */
+const writeSchemaValidationWarningsReport = async ({ outputPath, errorMap = {} }) => {
+  const {
+    stats: { totalErrors = 0, totalWarnings = 0 }
+  } = errorMap ?? {};
+  if (totalErrors === 0 && totalWarnings > 0) {
+    const resolvedPath = resolveFilePathSync({ outputPath, filename: SCHEMA_VALIDATION_WARNINGS_FILENAME });
+    await writeFile(resolvedPath, JSON.stringify(combineErrors(errorMap)));
+    console.log(`Schema validation warnings (no errors) written to: ${resolvedPath}`);
+    return resolvedPath;
+  }
+  return undefined;
+};
+
+/**
  * Writes a data-availability-report.json file for the given version and availability data
  *
  * @param {Object} params
@@ -1418,6 +1442,8 @@ module.exports = {
   scorePayload,
   writeAnalyticsReports,
   writeSchemaValidationErrorReport,
+  writeSchemaValidationWarningsReport,
+  SCHEMA_VALIDATION_WARNINGS_FILENAME,
   processHttpErrorResponse,
   parseResourceNameFromODataRequestUri,
   buildOutputFilePath,

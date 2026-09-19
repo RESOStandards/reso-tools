@@ -1,6 +1,6 @@
 import { readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   SUPPORTED_DD_VERSIONS,
@@ -80,5 +80,15 @@ describe('guards narrow safely (no `as` casts needed)', () => {
     expect(isCertifiableDDVersion('1.7')).toBe(false);
     expect(isCertifiableDDVersion('2.0')).toBe(true);
     expect(isCertifiableDDVersion('2.1')).toBe(true);
+  });
+});
+
+describe('the legacy @reso.context checker knows the same versions', () => {
+  it('KNOWN_DD_VERSIONS in src/legacy/lib/schema/reso-context.js equals SUPPORTED_DD_VERSIONS (drift guard)', () => {
+    // The checker accepts a context version with no run version declared only when it names a Data Dictionary
+    // version this engine ships a reference for; the two lists are kept in different modules (CJS legacy vs the
+    // SDK) so this guard is what keeps them one list.
+    const { KNOWN_DD_VERSIONS } = createRequire(import.meta.url)(resolve(import.meta.dirname, '../../src/legacy/lib/schema/reso-context.js'));
+    expect([...KNOWN_DD_VERSIONS].sort()).toEqual([...SUPPORTED_DD_VERSIONS].sort());
   });
 });

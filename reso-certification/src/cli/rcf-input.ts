@@ -10,7 +10,10 @@
  *
  * A "payload" is one file's worth of records + the resource/version resolved from its
  * context (`@reso.context` urn form or `@odata.context` `$metadata#` form). Entries
- * that carry no recognizable context, or no records, are skipped as non-RCF.
+ * that carry NO context at all, or no records, are skipped as non-RCF. An entry that
+ * carries an `@reso.context` the resolver cannot read is NOT skipped: it is yielded
+ * with `invalidContext` so schema validation reports the malformed context and the
+ * run does not certify on the clean files alone (#298).
  */
 
 import { readFile, readdir, stat } from 'node:fs/promises';
@@ -48,7 +51,14 @@ export interface RcfPayload {
   /** The raw `@reso.context` value, when the payload carried one — forwarded to schema validation so the
    *  context itself is validated (#298: required on an RCF payload; shape / version / resource checked). */
   readonly context?: string;
+  /** Set when the payload carries an `@reso.context` the resolver could not read (wrong shape, or not a
+   *  string): `resource` is then the placeholder `_INVALID_`, the records are counted but never used for
+   *  inference, and validation reports the context as malformed. */
+  readonly invalidContext?: true;
 }
+
+/** Placeholder resource for a payload whose context could not be resolved. */
+export const INVALID_CONTEXT_RESOURCE = '_INVALID_';
 
 const capitalize = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
@@ -68,11 +78,18 @@ const parseContext = (ctx: unknown): { readonly version?: string; readonly resou
 /** An RcfPayload from a parsed JSON file, or null when it is not an RCF payload. */
 const toPayload = (parsed: unknown, source: string): RcfPayload | null => {
   if (!isPlainObject(parsed)) return null;
-  const ctx = parseContext(parsed['@reso.context'] ?? parsed['@odata.context']);
-  if (!ctx) return null;
   const records = Array.isArray(parsed.value) ? parsed.value : [parsed];
   if (records.length === 0) return null;
-  const context = typeof parsed['@reso.context'] === 'string' ? parsed['@reso.context'] : undefined;
+  const rawContext = parsed['@reso.context'];
+  const ctx = parseContext(rawContext ?? parsed['@odata.context']);
+  if (!ctx) {
+    // No context of either form → not an RCF payload. A present @reso.context the resolver cannot read is a
+    // payload whose context is wrong, which is a finding, not a reason to drop the file.
+    if (rawContext === undefined) return null;
+    const context = typeof rawContext === 'string' ? rawContext : JSON.stringify(rawContext);
+    return { source, records, resource: INVALID_CONTEXT_RESOURCE, context, invalidContext: true };
+  }
+  const context = typeof rawContext === 'string' ? rawContext : undefined;
   return { source, records, resource: ctx.resource, ...(ctx.version ? { version: ctx.version } : {}), ...(context ? { context } : {}) };
 };
 

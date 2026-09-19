@@ -427,13 +427,14 @@ const combineErrors = ({ errorCache, warningsCache, stats, version }) => {
 const capitalizeAjvMessage = (message, isWarning) => {
   // if the error/warning message does not start with one of the following strings
   // then it starts with modals like `Must` or `Should` which we want to emphasize on
-  // so we make them upper case.
-  const WARNING_MESSAGE_PREFIX = 'The';
+  // so we make them upper case. Messages that start with an article or a proper noun already read as a
+  // sentence on either severity ("The @reso.context value MUST …", "RCF payloads MUST …"): the modal inside
+  // them carries the emphasis, so they are left alone whether they land as warnings or errors.
+  const SENTENCE_PREFIXES = ['The', 'RCF'];
   const ERROR_MESSAGE_PREFIX = 'Fields';
 
-  return !message.startsWith(isWarning ? WARNING_MESSAGE_PREFIX : ERROR_MESSAGE_PREFIX)
-    ? message.slice(0, message.indexOf(' ')).toUpperCase() + message.slice(message.indexOf(' '), message.length)
-    : message;
+  const untouched = SENTENCE_PREFIXES.some(prefix => message.startsWith(prefix)) || (!isWarning && message.startsWith(ERROR_MESSAGE_PREFIX));
+  return untouched ? message : message.slice(0, message.indexOf(' ')).toUpperCase() + message.slice(message.indexOf(' '), message.length);
 };
 
 /**
