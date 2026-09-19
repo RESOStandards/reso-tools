@@ -1,5 +1,6 @@
 import { readdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import { dirname } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   SUPPORTED_DD_VERSIONS,
@@ -12,8 +13,11 @@ import {
   isSupportedDDVersion,
 } from '../../src/sdk/dd-versions.js';
 
-// The versions we ship reference metadata for, read straight off disk.
-const referenceDir = fileURLToPath(new URL('../../reference-metadata', import.meta.url));
+// The versions we ship reference metadata for, read straight off reso-common's reference-metadata
+// directory (the single source; resolved through its `reference-metadata/*` subpath export).
+const referenceDir = dirname(
+  createRequire(import.meta.url).resolve('@reso-standards/reso-common/reference-metadata/dd-2.1.json'),
+);
 const versionsOnDisk = readdirSync(referenceDir)
   .map((f) => /^dd-(.+)\.json$/.exec(f)?.[1])
   .filter((v): v is string => v != null)
