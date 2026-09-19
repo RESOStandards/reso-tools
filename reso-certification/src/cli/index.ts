@@ -861,7 +861,7 @@ schemaCmd
   .requiredOption('-m, --metadata <file>', 'Metadata report JSON (metadata-report.json), or "-" for stdin')
   .requiredOption('-p, --payload <file>', 'Payload JSON — an OData collection { value: [...] } or a single record, or "-" for stdin')
   .option('-v, --version <version>', 'DD version for the schema context (e.g. 2.0)')
-  .option('-r, --resource <name>', 'Resource name (else inferred from the payload @odata.context)')
+  .option('-r, --resource <name>', 'Resource name (else inferred from the payload @reso.context or @odata.context)')
   .option('-s, --settings <file>', 'schema-validation-settings.json (else ./ then the pre-baked copy)')
   .option('-a, --additional-properties', 'Allow fields not present in the metadata (default: reject them)')
   .option('--output-dir <path>', 'Directory for the report (created if missing); "-" for stdout', '.')

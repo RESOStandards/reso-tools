@@ -9,8 +9,11 @@
  * consumer decides strict-fail vs. accumulate as it drains the stream.
  *
  * A "payload" is one file's worth of records + the resource/version resolved from its
- * context (`@reso.context` urn form or `@odata.context` `$metadata#` form). Entries
- * that carry NO context at all, or no records, are skipped as non-RCF. An entry that
+ * context. The `@reso.context` urn form is the RESO Common Format context and is
+ * REQUIRED on an RCF payload (#298: its absence is a schema error); the `@odata.context`
+ * `$metadata#` form is read for the resource so such a file is still ingested and
+ * reported, not dropped. Entries that carry NO context of either form, or no records,
+ * are skipped as non-RCF. An entry that
  * carries an `@reso.context` the resolver cannot read is NOT skipped: it is yielded
  * with `invalidContext` so schema validation reports the malformed context and the
  * run does not certify on the clean files alone (#298).
