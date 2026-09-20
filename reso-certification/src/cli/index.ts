@@ -874,8 +874,7 @@ schemaCmd
         metadataReportJson,
         jsonPayload,
         resourceName: opts.resource,
-        // the exemptions in the settings file are keyed by the Data Dictionary form (2.1, not 2.1.0)
-        version: opts.version ? normalizeDDVersion(opts.version) : undefined,
+        version: opts.version, // normalized to the Data Dictionary form inside validateSchemaPayload
         validationConfig,
         additionalProperties: opts.additionalProperties,
       });
@@ -1252,7 +1251,7 @@ program
         if (s.invalidContextFiles > 0) {
           process.stderr.write(
             `rcf: ${s.invalidContextFiles} file(s) carry an unreadable @reso.context (${s.invalidContextRecords} record(s) not certified)` +
-              (opts.schemaValidate ? ' — reported as schema errors\n' : ' — run with --schema-validate for the report\n'),
+              (opts.schemaValidate ? ' — counted among the schema errors above\n' : ' — run with --schema-validate to have them reported as schema errors\n'),
           );
         }
         // Zero-record (empty/unreadable) submissions and degraded variations runs must not read as a clean pass.

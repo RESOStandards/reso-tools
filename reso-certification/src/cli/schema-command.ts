@@ -7,6 +7,7 @@
  * pure over its inputs so it can be unit-tested without a process.
  */
 
+import { normalizeDDVersion } from '../sdk/dd-versions.js';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -75,9 +76,10 @@ export interface SchemaValidationResult {
 
 /**
  * Generate a JSON Schema from a metadata report and validate a payload against it. On this path (no
- * acquisition declared) a present `@reso.context` names the resource and version; `resourceName` / `version`
- * apply when the payload carries none (the resource defaults to Property). The exemptions in
- * `validationConfig` are applied, and both a collection (`{ value: [...] }`) and a single record are handled.
+ * acquisition declared) a present `@reso.context` names the RESOURCE, and `resourceName` applies only when the
+ * payload carries none (default Property); for the VERSION it is the other way round: `version` wins when
+ * given (normalized to the Data Dictionary form), else the context's. The exemptions in `validationConfig` are
+ * applied, and both a collection (`{ value: [...] }`) and a single record are handled.
  */
 export const validateSchemaPayload = async (opts: {
   readonly metadataReportJson: unknown;
@@ -87,6 +89,12 @@ export const validateSchemaPayload = async (opts: {
   readonly validationConfig?: unknown;
   readonly additionalProperties?: boolean;
 }): Promise<SchemaValidationResult> => {
+  // A payload is a JSON object: a single record or a collection `{ value: [...] }`. Anything else (a bare
+  // array, a string, a number, null) has no resource and no records; the legacy validator drops ajv's
+  // root-level type error, so such an input read as PASS. Refuse it up front (the CLI maps a throw to exit 2).
+  if (typeof opts.jsonPayload !== 'object' || opts.jsonPayload === null || Array.isArray(opts.jsonPayload)) {
+    throw new Error('payload must be a JSON object: a single record or a collection { "value": [ ... ] }');
+  }
   const mod = loadSchemaModule();
   const jsonSchema = await mod.generateJsonSchema({
     metadataReportJson: opts.metadataReportJson,
@@ -97,7 +105,8 @@ export const validateSchemaPayload = async (opts: {
     jsonSchema,
     jsonPayload: opts.jsonPayload,
     resourceName: opts.resourceName,
-    version: opts.version,
+    // the exemptions in validationConfig are keyed by the Data Dictionary form (2.1, never 2.1.0)
+    version: opts.version === undefined ? undefined : normalizeDDVersion(opts.version),
     validationConfig: opts.validationConfig ?? {},
     errorMap: {},
   });

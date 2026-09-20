@@ -189,6 +189,40 @@ describe('runReplicate — --strict propagates a schema-validation failure (no f
     expect(JSON.stringify(warnings.warnings)).toMatch(/does not match the requested resource/);
   });
 
+  it('--version in the Core form (2.1.0) finds the 2.1-keyed exemptions: an exempt enumeration is a warning, not an error (the boundary normalizes)', async () => {
+    const CITY = 'org.reso.metadata.enums.City';
+    const report21 = {
+      ...minimalReport,
+      version: '2.1',
+      fields: [
+        ...minimalReport.fields,
+        { resourceName: RESOURCE, fieldName: 'MLSAreaMajor', type: CITY, annotations: [] },
+      ],
+      lookups: [{ lookupName: CITY, lookupValue: 'SampleCity', type: 'Edm.Int32', annotations: [] }],
+    };
+    const record = { ListingKey: 'E1', ModificationTimestamp: '2024-01-01T00:00:00.000Z', MLSAreaMajor: 'NotAnAdvertisedValue' };
+    const server = await startReplicationMockServer({ resource: RESOURCE, records: [record] });
+    cleanups.push(server.close);
+    const outputPath = await mkdtemp(join(tmpdir(), 'replicate-exempt-'));
+    cleanups.push(() => rm(outputPath, { recursive: true, force: true }));
+    const reportPath = join(outputPath, 'metadata-report.json');
+    await writeFile(reportPath, JSON.stringify(report21));
+
+    await runReplicate({
+      serviceRootUri: server.url,
+      strategy: 'TopAndSkip',
+      bearerToken: 'test-token',
+      metadataReportPath: reportPath,
+      outputPath,
+      version: '2.1.0',
+      jsonSchemaValidation: true,
+      secondsDelayBetweenRequests: 0,
+    });
+    const written = await readdir(outputPath);
+    expect(written).not.toContain('data-availability-schema-validation-errors.json'); // before: the 2.1 exemption was missed under "2.1.0" → error
+    expect(written).toContain('data-availability-schema-validation-warnings.json');
+  });
+
   it('rejects up front when schema validation is requested without a metadata report', async () => {
     await expect(
       runReplicate({

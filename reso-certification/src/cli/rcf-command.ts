@@ -69,6 +69,9 @@ export const processRcfStream = async (
     readonly sampleCap?: number;
     /** Caller-resolved DD version — the authoritative fallback for validation (see below). */
     readonly version?: string;
+    /** Maps a payload's resource (as ingested from its context, lowercase under the RCF rule) to the Data
+     *  Dictionary resource name; the ingested form stands for a name the DD does not define. */
+    readonly canonicalResource?: (resource: string) => string;
   } = {},
 ): Promise<RcfStreamResult> => {
   const recordsByResource: Record<string, unknown[]> = {};
@@ -83,14 +86,19 @@ export const processRcfStream = async (
 
   for await (const payload of payloads) {
     capturedVersion ??= payload.version;
-    const { resource, records } = payload;
+    const { records } = payload;
+    // The RCF context carries the resource name lowercase; the reports, the reference lookups and the
+    // schema definitions are keyed by the DD name (OpenHouse, not Openhouse), so resolve it here once.
+    const resource = opts.canonicalResource ? opts.canonicalResource(payload.resource) : payload.resource;
 
     if (opts.validator) {
       // The caller-resolved run version is authoritative (declared with --version, or peeked from the first
       // payload): the payload's own context is checked AGAINST it (#298), so a file whose context names another
       // version is a mismatch, not a version the run silently adopts. Only when the caller resolved none (an
       // @odata.context collection carries no version, and the legacy validator requires one) does the payload's
-      // version stand in. Forward the raw context so its shape / version / resource are validated too.
+      // version stand in. Forward the raw context so its shape and version are validated too. (Its resource
+      // segment is what this command derives `resource` from, so on the rcf command a resource disagreement
+      // cannot arise; that rule is exercised by callers that request a resource independently of the payload.)
       errorMap = opts.validator.validate({ ...(payload.context !== undefined ? { '@reso.context': payload.context } : {}), value: records }, resource, opts.version ?? payload.version, errorMap);
       if (opts.strict && opts.validator.combine(errorMap).totalErrors > 0) {
         throw Object.assign(new Error(`Schema validation failed (strict) at ${payload.source}.`), { schemaFailure: true });
@@ -205,7 +213,7 @@ export interface RcfResult {
 export const resolveRcfExitCode = (result: Pick<RcfResult, 'stats' | 'variationsError'>): number => {
   if (result.stats.totalRecords === 0) return 2;
   if (result.stats.schemaErrors > 0) return 1;
-  if ((result.stats.invalidContextFiles ?? 0) > 0) return 2;
+  if (result.stats.invalidContextFiles > 0) return 2;
   if (result.variationsError) return 2;
   return 0;
 };
@@ -235,7 +243,14 @@ export const runRcf = async (opts: {
     throw new Error(`Unsupported Data Dictionary version "${requested}" (from ${opts.version ? '--version' : "the input's @reso.context"}); supported: ${SUPPORTED_DD_VERSIONS.join(', ')}`);
   }
   const version = normalizeDDVersion(requested);
-  const referenceMap = buildMetadataMap(getReferenceMetadata(version)).metadataMap;
+  const reference = getReferenceMetadata(version) as { readonly resources?: ReadonlyArray<string | { readonly resourceName: string }> };
+  const referenceMap = buildMetadataMap(reference).metadataMap;
+  // DD resource names by their lowercase form: the context names the resource lowercase (#298), the reports
+  // and reference lookups use the DD's own casing (OpenHouse, PropertyUnitTypes, OUID).
+  const ddNames = new Map(
+    (reference.resources ?? []).map((r) => (typeof r === 'string' ? r : r.resourceName)).map((name) => [name.toLowerCase(), name] as const),
+  );
+  const canonicalResource = (resource: string): string => ddNames.get(resource.toLowerCase()) ?? resource;
 
   // Schema-validate against the DD (strict / -a), generating the DD schema once up front.
   const validator = opts.schemaValidate
@@ -252,6 +267,7 @@ export const runRcf = async (opts: {
     strict: opts.strict,
     sampleCap: opts.sampleCap,
     version,
+    canonicalResource,
   });
 
   const metadataReport = inferMetadataReport({

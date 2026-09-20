@@ -56,13 +56,46 @@ describe('validateSchemaPayload — the schema command verdict core', () => {
     expect(JSON.stringify(report)).toMatch(/NotAResource.*not defined|not defined.*NotAResource/);
   });
 
-  it('a mixed-case @reso.context resource (malformed) with no -r → the payload is not silently passed', async () => {
-    const { totalErrors } = await validateSchemaPayload({
+  it('a @reso.context naming a resource the schema does not define, no -r → one counted error naming it, never a silent pass', async () => {
+    const { totalErrors, report } = await validateSchemaPayload({
       metadataReportJson: metadata,
       jsonPayload: { '@reso.context': 'urn:reso:metadata:2.0:resource:NotAResource', value: [{ ListingKey: 'x' }] },
       version: '2.0',
     });
-    expect(totalErrors).toBeGreaterThan(0);
+    expect(totalErrors).toBe(1);
+    expect(JSON.stringify(report)).toMatch(/NotAResource.*not defined/);
+  });
+
+  it('a @reso.context the resolver cannot read at all, no -r → one counted error saying so, keyed under a named resource, never ""', async () => {
+    for (const context of ['urn:reso:metadata:2.0', 'URN:RESO:METADATA:2.0:RESOURCE:PROPERTY']) {
+      const { totalErrors, report } = await validateSchemaPayload({
+        metadataReportJson: metadata,
+        jsonPayload: { '@reso.context': context, value: [{ ListingKey: 'x' }] },
+        version: '2.0',
+      });
+      expect(totalErrors).toBe(1);
+      expect(JSON.stringify(report)).toMatch(/could not be resolved to a resource/);
+      const resourceKeys = Object.values((report as { errors: Record<string, { resources: Record<string, unknown> }> }).errors).flatMap(e => Object.keys(e.resources));
+      expect(resourceKeys).not.toContain('');
+    }
+  });
+
+  it('a Core-form version (2.1.0) finds the 2.1-keyed exemptions: an ignoreEnumerations field is a warning, not an error', async () => {
+    // the settings file is keyed by the Data Dictionary form; an unnormalized 2.1.0 missed every exemption
+    const meta21 = getReferenceMetadata('2.1');
+    const settings = await loadSettings(resolveSettingsPath());
+    const payload = { '@reso.context': 'urn:reso:metadata:2.1:resource:property', value: [{ ListingKey: 'x', MLSAreaMajor: 'NotAnAdvertisedValue' }] };
+    const asDd = await validateSchemaPayload({ metadataReportJson: meta21, jsonPayload: payload, version: '2.1', validationConfig: settings });
+    const asCore = await validateSchemaPayload({ metadataReportJson: meta21, jsonPayload: payload, version: '2.1.0', validationConfig: settings });
+    expect(asDd.totalErrors).toBe(0);
+    expect(asCore.totalErrors).toBe(0); // before: 1 (the exemption keyed "2.1" was not found under "2.1.0")
+    expect((asCore.report as { totalWarnings: number }).totalWarnings).toBe((asDd.report as { totalWarnings: number }).totalWarnings);
+  });
+
+  it('a top-level payload that is neither an object nor a collection (a bare array, a string, a number) is refused, never PASS', async () => {
+    for (const jsonPayload of [[{ ListingKey: 'x' }], 'not a payload', 42, null]) {
+      await expect(validateSchemaPayload({ metadataReportJson: metadata, jsonPayload, resourceName: 'Property', version: '2.0' })).rejects.toThrow(/payload must be a JSON object/);
+    }
   });
 });
 
