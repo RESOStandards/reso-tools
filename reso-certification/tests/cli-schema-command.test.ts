@@ -38,6 +38,32 @@ describe('validateSchemaPayload — the schema command verdict core', () => {
     expect(totalErrors).toBeGreaterThan(0);
     expect(report).toBeDefined();
   });
+
+  // Review round 2 (2026-09-19): a payload the command never evaluated must never read as a pass. Before, a
+  // resource the schema does not define crashed the command (exit 2); the round-1 fix made every validate()
+  // exit return its caches, which turned that crash into "0 errors" / exit 0.
+  it('a resource the schema does not define → an error naming the resource, never 0 errors for a payload that was not validated', async () => {
+    // no context on the payload: on this command's (legacy) path a present @reso.context selects the resource
+    // over -r, so the unknown-resource exit is reached through -r only when the payload carries none
+    const { '@reso.context': _ctx, ...contextless } = valuePayload as Record<string, unknown>;
+    const { totalErrors, report } = await validateSchemaPayload({
+      metadataReportJson: metadata,
+      jsonPayload: contextless,
+      resourceName: 'NotAResource',
+      version: '2.0',
+    });
+    expect(totalErrors).toBeGreaterThan(0);
+    expect(JSON.stringify(report)).toMatch(/NotAResource.*not defined|not defined.*NotAResource/);
+  });
+
+  it('a mixed-case @reso.context resource (malformed) with no -r → the payload is not silently passed', async () => {
+    const { totalErrors } = await validateSchemaPayload({
+      metadataReportJson: metadata,
+      jsonPayload: { '@reso.context': 'urn:reso:metadata:2.0:resource:NotAResource', value: [{ ListingKey: 'x' }] },
+      version: '2.0',
+    });
+    expect(totalErrors).toBeGreaterThan(0);
+  });
 });
 
 describe('resolveSettingsPath — explicit → CWD → pre-baked precedence', () => {

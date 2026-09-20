@@ -789,9 +789,7 @@ const createRuntimeAvailabilityStats = (resourceAvailabilityMap = {}) =>
  * @param {Object} errorMap a map containing JSON Schema validation errors
  */
 const writeSchemaValidationErrorReport = async ({ outputPath, errorMap = {} }) => {
-  const {
-    stats: { totalErrors = 0 }
-  } = errorMap ?? {};
+  const { totalErrors = 0 } = errorMap?.stats ?? {};
   if (totalErrors > 0) {
     const resolvedPath = resolveFilePathSync({ outputPath, filename: SCHEMA_VALIDATION_REPORT_FILENAME });
     await writeFile(resolvedPath, JSON.stringify(combineErrors(errorMap)));
@@ -810,9 +808,9 @@ const writeSchemaValidationErrorReport = async ({ outputPath, errorMap = {} }) =
  * @returns {Promise<string|undefined>} the path written, when warnings were present without errors
  */
 const writeSchemaValidationWarningsReport = async ({ outputPath, errorMap = {} }) => {
-  const {
-    stats: { totalErrors = 0, totalWarnings = 0 }
-  } = errorMap ?? {};
+  // a run in which no page was validated (zero records, every request an error the engine swallowed) hands
+  // an empty accumulator here: nothing to write, never a reason to fail the run
+  const { totalErrors = 0, totalWarnings = 0 } = errorMap?.stats ?? {};
   if (totalErrors === 0 && totalWarnings > 0) {
     const resolvedPath = resolveFilePathSync({ outputPath, filename: SCHEMA_VALIDATION_WARNINGS_FILENAME });
     await writeFile(resolvedPath, JSON.stringify(combineErrors(errorMap)));

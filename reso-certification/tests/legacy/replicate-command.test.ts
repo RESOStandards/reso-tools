@@ -130,6 +130,65 @@ describe('runReplicate — --strict propagates a schema-validation failure (no f
     ).rejects.toThrow(/[Ss]chema validation/);
   });
 
+  // Review round 2 (2026-09-19): the warnings-report call at the end of a replication run must never be the
+  // thing that fails the run. A pass in which no page was validated (zero records everywhere; every request an
+  // HTTP error the engine swallows) hands the report writers an empty accumulator; the errors writer is
+  // guarded, the warnings writer was not, and the run rejected at report time with no analytics reports.
+  it('a schema-validated run in which no page carried records still resolves and writes the analytics reports', async () => {
+    const server = await startReplicationMockServer({ resource: RESOURCE, records: [] });
+    cleanups.push(server.close);
+    const outputPath = await mkdtemp(join(tmpdir(), 'replicate-empty-'));
+    cleanups.push(() => rm(outputPath, { recursive: true, force: true }));
+    const reportPath = join(outputPath, 'metadata-report.json');
+    await writeFile(reportPath, JSON.stringify(minimalReport));
+
+    await runReplicate({
+      serviceRootUri: server.url,
+      strategy: 'TopAndSkip',
+      bearerToken: 'test-token',
+      metadataReportPath: reportPath,
+      outputPath,
+      version: '2.0',
+      jsonSchemaValidation: true,
+      secondsDelayBetweenRequests: 0,
+    });
+    const written = await readdir(outputPath); // the reports are written at outputPath itself
+    expect(written).toContain('data-availability-report.json');
+    expect(written).not.toContain('data-availability-schema-validation-warnings.json');
+    expect(written).not.toContain('data-availability-schema-validation-errors.json');
+  });
+
+  it('a run whose only findings are warnings writes the warnings file beside the analytics reports (the call site, end to end)', async () => {
+    // a well-formed page context naming another resource: a warning on the transport path, no error
+    const record = { ListingKey: 'W1', ModificationTimestamp: '2024-01-01T00:00:00.000Z' };
+    const server = await startReplicationMockServer({ resource: RESOURCE, records: [record], pageContext: 'urn:reso:metadata:2.0:resource:member' });
+    cleanups.push(server.close);
+    const outputPath = await mkdtemp(join(tmpdir(), 'replicate-warn-'));
+    cleanups.push(() => rm(outputPath, { recursive: true, force: true }));
+    const reportPath = join(outputPath, 'metadata-report.json');
+    await writeFile(reportPath, JSON.stringify(minimalReport));
+
+    await runReplicate({
+      serviceRootUri: server.url,
+      strategy: 'TopAndSkip',
+      bearerToken: 'test-token',
+      metadataReportPath: reportPath,
+      outputPath,
+      version: '2.0',
+      jsonSchemaValidation: true,
+      secondsDelayBetweenRequests: 0,
+    });
+    const dir = outputPath; // the reports are written at outputPath itself
+    const written = await readdir(dir);
+    expect(written).toContain('data-availability-report.json');
+    expect(written).toContain('data-availability-schema-validation-warnings.json');
+    expect(written).not.toContain('data-availability-schema-validation-errors.json');
+    const warnings = JSON.parse(await readFile(join(dir, 'data-availability-schema-validation-warnings.json'), 'utf8'));
+    expect(warnings.totalErrors).toBe(0);
+    expect(warnings.totalWarnings).toBeGreaterThanOrEqual(1);
+    expect(JSON.stringify(warnings.warnings)).toMatch(/does not match the requested resource/);
+  });
+
   it('rejects up front when schema validation is requested without a metadata report', async () => {
     await expect(
       runReplicate({

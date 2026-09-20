@@ -44,6 +44,9 @@ export interface RcfStreamResult {
   readonly recordsByResource: Record<string, unknown[]>;
   readonly availability: Record<string, AvailabilityResource>;
   readonly totalRecords: number;
+  /** Files whose `@reso.context` was present but unreadable: ingested, reported by validation, never certifiable. */
+  readonly invalidContextFiles: number;
+  readonly invalidContextRecords: number;
   /** DD version observed in the stream (first payload that carried one). */
   readonly version?: string;
   readonly schemaErrors: number;
@@ -74,6 +77,8 @@ export const processRcfStream = async (
   let errorMap: Record<string, unknown> = {};
   const cap = opts.sampleCap ?? DEFAULT_SAMPLE_CAP;
   let totalRecords = 0;
+  let invalidContextFiles = 0;
+  let invalidContextRecords = 0;
   let capturedVersion: string | undefined;
 
   for await (const payload of payloads) {
@@ -93,8 +98,10 @@ export const processRcfStream = async (
     }
 
     if (payload.invalidContext) {
-      // counted as ingested (the file is part of the submission), reported by validation above, never inferred from
-      totalRecords += records.length;
+      // part of the submission but never certifiable: its own stat (so the exit code sees it whether or not a
+      // validator ran), reported by validation above when one did, never counted as a record or inferred from
+      invalidContextFiles += 1;
+      invalidContextRecords += records.length;
       continue;
     }
     const acc = (recordsByResource[resource] ??= []);
@@ -117,6 +124,8 @@ export const processRcfStream = async (
     recordsByResource,
     availability,
     totalRecords,
+    invalidContextFiles,
+    invalidContextRecords,
     version: opts.version ?? capturedVersion,
     schemaErrors: combined.totalErrors,
     schemaReport: combined.report,
@@ -147,8 +156,12 @@ const buildDataAvailabilityReport = (
 });
 
 /** Peek the first payload's DD version without draining the stream (used to build the DD schema/reference). */
+/** The first payload's context version — skipping payloads that carry none (an unreadable context, the
+ *  @odata.context form), so a bad file that sorts first never decides the run's version. */
 const peekVersion = async (input: string): Promise<string | undefined> => {
-  for await (const payload of readRcfPayloads(input)) return payload.version;
+  for await (const payload of readRcfPayloads(input)) {
+    if (payload.version) return payload.version;
+  }
   return undefined;
 };
 
@@ -167,6 +180,9 @@ export interface RcfResult {
     readonly fields: number;
     readonly lookups: number;
     readonly schemaErrors: number;
+    /** Files with an unreadable `@reso.context` and the records they carried (never certified; see the exit code). */
+    readonly invalidContextFiles: number;
+    readonly invalidContextRecords: number;
     readonly variationsTotal?: number;
   };
 }
@@ -179,13 +195,17 @@ export interface RcfResult {
  * - `totalRecords === 0` → 2: an empty or unreadable submission (no RCF entries, an
  *   unrecognized context, an all-non-RCF bundle) ingested nothing certifiable. It MUST NOT
  *   read as a clean pass, or CI would treat a submission it could not parse as certified.
- * - `schemaErrors > 0` → 1: schema/certification failures.
+ * - `schemaErrors > 0` → 1: schema/certification failures (an unreadable `@reso.context` is one when a
+ *   validator ran).
+ * - `invalidContextFiles > 0` → 2: the submission carried files whose context could not be read and no
+ *   validator was there to report them; they were never certified, so the run is not a clean pass.
  * - `variationsError` → 2: a requested variations pass degraded and did not complete.
  * - otherwise → 0.
  */
 export const resolveRcfExitCode = (result: Pick<RcfResult, 'stats' | 'variationsError'>): number => {
   if (result.stats.totalRecords === 0) return 2;
   if (result.stats.schemaErrors > 0) return 1;
+  if ((result.stats.invalidContextFiles ?? 0) > 0) return 2;
   if (result.variationsError) return 2;
   return 0;
 };
@@ -278,6 +298,8 @@ export const runRcf = async (opts: {
     ...(opts.schemaValidate ? { schemaReport: stream.schemaReport } : {}),
     stats: {
       totalRecords: stream.totalRecords,
+      invalidContextFiles: stream.invalidContextFiles,
+      invalidContextRecords: stream.invalidContextRecords,
       resources: metadataReport.resources.length,
       fields: metadataReport.fields.length,
       lookups: metadataReport.lookups.length,

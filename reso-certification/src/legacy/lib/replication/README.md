@@ -87,6 +87,7 @@ The also assume that the user will have access to the `metadata-report.json` or 
 
 ## Replicate Data from a RESO Server with JSON Schema Validation
 Once replication is working correctly using the commands above, the next step is to add schema validation. 
+With schema validation on, a run with errors writes `data-availability-schema-validation-errors.json` in place of the analytics reports; a run whose only findings are warnings writes the analytics reports and `data-availability-schema-validation-warnings.json` beside them.
 
 ```
 $ reso-certification-utils replicate -s TimestampDesc -u https://yourapi.com/serviceRoot -i <clientId> -c <clientSecret> -k <tokenUri> -e api -l 100000 -p <your-metadata-report.json> -t 100 -f "OriginatingSystemName eq '<your originating system name>'" -v 1.7 -j true

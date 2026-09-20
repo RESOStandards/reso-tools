@@ -14,6 +14,7 @@
  */
 
 import { resolve } from 'node:path';
+import { normalizeDDVersion } from '../sdk/dd-versions.js';
 
 // Legacy CJS engine, imported exactly as src/sdk/dd.ts does (default import + destructure, no createRequire).
 // @ts-expect-error — legacy CJS, no type declarations
@@ -129,7 +130,8 @@ export const runReplicate = async (opts: ReplicateOptions): Promise<ReplicateRes
     maxPageSize: opts.maxPageSize,
     limit: opts.limit,
     outputPath: opts.outputPath,
-    version: opts.version ?? DEFAULT_DD_VERSION,
+    // the Data Dictionary form (2.1, not 2.1.0): the schema exemptions and the reference metadata are keyed by it
+    version: normalizeDDVersion(opts.version ?? DEFAULT_DD_VERSION),
     jsonSchemaValidation: opts.jsonSchemaValidation ?? false,
     strictMode: opts.strictMode ?? false,
     shouldSaveResults: opts.shouldSaveResults ?? false,

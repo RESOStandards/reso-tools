@@ -74,9 +74,10 @@ export interface SchemaValidationResult {
 }
 
 /**
- * Generate a JSON Schema from a metadata report and validate a payload against it. `validate` infers the
- * resource/version from the payload's `@odata.context` when `resourceName`/`version` are omitted, applies the
- * exemptions in `validationConfig`, and handles both a collection (`{ value: [...] }`) and a single record.
+ * Generate a JSON Schema from a metadata report and validate a payload against it. On this path (no
+ * acquisition declared) a present `@reso.context` names the resource and version; `resourceName` / `version`
+ * apply when the payload carries none (the resource defaults to Property). The exemptions in
+ * `validationConfig` are applied, and both a collection (`{ value: [...] }`) and a single record are handled.
  */
 export const validateSchemaPayload = async (opts: {
   readonly metadataReportJson: unknown;
@@ -150,8 +151,8 @@ export const createDdSchemaValidator = async (opts: {
     validate: (jsonPayload, resourceName, version, errorMap = {}) =>
       mod.validate({ jsonSchema, jsonPayload, resourceName, version, validationConfig: opts.validationConfig ?? {}, errorMap, ...(opts.acquisition ? { acquisition: opts.acquisition } : {}) }),
     combine: errorMap => {
-      // A payload whose resource isn't in the schema leaves the error map without `stats`; default it
-      // so combineErrors doesn't dereference `stats.totalErrors` on undefined (an existing `stats` wins).
+      // Every validate() exit now returns its caches; the default keeps `combine` total on an untouched
+      // accumulator (a stream that validated nothing) without dereferencing `stats` on undefined.
       const combined = mod.combineErrors({ stats: { totalErrors: 0, totalWarnings: 0 }, ...errorMap });
       return { totalErrors: combined.totalErrors ?? 0, report: combined };
     },

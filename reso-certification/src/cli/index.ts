@@ -861,7 +861,7 @@ schemaCmd
   .requiredOption('-m, --metadata <file>', 'Metadata report JSON (metadata-report.json), or "-" for stdin')
   .requiredOption('-p, --payload <file>', 'Payload JSON — an OData collection { value: [...] } or a single record, or "-" for stdin')
   .option('-v, --version <version>', 'DD version for the schema context (e.g. 2.0)')
-  .option('-r, --resource <name>', 'Resource name (else inferred from the payload @reso.context or @odata.context)')
+  .option('-r, --resource <name>', 'Resource name when the payload carries no @reso.context (a present context names the resource); default Property')
   .option('-s, --settings <file>', 'schema-validation-settings.json (else ./ then the pre-baked copy)')
   .option('-a, --additional-properties', 'Allow fields not present in the metadata (default: reject them)')
   .option('--output-dir <path>', 'Directory for the report (created if missing); "-" for stdout', '.')
@@ -874,7 +874,8 @@ schemaCmd
         metadataReportJson,
         jsonPayload,
         resourceName: opts.resource,
-        version: opts.version,
+        // the exemptions in the settings file are keyed by the Data Dictionary form (2.1, not 2.1.0)
+        version: opts.version ? normalizeDDVersion(opts.version) : undefined,
         validationConfig,
         additionalProperties: opts.additionalProperties,
       });
@@ -1247,6 +1248,12 @@ program
         }
         if (s.totalRecords === 0) {
           process.stderr.write(`rcf: no certifiable records were ingested from ${resolve(opts.input)} — nothing to certify\n`);
+        }
+        if (s.invalidContextFiles > 0) {
+          process.stderr.write(
+            `rcf: ${s.invalidContextFiles} file(s) carry an unreadable @reso.context (${s.invalidContextRecords} record(s) not certified)` +
+              (opts.schemaValidate ? ' — reported as schema errors\n' : ' — run with --schema-validate for the report\n'),
+          );
         }
         // Zero-record (empty/unreadable) submissions and degraded variations runs must not read as a clean pass.
         process.exitCode = resolveRcfExitCode(result);

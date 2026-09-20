@@ -203,7 +203,7 @@ There are two files related to sampling and availability:
 * `data-availability-responses.json` - Shows the requests that were run during testing
 
 # Schema Validation Errors
-If there are schema validation errors while sampling, the output will be in a file called `data-availability-schema-validation-errors.json`. In this case, there will be no data availability reports, as outlined above. 
+If there are schema validation errors while sampling, the output will be in a file called `data-availability-schema-validation-errors.json`. In this case, there will be no data availability reports, as outlined above. A run with warnings and no errors (for example a page whose `@reso.context` disagrees with the run, a warning until Data Dictionary 3.0) writes the data availability reports and, beside them, `data-availability-schema-validation-warnings.json` in the same format. 
 
 The format of the schema validation reports can be [seen in the tests](/test/schema/). These are generally grouped into categories with error messages and counts. 
 
