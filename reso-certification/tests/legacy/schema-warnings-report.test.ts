@@ -35,6 +35,14 @@ describe('schema-validation warnings report (transport-path context findings on 
     expect(JSON.stringify(report.warnings)).toMatch(/@reso\.context/);
   });
 
+  it('an empty accumulator (no page was validated) → nothing written, nothing thrown, for either writer', async () => {
+    const outputPath = mkdtempSync(resolve(tmpdir(), 'schema-warn-'));
+    expect(await writeSchemaValidationWarningsReport({ outputPath, errorMap: {} })).toBeUndefined();
+    expect(await writeSchemaValidationWarningsReport({ outputPath, errorMap: undefined })).toBeUndefined();
+    await expect(writeSchemaValidationErrorReport({ outputPath, errorMap: {} })).resolves.toBeUndefined();
+    expect(existsSync(resolve(outputPath, SCHEMA_VALIDATION_WARNINGS_FILENAME))).toBe(false);
+  });
+
   it('no warnings → nothing is written; errors present → the errors report is the artifact, not this one', async () => {
     const outputPath = mkdtempSync(resolve(tmpdir(), 'schema-warn-'));
     expect(await writeSchemaValidationWarningsReport({ outputPath, errorMap: errorMapWith(0, 0) })).toBeUndefined();

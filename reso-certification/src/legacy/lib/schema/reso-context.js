@@ -38,6 +38,7 @@ const majorMinor = version => {
 // quoted annotation name would come back as "@RESO.CONTEXT".
 const RESO_CONTEXT_MESSAGES = Object.freeze({
   REQUIRED: 'RCF payloads MUST carry "@reso.context" (urn:reso:metadata:{version}:resource:{resource-name})',
+  REQUIRED_TRANSPORT: `The "@reso.context" annotation MUST be present on every payload from Data Dictionary ${CONTEXT_REQUIRED_FROM_DD_VERSION} (urn:reso:metadata:{version}:resource:{resource-name})`,
   MALFORMED: 'The "@reso.context" value MUST be urn:reso:metadata:{version}:resource:{resource-name} with a lowercase resource name',
   VERSION_MISMATCH: 'The "@reso.context" version does not match the run version',
   RESOURCE_MISMATCH: 'The "@reso.context" resource does not match the requested resource'
@@ -83,7 +84,9 @@ const checkResoContext = ({ context, resource, version, mode = 'transport', embe
   const findings = [];
 
   if (context === undefined || context === null) {
-    if (strict && !embedded) findings.push({ severity: 'error', message: RESO_CONTEXT_MESSAGES.REQUIRED });
+    if (strict && !embedded) {
+      findings.push({ severity: 'error', message: mode === 'rcf' ? RESO_CONTEXT_MESSAGES.REQUIRED : RESO_CONTEXT_MESSAGES.REQUIRED_TRANSPORT });
+    }
     return { findings, parsed: null };
   }
 

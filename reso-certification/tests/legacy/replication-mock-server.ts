@@ -20,6 +20,8 @@ export interface ReplicationMockOptions {
   readonly records: ReadonlyArray<Record<string, unknown>>;
   /** Timestamp field the strategies filter/order on (the engine hardcodes ModificationTimestamp). */
   readonly timestampField?: string;
+  /** When set, every non-empty page carries this `@reso.context` value (a provider that emits the context). */
+  readonly pageContext?: string;
 }
 
 export interface ReplicationMockServer {
@@ -96,7 +98,7 @@ export const startReplicationMockServer = async (opts: ReplicationMockOptions): 
     const skip = toInt(q['$skip']) ?? 0;
     const page = ordered.slice(skip, skip + pageSize);
 
-    const body: Record<string, unknown> = { '@odata.context': `${base}/$metadata#${opts.resource}`, value: page };
+    const body: Record<string, unknown> = { '@odata.context': `${base}/$metadata#${opts.resource}`, ...(opts.pageContext ? { '@reso.context': opts.pageContext } : {}), value: page };
     if (skip + pageSize < ordered.length) {
       body['@odata.nextLink'] = `${base}/${opts.resource}?$skip=${skip + pageSize}`;
     }

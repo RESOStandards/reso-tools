@@ -227,21 +227,16 @@ const buildExpandSchema = async (
     const normalized = unwrapCollectionElementTypes(report);
     const jsonSchema = await mod.generateJsonSchema({ metadataReportJson: normalized, additionalProperties: false });
     if (jsonSchema == null) return undefined;
-    // Force the lazy ajv compile of one representative resource now (result discarded) to surface a wholesale
-    // schema-compile failure HERE — caught below → undefined validator → the nav gates on the observable 200,
-    // never a silent per-item "valid". One compile is enough for a structural/wholesale failure. We deliberately
-    // do NOT warm every distinct resource: the legacy validate() compiles a resource-specific schema per call
-    // (it mutates `oneOf` per resource before `ajv.compile`), so warming all of them is O(resources) compiles
-    // at construction — 41 for the full DD reference, seconds of work on a CI runner. A compile failure isolated
-    // to a single OTHER resource (a navigation whose target type has no definition, the 494d9be shape) is
-    // reached per item instead: that item is INDETERMINATE (#297), and because validate() restores the shared
-    // schema on every exit, the failure leaves nothing behind for the next resource, so every other target type
-    // is evaluated exactly as it would have been in any other order.
-    // Warm-up walks the report's resources in declaration order until ONE compiles. A resource whose own schema
-    // throws is recorded as undeterminable (its items are indeterminate, #297) and the next resource is tried, so
-    // the outcome no longer depends on whether the uncompilable resource happened to be declared first: before,
-    // a first-declared uncompilable resource failed the whole build and every navigation, compilable or not, was
-    // skipped. Only when no resource compiles is the failure wholesale → undefined → the nav gates on the 200.
+    // Warm-up: force the lazy ajv compile now, walking the report's resources in declaration order until ONE
+    // compiles. That one compile proves the schema is structurally sound; a wholesale failure (no resource
+    // compiles) is caught below → undefined validator → the nav gates on the observable 200, never a silent
+    // per-item "valid". A resource whose OWN schema throws (a navigation whose target type has no definition,
+    // the 494d9be shape) is recorded as undeterminable — its items are INDETERMINATE (#297) — and the walk moves
+    // on, so the verdict never depends on which resource was declared first. We deliberately do not warm every
+    // resource: the legacy validate() compiles a resource-specific schema per call, so that would be O(resources)
+    // compiles at construction (41 for the full DD reference). A compile failure on a resource the walk did not
+    // reach is caught per item instead, and because validate() restores the shared schema on every exit, it
+    // leaves nothing behind for the next resource.
     const undeterminable = new Set<string>();
     const resources = [...new Set(normalized.fields.map((field) => field.resourceName))];
     for (const resourceName of resources) {

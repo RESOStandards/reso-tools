@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterAll } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { processRcfStream, runRcf, resolveRcfExitCode, type RcfResult } from '../../src/cli/rcf-command.js';
 import type { RcfPayload } from '../../src/cli/rcf-input.js';
@@ -133,8 +133,11 @@ describe('runRcf (offline)', () => {
     expect(resolveRcfExitCode(result)).toBe(1);
   });
 
+  const tempDirs: string[] = [];
+  afterAll(() => { for (const d of tempDirs) rmSync(d, { recursive: true, force: true }); });
   const tempDirWith = (files: Record<string, unknown>): string => {
     const dir = mkdtempSync(resolve(tmpdir(), 'rcf-review-'));
+    tempDirs.push(dir);
     for (const [name, body] of Object.entries(files)) writeFileSync(resolve(dir, name), JSON.stringify(body));
     return dir;
   };
@@ -160,15 +163,50 @@ describe('runRcf (offline)', () => {
     expect(result.stats.schemaErrors).toBe(0);
   });
 
+  it('without --schema-validate an all-unreadable submission still exits non-zero and a mixed one counts only the certifiable records', async () => {
+    // round 2: the round-1 ingestion fix counted invalid-context records as ingested even when no validator ran,
+    // so an all-unreadable submission exited 0 with an empty report (before: exit 2), and a mixed directory's
+    // record count disagreed with its availability report
+    const allBad = tempDirWith({ 'bad.json': { '@reso.context': 'urn:reso:metadata:2.0', value: [goodRecord, goodRecord] } });
+    const r1 = await runRcf({ input: allBad, version: '2.0', generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    expect(r1.stats.totalRecords).toBe(0);
+    expect(r1.stats.invalidContextFiles).toBe(1);
+    expect(resolveRcfExitCode(r1)).not.toBe(0);
+
+    const mixed = tempDirWith({
+      'good.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:property', value: [goodRecord] },
+      'bad.json': { '@reso.context': 'urn:reso:metadata:2.0', value: [goodRecord, goodRecord] },
+    });
+    const r2 = await runRcf({ input: mixed, version: '2.0', generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    expect(r2.stats.totalRecords).toBe(1); // only the certifiable records; the two invalid-context ones are their own stat
+    expect(r2.stats.invalidContextFiles).toBe(1);
+    expect(r2.stats.invalidContextRecords).toBe(2);
+    expect(JSON.stringify(r2.dataAvailabilityReport)).not.toMatch(/_INVALID_/); // never inferred from
+    expect(resolveRcfExitCode(r2)).toBe(2); // unreadable files in the submission with no validator to report them
+  });
+
+  it('with no --version, the run version is peeked from the first payload that CARRIES one, not from an invalid-context file that sorts first', async () => {
+    // round 2: peekVersion adopted undefined from the invalid-context payload, the run defaulted to 2.0 and every
+    // clean 2.1 file got a spurious version mismatch
+    const dir = tempDirWith({
+      'a-bad.json': { '@reso.context': 'urn:reso:metadata:2.1', value: [goodRecord] },
+      'b-good.json': { '@reso.context': 'urn:reso:metadata:2.1:resource:property', value: [goodRecord] },
+    });
+    const result = await runRcf({ input: dir, schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    expect(result.version).toBe('2.1');
+    expect(JSON.stringify(result.schemaReport)).not.toMatch(/version does not match/);
+  });
+
   it('a file whose @reso.context is present but unparseable is INGESTED and reported malformed, not silently dropped from a mixed directory', async () => {
     const dir = tempDirWith({
       'good.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:property', value: [goodRecord] },
       'bad.json': { '@reso.context': 'urn:reso:metadata:2.0', value: [goodRecord, goodRecord] },
     });
     const result = await runRcf({ input: dir, version: '2.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
-    expect(result.stats.totalRecords).toBe(3); // before: bad.json was dropped as "not an RCF payload" and the run certified on good.json alone
+    expect(result.stats.totalRecords).toBe(1); // the certifiable records; before: bad.json was dropped as "not an RCF payload" and the run certified on good.json alone
+    expect(result.stats.invalidContextRecords).toBe(2);
     expect(result.stats.schemaErrors).toBeGreaterThanOrEqual(1);
-    expect(JSON.stringify(result.schemaReport)).toMatch(/@reso\.context/);
+    expect(JSON.stringify(result.schemaReport)).toMatch(/MUST be urn:reso:metadata/); // the MALFORMED message, not merely REQUIRED
     expect(resolveRcfExitCode(result)).toBe(1);
   });
 

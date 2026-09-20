@@ -160,8 +160,22 @@ const validate = ({
       const multiValueSchema = schema?.oneOf?.find(s => s.properties.value);
 
       if (!formattedResourceName) {
-        console.log(`Found invalid resource: ${contextData?.resource}`);
-        addPayloadError(contextData?.resource ?? resourceName, fileName, 'Invalid resource', payloadErrors);
+        // The payload names a resource the schema does not define, so it cannot be validated. That is never a
+        // pass: the payload error is kept for callers that read it, and a COUNTED error carries the fact into
+        // every report and exit code (review of 2026-09-19: the crash this exit used to produce had become a
+        // silent "0 errors" once every exit returned its caches).
+        const unknownResource = contextData?.resource ?? resourceName;
+        console.log(`Found invalid resource: ${unknownResource}`);
+        addPayloadError(unknownResource, fileName, 'Invalid resource', payloadErrors);
+        updateCacheAndStats({
+          cache: errorCache,
+          resourceName: unknownResource ?? '_INVALID_',
+          failedItemName: '@resource',
+          message: `The resource "${unknownResource}" is not defined in the schema for Data Dictionary ${ddVersion}; the payload was not validated`,
+          fileName,
+          stats,
+          isWarning: false
+        });
         return result();
       }
       resourceName = formattedResourceName;

@@ -160,7 +160,7 @@ describe('validate() — severity follows the acquisition path, not the annotati
     expect(Object.keys(report.warnings ?? {}).join(' ')).toMatch(/@reso\.context/);
   });
 
-  it('RCF + a well-formed context naming a resource the schema does not define: the result carries stats and caches (no TypeError downstream) and the payload error', async () => {
+  it('RCF + a well-formed context naming a resource the schema does not define: the result carries stats and caches (no TypeError downstream), the payload error, and a COUNTED error (the payload was not validated)', async () => {
     const jsonSchema = await generateJsonSchema({ metadataReportJson: metadata });
     const result = validate({ jsonSchema, jsonPayload: { '@reso.context': 'urn:reso:metadata:2.0:resource:notaresource', value: [{ A: 1 }] }, resourceName: 'Notaresource', version: '2.0', errorMap: {}, acquisition: 'rcf' });
     expect(result.stats).toBeDefined(); // before: `return errorMap` → {} → replication's destructure of stats threw
@@ -168,6 +168,9 @@ describe('validate() — severity follows the acquisition path, not the annotati
     expect(result.warningsCache).toBeDefined();
     const payloadErrors = result.payloadErrors as Record<string, Record<string, unknown>>;
     expect(Object.values(payloadErrors).some(byMessage => 'Invalid resource' in byMessage)).toBe(true);
+    const report = combineErrors(result);
+    expect(report.totalErrors).toBe(1); // a payload nobody validated is never a pass
+    expect(Object.keys(report.errors ?? {}).join(' ')).toMatch(/notaresource.*not defined/i);
   });
 
   it('transport with the run version in its 2.1.0 form and a 2.1 context: no version-mismatch finding (major.minor compared)', async () => {
@@ -183,6 +186,30 @@ describe('validate() — severity follows the acquisition path, not the annotati
     expect(r.findings).toEqual([]);
     const page = checkResoContext({ context: undefined, resource: 'Member', version: '3.0', mode: 'transport' });
     expect(page.findings.map((f: { severity: string }) => f.severity)).toEqual(['error']);
+    expect(page.findings[0].message).toMatch(/^The "@reso\.context" annotation MUST be present/); // a transport page, not an RCF payload
+    expect(checkResoContext({ context: undefined, resource: 'Member', version: '2.0', mode: 'rcf' }).findings[0].message).toMatch(/^RCF payloads MUST carry/);
+  });
+
+  it('embedded, through validate(): at DD 3.0 an $expand child without a context has no context finding; a child carrying a WRONG context is still checked', async () => {
+    const meta21 = structuredClone(getReferenceMetadata('2.1'));
+    const jsonSchema = await generateJsonSchema({ metadataReportJson: meta21 });
+    const item = (payload: Record<string, unknown>, embedded: boolean) =>
+      combineErrors(validate({ jsonSchema, jsonPayload: payload, resourceName: 'Member', version: '3.0', errorMap: {}, acquisition: 'transport', embedded }));
+    const bare = item({ MemberKey: 'm' }, true);
+    expect(bare.totalErrors).toBe(0); expect(bare.totalWarnings).toBe(0);
+    const page = item({ MemberKey: 'm' }, false);
+    expect(page.totalErrors).toBe(1); // the page itself is required to carry it from 3.0
+    const wrong = item({ '@reso.context': 'urn:reso:metadata:3.0:resource:office', MemberKey: 'm' }, true);
+    expect(wrong.totalErrors).toBe(1); // present and disagreeing: checked even on an embedded item (error at 3.0)
+    expect(Object.keys(wrong.errors ?? {}).join(' ')).toMatch(/does not match the requested resource/);
+  });
+
+  it('major.minor comparison locks the false-pass side too: a 2.1.0 run against a 2.0 context is a mismatch', async () => {
+    const meta21 = structuredClone(getReferenceMetadata('2.1'));
+    const jsonSchema = await generateJsonSchema({ metadataReportJson: meta21 });
+    const report = combineErrors(validate({ jsonSchema, jsonPayload: { '@reso.context': 'urn:reso:metadata:2.0:resource:property', ListingKey: 'x' }, resourceName: 'Property', version: '2.1.0', errorMap: {}, acquisition: 'transport' }));
+    expect(report.totalWarnings).toBe(1);
+    expect(Object.keys(report.warnings ?? {}).join(' ')).toMatch(/version does not match/);
   });
 
   it('the schema is left as it was found after a compile failure (no residue for the next resource)', async () => {
