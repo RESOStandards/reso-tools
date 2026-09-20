@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { afterAll, describe, expect, it } from 'vitest';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
@@ -22,9 +22,13 @@ const errorMapWith = (totalErrors: number, totalWarnings: number) => ({
   payloadErrors: {},
 });
 
+const tempDirs: string[] = [];
+const tempDir = (): string => { const d = mkdtempSync(resolve(tmpdir(), 'schema-warn-')); tempDirs.push(d); return d; };
+afterAll(() => { for (const d of tempDirs) rmSync(d, { recursive: true, force: true }); });
+
 describe('schema-validation warnings report (transport-path context findings on a DD run)', () => {
   it('warnings without errors → the warnings file is written beside the analytics reports, carrying the combined report', async () => {
-    const outputPath = mkdtempSync(resolve(tmpdir(), 'schema-warn-'));
+    const outputPath = tempDir();
     const written = await writeSchemaValidationWarningsReport({ outputPath, errorMap: errorMapWith(0, 1) });
     expect(written).toBeTruthy();
     const file = resolve(outputPath, SCHEMA_VALIDATION_WARNINGS_FILENAME);
@@ -36,7 +40,7 @@ describe('schema-validation warnings report (transport-path context findings on 
   });
 
   it('an empty accumulator (no page was validated) → nothing written, nothing thrown, for either writer', async () => {
-    const outputPath = mkdtempSync(resolve(tmpdir(), 'schema-warn-'));
+    const outputPath = tempDir();
     expect(await writeSchemaValidationWarningsReport({ outputPath, errorMap: {} })).toBeUndefined();
     expect(await writeSchemaValidationWarningsReport({ outputPath, errorMap: undefined })).toBeUndefined();
     await expect(writeSchemaValidationErrorReport({ outputPath, errorMap: {} })).resolves.toBeUndefined();
@@ -44,7 +48,7 @@ describe('schema-validation warnings report (transport-path context findings on 
   });
 
   it('no warnings → nothing is written; errors present → the errors report is the artifact, not this one', async () => {
-    const outputPath = mkdtempSync(resolve(tmpdir(), 'schema-warn-'));
+    const outputPath = tempDir();
     expect(await writeSchemaValidationWarningsReport({ outputPath, errorMap: errorMapWith(0, 0) })).toBeUndefined();
     expect(await writeSchemaValidationWarningsReport({ outputPath, errorMap: errorMapWith(2, 1) })).toBeUndefined();
     expect(existsSync(resolve(outputPath, SCHEMA_VALIDATION_WARNINGS_FILENAME))).toBe(false);

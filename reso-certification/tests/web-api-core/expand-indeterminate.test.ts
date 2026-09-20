@@ -134,6 +134,16 @@ describe('#297 — per-item validator failure is INDETERMINATE, never "all N ite
     expect(officeAfter.errors.length).toBeGreaterThan(0);
   });
 
+  it('T9 at DD 3.0 an expanded child item without its own @reso.context is valid (the page carries it); a child carrying a WRONG context is still checked', async () => {
+    const validator = await createExpandSchemaValidator({ metadataReport: reportWith([...propertyFields, ...officeFields]), version: '3.0.0', validationConfig: {} });
+    expect(validator).toBeDefined();
+    const clean = validator!.validate({ OfficeKey: 'o1', OfficeName: 'ok' }, 'Office');
+    expect(clean.valid).toBe(true); // before the `embedded` flag: REQUIRED error on every expanded item once the 3.0 gate is reachable
+    expect(clean.indeterminate).toBeFalsy();
+    const wrong = validator!.validate({ '@reso.context': 'urn:reso:metadata:3.0:resource:member', OfficeKey: 'o1', OfficeName: 'ok' }, 'Office');
+    expect(wrong.valid).toBe(false); // present and disagreeing with the requested resource: an error at 3.0
+  });
+
   it('T8 the uncompilable resource declared FIRST: a validator is still built, its own items are indeterminate, a grossly invalid Office item still FAILS', async () => {
     // before: the single warm-up on the first-declared resource threw, no validator was built, and every
     // navigation was skipped — including one whose expanded data was genuinely schema-invalid

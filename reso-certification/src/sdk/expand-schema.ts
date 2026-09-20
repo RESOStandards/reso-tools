@@ -208,14 +208,13 @@ interface BuiltSchema {
 }
 
 /**
- * Build AND compile the schema ONCE. Returns `undefined` on ANY construction failure — a report the generator
- * cannot project (returns null) OR a schema ajv cannot compile — so the caller can gate the nav on the 200
- * alone rather than let a per-item catch silently pass every item (the false-PASS this guards against).
- *
- * `generateJsonSchema` builds the JSON Schema object but ajv compilation is LAZY (it happens inside the first
- * `validate()`); a warm-up `validate()` against a real resource forces that compile HERE, so a non-compilable
- * schema fails determinately at construction. The legacy `validate()` deep-clones and restores the schema it
- * mutates on each call, so the warm-up leaves no residue for later items.
+ * Build the schema ONCE and force ajv's lazy compile with a warm-up that walks the report's resources until one
+ * compiles. Returns `undefined` only on a wholesale failure — a report the generator cannot project (returns
+ * null) or no resource whose schema compiles — so the caller gates the nav on the 200 alone rather than let a
+ * per-item catch silently pass every item (the false-PASS this guards against). Resources whose own schema
+ * threw during the walk come back in `undeterminable`: their items are indeterminate (#297), decided at
+ * construction so the verdict never depends on declaration order. The legacy `validate()` restores the schema
+ * it mutates on every exit, so neither the warm-up nor a per-item compile failure leaves residue.
  */
 const buildExpandSchema = async (
   mod: LegacySchemaModule,

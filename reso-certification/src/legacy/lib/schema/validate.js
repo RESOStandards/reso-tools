@@ -124,8 +124,10 @@ const validate = ({
   // §3.4.1(a), lowercase resource name,
   // additional trailing parameters allowed), version against the run's declared version, resource against the
   // requested resource. RCF → errors; transport → warnings until DD 3.0, then errors and required.
+  let contextErrorsCounted = 0;
   if (acquisition === 'rcf' || acquisition === 'transport') {
     const { findings } = checkResoContext({ context: payload['@reso.context'], resource: resourceName, version, mode: acquisition, embedded });
+    contextErrorsCounted = findings.filter(({ severity }) => severity === 'error').length;
     findings.forEach(({ severity, message }) =>
       updateCacheAndStats({
         cache: severity === 'warning' ? warningsCache : errorCache,
@@ -160,22 +162,29 @@ const validate = ({
       const multiValueSchema = schema?.oneOf?.find(s => s.properties.value);
 
       if (!formattedResourceName) {
-        // The payload names a resource the schema does not define, so it cannot be validated. That is never a
-        // pass: the payload error is kept for callers that read it, and a COUNTED error carries the fact into
-        // every report and exit code (review of 2026-09-19: the crash this exit used to produce had become a
-        // silent "0 errors" once every exit returned its caches).
-        const unknownResource = contextData?.resource ?? resourceName;
+        // The payload cannot be validated: its context could not be resolved to a resource, or it names one
+        // the schema does not define. That is never a pass: the payload error is kept for callers that read it,
+        // and ONE counted error carries the fact into every report and exit code (review of 2026-09-19: the
+        // crash this exit used to produce had become a silent "0 errors" once every exit returned its caches).
+        // When the context check above already counted an error for this payload (rcf / transport paths), that
+        // error is the record; a second one would double-count the same file.
+        const unresolved = !contextData?.resource;
+        const unknownResource = contextData?.resource || resourceName || '_INVALID_';
         console.log(`Found invalid resource: ${unknownResource}`);
         addPayloadError(unknownResource, fileName, 'Invalid resource', payloadErrors);
-        updateCacheAndStats({
-          cache: errorCache,
-          resourceName: unknownResource ?? '_INVALID_',
-          failedItemName: '@resource',
-          message: `The resource "${unknownResource}" is not defined in the schema for Data Dictionary ${ddVersion}; the payload was not validated`,
-          fileName,
-          stats,
-          isWarning: false
-        });
+        if (contextErrorsCounted === 0) {
+          updateCacheAndStats({
+            cache: errorCache,
+            resourceName: unknownResource,
+            failedItemName: '@resource',
+            message: unresolved
+              ? `The "@reso.context" value could not be resolved to a resource; the payload was not validated (found ${JSON.stringify(payload['@reso.context'])})`
+              : `The resource "${unknownResource}" is not defined in the schema for Data Dictionary ${ddVersion}; the payload was not validated`,
+            fileName,
+            stats,
+            isWarning: false
+          });
+        }
         return result();
       }
       resourceName = formattedResourceName;

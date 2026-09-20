@@ -185,6 +185,32 @@ describe('runRcf (offline)', () => {
     expect(resolveRcfExitCode(r2)).toBe(2); // unreadable files in the submission with no validator to report them
   });
 
+  it('a well-formed context naming a resource the DD does not define: exit 1 with the "not defined" error under --schema-validate, a schema failure under --strict', async () => {
+    const dir = tempDirWith({ 'p.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:propery', value: [goodRecord] } });
+    const result = await runRcf({ input: dir, version: '2.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    expect(result.stats.schemaErrors).toBe(1);
+    expect(JSON.stringify(result.schemaReport)).toMatch(/propery.*is not defined in the schema/i);
+    expect(resolveRcfExitCode(result)).toBe(1);
+    await expect(runRcf({ input: dir, version: '2.0', schemaValidate: true, strict: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false })).rejects.toMatchObject({ schemaFailure: true });
+  });
+
+  it('a lowercase multi-word resource in the context (the mandated form) is canonicalized to the DD resource name for inference and the reports', async () => {
+    // round 2b: the lowercase rule plus a first-letter capitalize keyed OpenHouse records under "Openhouse", so
+    // inference missed the reference map (every field local, no lookups) for 27 of the 41 DD 2.0 resources
+    const openHouse = { OpenHouseKey: 'OH1', ListingKey: 'P1', OpenHouseDate: '2026-01-01', OpenHouseType: 'Public' };
+    const dir = tempDirWith({ 'oh.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:openhouse', value: [openHouse] } });
+    const result = await runRcf({ input: dir, version: '2.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    expect(result.stats.schemaErrors).toBe(0);
+    expect(resolveRcfExitCode(result)).toBe(0);
+    const report = result.metadataReport as { resources: ReadonlyArray<{ resourceName: string }>; fields: ReadonlyArray<{ resourceName: string; fieldName: string; type: string }>; lookups: ReadonlyArray<{ lookupName: string }> };
+    expect(report.resources.map(r => r.resourceName)).toEqual(['OpenHouse']);
+    const type = report.fields.find(f => f.resourceName === 'OpenHouse' && f.fieldName === 'OpenHouseType')?.type;
+    expect(type).not.toBe('Edm.String'); // the DD enumeration, resolved through the reference map
+    expect(report.lookups.length).toBeGreaterThan(0);
+    const availability = result.dataAvailabilityReport as { fields: ReadonlyArray<{ resourceName: string }> };
+    expect(new Set(availability.fields.map(f => f.resourceName))).toEqual(new Set(['OpenHouse']));
+  });
+
   it('with no --version, the run version is peeked from the first payload that CARRIES one, not from an invalid-context file that sorts first', async () => {
     // round 2: peekVersion adopted undefined from the invalid-context payload, the run defaulted to 2.0 and every
     // clean 2.1 file got a spurious version mismatch
@@ -205,8 +231,11 @@ describe('runRcf (offline)', () => {
     const result = await runRcf({ input: dir, version: '2.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
     expect(result.stats.totalRecords).toBe(1); // the certifiable records; before: bad.json was dropped as "not an RCF payload" and the run certified on good.json alone
     expect(result.stats.invalidContextRecords).toBe(2);
-    expect(result.stats.schemaErrors).toBeGreaterThanOrEqual(1);
+    expect(result.stats.schemaErrors).toBe(1); // exactly one counted error for the one bad file (round 2b: it was two, the second keyed under "")
     expect(JSON.stringify(result.schemaReport)).toMatch(/MUST be urn:reso:metadata/); // the MALFORMED message, not merely REQUIRED
+    const resourceKeys = Object.values((result.schemaReport as { errors: Record<string, { resources: Record<string, unknown> }> }).errors).flatMap(e => Object.keys(e.resources));
+    expect(resourceKeys).not.toContain(''); // the finding is keyed under a named resource, never ""
+    expect(resourceKeys).toEqual(['_INVALID_']);
     expect(resolveRcfExitCode(result)).toBe(1);
   });
 
@@ -259,6 +288,8 @@ describe('resolveRcfExitCode', () => {
     fields: 1,
     lookups: 0,
     schemaErrors: 0,
+    invalidContextFiles: 0,
+    invalidContextRecords: 0,
     ...over,
   });
   const result = (
@@ -283,6 +314,14 @@ describe('resolveRcfExitCode', () => {
 
   it('exits 2 when a requested variations pass degraded', () => {
     expect(resolveRcfExitCode(result({}, 'service unavailable'))).toBe(2);
+  });
+
+  it('exits 2 when the submission carried files with an unreadable @reso.context that no validator reported', () => {
+    expect(resolveRcfExitCode(result({ invalidContextFiles: 1, invalidContextRecords: 3 }))).toBe(2);
+  });
+
+  it('schema errors take precedence over unreadable-context files (exit 1: they were reported)', () => {
+    expect(resolveRcfExitCode(result({ schemaErrors: 2, invalidContextFiles: 1 }))).toBe(1);
   });
 
   it('exits 0 on a clean run with records and no errors', () => {
