@@ -20,6 +20,7 @@
     "bootstrap": "npm install && npm run build",
     "bootstrap:force": "npm install && npm run build",
     "build": "npm run build --workspaces --if-present",
+    "pack:all": "node scripts/pack-all.mjs",
     "lint": "biome check .",
     "lint:fix": "biome check --fix .",
     "typecheck": "npm run typecheck:common && npm run typecheck:metadata-utils && npm run typecheck:filter-parser && npm run typecheck:validation && npm run typecheck:client && npm run typecheck:server && npm run typecheck:certification && npm run typecheck:mcp",

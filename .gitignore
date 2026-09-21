@@ -44,3 +44,6 @@ upi-validation-report.json
 
 # Local MCP server config (may contain bearer tokens)
 .mcp.json
+
+# pack:all output — tarballs for linking into reso-tools-private (never committed)
+.packs/
