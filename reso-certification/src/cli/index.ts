@@ -30,13 +30,19 @@ import { resolveCliAuth, mintOAuth2ClientCredentialsToken } from './auth.js';
 import {
   computeVariationsViaService,
   updateVariationsViaService,
+  listVariationReviewItemsViaService,
+  listMyEndorsementsViaService,
+  listEndorsementsByReviewStatusViaService,
   parseVariationsCsv,
   findVariations,
   DEFAULT_FUZZINESS,
   DEFAULT_DD_VERSION,
   VARIATIONS_REPORT_FILENAME,
   type VariationsServiceReport,
+  type VariationReviewElementType,
+  type EndorsementReviewStatus,
 } from '../variations/index.js';
+import { formatReviewItemsTable, formatEndorsementStatusTable, formatProvenance } from './variations-review-command.js';
 import { validateSchemaPayload, generateSchemaFromReport, loadSettings } from './schema-command.js';
 import { runMetadataStep } from './metadata-command.js';
 import { fetchMetadataReportFromServer } from '../sdk/metadata-source.js';
@@ -677,6 +683,72 @@ program
       }
     },
   );
+
+// ── Variations review (read side) ──
+//
+// The items in review and the caller's submission status, read from the same
+// routes the web client's review page uses. Provider tokens see their own rows;
+// an admin token sees the org-wide pool. Read-only: nothing here writes to the
+// pool or the canonical store. Auth as update-variations: an OAuth2
+// client_credentials token from .env (TOKEN_URI / CLIENT_ID / CLIENT_SECRET),
+// falling back to the CERT_AUTH_API_* provider-token mint.
+
+const REVIEW_ELEMENT_TYPES: ReadonlyArray<VariationReviewElementType> = ['resource', 'field', 'lookup'];
+
+program
+  .command('list-variation-reviews')
+  .description('List the variations in review (your own as a provider, the whole pool as an admin) — read-only')
+  .option('--status <status>', 'Filter by pool status: pending, ft-submitted or resolved')
+  .option('--element-type <type>', 'Filter by element type: resource, field or lookup')
+  .option('--provenance', 'Show every submitting tuple under each item instead of the summary table')
+  .option('--json', 'Print the items exactly as the service returned them')
+  .action(async (opts: { status?: string; elementType?: string; provenance?: boolean; json?: boolean }) => {
+    try {
+      if (opts.elementType !== undefined && !REVIEW_ELEMENT_TYPES.includes(opts.elementType as VariationReviewElementType)) {
+        throw new Error(`--element-type must be one of: ${REVIEW_ELEMENT_TYPES.join(', ')}`);
+      }
+      const bearerToken = await mintOAuth2ClientCredentialsToken();
+      const items = await listVariationReviewItemsViaService({
+        fromCli: true,
+        ...(bearerToken ? { bearerToken } : {}),
+        ...(opts.status ? { status: opts.status } : {}),
+        ...(opts.elementType ? { elementType: opts.elementType as VariationReviewElementType } : {}),
+      });
+      if (opts.json) {
+        console.log(JSON.stringify(items, null, 2));
+        return;
+      }
+      console.log(opts.provenance ? formatProvenance(items) : formatReviewItemsTable(items));
+      console.error(`${items.length} item(s) in review${opts.status ? ` with status ${opts.status}` : ''}.`);
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exitCode = 2;
+    }
+  });
+
+const ENDORSEMENT_REVIEW_STATUSES: ReadonlyArray<EndorsementReviewStatus> = ['none', 'in-review', 'resolved'];
+
+program
+  .command('variations-review-status')
+  .description('Show where each of your variations submissions stands (lifecycle and review status) — read-only')
+  .option('--review-status <status>', 'Admin: list every provider\'s submissions with this review status (none, in-review or resolved) instead of your own')
+  .option('--json', 'Print the rows exactly as the service returned them')
+  .action(async (opts: { reviewStatus?: string; json?: boolean }) => {
+    try {
+      if (opts.reviewStatus !== undefined && !ENDORSEMENT_REVIEW_STATUSES.includes(opts.reviewStatus as EndorsementReviewStatus)) {
+        throw new Error(`--review-status must be one of: ${ENDORSEMENT_REVIEW_STATUSES.join(', ')}`);
+      }
+      const bearerToken = await mintOAuth2ClientCredentialsToken();
+      const auth = { fromCli: true, ...(bearerToken ? { bearerToken } : {}) };
+      const rows = opts.reviewStatus
+        ? await listEndorsementsByReviewStatusViaService({ ...auth, reviewStatus: opts.reviewStatus as EndorsementReviewStatus })
+        : await listMyEndorsementsViaService(auth);
+      console.log(opts.json ? JSON.stringify(rows, null, 2) : formatEndorsementStatusTable(rows));
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exitCode = 2;
+    }
+  });
 
 // ── Metadata Report subcommand group ──
 //

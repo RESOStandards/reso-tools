@@ -30,6 +30,10 @@ clients call it.
   the legacy `findVariations` signature so existing call sites swap over
   unchanged. Reads `pathToMetadataReportJson`, calls the service, and writes
   `data-dictionary-variations.json` into `outputPath` when variations are found.
+- **`listVariationReviewItemsViaService(input)`** and the two endorsement
+  listings in `review.ts` – the read side of the review pool, for the CLI's
+  `list-variation-reviews` / `variations-review-status` and for any SDK caller.
+  Same auth model and coded errors; results are the service's rows, unchanged.
 
 ## Auth
 
@@ -50,5 +54,6 @@ Two callers, two token sources – resolved by whether a `bearerToken` is passed
 |---|---|
 | `service.ts` | `computeVariationsViaService` + the coded-error surface |
 | `find-variations.ts` | `findVariations` file-in/file-out wrapper |
+| `review.ts` | the read side of the review pool: `listVariationReviewItemsViaService`, `listMyEndorsementsViaService`, `listEndorsementsByReviewStatusViaService` — the routes the web client's review page reads, returned as served |
 | `constants.ts` | `DEFAULT_FUZZINESS`, `DEFAULT_DD_VERSION`, output filename |
 | `index.ts` | public exports |

@@ -17,6 +17,19 @@ export {
   type VariationsServiceErrorCode,
 } from './service.js';
 
+export {
+  listVariationReviewItemsViaService,
+  listMyEndorsementsViaService,
+  listEndorsementsByReviewStatusViaService,
+  type ListVariationReviewItemsInput,
+  type ListMyEndorsementsInput,
+  type ListEndorsementsByReviewStatusInput,
+  type EndorsementReviewStatus,
+  type VariationReviewItem,
+  type VariationReviewProvenance,
+  type VariationReviewElementType,
+  type EndorsementStatusRow,
+} from './review.js';
 export { findVariations, type FindVariationsInput } from './find-variations.js';
 
 export { parseVariationsCsv, type VariationSuggestionItem, type ParsedVariationsCsv } from './csv.js';
