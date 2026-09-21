@@ -5,6 +5,7 @@ import {
   formatReviewItemsTable,
   formatEndorsementStatusTable,
   formatProvenance,
+  duplicateVariationKeys,
 } from '../../src/cli/variations-review-command.js';
 import type { VariationReviewItem } from '../../src/variations/review.js';
 
@@ -111,5 +112,15 @@ describe('formatEndorsementStatusTable', () => {
   });
   it('says so when there is nothing', () => {
     expect(formatEndorsementStatusTable([])).toBe('No submissions.');
+  });
+});
+
+describe('duplicateVariationKeys', () => {
+  it('names each key the service returned more than once, in display form, and nothing else', () => {
+    const twice = item();
+    const once = item({ variationKey: `Property${SEP}Roof${SEP}Corrugated` });
+    expect(duplicateVariationKeys([twice, once, twice])).toEqual(['Property.BuyerAgentKeyNumeric']);
+    expect(duplicateVariationKeys([once, twice])).toEqual([]);
+    expect(duplicateVariationKeys([])).toEqual([]);
   });
 });

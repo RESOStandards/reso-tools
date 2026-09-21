@@ -42,7 +42,12 @@ import {
   type VariationReviewElementType,
   type EndorsementReviewStatus,
 } from '../variations/index.js';
-import { formatReviewItemsTable, formatEndorsementStatusTable, formatProvenance } from './variations-review-command.js';
+import {
+  formatReviewItemsTable,
+  formatEndorsementStatusTable,
+  formatProvenance,
+  duplicateVariationKeys,
+} from './variations-review-command.js';
 import { validateSchemaPayload, generateSchemaFromReport, loadSettings } from './schema-command.js';
 import { runMetadataStep } from './metadata-command.js';
 import { fetchMetadataReportFromServer } from '../sdk/metadata-source.js';
@@ -701,11 +706,16 @@ program
   .option('--status <status>', 'Filter by pool status: pending, ft-submitted or resolved')
   .option('--element-type <type>', 'Filter by element type: resource, field or lookup')
   .option('--provenance', 'Show every submitting tuple under each item instead of the summary table')
+  .option('--page-size <n>', 'Items per request to the service; every page is fetched regardless')
   .option('--json', 'Print the items exactly as the service returned them')
-  .action(async (opts: { status?: string; elementType?: string; provenance?: boolean; json?: boolean }) => {
+  .action(async (opts: { status?: string; elementType?: string; provenance?: boolean; pageSize?: string; json?: boolean }) => {
     try {
       if (opts.elementType !== undefined && !REVIEW_ELEMENT_TYPES.includes(opts.elementType as VariationReviewElementType)) {
         throw new Error(`--element-type must be one of: ${REVIEW_ELEMENT_TYPES.join(', ')}`);
+      }
+      const pageSize = opts.pageSize === undefined ? undefined : Number.parseInt(opts.pageSize, 10);
+      if (pageSize !== undefined && (!Number.isInteger(pageSize) || pageSize <= 0)) {
+        throw new Error(`--page-size must be a positive integer, got '${opts.pageSize}'`);
       }
       const bearerToken = await mintOAuth2ClientCredentialsToken();
       const items = await listVariationReviewItemsViaService({
@@ -713,7 +723,15 @@ program
         ...(bearerToken ? { bearerToken } : {}),
         ...(opts.status ? { status: opts.status } : {}),
         ...(opts.elementType ? { elementType: opts.elementType as VariationReviewElementType } : {}),
+        ...(pageSize ? { limit: pageSize } : {}),
       });
+      const duplicates = duplicateVariationKeys(items);
+      if (duplicates.length > 0) {
+        console.error(
+          `Warning: the service returned ${duplicates.length} item(s) more than once across pages, with their provenance split ` +
+            `(${duplicates.join(', ')}). Rows are shown as served; a larger --page-size, or none, avoids the split.`,
+        );
+      }
       if (opts.json) {
         console.log(JSON.stringify(items, null, 2));
         return;
