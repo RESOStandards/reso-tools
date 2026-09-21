@@ -194,6 +194,41 @@ describe('runRcf (offline)', () => {
     await expect(runRcf({ input: dir, version: '2.0', schemaValidate: true, strict: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false })).rejects.toMatchObject({ schemaFailure: true });
   });
 
+  // RCF is taken as-is (Josh, 2026-09-21): the Data Dictionary allows extension, and an RCF submission carries no
+  // provider metadata to "advertise" anything against. Local fields and enumeration values outside the standard
+  // set are accepted, always; a field that matches the DD must have the right type (error); a value that exceeds
+  // the DD's length, precision or scale is a warning.
+  it('RCF as-is: a local field and a value outside the standard set are accepted, with or without -a; a wrong type on a DD field is still an error', async () => {
+    const dir = tempDirWith({
+      'p.json': {
+        '@reso.context': 'urn:reso:metadata:2.0:resource:property',
+        value: [{ ListingKey: 'P1', MyLocalField: 'x', StandardStatus: 'NotAStandardStatus' }],
+      },
+    });
+    const asIs = await runRcf({ input: dir, version: '2.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    expect(asIs.stats.schemaErrors).toBe(0); // before: 2 (MUST be advertised: the field, and the enumeration value)
+    expect((asIs.schemaReport as { totalWarnings: number }).totalWarnings).toBe(0); // accepted, not warned about
+    expect(resolveRcfExitCode(asIs)).toBe(0);
+    // `-a` is kept for existing invocations and changes nothing either way
+    const withFlag = await runRcf({ input: dir, version: '2.0', schemaValidate: true, additionalProperties: false, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    expect(withFlag.stats.schemaErrors).toBe(0);
+
+    const wrongType = tempDirWith({ 'p.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:property', value: [{ ListingKey: 'P1', ListPrice: 'not-a-number' }] } });
+    const typed = await runRcf({ input: wrongType, version: '2.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    expect(typed.stats.schemaErrors).toBe(1);
+    expect(JSON.stringify(typed.schemaReport)).toMatch(/MUST be number/);
+  });
+
+  it('RCF: a DD decimal value over its precision is a WARNING, not an error (length, precision and scale are advisory on RCF)', async () => {
+    // Property.BathroomsFull is Edm.Decimal precision 3, scale 0 in DD 2.0: the schema caps it at 999
+    const dir = tempDirWith({ 'p.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:property', value: [{ ListingKey: 'P1', BathroomsFull: 12345 }] } });
+    const result = await runRcf({ input: dir, version: '2.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    expect(result.stats.schemaErrors).toBe(0); // before: 1 (a MUST via the schema's maximum)
+    const report = result.schemaReport as { totalWarnings: number; warnings: Record<string, unknown> };
+    expect(report.totalWarnings).toBe(1);
+    expect(Object.keys(report.warnings).join(' ')).toMatch(/precision/i);
+  });
+
   it('a lowercase multi-word resource in the context (the mandated form) is canonicalized to the DD resource name for inference and the reports', async () => {
     // round 2b: the lowercase rule plus a first-letter capitalize keyed OpenHouse records under "Openhouse", so
     // inference missed the reference map (every field local, no lookups) for 27 of the 41 DD 2.0 resources

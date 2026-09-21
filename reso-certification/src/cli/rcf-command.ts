@@ -226,6 +226,7 @@ export const runRcf = async (opts: {
   readonly input: string;
   readonly version?: string;
   readonly fuzziness?: number;
+  /** Kept so existing `-a` invocations keep working; it has no effect: extension is always allowed on the rcf path. */
   readonly additionalProperties?: boolean;
   readonly strict?: boolean;
   readonly schemaValidate?: boolean;
@@ -252,11 +253,15 @@ export const runRcf = async (opts: {
   );
   const canonicalResource = (resource: string): string => ddNames.get(resource.toLowerCase()) ?? resource;
 
-  // Schema-validate against the DD (strict / -a), generating the DD schema once up front.
+  // Schema-validate against the DD (--strict), generating the DD schema once up front.
   const validator = opts.schemaValidate
     ? await createDdSchemaValidator({
         metadataReportJson: getReferenceMetadata(version),
-        additionalProperties: opts.additionalProperties,
+        // RCF is taken as-is: the Data Dictionary allows extension, so local fields (and, in the validator,
+        // values outside the standard set) are always accepted; a DD field is held to its type, and length,
+        // precision and scale beyond the DD's are warnings. Extension is on regardless of `opts.additionalProperties`,
+        // which is kept only so existing `-a` invocations keep working.
+        additionalProperties: true,
         validationConfig: opts.validationConfig,
         acquisition: 'rcf',
       })

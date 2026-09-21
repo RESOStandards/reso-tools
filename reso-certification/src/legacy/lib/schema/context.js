@@ -19,6 +19,8 @@ const createValidationContext = () => {
   let payloadType = null;
   let validationConfig = null;
   let disableKeys = false;
+  /** @type {'transport'|'rcf'|null} the DECLARED acquisition path (null for legacy callers on the presence heuristic) */
+  let acquisition = null;
   return {
     getActiveResource: () => activeResource,
     setActiveResource: resource => {
@@ -28,6 +30,10 @@ const createValidationContext = () => {
       isRCF = rcf;
     },
     isRCF: () => isRCF,
+    getAcquisition: () => acquisition,
+    setAcquisition: path => {
+      acquisition = path === 'rcf' || path === 'transport' ? path : null;
+    },
     getVersion: () => ddVersion,
     setVersion: version => {
       ddVersion = version;
@@ -59,6 +65,7 @@ const createValidationContext = () => {
       schema = null;
       payloadType = null;
       validationConfig = null;
+      acquisition = null;
     }
   };
 };

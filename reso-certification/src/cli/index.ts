@@ -1180,7 +1180,7 @@ program
 
 // ── RCF Subcommand (per-step util: RESO Common Format certification) ──
 // RCF providers deliver data, not a schema — a .json/.zip/directory of payloads or records. This
-// streams the input, optionally schema-validates it against the DD (strict / -a), reverse-infers a
+// streams the input, optionally schema-validates it against the DD (--strict), reverse-infers a
 // DD-2.0 metadata report + a data-availability report, and runs the variations service on the
 // inferred report — the same two artifacts as a DD 2.0 run, plus the variations report.
 
@@ -1191,8 +1191,8 @@ program
   .option('-v, --version <ver>', 'DD version (default: from the payload @reso.context, else 2.0)')
   .option('-f, --fuzziness <float>', `Variations fuzzy-match threshold (0–1, default ${DEFAULT_FUZZINESS})`, String(DEFAULT_FUZZINESS))
   .option('--output-dir <path>', 'Directory for the reports (created if missing)', '.')
-  .option('--schema-validate', 'Schema-validate each payload against the DD before inferring')
-  .option('-a, --additional-properties', 'Allow fields not in the DD (extensions) during schema validation')
+  .option('--schema-validate', 'Schema-validate each payload against the DD before inferring (RCF is taken as-is: local fields and values are accepted; a DD field must have the right type; length, precision and scale beyond the DD are warnings)')
+  .option('-a, --additional-properties', 'Accepted for compatibility: extension is always allowed on RCF (local fields and values), so this flag has no effect here')
   .option('--strict', 'Fail fast on the first schema-validation error (with --schema-validate)')
   .option('--no-variations', 'Skip the variations service call (infer + reports only)')
   .action(

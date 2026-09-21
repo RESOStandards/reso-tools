@@ -17,6 +17,11 @@ const { getReferenceMetadata } = require(resolve(import.meta.dirname, '../../src
  * transport-acquired (Web API Core, DD replicated over the provider's Web API) → absent allowed and the other
  * three are warnings until DD 3.0, when the context becomes required and they fail; `maxLength` overflow is a
  * MUST on the transport path with or without a context, advisory on an RCF payload.
+ *
+ * Amendment (Josh, 2026-09-21): RCF is taken as-is. On the DECLARED rcf path local fields and values outside the
+ * standard set are accepted; a DD field is held to its type; length, precision and scale beyond the DD's are
+ * warnings (a scale-0 decimal over its precision cap or with a fractional value); the Int16/32/64 range caps and a
+ * non-numeric value stay the type MUST. Transport and the presence heuristic are unchanged.
  */
 const CTX = 'urn:reso:metadata:2.0:resource:property';
 
@@ -210,6 +215,67 @@ describe('validate() — severity follows the acquisition path, not the annotati
     const report = combineErrors(validate({ jsonSchema, jsonPayload: { '@reso.context': 'urn:reso:metadata:2.0:resource:property', ListingKey: 'x' }, resourceName: 'Property', version: '2.1.0', errorMap: {}, acquisition: 'transport' }));
     expect(report.totalWarnings).toBe(1);
     expect(Object.keys(report.warnings ?? {}).join(' ')).toMatch(/version does not match/);
+  });
+
+  it('RCF as-is applies to the DECLARED rcf path only: a value outside the standard set is accepted there, and stays an error on the presence heuristic and on transport', async () => {
+    // AboveGradeFinishedAreaSource is an enumeration in the DD 2.0 reference; "NotAStandardValue" is outside it
+    const jsonSchema = await generateJsonSchema({ metadataReportJson: metadata });
+    const payload = { '@reso.context': CTX, AboveGradeFinishedAreaSource: 'NotAStandardValue' };
+    const declaredRcf = combineErrors(validate({ jsonSchema, jsonPayload: payload, resourceName: 'Property', version: '2.0', errorMap: {}, acquisition: 'rcf' }));
+    expect(declaredRcf.totalErrors).toBe(0); // extension accepted
+    expect(declaredRcf.totalWarnings).toBe(0); // accepted, not warned about
+    const heuristic = combineErrors(validate({ jsonSchema, jsonPayload: payload, resourceName: 'Property', version: '2.0', errorMap: {} }));
+    expect(heuristic.totalErrors).toBe(1); // a legacy caller validating provider metadata keeps the DD rule
+    const transport = combineErrors(validate({ jsonSchema, jsonPayload: payload, resourceName: 'Property', version: '2.0', errorMap: {}, acquisition: 'transport' }));
+    expect(transport.totalErrors).toBe(1);
+    expect(Object.keys(transport.errors ?? {}).join(' ')).toMatch(/MUST be advertised/);
+  });
+
+  it('a scale-0 DD decimal: over its precision or with a fractional value is a warning on declared rcf (precision, scale), a MUST on transport', async () => {
+    const jsonSchema = await generateJsonSchema({ metadataReportJson: metadata });
+    const run = (jsonPayload: Record<string, unknown>, acquisition: string) =>
+      combineErrors(validate({ jsonSchema, jsonPayload, resourceName: 'Property', version: '2.0', errorMap: {}, acquisition }));
+    // Property.BathroomsFull is Edm.Decimal precision 3, scale 0
+    const overPrecision = run({ '@reso.context': CTX, BathroomsFull: 12345 }, 'rcf');
+    expect(overPrecision.totalErrors).toBe(0); expect(overPrecision.totalWarnings).toBe(1);
+    expect(Object.keys(overPrecision.warnings ?? {}).join(' ')).toMatch(/precision/);
+    const fractional = run({ '@reso.context': CTX, BathroomsFull: 2.5 }, 'rcf');
+    expect(fractional.totalErrors).toBe(0); expect(fractional.totalWarnings).toBe(1);
+    expect(Object.keys(fractional.warnings ?? {}).join(' ')).toMatch(/scale 0/);
+    const wrongType = run({ '@reso.context': CTX, BathroomsFull: 'two' }, 'rcf');
+    expect(wrongType.totalErrors).toBe(1); // a non-numeric value is the type MUST
+    const transport = run({ '@reso.context': CTX, BathroomsFull: 12345 }, 'transport');
+    expect(transport.totalErrors).toBe(1); expect(transport.totalWarnings).toBe(0);
+    const transportFraction = run({ '@reso.context': CTX, BathroomsFull: 2.5 }, 'transport');
+    expect(transportFraction.totalErrors).toBe(1);
+  });
+
+  it('the numeric downgrades reach a scale-0 decimal two expansions deep on rcf, stay a MUST on transport, and never touch an Int16/Int64 range cap or the presence heuristic', async () => {
+    // a synthetic Edm.Int16 beside the DD 2.0 reference: its range cap is the type's own bound, a MUST everywhere
+    const meta = structuredClone(metadata);
+    meta.fields.push({ resourceName: 'Property', fieldName: 'TestInt16', nullable: true, annotations: [], type: 'Edm.Int16' });
+    const jsonSchema = await generateJsonSchema({ metadataReportJson: meta });
+    const run = (jsonPayload: Record<string, unknown>, acquisition?: string) =>
+      combineErrors(validate({ jsonSchema, jsonPayload, resourceName: 'Property', version: '2.0', errorMap: {}, ...(acquisition ? { acquisition } : {}) }));
+    // depth 2: Property → ListAgent (Member) → Office (Office) → NumberOfBranches (Edm.Decimal, scale 0)
+    const deep = (v: number) => ({ '@reso.context': CTX, ListingKey: 'p', ListAgent: { MemberKey: 'm', Office: { OfficeKey: 'o', NumberOfBranches: v } } });
+    const deepFraction = run(deep(1.5), 'rcf');
+    expect(deepFraction.totalErrors).toBe(0); expect(deepFraction.totalWarnings).toBe(1);
+    expect(Object.keys(deepFraction.warnings ?? {}).join(' ')).toMatch(/scale 0/);
+    const deepOver = run(deep(12345), 'rcf');
+    expect(deepOver.totalErrors).toBe(0); expect(deepOver.totalWarnings).toBe(1);
+    expect(run(deep(1.5), 'transport').totalErrors).toBe(1);
+    // an Int16 over its range or with a fraction: the type MUST on rcf too
+    const int16Over = run({ '@reso.context': CTX, TestInt16: 70000 }, 'rcf');
+    expect(int16Over.totalErrors).toBe(1); expect(int16Over.totalWarnings).toBe(0);
+    expect(Object.keys(int16Over.errors ?? {}).join(' ')).toMatch(/MUST be <= 65535/);
+    const int16Fraction = run({ '@reso.context': CTX, TestInt16: 1.5 }, 'rcf');
+    expect(int16Fraction.totalErrors).toBe(1); expect(int16Fraction.totalWarnings).toBe(0);
+    // the presence heuristic (no acquisition, context present): both numeric cases stay a MUST
+    const heuristicOver = run({ '@reso.context': CTX, BathroomsFull: 12345 });
+    expect(heuristicOver.totalErrors).toBe(1); expect(heuristicOver.totalWarnings).toBe(0);
+    const heuristicFraction = run({ '@reso.context': CTX, BathroomsFull: 2.5 });
+    expect(heuristicFraction.totalErrors).toBe(1); expect(heuristicFraction.totalWarnings).toBe(0);
   });
 
   it('the schema is left as it was found after a compile failure (no residue for the next resource)', async () => {
