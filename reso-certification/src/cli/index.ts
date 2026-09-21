@@ -541,6 +541,13 @@ ddCmd.action(
       }
 
       const ddVersion = normalizeDDVersion(opts.ddVersion);
+
+      // The variations step authenticates to the Variations Service with the tools .env
+      // OAuth2 client credentials (TOKEN_URI / CLIENT_ID / CLIENT_SECRET), as find-variations
+      // does — so a config-driven run computes against the environment those credentials
+      // belong to. When they are absent the service wrapper falls back to the CERT_AUTH_API_*
+      // provider-token mint, unchanged.
+      const servicesAuthToken = await mintOAuth2ClientCredentialsToken();
       if (!isCertifiableDDVersion(ddVersion)) {
         throw new Error(`Invalid version "${opts.ddVersion}". RESO certification requires DD ${CERTIFIABLE_DD_VERSIONS.join(' or ')}.`);
       }
@@ -563,6 +570,7 @@ ddCmd.action(
           const config: DDConfig = {
             ...baseConfig,
             fromCli: true,
+            ...(servicesAuthToken ? { servicesAuthToken } : {}),
             server: { ...baseConfig.server, auth },
             limit: opts.limit !== undefined ? Number(opts.limit) : (baseConfig.limit ?? 100000),
             ...(opts.strict ? { strictMode: true } : {}),
@@ -587,6 +595,7 @@ ddCmd.action(
         const config: DDConfig = {
           endorsement: 'dd',
           fromCli: true,
+          ...(servicesAuthToken ? { servicesAuthToken } : {}),
           server: { url: opts.url!, auth },
           version: ddVersion,
           limit: opts.limit !== undefined ? Number(opts.limit) : 100000,
