@@ -198,7 +198,7 @@ describe('runRcf (offline)', () => {
   // provider metadata to "advertise" anything against. Local fields and enumeration values outside the standard
   // set are accepted, always; a field that matches the DD must have the right type (error); a value that exceeds
   // the DD's length, precision or scale is a warning.
-  it('RCF as-is: a local field and a value outside the standard set are accepted, with or without -a; a wrong type on a DD field is still an error', async () => {
+  it('RCF as-is: a local field and a value outside the standard set are accepted regardless of the additionalProperties option; a wrong type on a DD field is still an error', async () => {
     const dir = tempDirWith({
       'p.json': {
         '@reso.context': 'urn:reso:metadata:2.0:resource:property',
