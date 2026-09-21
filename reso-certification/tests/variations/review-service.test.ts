@@ -125,7 +125,7 @@ describe('listVariationReviewItemsViaService', () => {
 
     await expect(listVariationReviewItemsViaService({ fromCli: true })).rejects.toMatchObject({
       code: 'AUTH_REQUIRED',
-      message: expect.stringContaining('.env'),
+      message: expect.stringMatching(/TOKEN_URI.*CLIENT_SECRET.*CERT_AUTH_API_BASE_URL.*\.env/),
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });

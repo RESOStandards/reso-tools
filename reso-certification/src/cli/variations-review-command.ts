@@ -82,3 +82,14 @@ export const formatProvenance = (items: ReadonlyArray<VariationReviewItem>): str
       return [head, ...lines].join('\n');
     })
     .join('\n');
+
+/**
+ * Variation keys the service returned more than once. The items route groups
+ * rows by key within a page, so a key whose rows straddle a page boundary
+ * comes back twice with its provenance split; the CLI reports the rows as
+ * served and warns, rather than merging and hiding it.
+ */
+export const duplicateVariationKeys = (items: ReadonlyArray<VariationReviewItem>): ReadonlyArray<string> => {
+  const counts = items.reduce((m, i) => m.set(i.variationKey, (m.get(i.variationKey) ?? 0) + 1), new Map<string, number>());
+  return [...counts.entries()].filter(([, n]) => n > 1).map(([k]) => displayVariationKey(k));
+};

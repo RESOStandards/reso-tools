@@ -246,7 +246,8 @@ reso-cert list-variation-reviews --element-type lookup --json    # exactly what 
 
 `--status <pending|ft-submitted|resolved>` · `--element-type <resource|field|lookup>` ·
 `--provenance` (one line per submitting tuple: when, which provider/USI/recipient, by whom,
-environment, role) · `--json`. The summary table shows the mapping, the strategy where the
+environment, role) · `--page-size <n>` (items per request; every page is fetched regardless) ·
+`--json`. The summary table shows the mapping, the strategy where the
 pool holds one, the tuple count and the earliest submission.
 
 ### `variations-review-status`
