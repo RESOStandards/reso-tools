@@ -121,6 +121,12 @@ reso-cert dd --url https://api.example.com --auth-token TOKEN --strict
 | `--dd-version <v>` | current DD | DD version (must be a certifiable version) |
 | `--limit <n>` | `100000` | Max records replicated per resource |
 | `--strict` | — | Fail on variations and enforce JSON-schema validation |
+
+The variations step computes through the Variations Service. It authenticates with the OAuth2
+client-credentials token minted from `.env` (`TOKEN_URI` / `CLIENT_ID` / `CLIENT_SECRET`), the
+same way `find-variations` does, so a run computes against the environment those credentials
+belong to; with them absent it falls back to the `CERT_AUTH_API_*` provider-token mint. In
+`--config` mode every entry's report lands as `variations-report.json` under the output dir.
 | `--batch-expand` | — | Batch every expansion per resource into one `$expand` request |
 
 ## Per-step utilities
