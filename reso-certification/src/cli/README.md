@@ -29,6 +29,8 @@ human-readable summary goes to **stderr**, so you can pipe `--output json` clean
 | [`find-variations`](#find-variations) | DD variations review via the v2 Variations Service |
 | [`metadata-report adapt`](#metadata-report-adapt) | Back-fill the `resources[]` block on a DD 2.0/2.1 report |
 | [`update-variations`](#update-variations) | Submit reviewed variation suggestions (admin) |
+| [`list-variation-reviews`](#list-variation-reviews) | The variations in review — yours as a provider, the whole pool as an admin (read-only) |
+| [`variations-review-status`](#variations-review-status) | Where each variations submission stands (read-only) |
 
 The first four are **endorsement runners** (a full compliance pipeline against a live
 server). The rest are **per-step utilities** — each does one stage of a run in isolation,
@@ -225,6 +227,37 @@ reso-cert update-variations -s suggestions.csv --admin-review
 `--chunk-size <n>` (suggestions per request, default `1000`). The run summary reports
 `submitted`, per-status stats, and any `permission-denied` / `validation-failed` /
 `corrections` — review those before assuming a clean run.
+
+## Variations review (read-only)
+
+Both read the same routes the web client's review page uses, with the same auth as
+`update-variations` (an OAuth2 client-credentials token from `.env`, falling back to the
+`CERT_AUTH_API_*` provider-token mint). Neither writes anything.
+
+### `list-variation-reviews`
+The items in the review pool: a provider token sees its own rows, an admin token the
+org-wide pool. One line per variation key, collapsed across every tuple that flagged it.
+
+```bash
+reso-cert list-variation-reviews --status pending
+reso-cert list-variation-reviews --status pending --provenance   # every submitting tuple under each item
+reso-cert list-variation-reviews --element-type lookup --json    # exactly what the service returned
+```
+
+`--status <pending|ft-submitted|resolved>` · `--element-type <resource|field|lookup>` ·
+`--provenance` (one line per submitting tuple: when, which provider/USI/recipient, by whom,
+environment, role) · `--json`. The summary table shows the mapping, the strategy where the
+pool holds one, the tuple count and the earliest submission.
+
+### `variations-review-status`
+Your submissions with their `lifecycle` and `review` status, one line each.
+
+```bash
+reso-cert variations-review-status
+reso-cert variations-review-status --review-status in-review   # admin: every provider's, by review status
+```
+
+`--review-status <none|in-review|resolved>` (admin queue instead of your own) · `--json`.
 
 ## Config-file mode
 
