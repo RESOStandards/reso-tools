@@ -250,7 +250,7 @@ describe('validate() — severity follows the acquisition path, not the annotati
     expect(transportFraction.totalErrors).toBe(1);
   });
 
-  it('the numeric downgrades reach a scale-0 decimal two expansions deep on rcf, stay a MUST on transport, and never touch an Int16/Int64 range cap or the presence heuristic', async () => {
+  it('the numeric downgrades reach a scale-0 decimal two expansions deep and inside a collection expansion on rcf, stay a MUST on transport, and never touch an Int16 / Int64 range cap or the presence heuristic', async () => {
     // a synthetic Edm.Int16 beside the DD 2.0 reference: its range cap is the type's own bound, a MUST everywhere
     const meta = structuredClone(metadata);
     meta.fields.push({ resourceName: 'Property', fieldName: 'TestInt16', nullable: true, annotations: [], type: 'Edm.Int16' });
@@ -276,6 +276,23 @@ describe('validate() — severity follows the acquisition path, not the annotati
     expect(heuristicOver.totalErrors).toBe(1); expect(heuristicOver.totalWarnings).toBe(0);
     const heuristicFraction = run({ '@reso.context': CTX, BathroomsFull: 2.5 });
     expect(heuristicFraction.totalErrors).toBe(1); expect(heuristicFraction.totalWarnings).toBe(0);
+    // depth 2 over precision on transport, single record and the `value` envelope: the MUST holds
+    expect(run(deep(12345), 'transport').totalErrors).toBe(1);
+    const deepPage = run({ '@reso.context': CTX, value: [{ ListingKey: 'p', ListAgent: { MemberKey: 'm', Office: { OfficeKey: 'o', NumberOfBranches: 12345 } } }] }, 'transport');
+    expect(deepPage.totalErrors).toBe(1); expect(deepPage.totalWarnings).toBe(0);
+    // through a COLLECTION expansion (an index segment after the expansion): Media[0].Order is a scale-0 decimal
+    const inCollection = (v: number) => ({ '@reso.context': CTX, value: [{ ListingKey: 'p', Media: [{ MediaKey: 'm', Order: v }] }] });
+    const collFraction = run(inCollection(1.5), 'rcf');
+    expect(collFraction.totalErrors).toBe(0); expect(collFraction.totalWarnings).toBe(1);
+    expect(Object.keys(collFraction.warnings ?? {}).join(' ')).toMatch(/scale 0/);
+    const collOver = run(inCollection(12345), 'rcf');
+    expect(collOver.totalErrors).toBe(0); expect(collOver.totalWarnings).toBe(1);
+    expect(Object.keys(collOver.warnings ?? {}).join(' ')).toMatch(/precision/);
+    // a real Edm.Int64 in the reference (EntityEvent.EntityEventSequence): its range cap and a fraction stay a MUST on rcf
+    const eventCtx = 'urn:reso:metadata:2.0:resource:entityevent';
+    const event = (v: number) => combineErrors(validate({ jsonSchema, jsonPayload: { '@reso.context': eventCtx, EntityEventSequence: v }, resourceName: 'EntityEvent', version: '2.0', errorMap: {}, acquisition: 'rcf' }));
+    expect(event(1e30).totalErrors).toBe(1); expect(event(1e30).totalWarnings).toBe(0);
+    expect(event(1.5).totalErrors).toBe(1); expect(event(1.5).totalWarnings).toBe(0);
   });
 
   it('the schema is left as it was found after a compile failure (no residue for the next resource)', async () => {
