@@ -146,9 +146,11 @@ export const createDdSchemaValidator = async (opts: {
   readonly metadataReportJson: unknown;
   readonly additionalProperties?: boolean;
   readonly validationConfig?: unknown;
-  /** How the payloads were obtained (#298). 'rcf' — RESO Common Format files: advisory length, `@reso.context`
-   *  required and validated. 'transport' — Web API pages: MUST length, context optional until DD 3.0 and
-   *  validated when present. Omitted — the legacy presence heuristic. */
+  /** How the payloads were obtained (#298). 'rcf' — RESO Common Format files, taken as-is: values outside the
+   *  standard set accepted, a DD field held to its type, length / precision / scale advisory, `@reso.context`
+   *  required and validated (local FIELDS are accepted when the caller generates the schema with
+   *  additionalProperties, as the rcf command does). 'transport' — Web API pages: MUST everything, context
+   *  optional until DD 3.0 and validated when present. Omitted — the legacy presence heuristic. */
   readonly acquisition?: 'transport' | 'rcf';
 }): Promise<DdSchemaValidator> => {
   const mod = loadSchemaModule();

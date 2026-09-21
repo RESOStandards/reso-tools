@@ -279,6 +279,12 @@ const addCustomValidationForEnum = ajv => {
           }
           if (schema.includes(enumValue)) {
             valid.push(true);
+          } else if (validationContext.getAcquisition() === 'rcf') {
+            // RCF as-is (the DECLARED rcf path, never the presence heuristic): the Data Dictionary allows extension,
+            // and an RCF submission carries no provider metadata for a value to be "advertised" against, so a value
+            // outside the standard set is accepted, as a local field is. The DD-path rule (values must be advertised
+            // in the provider's metadata) is untouched.
+            valid.push(true);
           } else {
             // Collect the needed error data if validation fails
             valid.push(false);
@@ -310,6 +316,7 @@ const VALIDATION_ERROR_MESSAGES = Object.freeze({
 
 const SCHEMA_ERROR_KEYWORDS = Object.freeze({
   MAX_LENGTH: 'maxLength',
+  MAXIMUM: 'maximum',
   ERROR_MESSAGE: 'errorMessage',
   ENUM: 'enum',
   ADDITIONAL_PROPERTIES: 'additionalProperties',

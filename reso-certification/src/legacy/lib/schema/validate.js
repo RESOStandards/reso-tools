@@ -60,8 +60,10 @@ const ORIGINAL_SCHEMA = 'original_schema';
  * @param {'transport'|'rcf'=} obj.acquisition  how the payload was obtained (#298): 'transport' = a Web API Core page,
  *   a DD run replicated over the provider's Web API, an $expand child → DD/Core rules (maxLength is a MUST), the
  *   context optional until DD 3.0 and validated when present (warnings until 3.0); 'rcf' = a RESO Common Format
- *   payload → advisory length, the context REQUIRED and validated (errors). Omitted → the legacy presence
- *   heuristic (mode = !!payload['@reso.context']) for callers that have not declared a path.
+ *   payload, taken as-is → local fields and values outside the standard set accepted, a DD field held to its
+ *   type, length / precision / scale beyond the DD's advisory, the context REQUIRED and validated (errors).
+ *   Omitted → the legacy presence heuristic (mode = !!payload['@reso.context']) for callers that have not
+ *   declared a path: advisory length when a context is present, nothing else relaxed.
  *   On 'transport' the REQUESTED resource and the run's version select the schema; a present context is a
  *   consistency signal, never the switch. On 'rcf' the context is the payload's model identifier and selects.
  * @param {boolean=} obj.embedded  the payload is an item embedded in a page (an $expand child): its context, when
@@ -117,6 +119,7 @@ const validate = ({
   // path keep the presence heuristic.
   const isRCF = acquisition === 'rcf' ? true : acquisition === 'transport' ? false : !!payload['@reso.context'];
   validationContext.setRCF(isRCF);
+  validationContext.setAcquisition(acquisition);
 
   const ddVersion = validationContext.getVersion();
 
@@ -329,6 +332,32 @@ const validatePayload = ({ payloads = {}, schema, resourceNameFromArgs = '', ver
  *
  * Processes the raw validation results from AJV.
  */
+/**
+ * The Data Dictionary type of the field an ajv instancePath points at, walking every expansion level: each
+ * non-numeric segment (other than `value`) is looked up on the CURRENT model; an expansion entry advances the
+ * model to its target type; the last field entry's `type` is the answer. `parseNestedPropertyForResourceAndField`
+ * resolves one expansion level (its sourceModel / sourceModelField), which is enough for the report's naming but
+ * not for a type lookup two expansions deep (Property → ListAgent → Office.NumberOfBranches).
+ *
+ * @returns {string|undefined} the DD type, or undefined for a local field or an unresolvable path
+ */
+const resolveDdTypeAlongPath = (metadataMap, resourceName, segments) => {
+  let model = resourceName;
+  let type;
+  for (const segment of segments ?? []) {
+    if (segment === 'value' || !Number.isNaN(Number(segment))) continue;
+    const entry = metadataMap?.[model]?.[segment];
+    if (!entry) return undefined;
+    if (entry.isExpansion) {
+      model = entry.typeName || model;
+      type = undefined;
+    } else {
+      type = entry.type;
+    }
+  }
+  return type;
+};
+
 const generateErrorReport = ({
   validate,
   json,
@@ -367,12 +396,29 @@ const generateErrorReport = ({
       failedItemValue = '';
     }
 
+
     const { fieldName, sourceModel, sourceModelField: modelField, index, expansionIndex } = parseNestedPropertyForResourceAndField({
       arr: nestedPayloadProperties,
       metadataMap: schema?.definitions?.MetadataMap,
       parentResourceName: resourceName
     });
     let sourceModelField = modelField;
+
+    // The generator types a scale-0 Edm.Decimal as JSON `integer`, so a fractional value fails the `type`
+    // keyword. That is the Data Dictionary SCALE exceeded, not a wrong type: on the declared RCF path (as-is: type
+    // is a MUST, length, scale and precision beyond the DD's are warnings) it is reported as a scale warning; a
+    // non-numeric value stays the type MUST, and transport keeps the MUST.
+    const failedDdType = resolveDdTypeAlongPath(metadataMap, resourceName, nestedPayloadProperties);
+    if (
+      keyword === SCHEMA_ERROR_KEYWORDS.TYPE &&
+      transformedValue === 'decimal' &&
+      (Array.isArray(params?.type) ? params.type.includes('integer') : params?.type === 'integer') &&
+      failedDdType === 'Edm.Decimal' &&
+      validationContext.getAcquisition() === 'rcf'
+    ) {
+      isWarning = true;
+      message = 'SHOULD have no decimal places (Data Dictionary scale 0)';
+    }
 
     if (
       keyword === SCHEMA_ERROR_KEYWORDS.TYPE &&
@@ -431,6 +477,18 @@ const generateErrorReport = ({
           isRCF
         );
       }
+    }
+
+    // A numeric value over the Data Dictionary precision (the schema's `maximum` on a scale-0 decimal) is, like
+    // length, advisory on the DECLARED RCF path: RCF is taken as-is, and a DD field is held to its TYPE (a MUST)
+    // while length, scale and precision beyond the DD's are reported as warnings. Declared, not the presence
+    // heuristic: legacy callers validating provider metadata against a payload that happens to carry a context
+    // keep the DD rules.
+    // Only the precision cap the generator puts on a scale-0 Edm.Decimal; the Edm.Int16/32/64 range caps are the
+    // type's own bounds and stay a MUST on every path.
+    if (resolvedKeyword === SCHEMA_ERROR_KEYWORDS.MAXIMUM && validationContext.getAcquisition() === 'rcf' && failedDdType === 'Edm.Decimal') {
+      isWarning = true;
+      message = `SHOULD not exceed the Data Dictionary precision (maximum ${params?.limit ?? params?.errors?.[0]?.params?.limit ?? ''})`;
     }
 
     const keysDisabled = validationContext.keysDisabled();
