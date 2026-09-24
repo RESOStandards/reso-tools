@@ -684,7 +684,7 @@ program
         console.log(`Submitted ${result.submitted} suggestion(s) in ${result.chunks} chunk(s).`);
         if (Object.keys(result.stats).length) {
           console.log('Stats:');
-          Object.entries(result.stats).forEach(([key, value]) => console.log(`  • ${key}: ${value}`));
+          for (const [key, value] of Object.entries(result.stats)) console.log(`  • ${key}: ${value}`);
         }
         if (result.permissionDenied || result.validationFailed || result.corrections) {
           console.error(
@@ -1260,9 +1260,11 @@ program
         }
         if (s.invalidContextFiles > 0) {
           process.stderr.write(
-            `rcf: ${s.invalidContextFiles} file(s) carry an unreadable @reso.context (${s.invalidContextRecords} record(s) not certified)${opts.schemaValidate
+            `rcf: ${s.invalidContextFiles} file(s) carry an unreadable @reso.context (${s.invalidContextRecords} record(s) not certified)${
+              opts.schemaValidate
                 ? ' — counted among the schema errors above\n'
-                : ' — run with --schema-validate to have them reported as schema errors\n'}`
+                : ' — run with --schema-validate to have them reported as schema errors\n'
+            }`
           );
         }
         // Zero-record (empty/unreadable) submissions and degraded variations runs must not read as a clean pass.

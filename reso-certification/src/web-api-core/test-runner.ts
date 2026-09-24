@@ -1263,7 +1263,7 @@ export const runLookupResourceScenario = async (
   params: TestParams,
   authToken: string,
   start: number,
-  requester: ODataRequester = webRequester,
+  requester: ODataRequester,
   lookupCtx: LookupResourceContext
 ): Promise<ScenarioResult> => {
   // The Lookup Resource is the STRING enum mechanism, so only string forms have one: SINGLE_STRING (single-valued)
@@ -1316,7 +1316,7 @@ const runScenario = async (
   scenario: CoreScenario,
   params: TestParams,
   authToken: string,
-  requester: ODataRequester = webRequester,
+  requester: ODataRequester,
   lookupCtx: LookupResourceContext
 ): Promise<ScenarioResult> => {
   const start = Date.now();
@@ -1573,9 +1573,7 @@ const ODATA_SKIP_SPEC_URL = 'https://docs.oasis-open.org/odata/odata/v4.0/errata
 export const describeSkipOverlap = (overlap: number): string => {
   const keys = `${overlap} key${overlap === 1 ? '' : 's'}`;
   const verb = overlap === 1 ? 'appears' : 'appear';
-  return (
-    `$skip overlap: ${keys} ${verb} in both pages — consecutive pages must be disjoint. Absent $orderby, OData REQUIRES the service to impose a stable ordering across requests that include $top/$skip (4.0 §11.2.5.4 [$skip], §11.2.5.3 [$top]; 4.01 §11.2.6.3–.4) — a stable sort is mandatory, so $top=5 then $skip=5 must return different records. See ${ODATA_SKIP_SPEC_URL}`
-  );
+  return `$skip overlap: ${keys} ${verb} in both pages — consecutive pages must be disjoint. Absent $orderby, OData REQUIRES the service to impose a stable ordering across requests that include $top/$skip (4.0 §11.2.5.4 [$skip], §11.2.5.3 [$top]; 4.01 §11.2.6.3–.4) — a stable sort is mandatory, so $top=5 then $skip=5 must return different records. See ${ODATA_SKIP_SPEC_URL}`;
 };
 
 /** Run structural scenarios (metadata, service-document, fetch-by-key, select, top, skip, count). Exported as a

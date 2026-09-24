@@ -149,9 +149,10 @@ export const parseVariationsCsv = (csvData: string): ParsedVariationsCsv => {
         `Variations CSV row ${rowNumber} has ${cells.length} columns but the header has ${headerRow.length} — check for an unquoted comma.`
       );
     }
-    const item = fieldByIndex.reduce<Partial<VariationSuggestionItem>>((acc, field, i) => {
+    const item = fieldByIndex.reduce<{ -readonly [K in keyof VariationSuggestionItem]?: VariationSuggestionItem[K] }>((acc, field, i) => {
       const value = cells[i]?.trim();
-      return field && value ? { ...acc, [field]: value } : acc;
+      if (field && value) acc[field] = value;
+      return acc;
     }, {});
     if (!isComplete(item)) {
       throw new Error(`Variations CSV row ${rowNumber} is missing a Resource Name.`);

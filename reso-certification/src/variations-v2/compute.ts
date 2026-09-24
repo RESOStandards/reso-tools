@@ -288,12 +288,12 @@ const resolveField = (resourceName: string, fieldName: string, ctx: Ctx): void =
       s =>
         !!(
           (metadataReportMap?.[s.suggestedResourceName as never] as Json)?.[s.suggestedFieldName as never] ||
-          Object.values(
-            (metadataReportMap?.[s.suggestedResourceName as never] as Json)?.[s.suggestedFieldName as never] ?? {}
-          ).some(entry => {
-            const { standardFieldName = null } = entry as Json;
-            return !!s.suggestedFieldName && s.suggestedFieldName === standardFieldName;
-          })
+          Object.values((metadataReportMap?.[s.suggestedResourceName as never] as Json)?.[s.suggestedFieldName as never] ?? {}).some(
+            entry => {
+              const { standardFieldName = null } = entry as Json;
+              return !!s.suggestedFieldName && s.suggestedFieldName === standardFieldName;
+            }
+          )
         ),
       ({ suggestedResourceName, suggestedFieldName, isAdminReview, isFastTrack, ...rest }) => [
         {

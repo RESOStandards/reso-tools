@@ -40,11 +40,23 @@ const executeStepFunctions = async <TContext extends PipelineContext>(
     const results = await Promise.all(functions.map(fn => fn(context, onProgress)));
 
     // Merge outputs: contexts merge (last wins), summaries join, errors concat
-    const mergedContext = results.reduce((acc, r) => ({ ...acc, ...r.context }), { ...context } as TContext);
+    const mergedContext = results.reduce(
+      (acc, r) => {
+        Object.assign(acc, r.context);
+        return acc;
+      },
+      { ...context } as TContext
+    );
     const summaries = results.map(r => r.summary).filter(Boolean);
     const errors = results.flatMap(r => r.errors ?? []);
     const artifacts = results.flatMap(r => r.artifacts ?? []);
-    const counts = results.reduce((acc, r) => ({ ...acc, ...r.counts }), {} as Record<string, number>);
+    const counts = results.reduce(
+      (acc, r) => {
+        Object.assign(acc, r.counts);
+        return acc;
+      },
+      {} as Record<string, number>
+    );
     // Merge sub-status with the same precedence as the sequential runner: failed > incomplete > passed.
     const mergedStatus = results.some(r => r.status === 'failed')
       ? ('failed' as const)
