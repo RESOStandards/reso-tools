@@ -1,12 +1,12 @@
 {
   "name": "@reso-standards/reso-common",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/RESOStandards/reso-tools.git",
     "directory": "reso-common"
   },
-  "description": "Universal (browser + Node) RESO metadata model and projections — the shared ResoMetadata shape, pure helpers and the EDMX generator. Zero runtime dependencies, no Node APIs.",
+  "description": "Universal (browser + Node) RESO metadata model and projections \u2014 the shared ResoMetadata shape, pure helpers and the EDMX generator. Zero runtime dependencies, no Node APIs.",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "main": "./dist/index.js",
