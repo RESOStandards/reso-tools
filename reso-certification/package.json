@@ -7,7 +7,7 @@
     "url": "git+https://github.com/RESOStandards/reso-tools.git",
     "directory": "reso-certification"
   },
-  "description": "RESO certification testing toolkit \u2014 Add/Edit (RCP-010), Web API Core, Data Dictionary",
+  "description": "RESO certification testing toolkit – Add/Edit (RCP-010), Web API Core, Data Dictionary",
   "type": "module",
   "engines": {
     "node": ">=22.0.0"
