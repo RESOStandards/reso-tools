@@ -5,7 +5,7 @@
  * so that certification test scenarios require no changes.
  */
 
-import { buildUri, createClient, type ResilienceSession } from '@reso-standards/reso-client';
+import { type ResilienceSession, buildUri, createClient } from '@reso-standards/reso-client';
 import type { ODataResponse } from './types.js';
 
 /** Options for making an OData HTTP request. */
@@ -37,7 +37,7 @@ export const odataRequest = async (
     baseUrl: '',
     auth: { mode: 'token', authToken: options.authToken },
     defaultHeaders,
-    session: options.session,
+    session: options.session
   });
 
   return client.request(options.method, options.url, {

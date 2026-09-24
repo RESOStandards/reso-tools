@@ -9,11 +9,7 @@
 
 import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
-import {
-  validateMetadata,
-  formatValidationSummary,
-  collectValidationErrors,
-} from '../sdk/metadata-validation.js';
+import { collectValidationErrors, formatValidationSummary, validateMetadata } from '../sdk/metadata-validation.js';
 import type { MetadataValidationResult } from '../sdk/metadata-validation.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
 
@@ -59,18 +55,13 @@ export const runMetadataStep = async (opts: {
     : { report: undefined, reportError: undefined };
   const validationValid = validation.xsdValid && validation.semanticValid;
   const passed = validationValid && (!emit || report !== undefined);
-  const errors = reportError
-    ? [...collectValidationErrors(validation), `[report] ${reportError}`]
-    : collectValidationErrors(validation);
+  const errors = reportError ? [...collectValidationErrors(validation), `[report] ${reportError}`] : collectValidationErrors(validation);
   return { passed, validation, summary: formatValidationSummary(validation), errors, report, reportError };
 };
 
 /** Serialize the report, capturing (rather than throwing) a serializer failure so the step reports a verdict
  *  instead of crashing on malformed CSDL. The failure reason is surfaced in {@link MetadataStepResult.reportError}. */
-const tryGenerateReport = (
-  metadataXml: string,
-  ddVersion: string,
-): { readonly report?: MetadataReport; readonly reportError?: string } => {
+const tryGenerateReport = (metadataXml: string, ddVersion: string): { readonly report?: MetadataReport; readonly reportError?: string } => {
   try {
     return { report: generateMetadataReport(metadataXml, ddVersion) };
   } catch (err) {

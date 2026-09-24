@@ -23,13 +23,10 @@ export const metadataReportToResoMetadata = (report: MetadataReport): ResoMetada
     lookupName: l.lookupName,
     lookupValue: l.lookupValue,
     type: l.type,
-    annotations: l.annotations ?? [],
-  })),
+    annotations: l.annotations ?? []
+  }))
 });
 
 /** Generate reference EDMX XML for the given resources from a DD MetadataReport. */
-export const generateReferenceEdmx = (
-  report: MetadataReport,
-  targetResources: ReadonlyArray<string>,
-  enumMode: EnumMode,
-): string => generateEdmx(metadataReportToResoMetadata(report), targetResources, enumMode);
+export const generateReferenceEdmx = (report: MetadataReport, targetResources: ReadonlyArray<string>, enumMode: EnumMode): string =>
+  generateEdmx(metadataReportToResoMetadata(report), targetResources, enumMode);

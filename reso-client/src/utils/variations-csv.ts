@@ -42,7 +42,7 @@ export const VARIATIONS_CSV_COLUMNS = [
   'Suggested Related Field Name',
   'Suggested Related Lookup Value',
   'Outcome',
-  'Comments',
+  'Comments'
 ] as const;
 
 export interface VariationCsvRow {
@@ -81,7 +81,7 @@ export const variationsToCsv = (rows: ReadonlyArray<VariationCsvRow>): string =>
     r.suggestedRelatedFieldName,
     r.suggestedRelatedLookupValue,
     r.outcome,
-    r.comments,
+    r.comments
   ]);
   return rowsToCsv(VARIATIONS_CSV_COLUMNS, data);
 };
@@ -99,8 +99,8 @@ const HEADER_TO_FIELD: Readonly<Record<string, keyof VariationCsvRow>> = {
   'suggested related resource name': 'suggestedRelatedResourceName',
   'suggested related field name': 'suggestedRelatedFieldName',
   'suggested related lookup value': 'suggestedRelatedLookupValue',
-  'outcome': 'outcome',
-  'comments': 'comments',
+  outcome: 'outcome',
+  comments: 'comments'
 };
 
 export interface ParseVariationsCsvError {
@@ -134,13 +134,11 @@ export const csvToVariations = (csv: string): ParseVariationsCsvResult => {
   if (raw.length === 0) return { rows: [], errors: [{ line: 0, message: 'CSV is empty' }] };
 
   const headerRow = raw[0].map(h => h.trim().toLowerCase());
-  const columnMap: Array<keyof VariationCsvRow | null> = headerRow.map(h =>
-    HEADER_TO_FIELD[h] ?? null
-  );
+  const columnMap: Array<keyof VariationCsvRow | null> = headerRow.map(h => HEADER_TO_FIELD[h] ?? null);
   if (!columnMap.includes('resourceName')) {
     return {
       rows: [],
-      errors: [{ line: 1, message: 'Header row must include a "Resource Name" column' }],
+      errors: [{ line: 1, message: 'Header row must include a "Resource Name" column' }]
     };
   }
 

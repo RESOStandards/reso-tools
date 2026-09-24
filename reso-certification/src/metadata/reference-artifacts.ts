@@ -12,15 +12,11 @@
  * self-test harness's concern.
  */
 import type { EnumMode } from '@reso-standards/reso-common';
-import { generateReferenceEdmx } from './reference-edmx.js';
 import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
-import {
-  synthesizeLookupResourceRecords,
-  serializeLookupResourceDump,
-  mergeWithLookupResource,
-} from './lookup-resource.js';
+import { mergeWithLookupResource, serializeLookupResourceDump, synthesizeLookupResourceRecords } from './lookup-resource.js';
 import type { LookupResourceDump } from './lookup-resource.js';
+import { generateReferenceEdmx } from './reference-edmx.js';
 
 /** The reference artifact set for one enum representation. */
 export interface ReferenceArtifacts {
@@ -47,7 +43,7 @@ export const generateReferenceArtifacts = (
   report: MetadataReport,
   targetResources: ReadonlyArray<string>,
   enumMode: EnumMode,
-  version: string,
+  version: string
 ): ReferenceArtifacts => {
   const edmx = generateReferenceEdmx(report, targetResources, enumMode);
   const base = generateMetadataReport(edmx, version);

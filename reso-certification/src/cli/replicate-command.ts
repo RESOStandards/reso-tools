@@ -16,11 +16,11 @@
 import { resolve } from 'node:path';
 import { normalizeDDVersion } from '../sdk/dd-versions.js';
 
+// @ts-expect-error — legacy CJS
+import certUtilsCommon from '../legacy/common.js';
 // Legacy CJS engine, imported exactly as src/sdk/dd.ts does (default import + destructure, no createRequire).
 // @ts-expect-error — legacy CJS, no type declarations
 import certUtils from '../legacy/index.js';
-// @ts-expect-error — legacy CJS
-import certUtilsCommon from '../legacy/common.js';
 // @ts-expect-error — legacy CJS
 import certUtilsReplicationUtils from '../legacy/lib/replication/utils.js';
 
@@ -62,7 +62,7 @@ const extractStats = (info: Record<string, unknown>): ReplicationStats => ({
   totalRecordsFetched: toNumber(info.totalRecordsFetched),
   meanResponseMs: toNumber(info.meanResponseMs),
   throughput: toNumber(info.throughput),
-  totalRequests: toNumber(info.totalRequests),
+  totalRequests: toNumber(info.totalRequests)
 });
 
 export interface ReplicateOptions {
@@ -100,9 +100,7 @@ export interface ReplicateOptions {
  */
 export const runReplicate = async (opts: ReplicateOptions): Promise<ReplicateResult> => {
   if (!REPLICATION_STRATEGY_VALUES.includes(opts.strategy)) {
-    throw new Error(
-      `Unknown strategy '${opts.strategy}'. Must be one of: ${REPLICATION_STRATEGY_VALUES.join(', ')}.`,
-    );
+    throw new Error(`Unknown strategy '${opts.strategy}'. Must be one of: ${REPLICATION_STRATEGY_VALUES.join(', ')}.`);
   }
   if (!opts.metadataReportPath && !opts.resourceName) {
     throw new Error('Provide either --resource <name> (single-resource) or --metadata <path> (report-driven).');
@@ -110,7 +108,9 @@ export const runReplicate = async (opts: ReplicateOptions): Promise<ReplicateRes
   // Schema validation (and the data-availability report) need the metadata to generate the schema and know
   // every resource's fields, so they are report-driven-mode only.
   if (opts.jsonSchemaValidation && !opts.metadataReportPath) {
-    throw new Error('Schema validation (--json-schema-validation / --strict) requires a metadata report (--metadata) — the schema is generated from it.');
+    throw new Error(
+      'Schema validation (--json-schema-validation / --strict) requires a metadata report (--metadata) — the schema is generated from it.'
+    );
   }
 
   const replicationStateService = createReplicationStateServiceInstance();
@@ -147,7 +147,7 @@ export const runReplicate = async (opts: ReplicateOptions): Promise<ReplicateRes
     onProgress: (info: Record<string, unknown>) => {
       lastInfo = info;
       opts.onProgress?.(info);
-    },
+    }
   });
 
   return { strategy: opts.strategy, stats: extractStats(lastInfo), outputDir: resolve(opts.outputPath) };

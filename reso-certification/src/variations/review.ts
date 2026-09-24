@@ -122,7 +122,7 @@ const resolveToken = async (input: ServiceAuthInput, what: string): Promise<stri
       'AUTH_REQUIRED',
       input.fromCli
         ? `${what} requires authentication. Set TOKEN_URI, CLIENT_ID and CLIENT_SECRET (or CERT_AUTH_API_BASE_URL, CERT_AUTH_API_USERNAME and CERTIFICATION_API_KEY) in your .env so the CLI can mint a provider token.`
-        : `${what} requires authentication. Pass a provider token (bearerToken) — e.g. the session token from logging in.`,
+        : `${what} requires authentication. Pass a provider token (bearerToken) — e.g. the session token from logging in.`
     );
   }
   return token;
@@ -136,7 +136,7 @@ const getJson = async (url: URL, token: string, input: ServiceAuthInput, what: s
       'AUTH_REJECTED',
       input.fromCli
         ? `${what}: the provider token was rejected. Re-check your CERT_AUTH_API_* .env credentials.`
-        : `${what}: your session token was rejected or has expired. Log in again to continue.`,
+        : `${what}: your session token was rejected or has expired. Log in again to continue.`
     );
   }
   if (!response.ok) {
@@ -152,7 +152,7 @@ const getJson = async (url: URL, token: string, input: ServiceAuthInput, what: s
  * never a partial list presented as the whole pool.
  */
 export const listVariationReviewItemsViaService = async (
-  input: ListVariationReviewItemsInput = {},
+  input: ListVariationReviewItemsInput = {}
 ): Promise<ReadonlyArray<VariationReviewItem>> => {
   const what = 'Listing variations in review';
   const servicesUrl = resolveServicesUrl();
@@ -176,7 +176,7 @@ export const listVariationReviewItemsViaService = async (
   const walk = async (
     cursor: string | undefined,
     acc: ReadonlyArray<VariationReviewItem>,
-    pages: number,
+    pages: number
   ): Promise<ReadonlyArray<VariationReviewItem>> => {
     if (pages >= MAX_PAGES) {
       throw serviceError('SERVICE_ERROR', `${what} failed: the service kept returning a next page after ${MAX_PAGES} pages.`);
@@ -193,9 +193,7 @@ export const listVariationReviewItemsViaService = async (
  * The caller's endorsements with their `lifecycleStatus` / `reviewStatus` —
  * one row per submission. The route serves `{ endorsements: [...] }`.
  */
-export const listMyEndorsementsViaService = async (
-  input: ListMyEndorsementsInput = {},
-): Promise<ReadonlyArray<EndorsementStatusRow>> => {
+export const listMyEndorsementsViaService = async (input: ListMyEndorsementsInput = {}): Promise<ReadonlyArray<EndorsementStatusRow>> => {
   const what = 'Fetching review status';
   const servicesUrl = resolveServicesUrl();
   const token = await resolveToken(input, what);
@@ -208,7 +206,7 @@ export const listMyEndorsementsViaService = async (
  * provider's rows; a provider token gets the route's own scoping to its rows.
  */
 export const listEndorsementsByReviewStatusViaService = async (
-  input: ListEndorsementsByReviewStatusInput = {},
+  input: ListEndorsementsByReviewStatusInput = {}
 ): Promise<ReadonlyArray<EndorsementStatusRow>> => {
   const what = 'Fetching review status';
   const servicesUrl = resolveServicesUrl();
@@ -219,7 +217,12 @@ export const listEndorsementsByReviewStatusViaService = async (
   return endorsementsAt(url, token, input, what);
 };
 
-const endorsementsAt = async (url: URL, token: string, input: ServiceAuthInput, what: string): Promise<ReadonlyArray<EndorsementStatusRow>> => {
+const endorsementsAt = async (
+  url: URL,
+  token: string,
+  input: ServiceAuthInput,
+  what: string
+): Promise<ReadonlyArray<EndorsementStatusRow>> => {
   const body = await getJson(url, token, input, what);
   if (!isRecord(body) || !Array.isArray(body.endorsements)) {
     throw serviceError('SERVICE_ERROR', `${what} failed: the service returned no endorsements array.`);

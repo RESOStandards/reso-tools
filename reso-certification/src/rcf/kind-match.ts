@@ -55,7 +55,7 @@ export const DEFAULT_KIND_MATCH_OPTIONS: KindMatchOptions = {
   minContainment: 0.4,
   marginRatio: 1.5,
   keyBonus: 2.0,
-  enumBonus: 1.5,
+  enumBonus: 1.5
 };
 
 export interface KindMatchInput {
@@ -125,7 +125,7 @@ const indexResource = (resource: string, fields: ReferenceMap[string]): Candidat
     resource,
     fields: new Set(Object.keys(fields)),
     keyNames: new Set([`${resource}Key`, `${resource}KeyNumeric`]),
-    lookups,
+    lookups
   };
 };
 
@@ -185,8 +185,7 @@ export const buildKindMatcher = (referenceMap: ReferenceMap, options: KindMatchO
     const containment = winner.containmentIdf / knownIdfMass;
     const margin = runnerUp && runnerUp.score > 0 ? winner.score / runnerUp.score : Number.POSITIVE_INFINITY;
 
-    const confident =
-      winner.score >= options.minMatchIdf && containment >= options.minContainment && margin >= options.marginRatio;
+    const confident = winner.score >= options.minMatchIdf && containment >= options.minContainment && margin >= options.marginRatio;
     if (!confident) return null;
 
     return {
@@ -194,7 +193,7 @@ export const buildKindMatcher = (referenceMap: ReferenceMap, options: KindMatchO
       score: winner.score,
       containment,
       margin,
-      signals: { containmentIdf: winner.containmentIdf, keyField: winner.keyField, enumOverlap: winner.enumOverlap },
+      signals: { containmentIdf: winner.containmentIdf, keyField: winner.keyField, enumOverlap: winner.enumOverlap }
     };
   };
 

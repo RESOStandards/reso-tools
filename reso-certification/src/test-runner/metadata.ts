@@ -103,7 +103,11 @@ export const fetchMetadata = async (serverUrl: string, authToken: string, useFor
   fetchRawMetadata(serverUrl.replace(/\/$/, ''), authToken, { useFormatParam });
 
 /** Fetches metadata and detects the server's OData version. */
-export const fetchMetadataWithVersion = async (serverUrl: string, authToken: string, useFormatParam = true): Promise<{ xml: string; odataVersion: string | undefined }> =>
+export const fetchMetadataWithVersion = async (
+  serverUrl: string,
+  authToken: string,
+  useFormatParam = true
+): Promise<{ xml: string; odataVersion: string | undefined }> =>
   fetchRawMetadataWithVersion(serverUrl.replace(/\/$/, ''), authToken, { useFormatParam });
 
 /** Reads OData XML metadata from a local file. */

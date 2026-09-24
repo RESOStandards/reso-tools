@@ -23,12 +23,20 @@ export const createDataResetHandler =
 
       // Delete in reverse dependency order (children first)
       const childResources = TARGET_RESOURCES.filter(r =>
-        ['Media', 'OpenHouse', 'Showing', 'PropertyRooms', 'PropertyGreenVerification',
-         'PropertyPowerProduction', 'PropertyUnitTypes', 'TeamMembers'].includes(r)
+        [
+          'Media',
+          'OpenHouse',
+          'Showing',
+          'PropertyRooms',
+          'PropertyGreenVerification',
+          'PropertyPowerProduction',
+          'PropertyUnitTypes',
+          'TeamMembers'
+        ].includes(r)
       ).filter(r => !readOnlyResources.has(r));
-      const parentResources = TARGET_RESOURCES.filter(r =>
-        !childResources.includes(r) && r !== 'Lookup'
-      ).filter(r => !readOnlyResources.has(r));
+      const parentResources = TARGET_RESOURCES.filter(r => !childResources.includes(r) && r !== 'Lookup').filter(
+        r => !readOnlyResources.has(r)
+      );
 
       for (const resource of [...childResources, ...parentResources]) {
         const ctx = buildResourceContext(metadata, resource);

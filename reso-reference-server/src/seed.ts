@@ -1,6 +1,6 @@
 import { createApp, loadConfig } from './index.js';
 import { loadMetadata } from './metadata/loader.js';
-import { applySeedData, type SeedResult } from './seed-data.js';
+import { type SeedResult, applySeedData } from './seed-data.js';
 
 /**
  * Standalone seed CLI (`npm run seed` / `node dist/seed.js`). Builds a DAL for the
@@ -16,9 +16,7 @@ export const loadSeedData = async (): Promise<SeedResult> => {
   const { dal, cleanup } = await createApp({ config });
   try {
     const result = await applySeedData(dal, metadata);
-    console.log(result.skipped
-      ? 'Seed skipped: database already contains data.'
-      : `Seed complete: ${result.loaded} records loaded.`);
+    console.log(result.skipped ? 'Seed skipped: database already contains data.' : `Seed complete: ${result.loaded} records loaded.`);
     return result;
   } finally {
     cleanup();
@@ -30,7 +28,7 @@ const isDirectExecution = process.argv[1]?.endsWith('/dist/seed.js') === true;
 if (isDirectExecution) {
   loadSeedData()
     .then(() => process.exit(0))
-    .catch((err) => {
+    .catch(err => {
       console.error('Seed failed:', err instanceof Error ? err.message : err);
       process.exit(1);
     });

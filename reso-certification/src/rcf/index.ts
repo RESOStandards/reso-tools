@@ -18,7 +18,7 @@ export {
   ENUM_MIN_SAMPLE,
   ENUM_MAX_DISTINCT_RATIO,
   ENUM_MAX_DISTINCT,
-  type StringFieldStats,
+  type StringFieldStats
 } from './local-enum-detection.js';
 export { aggregateFieldType, type AggregatedFieldType } from './aggregate.js';
 export {
@@ -29,7 +29,7 @@ export {
   type ReferenceField,
   type ReferenceLookupEntry,
   type PayloadCache,
-  type InferMetadataReportInput,
+  type InferMetadataReportInput
 } from './assemble-report.js';
 export {
   buildKindMatcher,
@@ -37,5 +37,5 @@ export {
   type KindMatcher,
   type KindMatch,
   type KindMatchInput,
-  type KindMatchOptions,
+  type KindMatchOptions
 } from './kind-match.js';

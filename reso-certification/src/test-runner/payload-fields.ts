@@ -23,19 +23,13 @@ export const isEnumProperty = (prop: EntityProperty): boolean =>
   prop.annotations?.['RESO.OData.Metadata.LookupName'] !== undefined;
 
 /** Extract field names from a payload, excluding OData annotations and key fields. */
-export const extractPayloadFields = (
-  payload: Record<string, unknown>,
-  entityType: EntityType,
-): ReadonlyArray<string> => {
+export const extractPayloadFields = (payload: Record<string, unknown>, entityType: EntityType): ReadonlyArray<string> => {
   const keySet = new Set(entityType.keyProperties);
   return Object.keys(payload).filter(k => !k.startsWith('@') && !keySet.has(k));
 };
 
 /** Extract enumeration field names and their values from a payload. */
-export const extractEnumerations = (
-  payload: Record<string, unknown>,
-  entityType: EntityType,
-): ReadonlyArray<EnumerationDetail> => {
+export const extractEnumerations = (payload: Record<string, unknown>, entityType: EntityType): ReadonlyArray<EnumerationDetail> => {
   const propMap = new Map(entityType.properties.map(p => [p.name, p]));
   const results: EnumerationDetail[] = [];
 
@@ -51,12 +45,9 @@ export const extractEnumerations = (
 };
 
 /** Extract expansion (navigation property) field names from a payload. */
-export const extractExpansions = (
-  payload: Record<string, unknown>,
-  entityType: EntityType,
-): ReadonlyArray<string> => {
+export const extractExpansions = (payload: Record<string, unknown>, entityType: EntityType): ReadonlyArray<string> => {
   const propNames = new Set(entityType.properties.map(p => p.name));
   return Object.keys(payload).filter(
-    k => !k.startsWith('@') && !propNames.has(k) && (Array.isArray(payload[k]) || typeof payload[k] === 'object'),
+    k => !k.startsWith('@') && !propNames.has(k) && (Array.isArray(payload[k]) || typeof payload[k] === 'object')
   );
 };

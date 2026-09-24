@@ -1,10 +1,10 @@
-import { mkdir, writeFile, rename } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { BaseComplianceConfig, PipelineResult, PipelineContext, ProgressCallback } from './types.js';
 import { optionalOutcome } from '../web-api-core/test-runner.js';
 import { FETCH_METADATA, RUN_ADD_EDIT_SCENARIOS, RUN_CORE_SCENARIOS, RUN_ENTITY_EVENT_SCENARIOS } from './step-names.js';
+import type { BaseComplianceConfig, PipelineContext, PipelineResult, ProgressCallback } from './types.js';
 
 // ── Software version ──
 
@@ -56,11 +56,7 @@ const DEFAULT_RESULTS_PATH = '.reso-cert';
  * Build the standard nested output path for any endorsement.
  * Structure: {base}/{endorsement-version}/{providerUoi}-{providerUsi}/{recipientUoi}/current
  */
-export const buildOutputPath = (
-  endorsementSlug: string,
-  version: string,
-  config: BaseComplianceConfig,
-): string => {
+export const buildOutputPath = (endorsementSlug: string, version: string, config: BaseComplianceConfig): string => {
   const resultsPath = config.options?.outputDir ?? join(process.cwd(), DEFAULT_RESULTS_PATH);
   const providerUoi = config.providerUoi ?? `LOCAL-${Date.now()}`;
   const providerUsi = config.providerUsi ?? 'LOCAL-SYSTEM';
@@ -85,11 +81,7 @@ export const archiveCurrentResults = async (currentPath: string): Promise<void> 
  * (metadata.xml, downloaded payloads, etc.) without each runner
  * reimplementing this prelude.
  */
-export const prepareOutputDir = async (
-  endorsementSlug: string,
-  version: string,
-  config: BaseComplianceConfig,
-): Promise<string> => {
+export const prepareOutputDir = async (endorsementSlug: string, version: string, config: BaseComplianceConfig): Promise<string> => {
   const outputPath = buildOutputPath(endorsementSlug, version, config);
   await archiveCurrentResults(outputPath);
   await mkdir(outputPath, { recursive: true });
@@ -130,9 +122,7 @@ export const serializeAddEditRemarks = (result: PipelineResult): string => {
   // Pair the count with the matching word — a failed run reports its FAILED count, otherwise the passed
   // count (#258: the remark previously read "<passed> of <total> scenarios failed", using the passed count
   // with the run's status word).
-  const headline = failed > 0
-    ? `${failed} of ${total} scenarios failed`
-    : `${passed} of ${total} scenarios passed`;
+  const headline = failed > 0 ? `${failed} of ${total} scenarios failed` : `${passed} of ${total} scenarios passed`;
   const parts = [headline];
   if (fieldCount > 0) parts.push(`${fieldCount} fields validated against ${resource} metadata`);
   if (failed > 0) {
@@ -164,7 +154,15 @@ export const serializeCoreRemarks = (result: PipelineResult): string => {
   const testStep = result.steps.find(s => s.name === RUN_CORE_SCENARIOS);
   if (!testStep?.counts) return `Web API Core compliance test ${result.status}.`;
 
-  const { passed = 0, failed = 0, skipped = 0, warnings = 0, optionalPassed = 0, optionalNotSupported = 0, optionalNotTested = 0 } = testStep.counts;
+  const {
+    passed = 0,
+    failed = 0,
+    skipped = 0,
+    warnings = 0,
+    optionalPassed = 0,
+    optionalNotSupported = 0,
+    optionalNotTested = 0
+  } = testStep.counts;
   const requiredTotal = passed + failed + skipped;
   const optionalTotal = optionalPassed + optionalNotSupported + optionalNotTested;
   const warnSuffix = warnings > 0 ? ` ${warnings} warning${warnings === 1 ? '' : 's'} (non-gating).` : '';
@@ -180,17 +178,17 @@ export const serializeCoreRemarks = (result: PipelineResult): string => {
 export const createGenericReportGenerator = (
   description: string,
   version: string,
-  serializeRemarks: (result: PipelineResult) => string,
+  serializeRemarks: (result: PipelineResult) => string
 ): ReportGenerator => ({
   name: 'Generic',
   filename: 'report.json',
-  generate: (result) => ({
+  generate: result => ({
     description,
     version,
     softwareVersion: SOFTWARE_VERSION,
     generatedOn: new Date().toISOString(),
-    remarks: serializeRemarks(result),
-  }),
+    remarks: serializeRemarks(result)
+  })
 });
 
 // ── Detailed Report Generator ──
@@ -199,11 +197,11 @@ export const createGenericReportGenerator = (
 export const createDetailedReportGenerator = (
   description: string,
   version: string,
-  serializeRemarks: (result: PipelineResult) => string,
+  serializeRemarks: (result: PipelineResult) => string
 ): ReportGenerator => ({
   name: 'Detailed',
   filename: 'report-detailed.json',
-  generate: (result) => {
+  generate: result => {
     // Extract resource-level test reports if available (Core, Add/Edit, EntityEvent)
     const ctx = result.context as Record<string, unknown>;
     const resourceReports = ctx.resourceReports as ReadonlyArray<Record<string, unknown>> | undefined;
@@ -225,48 +223,50 @@ export const createDetailedReportGenerator = (
         ...(params ? { params } : {}),
         ...(counts ? { counts } : {}),
         ...(artifacts ? { artifacts } : {}),
-        ...(errors && errors.length > 0 ? { errors } : {}),
+        ...(errors && errors.length > 0 ? { errors } : {})
       })),
       // Include per-resource scenario results for test-running endorsements
-      ...(resourceReports ? {
-        resourceReports: resourceReports.map((r: Record<string, unknown>) => ({
-          resource: r.resource,
-          summary: r.summary,
-          scenarios: (r.scenarios as ReadonlyArray<Record<string, unknown>> ?? []).map(s => ({
-            name: s.name ?? s.scenario,
-            tag: s.tag,
-            passed: s.passed,
-            skipped: s.skipped ?? false,
-            // Non-gating warnings (single-enum ne, $expand RRK, later Fast Track / DD 3.0 suggestions) — carried so
-            // the CLI and the desktop UI can surface them; they never affect `passed` or the verdict.
-            ...(Array.isArray(s.warnings) && s.warnings.length > 0 ? { warnings: s.warnings } : {}),
-            // Optional ("Optional Tests") scenarios carry their rendered
-            // outcome (Passed / Not Supported / Not Tested) so the report
-            // is self-describing; required scenarios use passed/skipped.
-            ...(s.optional
-              ? {
-                  optional: true,
-                  outcome: optionalOutcome({
-                    passed: Boolean(s.passed),
-                    skipped: Boolean(s.skipped),
-                    errored: Boolean(s.errored),
-                  }),
-                }
-              : {}),
-            duration: s.duration,
-            requestUrl: s.requestUrl,
-            assertions: (s.assertions as ReadonlyArray<Record<string, unknown>> ?? []).map(a => ({
-              description: a.description ?? a.message,
-              passed: a.passed ?? (a.status === 'pass'),
-              ...(a.expected !== undefined ? { expected: a.expected } : {}),
-              ...(a.actual !== undefined ? { actual: a.actual } : {}),
-              ...(a.status ? { status: a.status } : {}),
-            })),
-          })),
-        })),
-      } : {}),
+      ...(resourceReports
+        ? {
+            resourceReports: resourceReports.map((r: Record<string, unknown>) => ({
+              resource: r.resource,
+              summary: r.summary,
+              scenarios: ((r.scenarios as ReadonlyArray<Record<string, unknown>>) ?? []).map(s => ({
+                name: s.name ?? s.scenario,
+                tag: s.tag,
+                passed: s.passed,
+                skipped: s.skipped ?? false,
+                // Non-gating warnings (single-enum ne, $expand RRK, later Fast Track / DD 3.0 suggestions) — carried so
+                // the CLI and the desktop UI can surface them; they never affect `passed` or the verdict.
+                ...(Array.isArray(s.warnings) && s.warnings.length > 0 ? { warnings: s.warnings } : {}),
+                // Optional ("Optional Tests") scenarios carry their rendered
+                // outcome (Passed / Not Supported / Not Tested) so the report
+                // is self-describing; required scenarios use passed/skipped.
+                ...(s.optional
+                  ? {
+                      optional: true,
+                      outcome: optionalOutcome({
+                        passed: Boolean(s.passed),
+                        skipped: Boolean(s.skipped),
+                        errored: Boolean(s.errored)
+                      })
+                    }
+                  : {}),
+                duration: s.duration,
+                requestUrl: s.requestUrl,
+                assertions: ((s.assertions as ReadonlyArray<Record<string, unknown>>) ?? []).map(a => ({
+                  description: a.description ?? a.message,
+                  passed: a.passed ?? a.status === 'pass',
+                  ...(a.expected !== undefined ? { expected: a.expected } : {}),
+                  ...(a.actual !== undefined ? { actual: a.actual } : {}),
+                  ...(a.status ? { status: a.status } : {})
+                }))
+              }))
+            }))
+          }
+        : {})
     };
-  },
+  }
 });
 
 // ── Report Writer ──
@@ -276,7 +276,7 @@ export const writeReports = async (
   result: PipelineResult,
   generators: ReadonlyArray<ReportGenerator>,
   outputDir: string,
-  _onProgress?: ProgressCallback,
+  _onProgress?: ProgressCallback
 ): Promise<ReadonlyArray<{ readonly name: string; readonly path: string }>> => {
   await mkdir(outputDir, { recursive: true });
 
@@ -297,17 +297,17 @@ export const writeReports = async (
 /** Report generators for Add/Edit endorsement. */
 export const addEditReportGenerators = (version: string): ReadonlyArray<ReportGenerator> => [
   createGenericReportGenerator('Web API Add/Edit', version, serializeAddEditRemarks),
-  createDetailedReportGenerator('Web API Add/Edit', version, serializeAddEditRemarks),
+  createDetailedReportGenerator('Web API Add/Edit', version, serializeAddEditRemarks)
 ];
 
 /** Report generators for EntityEvent endorsement. */
 export const entityEventReportGenerators = (version: string): ReadonlyArray<ReportGenerator> => [
   createGenericReportGenerator('EntityEvent (RCP-027)', version, serializeEntityEventRemarks),
-  createDetailedReportGenerator('EntityEvent (RCP-027)', version, serializeEntityEventRemarks),
+  createDetailedReportGenerator('EntityEvent (RCP-027)', version, serializeEntityEventRemarks)
 ];
 
 /** Report generators for Web API Core endorsement. */
 export const coreReportGenerators = (version: string): ReadonlyArray<ReportGenerator> => [
   createGenericReportGenerator('Web API Server Core', version, serializeCoreRemarks),
-  createDetailedReportGenerator('Web API Server Core', version, serializeCoreRemarks),
+  createDetailedReportGenerator('Web API Server Core', version, serializeCoreRemarks)
 ];

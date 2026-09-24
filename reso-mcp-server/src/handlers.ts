@@ -2,17 +2,17 @@
  * MCP tool handlers — implement each tool by calling SDK functions.
  */
 
-import { resolveToken } from '@reso-standards/reso-client';
 import {
-  odataRequest,
   buildResourceUrl,
   fetchMetadata,
-  parseMetadataXml,
   getEntityType,
-  runComplianceTests,
+  odataRequest,
+  parseMetadataXml,
+  runComplianceTests
 } from '@reso-standards/reso-certification';
-import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import type { ComplianceConfig } from '@reso-standards/reso-certification';
+import { resolveToken } from '@reso-standards/reso-client';
+import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 
 /** Auth args common to most tools. */
 interface AuthArgs {
@@ -31,7 +31,7 @@ const resolveAuthToken = async (args: AuthArgs): Promise<string> => {
       mode: 'client_credentials',
       clientId: args.clientId,
       clientSecret: args.clientSecret,
-      tokenUrl: args.tokenUrl,
+      tokenUrl: args.tokenUrl
     });
   }
 
@@ -55,19 +55,22 @@ interface HandlerResult {
 }
 
 const textResult = (data: unknown): HandlerResult => ({
-  content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+  content: [{ type: 'text', text: JSON.stringify(data, null, 2) }]
 });
 
 const errorResult = (message: string): HandlerResult => ({
   content: [{ type: 'text', text: message }],
-  isError: true,
+  isError: true
 });
 
 // ── Authenticate ──
 
 export const handleAuthenticate = async (args: Record<string, unknown>): Promise<HandlerResult> => {
   const { clientId, clientSecret, tokenUrl, scope } = args as {
-    clientId: string; clientSecret: string; tokenUrl: string; scope?: string;
+    clientId: string;
+    clientSecret: string;
+    tokenUrl: string;
+    scope?: string;
   };
 
   const token = await resolveToken({
@@ -75,7 +78,7 @@ export const handleAuthenticate = async (args: Record<string, unknown>): Promise
     clientId,
     clientSecret,
     tokenUrl,
-    ...(scope ? { scope } : {}),
+    ...(scope ? { scope } : {})
   });
 
   return textResult({ token, message: 'Token obtained. Use this token as authToken in subsequent tool calls.' });
@@ -86,9 +89,15 @@ export const handleAuthenticate = async (args: Record<string, unknown>): Promise
 export const handleQuery = async (args: Record<string, unknown>): Promise<HandlerResult> => {
   const authToken = await resolveAuthToken(args as AuthArgs);
   const { url, resource, filter, select, orderby, top, skip, count, expand } = args as {
-    url: string; resource: string;
-    filter?: string; select?: string; orderby?: string;
-    top?: number; skip?: number; count?: boolean; expand?: string;
+    url: string;
+    resource: string;
+    filter?: string;
+    select?: string;
+    orderby?: string;
+    top?: number;
+    skip?: number;
+    count?: boolean;
+    expand?: string;
   };
 
   const params = new URLSearchParams();
@@ -121,7 +130,9 @@ const writeOk = (status: number): boolean => status >= 200 && status < 300;
 export const handleCreate = async (args: Record<string, unknown>): Promise<HandlerResult> => {
   const authToken = await resolveAuthToken(args as AuthArgs);
   const { url, resource, record } = args as {
-    url: string; resource: string; record: Record<string, unknown>;
+    url: string;
+    resource: string;
+    record: Record<string, unknown>;
   };
 
   const requestUrl = buildResourceUrl(url, resource);
@@ -139,7 +150,10 @@ export const handleCreate = async (args: Record<string, unknown>): Promise<Handl
 export const handleUpdate = async (args: Record<string, unknown>): Promise<HandlerResult> => {
   const authToken = await resolveAuthToken(args as AuthArgs);
   const { url, resource, key, record } = args as {
-    url: string; resource: string; key: string; record: Record<string, unknown>;
+    url: string;
+    resource: string;
+    key: string;
+    record: Record<string, unknown>;
   };
 
   const requestUrl = buildResourceUrl(url, resource, key);
@@ -200,7 +214,7 @@ export const handleValidate = async (args: Record<string, unknown>): Promise<Han
   return textResult({
     resource,
     fieldsProvided: fieldCount,
-    message: `Record has ${fieldCount} fields. Full DD validation requires server metadata — use the metadata tool first to fetch field definitions.`,
+    message: `Record has ${fieldCount} fields. Full DD validation requires server metadata — use the metadata tool first to fetch field definitions.`
   });
 };
 
@@ -223,8 +237,11 @@ export const handleParseFilter = async (args: Record<string, unknown>): Promise<
 
 export const handleRunCompliance = async (args: Record<string, unknown>): Promise<HandlerResult> => {
   const { endorsement, url, resource, version, mode, resources } = args as {
-    endorsement: string; url: string;
-    resource?: string; version?: string; mode?: string;
+    endorsement: string;
+    url: string;
+    resource?: string;
+    version?: string;
+    mode?: string;
     resources?: ReadonlyArray<string>;
   };
 
@@ -264,9 +281,9 @@ export const handleRunCompliance = async (args: Record<string, unknown>): Promis
       status: s.status,
       duration: s.duration,
       summary: s.summary,
-      errors: s.errors,
+      errors: s.errors
     })),
-    progress: progressLog,
+    progress: progressLog
   });
 };
 
@@ -294,5 +311,5 @@ export const handlers: Readonly<Record<string, (args: Record<string, unknown>) =
   validate: handleValidate,
   'parse-filter': handleParseFilter,
   'run-compliance': handleRunCompliance,
-  'metadata-report': handleMetadataReport,
+  'metadata-report': handleMetadataReport
 };

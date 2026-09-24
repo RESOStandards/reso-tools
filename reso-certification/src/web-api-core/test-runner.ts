@@ -5,32 +5,32 @@
  * approach: build query → make request → assert results.
  */
 
-import { type ODataRequester, odataRequest, webRequester } from '../test-runner/index.js';
-import { fetchMetadataWithVersion } from '../test-runner/metadata.js';
-import { MetadataFetchError, decodeFlagsValue } from '@reso-standards/reso-metadata-utils';
 import { type EnumRepresentation, isDeadlineError } from '@reso-standards/reso-client';
-import type { TestParams } from './sampling.js';
-import type { EnumCandidate } from './enum-selection.js';
-import { buildStandardMap, type StandardMap } from './standard-map.js';
-import { createLookupCache, type LookupCache } from './lookup-cache.js';
-import { buildLookupUrl, buildScenarioQuery, recordDerivedSet, originatingSystemFilterClause } from './queries.js';
-import { emptyVerdict, type EmptyContext, type EmptyVerdict } from './empty-verdict.js';
-import { scenariosForVersion, type ComparisonOp, type CoreScenario, type ExpandScenario } from './scenarios.js';
-import { parseServiceDocument } from './serving.js';
+import { MetadataFetchError, decodeFlagsValue } from '@reso-standards/reso-metadata-utils';
+import { type ODataRequester, type odataRequest, webRequester } from '../test-runner/index.js';
+import { fetchMetadataWithVersion } from '../test-runner/metadata.js';
 import {
-  assertODataResponse,
+  type AssertionResult,
+  assertCollectionLambda,
+  assertEnumMatch,
   assertHasResults,
+  assertODataResponse,
   assertScalarComparison,
   assertScalarCompoundOr,
   assertSortOrder,
-  assertEnumMatch,
-  assertCollectionLambda,
   assertStringComparison,
-  extractRecords,
   extractCount,
   extractNextLink,
-  type AssertionResult,
+  extractRecords
 } from './assertions.js';
+import { type EmptyContext, type EmptyVerdict, emptyVerdict } from './empty-verdict.js';
+import type { EnumCandidate } from './enum-selection.js';
+import { type LookupCache, createLookupCache } from './lookup-cache.js';
+import { buildLookupUrl, buildScenarioQuery, originatingSystemFilterClause, recordDerivedSet } from './queries.js';
+import type { TestParams } from './sampling.js';
+import { type ComparisonOp, type CoreScenario, type ExpandScenario, scenariosForVersion } from './scenarios.js';
+import { parseServiceDocument } from './serving.js';
+import { type StandardMap, buildStandardMap } from './standard-map.js';
 
 /** Result of a single scenario execution. */
 export interface ScenarioResult {
@@ -114,22 +114,14 @@ export interface CoreSummary {
 /** Derive an Optional Test's outcome. A skipped or errored (indeterminate)
  *  result is "Not Tested" — the test couldn't run, so support is unknown.
  *  A determinate run maps pass→"Passed", fail→"Not Supported". */
-export const optionalOutcome = (
-  result: Pick<ScenarioResult, 'passed' | 'skipped' | 'errored'>,
-): OptionalOutcome =>
-  result.skipped || result.errored
-    ? 'Not Tested'
-    : result.passed
-      ? 'Passed'
-      : 'Not Supported';
+export const optionalOutcome = (result: Pick<ScenarioResult, 'passed' | 'skipped' | 'errored'>): OptionalOutcome =>
+  result.skipped || result.errored ? 'Not Tested' : result.passed ? 'Passed' : 'Not Supported';
 
 /** Summarize scenario results. The verdict surface (passed/failed/skipped)
  *  counts REQUIRED scenarios only — an optional failure can never make
  *  `failed > 0`. Optional results are tallied separately by outcome. A
  *  scenario with no `optional` flag defaults to required. */
-export const summarizeScenarios = (
-  results: ReadonlyArray<ScenarioResult>,
-): CoreSummary => {
+export const summarizeScenarios = (results: ReadonlyArray<ScenarioResult>): CoreSummary => {
   const required = results.filter(r => r.optional !== true);
   const optional = results.filter(r => r.optional === true);
   return {
@@ -140,10 +132,10 @@ export const summarizeScenarios = (
     optional: {
       passed: optional.filter(r => optionalOutcome(r) === 'Passed').length,
       notSupported: optional.filter(r => optionalOutcome(r) === 'Not Supported').length,
-      notTested: optional.filter(r => optionalOutcome(r) === 'Not Tested').length,
+      notTested: optional.filter(r => optionalOutcome(r) === 'Not Tested').length
     },
     // Verdict-neutral: total warnings across ALL scenarios (required + optional), never folded into failed.
-    warnings: results.reduce((n, r) => n + (r.warnings?.length ?? 0), 0),
+    warnings: results.reduce((n, r) => n + (r.warnings?.length ?? 0), 0)
   };
 };
 
@@ -159,10 +151,8 @@ export const isProviderWideScenario = (scenario: CoreScenario): boolean =>
  * unparseable header). Running it otherwise issues a 4.01-only query against a possibly-4.0 server — a
  * misattributed false-fail. Returns true when the scenario must be skipped for the detected version.
  */
-export const isInOperatorSkippedForVersion = (
-  scenario: CoreScenario,
-  detectedODataVersion: string | undefined,
-): boolean => scenario.category === 'in-operator' && detectedODataVersion !== '4.01';
+export const isInOperatorSkippedForVersion = (scenario: CoreScenario, detectedODataVersion: string | undefined): boolean =>
+  scenario.category === 'in-operator' && detectedODataVersion !== '4.01';
 
 /** Build coverage matrix from resolved test params. */
 const buildCoverage = (params: TestParams): ReadonlyArray<TypeCoverage> => [
@@ -171,7 +161,7 @@ const buildCoverage = (params: TestParams): ReadonlyArray<TypeCoverage> => [
   { type: 'date', field: params.dateField, hasData: params.dateValue != null },
   { type: 'timestamp', field: params.timestampField, hasData: params.datetimeValue != null },
   { type: 'singleLookup', field: params.singleLookupField, hasData: params.singleLookupValue != null },
-  { type: 'multiLookup', field: params.multiLookupField, hasData: params.multiLookupValue1 != null },
+  { type: 'multiLookup', field: params.multiLookupField, hasData: params.multiLookupValue1 != null }
 ];
 
 // ── Enum-family gating + candidate retry ──
@@ -253,8 +243,28 @@ const scenarioSlot = (scenario: CoreScenario): 'single' | 'multi' =>
 const paramsWithCandidate = (params: TestParams, slot: 'single' | 'multi', c: EnumCandidate): TestParams => {
   const lookupNameByField = { ...params.lookupNameByField, ...(c.lookupName ? { [c.field]: c.lookupName } : {}) };
   return slot === 'multi'
-    ? { ...params, multiLookupField: c.field, multiLookupFieldRep: c.representation, multiLookupEnumType: c.enumType, multiLookupValue1: c.values[0], multiLookupValue2: c.values[1], multiLookupDistinctCount: c.distinctValueCount, multiLookupSubsetValues: c.subsetSampleValues, lookupNameByField }
-    : { ...params, singleLookupField: c.field, singleLookupFieldRep: c.representation, singleLookupEnumType: c.enumType, singleLookupValue: c.values[0], singleLookupValue2: c.values[1], singleLookupValue3: c.values[2], singleLookupDistinctCount: c.distinctValueCount, lookupNameByField };
+    ? {
+        ...params,
+        multiLookupField: c.field,
+        multiLookupFieldRep: c.representation,
+        multiLookupEnumType: c.enumType,
+        multiLookupValue1: c.values[0],
+        multiLookupValue2: c.values[1],
+        multiLookupDistinctCount: c.distinctValueCount,
+        multiLookupSubsetValues: c.subsetSampleValues,
+        lookupNameByField
+      }
+    : {
+        ...params,
+        singleLookupField: c.field,
+        singleLookupFieldRep: c.representation,
+        singleLookupEnumType: c.enumType,
+        singleLookupValue: c.values[0],
+        singleLookupValue2: c.values[1],
+        singleLookupValue3: c.values[2],
+        singleLookupDistinctCount: c.distinctValueCount,
+        lookupNameByField
+      };
 };
 
 /** A skipped-scenario result with a diagnostic. A skip never counts toward pass/fail. */
@@ -264,7 +274,7 @@ const skipResult = (scenario: CoreScenario, start: number, message: string): Sce
   passed: true,
   skipped: true,
   assertions: [{ passed: true, message: `Skipped: ${message}` }],
-  duration: Date.now() - start,
+  duration: Date.now() - start
 });
 
 /** A "not tested — run deadline reached" result. Counts as SKIPPED, never failed: the
@@ -277,7 +287,7 @@ const deadlineSkipResult = (scenario: CoreScenario): ScenarioResult => ({
   skipped: true,
   assertions: [{ passed: true, message: 'Not tested — run deadline reached' }],
   duration: 0,
-  optional: scenario.optional,
+  optional: scenario.optional
 });
 
 /**
@@ -317,7 +327,7 @@ export const rebaseNextLink = (nextLink: string, requestUrl: string): string => 
  *  `-1` sentinel `not(field le -1)` returns records where `field gt -1`. The data assertion must check that
  *  complement, not `op` itself, or it would false-fail every returned record. */
 export const complementOp = (op: ComparisonOp): ComparisonOp =>
-  ({ eq: 'ne', ne: 'eq', gt: 'le', le: 'gt', ge: 'lt', lt: 'ge' } as const)[op];
+  (({ eq: 'ne', ne: 'eq', gt: 'le', le: 'gt', ge: 'lt', lt: 'ge' }) as const)[op];
 
 /** Build the {@link EmptyContext} the `ne` empty-verdict consumes: the distinct value count of the field this
  *  scenario actually queried (scalar counts come from sampling; enum counts ride in on the substituted
@@ -338,22 +348,42 @@ export const emptyContextFor = (scenario: CoreScenario, params: TestParams): Emp
   // When the query was built over one record's OWN collection (all() / has-and), an empty result is a
   // DETERMINATE defect (the guaranteeing record must come back), not the legitimate-empty skip — see emptyVerdict.
   const derivedSet = recordDerivedSet(scenario, params) !== undefined;
-  return { ...(distinct !== undefined && { distinctValueCount: distinct }), complete: params.sampleComplete, ...(derivedSet && { recordDerivedSet: true }) };
+  return {
+    ...(distinct !== undefined && { distinctValueCount: distinct }),
+    complete: params.sampleComplete,
+    ...(derivedSet && { recordDerivedSet: true })
+  };
 };
 
 /** Map a 200-empty {@link EmptyVerdict} to the scenario-result flags for the branch. A `fail` and a `pass`
  *  are DETERMINATE (`retryable: false`): a guaranteed-match empty is a real defect that retrying another
  *  field would MASK, and a correct `ne` empty is likewise conclusive. Only `skip` stays retryable. */
 export const emptyOutcome = (
-  verdict: EmptyVerdict,
+  verdict: EmptyVerdict
 ): { readonly passed: boolean; readonly skipped: boolean; readonly retryable: boolean; readonly message: string } => {
   switch (verdict) {
     case 'fail':
-      return { passed: false, skipped: false, retryable: false, message: 'Guaranteed-match filter returned 0 records for a value sampled from this field — the operator failed to return a known-present record' };
+      return {
+        passed: false,
+        skipped: false,
+        retryable: false,
+        message:
+          'Guaranteed-match filter returned 0 records for a value sampled from this field — the operator failed to return a known-present record'
+      };
     case 'pass':
-      return { passed: true, skipped: false, retryable: false, message: 'ne over a single-valued field across the complete resource correctly returned no other records' };
+      return {
+        passed: true,
+        skipped: false,
+        retryable: false,
+        message: 'ne over a single-valued field across the complete resource correctly returned no other records'
+      };
     default:
-      return { passed: true, skipped: true, retryable: true, message: 'No records returned — filter executed but no matching data to validate' };
+      return {
+        passed: true,
+        skipped: true,
+        retryable: true,
+        message: 'No records returned — filter executed but no matching data to validate'
+      };
   }
 };
 
@@ -377,25 +407,27 @@ const RESOURCE_RECORD_KEY_FIELD = 'ResourceRecordKey';
 export const expandRrkWarnings = (
   records: ReadonlyArray<Record<string, unknown>>,
   scenario: ExpandScenario,
-  params: TestParams,
+  params: TestParams
 ): ReadonlyArray<string> => {
   const expandField = (params as unknown as Record<string, string | undefined>)[scenario.fieldParam];
   const keyField = params.keyField;
   if (!expandField || !keyField) return [];
 
-  return records.flatMap((record) => {
+  return records.flatMap(record => {
     const parentKey = record[keyField];
     if (parentKey == null) return []; // parent has no primary-key value — nothing to compare against
     const expanded = record[expandField];
     if (!Array.isArray(expanded)) return []; // absent / single object / scalar — not a child collection to check
     const items: ReadonlyArray<unknown> = expanded; // narrowed to any[]; re-bind to keep `unknown` element typing
-    return items.flatMap((child) => {
+    return items.flatMap(child => {
       if (child == null || typeof child !== 'object') return [];
       const rrk = (child as Record<string, unknown>)[RESOURCE_RECORD_KEY_FIELD];
       if (rrk == null) return []; // no ResourceRecordKey present — absence is out of scope (a different concern)
       return String(rrk) === String(parentKey)
         ? []
-        : [`Expanded ${expandField} item ${RESOURCE_RECORD_KEY_FIELD} ${JSON.stringify(String(rrk))} does not match the parent ${keyField} ${JSON.stringify(String(parentKey))} it was expanded into — an expanded item's ${RESOURCE_RECORD_KEY_FIELD} should equal the parent record's primary key (RCP-039 / transport#22)`];
+        : [
+            `Expanded ${expandField} item ${RESOURCE_RECORD_KEY_FIELD} ${JSON.stringify(String(rrk))} does not match the parent ${keyField} ${JSON.stringify(String(parentKey))} it was expanded into — an expanded item's ${RESOURCE_RECORD_KEY_FIELD} should equal the parent record's primary key (RCP-039 / transport#22)`
+          ];
     });
   });
 };
@@ -428,16 +460,11 @@ export interface ExpandItemValidator {
 /** Collect every expanded child OBJECT under `navName` across the sampled parent records. A collection nav
  *  serializes as an array, so a non-array / absent value contributes nothing (there is simply nothing to
  *  validate); null / non-object array elements are dropped (only real items are schema-validated). */
-const collectExpandedItems = (
-  records: ReadonlyArray<Record<string, unknown>>,
-  navName: string,
-): ReadonlyArray<Record<string, unknown>> =>
-  records.flatMap((record) => {
+const collectExpandedItems = (records: ReadonlyArray<Record<string, unknown>>, navName: string): ReadonlyArray<Record<string, unknown>> =>
+  records.flatMap(record => {
     if (record == null || typeof record !== 'object') return []; // null-safe: a null/non-object parent yields nothing
     const expanded = record[navName];
-    return Array.isArray(expanded)
-      ? expanded.filter((x): x is Record<string, unknown> => x != null && typeof x === 'object')
-      : [];
+    return Array.isArray(expanded) ? expanded.filter((x): x is Record<string, unknown> => x != null && typeof x === 'object') : [];
   });
 
 /** Shape-check a PRESENT expanded / navigation-property-path collection VALUE: it MUST be a JSON array (`[]` when
@@ -449,7 +476,7 @@ const collectionShapeError = (value: unknown): string | null => {
   if (!Array.isArray(value)) {
     return `value is ${value === null ? 'null' : typeof value}, not a JSON array`;
   }
-  const badIdx = value.findIndex((el) => el === null || typeof el !== 'object' || Array.isArray(el));
+  const badIdx = value.findIndex(el => el === null || typeof el !== 'object' || Array.isArray(el));
   return badIdx === -1
     ? null
     : `element ${badIdx} is ${value[badIdx] === null ? 'null' : Array.isArray(value[badIdx]) ? 'an array' : typeof value[badIdx]}, not an entity object`;
@@ -466,19 +493,29 @@ const summarizeItemValidation = (
   items: ReadonlyArray<Record<string, unknown>>,
   targetType: string,
   validator: ExpandItemValidator,
-  label: string,
+  label: string
 ): AssertionResult => {
   const verdicts = items.map((item, index) => ({ index, ...validator.validate(item, targetType) }));
-  const invalid = verdicts.filter((v) => !v.valid && !v.indeterminate);
-  const indeterminate = verdicts.filter((v) => v.indeterminate);
-  const notEvaluated = indeterminate.length > 0 ? ` (${indeterminate.length}/${items.length} not evaluated — ${indeterminate[0].reason ?? 'validator could not evaluate the item'})` : '';
+  const invalid = verdicts.filter(v => !v.valid && !v.indeterminate);
+  const indeterminate = verdicts.filter(v => v.indeterminate);
+  const notEvaluated =
+    indeterminate.length > 0
+      ? ` (${indeterminate.length}/${items.length} not evaluated — ${indeterminate[0].reason ?? 'validator could not evaluate the item'})`
+      : '';
   if (invalid.length > 0) {
     const first = invalid[0];
     const detail = first.errors.slice(0, 3).join('; ') || 'schema validation failed';
-    return { passed: false, message: `${label}: ${invalid.length}/${items.length} item(s) schema-invalid against ${targetType} — item ${first.index}: ${detail}${notEvaluated}` };
+    return {
+      passed: false,
+      message: `${label}: ${invalid.length}/${items.length} item(s) schema-invalid against ${targetType} — item ${first.index}: ${detail}${notEvaluated}`
+    };
   }
   if (indeterminate.length > 0) {
-    return { passed: true, indeterminate: true, message: `${label}: ${indeterminate.length}/${items.length} ${targetType} item(s) not evaluated — ${indeterminate[0].reason ?? 'validator could not evaluate the item'} — not validated (indeterminate)` };
+    return {
+      passed: true,
+      indeterminate: true,
+      message: `${label}: ${indeterminate.length}/${items.length} ${targetType} item(s) not evaluated — ${indeterminate[0].reason ?? 'validator could not evaluate the item'} — not validated (indeterminate)`
+    };
   }
   return { passed: true, message: `${label}: all ${items.length} ${targetType} item(s) valid against ${targetType}` };
 };
@@ -493,10 +530,13 @@ const summarizeItemValidation = (
 export const validateExpandedItems = (
   records: ReadonlyArray<Record<string, unknown>>,
   nav: { readonly name: string; readonly targetType: string },
-  validator: ExpandItemValidator | undefined,
+  validator: ExpandItemValidator | undefined
 ): AssertionResult => {
   if (!validator) {
-    return { passed: true, message: `$expand ${nav.name}: expansion returned 200; schema validation unavailable for this run (no validator built)` };
+    return {
+      passed: true,
+      message: `$expand ${nav.name}: expansion returned 200; schema validation unavailable for this run (no validator built)`
+    };
   }
   const items = collectExpandedItems(records, nav.name);
   if (items.length === 0) {
@@ -526,7 +566,7 @@ const runOneExpandNav = async (
   nav: { readonly name: string; readonly targetType: string },
   authToken: string,
   requester: ODataRequester,
-  validator: ExpandItemValidator | undefined,
+  validator: ExpandItemValidator | undefined
 ): Promise<ScenarioResult> => {
   const start = Date.now();
   const tag = `expand-${nav.name}`;
@@ -556,10 +596,15 @@ const runOneExpandNav = async (
         name,
         passed: true,
         skipped: true,
-        assertions: [{ passed: true, message: `$expand ${nav.name}: HTTP ${response.status} — expansion not supported / not accessible for this client (optional per RESO Core; OData §9.3.1/§11.2); skipped, status reported` }],
+        assertions: [
+          {
+            passed: true,
+            message: `$expand ${nav.name}: HTTP ${response.status} — expansion not supported / not accessible for this client (optional per RESO Core; OData §9.3.1/§11.2); skipped, status reported`
+          }
+        ],
         duration: Date.now() - start,
         requestLatency,
-        requestUrl: query.url,
+        requestUrl: query.url
       };
     }
     assertions.push(responseCheck);
@@ -578,7 +623,7 @@ const runOneExpandNav = async (
     // Josh: must a 2xx expand of an advertised nav carry it as `[]`?) Parent records are null-guarded.
     const shapeErr = records
       .filter((r): r is Record<string, unknown> => r != null && typeof r === 'object' && nav.name in r && r[nav.name] !== undefined)
-      .map((r) => collectionShapeError(r[nav.name]))
+      .map(r => collectionShapeError(r[nav.name]))
       .find((e): e is string => e !== null);
     if (shapeErr) {
       return {
@@ -586,10 +631,16 @@ const runOneExpandNav = async (
         name,
         passed: false,
         skipped: false,
-        assertions: [...assertions, { passed: false, message: `$expand ${nav.name}: expanded collection ${shapeErr} — a 2xx expansion must return an array ([] when empty, else a Collection of ${nav.targetType}); OData 4.01 JSON Format collection representation` }],
+        assertions: [
+          ...assertions,
+          {
+            passed: false,
+            message: `$expand ${nav.name}: expanded collection ${shapeErr} — a 2xx expansion must return an array ([] when empty, else a Collection of ${nav.targetType}); OData 4.01 JSON Format collection representation`
+          }
+        ],
         duration: Date.now() - start,
         requestLatency,
-        requestUrl: query.url,
+        requestUrl: query.url
       };
     }
     const warnings = expandRrkWarnings(records, scenario, navParams);
@@ -603,11 +654,17 @@ const runOneExpandNav = async (
         name,
         passed: true,
         skipped: true,
-        assertions: [...assertions, { passed: true, message: `$expand ${nav.name}: 200 received; per-item schema validation unavailable (no validator built) — not validated (skipped)` }],
+        assertions: [
+          ...assertions,
+          {
+            passed: true,
+            message: `$expand ${nav.name}: 200 received; per-item schema validation unavailable (no validator built) — not validated (skipped)`
+          }
+        ],
         duration: Date.now() - start,
         requestLatency,
         requestUrl: query.url,
-        ...(warnings.length > 0 ? { warnings } : {}),
+        ...(warnings.length > 0 ? { warnings } : {})
       };
     }
     assertions.push(validateExpandedItems(records, nav, validator));
@@ -622,13 +679,15 @@ const runOneExpandNav = async (
     // exercised on real data; fall back to the first parent with a key (drives the empty↔empty comparison).
     const parentItemsOf = (r: Record<string, unknown>): ReadonlyArray<unknown> => {
       const value = r[nav.name];
-      return Array.isArray(value) ? value.filter((x) => x != null && typeof x === 'object') : [];
+      return Array.isArray(value) ? value.filter(x => x != null && typeof x === 'object') : [];
     };
     const chosenParent =
-      records.find((r) => r[params.keyField] != null && parentItemsOf(r).length > 0) ??
-      records.find((r) => r[params.keyField] != null);
+      records.find(r => r[params.keyField] != null && parentItemsOf(r).length > 0) ?? records.find(r => r[params.keyField] != null);
     if (chosenParent == null) {
-      assertions.push({ passed: true, message: `$expand ${nav.name}: no parent key in the $expand response — navigation-property-path leg not exercised (no data)` });
+      assertions.push({
+        passed: true,
+        message: `$expand ${nav.name}: no parent key in the $expand response — navigation-property-path leg not exercised (no data)`
+      });
     } else {
       const parentKey = chosenParent[params.keyField];
       const expandItemCount = parentItemsOf(chosenParent).length;
@@ -644,18 +703,27 @@ const runOneExpandNav = async (
         // Non-2xx nav-property-path GET → the expansion isn't served here (not supported / not accessible / no
         // data); $expand is optional → not faulted, status reported (same rule as the primary leg). This is a
         // "can't access" boundary, not a records comparison.
-        assertions.push({ passed: true, message: `Navigation-property-path GET ${resource}('…')/${nav.name} → HTTP ${navResp.status} — not supported / not accessible for this client (OData §9.3.1/§11.2); not faulted, status reported` });
+        assertions.push({
+          passed: true,
+          message: `Navigation-property-path GET ${resource}('…')/${nav.name} → HTTP ${navResp.status} — not supported / not accessible for this client (OData §9.3.1/§11.2); not faulted, status reported`
+        });
       } else if (!navStatus.passed) {
         // A 2xx that is not 200 (e.g. 204 No Content) is the wrong code for a COLLECTION navigation-property-path:
         // OData §11.2.7 requires the collection of related entities, empty ONLY as a 200 empty result set — a
         // collection is never represented as 204 (204 is for a null single-valued nav). Served-but-wrong → FAIL.
-        assertions.push({ passed: false, message: `Navigation-property-path GET ${resource}('…')/${nav.name} → HTTP 200 expected but got a malformed/wrong-code response (${navStatus.message}) — a collection navigation-property-path returns 200 with an empty result set when none, never 204 (OData §11.2.7; web-api-core.md §2.5.10.2/§2.6.1)` });
+        assertions.push({
+          passed: false,
+          message: `Navigation-property-path GET ${resource}('…')/${nav.name} → HTTP 200 expected but got a malformed/wrong-code response (${navStatus.message}) — a collection navigation-property-path returns 200 with an empty result set when none, never 204 (OData §11.2.7; web-api-core.md §2.5.10.2/§2.6.1)`
+        });
       } else {
         // The nav-path collection value MUST be a JSON array of entity objects too (same rule as the inline leg —
         // symmetry: `{value:null}` / a non-array / an array of non-entities is malformed, not a vacuous pass).
         const navShapeErr = collectionShapeError((navResp.body as Record<string, unknown> | null)?.value);
         if (navShapeErr) {
-          assertions.push({ passed: false, message: `Navigation-property-path ${nav.name}: collection ${navShapeErr} — a collection navigation-property-path must return a JSON array of ${nav.targetType} entities (web-api-core.md §2.5.10.2)` });
+          assertions.push({
+            passed: false,
+            message: `Navigation-property-path ${nav.name}: collection ${navShapeErr} — a collection navigation-property-path must return a JSON array of ${nav.targetType} entities (web-api-core.md §2.5.10.2)`
+          });
         } else {
           const navItems = extractRecords(navResp.body);
           const navHasRecords = navItems.length > 0 || extractNextLink(navResp.body) != null;
@@ -665,9 +733,15 @@ const runOneExpandNav = async (
           // nav-path is empty (or vice versa), the server contradicts itself on one relationship → determinate FAIL.
           // (Both sides tolerate an empty page + @odata.nextLink as has-records, so paging never false-fails.)
           if (expandHasRecords !== navHasRecords) {
-            assertions.push({ passed: false, message: `Navigation-property-path ${nav.name}: $expand=${nav.name} returned ${expandItemCount} item(s) for this ${params.keyField} but ${resource}('…')/${nav.name} returned ${navItems.length} — the $expand and navigation-property-path forms resolve the same relationship and MUST agree on whether related entities exist (OData §11.2.7; web-api-core.md §2.5.10.2)` });
+            assertions.push({
+              passed: false,
+              message: `Navigation-property-path ${nav.name}: $expand=${nav.name} returned ${expandItemCount} item(s) for this ${params.keyField} but ${resource}('…')/${nav.name} returned ${navItems.length} — the $expand and navigation-property-path forms resolve the same relationship and MUST agree on whether related entities exist (OData §11.2.7; web-api-core.md §2.5.10.2)`
+            });
           } else {
-            assertions.push({ passed: true, message: `Navigation-property-path GET ${resource}('…')/${nav.name} → 200 (${navItems.length} item(s), consistent with $expand)` });
+            assertions.push({
+              passed: true,
+              message: `Navigation-property-path GET ${resource}('…')/${nav.name} → 200 (${navItems.length} item(s), consistent with $expand)`
+            });
             if (navItems.length > 0) {
               assertions.push(summarizeItemValidation(navItems, nav.targetType, validator, `Navigation-property-path ${nav.name}`));
             }
@@ -681,12 +755,34 @@ const runOneExpandNav = async (
     // scenario — the honest indeterminate outcome, never a determinate PASS on the 200 alone (#297). Both legs
     // still ran, so a determinate failure anywhere still fails.
     const indeterminate = allPassed && assertions.some(a => a.indeterminate === true);
-    return { tag, name, passed: allPassed, skipped: indeterminate, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url, ...(warnings.length > 0 ? { warnings } : {}) };
+    return {
+      tag,
+      name,
+      passed: allPassed,
+      skipped: indeterminate,
+      assertions,
+      duration: Date.now() - start,
+      requestLatency,
+      requestUrl: query.url,
+      ...(warnings.length > 0 ? { warnings } : {})
+    };
   } catch (err) {
     if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
     // A transport/parse error is INDETERMINATE (no server response to fault) — SKIPPED + errored, so it never
     // counts as a failure. Correctness rule: a compliant server must never false-fail on our network blip.
-    return { tag, name, passed: false, skipped: true, errored: true, assertions: [...assertions, { passed: false, message: `Skipped: $expand ${nav.name} errored — ${err instanceof Error ? err.message : String(err)}` }], duration: Date.now() - start, requestUrl: query.url };
+    return {
+      tag,
+      name,
+      passed: false,
+      skipped: true,
+      errored: true,
+      assertions: [
+        ...assertions,
+        { passed: false, message: `Skipped: $expand ${nav.name} errored — ${err instanceof Error ? err.message : String(err)}` }
+      ],
+      duration: Date.now() - start,
+      requestUrl: query.url
+    };
   }
 };
 
@@ -703,7 +799,7 @@ export const runExpandNavScenarios = async (
   params: TestParams,
   authToken: string,
   requester: ODataRequester = webRequester,
-  validator?: ExpandItemValidator,
+  validator?: ExpandItemValidator
 ): Promise<ReadonlyArray<ScenarioResult>> => {
   const navs = params.expandNavs ?? [];
   if (navs.length === 0) {
@@ -729,13 +825,18 @@ export const executeStandardScenario = async (
   params: TestParams,
   authToken: string,
   start: number,
-  requester: ODataRequester = webRequester,
+  requester: ODataRequester = webRequester
 ): Promise<{ readonly result: ScenarioResult; readonly retryable: boolean; readonly rejected: boolean; readonly accepted: boolean }> => {
   const query = buildScenarioQuery(serverUrl, resource, scenario, params);
   if (!query) {
     // Couldn't build the query (e.g. `in` needs 2+ values, this field had 1) — UNTESTABLE: neither a
     // rejection nor an acceptance, so it must stay neutral to an all-reject verdict.
-    return { result: skipResult(scenario, start, 'required test parameters not available for this resource'), retryable: true, rejected: false, accepted: false };
+    return {
+      result: skipResult(scenario, start, 'required test parameters not available for this resource'),
+      retryable: true,
+      rejected: false,
+      accepted: false
+    };
   }
   const assertions: AssertionResult[] = [];
   try {
@@ -748,7 +849,21 @@ export const executeStandardScenario = async (
     if (!responseCheck.passed) {
       // The server REJECTED the operator on this field (non-200). Another field might be filterable; but if
       // EVERY eligible field rejects it and none accepts it, that's a genuine operator gap → the caller fails.
-      return { result: { tag: scenario.tag, name: scenario.name, passed: false, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url }, retryable: true, rejected: true, accepted: false };
+      return {
+        result: {
+          tag: scenario.tag,
+          name: scenario.name,
+          passed: false,
+          skipped: false,
+          assertions,
+          duration: Date.now() - start,
+          requestLatency,
+          requestUrl: query.url
+        },
+        retryable: true,
+        rejected: true,
+        accepted: false
+      };
     }
 
     const records = extractRecords(response.body);
@@ -761,7 +876,21 @@ export const executeStandardScenario = async (
       const verdict = emptyVerdict(scenario, emptyContextFor(scenario, params));
       const outcome = emptyOutcome(verdict);
       assertions.push({ passed: verdict !== 'fail', message: outcome.message });
-      return { result: { tag: scenario.tag, name: scenario.name, passed: outcome.passed, skipped: outcome.skipped, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url }, retryable: outcome.retryable, rejected: false, accepted: true };
+      return {
+        result: {
+          tag: scenario.tag,
+          name: scenario.name,
+          passed: outcome.passed,
+          skipped: outcome.skipped,
+          assertions,
+          duration: Date.now() - start,
+          requestLatency,
+          requestUrl: query.url
+        },
+        retryable: outcome.retryable,
+        rejected: false,
+        accepted: true
+      };
     }
 
     const dataAssertion = assertData(records, scenario, params);
@@ -774,19 +903,53 @@ export const executeStandardScenario = async (
     const warnings: string[] = scenario.category === 'expand' ? [...expandRrkWarnings(records, scenario, params)] : [];
     if (dataAssertion) {
       if (isSingleEnumNe(scenario) && !dataAssertion.passed) {
-        warnings.push(`Single-enumeration ne — stricter than Core 2.0.0; reported as a WARNING pending WG sign-off, not failed: ${dataAssertion.message}`);
-        assertions.push({ passed: true, message: `Single-enumeration ne: reported for review, not failed (see warnings) — ${dataAssertion.message}` });
+        warnings.push(
+          `Single-enumeration ne — stricter than Core 2.0.0; reported as a WARNING pending WG sign-off, not failed: ${dataAssertion.message}`
+        );
+        assertions.push({
+          passed: true,
+          message: `Single-enumeration ne: reported for review, not failed (see warnings) — ${dataAssertion.message}`
+        });
       } else {
         assertions.push(dataAssertion);
       }
     }
     const allPassed = assertions.every(a => a.passed);
-    return { result: { tag: scenario.tag, name: scenario.name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestLatency, requestUrl: query.url, ...(warnings.length > 0 ? { warnings } : {}) }, retryable: false, rejected: false, accepted: true };
+    return {
+      result: {
+        tag: scenario.tag,
+        name: scenario.name,
+        passed: allPassed,
+        skipped: false,
+        assertions,
+        duration: Date.now() - start,
+        requestLatency,
+        requestUrl: query.url,
+        ...(warnings.length > 0 ? { warnings } : {})
+      },
+      retryable: false,
+      rejected: false,
+      accepted: true
+    };
   } catch (err) {
     if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
     // A transport/parse error is indeterminate — UNTESTABLE, neither a rejection nor an acceptance.
     assertions.push({ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` });
-    return { result: { tag: scenario.tag, name: scenario.name, passed: false, skipped: false, errored: true, assertions, duration: Date.now() - start, requestUrl: query.url }, retryable: true, rejected: false, accepted: false };
+    return {
+      result: {
+        tag: scenario.tag,
+        name: scenario.name,
+        passed: false,
+        skipped: false,
+        errored: true,
+        assertions,
+        duration: Date.now() - start,
+        requestUrl: query.url
+      },
+      retryable: true,
+      rejected: false,
+      accepted: false
+    };
   }
 };
 
@@ -808,7 +971,7 @@ export const runEnumFamilyScenario = async (
   authToken: string,
   start: number,
   op: EnumOp,
-  requester: ODataRequester = webRequester,
+  requester: ODataRequester = webRequester
 ): Promise<ScenarioResult> => {
   const slot = scenarioSlot(scenario);
   const candidates = (slot === 'multi' ? params.multiLookupCandidates : params.singleLookupCandidates) ?? [];
@@ -818,13 +981,25 @@ export const runEnumFamilyScenario = async (
   // and — worse — leave us reporting one of the 400s. Ranking is uncorrelated with filterability.
   const eligible = candidates.filter(c => scenarioTargetsRep(scenario, c.representation) && opValidForRep(op, c.representation));
   if (eligible.length === 0) {
-    return skipResult(scenario, start, `no ${slot}-valued enumeration field of this scenario's representation (category '${scenario.category}') supports "${op}" on this server`);
+    return skipResult(
+      scenario,
+      start,
+      `no ${slot}-valued enumeration field of this scenario's representation (category '${scenario.category}') supports "${op}" on this server`
+    );
   }
 
   let anyAccepted = false; // some eligible field returned 200 — the operator ran, so it is not an all-reject gap
   let firstRejection: ScenarioResult | undefined;
   for (const candidate of eligible) {
-    const { result, retryable, rejected, accepted } = await executeStandardScenario(serverUrl, resource, scenario, paramsWithCandidate(params, slot, candidate), authToken, start, requester);
+    const { result, retryable, rejected, accepted } = await executeStandardScenario(
+      serverUrl,
+      resource,
+      scenario,
+      paramsWithCandidate(params, slot, candidate),
+      authToken,
+      start,
+      requester
+    );
     if (!retryable) return result; // determinate pass/fail (incl. a guaranteed-match 200-empty → fail) — done
     if (accepted) anyAccepted = true;
     if (rejected) firstRejection ??= result;
@@ -867,24 +1042,36 @@ export const lookupResourcePresence = (
   expectedLookupName: string,
   sampleValues: ReadonlyArray<string | undefined>,
   cache: LookupCache,
-  isEnumerationIgnored: (resource: string, field: string) => boolean,
+  isEnumerationIgnored: (resource: string, field: string) => boolean
 ): AssertionResult => {
   if (rows.length === 0) {
     return { passed: false, message: `Lookup Resource returned no rows for LookupName '${expectedLookupName}'` };
   }
   const wrongName = rows.find(r => r.LookupName != null && String(r.LookupName) !== expectedLookupName);
   if (wrongName) {
-    return { passed: false, message: `Lookup Resource returned a row with LookupName=${JSON.stringify(wrongName.LookupName)}, expected '${expectedLookupName}'` };
+    return {
+      passed: false,
+      message: `Lookup Resource returned a row with LookupName=${JSON.stringify(wrongName.LookupName)}, expected '${expectedLookupName}'`
+    };
   }
   if (isEnumerationIgnored(resource, field)) {
-    return { passed: true, message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} is on the committee-approved ignore-enumerations list — value presence not enforced` };
+    return {
+      passed: true,
+      message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} is on the committee-approved ignore-enumerations list — value presence not enforced`
+    };
   }
   const present = sampleValues.filter((v): v is string => typeof v === 'string' && v.length > 0);
   const missing = present.filter(v => !cache.has(resource, field, v));
   if (missing.length > 0) {
-    return { passed: false, message: `Lookup Resource missing sample value(s): ${missing.map(v => `'${v}'`).join(', ')} for LookupName '${expectedLookupName}'` };
+    return {
+      passed: false,
+      message: `Lookup Resource missing sample value(s): ${missing.map(v => `'${v}'`).join(', ')} for LookupName '${expectedLookupName}'`
+    };
   }
-  return { passed: true, message: `Lookup Resource validated: LookupName '${expectedLookupName}' with ${present.length} sample value(s) present` };
+  return {
+    passed: true,
+    message: `Lookup Resource validated: LookupName '${expectedLookupName}' with ${present.length} sample value(s) present`
+  };
 };
 
 /**
@@ -905,38 +1092,61 @@ export const lookupResourceValueReport = (
   field: string,
   expectedLookupName: string,
   standardMap: StandardMap,
-  isEnumerationIgnored: (resource: string, field: string) => boolean,
+  isEnumerationIgnored: (resource: string, field: string) => boolean
 ): AssertionResult => {
   if (isEnumerationIgnored(resource, field)) {
-    return { passed: true, message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} is on the ignore-enumerations list — values not classified` };
+    return {
+      passed: true,
+      message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} is on the ignore-enumerations list — values not classified`
+    };
   }
   // Prefer the precise per-field DD set (joined on the field's DD type); fall back to "any DD enum" only when
   // the field can't be resolved to a DD enum, so an unresolvable field degrades to a laxer classification.
   const perFieldSet = standardMap.standardValuesForField(resource, field);
   const isDdStandard = (slv: string): boolean => (perFieldSet ? perFieldSet.has(slv) : standardMap.isStandardValue(slv));
   const resolved = perFieldSet !== undefined; // the field resolved to a DD enum (vs an unknown / provider-local field)
-  const declared = [...new Set(rows.flatMap(r => {
-    const slv = r.StandardLookupValue;
-    return slv != null && String(slv).length > 0 ? [String(slv)] : [];
-  }))];
+  const declared = [
+    ...new Set(
+      rows.flatMap(r => {
+        const slv = r.StandardLookupValue;
+        return slv != null && String(slv).length > 0 ? [String(slv)] : [];
+      })
+    )
+  ];
   if (declared.length === 0) {
-    return { passed: true, message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} — no StandardLookupValue values to classify` };
+    return {
+      passed: true,
+      message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} — no StandardLookupValue values to classify`
+    };
   }
   const local = declared.filter(slv => !isDdStandard(slv));
   const standardCount = declared.length - local.length;
   if (local.length === 0) {
-    return { passed: true, message: `Lookup Resource '${expectedLookupName}': tested ${resource}.${field} — all ${declared.length} value(s) are DD-standard` };
+    return {
+      passed: true,
+      message: `Lookup Resource '${expectedLookupName}': tested ${resource}.${field} — all ${declared.length} value(s) are DD-standard`
+    };
   }
-  const examples = local.slice(0, 5).map(v => `'${v}'`).join(', ') + (local.length > 5 ? `, +${local.length - 5} more` : '');
+  const examples =
+    local
+      .slice(0, 5)
+      .map(v => `'${v}'`)
+      .join(', ') + (local.length > 5 ? `, +${local.length - 5} more` : '');
   if (standardMap.isClosedEnumField(resource, field)) {
-    return { passed: true, message: `Lookup Resource '${expectedLookupName}': tested ${resource}.${field} — ${standardCount} DD-standard, ${local.length} value(s) extending a closed enumeration (${examples}). Reported only — Core does not gate on enumeration membership, but extending a closed enumeration would not pass Data Dictionary testing.` };
+    return {
+      passed: true,
+      message: `Lookup Resource '${expectedLookupName}': tested ${resource}.${field} — ${standardCount} DD-standard, ${local.length} value(s) extending a closed enumeration (${examples}). Reported only — Core does not gate on enumeration membership, but extending a closed enumeration would not pass Data Dictionary testing.`
+    };
   }
   // Resolvable non-closed enum → the openness rationale holds; unresolvable/provider-local field → state only
   // what is known (reported, not failed), since the field's enum-ness and openness are unknown.
   const rationale = resolved
     ? 'Local values are permitted for open enumerations; reported for review, not failed.'
     : 'Reported for review, not failed — Core does not gate on enumeration membership.';
-  return { passed: true, message: `Lookup Resource '${expectedLookupName}': tested ${resource}.${field} — ${standardCount} DD-standard, ${local.length} local value(s) (${examples}). ${rationale}` };
+  return {
+    passed: true,
+    message: `Lookup Resource '${expectedLookupName}': tested ${resource}.${field} — ${standardCount} DD-standard, ${local.length} local value(s) (${examples}). ${rationale}`
+  };
 };
 
 /**
@@ -975,8 +1185,13 @@ const validateStringLookupCandidate = async (
   authToken: string,
   requester: ODataRequester,
   lookupCtx: LookupResourceContext,
-  lookupNameByField: Readonly<Record<string, string>> | undefined,
-): Promise<{ readonly assertions: ReadonlyArray<AssertionResult>; readonly requestUrl: string; readonly errored: boolean; readonly requestLatency?: number }> => {
+  lookupNameByField: Readonly<Record<string, string>> | undefined
+): Promise<{
+  readonly assertions: ReadonlyArray<AssertionResult>;
+  readonly requestUrl: string;
+  readonly errored: boolean;
+  readonly requestLatency?: number;
+}> => {
   const field = cand.field;
   const expectedLookupName = lookupNameByField?.[field] ?? cand.lookupName ?? field;
   // Validate the LOCAL-first sample values — the ones most at risk of being absent from /Lookup — not the
@@ -989,7 +1204,7 @@ const validateStringLookupCandidate = async (
   // cache; the value report classifies each row's StandardLookupValue against the field's own DD enum, never gating.
   const validate = (rows: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<AssertionResult> => [
     lookupResourcePresence(rows, resource, field, expectedLookupName, sampleValues, lookupCtx.cache, lookupCtx.isEnumerationIgnored),
-    lookupResourceValueReport(rows, resource, field, expectedLookupName, lookupCtx.standardMap, lookupCtx.isEnumerationIgnored),
+    lookupResourceValueReport(rows, resource, field, expectedLookupName, lookupCtx.standardMap, lookupCtx.isEnumerationIgnored)
   ];
 
   // CACHE HIT: another field already fetched (and 200-verified) every row for this LookupName. Reuse and skip the fetch.
@@ -1033,7 +1248,11 @@ const validateStringLookupCandidate = async (
     return { assertions, requestUrl: url, errored: false, requestLatency };
   } catch (err) {
     if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
-    return { assertions: [{ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` }], requestUrl: url, errored: true };
+    return {
+      assertions: [{ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` }],
+      requestUrl: url,
+      errored: true
+    };
   }
 };
 
@@ -1045,7 +1264,7 @@ export const runLookupResourceScenario = async (
   authToken: string,
   start: number,
   requester: ODataRequester = webRequester,
-  lookupCtx: LookupResourceContext,
+  lookupCtx: LookupResourceContext
 ): Promise<ScenarioResult> => {
   // The Lookup Resource is the STRING enum mechanism, so only string forms have one: SINGLE_STRING (single-valued)
   // and COLLECTION_STRING (multi-valued). Validate BOTH when present — the spec supplies a single- AND a multi-valued
@@ -1061,7 +1280,12 @@ export const runLookupResourceScenario = async (
   // Validate each present string form against its own LookupName, sequentially so a LookupName shared across
   // candidates is fetched at most once (the second sees the first's cached rows). The scenario passes iff every
   // candidate's LookupName + sample values resolve.
-  const parts: { readonly assertions: ReadonlyArray<AssertionResult>; readonly requestUrl: string; readonly errored: boolean; readonly requestLatency?: number }[] = [];
+  const parts: {
+    readonly assertions: ReadonlyArray<AssertionResult>;
+    readonly requestUrl: string;
+    readonly errored: boolean;
+    readonly requestLatency?: number;
+  }[] = [];
   for (const cand of targets) {
     parts.push(await validateStringLookupCandidate(cand, serverUrl, resource, authToken, requester, lookupCtx, params.lookupNameByField));
   }
@@ -1081,7 +1305,7 @@ export const runLookupResourceScenario = async (
     assertions,
     duration: Date.now() - start,
     requestUrl: parts.map(p => p.requestUrl).join(' , '),
-    ...(requestLatency != null ? { requestLatency } : {}),
+    ...(requestLatency != null ? { requestLatency } : {})
   };
 };
 
@@ -1093,7 +1317,7 @@ const runScenario = async (
   params: TestParams,
   authToken: string,
   requester: ODataRequester = webRequester,
-  lookupCtx: LookupResourceContext,
+  lookupCtx: LookupResourceContext
 ): Promise<ScenarioResult> => {
   const start = Date.now();
 
@@ -1130,14 +1354,32 @@ const runScenario = async (
       const response = await requester.request({ method: 'GET', url: query.url, authToken });
       const requestLatency = Date.now() - reqStart;
       const responseCheck = assertODataResponse(response, scenario.expectedStatus);
-      return { tag: scenario.tag, name: scenario.name, passed: responseCheck.passed, skipped: false, assertions: [responseCheck], duration: Date.now() - start, requestLatency, requestUrl: query.url };
+      return {
+        tag: scenario.tag,
+        name: scenario.name,
+        passed: responseCheck.passed,
+        skipped: false,
+        assertions: [responseCheck],
+        duration: Date.now() - start,
+        requestLatency,
+        requestUrl: query.url
+      };
     }
     // Other standard scenarios (filter / orderby / expand / lookup-resource): a single execution.
     const { result } = await executeStandardScenario(serverUrl, resource, scenario, params, authToken, start, requester);
     return result;
   } catch (err) {
     if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
-    return { tag: scenario.tag, name: scenario.name, passed: false, skipped: false, errored: true, assertions: [{ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` }], duration: Date.now() - start, requestUrl: query.url };
+    return {
+      tag: scenario.tag,
+      name: scenario.name,
+      passed: false,
+      skipped: false,
+      errored: true,
+      assertions: [{ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` }],
+      duration: Date.now() - start,
+      requestUrl: query.url
+    };
   }
 };
 
@@ -1145,13 +1387,12 @@ const runScenario = async (
 const assertData = (
   records: ReadonlyArray<Record<string, unknown>>,
   scenario: CoreScenario,
-  params: TestParams,
+  params: TestParams
 ): AssertionResult | undefined => {
   const resolve = (param: string): string | number | undefined =>
     param === 'now' ? new Date().toISOString() : (params as unknown as Record<string, string | number | undefined>)[param];
 
-  const resolveField = (param: string): string =>
-    (params as unknown as Record<string, string>)[param] ?? param;
+  const resolveField = (param: string): string => (params as unknown as Record<string, string>)[param] ?? param;
 
   // A FLAGS_ENUM field may serialize the response as an integer bitmask (or comma string); decode it back
   // to member names using the field's CSDL enum type so the assertion compares like-for-like. Only flags
@@ -1162,7 +1403,7 @@ const assertData = (
     const rep = isMulti ? params.multiLookupFieldRep : params.singleLookupFieldRep;
     const enumType = isMulti ? params.multiLookupEnumType : params.singleLookupEnumType;
     return rep === 'FLAGS_ENUM' && enumType
-      ? (raw) => decodeFlagsValue(enumType, typeof raw === 'string' || typeof raw === 'number' ? raw : undefined)
+      ? raw => decodeFlagsValue(enumType, typeof raw === 'string' || typeof raw === 'number' ? raw : undefined)
       : undefined;
   };
 
@@ -1182,7 +1423,7 @@ const assertData = (
 
         if (scenario.compound.logical === 'and') {
           return check1.passed && check2.passed
-            ? { passed: true, message: `Compound AND filter satisfied` }
+            ? { passed: true, message: 'Compound AND filter satisfied' }
             : { passed: false, message: `Compound AND failed: ${!check1.passed ? check1.message : check2.message}` };
         }
         // OR: each record must satisfy at least ONE condition — a genuine per-record disjunction. NOT
@@ -1204,15 +1445,22 @@ const assertData = (
       // co-present pair when present (so the guaranteed-match record's collection is what's checked), else the
       // two sampled values. `recordDerivedSet` is the single source of truth (see queries.ts).
       return scenario.enumType === 'single'
-        ? assertEnumMatch(records, resolveField(scenario.fieldParam), scenario.op, String(resolve(scenario.valueParam)), decodeFor(scenario.fieldParam))
+        ? assertEnumMatch(
+            records,
+            resolveField(scenario.fieldParam),
+            scenario.op,
+            String(resolve(scenario.valueParam)),
+            decodeFor(scenario.fieldParam)
+          )
         : assertCollectionLambda(
             records,
             resolveField(scenario.fieldParam),
             'has',
-            recordDerivedSet(scenario, params) ?? (scenario.valueParam2
-              ? [String(resolve(scenario.valueParam)), String(resolve(scenario.valueParam2))]
-              : [String(resolve(scenario.valueParam))]),
-            decodeFor(scenario.fieldParam),
+            recordDerivedSet(scenario, params) ??
+              (scenario.valueParam2
+                ? [String(resolve(scenario.valueParam)), String(resolve(scenario.valueParam2))]
+                : [String(resolve(scenario.valueParam))]),
+            decodeFor(scenario.fieldParam)
           );
 
     case 'collection':
@@ -1221,21 +1469,27 @@ const assertData = (
         resolveField(scenario.fieldParam),
         scenario.lambda,
         recordDerivedSet(scenario, params) ?? [String(resolve(scenario.valueParam))],
-        decodeFor(scenario.fieldParam),
+        decodeFor(scenario.fieldParam)
       );
 
     case 'string-enum':
       if (scenario.enumType === 'single') {
-        return assertStringComparison(records, resolveField(scenario.fieldParam), scenario.op as 'eq' | 'ne', String(resolve(scenario.valueParam)));
+        return assertStringComparison(
+          records,
+          resolveField(scenario.fieldParam),
+          scenario.op as 'eq' | 'ne',
+          String(resolve(scenario.valueParam))
+        );
       }
       return assertCollectionLambda(
         records,
         resolveField(scenario.fieldParam),
         scenario.op as 'any' | 'all',
-        recordDerivedSet(scenario, params) ?? (scenario.valueParam2
-          ? [String(resolve(scenario.valueParam)), String(resolve(scenario.valueParam2))]
-          : [String(resolve(scenario.valueParam))]),
-        decodeFor(scenario.fieldParam),
+        recordDerivedSet(scenario, params) ??
+          (scenario.valueParam2
+            ? [String(resolve(scenario.valueParam)), String(resolve(scenario.valueParam2))]
+            : [String(resolve(scenario.valueParam))]),
+        decodeFor(scenario.fieldParam)
       );
 
     case 'in-operator': {
@@ -1273,9 +1527,12 @@ const assertData = (
         const actual = record[strField];
         if (actual == null) continue;
         const actualStr = String(actual);
-        const matches = func === 'contains' ? actualStr.includes(strValue)
-          : func === 'startswith' ? actualStr.startsWith(strValue)
-          : actualStr.endsWith(strValue);
+        const matches =
+          func === 'contains'
+            ? actualStr.includes(strValue)
+            : func === 'startswith'
+              ? actualStr.startsWith(strValue)
+              : actualStr.endsWith(strValue);
         if (!matches) {
           failures.push(`Record ${i}: ${strField}=${JSON.stringify(actualStr)} does not satisfy ${func}('${strValue}')`);
         }
@@ -1317,10 +1574,7 @@ export const describeSkipOverlap = (overlap: number): string => {
   const keys = `${overlap} key${overlap === 1 ? '' : 's'}`;
   const verb = overlap === 1 ? 'appears' : 'appear';
   return (
-    `$skip overlap: ${keys} ${verb} in both pages — consecutive pages must be disjoint. ` +
-    `Absent $orderby, OData REQUIRES the service to impose a stable ordering across requests that include ` +
-    `$top/$skip (4.0 §11.2.5.4 [$skip], §11.2.5.3 [$top]; 4.01 §11.2.6.3–.4) — a stable sort is mandatory, so ` +
-    `$top=5 then $skip=5 must return different records. See ${ODATA_SKIP_SPEC_URL}`
+    `$skip overlap: ${keys} ${verb} in both pages — consecutive pages must be disjoint. Absent $orderby, OData REQUIRES the service to impose a stable ordering across requests that include $top/$skip (4.0 §11.2.5.4 [$skip], §11.2.5.3 [$top]; 4.01 §11.2.6.3–.4) — a stable sort is mandatory, so $top=5 then $skip=5 must return different records. See ${ODATA_SKIP_SPEC_URL}`
   );
 };
 
@@ -1335,7 +1589,7 @@ export const runStructuralScenario = async (
   params: TestParams,
   authToken: string,
   start: number,
-  requester: ODataRequester = webRequester,
+  requester: ODataRequester = webRequester
 ): Promise<ScenarioResult> => {
   const assertions: AssertionResult[] = [];
   const warnings: string[] = []; // non-gating, verdict-neutral (see the $select projection-honored check)
@@ -1441,14 +1695,18 @@ export const runStructuralScenario = async (
       const records = extractRecords(response.body);
       const projectedDataFields = query.selectFields.filter(f => f !== params.keyField);
       if (projectedDataFields.length === 0) {
-        assertions.push({ passed: true, message: '$select: no non-key field available to project — multi-field projection not exercised on this resource' });
+        assertions.push({
+          passed: true,
+          message: '$select: no non-key field available to project — multi-field projection not exercised on this resource'
+        });
       } else {
         const confirmed = projectedDataFields.filter(f => records.some(r => f in r));
         assertions.push({
           passed: true,
-          message: confirmed.length > 0
-            ? `$select: projected fields present (${confirmed.join(', ')}); additional properties permitted (OData 4.01 §11.2.5.1)`
-            : '$select: projected data field null/omitted on this page — not a defect (OData 4.01 §11.2.5.1)',
+          message:
+            confirmed.length > 0
+              ? `$select: projected fields present (${confirmed.join(', ')}); additional properties permitted (OData 4.01 §11.2.5.1)`
+              : '$select: projected data field null/omitted on this page — not a defect (OData 4.01 §11.2.5.1)'
         });
       }
     } else {
@@ -1463,7 +1721,17 @@ export const runStructuralScenario = async (
   }
 
   const allPassed = assertions.every(a => a.passed);
-  return { tag, name, passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestUrl: query.url, odataVersion, ...(warnings.length > 0 ? { warnings } : {}) };
+  return {
+    tag,
+    name,
+    passed: allPassed,
+    skipped: false,
+    assertions,
+    duration: Date.now() - start,
+    requestUrl: query.url,
+    odataVersion,
+    ...(warnings.length > 0 ? { warnings } : {})
+  };
 };
 
 // Server-driven-paging walk (Check B) knobs. Page size is REQUESTED via Prefer: odata.maxpagesize — a SHOULD,
@@ -1488,7 +1756,7 @@ export const runPagingScenario = async (
   authToken: string,
   start: number,
   requester: ODataRequester = webRequester,
-  walkBound = PAGING_WALK_TOP_BOUND,
+  walkBound = PAGING_WALK_TOP_BOUND
 ): Promise<ScenarioResult> => {
   const assertions: AssertionResult[] = [];
   // The report surfaces whichever request FAILED: a `$top=1` failure must show the `$top=1` GET, not the walk.
@@ -1505,9 +1773,16 @@ export const runPagingScenario = async (
     if (topOne.status !== 200) {
       topOneAssertions.push({ passed: false, message: `$top=1 request returned HTTP ${topOne.status} (expected 200)` });
     } else if (extractNextLink(topOne.body)) {
-      topOneAssertions.push({ passed: false, message: '$top=1 MUST NOT return an @odata.nextLink — the single requested record is the complete response to a $top=1 request; a continuation would exceed $top=1 (web-api-core.md Server-Driven Paging §2.5; OData 4.01 §11.2.6.3).' });
+      topOneAssertions.push({
+        passed: false,
+        message:
+          '$top=1 MUST NOT return an @odata.nextLink — the single requested record is the complete response to a $top=1 request; a continuation would exceed $top=1 (web-api-core.md Server-Driven Paging §2.5; OData 4.01 §11.2.6.3).'
+      });
     } else {
-      topOneAssertions.push({ passed: true, message: '$top=1 returned no @odata.nextLink (correct — the single requested record is the complete set)' });
+      topOneAssertions.push({
+        passed: true,
+        message: '$top=1 returned no @odata.nextLink (correct — the single requested record is the complete set)'
+      });
     }
   } catch (err) {
     if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
@@ -1531,11 +1806,18 @@ export const runPagingScenario = async (
     : undefined;
 
   if (!walkUrl) {
-    assertions.push({ passed: true, message: 'Server-driven paging walk skipped — no timestamp field with ≥2 distinct sampled values to page through' });
+    assertions.push({
+      passed: true,
+      message: 'Server-driven paging walk skipped — no timestamp field with ≥2 distinct sampled values to page through'
+    });
   } else {
     const seen = new Set<string>();
     let url: string | undefined = walkUrl;
-    let pages = 0, total = 0, dup = false, lastHadNext = false, brokePage = false;
+    let pages = 0;
+    let total = 0;
+    let dup = false;
+    let lastHadNext = false;
+    let brokePage = false;
     try {
       while (url && pages < PAGING_WALK_MAX_PAGES) {
         const resp = await requester.request({ method: 'GET', url, authToken, headers: PAGING_WALK_PREFER_HEADER });
@@ -1559,15 +1841,31 @@ export const runPagingScenario = async (
       }
       if (!brokePage) {
         if (dup) {
-          assertions.push({ passed: false, message: 'Server-driven paging: a record key repeated across pages — each page MUST return records not already seen on a previous page (web-api-core.md Server-Driven Paging).' });
+          assertions.push({
+            passed: false,
+            message:
+              'Server-driven paging: a record key repeated across pages — each page MUST return records not already seen on a previous page (web-api-core.md Server-Driven Paging).'
+          });
         } else if (total > walkBound || (total >= walkBound && lastHadNext)) {
-          assertions.push({ passed: false, message: `Server-driven paging: server returned ${total} records for $top=${walkBound}${lastHadNext ? ' and still offered an @odata.nextLink' : ''} — must be up to but not greater than $top (OData 4.01 §11.2.6.3).` });
+          assertions.push({
+            passed: false,
+            message: `Server-driven paging: server returned ${total} records for $top=${walkBound}${lastHadNext ? ' and still offered an @odata.nextLink' : ''} — must be up to but not greater than $top (OData 4.01 §11.2.6.3).`
+          });
         } else if (pages > 1 && !lastHadNext) {
-          assertions.push({ passed: true, message: `Server-driven paging: ${pages} pages, ${seen.size} unique records, clean termination (no @odata.nextLink on the final page)` });
+          assertions.push({
+            passed: true,
+            message: `Server-driven paging: ${pages} pages, ${seen.size} unique records, clean termination (no @odata.nextLink on the final page)`
+          });
         } else if (pages === 1 && !lastHadNext) {
-          assertions.push({ passed: true, message: `Server-driven paging: whole filtered set returned in one page (${seen.size} records), no @odata.nextLink — valid (page size is the server's choice)` });
+          assertions.push({
+            passed: true,
+            message: `Server-driven paging: whole filtered set returned in one page (${seen.size} records), no @odata.nextLink — valid (page size is the server's choice)`
+          });
         } else if (pages >= PAGING_WALK_MAX_PAGES && lastHadNext) {
-          assertions.push({ passed: true, message: `Server-driven paging: ${pages} pages walked (page cap), ${seen.size} unique records, no overlap — paging works; the server did not honor the requested page size, so termination was not reached within the cap` });
+          assertions.push({
+            passed: true,
+            message: `Server-driven paging: ${pages} pages walked (page cap), ${seen.size} unique records, no overlap — paging works; the server did not honor the requested page size, so termination was not reached within the cap`
+          });
         }
       }
     } catch (err) {
@@ -1580,7 +1878,15 @@ export const runPagingScenario = async (
   // Point the report at the request that failed: the $top=1 normative check when it failed, else the walk URL
   // (also the URL shown when everything passes); fall back to $top=1 when the walk was skipped.
   const requestUrl = topOneFailed ? topOneUrl : (walkUrl ?? topOneUrl);
-  return { tag: 'server-driven-paging', name: 'Server-driven paging', passed: allPassed, skipped: false, assertions, duration: Date.now() - start, requestUrl };
+  return {
+    tag: 'server-driven-paging',
+    name: 'Server-driven paging',
+    passed: allPassed,
+    skipped: false,
+    assertions,
+    duration: Date.now() - start,
+    requestUrl
+  };
 };
 
 // ── Provider-wide pass ──
@@ -1600,7 +1906,13 @@ export interface ProviderScenariosResult {
 
 /** A minimal params stub for the provider-wide structural scenarios (they ignore per-resource params). */
 const providerParamsStub: TestParams = {
-  resource: '', keyField: '', keyValue: '', enumMode: 'string', integerValueHigh: 0, skippedTypes: [], sampleComplete: false,
+  resource: '',
+  keyField: '',
+  keyValue: '',
+  enumMode: 'string',
+  integerValueHigh: 0,
+  skippedTypes: [],
+  sampleComplete: false
 };
 
 /**
@@ -1612,7 +1924,7 @@ const runServiceDocumentProbe = async (
   serverUrl: string,
   authToken: string,
   start: number,
-  requester: ODataRequester,
+  requester: ODataRequester
 ): Promise<{ readonly result: ScenarioResult; readonly served: ReadonlySet<string> | undefined }> => {
   const url = serverUrl;
   const assertions: AssertionResult[] = [];
@@ -1623,11 +1935,33 @@ const runServiceDocumentProbe = async (
     // Only a determinately GOOD service doc (200 shape) feeds the detection surface; a failed response
     // leaves the surface INDETERMINATE (undefined), never a false "absent".
     const served = assertions.every(a => a.passed) ? parseServiceDocument(response.body) : undefined;
-    return { result: { tag: 'service-document', name: 'service-document', passed: assertions.every(a => a.passed), skipped: false, assertions, duration: Date.now() - start, requestUrl: url }, served };
+    return {
+      result: {
+        tag: 'service-document',
+        name: 'service-document',
+        passed: assertions.every(a => a.passed),
+        skipped: false,
+        assertions,
+        duration: Date.now() - start,
+        requestUrl: url
+      },
+      served
+    };
   } catch (err) {
     if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
     assertions.push({ passed: false, message: `Error: ${err instanceof Error ? err.message : String(err)}` });
-    return { result: { tag: 'service-document', name: 'service-document', passed: false, skipped: false, assertions, duration: Date.now() - start, requestUrl: url }, served: undefined };
+    return {
+      result: {
+        tag: 'service-document',
+        name: 'service-document',
+        passed: false,
+        skipped: false,
+        assertions,
+        duration: Date.now() - start,
+        requestUrl: url
+      },
+      served: undefined
+    };
   }
 };
 
@@ -1643,7 +1977,7 @@ export const runProviderScenarios = async (
   serverUrl: string,
   authToken: string,
   version: '2.0.0' | '2.1.0' = '2.0.0',
-  requester: ODataRequester = webRequester,
+  requester: ODataRequester = webRequester
 ): Promise<ProviderScenariosResult> => {
   const provWide = scenariosForVersion(version).filter(isProviderWideScenario);
   const metaScenario = provWide.find(s => s.category === 'structural' && s.assertion === 'metadata');
@@ -1655,7 +1989,16 @@ export const runProviderScenarios = async (
   try {
     if (metaScenario) {
       const start = Date.now();
-      const result = await runStructuralScenario(serverUrl, '', 'metadata', { url: `${serverUrl}/$metadata`, selectFields: [] }, providerParamsStub, authToken, start, requester);
+      const result = await runStructuralScenario(
+        serverUrl,
+        '',
+        'metadata',
+        { url: `${serverUrl}/$metadata`, selectFields: [] },
+        providerParamsStub,
+        authToken,
+        start,
+        requester
+      );
       scenarios.push(result);
       odataVersion = result.odataVersion;
     }
@@ -1716,19 +2059,20 @@ export const runCoreResourceScenarios = async (
   authToken: string,
   version: '2.0.0' | '2.1.0' = '2.0.0',
   requester: ODataRequester = webRequester,
-  options?: CoreResourceScenarioOptions,
+  options?: CoreResourceScenarioOptions
 ): Promise<ResourceTestReport> => {
-  const scenarios = scenariosForVersion(version)
-    .filter(s => (options?.excludeProviderWide ? !isProviderWideScenario(s) : true));
+  const scenarios = scenariosForVersion(version).filter(s => (options?.excludeProviderWide ? !isProviderWideScenario(s) : true));
   const results: ScenarioResult[] = [];
 
   // Lookup Resource dependencies. The SDK threads a run-wide cache + standard map + ignore predicate; a direct
   // caller (e.g. a focused test) gets a per-resource fallback so the scenario still works in isolation. The
   // fallback cache resolves LookupNames off THIS resource's params (it only ever tests one resource).
   const lookupCtx: LookupResourceContext = {
-    cache: options?.lookupCache ?? createLookupCache({ lookupNameFor: (res, fld) => (res === resource ? params.lookupNameByField?.[fld] : undefined) }),
+    cache:
+      options?.lookupCache ??
+      createLookupCache({ lookupNameFor: (res, fld) => (res === resource ? params.lookupNameByField?.[fld] : undefined) }),
     standardMap: options?.standardMap ?? buildStandardMap(version),
-    isEnumerationIgnored: options?.isEnumerationIgnored ?? (() => false),
+    isEnumerationIgnored: options?.isEnumerationIgnored ?? (() => false)
   };
 
   // Track cross-scenario state for cascade-skip + OData-version gating. The version is pre-seeded from the
@@ -1749,7 +2093,7 @@ export const runCoreResourceScenarios = async (
         skipped: true,
         assertions: [{ passed: false, message: 'Skipped: lookup-resource-validation failed earlier in this run' }],
         duration: 0,
-        optional: scenario.optional,
+        optional: scenario.optional
       });
       continue;
     }
@@ -1764,9 +2108,14 @@ export const runCoreResourceScenarios = async (
         name: scenario.name,
         passed: false,
         skipped: true,
-        assertions: [{ passed: false, message: `Skipped: 'in' operator requires OData-Version 4.01 (server reports ${detectedODataVersion ?? 'no OData-Version'})` }],
+        assertions: [
+          {
+            passed: false,
+            message: `Skipped: 'in' operator requires OData-Version 4.01 (server reports ${detectedODataVersion ?? 'no OData-Version'})`
+          }
+        ],
         duration: 0,
-        optional: scenario.optional,
+        optional: scenario.optional
       });
       continue;
     }
@@ -1776,7 +2125,15 @@ export const runCoreResourceScenarios = async (
     // than inside runScenario because it yields MANY results; the run-deadline handling mirrors the generic path.
     if (scenario.category === 'expand') {
       try {
-        const expandResults = await runExpandNavScenarios(serverUrl, resource, scenario, params, authToken, requester, options?.expandValidator);
+        const expandResults = await runExpandNavScenarios(
+          serverUrl,
+          resource,
+          scenario,
+          params,
+          authToken,
+          requester,
+          options?.expandValidator
+        );
         results.push(...expandResults);
       } catch (err) {
         if (!isDeadlineError(err)) throw err;
@@ -1813,6 +2170,6 @@ export const runCoreResourceScenarios = async (
     coverage: buildCoverage(params),
     scenarios: results,
     summary: summarizeScenarios(results),
-    ...(deadlineReached ? { deadlineReached: true } : {}),
+    ...(deadlineReached ? { deadlineReached: true } : {})
   };
 };

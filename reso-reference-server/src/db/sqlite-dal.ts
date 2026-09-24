@@ -10,8 +10,8 @@
  * to conform to the async DataAccessLayer interface.
  */
 
-import type Database from 'better-sqlite3';
 import type { ExpandExpression } from '@reso-standards/odata-expression-parser';
+import type Database from 'better-sqlite3';
 import type { ResoField } from '../metadata/types.js';
 import type {
   CollectionQueryOptions,
@@ -301,9 +301,7 @@ const resolveNestedExpand = (
       const children = expanded[binding.name];
       if (!children) continue;
 
-      const childEntities = binding.isCollection
-        ? (children as ReadonlyArray<EntityRecord>)
-        : [children as EntityRecord];
+      const childEntities = binding.isCollection ? (children as ReadonlyArray<EntityRecord>) : [children as EntityRecord];
 
       if (childEntities.length === 0) continue;
 
@@ -413,15 +411,10 @@ const resolveChildExpand = (
     return entity;
   });
 
-  const nestedBindings = expandBindings.filter(({ expandExpr }) =>
-    expandExpr.options.$expand && expandExpr.options.$expand.length > 0
-  );
+  const nestedBindings = expandBindings.filter(({ expandExpr }) => expandExpr.options.$expand && expandExpr.options.$expand.length > 0);
 
   if (nestedBindings.length > 0 && childCtx.resolveChildContext) {
-    return applyExpandSelect(
-      resolveNestedExpand(database, stitched, nestedBindings, childCtx.resolveChildContext, depth),
-      expandBindings
-    );
+    return applyExpandSelect(resolveNestedExpand(database, stitched, nestedBindings, childCtx.resolveChildContext, depth), expandBindings);
   }
 
   return applyExpandSelect(stitched, expandBindings);
@@ -447,9 +440,7 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
       selectedFields = dataFields;
     }
 
-    const expandBindings = options?.$expand
-      ? resolveExpandBindings(options.$expand, ctx.navigationBindings)
-      : [];
+    const expandBindings = options?.$expand ? resolveExpandBindings(options.$expand, ctx.navigationBindings) : [];
 
     let expandSelect = options?.$select;
     if (options?.$select && expandBindings.length > 0) {
@@ -556,9 +547,7 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
 
       let entities = groupRows(rows, parentAlias, ctx.keyField, ctx.fields, selectedFields, expandBindings);
 
-      const nestedBindings = expandBindings.filter(({ expandExpr }) =>
-        expandExpr.options.$expand && expandExpr.options.$expand.length > 0
-      );
+      const nestedBindings = expandBindings.filter(({ expandExpr }) => expandExpr.options.$expand && expandExpr.options.$expand.length > 0);
       if (nestedBindings.length > 0) {
         entities = resolveNestedExpand(db, entities, nestedBindings, ctx.resolveChildContext, 1);
       }

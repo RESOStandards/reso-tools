@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { runAllScenarios } from '../add-edit/index.js';
 import {
   buildResourceUrl,
   fetchMetadata,
@@ -7,16 +8,15 @@ import {
   loadMetadataFromFile,
   odataRequest,
   parseMetadataXml,
-  resolveAuthToken,
+  resolveAuthToken
 } from '../test-runner/index.js';
 import { persistMetadataXml } from '../test-runner/metadata.js';
-import { runAllScenarios } from '../add-edit/index.js';
-import type { AddEditConfig, PipelineStep } from './types.js';
+import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
-import { addEditReportGenerators, writeReports, prepareOutputDir } from './reports.js';
-import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
-import type { BaseTestContext } from './types.js';
+import { addEditReportGenerators, prepareOutputDir, writeReports } from './reports.js';
 import { FETCH_METADATA, RUN_ADD_EDIT_SCENARIOS } from './step-names.js';
+import type { AddEditConfig, PipelineStep } from './types.js';
+import type { BaseTestContext } from './types.js';
 
 // ── Pipeline Context ──
 
@@ -37,9 +37,7 @@ const serviceCheck: PipelineStep<AddEditContext> = {
   name: 'Service check',
   run: async (ctx, onProgress) => {
     const url = ctx.serverUrl;
-    const headers: Record<string, string> = ctx.authToken
-      ? { Authorization: `Bearer ${ctx.authToken}` }
-      : {};
+    const headers: Record<string, string> = ctx.authToken ? { Authorization: `Bearer ${ctx.authToken}` } : {};
     const maxAttempts = 10;
     for (let i = 0; i < maxAttempts; i++) {
       try {
@@ -47,21 +45,28 @@ const serviceCheck: PipelineStep<AddEditContext> = {
         if (response.ok) {
           return { context: ctx, summary: 'OData service is ready', requestDetails: [{ method: 'GET', url }] };
         }
-      } catch { /* network error — retry */ }
+      } catch {
+        /* network error — retry */
+      }
       await new Promise(resolve => setTimeout(resolve, 2000));
       onProgress({ step: 'Service check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
     }
-    return { context: ctx, status: 'failed', errors: ['OData service did not respond'], requestDetails: [{ method: 'GET', url, error: `No response after ${maxAttempts} attempts` }] };
-  },
+    return {
+      context: ctx,
+      status: 'failed',
+      errors: ['OData service did not respond'],
+      requestDetails: [{ method: 'GET', url, error: `No response after ${maxAttempts} attempts` }]
+    };
+  }
 };
 
 /** Resolve the auth token from the config. */
 const resolveAuth = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
   name: 'Resolve authentication',
-  run: async (ctx) => {
+  run: async ctx => {
     const authToken = await resolveAuthToken(config.server.auth);
-    return { context: { ...ctx, authToken }, summary: `Auth credentials present` };
-  },
+    return { context: { ...ctx, authToken }, summary: 'Auth credentials present' };
+  }
 });
 
 /** Fetch and parse OData $metadata from the server or a local file. */
@@ -90,8 +95,8 @@ const fetchAndParseMetadata = (config: AddEditConfig): PipelineStep<AddEditConte
         status: 'failed',
         errors: [
           ...validationErrors,
-          `Entity type "${ctx.resource}" not found in metadata. Available: ${metadata.entityTypes.map(et => et.name).join(', ')}`,
-        ],
+          `Entity type "${ctx.resource}" not found in metadata. Available: ${metadata.entityTypes.map(et => et.name).join(', ')}`
+        ]
       };
     }
 
@@ -100,20 +105,20 @@ const fetchAndParseMetadata = (config: AddEditConfig): PipelineStep<AddEditConte
       summary: `Parsed metadata: ${metadata.entityTypes.length} entity types. ${formatValidationSummary(validation)}`,
       counts: { entityTypes: metadata.entityTypes.length, fields: entityType.properties.length },
       ...(validationErrors.length > 0 ? { errors: validationErrors } : {}),
-      ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {}),
+      ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {})
     };
-  },
+  }
 });
 
 /** Sample real records from the server to extract keys for update/delete payloads. */
 const sampleRecords = (_config: AddEditConfig): PipelineStep<AddEditContext> => ({
   name: 'Sample records',
-  run: async (ctx) => {
+  run: async ctx => {
     const url = buildResourceUrl(ctx.serverUrl, ctx.resource);
     const response = await odataRequest({
       method: 'GET',
       url: `${url}?$top=2&$orderby=ListingKey`,
-      authToken: ctx.authToken!,
+      authToken: ctx.authToken!
     });
 
     const body = response.body as { value?: ReadonlyArray<Record<string, unknown>> };
@@ -123,7 +128,7 @@ const sampleRecords = (_config: AddEditConfig): PipelineStep<AddEditContext> => 
       return {
         context: ctx,
         status: 'failed',
-        errors: [`Need at least 2 ${ctx.resource} records for sampling, found ${records.length}`],
+        errors: [`Need at least 2 ${ctx.resource} records for sampling, found ${records.length}`]
       };
     }
 
@@ -133,20 +138,20 @@ const sampleRecords = (_config: AddEditConfig): PipelineStep<AddEditContext> => 
     return {
       context: { ...ctx, sampleKeys: keys, sampleRecords: records },
       summary: `Sampled ${keys.length} ${ctx.resource} records`,
-      params: { keys },
+      params: { keys }
     };
-  },
+  }
 });
 
 /** Generate payload files from inline config, sampled keys, or a provided directory. */
 const generatePayloads = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
   name: 'Generate payloads',
-  run: async (ctx) => {
+  run: async ctx => {
     // Option 1: User provided a directory of payload files
     if (config.payloadsDir) {
       return {
         context: { ...ctx, payloadsDir: config.payloadsDir },
-        summary: `Using existing payloads from ${config.payloadsDir}`,
+        summary: `Using existing payloads from ${config.payloadsDir}`
       };
     }
 
@@ -165,14 +170,13 @@ const generatePayloads = (config: AddEditConfig): PipelineStep<AddEditContext> =
 
       // Key chaining: if update/delete missing keys, they'll be resolved after create runs
       const needsKeyChaining =
-        (inline.updateSucceeds && !(keyField in inline.updateSucceeds)) ||
-        (inline.deleteSucceeds && !('id' in inline.deleteSucceeds));
+        (inline.updateSucceeds && !(keyField in inline.updateSucceeds)) || (inline.deleteSucceeds && !('id' in inline.deleteSucceeds));
 
       if (needsKeyChaining && !hasCreate && keys.length === 0) {
         return {
           context: ctx,
           status: 'failed',
-          errors: ['Update/delete payloads missing keys and no Create payload to chain from. Provide keys or add Create payloads.'],
+          errors: ['Update/delete payloads missing keys and no Create payload to chain from. Provide keys or add Create payloads.']
         };
       }
 
@@ -181,12 +185,28 @@ const generatePayloads = (config: AddEditConfig): PipelineStep<AddEditContext> =
       const deleteKey = keys[1] ?? keys[0] ?? null;
 
       const payloads: Record<string, Record<string, unknown>> = {
-        'create-succeeds.json': inline.createSucceeds ?? { ListPrice: 350000, BedroomsTotal: 4, City: 'Test City', StateOrProvince: 'CA', PostalCode: '90210', Country: 'US' },
+        'create-succeeds.json': inline.createSucceeds ?? {
+          ListPrice: 350000,
+          BedroomsTotal: 4,
+          City: 'Test City',
+          StateOrProvince: 'CA',
+          PostalCode: '90210',
+          Country: 'US'
+        },
         'create-fails.json': inline.createFails ?? { ListPrice: -99999, BedroomsTotal: 3 },
-        'update-succeeds.json': { ...inline.updateSucceeds, ...(updateKey && !(keyField in (inline.updateSucceeds ?? {})) ? { [keyField]: updateKey } : {}) },
-        'update-fails.json': { ...inline.updateFails, ...(updateKey && !(keyField in (inline.updateFails ?? {})) ? { [keyField]: updateKey } : {}) },
-        'delete-succeeds.json': inline.deleteSucceeds && 'id' in inline.deleteSucceeds ? inline.deleteSucceeds : { id: deleteKey ?? '00000000-0000-0000-0000-000000000000' },
-        'delete-fails.json': inline.deleteFails ?? { id: '00000000-0000-0000-0000-000000000000' },
+        'update-succeeds.json': {
+          ...inline.updateSucceeds,
+          ...(updateKey && !(keyField in (inline.updateSucceeds ?? {})) ? { [keyField]: updateKey } : {})
+        },
+        'update-fails.json': {
+          ...inline.updateFails,
+          ...(updateKey && !(keyField in (inline.updateFails ?? {})) ? { [keyField]: updateKey } : {})
+        },
+        'delete-succeeds.json':
+          inline.deleteSucceeds && 'id' in inline.deleteSucceeds
+            ? inline.deleteSucceeds
+            : { id: deleteKey ?? '00000000-0000-0000-0000-000000000000' },
+        'delete-fails.json': inline.deleteFails ?? { id: '00000000-0000-0000-0000-000000000000' }
       };
 
       const writes = Object.entries(payloads).map(([filename, data]) =>
@@ -199,33 +219,39 @@ const generatePayloads = (config: AddEditConfig): PipelineStep<AddEditContext> =
         context: { ...ctx, payloadsDir: outputDir },
         summary: `Generated 6 payload files from config${chainedMsg}`,
         artifacts: [{ label: 'Payloads', path: outputDir }],
-        counts: { payloads: 6 },
+        counts: { payloads: 6 }
       };
     }
 
     // Option 3: Auto-generate from sampled records (default)
     const keys = ctx.sampleKeys!;
     const payloads: Record<string, Record<string, unknown>> = {
-      'create-succeeds.json': { ListPrice: 350000.00, BedroomsTotal: 4, BathroomsTotalInteger: 3, City: 'Test City', StateOrProvince: 'CA', PostalCode: '90210', Country: 'US' },
-      'create-fails.json': { ListPrice: -99999.00, BedroomsTotal: 3, BathroomsTotalInteger: 2 },
-      'update-succeeds.json': { ListingKey: keys[0], ListPrice: 375000.00 },
-      'update-fails.json': { ListingKey: keys[0], ListPrice: -1.00 },
+      'create-succeeds.json': {
+        ListPrice: 350000.0,
+        BedroomsTotal: 4,
+        BathroomsTotalInteger: 3,
+        City: 'Test City',
+        StateOrProvince: 'CA',
+        PostalCode: '90210',
+        Country: 'US'
+      },
+      'create-fails.json': { ListPrice: -99999.0, BedroomsTotal: 3, BathroomsTotalInteger: 2 },
+      'update-succeeds.json': { ListingKey: keys[0], ListPrice: 375000.0 },
+      'update-fails.json': { ListingKey: keys[0], ListPrice: -1.0 },
       'delete-succeeds.json': { id: keys[1] },
-      'delete-fails.json': { id: '00000000-0000-0000-0000-000000000000' },
+      'delete-fails.json': { id: '00000000-0000-0000-0000-000000000000' }
     };
 
-    const writes = Object.entries(payloads).map(([filename, data]) =>
-      writeFile(join(outputDir, filename), JSON.stringify(data, null, 2))
-    );
+    const writes = Object.entries(payloads).map(([filename, data]) => writeFile(join(outputDir, filename), JSON.stringify(data, null, 2)));
     await Promise.all(writes);
 
     return {
       context: { ...ctx, payloadsDir: outputDir },
-      summary: `Generated 6 payload files`,
+      summary: 'Generated 6 payload files',
       artifacts: [{ label: 'Payloads', path: outputDir }],
-      counts: { payloads: 6 },
+      counts: { payloads: 6 }
     };
-  },
+  }
 });
 
 /** Run all 8 Add/Edit certification scenarios. */
@@ -237,19 +263,19 @@ const runTests = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
       resource: ctx.resource,
       payloadsDir: ctx.payloadsDir!,
       auth: config.server.auth,
-      metadataPath: config.metadataPath,
+      metadataPath: config.metadataPath
     });
 
     const { passed, failed } = testReport.summary;
-    const status = failed > 0 ? 'failed' as const : 'passed' as const;
+    const status = failed > 0 ? ('failed' as const) : ('passed' as const);
 
     return {
       context: { ...ctx, testReport },
       status,
       summary: `${passed} passed, ${failed} failed (${testReport.scenarios.length} scenarios)`,
-      counts: { total: testReport.scenarios.length, passed, failed },
+      counts: { total: testReport.scenarios.length, passed, failed }
     };
-  },
+  }
 });
 
 /** Write generic and detailed compliance reports. */
@@ -261,31 +287,36 @@ const writeComplianceReports = (config: AddEditConfig): PipelineStep<AddEditCont
     const generators = addEditReportGenerators(config.specVersion ?? '2.0.0');
 
     // Adapt testReport into resourceReports shape for the detailed report serializer
-    const testReport = ctx.testReport as { scenarios: ReadonlyArray<unknown>; summary: { total: number; passed: number; failed: number; skipped?: number } };
+    const testReport = ctx.testReport as {
+      scenarios: ReadonlyArray<unknown>;
+      summary: { total: number; passed: number; failed: number; skipped?: number };
+    };
     const contextWithReports = {
       ...ctx,
-      resourceReports: [{
-        resource: ctx.resource,
-        summary: testReport.summary,
-        scenarios: testReport.scenarios,
-      }],
+      resourceReports: [
+        {
+          resource: ctx.resource,
+          summary: testReport.summary,
+          scenarios: testReport.scenarios
+        }
+      ]
     };
 
     const pipelineResult = {
-      status: testReport.summary.failed > 0 ? 'failed' as const : 'passed' as const,
+      status: testReport.summary.failed > 0 ? ('failed' as const) : ('passed' as const),
       endorsement: 'add-edit',
-      steps: ctx.pipelineSteps as ReadonlyArray<import('./types.js').StepResult> ?? [],
+      steps: (ctx.pipelineSteps as ReadonlyArray<import('./types.js').StepResult>) ?? [],
       context: contextWithReports,
-      duration: 0,
+      duration: 0
     };
 
     const written = await writeReports(pipelineResult, generators, ctx.outputPath, onProgress);
 
     return {
       context: { ...ctx, reports: written },
-      summary: `${written.length} reports written`,
+      summary: `${written.length} reports written`
     };
-  },
+  }
 });
 
 // ── Pipeline Assembly ──
@@ -310,35 +341,25 @@ export const createAddEditPipeline = (config: AddEditConfig) => {
     ...(needsSampling ? [sampleRecords(config)] : []),
     generatePayloads(config),
     runTests(config),
-    writeComplianceReports(config),
+    writeComplianceReports(config)
   ]);
 };
 
 /** Run Add/Edit compliance tests with a single function call. */
-export const runAddEditCompliance = async (
-  config: AddEditConfig,
-  onProgress?: (progress: import('./types.js').StepProgress) => void,
-) => {
+export const runAddEditCompliance = async (config: AddEditConfig, onProgress?: (progress: import('./types.js').StepProgress) => void) => {
   const pipeline = createAddEditPipeline(config);
   const outputPath = await prepareOutputDir('web-api-add-edit', config.specVersion ?? '2.0.0', config);
   const initialContext: AddEditContext = {
     serverUrl: config.server.url,
     resource: config.resource,
-    outputPath,
+    outputPath
   };
 
-  return pipeline.run(
-    initialContext,
-    onProgress,
-    { failFast: config.options?.failFast ?? false },
-  );
+  return pipeline.run(initialContext, onProgress, { failFast: config.options?.failFast ?? false });
 };
 
 /** Run Add/Edit compliance from a config file. Runs each config entry sequentially. */
-export const runAddEditFromConfigFile = async (
-  configPath: string,
-  onProgress?: (progress: import('./types.js').StepProgress) => void,
-) => {
+export const runAddEditFromConfigFile = async (configPath: string, onProgress?: (progress: import('./types.js').StepProgress) => void) => {
   const { loadConfigFile, configEntryToAddEdit } = await import('./config.js');
   const configFile = await loadConfigFile(configPath);
 

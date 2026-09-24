@@ -15,20 +15,22 @@
  */
 
 import { createRequire } from 'node:module';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
-import { inferMetadataReport, type ReferenceMap } from '../rcf/index.js';
-import { createDdSchemaValidator, type DdSchemaValidator } from './schema-command.js';
+import { type ReferenceMap, inferMetadataReport } from '../rcf/index.js';
 import { SUPPORTED_DD_VERSIONS, isSupportedDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
-import { computeVariationsViaService, isVariationsAuthError, type VariationsServiceReport } from '../variations/index.js';
-import { readRcfPayloads, type RcfPayload } from './rcf-input.js';
+import { type VariationsServiceReport, computeVariationsViaService, isVariationsAuthError } from '../variations/index.js';
+import { type RcfPayload, readRcfPayloads } from './rcf-input.js';
+import { type DdSchemaValidator, createDdSchemaValidator } from './schema-command.js';
 
 const requireCjs = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
 // getReferenceMetadata + buildMetadataMap are shared v2 utilities (reference DD metadata), not RCF inference.
 const { getReferenceMetadata } = requireCjs(resolve(here, '../etl/index.cjs')) as { getReferenceMetadata: (v: string) => unknown };
-const { buildMetadataMap } = requireCjs(resolve(here, '../legacy/common.js')) as { buildMetadataMap: (r: unknown) => { metadataMap: ReferenceMap } };
+const { buildMetadataMap } = requireCjs(resolve(here, '../legacy/common.js')) as {
+  buildMetadataMap: (r: unknown) => { metadataMap: ReferenceMap };
+};
 
 const DEFAULT_VERSION = '2.0';
 /** Records kept per resource for inference; availability is scored over ALL records regardless. */
@@ -72,7 +74,7 @@ export const processRcfStream = async (
     /** Maps a payload's resource (as ingested from its context, lowercase under the RCF rule) to the Data
      *  Dictionary resource name; the ingested form stands for a name the DD does not define. */
     readonly canonicalResource?: (resource: string) => string;
-  } = {},
+  } = {}
 ): Promise<RcfStreamResult> => {
   const recordsByResource: Record<string, unknown[]> = {};
   const availability: Record<string, MutableAvailability> = {};
@@ -99,7 +101,12 @@ export const processRcfStream = async (
       // version stand in. Forward the raw context so its shape and version are validated too. (Its resource
       // segment is what this command derives `resource` from, so on the rcf command a resource disagreement
       // cannot arise; that rule is exercised by callers that request a resource independently of the payload.)
-      errorMap = opts.validator.validate({ ...(payload.context !== undefined ? { '@reso.context': payload.context } : {}), value: records }, resource, opts.version ?? payload.version, errorMap);
+      errorMap = opts.validator.validate(
+        { ...(payload.context !== undefined ? { '@reso.context': payload.context } : {}), value: records },
+        resource,
+        opts.version ?? payload.version,
+        errorMap
+      );
       if (opts.strict && opts.validator.combine(errorMap).totalErrors > 0) {
         throw Object.assign(new Error(`Schema validation failed (strict) at ${payload.source}.`), { schemaFailure: true });
       }
@@ -136,7 +143,7 @@ export const processRcfStream = async (
     invalidContextRecords,
     version: opts.version ?? capturedVersion,
     schemaErrors: combined.totalErrors,
-    schemaReport: combined.report,
+    schemaReport: combined.report
   };
 };
 
@@ -144,7 +151,7 @@ export const processRcfStream = async (
 const buildDataAvailabilityReport = (
   availability: Record<string, AvailabilityResource>,
   version: string,
-  generatedOn: string,
+  generatedOn: string
 ): unknown => ({
   description: 'RESO Data Availability Report (inferred from RESO Common Format samples)',
   version,
@@ -158,9 +165,9 @@ const buildDataAvailabilityReport = (
       resourceName,
       fieldName,
       frequency,
-      availability: a.recordCount > 0 ? Number((frequency / a.recordCount).toFixed(4)) : 0,
-    })),
-  ),
+      availability: a.recordCount > 0 ? Number((frequency / a.recordCount).toFixed(4)) : 0
+    }))
+  )
 });
 
 /** Peek the first payload's DD version without draining the stream (used to build the DD schema/reference). */
@@ -241,7 +248,9 @@ export const runRcf = async (opts: {
   // context naming 3.0 or 2.00 passed the shape check and the run died on a null reference deep inside.
   const requested = opts.version ?? (await peekVersion(opts.input)) ?? DEFAULT_VERSION;
   if (!isSupportedDDVersion(requested)) {
-    throw new Error(`Unsupported Data Dictionary version "${requested}" (from ${opts.version ? '--version' : "the input's @reso.context"}); supported: ${SUPPORTED_DD_VERSIONS.join(', ')}`);
+    throw new Error(
+      `Unsupported Data Dictionary version "${requested}" (from ${opts.version ? '--version' : "the input's @reso.context"}); supported: ${SUPPORTED_DD_VERSIONS.join(', ')}`
+    );
   }
   const version = normalizeDDVersion(requested);
   const reference = getReferenceMetadata(version) as { readonly resources?: ReadonlyArray<string | { readonly resourceName: string }> };
@@ -249,7 +258,7 @@ export const runRcf = async (opts: {
   // DD resource names by their lowercase form: the context names the resource lowercase (#298), the reports
   // and reference lookups use the DD's own casing (OpenHouse, PropertyUnitTypes, OUID).
   const ddNames = new Map(
-    (reference.resources ?? []).map((r) => (typeof r === 'string' ? r : r.resourceName)).map((name) => [name.toLowerCase(), name] as const),
+    (reference.resources ?? []).map(r => (typeof r === 'string' ? r : r.resourceName)).map(name => [name.toLowerCase(), name] as const)
   );
   const canonicalResource = (resource: string): string => ddNames.get(resource.toLowerCase()) ?? resource;
 
@@ -263,7 +272,7 @@ export const runRcf = async (opts: {
         // which is kept only so existing `-a` invocations keep working.
         additionalProperties: true,
         validationConfig: opts.validationConfig,
-        acquisition: 'rcf',
+        acquisition: 'rcf'
       })
     : undefined;
 
@@ -272,14 +281,14 @@ export const runRcf = async (opts: {
     strict: opts.strict,
     sampleCap: opts.sampleCap,
     version,
-    canonicalResource,
+    canonicalResource
   });
 
   const metadataReport = inferMetadataReport({
     recordsByResource: stream.recordsByResource,
     referenceMap,
     version,
-    generatedOn: opts.generatedOn,
+    generatedOn: opts.generatedOn
   });
   const dataAvailabilityReport = buildDataAvailabilityReport(stream.availability, version, opts.generatedOn);
 
@@ -296,8 +305,8 @@ export const runRcf = async (opts: {
           version,
           ...(opts.fuzziness !== undefined ? { fuzziness: opts.fuzziness } : {}),
           fromCli: true,
-          ...(opts.bearerToken ? { bearerToken: opts.bearerToken } : {}),
-        }),
+          ...(opts.bearerToken ? { bearerToken: opts.bearerToken } : {})
+        })
       };
     } catch (err) {
       if (isVariationsAuthError(err)) throw err;
@@ -325,7 +334,7 @@ export const runRcf = async (opts: {
       fields: metadataReport.fields.length,
       lookups: metadataReport.lookups.length,
       schemaErrors: stream.schemaErrors,
-      ...(variationsTotal !== undefined ? { variationsTotal } : {}),
-    },
+      ...(variationsTotal !== undefined ? { variationsTotal } : {})
+    }
   };
 };

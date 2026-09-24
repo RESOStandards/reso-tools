@@ -4,7 +4,7 @@
  */
 
 import { parseCsdlXml, validateCsdl } from '@reso-standards/reso-metadata-utils';
-import { validateCsdlXml, detectODataVersion } from '../xsd/validate-csdl.js';
+import { detectODataVersion, validateCsdlXml } from '../xsd/validate-csdl.js';
 import type { ODataVersion, XsdValidationError } from '../xsd/validate-csdl.js';
 
 /** Combined metadata validation result. */
@@ -25,10 +25,7 @@ export interface MetadataValidationResult {
  * @param odataVersion - Optional OData version override.
  * @returns Combined validation result.
  */
-export const validateMetadata = async (
-  csdlXml: string,
-  odataVersion?: ODataVersion,
-): Promise<MetadataValidationResult> => {
+export const validateMetadata = async (csdlXml: string, odataVersion?: ODataVersion): Promise<MetadataValidationResult> => {
   const detectedVersion = odataVersion ?? detectODataVersion(csdlXml) ?? '4.0';
 
   // XSD structural validation
@@ -44,7 +41,7 @@ export const validateMetadata = async (
     semanticValid: semanticResult.valid,
     odataVersion: detectedVersion,
     xsdErrors: xsdResult.errors,
-    semanticErrors: semanticResult.errors,
+    semanticErrors: semanticResult.errors
   };
 };
 
@@ -62,5 +59,5 @@ export const formatValidationSummary = (result: MetadataValidationResult): strin
  */
 export const collectValidationErrors = (result: MetadataValidationResult): ReadonlyArray<string> => [
   ...result.xsdErrors.map(e => `[XSD] ${e.message}${e.line ? ` (line ${e.line})` : ''}`),
-  ...result.semanticErrors.map(e => `[${e.path}] ${e.message}${e.specUrl ? ` — ${e.specUrl}` : ''}`),
+  ...result.semanticErrors.map(e => `[${e.path}] ${e.message}${e.specUrl ? ` — ${e.specUrl}` : ''}`)
 ];

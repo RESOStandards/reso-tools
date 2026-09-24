@@ -16,10 +16,7 @@ export const escapeCsvField = (value: string | undefined | null): string => {
   return `"${s.replace(/"/g, '""')}"`;
 };
 
-export const rowsToCsv = (
-  headers: ReadonlyArray<string>,
-  rows: ReadonlyArray<ReadonlyArray<string | undefined | null>>
-): string => {
+export const rowsToCsv = (headers: ReadonlyArray<string>, rows: ReadonlyArray<ReadonlyArray<string | undefined | null>>): string => {
   const headerLine = headers.map(escapeCsvField).join(',');
   const dataLines = rows.map(row => row.map(escapeCsvField).join(','));
   return [headerLine, ...dataLines].join('\n');

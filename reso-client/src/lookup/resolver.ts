@@ -51,7 +51,7 @@ const fetchFromLookupResource = async (
   fetchFn: (url: string, init?: RequestInit) => Promise<Response>
 ): Promise<ReadonlyArray<LookupValue>> => {
   const headers: Record<string, string> = { Accept: 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const filter = encodeURIComponent(`LookupName eq '${lookupName}'`);
   const url = `${baseUrl.replace(/\/$/, '')}/Lookup?$filter=${filter}&$orderby=LookupValue asc&$top=1000`;
@@ -79,9 +79,9 @@ const fetchBatchFromLookupResource = async (
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
-    Prefer: `odata.maxpagesize=${maxPageSize}`,
+    Prefer: `odata.maxpagesize=${maxPageSize}`
   };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const nameList = lookupNames.map(n => `'${n}'`).join(',');
   const filter = encodeURIComponent(`LookupName in (${nameList})`);
@@ -117,10 +117,7 @@ const fetchBatchFromLookupResource = async (
  * Resolve the entity type for a resource (entity set), walking the
  * inheritance chain to collect all properties.
  */
-const resolveEntityType = (
-  resourceName: string,
-  schema: CsdlSchema
-): CsdlEntityType | undefined => {
+const resolveEntityType = (resourceName: string, schema: CsdlSchema): CsdlEntityType | undefined => {
   if (!schema.entityContainer) return undefined;
 
   const entitySet = schema.entityContainer.entitySets.find(es => es.name === resourceName);
@@ -134,9 +131,7 @@ const resolveEntityType = (
  * For each property in an entity type, determine whether it's a lookup field
  * and what its lookup name is. Returns pairs of [fieldName, lookupName].
  */
-const resolveLookupFields = (
-  entityType: CsdlEntityType
-): ReadonlyArray<readonly [string, string]> =>
+const resolveLookupFields = (entityType: CsdlEntityType): ReadonlyArray<readonly [string, string]> =>
   entityType.properties
     .map(prop => {
       // Check for RESO LookupName annotation first
@@ -165,9 +160,7 @@ export const createLookupResolver = (config: LookupResolverConfig): LookupResolv
   const fetchFn = config.fetchFn ?? globalThis.fetch.bind(globalThis);
 
   // Pre-index CSDL enum types by name
-  const enumMap = new Map(
-    schema.enumTypes.map(et => [et.name, et])
-  );
+  const enumMap = new Map(schema.enumTypes.map(et => [et.name, et]));
 
   // Detect whether a Lookup entity set exists
   const hasLookupResource = schema.entityContainer?.entitySets.some(es => es.name === 'Lookup') ?? false;
@@ -201,9 +194,7 @@ export const createLookupResolver = (config: LookupResolverConfig): LookupResolv
     return values;
   };
 
-  const resolveLookupsBatch = async (
-    lookupNames: ReadonlyArray<string>
-  ): Promise<Readonly<Record<string, ReadonlyArray<LookupValue>>>> => {
+  const resolveLookupsBatch = async (lookupNames: ReadonlyArray<string>): Promise<Readonly<Record<string, ReadonlyArray<LookupValue>>>> => {
     if (lookupNames.length === 0) return {};
 
     const uncachedNames = lookupNames.filter(name => !cache.has(name));
@@ -222,7 +213,7 @@ export const createLookupResolver = (config: LookupResolverConfig): LookupResolv
 
     // Resolve each name — cache hits for batch-fetched, CSDL enum fallback for the rest
     const entries = await Promise.all(
-      lookupNames.map(async (name) => {
+      lookupNames.map(async name => {
         const values = await resolveLookups(name);
         return [name, values] as const;
       })
@@ -231,9 +222,7 @@ export const createLookupResolver = (config: LookupResolverConfig): LookupResolv
     return Object.fromEntries(entries.filter(([, values]) => values.length > 0));
   };
 
-  const resolveLookupsForResource = async (
-    resourceName: string
-  ): Promise<Readonly<Record<string, ReadonlyArray<LookupValue>>>> => {
+  const resolveLookupsForResource = async (resourceName: string): Promise<Readonly<Record<string, ReadonlyArray<LookupValue>>>> => {
     const entityType = resolveEntityType(resourceName, schema);
     if (!entityType) return {};
 

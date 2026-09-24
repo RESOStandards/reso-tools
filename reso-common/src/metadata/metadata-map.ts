@@ -14,7 +14,7 @@
  * but the `numComplexTypes` stat counts only the *raw* incoming flag (a legacy quirk, preserved).
  */
 
-import type { ResoField, ResoLookup, ResoAnnotation } from './model.js';
+import type { ResoAnnotation, ResoField, ResoLookup } from './model.js';
 
 const ANNOTATION_STANDARD_NAME = 'RESO.OData.Metadata.StandardName';
 const ANNOTATION_DD_WIKI_URL = 'RESO.DDWikiUrl';
@@ -23,8 +23,7 @@ const ANNOTATION_DD_WIKI_URL = 'RESO.DDWikiUrl';
 const isStringEnumeration = (type?: string): boolean => !!type && type.includes('Edm.String');
 
 /** Simple lookup name from a (possibly qualified) type — 'PropertyEnums.Status' → 'Status'. */
-const parseLookupName = (lookupName: string): string =>
-  lookupName.substring(lookupName.lastIndexOf('.') + 1);
+const parseLookupName = (lookupName: string): string => lookupName.substring(lookupName.lastIndexOf('.') + 1);
 
 /** The report-field shape `buildMetadataMap` consumes — a `ResoField` plus the optional
  *  `isComplexType` flag the serializer may carry. */
@@ -92,56 +91,51 @@ interface CollectedLookup {
   readonly isStringEnumeration?: boolean;
 }
 
-const extractAnnotations = (
-  annotations: ReadonlyArray<ResoAnnotation> = [],
-): { lookupValue?: string; ddWikiUrl?: string } =>
+const extractAnnotations = (annotations: ReadonlyArray<ResoAnnotation> = []): { lookupValue?: string; ddWikiUrl?: string } =>
   annotations.reduce<{ lookupValue?: string; ddWikiUrl?: string }>((acc, { term, value }) => {
     if (term === ANNOTATION_STANDARD_NAME) acc.lookupValue = value;
     if (term === ANNOTATION_DD_WIKI_URL) acc.ddWikiUrl = value;
     return acc;
   }, {});
 
-const isSampleSentinel = (value?: string): boolean =>
-  !!value && value.startsWith('Sample') && value.endsWith('EnumValue');
+const isSampleSentinel = (value?: string): boolean => !!value && value.startsWith('Sample') && value.endsWith('EnumValue');
 
 /**
  * Build the standard metadata map (and stats) from a metadata report. The map is the structure the
  * variations matcher walks: `map[resourceName][fieldName]` carries the field's flags plus, for
  * lookup fields, `lookupValues` (display-name keyed) and `legacyODataValues` (wire-form keyed).
  */
-export const buildMetadataMap = (
-  { fields = [], lookups = [] }: MetadataMapInput = {},
-): { metadataMap: MetadataMap; stats: MetadataMapStats } => {
+export const buildMetadataMap = ({
+  fields = [],
+  lookups = []
+}: MetadataMapInput = {}): { metadataMap: MetadataMap; stats: MetadataMapStats } => {
   const stats: MetadataMapStats = {
     numResources: 0,
     numFields: 0,
     numLookups: 0,
     numExpansions: 0,
-    numComplexTypes: 0,
+    numComplexTypes: 0
   };
 
-  const lookupMap = lookups.reduce<Record<string, CollectedLookup[]>>(
-    (acc, { lookupName, lookupValue, type, annotations = [] }) => {
-      (acc[lookupName] ??= []);
+  const lookupMap = lookups.reduce<Record<string, CollectedLookup[]>>((acc, { lookupName, lookupValue, type, annotations = [] }) => {
+    acc[lookupName] ??= [];
 
-      const { lookupValue: annotatedLookupValue, ddWikiUrl } = extractAnnotations(annotations);
+    const { lookupValue: annotatedLookupValue, ddWikiUrl } = extractAnnotations(annotations);
 
-      // Open-enum sample sentinels (Sample{Name}EnumValue) are reference scaffolding — never a real
-      // standard value; skip them so they never enter the map.
-      if (isSampleSentinel(lookupValue) || isSampleSentinel(annotatedLookupValue)) return acc;
+    // Open-enum sample sentinels (Sample{Name}EnumValue) are reference scaffolding — never a real
+    // standard value; skip them so they never enter the map.
+    if (isSampleSentinel(lookupValue) || isSampleSentinel(annotatedLookupValue)) return acc;
 
-      if (isStringEnumeration(type)) {
-        // String + Lookup Resource: the standard value is the annotated (display) value.
-        acc[lookupName].push({ lookupValue, standardLookupValue: annotatedLookupValue, ddWikiUrl, isStringEnumeration: true });
-      } else {
-        acc[lookupName].push({ lookupValue: annotatedLookupValue, legacyODataValue: lookupValue, ddWikiUrl });
-      }
+    if (isStringEnumeration(type)) {
+      // String + Lookup Resource: the standard value is the annotated (display) value.
+      acc[lookupName].push({ lookupValue, standardLookupValue: annotatedLookupValue, ddWikiUrl, isStringEnumeration: true });
+    } else {
+      acc[lookupName].push({ lookupValue: annotatedLookupValue, legacyODataValue: lookupValue, ddWikiUrl });
+    }
 
-      stats.numLookups++;
-      return acc;
-    },
-    {},
-  );
+    stats.numLookups++;
+    return acc;
+  }, {});
 
   const metadataMap = fields.reduce<MetadataMap>((acc, field) => {
     const {
@@ -153,7 +147,7 @@ export const buildMetadataMap = (
       annotations = [],
       typeName = '',
       nullable = true,
-      isCollection = false,
+      isCollection = false
     } = field;
 
     if (!acc[resourceName]) {
@@ -172,7 +166,7 @@ export const buildMetadataMap = (
       isCollection,
       isLookupField,
       isComplexType: isComplexType || (!isExpansion && !type.startsWith('Edm.') && !isLookupField),
-      ddWikiUrl,
+      ddWikiUrl
     };
     acc[resourceName][fieldName] = entry;
 
@@ -181,14 +175,27 @@ export const buildMetadataMap = (
       entry.legacyODataValues ??= {};
       const lookupName = parseLookupName(type);
 
-      for (const { lookupValue, standardLookupValue, legacyODataValue, ddWikiUrl: lvWikiUrl, isStringEnumeration: lvIsStringEnum } of lookupMap[type]) {
+      for (const {
+        lookupValue,
+        standardLookupValue,
+        legacyODataValue,
+        ddWikiUrl: lvWikiUrl,
+        isStringEnumeration: lvIsStringEnum
+      } of lookupMap[type]) {
         // skip legacyOData matching when using string enumerations
         if (!lvIsStringEnum && legacyODataValue && legacyODataValue.length) {
           entry.legacyODataValues[legacyODataValue] = { type, lookupName, lookupValue, legacyODataValue, ddWikiUrl: lvWikiUrl };
         }
 
-        if (lookupValue && lookupValue.length) {
-          const value: MetadataMapLookupValue = { type, lookupName, lookupValue, legacyODataValue, ddWikiUrl: lvWikiUrl, isStringEnumeration: lvIsStringEnum };
+        if (lookupValue?.length) {
+          const value: MetadataMapLookupValue = {
+            type,
+            lookupName,
+            lookupValue,
+            legacyODataValue,
+            ddWikiUrl: lvWikiUrl,
+            isStringEnumeration: lvIsStringEnum
+          };
           if (standardLookupValue) (value as { standardLookupValue?: string }).standardLookupValue = standardLookupValue;
           entry.lookupValues[lookupValue] = value;
         }

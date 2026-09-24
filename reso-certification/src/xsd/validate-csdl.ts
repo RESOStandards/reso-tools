@@ -67,7 +67,7 @@ const getValidator = async (): Promise<XsdValidatorModule> => {
   // tolerate raw paths, but pathToFileURL is the spec-compliant form
   // and works on all three platforms.
   const validatorPath = join(__dirname, '..', '..', 'xsd-validator', 'index.js');
-  validatorModule = await import(pathToFileURL(validatorPath).href) as XsdValidatorModule;
+  validatorModule = (await import(pathToFileURL(validatorPath).href)) as XsdValidatorModule;
   return validatorModule;
 };
 
@@ -87,7 +87,13 @@ export const validateCsdlXml = async (csdlXml: string, version?: ODataVersion): 
     return {
       valid: false,
       odataVersion: '4.0',
-      errors: [{ message: 'Cannot determine OData version from CSDL document. Expected Version="4.0" or "4.01" on the root Edmx element.', line: null, column: null }],
+      errors: [
+        {
+          message: 'Cannot determine OData version from CSDL document. Expected Version="4.0" or "4.01" on the root Edmx element.',
+          line: null,
+          column: null
+        }
+      ]
     };
   }
 

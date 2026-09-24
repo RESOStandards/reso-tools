@@ -30,9 +30,7 @@ export interface FetchMetadataReportFromServerInput {
  * serialized (`generateMetadataReport`). No temporary file is written — the
  * report is returned for a caller (e.g. the variations step) to consume directly.
  */
-export const fetchMetadataReportFromServer = async (
-  input: FetchMetadataReportFromServerInput,
-): Promise<MetadataReport> => {
+export const fetchMetadataReportFromServer = async (input: FetchMetadataReportFromServerInput): Promise<MetadataReport> => {
   const { xml } = await fetchMetadataWithVersion(input.url, input.bearerToken);
   return generateMetadataReport(xml, input.version);
 };

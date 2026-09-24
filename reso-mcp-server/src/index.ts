@@ -14,8 +14,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { toolsForScope, type ToolScope } from './tools.js';
 import { handlers } from './handlers.js';
+import { type ToolScope, toolsForScope } from './tools.js';
 
 /** Parse CLI args for --scope flag. */
 const parseScope = (): ToolScope => {
@@ -30,27 +30,25 @@ const parseScope = (): ToolScope => {
 /** Convert a JSON Schema property definition to a Zod schema. */
 const jsonPropToZod = (prop: Record<string, unknown>): z.ZodTypeAny => {
   switch (prop.type) {
-    case 'string': return prop.enum
-      ? z.enum(prop.enum as [string, ...string[]])
-      : z.string().describe(String(prop.description ?? ''));
+    case 'string':
+      return prop.enum ? z.enum(prop.enum as [string, ...string[]]) : z.string().describe(String(prop.description ?? ''));
     // TODO(v0.8): revisit string-coerced numbers/booleans. Using z.coerce here so that
     // MCP harnesses that send all tool args as strings (e.g. XML-text parameter forms)
     // don't trip strict number/boolean validation. Strict validation would be cleaner
     // but requires the harness side to honor JSON Schema types.
-    case 'number': return z.coerce.number().describe(String(prop.description ?? ''));
-    case 'boolean': return z.coerce.boolean().describe(String(prop.description ?? ''));
+    case 'number':
+      return z.coerce.number().describe(String(prop.description ?? ''));
+    case 'boolean':
+      return z.coerce.boolean().describe(String(prop.description ?? ''));
     // TODO(v0.8): see number/boolean note above. Same harness-coercion situation
     // applies to object/array — XML-text harnesses serialize structured args as
     // JSON strings. We accept either form and parse on the way in.
-    case 'object': return z.preprocess(
-      v => (typeof v === 'string' ? JSON.parse(v) : v),
-      z.record(z.unknown()),
-    ).describe(String(prop.description ?? ''));
-    case 'array': return z.preprocess(
-      v => (typeof v === 'string' ? JSON.parse(v) : v),
-      z.array(z.string()),
-    ).describe(String(prop.description ?? ''));
-    default: return z.unknown();
+    case 'object':
+      return z.preprocess(v => (typeof v === 'string' ? JSON.parse(v) : v), z.record(z.unknown())).describe(String(prop.description ?? ''));
+    case 'array':
+      return z.preprocess(v => (typeof v === 'string' ? JSON.parse(v) : v), z.array(z.string())).describe(String(prop.description ?? ''));
+    default:
+      return z.unknown();
   }
 };
 
@@ -73,7 +71,7 @@ const tools = toolsForScope(scope);
 
 const server = new McpServer({
   name: 'reso-mcp-server',
-  version: '0.8.0',
+  version: '0.8.0'
 });
 
 // Register each tool with its Zod schema
@@ -85,14 +83,14 @@ for (const tool of tools) {
     {
       description: tool.description,
       inputSchema: zodShape,
-      ...(tool.annotations ? { annotations: tool.annotations } : {}),
+      ...(tool.annotations ? { annotations: tool.annotations } : {})
     },
-    async (args) => {
+    async args => {
       const handler = handlers[tool.name];
       if (!handler) {
         return {
           content: [{ type: 'text' as const, text: `Unknown tool: ${tool.name}` }],
-          isError: true,
+          isError: true
         };
       }
 
@@ -101,10 +99,10 @@ for (const tool of tools) {
       } catch (err) {
         return {
           content: [{ type: 'text' as const, text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
-          isError: true,
+          isError: true
         };
       }
-    },
+    }
   );
 }
 

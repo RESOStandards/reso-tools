@@ -30,7 +30,7 @@ export interface GovernorDeps {
 
 const realDeps: GovernorDeps = {
   now: () => Date.now(),
-  sleep: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+  sleep: (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 };
 
 export interface Governor {
@@ -48,16 +48,13 @@ interface Bucket {
 const deferred = (): { promise: Promise<void>; resolve: () => void } => {
   // The executor runs synchronously, so `resolve` is assigned before this returns.
   let resolve: () => void = () => undefined;
-  const promise = new Promise<void>((res) => {
+  const promise = new Promise<void>(res => {
     resolve = res;
   });
   return { promise, resolve };
 };
 
-export const createGovernor = (
-  config: GovernorConfig = DEFAULT_GOVERNOR,
-  deps: GovernorDeps = realDeps
-): Governor => {
+export const createGovernor = (config: GovernorConfig = DEFAULT_GOVERNOR, deps: GovernorDeps = realDeps): Governor => {
   const buckets = new Map<string, Bucket>();
 
   const bucketFor = (key: string): Bucket => {

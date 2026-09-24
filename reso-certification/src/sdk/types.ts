@@ -108,8 +108,10 @@ export interface StepOutput<TContext extends PipelineContext = PipelineContext> 
  * A single test function within a step.
  * Takes accumulated context and returns step output with updated context.
  */
-export type TestFunction<TContext extends PipelineContext = PipelineContext> =
-  (context: Readonly<TContext>, onProgress: ProgressCallback) => Promise<StepOutput<TContext>>;
+export type TestFunction<TContext extends PipelineContext = PipelineContext> = (
+  context: Readonly<TContext>,
+  onProgress: ProgressCallback
+) => Promise<StepOutput<TContext>>;
 
 /** Execution mode for test functions within a step. */
 export type StepMode = 'sequential' | 'parallel';

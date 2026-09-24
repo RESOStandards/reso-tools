@@ -5,21 +5,26 @@
  * pipeline pattern as Add/Edit and EntityEvent.
  */
 
-import { resolveAuthToken } from '../test-runner/auth.js';
-import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, getEntityType, persistMetadataXml } from '../test-runner/metadata.js';
-import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
-import { buildStandardMap, createLookupCache, resolveTestParams, WELL_KNOWN_RESOURCES, NO_RECORDS_SAMPLED } from '../web-api-core/index.js';
-import { runCoreResourceScenarios, runProviderScenarios, summarizeScenarios, type ResourceTestReport } from '../web-api-core/test-runner.js';
-import { resolveNoRecordsOutcome, resolveServingDecision } from '../web-api-core/serving.js';
-import { createExpandSchemaValidator, isEnumerationIgnored, loadValidationConfig } from './expand-schema.js';
-import { FETCH_METADATA, RUN_CORE_SCENARIOS } from './step-names.js';
-import { coerceCoreVersion, isCore21OrLater } from './core-versions.js';
-import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import { isDeadlineError, runSettled } from '@reso-standards/reso-client';
-import { createCertSession, createSessionRequester, type ODataRequester } from '../test-runner/requester.js';
-import type { BaseTestContext, CoreConfig, PipelineStep, StepResult } from './types.js';
+import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
+import { resolveAuthToken } from '../test-runner/auth.js';
+import { fetchMetadata, getEntityType, loadMetadataFromFile, parseMetadataXml, persistMetadataXml } from '../test-runner/metadata.js';
+import { type ODataRequester, createCertSession, createSessionRequester } from '../test-runner/requester.js';
+import { NO_RECORDS_SAMPLED, WELL_KNOWN_RESOURCES, buildStandardMap, createLookupCache, resolveTestParams } from '../web-api-core/index.js';
+import { resolveNoRecordsOutcome, resolveServingDecision } from '../web-api-core/serving.js';
+import {
+  type ResourceTestReport,
+  runCoreResourceScenarios,
+  runProviderScenarios,
+  summarizeScenarios
+} from '../web-api-core/test-runner.js';
+import { coerceCoreVersion, isCore21OrLater } from './core-versions.js';
+import { createExpandSchemaValidator, isEnumerationIgnored, loadValidationConfig } from './expand-schema.js';
+import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
-import { coreReportGenerators, writeReports, prepareOutputDir } from './reports.js';
+import { coreReportGenerators, prepareOutputDir, writeReports } from './reports.js';
+import { FETCH_METADATA, RUN_CORE_SCENARIOS } from './step-names.js';
+import type { BaseTestContext, CoreConfig, PipelineStep, StepResult } from './types.js';
 
 // ── Pipeline Context ──
 
@@ -38,9 +43,7 @@ const serviceCheck: PipelineStep<CoreContext> = {
   name: 'Service check',
   run: async (ctx, onProgress) => {
     const url = ctx.serverUrl;
-    const headers: Record<string, string> = ctx.authToken
-      ? { Authorization: `Bearer ${ctx.authToken}` }
-      : {};
+    const headers: Record<string, string> = ctx.authToken ? { Authorization: `Bearer ${ctx.authToken}` } : {};
     const maxAttempts = 10;
     for (let i = 0; i < maxAttempts; i++) {
       try {
@@ -48,20 +51,27 @@ const serviceCheck: PipelineStep<CoreContext> = {
         if (response.ok) {
           return { context: ctx, summary: 'OData service is ready', requestDetails: [{ method: 'GET', url }] };
         }
-      } catch { /* network error — retry */ }
+      } catch {
+        /* network error — retry */
+      }
       await new Promise(resolve => setTimeout(resolve, 2000));
       onProgress({ step: 'Service check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
     }
-    return { context: ctx, status: 'failed', errors: ['OData service did not respond'], requestDetails: [{ method: 'GET', url, error: `No response after ${maxAttempts} attempts` }] };
-  },
+    return {
+      context: ctx,
+      status: 'failed',
+      errors: ['OData service did not respond'],
+      requestDetails: [{ method: 'GET', url, error: `No response after ${maxAttempts} attempts` }]
+    };
+  }
 };
 
 const resolveAuth = (config: CoreConfig): PipelineStep<CoreContext> => ({
   name: 'Resolve authentication',
-  run: async (ctx) => {
+  run: async ctx => {
     const authToken = await resolveAuthToken(config.server.auth);
-    return { context: { ...ctx, authToken }, summary: `Auth credentials present` };
-  },
+    return { context: { ...ctx, authToken }, summary: 'Auth credentials present' };
+  }
 });
 
 const fetchAndParseMetadata = (config: CoreConfig): PipelineStep<CoreContext> => ({
@@ -89,7 +99,7 @@ const fetchAndParseMetadata = (config: CoreConfig): PipelineStep<CoreContext> =>
 
     const allErrors = [
       ...validationErrors,
-      ...(missingResources.length > 0 ? [`Resources not found in metadata: ${missingResources.join(', ')}`] : []),
+      ...(missingResources.length > 0 ? [`Resources not found in metadata: ${missingResources.join(', ')}`] : [])
     ];
 
     return {
@@ -97,9 +107,9 @@ const fetchAndParseMetadata = (config: CoreConfig): PipelineStep<CoreContext> =>
       summary: `Parsed metadata: ${metadata.entityTypes.length} entity types, ${availableResources.length}/${ctx.resources.length} resources available. ${formatValidationSummary(validation)}`,
       counts: { entityTypes: metadata.entityTypes.length, resources: availableResources.length },
       ...(allErrors.length > 0 ? { errors: allErrors } : {}),
-      ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {}),
+      ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {})
     };
-  },
+  }
 });
 
 /**
@@ -120,11 +130,11 @@ export const skippedResourceReport = (resource: string, error: unknown): Resourc
         passed: false,
         skipped: true,
         assertions: [],
-        duration: 0,
-      },
+        duration: 0
+      }
     ],
     coverage: [],
-    summary: { total: 1, passed: 0, failed: 0, skipped: 1, optional: { passed: 0, notSupported: 0, notTested: 0 } },
+    summary: { total: 1, passed: 0, failed: 0, skipped: 1, optional: { passed: 0, notSupported: 0, notTested: 0 } }
   };
 };
 
@@ -143,20 +153,27 @@ export const deadlineResourceReport = (resource: string): ResourceTestReport => 
       passed: true,
       skipped: true,
       assertions: [{ passed: true, message: 'Not tested — run deadline reached' }],
-      duration: 0,
-    },
+      duration: 0
+    }
   ],
   coverage: [],
   summary: { total: 1, passed: 0, failed: 0, skipped: 1, optional: { passed: 0, notSupported: 0, notTested: 0 } },
-  deadlineReached: true,
+  deadlineReached: true
 });
 
 /** The synthetic resource label under which the once-per-provider structural scenarios are reported. */
 export const PROVIDER_WIDE_LABEL = 'Service (provider-wide)';
 
 /** A minimal params stub for a report that never sampled (masked / provider-wide). */
-const stubParams = (resource: string): ResourceTestReport['params'] =>
-  ({ resource, keyField: '', keyValue: '', enumMode: 'string', integerValueHigh: 0, skippedTypes: [], sampleComplete: false });
+const stubParams = (resource: string): ResourceTestReport['params'] => ({
+  resource,
+  keyField: '',
+  keyValue: '',
+  enumMode: 'string',
+  integerValueHigh: 0,
+  skippedTypes: [],
+  sampleComplete: false
+});
 
 /**
  * A REQUIRED resource (Property/Member/Office/Field/Lookup) that is determinately declared-but-not-served at
@@ -173,12 +190,17 @@ export const requiredResourceNotServedReport = (resource: string): ResourceTestR
       name: `${resource} is declared in $metadata but not served as a top-level resource`,
       passed: false,
       skipped: false,
-      assertions: [{ passed: false, message: `Required resource not served top level — ${resource} is declared in the metadata but is absent from both the service document and the served EntitySets, so it cannot be queried at the top level` }],
-      duration: 0,
-    },
+      assertions: [
+        {
+          passed: false,
+          message: `Required resource not served top level — ${resource} is declared in the metadata but is absent from both the service document and the served EntitySets, so it cannot be queried at the top level`
+        }
+      ],
+      duration: 0
+    }
   ],
   coverage: [],
-  summary: { total: 1, passed: 0, failed: 1, skipped: 0, optional: { passed: 0, notSupported: 0, notTested: 0 } },
+  summary: { total: 1, passed: 0, failed: 1, skipped: 0, optional: { passed: 0, notSupported: 0, notTested: 0 } }
 });
 
 /**
@@ -196,12 +218,17 @@ export const notServedNotApplicableReport = (resource: string): ResourceTestRepo
       name: `${resource} declared but not served at the top level — Not Applicable`,
       passed: true,
       skipped: true,
-      assertions: [{ passed: true, message: `Not Applicable — ${resource} is declared in the metadata but not served as a top-level resource; per the Core 2.1.0 carve-out this is permitted (it may be available only via $expand)` }],
-      duration: 0,
-    },
+      assertions: [
+        {
+          passed: true,
+          message: `Not Applicable — ${resource} is declared in the metadata but not served as a top-level resource; per the Core 2.1.0 carve-out this is permitted (it may be available only via $expand)`
+        }
+      ],
+      duration: 0
+    }
   ],
   coverage: [],
-  summary: { total: 1, passed: 0, failed: 0, skipped: 1, optional: { passed: 0, notSupported: 0, notTested: 0 } },
+  summary: { total: 1, passed: 0, failed: 0, skipped: 1, optional: { passed: 0, notSupported: 0, notTested: 0 } }
 });
 
 /**
@@ -218,11 +245,7 @@ export const coreVerdict = (args: {
   readonly coverageFailed: boolean;
   readonly deadlineReached: boolean;
 }): 'passed' | 'failed' | 'incomplete' =>
-  args.totalFailed > 0 || args.coverageFailed
-    ? 'failed'
-    : args.deadlineReached
-      ? 'incomplete'
-      : 'passed';
+  args.totalFailed > 0 || args.coverageFailed ? 'failed' : args.deadlineReached ? 'incomplete' : 'passed';
 
 /**
  * The report's HEADLINE outcome — coreVerdict plus the "the run did not complete cleanly"
@@ -257,7 +280,9 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // step already reported the real failure), fail cleanly instead of parsing `undefined` and surfacing a raw
     // "Cannot read properties of undefined (reading 'toString')" from the XML parser.
     if (!ctx.metadataXml) {
-      throw new Error('metadata unavailable — the server did not return a valid $metadata document (see the Fetch metadata failure above); cannot run Core scenarios');
+      throw new Error(
+        'metadata unavailable — the server did not return a valid $metadata document (see the Fetch metadata failure above); cannot run Core scenarios'
+      );
     }
     const metadata = parseMetadataXml(ctx.metadataXml);
     const version = ctx.version;
@@ -271,11 +296,10 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // from each resource's sampled `lookupNameByField` as params resolve below — never a module-level global.
     const lookupNamesByResource = new Map<string, Readonly<Record<string, string>>>();
     const lookupCache = createLookupCache({
-      lookupNameFor: (resource, field) => lookupNamesByResource.get(resource)?.[field],
+      lookupNameFor: (resource, field) => lookupNamesByResource.get(resource)?.[field]
     });
     const validationConfig = await loadValidationConfig();
-    const isEnumIgnored = (resource: string, field: string): boolean =>
-      isEnumerationIgnored(validationConfig, version, resource, field);
+    const isEnumIgnored = (resource: string, field: string): boolean => isEnumerationIgnored(validationConfig, version, resource, field);
     // One resilience session shared across the whole run (see createCertSession for the full
     // rationale): cert retries only 429/503 (twice), records every other response and moves on,
     // with no breaker or pacing and a 15-min per-request timeout. A total run budget bounds the
@@ -286,10 +310,15 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // it (dimmed) as the "currently testing" line. Report-only; the request itself is unchanged.
     const baseRequester = createSessionRequester(session);
     const requester: ODataRequester = {
-      request: (options) => {
-        onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: '', detail: { kind: 'core-progress', event: 'request', method: options.method, url: options.url } });
+      request: options => {
+        onProgress({
+          step: RUN_CORE_SCENARIOS,
+          status: 'running',
+          message: '',
+          detail: { kind: 'core-progress', event: 'request', method: options.method, url: options.url }
+        });
         return baseRequester.request(options);
-      },
+      }
     };
 
     // Core 2.1.0 $expand is GATING and schema-validates each expanded child item against its target entity
@@ -302,7 +331,11 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         const metadataReport = generateMetadataReport(ctx.metadataXml!, version);
         return await createExpandSchemaValidator({ metadataReport, version });
       } catch (err) {
-        onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `$expand schema validation unavailable — ${err instanceof Error ? err.message : String(err)}` });
+        onProgress({
+          step: RUN_CORE_SCENARIOS,
+          status: 'running',
+          message: `$expand schema validation unavailable — ${err instanceof Error ? err.message : String(err)}`
+        });
         return undefined;
       }
     };
@@ -322,11 +355,23 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
       step: RUN_CORE_SCENARIOS,
       status: 'running',
       message: `${PROVIDER_WIDE_LABEL}: ${providerSummary.passed} passed, ${providerSummary.failed} failed, ${providerSummary.skipped} skipped`,
-      detail: { kind: 'core-progress', event: 'phase', resource: PROVIDER_WIDE_LABEL, phase: 'done', outcome: providerSummary.failed > 0 ? 'failed' : 'passed', counts: providerSummary },
+      detail: {
+        kind: 'core-progress',
+        event: 'phase',
+        resource: PROVIDER_WIDE_LABEL,
+        phase: 'done',
+        outcome: providerSummary.failed > 0 ? 'failed' : 'passed',
+        counts: providerSummary
+      }
     });
 
     // Seed the interactive per-resource view — every resource starts queued.
-    onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `Testing ${ctx.resources.length} resource(s)...`, detail: { kind: 'core-progress', event: 'init', resources: ctx.resources } });
+    onProgress({
+      step: RUN_CORE_SCENARIOS,
+      status: 'running',
+      message: `Testing ${ctx.resources.length} resource(s)...`,
+      detail: { kind: 'core-progress', event: 'init', resources: ctx.resources }
+    });
 
     // Continue-on-error across resources: one bad resource (e.g. a sampling network
     // failure) is captured and the run keeps going, so a walk-away run still yields a
@@ -344,14 +389,31 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           entityType,
           version,
           servedEntitySets: provider.servedEntitySets,
-          declaredEntitySets: metadata.entitySets,
+          declaredEntitySets: metadata.entitySets
         });
         if (decision === 'fail') {
-          onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `${resource}: required resource declared but not served top level — one clean failure`, detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'failed', note: 'declared but not served' } });
+          onProgress({
+            step: RUN_CORE_SCENARIOS,
+            status: 'running',
+            message: `${resource}: required resource declared but not served top level — one clean failure`,
+            detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'failed', note: 'declared but not served' }
+          });
           return requiredResourceNotServedReport(resource);
         }
         if (decision === 'na') {
-          onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `${resource}: declared but not served top level — Not Applicable (may be expansion-only)`, detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'not-applicable', note: 'not served (expansion-only)' } });
+          onProgress({
+            step: RUN_CORE_SCENARIOS,
+            status: 'running',
+            message: `${resource}: declared but not served top level — Not Applicable (may be expansion-only)`,
+            detail: {
+              kind: 'core-progress',
+              event: 'phase',
+              resource,
+              phase: 'done',
+              outcome: 'not-applicable',
+              note: 'not served (expansion-only)'
+            }
+          });
           return notServedNotApplicableReport(resource);
         }
 
@@ -359,10 +421,10 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           step: RUN_CORE_SCENARIOS,
           status: 'running',
           message: `Sampling ${resource}...`,
-          detail: { kind: 'core-progress', event: 'phase', resource, phase: 'sampling' },
+          detail: { kind: 'core-progress', event: 'phase', resource, phase: 'sampling' }
         });
 
-        const enumModeOverride = ctx.enumMode !== 'auto' ? ctx.enumMode as import('../web-api-core/sampling.js').EnumMode : undefined;
+        const enumModeOverride = ctx.enumMode !== 'auto' ? (ctx.enumMode as import('../web-api-core/sampling.js').EnumMode) : undefined;
         // Sampling issues requests, so it can hit the run deadline; if it does, this resource is
         // "not tested" (ran out of time), NOT "could not sample". A deadline reached mid-scenarios
         // is handled inside runCoreResourceScenarios, which returns a partial report.
@@ -377,13 +439,18 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           requester,
           // Resource-aware OriginatingSystem scope (multi-tenant): resolveTestParams applies it only to
           // resources whose metadata carries the field, and to its own sample fetch. Inert when unset.
-          { name: config.originatingSystemName, id: config.originatingSystemId },
+          { name: config.originatingSystemName, id: config.originatingSystemId }
         ).catch((err: unknown) => {
           if (isDeadlineError(err)) return null;
           throw err;
         });
         if (params === null) {
-          onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `${resource}: not tested (ran out of time)`, detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'skipped', note: 'ran out of time' } });
+          onProgress({
+            step: RUN_CORE_SCENARIOS,
+            status: 'running',
+            message: `${resource}: not tested (ran out of time)`,
+            detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'skipped', note: 'ran out of time' }
+          });
           return deadlineResourceReport(resource);
         }
 
@@ -393,11 +460,28 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         // Records present → 'run', and the normal sample-and-test path below continues.
         const availability = resolveNoRecordsOutcome(resource, version, !params.skippedTypes.includes(NO_RECORDS_SAMPLED));
         if (availability === 'fail') {
-          onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `${resource}: required resource returned no records at the top level — failure`, detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'failed', note: 'no top-level records' } });
+          onProgress({
+            step: RUN_CORE_SCENARIOS,
+            status: 'running',
+            message: `${resource}: required resource returned no records at the top level — failure`,
+            detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'failed', note: 'no top-level records' }
+          });
           return requiredResourceNotServedReport(resource);
         }
         if (availability === 'na') {
-          onProgress({ step: RUN_CORE_SCENARIOS, status: 'running', message: `${resource}: no records at the top level — Not Applicable (carried by $expand)`, detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'not-applicable', note: 'no top-level records' } });
+          onProgress({
+            step: RUN_CORE_SCENARIOS,
+            status: 'running',
+            message: `${resource}: no records at the top level — Not Applicable (carried by $expand)`,
+            detail: {
+              kind: 'core-progress',
+              event: 'phase',
+              resource,
+              phase: 'done',
+              outcome: 'not-applicable',
+              note: 'no top-level records'
+            }
+          });
           return notServedNotApplicableReport(resource);
         }
 
@@ -409,7 +493,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           onProgress({
             step: RUN_CORE_SCENARIOS,
             status: 'running',
-            message: `${resource}: missing types: ${params.skippedTypes.join(', ')} — some scenarios will be skipped`,
+            message: `${resource}: missing types: ${params.skippedTypes.join(', ')} — some scenarios will be skipped`
           });
         }
 
@@ -417,7 +501,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           step: RUN_CORE_SCENARIOS,
           status: 'running',
           message: `Testing ${resource}...`,
-          detail: { kind: 'core-progress', event: 'phase', resource, phase: 'testing' },
+          detail: { kind: 'core-progress', event: 'phase', resource, phase: 'testing' }
         });
 
         const report = await runCoreResourceScenarios(
@@ -430,32 +514,53 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           // Provider-wide scenarios already ran once above; thread the detected version for the 4.01 gate, the
           // once-per-run $expand schema validator (undefined at 2.0.0 / if it couldn't be built), and the
           // shared Lookup Resource cache + standard map + ignore predicate.
-          { excludeProviderWide: true, odataVersion: provider.odataVersion, ...(expandValidator ? { expandValidator } : {}), lookupCache, standardMap, isEnumerationIgnored: isEnumIgnored },
+          {
+            excludeProviderWide: true,
+            odataVersion: provider.odataVersion,
+            ...(expandValidator ? { expandValidator } : {}),
+            lookupCache,
+            standardMap,
+            isEnumerationIgnored: isEnumIgnored
+          }
         );
 
         onProgress({
           step: RUN_CORE_SCENARIOS,
           status: 'running',
           message: `${resource}: ${report.summary.passed} passed, ${report.summary.failed} failed, ${report.summary.skipped} skipped`,
-          detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: report.summary.failed > 0 ? 'failed' : 'passed', counts: report.summary },
+          detail: {
+            kind: 'core-progress',
+            event: 'phase',
+            resource,
+            phase: 'done',
+            outcome: report.summary.failed > 0 ? 'failed' : 'passed',
+            counts: report.summary
+          }
         });
 
         return report;
       },
       {
         onError: 'continue',
-        onOutcome: (outcome) => {
+        onOutcome: outcome => {
           if (outcome.status === 'failed') {
             const reason = outcome.error instanceof Error ? outcome.error.message : String(outcome.error);
             onProgress({
               step: RUN_CORE_SCENARIOS,
               status: 'running',
               message: `${outcome.item}: skipped (could not sample) — ${reason}`,
-              detail: { kind: 'core-progress', event: 'phase', resource: outcome.item, phase: 'done', outcome: 'skipped', note: 'could not sample' },
+              detail: {
+                kind: 'core-progress',
+                event: 'phase',
+                resource: outcome.item,
+                phase: 'done',
+                outcome: 'skipped',
+                note: 'could not sample'
+              }
             });
           }
-        },
-      },
+        }
+      }
     );
 
     if (settled.stoppedEarly && settled.fatalError !== undefined) {
@@ -472,17 +577,18 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
       scenarios: provider.scenarios,
       coverage: [],
       summary: providerSummary,
-      ...(provider.deadlineReached ? { deadlineReached: true } : {}),
+      ...(provider.deadlineReached ? { deadlineReached: true } : {})
     };
 
     // Preserve resource order; a resource we couldn't sample/test is reported as skipped.
     const resourceReports: ResourceTestReport[] = [
       providerReport,
-      ...settled.outcomes.map((outcome): ResourceTestReport =>
-        outcome.status === 'ok'
-          ? outcome.value
-          : skippedResourceReport(outcome.item, outcome.status === 'failed' ? outcome.error : new Error(outcome.reason)),
-      ),
+      ...settled.outcomes.map(
+        (outcome): ResourceTestReport =>
+          outcome.status === 'ok'
+            ? outcome.value
+            : skippedResourceReport(outcome.item, outcome.status === 'failed' ? outcome.error : new Error(outcome.reason))
+      )
     ];
 
     // Required scenarios drive the verdict. Optional ("Optional Tests")
@@ -501,9 +607,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
 
     // Compute union coverage across all resources
     const allTypes = ['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup'];
-    const coveredTypes = allTypes.filter(type =>
-      resourceReports.some(r => r.coverage.some(c => c.type === type && c.hasData))
-    );
+    const coveredTypes = allTypes.filter(type => resourceReports.some(r => r.coverage.some(c => c.type === type && c.hasData)));
     const missingTypes = allTypes.filter(t => !coveredTypes.includes(t));
     const fullCoverage = missingTypes.length === 0;
 
@@ -516,20 +620,15 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     const deadlineReached = resourceReports.some(r => r.deadlineReached);
     const status = coreVerdict({ totalFailed, coverageFailed, deadlineReached });
 
-    const coverageMsg = fullCoverage
-      ? 'Full type coverage achieved'
-      : `Missing coverage: ${missingTypes.join(', ')}`;
+    const coverageMsg = fullCoverage ? 'Full type coverage achieved' : `Missing coverage: ${missingTypes.join(', ')}`;
     const modeMsg = requireFullCoverage ? ' (--full-coverage enabled)' : '';
     const incompleteMsg = deadlineReached ? 'INCOMPLETE — run deadline reached; remaining resources/scenarios not tested. ' : '';
 
     return {
       context: { ...ctx, resourceReports, coverageMatrix: { coveredTypes, missingTypes, fullCoverage } },
       status,
-      summary: incompleteMsg
-        + `${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped`
-        + (totalWarnings > 0 ? `, ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}` : '')
-        + (optTotal > 0 ? `; optional: ${optPassed} passed, ${optNotSupported} not supported, ${optNotTested} not tested` : '')
-        + ` (${totalScenarios} scenarios across ${resourceReports.length} resources). ${coverageMsg}${modeMsg}`,
+      summary:
+        `${incompleteMsg}${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped${totalWarnings > 0 ? `, ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}` : ''}${optTotal > 0 ? `; optional: ${optPassed} passed, ${optNotSupported} not supported, ${optNotTested} not tested` : ''} (${totalScenarios} scenarios across ${resourceReports.length} resources). ${coverageMsg}${modeMsg}`,
       counts: {
         total: totalScenarios,
         passed: totalPassed,
@@ -539,11 +638,11 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         optionalPassed: optPassed,
         optionalNotSupported: optNotSupported,
         optionalNotTested: optNotTested,
-        resources: resourceReports.length,
+        resources: resourceReports.length
       },
-      ...(coverageFailed ? { errors: [`Full coverage required but missing types: ${missingTypes.join(', ')}`] } : {}),
+      ...(coverageFailed ? { errors: [`Full coverage required but missing types: ${missingTypes.join(', ')}`] } : {})
     };
-  },
+  }
 });
 
 const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> => ({
@@ -554,7 +653,7 @@ const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> =
     // can persist metadata.xml. Reuse it here instead of rebuilding.
     const generators = coreReportGenerators(coerceCoreVersion(config.version));
 
-    const resourceReports = ctx.resourceReports as ReadonlyArray<ResourceTestReport> ?? [];
+    const resourceReports = (ctx.resourceReports as ReadonlyArray<ResourceTestReport>) ?? [];
     const totalFailed = resourceReports.reduce((sum, r) => sum + r.summary.failed, 0);
     // The report's headline outcome must agree with the run's process verdict (and CLI exit
     // code), so it is derived via reportVerdict (see there). It folds the TESTING result
@@ -570,25 +669,25 @@ const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> =
     const deadlineReached = resourceReports.some(r => r.deadlineReached);
     const coverageMatrix = ctx.coverageMatrix as { readonly fullCoverage?: boolean } | undefined;
     const coverageFailed = (config.fullCoverage ?? false) && !(coverageMatrix?.fullCoverage ?? true);
-    const priorSteps = ctx.pipelineSteps as ReadonlyArray<StepResult> ?? [];
+    const priorSteps = (ctx.pipelineSteps as ReadonlyArray<StepResult>) ?? [];
     const priorStepFailed = priorSteps.some(s => s.status === 'failed');
     const testingAborted = (ctx.resources?.length ?? 0) > 0 && resourceReports.length === 0;
 
     const pipelineResult = {
       status: reportVerdict({ priorStepFailed, testingAborted, totalFailed, coverageFailed, deadlineReached }),
       endorsement: 'core',
-      steps: ctx.pipelineSteps as ReadonlyArray<StepResult> ?? [],
+      steps: (ctx.pipelineSteps as ReadonlyArray<StepResult>) ?? [],
       context: ctx,
-      duration: 0,
+      duration: 0
     };
 
     const written = await writeReports(pipelineResult, generators, ctx.outputPath, onProgress);
 
     return {
       context: { ...ctx, reports: written },
-      summary: `${written.length} reports written`,
+      summary: `${written.length} reports written`
     };
-  },
+  }
 });
 
 // ── Pipeline Assembly ──
@@ -600,15 +699,12 @@ export const createCorePipeline = (config: CoreConfig) => {
     ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),
     fetchAndParseMetadata(config),
     sampleAndTest(config),
-    writeComplianceReports(config),
+    writeComplianceReports(config)
   ]);
 };
 
 /** Run Web API Core compliance tests with a single function call. */
-export const runCoreCompliance = async (
-  config: CoreConfig,
-  onProgress?: (progress: import('./types.js').StepProgress) => void,
-) => {
+export const runCoreCompliance = async (config: CoreConfig, onProgress?: (progress: import('./types.js').StepProgress) => void) => {
   // Normalize the Core version to its canonical CoreVersion at the SDK boundary. Config sources hand it over as
   // "2.1" as often as "2.1.0", and EVERY version gate downstream (the $expand validator, the serving carve-outs,
   // scenario selection) plus the output-dir path and the report's version stamp read from this one value. A bare
@@ -624,12 +720,8 @@ export const runCoreCompliance = async (
     version,
     enumMode: normalizedConfig.enumMode ?? 'auto',
     resources,
-    outputPath,
+    outputPath
   };
 
-  return pipeline.run(
-    initialContext,
-    onProgress,
-    { failFast: config.options?.failFast ?? false },
-  );
+  return pipeline.run(initialContext, onProgress, { failFast: config.options?.failFast ?? false });
 };

@@ -64,12 +64,12 @@ export const mintOAuth2ClientCredentialsToken = async (): Promise<string | undef
     const params = new URLSearchParams({
       grant_type: 'client_credentials',
       client_id: clientId,
-      client_secret: clientSecret,
+      client_secret: clientSecret
     });
     const res = await fetch(tokenUri, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString(),
+      body: params.toString()
     });
     if (!res.ok) {
       console.error(`OAuth2 token mint failed: HTTP ${res.status} ${res.statusText}`);
@@ -113,7 +113,7 @@ const buildAuthFromFlags = (flags: CliAuthFlags): AuthConfig | null => {
     mode: 'client_credentials',
     clientId: flags.clientId,
     clientSecret: flags.clientSecret,
-    tokenUrl: flags.tokenUrl,
+    tokenUrl: flags.tokenUrl
   };
 };
 
@@ -139,10 +139,10 @@ export const resolveCliAuth = (flags: CliAuthFlags, configAuth?: AuthConfig): Au
   } catch {
     throw new Error(
       'No authentication configured. Provide one of:\n' +
-      '  --auth-token <token>\n' +
-      '  --client-id <id> --client-secret <secret> --token-url <url>\n' +
-      '  RESO_AUTH_TOKEN or RESO_CLIENT_ID/RESO_CLIENT_SECRET/RESO_TOKEN_URI env vars\n' +
-      '  A config file with auth via --config <path>'
+        '  --auth-token <token>\n' +
+        '  --client-id <id> --client-secret <secret> --token-url <url>\n' +
+        '  RESO_AUTH_TOKEN or RESO_CLIENT_ID/RESO_CLIENT_SECRET/RESO_TOKEN_URI env vars\n' +
+        '  A config file with auth via --config <path>'
     );
   }
 };

@@ -20,17 +20,17 @@ export const MATCHING_STRATEGIES = Object.freeze({
   EDIT_DISTANCE: 'Edit Distance',
   ADMIN_REVIEW: 'Admin Review',
   FAST_TRACK: 'Fast Track',
-  EXTERNAL_SUGGESTION: 'Suggestion',
+  EXTERNAL_SUGGESTION: 'Suggestion'
 } as const);
 
 /** Lowercase and strip everything but [0-9a-z]; falls back to the input when that empties it. */
-export const normalizeDataElementName = (name: string): string =>
-  name?.toLowerCase()?.replace(/[^0-9a-z]/gi, '') || name;
+export const normalizeDataElementName = (name: string): string => name?.toLowerCase()?.replace(/[^0-9a-z]/gi, '') || name;
 
 /** Map a suggestion's provenance flags to its strategy label. */
-export const classifySuggestionStrategy = (
-  { isAdminReview = false, isFastTrack = false }: { isAdminReview?: boolean; isFastTrack?: boolean } = {},
-): string => {
+export const classifySuggestionStrategy = ({
+  isAdminReview = false,
+  isFastTrack = false
+}: { isAdminReview?: boolean; isFastTrack?: boolean } = {}): string => {
   if (isAdminReview) return MATCHING_STRATEGIES.ADMIN_REVIEW;
   if (isFastTrack) return MATCHING_STRATEGIES.FAST_TRACK;
   return MATCHING_STRATEGIES.EXTERNAL_SUGGESTION;
@@ -38,10 +38,7 @@ export const classifySuggestionStrategy = (
 
 interface DDWikiUrlInput {
   readonly version?: string;
-  readonly standardMetadataMap?: Record<
-    string,
-    Record<string, { legacyODataValues?: Record<string, { lookupValue?: string }> }>
-  >;
+  readonly standardMetadataMap?: Record<string, Record<string, { legacyODataValues?: Record<string, { lookupValue?: string }> }>>;
   readonly resourceName?: string;
   readonly fieldName?: string;
   readonly lookupValue?: string;
@@ -62,7 +59,7 @@ export const getDDWikiUrl = ({
   resourceName,
   fieldName,
   lookupValue,
-  legacyODataValue,
+  legacyODataValue
 }: DDWikiUrlInput): string | null => {
   const base = `https://dd.reso.org/DD${version}`;
 
@@ -114,7 +111,7 @@ export const prepareResults = ({
   lookupValues = [],
   legacyODataValues = [],
   expansions = [],
-  complexTypes = [],
+  complexTypes = []
 }: PrepareResultsInput = {}): PreparedVariations => {
   return {
     resources:
@@ -126,7 +123,7 @@ export const prepareResults = ({
           }
           (acc[key].suggestions as Json[]).push(suggestion);
           return acc;
-        }, {}),
+        }, {})
       ) || [],
     fields: Object.values(
       fields.reduce<Record<string, Record<string, Json>>>((acc, { resourceName, fieldName, ...suggestion }) => {
@@ -140,7 +137,7 @@ export const prepareResults = ({
         }
         (acc[rKey][fKey].suggestions as Json[]).push(suggestion);
         return acc;
-      }, {}),
+      }, {})
     ).flatMap(Object.values),
     lookups: Object.values(
       [...lookupValues, ...legacyODataValues].reduce<Record<string, Record<string, Record<string, Json>>>>(
@@ -162,16 +159,16 @@ export const prepareResults = ({
               fieldName,
               legacyODataValue,
               lookupValue,
-              suggestions: [],
+              suggestions: []
             };
           }
 
           const suggestions = acc[rKey][fKey][lookupKey].suggestions as Json[];
           if (
             !suggestions.some(
-              (x) =>
+              x =>
                 (x as Json)?.suggestedLookupValue === (rest as Json)?.suggestedLookupValue &&
-                (x as Json)?.suggestedLegacyODataValue === (rest as Json)?.suggestedLegacyODataValue,
+                (x as Json)?.suggestedLegacyODataValue === (rest as Json)?.suggestedLegacyODataValue
             )
           ) {
             suggestions.push({ ...rest });
@@ -179,10 +176,10 @@ export const prepareResults = ({
 
           return acc;
         },
-        {},
-      ),
-    ).flatMap((item) => Object.values(Object.values(item).flatMap(Object.values))),
+        {}
+      )
+    ).flatMap(item => Object.values(Object.values(item).flatMap(Object.values))),
     expansions,
-    complexTypes,
+    complexTypes
   };
 };

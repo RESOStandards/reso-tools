@@ -15,8 +15,8 @@
  * resource exactly as today — a declared-but-404ing resource then fails for real instead of being masked.
  */
 
-import type { EntityType, ParsedEntitySet } from '../test-runner/types.js';
 import { isCore21OrLater } from '../sdk/core-versions.js';
+import type { EntityType, ParsedEntitySet } from '../test-runner/types.js';
 import { REQUIRED_RESOURCES_V21, WELL_KNOWN_RESOURCES } from './sampling.js';
 
 /** Whether a resource is PRESENT / ABSENT in a served-top-level surface, or the surface is INDETERMINATE. */
@@ -28,10 +28,7 @@ export type ServingDecision = 'run' | 'fail' | 'na';
 /** Resources eligible for the carve-out: the always-top-level required set (P/M/O/F/L) plus the other
  *  well-known resources (Media, OpenHouse, Showing). Anything outside this set always runs as today —
  *  we never mask a resource we don't recognize. */
-const MASKABLE_RESOURCES: ReadonlySet<string> = new Set<string>([
-  ...WELL_KNOWN_RESOURCES.map(r => r.resource),
-  ...REQUIRED_RESOURCES_V21
-]);
+const MASKABLE_RESOURCES: ReadonlySet<string> = new Set<string>([...WELL_KNOWN_RESOURCES.map(r => r.resource), ...REQUIRED_RESOURCES_V21]);
 
 /**
  * Parse an OData service document body into the set of served top-level EntitySet names.
@@ -76,10 +73,7 @@ export const servedPresence = (served: ReadonlySet<string> | undefined, resource
  * by set name). No container / zero sets ⇒ INDETERMINATE (the surface says nothing). Otherwise PRESENT iff
  * some declared set exposes the resource's EntityType.
  */
-export const declaredPresence = (
-  entitySets: ReadonlyArray<ParsedEntitySet> | undefined,
-  entityType: EntityType
-): Presence =>
+export const declaredPresence = (entitySets: ReadonlyArray<ParsedEntitySet> | undefined, entityType: EntityType): Presence =>
   entitySets === undefined || entitySets.length === 0
     ? 'indeterminate'
     : entitySets.some(es => es.entityType === entityType.name)
@@ -137,11 +131,7 @@ export const resolveServingDecision = (args: {
  * The required-list gate is what keeps this loosening from opening a false-pass: only expansion-class resources
  * become NA on an empty top level; a required resource always fails.
  */
-export const resolveNoRecordsOutcome = (
-  resource: string,
-  version: '2.0.0' | '2.1.0',
-  hasTopLevelRecords: boolean,
-): ServingDecision => {
+export const resolveNoRecordsOutcome = (resource: string, version: '2.0.0' | '2.1.0', hasTopLevelRecords: boolean): ServingDecision => {
   if (hasTopLevelRecords || !isCore21OrLater(version)) return 'run';
   return REQUIRED_RESOURCES_V21.includes(resource) ? 'fail' : 'na';
 };

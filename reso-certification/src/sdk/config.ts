@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import type { AuthConfig } from '../test-runner/types.js';
-import type { AddEditConfig, EntityEventConfig, CoreConfig, DDConfig } from './types.js';
 import { coerceCoreVersion } from './core-versions.js';
 import { coerceDDVersion } from './dd-versions.js';
+import type { AddEditConfig, CoreConfig, DDConfig, EntityEventConfig } from './types.js';
 
 // ── Config File Types ──
 
@@ -99,7 +99,7 @@ const resolveAuthFromEntry = (entry: ConfigEntry): AuthConfig => {
       mode: 'client_credentials',
       clientId: entry.clientCredentials.clientId,
       clientSecret: entry.clientCredentials.clientSecret,
-      tokenUrl: entry.clientCredentials.tokenUri,
+      tokenUrl: entry.clientCredentials.tokenUri
     };
   }
   if (entry.token) {
@@ -152,9 +152,17 @@ interface RawConfigEntry {
 const validateServiceRootUri = (uri: string, recipientUoi: string): string => {
   const value = uri.trim();
   const where = recipientUoi ? ` for recipient ${recipientUoi}` : '';
-  const parsed = ((): URL | undefined => { try { return new URL(value); } catch { return undefined; } })();
+  const parsed = ((): URL | undefined => {
+    try {
+      return new URL(value);
+    } catch {
+      return undefined;
+    }
+  })();
   if (!parsed || (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')) {
-    throw new Error(`Config${where}: serviceRootUri ${JSON.stringify(value)} is not a valid URL — set an absolute http(s) server address. The CLI does not resolve placeholder shortcuts like "LOCAL_SERVER"; export a config with the real server address.`);
+    throw new Error(
+      `Config${where}: serviceRootUri ${JSON.stringify(value)} is not a valid URL — set an absolute http(s) server address. The CLI does not resolve placeholder shortcuts like "LOCAL_SERVER"; export a config with the real server address.`
+    );
   }
   return value;
 };
@@ -167,7 +175,14 @@ const normalizeConfigEntry = (raw: RawConfigEntry): ConfigEntry => {
   // Auth: prefer the desktop's nested `auth`, else the legacy top-level `token` / `clientCredentials`.
   const auth: ConfigAuth = raw.auth
     ? raw.auth.mode === 'client_credentials' || (!!raw.auth.clientId && !!raw.auth.clientSecret)
-      ? { clientCredentials: { clientId: raw.auth.clientId ?? '', clientSecret: raw.auth.clientSecret ?? '', tokenUri: raw.auth.tokenUrl ?? '', ...(raw.auth.scope ? { scope: raw.auth.scope } : {}) } }
+      ? {
+          clientCredentials: {
+            clientId: raw.auth.clientId ?? '',
+            clientSecret: raw.auth.clientSecret ?? '',
+            tokenUri: raw.auth.tokenUrl ?? '',
+            ...(raw.auth.scope ? { scope: raw.auth.scope } : {})
+          }
+        }
       : { token: raw.auth.authToken }
     : raw.clientCredentials
       ? { clientCredentials: raw.clientCredentials }
@@ -192,7 +207,7 @@ const normalizeConfigEntry = (raw: RawConfigEntry): ConfigEntry => {
     ...(raw.ddOptions ? { ddOptions: raw.ddOptions } : {}),
     ...(raw.coreOptions ? { coreOptions: raw.coreOptions } : {}),
     ...(raw.addEditOptions ? { addEditOptions: raw.addEditOptions } : {}),
-    ...(raw.entityEventOptions ? { entityEventOptions: raw.entityEventOptions } : {}),
+    ...(raw.entityEventOptions ? { entityEventOptions: raw.entityEventOptions } : {})
   };
 };
 
@@ -201,11 +216,13 @@ const normalizeConfigEntry = (raw: RawConfigEntry): ConfigEntry => {
  *  nested `auth`), and a single-entry config (`{ serviceRootUri, auth, ... }`) — so a downloaded desktop config
  *  runs unmodified. Mirrors reso-web-client's config-import. */
 export const normalizeConfigFile = (raw: Record<string, unknown>): CertConfigFile => {
-  const rawEntries: ReadonlyArray<RawConfigEntry> =
-    Array.isArray(raw.configs) ? (raw.configs as ReadonlyArray<RawConfigEntry>)
-      : Array.isArray(raw.recipients) ? (raw.recipients as ReadonlyArray<RawConfigEntry>)
-        : (raw.serviceRootUri || raw.recipientUoi) ? [raw as RawConfigEntry]
-          : [];
+  const rawEntries: ReadonlyArray<RawConfigEntry> = Array.isArray(raw.configs)
+    ? (raw.configs as ReadonlyArray<RawConfigEntry>)
+    : Array.isArray(raw.recipients)
+      ? (raw.recipients as ReadonlyArray<RawConfigEntry>)
+      : raw.serviceRootUri || raw.recipientUoi
+        ? [raw as RawConfigEntry]
+        : [];
 
   if (rawEntries.length === 0) {
     throw new Error('Config file has no entries — expected a "configs" or "recipients" array (or a single entry with "serviceRootUri").');
@@ -236,7 +253,7 @@ const osid = (block: { readonly originatingSystemId?: string } | undefined, entr
 /** Core `resources` as the desktop writes it (a comma-separated string) or as a list. */
 const coreResources = (value: string | ReadonlyArray<string> | undefined): ReadonlyArray<string> | undefined => {
   if (value === undefined) return undefined;
-  const list = (typeof value === 'string' ? value.split(',') : value).map((r) => r.trim()).filter(Boolean);
+  const list = (typeof value === 'string' ? value.split(',') : value).map(r => r.trim()).filter(Boolean);
   return list.length > 0 ? list : undefined;
 };
 
@@ -245,14 +262,16 @@ export const configEntryToAddEdit = (entry: ConfigEntry, providerUoi: string): A
   endorsement: 'add-edit',
   server: {
     url: entry.serviceRootUri,
-    auth: resolveAuthFromEntry(entry),
+    auth: resolveAuthFromEntry(entry)
   },
   resource: entry.addEditOptions?.resource ?? entry.resource ?? 'Property',
   specVersion: entry.addEditOptions?.specVersion ?? entry.version ?? '2.0.0',
-  ...(entry.addEditOptions?.payloadsDir ?? entry.payloadsDir ? { payloadsDir: entry.addEditOptions?.payloadsDir ?? entry.payloadsDir } : {}),
+  ...((entry.addEditOptions?.payloadsDir ?? entry.payloadsDir)
+    ? { payloadsDir: entry.addEditOptions?.payloadsDir ?? entry.payloadsDir }
+    : {}),
   options: {
-    outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/add-edit`,
-  },
+    outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/add-edit`
+  }
 });
 
 /** Convert an EntityEvent config entry to a ComplianceConfig. */
@@ -260,7 +279,7 @@ export const configEntryToEntityEvent = (entry: ConfigEntry, providerUoi: string
   endorsement: 'entity-event',
   server: {
     url: entry.serviceRootUri,
-    auth: resolveAuthFromEntry(entry),
+    auth: resolveAuthFromEntry(entry)
   },
   mode: entry.entityEventOptions?.mode ?? entry.mode ?? 'observe',
   writableResource: entry.entityEventOptions?.writableResource ?? entry.writableResource ?? entry.resource ?? 'Property',
@@ -268,8 +287,8 @@ export const configEntryToEntityEvent = (entry: ConfigEntry, providerUoi: string
   ...(entry.entityEventOptions?.pollInterval !== undefined ? { pollInterval: entry.entityEventOptions.pollInterval } : {}),
   ...(entry.entityEventOptions?.pollTimeout !== undefined ? { pollTimeout: entry.entityEventOptions.pollTimeout } : {}),
   options: {
-    outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/entity-event`,
-  },
+    outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/entity-event`
+  }
 });
 
 /** Convert a Core config entry to a ComplianceConfig. */
@@ -277,7 +296,7 @@ export const configEntryToCore = (entry: ConfigEntry, providerUoi: string): Core
   endorsement: 'core',
   server: {
     url: entry.serviceRootUri,
-    auth: resolveAuthFromEntry(entry),
+    auth: resolveAuthFromEntry(entry)
   },
   version: coerceCoreVersion(entry.coreOptions?.version ?? entry.version),
   ...(entry.coreOptions?.enumMode ? { enumMode: entry.coreOptions.enumMode } : {}),
@@ -286,8 +305,8 @@ export const configEntryToCore = (entry: ConfigEntry, providerUoi: string): Core
   ...(osn(entry.coreOptions, entry) ? { originatingSystemName: osn(entry.coreOptions, entry) } : {}),
   ...(osid(entry.coreOptions, entry) ? { originatingSystemId: osid(entry.coreOptions, entry) } : {}),
   options: {
-    outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/core`,
-  },
+    outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/core`
+  }
 });
 
 /** Convert a DD config entry to a ComplianceConfig. */
@@ -295,7 +314,7 @@ export const configEntryToDD = (entry: ConfigEntry, providerUoi: string): DDConf
   endorsement: 'dd',
   server: {
     url: entry.serviceRootUri,
-    auth: resolveAuthFromEntry(entry),
+    auth: resolveAuthFromEntry(entry)
   },
   version: coerceDDVersion(entry.ddOptions?.version ?? entry.version),
   ...(entry.ddOptions?.limit !== undefined ? { limit: entry.ddOptions.limit } : {}),
@@ -306,8 +325,8 @@ export const configEntryToDD = (entry: ConfigEntry, providerUoi: string): DDConf
   ...(osn(entry.ddOptions, entry) ? { originatingSystemName: osn(entry.ddOptions, entry) } : {}),
   ...(osid(entry.ddOptions, entry) ? { originatingSystemId: osid(entry.ddOptions, entry) } : {}),
   options: {
-    outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/dd`,
-  },
+    outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/dd`
+  }
 });
 
 // ── Key Chaining ──
@@ -331,11 +350,7 @@ export interface ResolvedPayloads {
  *
  * If no create payload and no key on update/delete, throws an error.
  */
-export const resolvePayloadKeys = (
-  payloads: ConfigPayloads,
-  keyField: string,
-  createdKey?: string,
-): ResolvedPayloads => {
+export const resolvePayloadKeys = (payloads: ConfigPayloads, keyField: string, createdKey?: string): ResolvedPayloads => {
   const hasCreate = !!payloads.createSucceeds && Object.keys(payloads.createSucceeds).length > 0;
 
   const updateSucceeds = { ...payloads.updateSucceeds };
@@ -382,6 +397,6 @@ export const resolvePayloadKeys = (
     updateFails,
     deleteSucceeds: deletePayload,
     deleteFails,
-    keyChained,
+    keyChained
   };
 };

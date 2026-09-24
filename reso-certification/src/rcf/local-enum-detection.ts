@@ -19,7 +19,7 @@
  * meant to be calibrated against real RCF samples during the e2e phase.
  */
 
-import { isValidValue, isNumericToken } from './values.js';
+import { isNumericToken, isValidValue } from './values.js';
 
 /** Minimum observed values before a verdict is trustworthy — never decide on a tiny sample. */
 export const ENUM_MIN_SAMPLE = 30;

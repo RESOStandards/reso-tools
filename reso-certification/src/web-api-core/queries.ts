@@ -6,16 +6,16 @@
 
 import type { TestParams } from './sampling.js';
 import type {
-  CoreScenario,
-  FilterScenario,
-  OrderByScenario,
-  EnumScenario,
   CollectionScenario,
+  CoreScenario,
+  EnumScenario,
   ErrorScenario,
-  StringEnumScenario,
-  StringFunctionScenario,
-  InOperatorScenario,
   ExpandScenario,
+  FilterScenario,
+  InOperatorScenario,
+  OrderByScenario,
+  StringEnumScenario,
+  StringFunctionScenario
 } from './scenarios.js';
 
 /** Result of building a query: the URL and the select fields. */
@@ -75,12 +75,7 @@ export const recordDerivedSet = (scenario: CoreScenario, params: TestParams): Re
 
 // ── Filter URL builders ──
 
-const buildFilterUrl = (
-  serverUrl: string,
-  resource: string,
-  params: TestParams,
-  scenario: FilterScenario,
-): QuerySpec | undefined => {
+const buildFilterUrl = (serverUrl: string, resource: string, params: TestParams, scenario: FilterScenario): QuerySpec | undefined => {
   const field = resolveField(params, scenario.fieldParam);
   const value = resolveParam(params, scenario.valueParam);
   if (!field || value == null) return undefined;
@@ -107,12 +102,7 @@ const buildFilterUrl = (
   return { url, selectFields };
 };
 
-const buildOrderByUrl = (
-  serverUrl: string,
-  resource: string,
-  params: TestParams,
-  scenario: OrderByScenario,
-): QuerySpec | undefined => {
+const buildOrderByUrl = (serverUrl: string, resource: string, params: TestParams, scenario: OrderByScenario): QuerySpec | undefined => {
   const field = resolveField(params, scenario.fieldParam);
   if (!field) return undefined;
 
@@ -131,12 +121,7 @@ const buildOrderByUrl = (
   return { url, selectFields };
 };
 
-const buildEnumUrl = (
-  serverUrl: string,
-  resource: string,
-  params: TestParams,
-  scenario: EnumScenario,
-): QuerySpec | undefined => {
+const buildEnumUrl = (serverUrl: string, resource: string, params: TestParams, scenario: EnumScenario): QuerySpec | undefined => {
   const field = resolveField(params, scenario.fieldParam);
   const value = resolveParam(params, scenario.valueParam);
   if (!field || value == null) return undefined;
@@ -169,7 +154,7 @@ const buildCollectionUrl = (
   serverUrl: string,
   resource: string,
   params: TestParams,
-  scenario: CollectionScenario,
+  scenario: CollectionScenario
 ): QuerySpec | undefined => {
   const field = resolveField(params, scenario.fieldParam);
   if (!field) return undefined;
@@ -193,7 +178,7 @@ const buildStringEnumUrl = (
   serverUrl: string,
   resource: string,
   params: TestParams,
-  scenario: StringEnumScenario,
+  scenario: StringEnumScenario
 ): QuerySpec | undefined => {
   const field = resolveField(params, scenario.fieldParam);
   const value = resolveParam(params, scenario.valueParam);
@@ -213,9 +198,7 @@ const buildStringEnumUrl = (
       filterExpr = `${field}/${scenario.op}(x:${valExpr})`;
     } else {
       const value2 = scenario.valueParam2 ? resolveParam(params, scenario.valueParam2) : undefined;
-      const valExpr = value2
-        ? `x eq ${odataString(value)} or x eq ${odataString(value2)}`
-        : `x eq ${odataString(value)}`;
+      const valExpr = value2 ? `x eq ${odataString(value)} or x eq ${odataString(value2)}` : `x eq ${odataString(value)}`;
       filterExpr = `${field}/${scenario.op}(x:${valExpr})`;
     }
   }
@@ -231,14 +214,12 @@ const buildInOperatorUrl = (
   serverUrl: string,
   resource: string,
   params: TestParams,
-  scenario: InOperatorScenario,
+  scenario: InOperatorScenario
 ): QuerySpec | undefined => {
   const field = resolveField(params, scenario.fieldParam);
   if (!field) return undefined;
 
-  const values = scenario.valueParams
-    .map(p => resolveParam(params, p))
-    .filter((v): v is string => v != null && v !== '');
+  const values = scenario.valueParams.map(p => resolveParam(params, p)).filter((v): v is string => v != null && v !== '');
   // Need at least two values to make `in` meaningful; otherwise it degenerates to `eq`.
   if (values.length < 2) return undefined;
 
@@ -259,12 +240,7 @@ const buildInOperatorUrl = (
 export const buildLookupUrl = (serverUrl: string, lookupName: string): string =>
   `${serverUrl}/Lookup?$filter=${encodeURIComponent(`LookupName eq '${lookupName}'`)}`;
 
-const buildExpandUrl = (
-  serverUrl: string,
-  resource: string,
-  params: TestParams,
-  scenario: ExpandScenario,
-): QuerySpec | undefined => {
+const buildExpandUrl = (serverUrl: string, resource: string, params: TestParams, scenario: ExpandScenario): QuerySpec | undefined => {
   const expandField = resolveField(params, scenario.fieldParam);
   if (!expandField) return undefined;
 
@@ -273,25 +249,14 @@ const buildExpandUrl = (
   return { url, selectFields };
 };
 
-const buildErrorUrl = (
-  serverUrl: string,
-  resource: string,
-  scenario: ErrorScenario,
-): QuerySpec => {
-  const url = scenario.expectedStatus === 400
-    ? `${serverUrl}/${resource}?$filter=INVALIDFIELD eq 'bad'`
-    : `${serverUrl}/ResourceNotFound`;
+const buildErrorUrl = (serverUrl: string, resource: string, scenario: ErrorScenario): QuerySpec => {
+  const url = scenario.expectedStatus === 400 ? `${serverUrl}/${resource}?$filter=INVALIDFIELD eq 'bad'` : `${serverUrl}/ResourceNotFound`;
   return { url, selectFields: [] };
 };
 
 // ── Structural query builders ──
 
-const buildStructuralUrl = (
-  serverUrl: string,
-  resource: string,
-  params: TestParams,
-  assertion: string,
-): QuerySpec | undefined => {
+const buildStructuralUrl = (serverUrl: string, resource: string, params: TestParams, assertion: string): QuerySpec | undefined => {
   switch (assertion) {
     case 'metadata':
       // URL kept for the scenario dispatcher (so it knows this assertion
@@ -315,23 +280,23 @@ const buildStructuralUrl = (
       const selectFields = dataField ? [params.keyField, dataField] : [params.keyField];
       return {
         url: `${serverUrl}/${resource}?$select=${selectFields.join(',')}`,
-        selectFields,
+        selectFields
       };
     }
     case 'top':
       return {
         url: `${serverUrl}/${resource}?$top=5&$select=${params.keyField}`,
-        selectFields: [params.keyField],
+        selectFields: [params.keyField]
       };
     case 'skip':
       return {
         url: `${serverUrl}/${resource}?$top=5&$select=${params.keyField}`,
-        selectFields: [params.keyField],
+        selectFields: [params.keyField]
       };
     case 'count':
       return {
         url: `${serverUrl}/${resource}?$top=5&$count=true&$select=${params.keyField}`,
-        selectFields: [params.keyField],
+        selectFields: [params.keyField]
       };
     default:
       return undefined;
@@ -344,7 +309,7 @@ const buildStringFunctionUrl = (
   serverUrl: string,
   resource: string,
   params: TestParams,
-  scenario: StringFunctionScenario,
+  scenario: StringFunctionScenario
 ): QuerySpec | undefined => {
   const field = resolveField(params, scenario.fieldParam);
   const value = resolveParam(params, scenario.valueParam);
@@ -362,12 +327,7 @@ const buildStringFunctionUrl = (
  * Build the OData query URL for a scenario.
  * Returns undefined if required test params are missing (scenario should be skipped).
  */
-const buildQueryForCategory = (
-  serverUrl: string,
-  resource: string,
-  scenario: CoreScenario,
-  params: TestParams,
-): QuerySpec | undefined => {
+const buildQueryForCategory = (serverUrl: string, resource: string, scenario: CoreScenario, params: TestParams): QuerySpec | undefined => {
   switch (scenario.category) {
     case 'structural':
       return buildStructuralUrl(serverUrl, resource, params, scenario.assertion);
@@ -415,7 +375,13 @@ export const ORIGINATING_SYSTEM_ID_FIELD = 'OriginatingSystemID';
  *  (/Lookup has no OriginatingSystem field), `error` (deliberate 404), `expand`, `structural` (key/metadata),
  *  and `paging`. PROVISIONAL — confirm fetch-by-key / count / paging against a real provider before finalizing. */
 const ORIGINATING_SYSTEM_SCOPED_CATEGORIES: ReadonlySet<string> = new Set([
-  'filter', 'orderby', 'enum', 'collection', 'string-enum', 'string-function', 'in-operator',
+  'filter',
+  'orderby',
+  'enum',
+  'collection',
+  'string-enum',
+  'string-function',
+  'in-operator'
 ]);
 
 /** The OriginatingSystemName (preferred) or OriginatingSystemID `$filter` clause for raw values, or '' when
@@ -447,11 +413,7 @@ const andUrlFilter = (url: string, clause: string): string => {
 
 /** Scope a resource-data query to the recipient's OriginatingSystem when one is configured; a no-op for the
  *  non-scoped categories and when no OriginatingSystem is set (inert until wired from the run config). */
-const scopeToOriginatingSystem = (
-  spec: QuerySpec | undefined,
-  scenario: CoreScenario,
-  params: TestParams,
-): QuerySpec | undefined => {
+const scopeToOriginatingSystem = (spec: QuerySpec | undefined, scenario: CoreScenario, params: TestParams): QuerySpec | undefined => {
   if (!spec || !ORIGINATING_SYSTEM_SCOPED_CATEGORIES.has(scenario.category)) return spec;
   const clause = originatingSystemClause(params);
   return clause ? { ...spec, url: andUrlFilter(spec.url, clause) } : spec;
@@ -465,6 +427,5 @@ export const buildScenarioQuery = (
   serverUrl: string,
   resource: string,
   scenario: CoreScenario,
-  params: TestParams,
-): QuerySpec | undefined =>
-  scopeToOriginatingSystem(buildQueryForCategory(serverUrl, resource, scenario, params), scenario, params);
+  params: TestParams
+): QuerySpec | undefined => scopeToOriginatingSystem(buildQueryForCategory(serverUrl, resource, scenario, params), scenario, params);

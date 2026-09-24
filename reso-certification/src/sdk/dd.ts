@@ -6,35 +6,35 @@
  * our own metadata serializer and Lookup Resource fetcher.
  */
 
-import { writeFile, copyFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { copyFile, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveAuthToken } from '../test-runner/auth.js';
-import { fetchMetadataWithVersion, persistMetadataXml } from '../test-runner/metadata.js';
 import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { runDdMetadataChecks } from '../metadata/dd-metadata-checks.js';
 import type { DdReference } from '../metadata/dd-metadata-checks.js';
 import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
-import type { BaseTestContext, DDConfig, PipelineStep, StepResult, TestFunction } from './types.js';
-import type { DDVersion } from './dd-versions.js';
-import { createPipeline } from './pipeline.js';
-import { createGenericReportGenerator, createDetailedReportGenerator, writeReports, prepareOutputDir } from './reports.js';
-import type { PipelineResult } from './types.js';
-import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
+import { resolveAuthToken } from '../test-runner/auth.js';
+import { fetchMetadataWithVersion, persistMetadataXml } from '../test-runner/metadata.js';
 import { computeVariationsViaService } from '../variations/index.js';
+import type { DDVersion } from './dd-versions.js';
+import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
+import { createPipeline } from './pipeline.js';
+import { createDetailedReportGenerator, createGenericReportGenerator, prepareOutputDir, writeReports } from './reports.js';
+import type { BaseTestContext, DDConfig, PipelineStep, StepResult, TestFunction } from './types.js';
+import type { PipelineResult } from './types.js';
 
 // ── Cert-utils imports (local copy for modification) ──
 
+// @ts-expect-error — legacy CJS (reference metadata loader)
+import certUtilsEtl from '../etl/index.cjs';
+// @ts-expect-error — legacy CJS
+import certUtilsCommon from '../legacy/common.js';
 // @ts-expect-error — legacy CJS, no type declarations
 import certUtils from '../legacy/index.js';
 // @ts-expect-error — legacy CJS
-import certUtilsCommon from '../legacy/common.js';
-// @ts-expect-error — legacy CJS
 import certUtilsReplicationUtils from '../legacy/lib/replication/utils.js';
-// @ts-expect-error — legacy CJS (reference metadata loader)
-import certUtilsEtl from '../etl/index.cjs';
 
 const { replicate } = certUtils;
 const { createReplicationStateServiceInstance } = certUtilsCommon;
@@ -75,9 +75,9 @@ const serviceCheck: PipelineStep<DDContext> = {
     // unidentified default User-Agent ('node') that undici emits.
     const headers: Record<string, string> = {
       Accept: 'application/json',
-      'User-Agent': 'RESO-Cert/0.11',
+      'User-Agent': 'RESO-Cert/0.11'
     };
-    if (ctx.authToken) headers['Authorization'] = `Bearer ${ctx.authToken}`;
+    if (ctx.authToken) headers.Authorization = `Bearer ${ctx.authToken}`;
     const maxAttempts = 10;
     let lastStatus: number | undefined;
     let lastBody: string | undefined;
@@ -88,7 +88,11 @@ const serviceCheck: PipelineStep<DDContext> = {
           return { context: ctx, summary: 'OData service is ready', requestDetails: [{ method: 'GET', url }] };
         }
         lastStatus = response.status;
-        try { lastBody = (await response.text()).slice(0, 500); } catch { /* ignore body read errors */ }
+        try {
+          lastBody = (await response.text()).slice(0, 500);
+        } catch {
+          /* ignore body read errors */
+        }
       } catch (err) {
         lastBody = err instanceof Error ? err.message : String(err);
       }
@@ -98,19 +102,22 @@ const serviceCheck: PipelineStep<DDContext> = {
     const errorDetail = lastStatus
       ? `HTTP ${lastStatus}${lastBody ? ` — ${lastBody}` : ''}`
       : `No response after ${maxAttempts} attempts${lastBody ? ` (last error: ${lastBody})` : ''}`;
-    return { context: ctx, status: 'failed', errors: [`OData service did not respond: ${errorDetail}`], requestDetails: [{ method: 'GET', url, error: errorDetail }] };
-  },
+    return {
+      context: ctx,
+      status: 'failed',
+      errors: [`OData service did not respond: ${errorDetail}`],
+      requestDetails: [{ method: 'GET', url, error: errorDetail }]
+    };
+  }
 };
 
 const resolveAuth = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Resolve authentication',
-  run: async (ctx) => {
+  run: async ctx => {
     const authToken = await resolveAuthToken(config.server.auth);
-    const requestDetails = config.server.auth.mode === 'client_credentials'
-      ? [{ method: 'POST', url: config.server.auth.tokenUrl }]
-      : [];
+    const requestDetails = config.server.auth.mode === 'client_credentials' ? [{ method: 'POST', url: config.server.auth.tokenUrl }] : [];
     return { context: { ...ctx, authToken }, summary: 'Auth credentials present', requestDetails };
-  },
+  }
 });
 
 const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
@@ -134,7 +141,11 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
 
     onProgress({ step: 'sub:metadata', status: 'running', message: 'Generating metadata report...' });
     const baseReport = generateMetadataReport(edmxXml, ctx.version);
-    onProgress({ step: 'sub:metadata', status: 'running', message: `Found ${baseReport.resources.length} resources, ${baseReport.fields.length.toLocaleString()} fields, ${baseReport.lookups.length.toLocaleString()} lookups` });
+    onProgress({
+      step: 'sub:metadata',
+      status: 'running',
+      message: `Found ${baseReport.resources.length} resources, ${baseReport.fields.length.toLocaleString()} fields, ${baseReport.lookups.length.toLocaleString()} lookups`
+    });
 
     // Persist raw EDMX next to the report files (shared helper, same
     // semantics as every other compliance pipeline).
@@ -147,12 +158,17 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
       baseReport,
       ctx.serverUrl,
       ctx.authToken!,
-      (count) => onProgress({ step: 'sub:metadata', status: 'running', message: `Fetching Lookup Resource... ${count.toLocaleString()} records` }),
-      odataVersion,
+      count =>
+        onProgress({ step: 'sub:metadata', status: 'running', message: `Fetching Lookup Resource... ${count.toLocaleString()} records` }),
+      odataVersion
     );
 
     if (lookupResourceAvailable) {
-      onProgress({ step: 'sub:metadata', status: 'running', message: `Lookup Resource: ${lookupRecordCount.toLocaleString()} records found. Merging...` });
+      onProgress({
+        step: 'sub:metadata',
+        status: 'running',
+        message: `Lookup Resource: ${lookupRecordCount.toLocaleString()} records found. Merging...`
+      });
     } else {
       onProgress({ step: 'sub:metadata', status: 'running', message: 'Lookup Resource not available (HTTP 404)' });
     }
@@ -184,7 +200,7 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
 
     const artifacts = [
       { label: 'Metadata XML', path: metadataXmlPath },
-      { label: 'Metadata report', path: metadataReportPath },
+      { label: 'Metadata report', path: metadataReportPath }
     ];
 
     return {
@@ -195,12 +211,12 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
       requestDetails: [
         // Match what the wrapper actually fetches (useFormatParam: true).
         { method: 'GET', url: `${ctx.serverUrl}/$metadata?$format=application/xml` },
-        ...(lookupResourceAvailable ? [{ method: 'GET', url: lookupUrl }] : []),
+        ...(lookupResourceAvailable ? [{ method: 'GET', url: lookupUrl }] : [])
       ],
       ...(validationErrors.length > 0 ? { errors: validationErrors } : {}),
-      ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {}),
+      ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {})
     };
-  },
+  }
 });
 
 /**
@@ -240,18 +256,29 @@ const validateDdMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
     // progress with hundreds of individual warning messages.
     const findingsPath = ctx.outputPath ? join(ctx.outputPath, 'metadata-validation-report.json') : undefined;
     if (findingsPath && findings.length > 0) {
-      await writeFile(findingsPath, JSON.stringify({
-        version: ctx.version,
-        generatedOn: new Date().toISOString(),
-        errorCount: errors.length,
-        warningCount: warnings.length,
-        findings,
-      }, null, 2));
+      await writeFile(
+        findingsPath,
+        JSON.stringify(
+          {
+            version: ctx.version,
+            generatedOn: new Date().toISOString(),
+            errorCount: errors.length,
+            warningCount: warnings.length,
+            findings
+          },
+          null,
+          2
+        )
+      );
     }
     const artifacts = findingsPath && findings.length > 0 ? [{ label: 'Metadata validation report', path: findingsPath }] : undefined;
 
     if (warnings.length > 0) {
-      onProgress({ step: 'sub:dd-metadata', status: 'running', message: `${warnings.length} Suggested Max (SHOULD) deviation${warnings.length === 1 ? '' : 's'} — see metadata-validation-report.json` });
+      onProgress({
+        step: 'sub:dd-metadata',
+        status: 'running',
+        message: `${warnings.length} Suggested Max (SHOULD) deviation${warnings.length === 1 ? '' : 's'} — see metadata-validation-report.json`
+      });
     }
     const warningSuffix = warnings.length ? ` (${warnings.length} warning${warnings.length === 1 ? '' : 's'})` : '';
 
@@ -261,22 +288,22 @@ const validateDdMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
         status: 'failed',
         errors: errors.map(e => e.message),
         summary: `Metadata validation failed: ${errors.length} issue${errors.length === 1 ? '' : 's'}${warningSuffix}`,
-        ...(artifacts ? { artifacts } : {}),
+        ...(artifacts ? { artifacts } : {})
       };
     }
 
     return {
       context: { ...ctx, ddMetadataValid: true },
       summary: `Metadata validation passed${warningSuffix}`,
-      ...(artifacts ? { artifacts } : {}),
+      ...(artifacts ? { artifacts } : {})
     };
-  },
+  }
 });
 
 const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Check variations',
   run: async (ctx, _onProgress) => {
-    if (parseFloat(ctx.version) < 2.0) {
+    if (Number.parseFloat(ctx.version) < 2.0) {
       return { context: ctx, status: 'skipped', summary: 'Variations are only checked for DD 2.0 and higher' };
     }
 
@@ -290,7 +317,7 @@ const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
       metadataReportJson,
       version: ctx.version,
       ...(config.servicesAuthToken ? { bearerToken: config.servicesAuthToken } : {}),
-      ...(config.fromCli ? { fromCli: true } : {}),
+      ...(config.fromCli ? { fromCli: true } : {})
     });
 
     const v = variations as Record<string, unknown[]>;
@@ -299,7 +326,7 @@ const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
       fields: v.fields?.length ?? 0,
       lookups: v.lookups?.length ?? 0,
       expansions: v.expansions?.length ?? 0,
-      complexTypes: v.complexTypes?.length ?? 0,
+      complexTypes: v.complexTypes?.length ?? 0
     };
     const total = counts.resources + counts.fields + counts.lookups + counts.expansions + counts.complexTypes;
     const hasVariations = total > 0;
@@ -308,7 +335,7 @@ const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
       counts.resources > 0 && `${counts.resources} resource${counts.resources !== 1 ? 's' : ''}`,
       counts.fields > 0 && `${counts.fields} field${counts.fields !== 1 ? 's' : ''}`,
       counts.lookups > 0 && `${counts.lookups} lookup${counts.lookups !== 1 ? 's' : ''}`,
-      counts.expansions > 0 && `${counts.expansions} expansion${counts.expansions !== 1 ? 's' : ''}`,
+      counts.expansions > 0 && `${counts.expansions} expansion${counts.expansions !== 1 ? 's' : ''}`
     ].filter(Boolean);
     const summaryDetail = parts.length > 0 ? `: ${parts.join(', ')}` : '';
 
@@ -331,7 +358,7 @@ const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
         // it on the file so the UI can display "Match Sensitivity: N%".
         // Without this, the blender's `fuzziness ?? 0` fallback shows 0%.
         fuzziness: fuzziness as number | undefined,
-        ...(variations as Record<string, unknown>),
+        ...(variations as Record<string, unknown>)
       };
       await writeFile(variationsPath, JSON.stringify(reportBody, null, 2));
     }
@@ -341,15 +368,15 @@ const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
         context: { ...ctx, variationsFound: true, variationsReport: variations },
         status: 'failed',
         errors: [`Found ${total} variation${total !== 1 ? 's' : ''} during testing${summaryDetail}`],
-        counts: { total, ...counts },
+        counts: { total, ...counts }
       };
     }
 
     return {
       context: { ...ctx, variationsFound: false },
-      summary: 'No variations found',
+      summary: 'No variations found'
     };
-  },
+  }
 });
 
 /** Build common replication settings from pipeline context. */
@@ -374,7 +401,7 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
   // `OriginatingSystemName eq '<v>'` (preferred) or
   // `OriginatingSystemID eq '<v>'` (fallback) to every replication query.
   originatingSystemName: config.originatingSystemName,
-  originatingSystemId: config.originatingSystemId,
+  originatingSystemId: config.originatingSystemId
 });
 
 // ── Replication test functions ──
@@ -382,15 +409,12 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
 // Run sequentially by default, or in parallel when concurrency > 1.
 
 /** Initialize replication state service and copy schema validation settings. */
-const initReplicationState: TestFunction<DDContext> = async (ctx) => {
+const initReplicationState: TestFunction<DDContext> = async ctx => {
   if (!ctx.replicationStateService) {
     const settingsFile = 'schema-validation-settings.json';
     if (!existsSync(settingsFile)) {
       const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-      const sourcePaths = [
-        join(packageRoot, settingsFile),
-        join(packageRoot, 'src', 'legacy', settingsFile),
-      ];
+      const sourcePaths = [join(packageRoot, settingsFile), join(packageRoot, 'src', 'legacy', settingsFile)];
       const sourcePath = sourcePaths.find(p => existsSync(p));
       if (sourcePath) {
         await copyFile(sourcePath, settingsFile);
@@ -414,7 +438,7 @@ const formatReplicationProgress = (info: Record<string, unknown>, currentStrateg
   const totalBytes = info.totalBytes != null ? Number(info.totalBytes) : null;
   const anomalies = Number(info.anomalyCount ?? 0);
 
-  const resources = (resourceStats ?? []).map((r) => ({
+  const resources = (resourceStats ?? []).map(r => ({
     name: String(r.resourceName ?? ''),
     records: Number(r.recordCount ?? 0),
     bytes: Number(r.bytes ?? 0),
@@ -423,7 +447,7 @@ const formatReplicationProgress = (info: Record<string, unknown>, currentStrateg
     meanMs: r.meanMs != null ? Number(r.meanMs) : null,
     anomalyCount: r.anomalyCount != null ? Number(r.anomalyCount) : 0,
     maxAnomalyMs: r.maxAnomalyMs != null ? Number(r.maxAnomalyMs) : null,
-    maxAnomalyDelta: r.maxAnomalyDelta != null ? Number(r.maxAnomalyDelta) : null,
+    maxAnomalyDelta: r.maxAnomalyDelta != null ? Number(r.maxAnomalyDelta) : null
   }));
 
   return JSON.stringify({
@@ -434,15 +458,12 @@ const formatReplicationProgress = (info: Record<string, unknown>, currentStrateg
     totalBytes,
     throughput,
     meanResponseMs: meanMs,
-    anomalyCount: anomalies,
+    anomalyCount: anomalies
   });
 };
 
 /** Build the onProgress adapter and a stats collector for a replication run. */
-const replicationProgressAdapter = (
-  onProgress: import('./types.js').ProgressCallback,
-  currentStrategy: string,
-) => {
+const replicationProgressAdapter = (onProgress: import('./types.js').ProgressCallback, currentStrategy: string) => {
   let lastInfo: Record<string, unknown> = {};
   return {
     callback: (info: Record<string, unknown>) => {
@@ -454,12 +475,13 @@ const replicationProgressAdapter = (
       meanResponseMs: Number(lastInfo.meanResponseMs ?? 0),
       throughput: Number(lastInfo.throughput ?? 0),
       anomalyCount: Number(lastInfo.anomalyCount ?? 0),
-      totalRequests: Number(lastInfo.totalRequests ?? 0),
-    }),
+      totalRequests: Number(lastInfo.totalRequests ?? 0)
+    })
   };
 };
 
-const replicateTimestampDesc = (config: DDConfig): TestFunction<DDContext> =>
+const replicateTimestampDesc =
+  (config: DDConfig): TestFunction<DDContext> =>
   async (ctx, onProgress) => {
     const pageSize = ctx.version === '1.7' ? DEFAULT_PAGE_SIZE_V17 : DEFAULT_PAGE_SIZE_V20;
     const progress = replicationProgressAdapter(onProgress, 'Timestamp Descending');
@@ -468,26 +490,28 @@ const replicateTimestampDesc = (config: DDConfig): TestFunction<DDContext> =>
       jsonSchemaValidation: ctx.version !== '1.7' ? (config.strictMode ?? true) : false,
       top: pageSize,
       strategy: REPLICATION_STRATEGIES.TIMESTAMP_DESC,
-      onProgress: progress.callback,
+      onProgress: progress.callback
     });
     const stats = progress.getLastStats();
     return { context: ctx, summary: `Timestamp Descending with $top=${pageSize}`, counts: stats };
   };
 
-const replicateNextLink = (config: DDConfig): TestFunction<DDContext> =>
+const replicateNextLink =
+  (config: DDConfig): TestFunction<DDContext> =>
   async (ctx, onProgress) => {
     const progress = replicationProgressAdapter(onProgress, 'NextLink');
     await replicate({
       ...buildReplicationSettings(ctx, config),
       maxPageSize: DEFAULT_PAGE_SIZE_V20,
       strategy: REPLICATION_STRATEGIES.NEXT_LINK,
-      onProgress: progress.callback,
+      onProgress: progress.callback
     });
     const stats = progress.getLastStats();
     return { context: ctx, summary: `NextLink with maxPageSize=${DEFAULT_PAGE_SIZE_V20}`, counts: stats };
   };
 
-const replicateNextLinkFiltered = (config: DDConfig): TestFunction<DDContext> =>
+const replicateNextLinkFiltered =
+  (config: DDConfig): TestFunction<DDContext> =>
   async (ctx, onProgress) => {
     const cutoffDate = new Date(new Date().getFullYear() - DEFAULT_YEARS_BACK, 0).toISOString();
     const progress = replicationProgressAdapter(onProgress, 'NextLink (modified-since filter)');
@@ -497,7 +521,7 @@ const replicateNextLinkFiltered = (config: DDConfig): TestFunction<DDContext> =>
       strategy: REPLICATION_STRATEGIES.NEXT_LINK,
       filter: `ModificationTimestamp ge ${cutoffDate}`,
       orderby: 'ModificationTimestamp asc',
-      onProgress: progress.callback,
+      onProgress: progress.callback
     });
     const stats = progress.getLastStats();
     return { context: ctx, summary: `NextLink (modified-since filter, ${DEFAULT_YEARS_BACK}yr lookback)`, counts: stats };
@@ -512,28 +536,23 @@ const replicateAndValidate = (config: DDConfig): PipelineStep<DDContext> => ({
   functions: [
     initReplicationState,
     ...(config.parallelReplicate
-      ? [async (ctx: Readonly<DDContext>, onProgress: import('./types.js').ProgressCallback) => {
-          // Run all replication strategies in parallel
-          const fns = [
-            replicateTimestampDesc(config),
-            ...(config.version !== '1.7' ? [
-              replicateNextLink(config),
-              replicateNextLinkFiltered(config),
-            ] : []),
-          ];
-          const results = await Promise.all(fns.map(fn => fn(ctx, onProgress)));
-          const summaries = results.map(r => r.summary).filter(Boolean);
-          return { context: ctx, summary: summaries.join('; ') };
-        }]
+      ? [
+          async (ctx: Readonly<DDContext>, onProgress: import('./types.js').ProgressCallback) => {
+            // Run all replication strategies in parallel
+            const fns = [
+              replicateTimestampDesc(config),
+              ...(config.version !== '1.7' ? [replicateNextLink(config), replicateNextLinkFiltered(config)] : [])
+            ];
+            const results = await Promise.all(fns.map(fn => fn(ctx, onProgress)));
+            const summaries = results.map(r => r.summary).filter(Boolean);
+            return { context: ctx, summary: summaries.join('; ') };
+          }
+        ]
       : [
           replicateTimestampDesc(config),
-          ...(config.version !== '1.7' ? [
-            replicateNextLink(config),
-            replicateNextLinkFiltered(config),
-          ] : []),
-        ]
-    ),
-  ],
+          ...(config.version !== '1.7' ? [replicateNextLink(config), replicateNextLinkFiltered(config)] : [])
+        ])
+  ]
 });
 
 /** Serialize DD pipeline results into a human-readable remarks string. */
@@ -541,7 +560,9 @@ const serializeDDRemarks = (result: PipelineResult): string => {
   const metaStep = result.steps.find(s => s.name === 'Generate metadata report');
   const parts: string[] = [];
   if (metaStep?.counts) {
-    parts.push(`${metaStep.counts.resources} resources, ${(metaStep.counts.fields ?? 0).toLocaleString()} fields, ${(metaStep.counts.lookups ?? 0).toLocaleString()} lookups`);
+    parts.push(
+      `${metaStep.counts.resources} resources, ${(metaStep.counts.fields ?? 0).toLocaleString()} fields, ${(metaStep.counts.lookups ?? 0).toLocaleString()} lookups`
+    );
   }
   parts.push(`Data Dictionary compliance test ${result.status}`);
   return `${parts.join('. ')}.`;
@@ -550,7 +571,7 @@ const serializeDDRemarks = (result: PipelineResult): string => {
 /** Create DD report generators. */
 const ddReportGenerators = (version: string) => [
   createGenericReportGenerator('Data Dictionary', version, serializeDDRemarks),
-  createDetailedReportGenerator('Data Dictionary', version, serializeDDRemarks),
+  createDetailedReportGenerator('Data Dictionary', version, serializeDDRemarks)
 ];
 
 const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext> => ({
@@ -567,16 +588,16 @@ const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext> => ({
     const pipelineResult = {
       status: 'passed' as const,
       endorsement: 'dd',
-      steps: ctx.pipelineSteps as ReadonlyArray<StepResult> ?? [],
+      steps: (ctx.pipelineSteps as ReadonlyArray<StepResult>) ?? [],
       context: ctx,
-      duration: 0,
+      duration: 0
     };
     const written = await writeReports(pipelineResult, generators, ctx.outputPath, onProgress);
     return {
       context: { ...ctx, reports: written },
-      summary: `${written.length} reports written`,
+      summary: `${written.length} reports written`
     };
-  },
+  }
 });
 
 // ── Pipeline Assembly ──
@@ -590,26 +611,19 @@ export const createDDPipeline = (config: DDConfig) =>
     validateDdMetadata(config),
     ...(config.version !== '1.7' ? [runVariations(config)] : []),
     replicateAndValidate(config),
-    writeComplianceReports(config),
+    writeComplianceReports(config)
   ]);
 
 /** Run DD compliance tests with a single function call. */
-export const runDDCompliance = async (
-  config: DDConfig,
-  onProgress?: (progress: import('./types.js').StepProgress) => void,
-) => {
+export const runDDCompliance = async (config: DDConfig, onProgress?: (progress: import('./types.js').StepProgress) => void) => {
   const outputPath = await prepareOutputDir('data-dictionary', config.version, config);
 
   const pipeline = createDDPipeline(config);
   const initialContext: DDContext = {
     serverUrl: config.server.url,
     version: config.version,
-    outputPath,
+    outputPath
   };
 
-  return pipeline.run(
-    initialContext,
-    onProgress,
-    { failFast: config.options?.failFast ?? true },
-  );
+  return pipeline.run(initialContext, onProgress, { failFast: config.options?.failFast ?? true });
 };

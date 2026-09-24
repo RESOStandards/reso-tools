@@ -20,7 +20,7 @@ export interface ODataRequester {
 
 /** The production requester — reso-client via `odataRequest` (today's behavior, unchanged). */
 export const webRequester: ODataRequester = {
-  request: (options) => odataRequest(options)
+  request: options => odataRequest(options)
 };
 
 /**
@@ -29,7 +29,7 @@ export const webRequester: ODataRequester = {
  * see the same session), which is where the shared breaker's fail-fast behavior comes from.
  */
 export const createSessionRequester = (session: ResilienceSession): ODataRequester => ({
-  request: (options) => odataRequest({ ...options, session })
+  request: options => odataRequest({ ...options, session })
 });
 
 /**
@@ -88,9 +88,7 @@ const CERT_RETRYABLE_STATUSES = [429, 503] as const;
  */
 export const DEFAULT_CERT_TOTAL_TIMEOUT_MS = 55 * 60_000;
 
-export const createCertSession = (
-  totalTimeoutMs: number = DEFAULT_CERT_TOTAL_TIMEOUT_MS
-): ResilienceSession =>
+export const createCertSession = (totalTimeoutMs: number = DEFAULT_CERT_TOTAL_TIMEOUT_MS): ResilienceSession =>
   createResilienceSession({
     governor: { ratePerSec: 0, burst: 0 },
     breaker: { threshold: Number.POSITIVE_INFINITY, cooldownMs: 0 },

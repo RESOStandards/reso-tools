@@ -20,8 +20,9 @@
  * 5. Multi-level $expand is supported via recursive batch lookups.
  */
 
-import type { Db } from 'mongodb';
 import type { ExpandExpression } from '@reso-standards/odata-expression-parser';
+import type { Db } from 'mongodb';
+import type { ResoField } from '../metadata/types.js';
 import type {
   CollectionQueryOptions,
   CollectionResult,
@@ -32,7 +33,6 @@ import type {
   SingleResult
 } from './data-access.js';
 import { MAX_EXPAND_DEPTH } from './data-access.js';
-import type { ResoField } from '../metadata/types.js';
 import { applyMongoExpandSelect } from './expand-select.js';
 import { filterToMongo } from './filter-to-mongo.js';
 import { coerceServedInteger } from './queries.js';
@@ -196,9 +196,7 @@ const batchExpandNavigation = async (
         const children = expanded[binding.name];
         if (!children) continue;
 
-        const childEntities = binding.isCollection
-          ? (children as ReadonlyArray<EntityRecord>)
-          : [children as EntityRecord];
+        const childEntities = binding.isCollection ? (children as ReadonlyArray<EntityRecord>) : [children as EntityRecord];
 
         if (childEntities.length === 0) continue;
 
@@ -289,7 +287,9 @@ export const createMongoDal = (db: Db): DataAccessLayer => {
     if (options?.$top !== undefined) cursor = cursor.limit(options.$top);
 
     const collFields = collectionFieldSet(ctx);
-    const docs = ((await cursor.toArray()) as Record<string, unknown>[]).map(d => coerceServedTypes(coerceCollections(d, collFields), ctx.fields));
+    const docs = ((await cursor.toArray()) as Record<string, unknown>[]).map(d =>
+      coerceServedTypes(coerceCollections(d, collFields), ctx.fields)
+    );
 
     // $count — uses the same filter for accurate count
     let count: number | undefined;
@@ -301,8 +301,14 @@ export const createMongoDal = (db: Db): DataAccessLayer => {
     let entities: ReadonlyArray<EntityRecord> = docs;
     if (options?.$expand) {
       entities = await batchExpandNavigation(
-        db, ctx.resource, ctx.keyField, docs,
-        options.$expand, ctx.navigationBindings, ctx.resolveChildContext, 0
+        db,
+        ctx.resource,
+        ctx.keyField,
+        docs,
+        options.$expand,
+        ctx.navigationBindings,
+        ctx.resolveChildContext,
+        0
       );
     }
 
@@ -339,8 +345,14 @@ export const createMongoDal = (db: Db): DataAccessLayer => {
     // Apply $expand
     if (options?.$expand) {
       const [expanded] = await batchExpandNavigation(
-        db, ctx.resource, ctx.keyField, [entity],
-        options.$expand, ctx.navigationBindings, ctx.resolveChildContext, 0
+        db,
+        ctx.resource,
+        ctx.keyField,
+        [entity],
+        options.$expand,
+        ctx.navigationBindings,
+        ctx.resolveChildContext,
+        0
       );
       return expanded;
     }

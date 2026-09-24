@@ -20,8 +20,8 @@
  */
 
 import { readFile, readdir, stat } from 'node:fs/promises';
-import { join, extname } from 'node:path';
 import { createRequire } from 'node:module';
+import { extname, join } from 'node:path';
 
 const requireCjs = createRequire(import.meta.url);
 
@@ -65,8 +65,7 @@ export const INVALID_CONTEXT_RESOURCE = '_INVALID_';
 
 const capitalize = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
-const isPlainObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v);
+const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /** Resolve resource (+ version, when present) from an RCF/OData context string. */
 const parseContext = (ctx: unknown): { readonly version?: string; readonly resource: string } | null => {
@@ -149,7 +148,7 @@ async function* zipEntries(zip: ZipFile): AsyncGenerator<ZipEntry> {
 
 async function* readZip(zipPath: string): AsyncGenerator<RcfPayload> {
   const zip = await new Promise<ZipFile>((resolve, reject) =>
-    yauzl.open(zipPath, { lazyEntries: true }, (err, z) => (err ? reject(err) : resolve(z))),
+    yauzl.open(zipPath, { lazyEntries: true }, (err, z) => (err ? reject(err) : resolve(z)))
   );
   try {
     for await (const entry of zipEntries(zip)) {

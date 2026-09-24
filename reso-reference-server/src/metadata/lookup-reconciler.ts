@@ -15,12 +15,10 @@ const LOOKUP_NAME_ANNOTATION_TERM = 'RESO.OData.Metadata.LookupName';
 const ENUM_PREFIX = 'org.reso.metadata.enums.';
 
 /** Strips the enum namespace prefix from a type name. */
-const stripEnumPrefix = (name: string): string =>
-  name.startsWith(ENUM_PREFIX) ? name.slice(ENUM_PREFIX.length) : name;
+const stripEnumPrefix = (name: string): string => (name.startsWith(ENUM_PREFIX) ? name.slice(ENUM_PREFIX.length) : name);
 
 /** Unwraps Collection() wrapper from a type name. */
-const unwrapCollection = (type: string): string =>
-  type.startsWith('Collection(') && type.endsWith(')') ? type.slice(11, -1) : type;
+const unwrapCollection = (type: string): string => (type.startsWith('Collection(') && type.endsWith(')') ? type.slice(11, -1) : type);
 
 /** Generates a deterministic LookupKey. */
 const generateLookupKey = (lookupName: string, lookupValue: string): string =>
@@ -30,10 +28,7 @@ const generateLookupKey = (lookupName: string, lookupValue: string): string =>
  * Builds a map of fieldName → lookupName for all enum fields in a resource.
  * Handles both string mode (LookupName annotation) and enum-type mode (type name).
  */
-const buildFieldLookupMap = (
-  metadata: ResoMetadata,
-  resourceName: string,
-): ReadonlyMap<string, string> => {
+const buildFieldLookupMap = (metadata: ResoMetadata, resourceName: string): ReadonlyMap<string, string> => {
   const fields = getFieldsForResource(metadata, resourceName);
   const map = new Map<string, string>();
 
@@ -65,7 +60,7 @@ export const reconcileLookups = async (
   dal: DataAccessLayer,
   metadata: ResoMetadata,
   resourceName: string,
-  records: ReadonlyArray<Record<string, unknown>>,
+  records: ReadonlyArray<Record<string, unknown>>
 ): Promise<number> => {
   const keyField = getKeyFieldForResource('Lookup');
   const lookupFields = getFieldsForResource(metadata, 'Lookup');
@@ -75,7 +70,7 @@ export const reconcileLookups = async (
     resource: 'Lookup',
     keyField,
     fields: lookupFields,
-    navigationBindings: [],
+    navigationBindings: []
   };
 
   const fieldLookupMap = buildFieldLookupMap(metadata, resourceName);
@@ -110,12 +105,9 @@ export const reconcileLookups = async (
     const result = await dal.queryCollection(lookupCtx, {
       $filter: `LookupName eq '${lookupName}'`,
       $select: 'LookupValue',
-      $top: 10000,
+      $top: 10000
     });
-    existingValues.set(
-      lookupName,
-      new Set(result.value.map(r => String(r.LookupValue ?? ''))),
-    );
+    existingValues.set(lookupName, new Set(result.value.map(r => String(r.LookupValue ?? ''))));
   }
 
   // Insert missing values
@@ -135,7 +127,7 @@ export const reconcileLookups = async (
           LookupValue: value,
           StandardLookupValue: value,
           LegacyODataValue: value,
-          ModificationTimestamp: timestamp,
+          ModificationTimestamp: timestamp
         });
         inserted++;
       } catch {

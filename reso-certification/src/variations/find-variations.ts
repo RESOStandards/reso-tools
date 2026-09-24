@@ -18,8 +18,8 @@
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { computeVariationsViaService, type VariationsServiceReport } from './service.js';
 import { DEFAULT_DD_VERSION, DEFAULT_FUZZINESS, VARIATIONS_REPORT_FILENAME } from './constants.js';
+import { type VariationsServiceReport, computeVariationsViaService } from './service.js';
 
 export interface FindVariationsInput {
   /**
@@ -58,7 +58,7 @@ export interface FindVariationsInput {
 
 /** True when the report carries at least one variation in any category. */
 const hasVariations = (report: VariationsServiceReport): boolean =>
-  Object.values(report.variations ?? {}).some((entries) => Array.isArray(entries) && entries.length > 0);
+  Object.values(report.variations ?? {}).some(entries => Array.isArray(entries) && entries.length > 0);
 
 /**
  * Resolve the metadata report from exactly one source — an in-memory report or
@@ -71,27 +71,17 @@ const loadMetadataReport = async (input: FindVariationsInput): Promise<unknown> 
   const hasInline = inline !== undefined;
   const hasPath = typeof path === 'string' && path.length > 0;
   if (hasInline && hasPath) {
-    throw new Error(
-      'findVariations: metadataReportJson and pathToMetadataReportJson are mutually exclusive — provide one.',
-    );
+    throw new Error('findVariations: metadataReportJson and pathToMetadataReportJson are mutually exclusive — provide one.');
   }
   if (hasInline) return inline;
   if (typeof path === 'string' && path.length > 0) {
     return JSON.parse(await readFile(path, { encoding: 'utf8' })) as unknown;
   }
-  throw new Error(
-    'findVariations: provide a metadata source — metadataReportJson (in-memory) or pathToMetadataReportJson (file).',
-  );
+  throw new Error('findVariations: provide a metadata source — metadataReportJson (in-memory) or pathToMetadataReportJson (file).');
 };
 
 export const findVariations = async (input: FindVariationsInput): Promise<VariationsServiceReport> => {
-  const {
-    fuzziness = DEFAULT_FUZZINESS,
-    version = DEFAULT_DD_VERSION,
-    fromCli,
-    outputPath,
-    bearerToken,
-  } = input;
+  const { fuzziness = DEFAULT_FUZZINESS, version = DEFAULT_DD_VERSION, fromCli, outputPath, bearerToken } = input;
 
   const metadataReportJson = await loadMetadataReport(input);
 
@@ -100,7 +90,7 @@ export const findVariations = async (input: FindVariationsInput): Promise<Variat
     version,
     fuzziness,
     ...(fromCli ? { fromCli } : {}),
-    ...(bearerToken ? { bearerToken } : {}),
+    ...(bearerToken ? { bearerToken } : {})
   });
 
   if (hasVariations(report)) {

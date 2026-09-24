@@ -16,8 +16,8 @@
  * Commander CLI helper, as the legacy did) tailors the not-configured message.
  */
 
-import { gzipSync, gunzipSync } from 'node:zlib';
-import { mintProviderToken, serviceError, isServiceAuthError } from '../sdk/common.js';
+import { gunzipSync, gzipSync } from 'node:zlib';
+import { isServiceAuthError, mintProviderToken, serviceError } from '../sdk/common.js';
 import type { ServiceErrorCode } from '../sdk/common.js';
 import { MAX_COMPUTE_PAYLOAD_BYTES, PAYLOAD_TOO_LARGE_MESSAGE } from './constants.js';
 import type { VariationSuggestionItem } from './csv.js';
@@ -46,9 +46,7 @@ export type VariationsServiceErrorCode = ServiceErrorCode;
 /** True for the two auth failures — the UI uses this to decide to prompt login. Alias of `isServiceAuthError`. */
 export const isVariationsAuthError = isServiceAuthError;
 
-export const computeVariationsViaService = async (
-  input: ComputeVariationsViaServiceInput,
-): Promise<VariationsServiceReport> => {
+export const computeVariationsViaService = async (input: ComputeVariationsViaServiceInput): Promise<VariationsServiceReport> => {
   const servicesUrl = process.env.RESO_SERVICES_URL;
   if (!servicesUrl) {
     throw serviceError('SERVICE_ERROR', 'Variations Service: RESO_SERVICES_URL is not set.');
@@ -60,14 +58,14 @@ export const computeVariationsViaService = async (
       'AUTH_REQUIRED',
       input.fromCli
         ? 'Variations check requires authentication. Set CERT_AUTH_API_BASE_URL, CERT_AUTH_API_USERNAME, and CERTIFICATION_API_KEY in your .env so the CLI can mint a provider token.'
-        : 'Variations check requires authentication. Pass a provider token (bearerToken) — e.g. the session token from logging in.',
+        : 'Variations check requires authentication. Pass a provider token (bearerToken) — e.g. the session token from logging in.'
     );
   }
 
   const body = {
     metadataReportJson: input.metadataReportJson,
     version: input.version,
-    ...(input.fuzziness !== undefined ? { fuzziness: input.fuzziness } : {}),
+    ...(input.fuzziness !== undefined ? { fuzziness: input.fuzziness } : {})
   };
 
   // text/plain + gzip+base64 mirrors the legacy /search call: large metadata
@@ -83,14 +81,14 @@ export const computeVariationsViaService = async (
     const mb = (bytes: number): string => (bytes / 1024 / 1024).toFixed(1);
     throw serviceError(
       'SERVICE_ERROR',
-      `Compressed request is ${mb(compressedBody.length)} MB (limit ~${mb(MAX_COMPUTE_PAYLOAD_BYTES)} MB). ${PAYLOAD_TOO_LARGE_MESSAGE}`,
+      `Compressed request is ${mb(compressedBody.length)} MB (limit ~${mb(MAX_COMPUTE_PAYLOAD_BYTES)} MB). ${PAYLOAD_TOO_LARGE_MESSAGE}`
     );
   }
 
   const response = await fetch(`${servicesUrl}/v2/certification/variations/compute`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'text/plain' },
-    body: compressedBody,
+    body: compressedBody
   });
 
   if (response.status === 401 || response.status === 403) {
@@ -98,7 +96,7 @@ export const computeVariationsViaService = async (
       'AUTH_REJECTED',
       input.fromCli
         ? 'Variations check: the provider token was rejected. Re-check your CERT_AUTH_API_* .env credentials.'
-        : 'Variations check: your session token was rejected or has expired. Log in again to continue.',
+        : 'Variations check: your session token was rejected or has expired. Log in again to continue.'
     );
   }
   if (response.status === 413) {
@@ -169,18 +167,13 @@ const hasItemsArray = (value: unknown): value is { readonly items: ReadonlyArray
  * item. Chunks POST sequentially. Throws with a coded error — auth failures
  * carry `AUTH_REQUIRED` / `AUTH_REJECTED` so the CLI and UI can react.
  */
-export const updateVariationsViaService = async (
-  input: UpdateVariationsViaServiceInput,
-): Promise<UpdateVariationsResult> => {
+export const updateVariationsViaService = async (input: UpdateVariationsViaServiceInput): Promise<UpdateVariationsResult> => {
   const servicesUrl = process.env.RESO_SERVICES_URL;
   if (!servicesUrl) {
     throw serviceError('SERVICE_ERROR', 'Variations Service: RESO_SERVICES_URL is not set.');
   }
   if (input.adminReview && input.fastTrack) {
-    throw serviceError(
-      'SERVICE_ERROR',
-      'A submission cannot be both admin-review and fast-track; the two flags are mutually exclusive.',
-    );
+    throw serviceError('SERVICE_ERROR', 'A submission cannot be both admin-review and fast-track; the two flags are mutually exclusive.');
   }
   if (input.items.length === 0) {
     throw serviceError('SERVICE_ERROR', 'No variation suggestions to submit.');
@@ -192,13 +185,13 @@ export const updateVariationsViaService = async (
       'AUTH_REQUIRED',
       input.fromCli
         ? 'Updating variations requires authentication. Set TOKEN_URI, CLIENT_ID, and CLIENT_SECRET in your .env so the CLI can mint a provider token.'
-        : 'Updating variations requires authentication. Pass a provider token (bearerToken).',
+        : 'Updating variations requires authentication. Pass a provider token (bearerToken).'
     );
   }
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/json'
   };
   if (input.adminSecret) headers['x-ft-admin-secret'] = input.adminSecret;
   if (input.overwrite) headers.Overwrite = 'true';
@@ -223,16 +216,14 @@ export const updateVariationsViaService = async (
         'AUTH_REJECTED',
         (input.fromCli
           ? 'Update variations: the provider token or admin secret was rejected. Re-check your .env credentials.'
-          : 'Update variations: your session token was rejected or has expired. Log in again to continue.') + committed,
+          : 'Update variations: your session token was rejected or has expired. Log in again to continue.') + committed
       );
     }
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
       throw serviceError(
         'SERVICE_ERROR',
-        `Update variations chunk ${index + 1}/${chunks.length} failed: ${response.status} ${response.statusText}` +
-          (detail ? ` — ${detail.slice(0, 500)}` : '') +
-          committed,
+        `Update variations chunk ${index + 1}/${chunks.length} failed: ${response.status} ${response.statusText}${detail ? ` — ${detail.slice(0, 500)}` : ''}${committed}`
       );
     }
 
@@ -241,7 +232,10 @@ export const updateVariationsViaService = async (
       if (typeof value === 'number') stats[key] = (stats[key] ?? 0) + value;
     }
     if (Array.isArray(body.permissionDenied)) {
-      rejected.permissionDenied += body.permissionDenied.reduce<number>((n, group) => n + (hasItemsArray(group) ? group.items.length : 0), 0);
+      rejected.permissionDenied += body.permissionDenied.reduce<number>(
+        (n, group) => n + (hasItemsArray(group) ? group.items.length : 0),
+        0
+      );
     }
     if (Array.isArray(body.validationFailed)) rejected.validationFailed += body.validationFailed.length;
     if (Array.isArray(body.corrections)) rejected.corrections += body.corrections.length;
@@ -253,6 +247,6 @@ export const updateVariationsViaService = async (
     stats,
     permissionDenied: rejected.permissionDenied,
     validationFailed: rejected.validationFailed,
-    corrections: rejected.corrections,
+    corrections: rejected.corrections
   };
 };

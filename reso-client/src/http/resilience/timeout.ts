@@ -16,10 +16,7 @@
  * can turn it off. The timer is always cleared in `finally`, so no timer lingers
  * after the request settles.
  */
-export const withTimeout = async <T>(
-  timeoutMs: number,
-  fn: (signal: AbortSignal) => Promise<T>
-): Promise<T> => {
+export const withTimeout = async <T>(timeoutMs: number, fn: (signal: AbortSignal) => Promise<T>): Promise<T> => {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     return fn(new AbortController().signal);
   }

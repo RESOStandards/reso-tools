@@ -43,7 +43,10 @@ export interface EnvConfig {
  * node --env-file=.env script.js
  * ```
  */
-export const authConfigFromEnv = (env: Record<string, string | undefined> = (globalThis as unknown as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {}): AuthConfig => {
+export const authConfigFromEnv = (
+  env: Record<string, string | undefined> = (globalThis as unknown as { process?: { env: Record<string, string | undefined> } }).process
+    ?.env ?? {}
+): AuthConfig => {
   const clientId = env[ENV_CLIENT_ID];
   const clientSecret = env[ENV_CLIENT_SECRET];
   const tokenUri = env[ENV_TOKEN_URI];
@@ -59,7 +62,7 @@ export const authConfigFromEnv = (env: Record<string, string | undefined> = (glo
       clientSecret,
       tokenUrl: tokenUri,
       ...(scope ? { scope } : {}),
-      ...(defaultExpiresIn ? { defaultExpiresIn } : {}),
+      ...(defaultExpiresIn ? { defaultExpiresIn } : {})
     };
   }
 
@@ -77,7 +80,10 @@ export const authConfigFromEnv = (env: Record<string, string | undefined> = (glo
  * Read a full EnvConfig (base URL + auth) from process.env.
  * Throws if RESO_BASE_URL or auth vars are missing.
  */
-export const configFromEnv = (env: Record<string, string | undefined> = (globalThis as unknown as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {}): EnvConfig => {
+export const configFromEnv = (
+  env: Record<string, string | undefined> = (globalThis as unknown as { process?: { env: Record<string, string | undefined> } }).process
+    ?.env ?? {}
+): EnvConfig => {
   const baseUrl = env[ENV_BASE_URL];
   if (!baseUrl) {
     throw new Error(`${ENV_BASE_URL} environment variable is required.`);
@@ -85,6 +91,6 @@ export const configFromEnv = (env: Record<string, string | undefined> = (globalT
 
   return {
     baseUrl,
-    auth: authConfigFromEnv(env),
+    auth: authConfigFromEnv(env)
   };
 };

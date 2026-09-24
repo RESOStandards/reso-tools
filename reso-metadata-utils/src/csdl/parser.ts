@@ -27,11 +27,11 @@ import type {
   CsdlProperty,
   CsdlReferentialConstraint,
   CsdlResourceInfo,
-  FieldAnnotation,
-  FieldInfo,
   CsdlReturnType,
   CsdlSchema,
-  CsdlSingleton
+  CsdlSingleton,
+  FieldAnnotation,
+  FieldInfo
 } from './types.js';
 
 /**
@@ -129,8 +129,18 @@ const canonicalizeType = (type: string, aliasMap: Readonly<Record<string, string
  * Description) are all String constants.
  */
 const CONSTANT_EXPRESSION_NAMES = [
-  'String', 'Bool', 'Int', 'Decimal', 'Float',
-  'Date', 'DateTimeOffset', 'Duration', 'Guid', 'TimeOfDay', 'EnumMember', 'Binary'
+  'String',
+  'Bool',
+  'Int',
+  'Decimal',
+  'Float',
+  'Date',
+  'DateTimeOffset',
+  'Duration',
+  'Guid',
+  'TimeOfDay',
+  'EnumMember',
+  'Binary'
 ] as const;
 
 /** Extracts an annotation's constant value from either the inline-attribute or child-element form. */
@@ -165,7 +175,10 @@ const parseAnnotations = (raw: Record<string, unknown>): Record<string, string> 
   return result;
 };
 
-const parseProperties = (rawProperties: ReadonlyArray<Record<string, unknown>>, aliasMap: Readonly<Record<string, string>>): ReadonlyArray<CsdlProperty> =>
+const parseProperties = (
+  rawProperties: ReadonlyArray<Record<string, unknown>>,
+  aliasMap: Readonly<Record<string, string>>
+): ReadonlyArray<CsdlProperty> =>
   rawProperties.map(rawProp => {
     const annotations = parseAnnotations(rawProp);
 
@@ -206,7 +219,10 @@ const parseReferentialConstraints = (rawConstraints: ReadonlyArray<Record<string
  *
  * @see https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_NavigationProperty
  */
-const parseNavigationProperties = (rawNavProps: ReadonlyArray<Record<string, unknown>>, aliasMap: Readonly<Record<string, string>>): ReadonlyArray<CsdlNavigationProperty> =>
+const parseNavigationProperties = (
+  rawNavProps: ReadonlyArray<Record<string, unknown>>,
+  aliasMap: Readonly<Record<string, string>>
+): ReadonlyArray<CsdlNavigationProperty> =>
   rawNavProps.map(rawNav => {
     const name = rawNav['@_Name'] as string;
     const type = canonicalizeType(rawNav['@_Type'] as string, aliasMap);
@@ -235,7 +251,10 @@ const parseNavigationProperties = (rawNavProps: ReadonlyArray<Record<string, unk
     };
   });
 
-const parseEntityTypes = (rawEntityTypes: ReadonlyArray<Record<string, unknown>>, aliasMap: Readonly<Record<string, string>>): ReadonlyArray<CsdlEntityType> =>
+const parseEntityTypes = (
+  rawEntityTypes: ReadonlyArray<Record<string, unknown>>,
+  aliasMap: Readonly<Record<string, string>>
+): ReadonlyArray<CsdlEntityType> =>
   rawEntityTypes.map(rawEntity => {
     const name = rawEntity['@_Name'] as string;
 
@@ -268,7 +287,10 @@ const parseEntityTypes = (rawEntityTypes: ReadonlyArray<Record<string, unknown>>
     };
   });
 
-const parseComplexTypes = (rawComplexTypes: ReadonlyArray<Record<string, unknown>>, aliasMap: Readonly<Record<string, string>>): ReadonlyArray<CsdlComplexType> =>
+const parseComplexTypes = (
+  rawComplexTypes: ReadonlyArray<Record<string, unknown>>,
+  aliasMap: Readonly<Record<string, string>>
+): ReadonlyArray<CsdlComplexType> =>
   rawComplexTypes.map(rawComplex => {
     const name = rawComplex['@_Name'] as string;
 
@@ -336,7 +358,10 @@ const parseNavigationPropertyBindings = (
 /**
  * Parse Parameter elements from an Action or Function.
  */
-const parseParameters = (rawParams: ReadonlyArray<Record<string, unknown>>, aliasMap: Readonly<Record<string, string>>): ReadonlyArray<CsdlParameter> =>
+const parseParameters = (
+  rawParams: ReadonlyArray<Record<string, unknown>>,
+  aliasMap: Readonly<Record<string, string>>
+): ReadonlyArray<CsdlParameter> =>
   rawParams.map(p => ({
     name: p['@_Name'] as string,
     type: canonicalizeType(p['@_Type'] as string, aliasMap),
@@ -348,7 +373,10 @@ const parseParameters = (rawParams: ReadonlyArray<Record<string, unknown>>, alia
 /**
  * Parse a ReturnType element from an Action or Function.
  */
-const parseReturnType = (rawReturn: Record<string, unknown> | undefined, aliasMap: Readonly<Record<string, string>>): CsdlReturnType | undefined => {
+const parseReturnType = (
+  rawReturn: Record<string, unknown> | undefined,
+  aliasMap: Readonly<Record<string, string>>
+): CsdlReturnType | undefined => {
   if (!rawReturn) return undefined;
   return {
     type: canonicalizeType(rawReturn['@_Type'] as string, aliasMap),
@@ -358,7 +386,10 @@ const parseReturnType = (rawReturn: Record<string, unknown> | undefined, aliasMa
   };
 };
 
-const parseActions = (rawActions: ReadonlyArray<Record<string, unknown>>, aliasMap: Readonly<Record<string, string>>): ReadonlyArray<CsdlAction> =>
+const parseActions = (
+  rawActions: ReadonlyArray<Record<string, unknown>>,
+  aliasMap: Readonly<Record<string, string>>
+): ReadonlyArray<CsdlAction> =>
   rawActions.map(rawAction => {
     const rawParams = (rawAction.Parameter as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
     const rawReturn = rawAction.ReturnType as Record<string, unknown> | undefined;
@@ -378,7 +409,10 @@ const parseActions = (rawActions: ReadonlyArray<Record<string, unknown>>, aliasM
     };
   });
 
-const parseFunctions = (rawFunctions: ReadonlyArray<Record<string, unknown>>, aliasMap: Readonly<Record<string, string>>): ReadonlyArray<CsdlFunction> =>
+const parseFunctions = (
+  rawFunctions: ReadonlyArray<Record<string, unknown>>,
+  aliasMap: Readonly<Record<string, string>>
+): ReadonlyArray<CsdlFunction> =>
   rawFunctions.map(rawFunc => {
     const rawParams = (rawFunc.Parameter as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
     const rawReturn = rawFunc.ReturnType as Record<string, unknown> | undefined;
@@ -399,7 +433,10 @@ const parseFunctions = (rawFunctions: ReadonlyArray<Record<string, unknown>>, al
     };
   });
 
-const parseEntityContainer = (rawContainer: Record<string, unknown> | undefined, aliasMap: Readonly<Record<string, string>>): CsdlEntityContainer | undefined => {
+const parseEntityContainer = (
+  rawContainer: Record<string, unknown> | undefined,
+  aliasMap: Readonly<Record<string, string>>
+): CsdlEntityContainer | undefined => {
   if (!rawContainer) return undefined;
 
   const name = (rawContainer['@_Name'] as string) ?? 'Default';
@@ -476,7 +513,7 @@ export const parseCsdlXml = (xml: string): CsdlSchema => {
   const schemas: ReadonlyArray<Record<string, unknown>> = Array.isArray(rawSchema) ? rawSchema : [rawSchema];
 
   // Use the namespace from the first schema that has entity types, or fall back to the first schema
-  const namespace: string = (schemas.find(s => s.EntityType) ?? schemas[0])['@_Namespace'] as string ?? '';
+  const namespace: string = ((schemas.find(s => s.EntityType) ?? schemas[0])['@_Namespace'] as string) ?? '';
 
   // CSDL allows a schema Alias as a shorthand for its Namespace; qualified type references may use
   // the alias or the namespace interchangeably. Map alias -> namespace so canonicalizeType can
@@ -512,8 +549,12 @@ export const parseCsdlXml = (xml: string): CsdlSchema => {
   const rawComplexTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s =>
     ((s.ComplexType as ReadonlyArray<Record<string, unknown>>) ?? []).map(e => ({ ...e, __schemaNamespace: s['@_Namespace'] }))
   );
-  const rawActions: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.Action as ReadonlyArray<Record<string, unknown>>) ?? []);
-  const rawFunctions: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s => (s.Function as ReadonlyArray<Record<string, unknown>>) ?? []);
+  const rawActions: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(
+    s => (s.Action as ReadonlyArray<Record<string, unknown>>) ?? []
+  );
+  const rawFunctions: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(
+    s => (s.Function as ReadonlyArray<Record<string, unknown>>) ?? []
+  );
   // EntityContainer is typically in one schema — find it
   const rawContainer = schemas.reduce<Record<string, unknown> | undefined>(
     (found, s) => found ?? (s.EntityContainer as Record<string, unknown> | undefined),
@@ -567,17 +608,15 @@ export const discoverResources = (schema: CsdlSchema): ReadonlyArray<CsdlResourc
     typeName: string
   ): string | undefined => {
     if (!et) return undefined;
-    const idProps = et.properties.filter(
-      p => p.name !== keyField && p.name.endsWith('Id') && p.type === 'Edm.String'
-    );
+    const idProps = et.properties.filter(p => p.name !== keyField && p.name.endsWith('Id') && p.type === 'Edm.String');
     if (idProps.length === 0) return undefined;
 
     // Derive the stem from the key field (e.g. "ListingKey" → "Listing", "MemberKey" → "Member")
     const keyStem = keyField.endsWith('Key') ? keyField.slice(0, -3) : undefined;
     const preferredNames = [
-      keyStem ? `${keyStem}Id` : undefined,    // ListingKey → ListingId
-      `${entitySetName}Id`,                     // Property → PropertyId
-      `${typeName}Id`                           // Property → PropertyId (type name)
+      keyStem ? `${keyStem}Id` : undefined, // ListingKey → ListingId
+      `${entitySetName}Id`, // Property → PropertyId
+      `${typeName}Id` // Property → PropertyId (type name)
     ].filter((n): n is string => n !== undefined);
 
     const preferred = preferredNames.reduce<string | undefined>(
@@ -594,7 +633,9 @@ export const discoverResources = (schema: CsdlSchema): ReadonlyArray<CsdlResourc
     const alternateKeyField = resolveAlternateKey(et, keyField, es.name, typeName);
     const navigationProperties = et?.navigationProperties.map(np => np.name) ?? [];
     return {
-      name: es.name, entityType: es.entityType, keyField,
+      name: es.name,
+      entityType: es.entityType,
+      keyField,
       ...(alternateKeyField ? { alternateKeyField } : {}),
       navigationProperties
     };
@@ -609,7 +650,8 @@ export const getEntityType = (schema: CsdlSchema, name: string): CsdlEntityType 
 export const getEnumType = (schema: CsdlSchema, name: string): CsdlEnumType | undefined => schema.enumTypes.find(et => et.name === name);
 
 /** Find a complex type by name. */
-export const getComplexType = (schema: CsdlSchema, name: string): CsdlComplexType | undefined => schema.complexTypes.find(ct => ct.name === name);
+export const getComplexType = (schema: CsdlSchema, name: string): CsdlComplexType | undefined =>
+  schema.complexTypes.find(ct => ct.name === name);
 
 /** The RESO annotation term that indicates a field uses the Lookup Resource. */
 const LOOKUP_NAME_TERM = 'RESO.OData.Metadata.LookupName';
@@ -631,8 +673,10 @@ const propertyToFieldInfo = (resourceName: string, prop: CsdlProperty, namespace
   const isCsdlEnum = !isEdmPrimitive(prop.type) && !prop.type.startsWith('Collection(Edm.');
 
   const typeName = isCsdlEnum
-    ? (rawType.startsWith(namespace + '.') ? rawType.slice(namespace.length + 1) : rawType)
-    : lookupName ?? undefined;
+    ? rawType.startsWith(`${namespace}.`)
+      ? rawType.slice(namespace.length + 1)
+      : rawType
+    : (lookupName ?? undefined);
 
   return {
     resourceName,
@@ -654,15 +698,9 @@ const propertyToFieldInfo = (resourceName: string, prop: CsdlProperty, namespace
  * Extract field metadata for all properties and navigation properties
  * of a CSDL entity type.
  */
-export const getFieldsForEntityType = (
-  schema: CsdlSchema,
-  entityType: CsdlEntityType,
-  resourceName: string
-): ReadonlyArray<FieldInfo> => {
+export const getFieldsForEntityType = (schema: CsdlSchema, entityType: CsdlEntityType, resourceName: string): ReadonlyArray<FieldInfo> => {
   const keyFields = new Set(entityType.key);
-  const fields = entityType.properties.map(p =>
-    propertyToFieldInfo(resourceName, p, schema.namespace, keyFields)
-  );
+  const fields = entityType.properties.map(p => propertyToFieldInfo(resourceName, p, schema.namespace, keyFields));
 
   const navFields: ReadonlyArray<FieldInfo> = entityType.navigationProperties.map(nav => ({
     resourceName,

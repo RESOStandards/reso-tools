@@ -14,11 +14,7 @@
 
 export const VARIATION_KEY_SEP = '';
 
-export const buildVariationKey = (
-  resourceName: string,
-  fieldName?: string,
-  lookupValue?: string,
-): string => {
+export const buildVariationKey = (resourceName: string, fieldName?: string, lookupValue?: string): string => {
   if (!resourceName || !resourceName.trim()) {
     throw new Error('buildVariationKey: resourceName is required');
   }
@@ -42,6 +38,6 @@ export const parseVariationKey = (key: string): ParsedVariationKey => {
   return {
     resourceName: parts[0],
     fieldName: parts[1] || undefined,
-    lookupValue: parts[2] || undefined,
+    lookupValue: parts[2] || undefined
   };
 };

@@ -19,7 +19,7 @@ export const resolveAuthToken = async (auth: AuthConfig): Promise<string> => {
     clientId: auth.clientId,
     clientSecret: auth.clientSecret,
     tokenUrl: auth.tokenUrl,
-    scope: auth.scope,
+    scope: auth.scope
   });
 };
 

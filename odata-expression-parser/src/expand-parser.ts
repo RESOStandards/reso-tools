@@ -109,13 +109,16 @@ const parseExpandOptions = (optionsStr: string, basePosition: number): ExpandQue
         options.$expand = parseExpandClauses(value, basePosition);
         break;
       case '$levels':
-        options.$levels = value === 'max' ? 'max' : (() => {
-          const n = Number(value);
-          if (!Number.isInteger(n) || n < 1) {
-            throw new ExpandParseError(`Invalid $levels value: "${value}"`, basePosition);
-          }
-          return n;
-        })();
+        options.$levels =
+          value === 'max'
+            ? 'max'
+            : (() => {
+                const n = Number(value);
+                if (!Number.isInteger(n) || n < 1) {
+                  throw new ExpandParseError(`Invalid $levels value: "${value}"`, basePosition);
+                }
+                return n;
+              })();
         break;
       default:
         throw new ExpandParseError(`Unknown expand option: "${key}"`, basePosition);
@@ -169,9 +172,7 @@ const parseExpandClause = (clause: string, basePosition: number): ExpandExpressi
   }
 
   const optionsStr = clause.slice(parenIdx + 1, closeIdx);
-  const options = optionsStr.length > 0
-    ? parseExpandOptions(optionsStr, basePosition + parenIdx + 1)
-    : {};
+  const options = optionsStr.length > 0 ? parseExpandOptions(optionsStr, basePosition + parenIdx + 1) : {};
 
   return { property, options };
 };

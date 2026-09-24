@@ -35,10 +35,7 @@ import type { CsdlEnumType } from './types.js';
  *  - Collection representations (`Collection(Edm.String)` / `Collection(EnumType)`) arrive as JSON
  *    arrays, not scalars, and are handled by the caller; this is the scalar (single / IsFlags) decoder.
  */
-export const decodeFlagsValue = (
-  enumType: CsdlEnumType,
-  raw: string | number | null | undefined,
-): ReadonlyArray<string> => {
+export const decodeFlagsValue = (enumType: CsdlEnumType, raw: string | number | null | undefined): ReadonlyArray<string> => {
   // Off-contract inputs must yield [] — never a phantom member. An absent enum field arrives as
   // `null`/`undefined` across the JSON boundary; a non-integer / NaN / Infinity / precision-unsafe
   // number is not a real enum value. Without these guards each would fall through to
@@ -65,7 +62,7 @@ export const decodeFlagsValue = (
     }
     if (bits < 0n) return [];
     return enumType.members
-      .filter((m) => {
+      .filter(m => {
         if (m.value === undefined) return false;
         let memberBit: bigint;
         try {
@@ -79,12 +76,12 @@ export const decodeFlagsValue = (
         // member. `x & (x - 1) === 0` is the power-of-two test.
         return memberBit > 0n && (memberBit & (memberBit - 1n)) === 0n && (bits & memberBit) === memberBit;
       })
-      .map((m) => m.name);
+      .map(m => m.name);
   }
 
   // Comma-joined name form (also covers a lone scalar name → a one-element result).
   return String(trimmed)
     .split(',')
-    .map((token) => token.trim())
-    .filter((token) => token.length > 0);
+    .map(token => token.trim())
+    .filter(token => token.length > 0);
 };

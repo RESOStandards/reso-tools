@@ -31,13 +31,13 @@ export interface FailureClassification {
   readonly message: string;
 }
 
-const httpFailure = (
-  kind: FailureKind,
-  retryable: boolean,
-  fatal: boolean,
-  status: number,
-  label: string
-): FailureClassification => ({ kind, retryable, fatal, status, message: `HTTP ${status} ${label}` });
+const httpFailure = (kind: FailureKind, retryable: boolean, fatal: boolean, status: number, label: string): FailureClassification => ({
+  kind,
+  retryable,
+  fatal,
+  status,
+  message: `HTTP ${status} ${label}`
+});
 
 /**
  * Classifies an HTTP error status. Intended for responses with `status >= 400`
@@ -61,8 +61,7 @@ export const classifyStatus = (status: number): FailureClassification => {
 export const classifyResponse = (response: { readonly status: number }): FailureClassification | null =>
   response.status >= 400 ? classifyStatus(response.status) : null;
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
 /**
  * Extracts name / code / message from a thrown value WITHOUT spreading it.
@@ -77,8 +76,7 @@ const extractErrorFields = (err: unknown): { name?: string; code?: string; messa
     const ownCode = (err as { code?: unknown }).code;
     const cause = (err as { cause?: unknown }).cause;
     const causeCode = isRecord(cause) ? cause.code : undefined;
-    const code =
-      typeof ownCode === 'string' ? ownCode : typeof causeCode === 'string' ? causeCode : undefined;
+    const code = typeof ownCode === 'string' ? ownCode : typeof causeCode === 'string' ? causeCode : undefined;
     return { name: err.name, code, message: err.message || err.name };
   }
   if (typeof err === 'string') return { message: err };
@@ -100,12 +98,7 @@ export const classifyThrown = (err: unknown): FailureClassification => {
 };
 
 /** The kind of an unrecoverable failure the resilient send surfaces by throwing. */
-export type ResilienceErrorKind =
-  | 'fatal-auth'
-  | 'exhausted'
-  | 'circuit-open'
-  | 'retry-wait-exceeded'
-  | 'deadline-exceeded'; // the run's total-timeout budget is spent — stop rather than wait/retry further
+export type ResilienceErrorKind = 'fatal-auth' | 'exhausted' | 'circuit-open' | 'retry-wait-exceeded' | 'deadline-exceeded'; // the run's total-timeout budget is spent — stop rather than wait/retry further
 
 /**
  * A thrown error the resilient send could not recover from. It is a plain `Error`
@@ -131,5 +124,4 @@ export const isResilienceError = (err: unknown): err is ResilienceError =>
  * budget is spent. Consumers use it to distinguish "we ran out of time" (stop
  * gracefully, mark the rest not-tested) from an ordinary request failure.
  */
-export const isDeadlineError = (err: unknown): boolean =>
-  isResilienceError(err) && err.resilienceKind === 'deadline-exceeded';
+export const isDeadlineError = (err: unknown): boolean => isResilienceError(err) && err.resilienceKind === 'deadline-exceeded';

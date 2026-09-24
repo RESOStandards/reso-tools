@@ -17,8 +17,26 @@ export { selectEnumCandidates, isSingleRep, isMultiRep } from './enum-selection.
 export type { EnumCandidate } from './enum-selection.js';
 export { buildScenarioQuery } from './queries.js';
 export type { QuerySpec } from './queries.js';
-export { runCoreResourceScenarios, runProviderScenarios, isProviderWideScenario, summarizeScenarios, runExpandNavScenarios, validateExpandedItems, lookupResourcePresence, lookupResourceValueReport } from './test-runner.js';
-export type { ScenarioResult, ResourceTestReport, TypeCoverage, ProviderScenariosResult, CoreResourceScenarioOptions, ExpandItemValidator, ExpandItemValidation, LookupResourceContext } from './test-runner.js';
+export {
+  runCoreResourceScenarios,
+  runProviderScenarios,
+  isProviderWideScenario,
+  summarizeScenarios,
+  runExpandNavScenarios,
+  validateExpandedItems,
+  lookupResourcePresence,
+  lookupResourceValueReport
+} from './test-runner.js';
+export type {
+  ScenarioResult,
+  ResourceTestReport,
+  TypeCoverage,
+  ProviderScenariosResult,
+  CoreResourceScenarioOptions,
+  ExpandItemValidator,
+  ExpandItemValidation,
+  LookupResourceContext
+} from './test-runner.js';
 export { parseServiceDocument, servedPresence, declaredPresence, resolveServingDecision, resolveNoRecordsOutcome } from './serving.js';
 export type { Presence, ServingDecision } from './serving.js';
 export {
@@ -31,6 +49,6 @@ export {
   assertStringComparison,
   extractRecords,
   extractCount,
-  extractNextLink,
+  extractNextLink
 } from './assertions.js';
 export type { AssertionResult } from './assertions.js';

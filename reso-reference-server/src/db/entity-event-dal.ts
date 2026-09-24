@@ -67,6 +67,6 @@ export const createEntityEventDal = (inner: DataAccessLayer, writer: EntityEvent
       return deleted;
     },
 
-    truncateResource: inner.truncateResource,
+    truncateResource: inner.truncateResource
   };
 };

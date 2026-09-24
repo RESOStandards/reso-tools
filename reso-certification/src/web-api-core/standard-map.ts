@@ -12,7 +12,7 @@
 
 // @ts-expect-error — legacy CJS (reference metadata loader), no type declarations
 import certUtilsEtl from '../etl/index.cjs';
-import { isClosedEnum, type DdReference } from '../metadata/dd-metadata-checks.js';
+import { type DdReference, isClosedEnum } from '../metadata/dd-metadata-checks.js';
 
 // getReferenceMetadata returns null when it can't load a version's reference file (it catches + logs), so the
 // type must admit null — the caller MUST guard, or `ref.fields` throws and takes down the whole Core run.
@@ -49,20 +49,22 @@ const unwrapCollection = (type: string): string =>
 
 /** Build a {@link StandardMap} from an already-loaded DD reference. Pure — the unit-test seam. */
 export const buildStandardMapFrom = (ref: DdReference): StandardMap => {
-  const fields = new Set(ref.fields.map((f) => fieldKey(f.resourceName, f.fieldName)));
+  const fields = new Set(ref.fields.map(f => fieldKey(f.resourceName, f.fieldName)));
   // A field's DD `type` is its enum name for an enumeration field (e.g. `org.reso.metadata.enums.StandardStatus`),
   // which is exactly how the lookups below are keyed — so this map is the field → enum-name join.
-  const fieldTypes = new Map<string, string>(ref.fields.map((f) => [fieldKey(f.resourceName, f.fieldName), f.type]));
+  const fieldTypes = new Map<string, string>(ref.fields.map(f => [fieldKey(f.resourceName, f.fieldName), f.type]));
   // A field's DD `lookupStatus` (e.g. "Locked with Enumerations") — the open/closed designation the value
   // report reads to decide whether a local value is a permitted extension or a closed-enum violation.
-  const fieldLookupStatus = new Map<string, string | undefined>(ref.fields.map((f) => [fieldKey(f.resourceName, f.fieldName), f.lookupStatus]));
+  const fieldLookupStatus = new Map<string, string | undefined>(
+    ref.fields.map(f => [fieldKey(f.resourceName, f.fieldName), f.lookupStatus])
+  );
   // A DD lookup value has two legal wire forms (the dual representation): the machine LegacyODataValue —
   // here `lookupValue` — and the human StandardName carried in the RESO.OData.Metadata.StandardName
   // annotation. A provider may serve EITHER, so both must count as standard; keying only on the machine
   // form misreads every human-form value as local, which defeats the local-first Lookup Resource sampling.
   const STANDARD_NAME_TERM = 'RESO.OData.Metadata.StandardName';
   const valueForms = (l: DdReference['lookups'][number]): ReadonlyArray<string> => {
-    const standardName = l.annotations?.find((a) => a.term === STANDARD_NAME_TERM)?.value;
+    const standardName = l.annotations?.find(a => a.term === STANDARD_NAME_TERM)?.value;
     return standardName ? [l.lookupValue, standardName] : [l.lookupValue];
   };
   const allValues = new Set(ref.lookups.flatMap(valueForms));
@@ -76,8 +78,8 @@ export const buildStandardMapFrom = (ref: DdReference): StandardMap => {
   }
   return {
     isStandardField: (resource, field) => fields.has(fieldKey(resource, field)),
-    isStandardValue: (value) => allValues.has(value),
-    standardValues: (lookupName) => byLookup.get(lookupName) ?? new Set<string>(),
+    isStandardValue: value => allValues.has(value),
+    standardValues: lookupName => byLookup.get(lookupName) ?? new Set<string>(),
     standardValuesForField: (resource, field) => {
       const type = fieldTypes.get(fieldKey(resource, field));
       if (type == null) return undefined; // unknown field → caller falls back to "standard in ANY DD enum"
@@ -89,7 +91,7 @@ export const buildStandardMapFrom = (ref: DdReference): StandardMap => {
       // collide with another enum's standard value (e.g. a city named 'Commercial').
       return byLookup.get(enumName) ?? new Set<string>();
     },
-    isClosedEnumField: (resource, field) => isClosedEnum(fieldLookupStatus.get(fieldKey(resource, field))),
+    isClosedEnumField: (resource, field) => isClosedEnum(fieldLookupStatus.get(fieldKey(resource, field)))
   };
 };
 
@@ -101,11 +103,10 @@ const EMPTY_STANDARD_MAP: StandardMap = {
   isStandardValue: () => false,
   standardValues: () => new Set<string>(),
   standardValuesForField: () => undefined,
-  isClosedEnumField: () => false,
+  isClosedEnumField: () => false
 };
 
-const isValidRef = (ref: DdReference | null): ref is DdReference =>
-  !!ref && Array.isArray(ref.fields) && Array.isArray(ref.lookups);
+const isValidRef = (ref: DdReference | null): ref is DdReference => !!ref && Array.isArray(ref.fields) && Array.isArray(ref.lookups);
 
 /**
  * Build the {@link StandardMap} for a version, loading the reference from reso-common.

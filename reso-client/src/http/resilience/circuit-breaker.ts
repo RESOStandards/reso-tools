@@ -49,10 +49,7 @@ interface Entry {
   openedAtMs: number;
 }
 
-export const createCircuitBreaker = (
-  config: BreakerConfig = DEFAULT_BREAKER,
-  deps: BreakerDeps = realBreakerDeps
-): CircuitBreaker => {
+export const createCircuitBreaker = (config: BreakerConfig = DEFAULT_BREAKER, deps: BreakerDeps = realBreakerDeps): CircuitBreaker => {
   const entries = new Map<string, Entry>();
 
   const entryFor = (key: string): Entry => {
