@@ -62,6 +62,38 @@ describe('prepareResults — one record shape across every bucket', () => {
     }
   });
 
+  it('carries the element level on the record, not just in the bucket', () => {
+    // The matcher knows an expansion from a field — it picks the bucket on exactly
+    // that — and used to discard the distinction. A field and an expansion populate
+    // the same keys, so a consumer re-deriving the level from the keys reads every
+    // expansion as a field. That is the review page's Expansions (0) bug.
+    const out = prepareResults({
+      resources: [{ resourceName: 'Prop', suggestedResourceName: 'Property' }],
+      fields: [{ resourceName: 'Property', fieldName: 'ListPrce', suggestedFieldName: 'ListPrice' }],
+      expansions: [{ resourceName: 'Property', fieldName: 'OpenHouse', suggestedFieldName: 'OpenHouses' }],
+      complexTypes: [{ resourceName: 'Property', fieldName: 'Address', suggestedFieldName: 'Addresses' }],
+      lookupValues: [{ resourceName: 'Property', fieldName: 'StandardStatus', lookupValue: 'Active UC' }],
+    });
+
+    expect(out.resources[0].level).toBe('resource');
+    expect(out.fields[0].level).toBe('field');
+    expect(out.expansions[0].level).toBe('expansion');
+    expect(out.complexTypes[0].level).toBe('complexType');
+    expect(out.lookups[0].level).toBe('lookup');
+  });
+
+  it('distinguishes a field from an expansion that populates the same keys', () => {
+    const out = prepareResults({
+      fields: [{ resourceName: 'Property', fieldName: 'Media', suggestedFieldName: 'Medias' }],
+      expansions: [{ resourceName: 'Property', fieldName: 'Media', suggestedFieldName: 'Medias' }],
+    });
+
+    // Identical records, distinguishable only by the level they carry.
+    expect(out.fields[0].level).toBe('field');
+    expect(out.expansions[0].level).toBe('expansion');
+    expect(out.fields[0].fieldName).toBe(out.expansions[0].fieldName);
+  });
+
   it('returns an empty bucket rather than a placeholder entry', () => {
     const out = prepareResults({});
     expect(out.expansions).toEqual([]);
