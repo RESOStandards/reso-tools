@@ -101,13 +101,21 @@ interface PrepareResultsInput {
  * re-derive it from which keys happen to be populated. They cannot: a field
  * and an expansion populate the same keys, so an expansion reads as a field.
  */
+/**
+ * One suggestion on a variation. Deliberately open: strategy, ddWikiUrl,
+ * distance, maxDistance, exactMatch, closeMatch, targetMajor and the Fast
+ * Track / admin-review flags accumulate at different stages, and pinning them
+ * all produces a type that fights every future matcher change.
+ */
+export type VariationSuggestion = Record<string, unknown>;
+
 export type VariationLevel = 'resource' | 'field' | 'expansion' | 'complexType' | 'lookup';
 
 /** A variation about a whole resource. */
 export interface ResourceEntry {
   readonly level: 'resource';
   readonly resourceName: string;
-  readonly suggestions: Json[];
+  readonly suggestions: VariationSuggestion[];
 }
 
 /** A variation about a named element of a resource. The three levels share a
@@ -116,7 +124,7 @@ export interface ElementEntry {
   readonly level: 'field' | 'expansion' | 'complexType';
   readonly resourceName: string;
   readonly fieldName: string;
-  readonly suggestions: Json[];
+  readonly suggestions: VariationSuggestion[];
 }
 
 /** A variation about one value of a lookup, in either wire form. */
@@ -126,7 +134,7 @@ export interface LookupEntry {
   readonly fieldName: string;
   readonly lookupValue?: string;
   readonly legacyODataValue?: string;
-  readonly suggestions: Json[];
+  readonly suggestions: VariationSuggestion[];
 }
 
 /**
@@ -135,6 +143,26 @@ export interface LookupEntry {
  * bucket silently violated for as long as it was passed through ungrouped.
  */
 export type VariationEntry = ResourceEntry | ElementEntry | LookupEntry;
+
+/** Whether a variation must be fixed against the current major, or is a warning
+ *  because every suggestion targets a future one. */
+export type Enforcement = 'must-fix' | 'warning';
+
+/**
+ * A grouped entry after the enforcement pass. Named separately from
+ * `VariationEntry` on purpose: `enforcement` is stamped by the service, not by
+ * the matcher, so a type that made it optional everywhere would stop the
+ * compiler reporting it missing at the point it should be present.
+ */
+export type Bucketed<T> = T & { readonly enforcement: Enforcement };
+
+export interface BucketedVariations {
+  readonly resources: Bucketed<ResourceEntry>[];
+  readonly fields: Bucketed<ElementEntry>[];
+  readonly lookups: Bucketed<LookupEntry>[];
+  readonly expansions: Bucketed<ElementEntry>[];
+  readonly complexTypes: Bucketed<ElementEntry>[];
+}
 
 export interface PreparedVariations {
   readonly resources: ResourceEntry[];
