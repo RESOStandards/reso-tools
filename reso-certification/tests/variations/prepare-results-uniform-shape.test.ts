@@ -94,6 +94,24 @@ describe('prepareResults — one record shape across every bucket', () => {
     expect(out.fields[0].fieldName).toBe(out.expansions[0].fieldName);
   });
 
+  it('cannot be made to pollute Object.prototype through a resource name', () => {
+    // Resource and field names come from a provider's own metadata, so `__proto__`
+    // is something a provider can legally publish. Grouping keys on those names,
+    // and a plain object literal as the accumulator would carry the assignment
+    // straight to Object.prototype. Flagged by CodeQL on the real change.
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+
+    prepareResults({
+      fields: [{ resourceName: '__proto__', fieldName: 'polluted', suggestedFieldName: 'X' }],
+      expansions: [{ resourceName: 'Property', fieldName: '__proto__', suggestedFieldName: 'X' }],
+      resources: [{ resourceName: '__proto__', suggestedResourceName: 'X' }],
+      lookupValues: [{ resourceName: '__proto__', fieldName: '__proto__', lookupValue: 'v' }],
+    });
+
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(Object.prototype).not.toHaveProperty('polluted');
+  });
+
   it('returns an empty bucket rather than a placeholder entry', () => {
     const out = prepareResults({});
     expect(out.expansions).toEqual([]);
