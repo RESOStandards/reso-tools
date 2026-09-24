@@ -31,6 +31,7 @@ const {
   getDDWikiUrl,
   prepareResults
 } = require('../legacy/lib/variations/index.js');
+import type { Bucketed, BucketedVariations, PreparedVariations, VariationEntry } from '@reso-standards/reso-common';
 const { distance } = require('fastest-levenshtein');
 
 type Json = Record<string, unknown>;
@@ -152,15 +153,23 @@ const emitSuggestionsUnlessSatisfied = (
  * current major), warning when every suggestion targets a future major. Items
  * with no suggestions (expansions, complex types) are current-major must-fix.
  */
-const bucketEnforcement = (variations: Json, currentMajor: number): void => {
-  for (const level of ['resources', 'fields', 'lookups', 'expansions', 'complexTypes']) {
-    for (const item of (variations[level] as Json[]) ?? []) {
-      const suggestions = (item.suggestions as Json[]) ?? [];
+const bucketEnforcement = (variations: PreparedVariations, currentMajor: number): BucketedVariations => {
+  const stamp = <T extends VariationEntry>(entries: ReadonlyArray<T>): Bucketed<T>[] =>
+    entries.map(item => {
       const mustFix =
-        suggestions.length === 0 ? true : suggestions.some(s => s.targetMajor == null || (s.targetMajor as number) <= currentMajor);
-      item.enforcement = mustFix ? 'must-fix' : 'warning';
-    }
-  }
+        item.suggestions.length === 0
+          ? true
+          : item.suggestions.some(s => s.targetMajor == null || (s.targetMajor as number) <= currentMajor);
+      return { ...item, enforcement: mustFix ? 'must-fix' : 'warning' };
+    });
+
+  return {
+    resources: stamp(variations.resources),
+    fields: stamp(variations.fields),
+    lookups: stamp(variations.lookups),
+    expansions: stamp(variations.expansions),
+    complexTypes: stamp(variations.complexTypes)
+  };
 };
 
 export const computeVariationsV2 = ({
@@ -172,7 +181,7 @@ export const computeVariationsV2 = ({
   applyIntEnumFix = true,
   currentMajor,
   applyVersionBucketing = true
-}: ComputeInput): { description: string; version: string; fuzziness: number; variations: Json } => {
+}: ComputeInput): { description: string; version: string; fuzziness: number; variations: PreparedVariations | BucketedVariations } => {
   const out: Accumulator = { resources: [], fields: [], lookupValues: [], legacyODataValues: [], expansions: [], complexTypes: [] };
 
   const { metadataMap: standardMetadataMap = {} } = buildMetadataMap(referenceMetadata);
@@ -183,10 +192,11 @@ export const computeVariationsV2 = ({
     resolveResource(resourceName, { metadataReportMap, standardMetadataMap, sMap, fuzziness, version, applyIntEnumFix, out });
   }
 
-  const variations = prepareResults(out) as Json;
-  if (applyVersionBucketing) {
-    bucketEnforcement(variations, currentMajor ?? Math.floor(Number.parseFloat(version)));
-  }
+  // `prepareResults` arrives through an untyped require (this file uses the legacy
+  // helpers on purpose, to keep parity risk localized), so it returns `any`. Anchor
+  // it to the shared type here or nothing downstream is actually checked.
+  const prepared: PreparedVariations = prepareResults(out);
+  const variations = applyVersionBucketing ? bucketEnforcement(prepared, currentMajor ?? Math.floor(Number.parseFloat(version))) : prepared;
 
   return {
     description: 'Data Dictionary Variations Report',
