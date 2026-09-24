@@ -78,6 +78,30 @@ const checkRequiredCredentials = () => {
  * @returns {{ resources: Array<Object>, fields: Array<Object>, lookups: Array<Object>, expansions: Array<Object>, complexTypes: Array<Object> }}
  *   grouped and deduplicated variation maps ready for reporting
  */
+/**
+ * Group flat `(resourceName, fieldName, ...suggestion)` records into one entry per
+ * element, carrying a `suggestions` array. Shared by every element-level bucket so
+ * fields, expansions and complex types have one record shape.
+ * @param {Array<Object>} records flat variation records
+ * @returns {Array<Object>} one entry per element, each with a `suggestions` array
+ */
+const groupByResourceAndField = records =>
+  Object.values(
+    records.reduce((acc, { resourceName, fieldName, ...suggestion }) => {
+      if (!acc?.[resourceName]) {
+        acc[resourceName] = {};
+      }
+
+      if (!acc?.[resourceName]?.[fieldName]) {
+        acc[resourceName][fieldName] = { resourceName, fieldName, suggestions: [] };
+      }
+      acc[resourceName][fieldName].suggestions.push(suggestion);
+
+      return acc;
+    }, {})
+  ).flatMap(Object.values);
+
+
 const prepareResults = ({
   resources = [],
   fields = [],
@@ -102,24 +126,7 @@ const prepareResults = ({
           return acc;
         }, {})
       ) || [],
-    fields: Object.values(
-      fields.reduce((acc, { resourceName, fieldName, ...suggestion }) => {
-        if (!acc?.[resourceName]) {
-          acc[resourceName] = {};
-        }
-
-        if (!acc?.[resourceName]?.[fieldName]) {
-          acc[resourceName][fieldName] = {
-            resourceName,
-            fieldName,
-            suggestions: []
-          };
-        }
-        acc[resourceName][fieldName].suggestions.push(suggestion);
-
-        return acc;
-      }, {})
-    ).flatMap(Object.values),
+    fields: groupByResourceAndField(fields),
     lookups: Object.values(
       [...lookupValues, ...legacyODataValues].reduce((acc, { resourceName, fieldName, lookupValue, legacyODataValue, ...rest }) => {
         if (!acc?.[resourceName]) {
@@ -153,8 +160,8 @@ const prepareResults = ({
         return acc;
       }, {})
     ).flatMap(item => Object.values(Object.values(item).flatMap(Object.values))),
-    expansions,
-    complexTypes
+    expansions: groupByResourceAndField(expansions),
+    complexTypes: groupByResourceAndField(complexTypes)
   };
 };
 
