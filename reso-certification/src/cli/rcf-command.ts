@@ -119,8 +119,10 @@ export const processRcfStream = async (
       invalidContextRecords += records.length;
       continue;
     }
-    const acc = (recordsByResource[resource] ??= []);
-    const av = (availability[resource] ??= { recordCount: 0, fields: {} });
+    recordsByResource[resource] ??= [];
+    availability[resource] ??= { recordCount: 0, fields: {} };
+    const acc = recordsByResource[resource];
+    const av = availability[resource];
     for (const record of records) {
       totalRecords += 1;
       av.recordCount += 1;

@@ -73,7 +73,8 @@ export interface InferMetadataReportInput {
 const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 const push = (cache: PayloadCache, resource: string, field: string, value: unknown): void => {
-  (cache[resource] ??= {})[field] ??= [];
+  cache[resource] ??= {};
+  cache[resource][field] ??= [];
   cache[resource][field].push(value);
 };
 

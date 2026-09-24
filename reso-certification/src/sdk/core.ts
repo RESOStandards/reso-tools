@@ -627,8 +627,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     return {
       context: { ...ctx, resourceReports, coverageMatrix: { coveredTypes, missingTypes, fullCoverage } },
       status,
-      summary:
-        `${incompleteMsg}${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped${totalWarnings > 0 ? `, ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}` : ''}${optTotal > 0 ? `; optional: ${optPassed} passed, ${optNotSupported} not supported, ${optNotTested} not tested` : ''} (${totalScenarios} scenarios across ${resourceReports.length} resources). ${coverageMsg}${modeMsg}`,
+      summary: `${incompleteMsg}${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped${totalWarnings > 0 ? `, ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}` : ''}${optTotal > 0 ? `; optional: ${optPassed} passed, ${optNotSupported} not supported, ${optNotTested} not tested` : ''} (${totalScenarios} scenarios across ${resourceReports.length} resources). ${coverageMsg}${modeMsg}`,
       counts: {
         total: totalScenarios,
         passed: totalPassed,

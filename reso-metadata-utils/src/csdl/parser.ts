@@ -526,7 +526,8 @@ export const parseCsdlXml = (xml: string): CsdlSchema => {
   const declaredNamespaceSet = new Set(schemas.map(s => s['@_Namespace']).filter((n): n is string => typeof n === 'string'));
   const aliasCounts = schemas.reduce<Record<string, number>>((acc, s) => {
     const alias = s['@_Alias'];
-    return typeof alias === 'string' ? { ...acc, [alias]: (acc[alias] ?? 0) + 1 } : acc;
+    if (typeof alias === 'string') acc[alias] = (acc[alias] ?? 0) + 1;
+    return acc;
   }, {});
   const aliasMap: Readonly<Record<string, string>> = Object.fromEntries(
     schemas
