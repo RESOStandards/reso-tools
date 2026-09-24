@@ -86,11 +86,19 @@ const checkRequiredCredentials = () => {
  * @param {string} level the element level these records describe
  * @returns {Array<Object>} one entry per element, each with a `suggestions` array
  */
+/**
+ * A map with no prototype, for accumulators keyed by provider-supplied names.
+ * A resource or field called `__proto__` is legal in someone's metadata, and a
+ * plain object literal would let it reach `Object.prototype`.
+ * @returns {Object} a prototype-free map
+ */
+const emptyMap = () => Object.create(null);
+
 const groupByResourceAndField = (records, level) =>
   Object.values(
     records.reduce((acc, { resourceName, fieldName, ...suggestion }) => {
       if (!acc?.[resourceName]) {
-        acc[resourceName] = {};
+        acc[resourceName] = emptyMap();
       }
 
       if (!acc?.[resourceName]?.[fieldName]) {
@@ -99,7 +107,7 @@ const groupByResourceAndField = (records, level) =>
       acc[resourceName][fieldName].suggestions.push(suggestion);
 
       return acc;
-    }, {})
+    }, emptyMap())
   ).flatMap(Object.values);
 
 
@@ -126,17 +134,17 @@ const prepareResults = ({
           acc[resourceName].suggestions.push(suggestion);
 
           return acc;
-        }, {})
+        }, emptyMap())
       ) || [],
     fields: groupByResourceAndField(fields, 'field'),
     lookups: Object.values(
       [...lookupValues, ...legacyODataValues].reduce((acc, { resourceName, fieldName, lookupValue, legacyODataValue, ...rest }) => {
         if (!acc?.[resourceName]) {
-          acc[resourceName] = {};
+          acc[resourceName] = emptyMap();
         }
 
         if (!acc?.[resourceName]?.[fieldName]) {
-          acc[resourceName][fieldName] = {};
+          acc[resourceName][fieldName] = emptyMap();
         }
 
         const lookupKey = legacyODataValue + lookupValue;
@@ -161,7 +169,7 @@ const prepareResults = ({
         }
 
         return acc;
-      }, {})
+      }, emptyMap())
     ).flatMap(item => Object.values(Object.values(item).flatMap(Object.values))),
     expansions: groupByResourceAndField(expansions, 'expansion'),
     complexTypes: groupByResourceAndField(complexTypes, 'complexType')

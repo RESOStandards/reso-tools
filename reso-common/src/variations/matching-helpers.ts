@@ -184,20 +184,29 @@ export interface PreparedVariations {
  * `suggestions` reads all three the same way. The caller names the level, because
  * the bucket is the only place that knows it.
  */
+/**
+ * A map with no prototype, for accumulators keyed by provider-supplied names.
+ * A resource or field called `__proto__` is legal in someone's metadata, and a
+ * plain object literal would let it reach `Object.prototype` (CodeQL
+ * js/prototype-polluting-assignment). `Object.create(null)` has no prototype to
+ * reach, so the key is inert.
+ */
+const emptyMap = <T>(): Record<string, T> => Object.create(null) as Record<string, T>;
+
 const groupByResourceAndField = (records: ReadonlyArray<Json>, level: ElementEntry['level']): ElementEntry[] =>
   Object.values(
     records.reduce<Record<string, Record<string, ElementEntry>>>((acc, { resourceName, fieldName, ...suggestion }) => {
       const rKey = resourceName as string;
       const fKey = fieldName as string;
       if (!acc?.[rKey]) {
-        acc[rKey] = {};
+        acc[rKey] = emptyMap();
       }
       if (!acc?.[rKey]?.[fKey]) {
         acc[rKey][fKey] = { level, resourceName: rKey, fieldName: fKey, suggestions: [] };
       }
       acc[rKey][fKey].suggestions.push(suggestion);
       return acc;
-    }, {})
+    }, emptyMap())
   ).flatMap(Object.values);
 
 export const prepareResults = ({
@@ -218,7 +227,7 @@ export const prepareResults = ({
           }
           acc[key].suggestions.push(suggestion);
           return acc;
-        }, {})
+        }, emptyMap())
       ) || [],
     fields: groupByResourceAndField(fields, 'field'),
     lookups: Object.values(
@@ -227,10 +236,10 @@ export const prepareResults = ({
           const rKey = resourceName as string;
           const fKey = fieldName as string;
           if (!acc?.[rKey]) {
-            acc[rKey] = {};
+            acc[rKey] = emptyMap();
           }
           if (!acc?.[rKey]?.[fKey]) {
-            acc[rKey][fKey] = {};
+            acc[rKey][fKey] = emptyMap();
           }
 
           const lookupKey = `${legacyODataValue}${lookupValue}`;
@@ -259,7 +268,7 @@ export const prepareResults = ({
 
           return acc;
         },
-        {}
+        emptyMap()
       )
     ).flatMap(item => Object.values(Object.values(item).flatMap(Object.values))),
     expansions: groupByResourceAndField(expansions, 'expansion'),
