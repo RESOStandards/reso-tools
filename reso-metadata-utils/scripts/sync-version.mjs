@@ -20,7 +20,7 @@ const contents = `// Auto-generated from package.json by scripts/sync-version.mj
 // Do not edit by hand — run \`npm run build\` (or \`node scripts/sync-version.mjs\`)
 // to regenerate after bumping the package version.
 
-export const VERSION = ${JSON.stringify(version)};
+export const VERSION = '${version}';
 `;
 
 writeFileSync(outPath, contents, 'utf8');
