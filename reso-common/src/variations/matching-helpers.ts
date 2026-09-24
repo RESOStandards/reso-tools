@@ -92,12 +92,56 @@ interface PrepareResultsInput {
   readonly complexTypes?: ReadonlyArray<Json>;
 }
 
+/**
+ * Which kind of element a variation is about.
+ *
+ * Carried on the record rather than implied by which bucket it sits in. The
+ * matcher knows an expansion from a field — it picks the bucket on exactly
+ * that — and then used to discard the distinction, leaving every consumer to
+ * re-derive it from which keys happen to be populated. They cannot: a field
+ * and an expansion populate the same keys, so an expansion reads as a field.
+ */
+export type VariationLevel = 'resource' | 'field' | 'expansion' | 'complexType' | 'lookup';
+
+/** A variation about a whole resource. */
+export interface ResourceEntry {
+  readonly level: 'resource';
+  readonly resourceName: string;
+  readonly suggestions: Json[];
+}
+
+/** A variation about a named element of a resource. The three levels share a
+ *  shape and differ only in what they are matched against. */
+export interface ElementEntry {
+  readonly level: 'field' | 'expansion' | 'complexType';
+  readonly resourceName: string;
+  readonly fieldName: string;
+  readonly suggestions: Json[];
+}
+
+/** A variation about one value of a lookup, in either wire form. */
+export interface LookupEntry {
+  readonly level: 'lookup';
+  readonly resourceName: string;
+  readonly fieldName: string;
+  readonly lookupValue?: string;
+  readonly legacyODataValue?: string;
+  readonly suggestions: Json[];
+}
+
+/**
+ * One grouped variation. `suggestions` is required on every arm: an entry with
+ * nothing to suggest is not representable, which is the shape the expansions
+ * bucket silently violated for as long as it was passed through ungrouped.
+ */
+export type VariationEntry = ResourceEntry | ElementEntry | LookupEntry;
+
 export interface PreparedVariations {
-  readonly resources: Json[];
-  readonly fields: Json[];
-  readonly lookups: Json[];
-  readonly expansions: Json[];
-  readonly complexTypes: Json[];
+  readonly resources: ResourceEntry[];
+  readonly fields: ElementEntry[];
+  readonly lookups: LookupEntry[];
+  readonly expansions: ElementEntry[];
+  readonly complexTypes: ElementEntry[];
 }
 
 /**
@@ -109,20 +153,21 @@ export interface PreparedVariations {
  * Group flat `(resourceName, fieldName, ...suggestion)` records into one entry per
  * element, carrying a `suggestions[]` array. Shared by every element-level bucket so
  * fields, expansions and complex types have one record shape — a consumer that reads
- * `suggestions` reads all three the same way.
+ * `suggestions` reads all three the same way. The caller names the level, because
+ * the bucket is the only place that knows it.
  */
-const groupByResourceAndField = (records: ReadonlyArray<Json>): Json[] =>
+const groupByResourceAndField = (records: ReadonlyArray<Json>, level: ElementEntry['level']): ElementEntry[] =>
   Object.values(
-    records.reduce<Record<string, Record<string, Json>>>((acc, { resourceName, fieldName, ...suggestion }) => {
+    records.reduce<Record<string, Record<string, ElementEntry>>>((acc, { resourceName, fieldName, ...suggestion }) => {
       const rKey = resourceName as string;
       const fKey = fieldName as string;
       if (!acc?.[rKey]) {
         acc[rKey] = {};
       }
       if (!acc?.[rKey]?.[fKey]) {
-        acc[rKey][fKey] = { resourceName, fieldName, suggestions: [] };
+        acc[rKey][fKey] = { level, resourceName: rKey, fieldName: fKey, suggestions: [] };
       }
-      (acc[rKey][fKey].suggestions as Json[]).push(suggestion);
+      acc[rKey][fKey].suggestions.push(suggestion);
       return acc;
     }, {})
   ).flatMap(Object.values);
@@ -138,18 +183,18 @@ export const prepareResults = ({
   return {
     resources:
       Object.values(
-        resources.reduce<Record<string, Json>>((acc, { resourceName, ...suggestion }) => {
+        resources.reduce<Record<string, ResourceEntry>>((acc, { resourceName, ...suggestion }) => {
           const key = resourceName as string;
           if (!acc?.[key]) {
-            acc[key] = { resourceName, suggestions: [] };
+            acc[key] = { level: 'resource', resourceName: key, suggestions: [] };
           }
-          (acc[key].suggestions as Json[]).push(suggestion);
+          acc[key].suggestions.push(suggestion);
           return acc;
         }, {})
       ) || [],
-    fields: groupByResourceAndField(fields),
+    fields: groupByResourceAndField(fields, 'field'),
     lookups: Object.values(
-      [...lookupValues, ...legacyODataValues].reduce<Record<string, Record<string, Record<string, Json>>>>(
+      [...lookupValues, ...legacyODataValues].reduce<Record<string, Record<string, Record<string, LookupEntry>>>>(
         (acc, { resourceName, fieldName, lookupValue, legacyODataValue, ...rest }) => {
           const rKey = resourceName as string;
           const fKey = fieldName as string;
@@ -164,15 +209,16 @@ export const prepareResults = ({
 
           if (!acc?.[rKey]?.[fKey]?.[lookupKey]) {
             acc[rKey][fKey][lookupKey] = {
-              resourceName,
-              fieldName,
-              legacyODataValue,
-              lookupValue,
+              level: 'lookup',
+              resourceName: rKey,
+              fieldName: fKey,
+              legacyODataValue: legacyODataValue as string | undefined,
+              lookupValue: lookupValue as string | undefined,
               suggestions: []
             };
           }
 
-          const suggestions = acc[rKey][fKey][lookupKey].suggestions as Json[];
+          const suggestions = acc[rKey][fKey][lookupKey].suggestions;
           if (
             !suggestions.some(
               x =>
@@ -188,7 +234,7 @@ export const prepareResults = ({
         {}
       )
     ).flatMap(item => Object.values(Object.values(item).flatMap(Object.values))),
-    expansions: groupByResourceAndField(expansions),
-    complexTypes: groupByResourceAndField(complexTypes)
+    expansions: groupByResourceAndField(expansions, 'expansion'),
+    complexTypes: groupByResourceAndField(complexTypes, 'complexType')
   };
 };
