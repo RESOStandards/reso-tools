@@ -96,8 +96,8 @@ export interface PreparedVariations {
   readonly resources: Json[];
   readonly fields: Json[];
   readonly lookups: Json[];
-  readonly expansions: ReadonlyArray<Json>;
-  readonly complexTypes: ReadonlyArray<Json>;
+  readonly expansions: Json[];
+  readonly complexTypes: Json[];
 }
 
 /**
