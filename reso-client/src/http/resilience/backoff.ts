@@ -28,11 +28,7 @@ export const DEFAULT_BACKOFF: BackoffConfig = { baseMs: 500, maxMs: 30_000, maxR
  * than fixed or equal jitter) is what keeps many parallel fetchers from resyncing
  * into a thundering herd. `random` is injectable for deterministic tests.
  */
-export const backoffMs = (
-  attempt: number,
-  config: BackoffConfig = DEFAULT_BACKOFF,
-  random: () => number = Math.random
-): number => {
+export const backoffMs = (attempt: number, config: BackoffConfig = DEFAULT_BACKOFF, random: () => number = Math.random): number => {
   const ceiling = Math.min(config.maxMs, config.baseMs * 2 ** attempt);
   return Math.floor(random() * ceiling);
 };

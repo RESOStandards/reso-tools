@@ -12,10 +12,10 @@ export {
   fetchLookupResource,
   mergeWithLookupResource,
   fetchAndMergeLookupResource,
-  serializeLookupResourceDump,
+  serializeLookupResourceDump
 } from './lookup-resource.js';
 
 export type {
   RawLookupRecord,
-  LookupResourceDump,
+  LookupResourceDump
 } from './lookup-resource.js';

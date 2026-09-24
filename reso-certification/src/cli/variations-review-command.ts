@@ -16,7 +16,11 @@ const pad = (value: string, width: number): string => value.padEnd(width);
 
 const renderTable = (headers: ReadonlyArray<string>, rows: ReadonlyArray<ReadonlyArray<string>>): string => {
   const widths = headers.map((h, i) => Math.max(h.length, ...rows.map(r => r[i].length)));
-  const line = (cells: ReadonlyArray<string>): string => cells.map((c, i) => pad(c, widths[i])).join('  ').trimEnd();
+  const line = (cells: ReadonlyArray<string>): string =>
+    cells
+      .map((c, i) => pad(c, widths[i]))
+      .join('  ')
+      .trimEnd();
   return [line(headers), line(widths.map(w => '-'.repeat(w))), ...rows.map(line)].join('\n');
 };
 
@@ -29,7 +33,7 @@ export const displayMapping = (mapping: VariationReviewItem['mapping']): string 
   const parts = [
     mapping.suggestedResourceName,
     mapping.suggestedFieldName,
-    mapping.suggestedStandardLookupValue ?? mapping.suggestedLookupValue ?? mapping.suggestedLegacyODataValue,
+    mapping.suggestedStandardLookupValue ?? mapping.suggestedLookupValue ?? mapping.suggestedLegacyODataValue
   ].filter((p): p is string => typeof p === 'string' && p.length > 0);
   return parts.length > 0 ? parts.join('.') : '-';
 };
@@ -47,7 +51,7 @@ export const formatReviewItemsTable = (items: ReadonlyArray<VariationReviewItem>
     cell(item.strategy),
     String(item.provenance.length),
     cell(earliest(item).slice(0, 19) || undefined),
-    cell(item.outcome),
+    cell(item.outcome)
   ]);
   return renderTable(['status', 'element', 'mapping', 'strategy', 'tuples', 'first submitted', 'outcome'], rows);
 };
@@ -63,7 +67,7 @@ export const formatEndorsementStatusTable = (rows: ReadonlyArray<EndorsementStat
     cell(r.version),
     cell(r.lifecycleStatus),
     cell(r.reviewStatus),
-    cell((r.updatedAt ?? r.submittedAt ?? '').slice(0, 19) || undefined),
+    cell((r.updatedAt ?? r.submittedAt ?? '').slice(0, 19) || undefined)
   ]);
   return renderTable(['provider', 'usi', 'recipient', 'endorsement', 'version', 'lifecycle', 'review', 'updated'], lines);
 };
@@ -77,7 +81,7 @@ export const formatProvenance = (items: ReadonlyArray<VariationReviewItem>): str
         p =>
           `  ${p.submittedAt.slice(0, 19)}  ${p.providerUoi}/${p.providerUsi}/${p.recipientUoi}  by ${cell(p.submittedByProviderUoi)}  ${cell(p.environmentName)}${
             p.lastEditorRole ? `  ${p.lastEditorRole}` : ''
-          }`,
+          }`
       );
       return [head, ...lines].join('\n');
     })

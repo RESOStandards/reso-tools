@@ -25,7 +25,7 @@ const numericOps: Readonly<Record<ComparisonOp, (a: number, b: number) => boolea
   gt: (a, b) => a > b,
   ge: (a, b) => a >= b,
   lt: (a, b) => a < b,
-  le: (a, b) => a <= b,
+  le: (a, b) => a <= b
 };
 
 const temporalOps: Readonly<Record<ComparisonOp, (a: string, b: string) => boolean>> = {
@@ -34,7 +34,7 @@ const temporalOps: Readonly<Record<ComparisonOp, (a: string, b: string) => boole
   gt: (a, b) => a > b,
   ge: (a, b) => a >= b,
   lt: (a, b) => a < b,
-  le: (a, b) => a <= b,
+  le: (a, b) => a <= b
 };
 
 /** Get the appropriate comparison function for a data type and operator. */
@@ -62,7 +62,7 @@ export const assertScalarComparison = (
   field: string,
   op: ComparisonOp,
   value: unknown,
-  dataType: DataType,
+  dataType: DataType
 ): AssertionResult => {
   const failures: string[] = [];
 
@@ -76,7 +76,10 @@ export const assertScalarComparison = (
 
   return failures.length === 0
     ? { passed: true, message: `All ${records.length} records satisfy ${field} ${op} ${JSON.stringify(value)}` }
-    : { passed: false, message: `${failures.length}/${records.length} records failed: ${failures[0]}${failures.length > 1 ? ` (and ${failures.length - 1} more)` : ''}` };
+    : {
+        passed: false,
+        message: `${failures.length}/${records.length} records failed: ${failures[0]}${failures.length > 1 ? ` (and ${failures.length - 1} more)` : ''}`
+      };
 };
 
 /**
@@ -92,7 +95,7 @@ export const assertScalarCompoundOr = (
   v1: unknown,
   op2: ComparisonOp,
   v2: unknown,
-  dataType: DataType,
+  dataType: DataType
 ): AssertionResult => {
   const failures: string[] = [];
 
@@ -100,13 +103,21 @@ export const assertScalarCompoundOr = (
     const actual = record[field];
     if (actual == null) continue;
     if (!compareValue(actual, op1, v1, dataType) && !compareValue(actual, op2, v2, dataType)) {
-      failures.push(`Record ${i}: ${field}=${JSON.stringify(actual)} satisfies neither ${op1} ${JSON.stringify(v1)} nor ${op2} ${JSON.stringify(v2)}`);
+      failures.push(
+        `Record ${i}: ${field}=${JSON.stringify(actual)} satisfies neither ${op1} ${JSON.stringify(v1)} nor ${op2} ${JSON.stringify(v2)}`
+      );
     }
   }
 
   return failures.length === 0
-    ? { passed: true, message: `All ${records.length} records satisfy ${field} ${op1} ${JSON.stringify(v1)} OR ${op2} ${JSON.stringify(v2)}` }
-    : { passed: false, message: `${failures.length}/${records.length} records failed the OR: ${failures[0]}${failures.length > 1 ? ` (and ${failures.length - 1} more)` : ''}` };
+    ? {
+        passed: true,
+        message: `All ${records.length} records satisfy ${field} ${op1} ${JSON.stringify(v1)} OR ${op2} ${JSON.stringify(v2)}`
+      }
+    : {
+        passed: false,
+        message: `${failures.length}/${records.length} records failed the OR: ${failures[0]}${failures.length > 1 ? ` (and ${failures.length - 1} more)` : ''}`
+      };
 };
 
 /**
@@ -116,7 +127,7 @@ export const assertScalarCompoundOr = (
 export const assertSortOrder = (
   records: ReadonlyArray<Record<string, unknown>>,
   field: string,
-  direction: SortDirection,
+  direction: SortDirection
 ): AssertionResult => {
   const values = records.map(r => r[field]).filter(v => v != null);
 
@@ -127,7 +138,7 @@ export const assertSortOrder = (
     if (!ordered) {
       return {
         passed: false,
-        message: `Sort order violated at position ${i}: ${prev} should be ${direction === 'asc' ? '<=' : '>='} ${curr}`,
+        message: `Sort order violated at position ${i}: ${prev} should be ${direction === 'asc' ? '<=' : '>='} ${curr}`
       };
     }
   }
@@ -146,7 +157,7 @@ export const assertEnumMatch = (
   value: string,
   /** Decode a response value into member names for `has` — a flags enum may serialize as an integer
    *  bitmask. Omitted for `eq`/`ne`, whose single-member string compares directly. */
-  decode?: (raw: unknown) => ReadonlyArray<string>,
+  decode?: (raw: unknown) => ReadonlyArray<string>
 ): AssertionResult => {
   const failures: string[] = [];
 
@@ -155,11 +166,12 @@ export const assertEnumMatch = (
     if (actual == null) continue;
 
     const actualStr = String(actual);
-    const matches = op === 'has'
-      ? (decode ? decode(actual) : actualStr.split(',').map(s => s.trim())).includes(value)
-      : op === 'eq'
-        ? actualStr === value
-        : actualStr !== value;
+    const matches =
+      op === 'has'
+        ? (decode ? decode(actual) : actualStr.split(',').map(s => s.trim())).includes(value)
+        : op === 'eq'
+          ? actualStr === value
+          : actualStr !== value;
 
     if (!matches) {
       failures.push(`Record ${i}: ${field}=${JSON.stringify(actual)} does not satisfy ${op} ${JSON.stringify(value)}`);
@@ -183,7 +195,7 @@ export const assertCollectionLambda = (
   /** Decode a response value into member names — a flags enum may serialize as an integer bitmask or a
    *  comma-joined string. Supplied for flags fields so the assertion compares like-for-like; omitted for
    *  string collections, where the array / comma fallback below is correct. */
-  decode?: (raw: unknown) => ReadonlyArray<string>,
+  decode?: (raw: unknown) => ReadonlyArray<string>
 ): AssertionResult => {
   const failures: string[] = [];
   // Drop empty / literal-"undefined" values (a retried candidate may have fewer than N distinct values);
@@ -202,18 +214,22 @@ export const assertCollectionLambda = (
     // `split(',')` yields as `['']`, etc.). With no members, `all()` is VACUOUSLY TRUE and `any()` is false —
     // the OData empty-collection semantics (web-api-core.md:107 "a record with an empty collection satisfies
     // this vacuously"; §2.5.9.9.2). Without the filter, an empty-string collection would false-fail `all()`.
-    const items: ReadonlyArray<string> = (decode
-      ? decode(actual)
-      : Array.isArray(actual)
-        ? (actual as unknown[]).map(String)
-        : String(actual).split(',').map(s => s.trim())
-    ).filter((s) => s.length > 0);
+    const items: ReadonlyArray<string> = (
+      decode
+        ? decode(actual)
+        : Array.isArray(actual)
+          ? (actual as unknown[]).map(String)
+          : String(actual)
+              .split(',')
+              .map(s => s.trim())
+    ).filter(s => s.length > 0);
 
-    const matches = op === 'any'
-      ? checkValues.some(v => items.includes(v)) // any(x: x eq A [or B]) — at least one element is a requested value (false for an empty collection)
-      : op === 'has'
-        ? checkValues.every(v => items.includes(v)) // has A [and has B] — EVERY requested flag must be set (AND)
-        : items.every(item => checkValues.includes(item)); // all(x: x eq A [or B]) — EVERY element is within {values}; VACUOUSLY TRUE for an empty collection
+    const matches =
+      op === 'any'
+        ? checkValues.some(v => items.includes(v)) // any(x: x eq A [or B]) — at least one element is a requested value (false for an empty collection)
+        : op === 'has'
+          ? checkValues.every(v => items.includes(v)) // has A [and has B] — EVERY requested flag must be set (AND)
+          : items.every(item => checkValues.includes(item)); // all(x: x eq A [or B]) — EVERY element is within {values}; VACUOUSLY TRUE for an empty collection
 
     if (!matches) {
       failures.push(`Record ${i}: ${field}=${JSON.stringify(actual)} does not satisfy ${op}(${checkValues.join(', ')})`);
@@ -232,7 +248,10 @@ const MAX_ERROR_DETAIL = 300;
  *  bounded prefix BEFORE collapsing: a misbehaving server can return a multi-MB error body and we only ever
  *  keep MAX_ERROR_DETAIL chars, so this never scans the whole body. */
 const truncateErrorDetail = (s: string): string => {
-  const t = s.slice(0, MAX_ERROR_DETAIL * 4).trim().replace(/\s+/g, ' ');
+  const t = s
+    .slice(0, MAX_ERROR_DETAIL * 4)
+    .trim()
+    .replace(/\s+/g, ' ');
   return t.length > MAX_ERROR_DETAIL ? `${t.slice(0, MAX_ERROR_DETAIL)}…` : t;
 };
 
@@ -258,10 +277,7 @@ const describeErrorBody = (response: ODataResponse): string => {
  * Assert structural OData response properties.
  * Checks status code, OData-Version header, and valid JSON.
  */
-export const assertODataResponse = (
-  response: ODataResponse,
-  expectedStatus: number,
-): AssertionResult => {
+export const assertODataResponse = (response: ODataResponse, expectedStatus: number): AssertionResult => {
   if (response.status !== expectedStatus) {
     // Capture the server's error detail (OData error.message, else the raw body) so a non-2xx failure is
     // self-diagnosing — e.g. a provider that requires an OriginatingSystemName filter, or a genuine
@@ -306,7 +322,7 @@ export const assertStringComparison = (
   records: ReadonlyArray<Record<string, unknown>>,
   field: string,
   op: 'eq' | 'ne',
-  value: string,
+  value: string
 ): AssertionResult => {
   const failures: string[] = [];
 

@@ -13,7 +13,7 @@
  * that field by construction; the standard map is a quality gate, never a value source.
  */
 
-import { resolveEnum, type EnumRepresentation } from '@reso-standards/reso-client';
+import { type EnumRepresentation, resolveEnum } from '@reso-standards/reso-client';
 import type { CsdlEnumType } from '@reso-standards/reso-metadata-utils';
 import type { EntityProperty } from '../test-runner/types.js';
 import type { StandardMap } from './standard-map.js';
@@ -70,7 +70,7 @@ const SUBSET_MAX_VALUES = 12;
 const decodedMembers = (
   records: ReadonlyArray<Record<string, unknown>>,
   field: string,
-  decode: (raw: unknown) => ReadonlyArray<string>,
+  decode: (raw: unknown) => ReadonlyArray<string>
 ): { readonly members: ReadonlyArray<string>; readonly fillCount: number; readonly subsetSampleValues?: ReadonlyArray<string> } => {
   const counts = new Map<string, number>(); // Map insertion order = first-seen, a stable tiebreak for equal counts
   let fillCount = 0;
@@ -100,7 +100,7 @@ const buildCandidate = (
   enumTypes: ReadonlyArray<CsdlEnumType>,
   standardMap: StandardMap,
   resource: string,
-  wantRep: (rep: EnumRepresentation) => boolean,
+  wantRep: (rep: EnumRepresentation) => boolean
 ): EnumCandidate | undefined => {
   const ef = resolveEnum({ name: prop.name, type: prop.type, ...(prop.annotations && { annotations: prop.annotations }) }, { enumTypes });
   if (!ef || !wantRep(ef.representation)) return undefined;
@@ -114,8 +114,8 @@ const buildCandidate = (
   // forgot to publish in /Lookup. Partitioning by standard-ness preserves the frequency order within each
   // partition, so values[0] is the most-frequent standard member — DD-known AND drift-resistant. Keep up to 3.
   const isStd = (m: string): boolean => standardMap.isStandardValue(m);
-  const standardFirst = [...members.filter(isStd), ...members.filter((m) => !isStd(m))];
-  const localFirst = [...members.filter((m) => !isStd(m)), ...members.filter(isStd)];
+  const standardFirst = [...members.filter(isStd), ...members.filter(m => !isStd(m))];
+  const localFirst = [...members.filter(m => !isStd(m)), ...members.filter(isStd)];
   const lookupName = prop.annotations?.[LOOKUP_NAME_ANNOTATION] ?? ef.enumType?.name;
 
   return {
@@ -128,7 +128,7 @@ const buildCandidate = (
     fillRate: records.length > 0 ? fillCount / records.length : 0,
     ...(lookupName !== undefined && { lookupName }),
     ...(ef.enumType !== undefined && { enumType: ef.enumType }),
-    ...(subsetSampleValues !== undefined && isMultiRep(ef.representation) && { subsetSampleValues }),
+    ...(subsetSampleValues !== undefined && isMultiRep(ef.representation) && { subsetSampleValues })
   };
 };
 
@@ -148,10 +148,10 @@ export const selectEnumCandidates = (
   enumTypes: ReadonlyArray<CsdlEnumType>,
   standardMap: StandardMap,
   resource: string,
-  wantRep: (rep: EnumRepresentation) => boolean,
+  wantRep: (rep: EnumRepresentation) => boolean
 ): ReadonlyArray<EnumCandidate> => {
   const candidates = properties
-    .map((p) => buildCandidate(p, records, enumTypes, standardMap, resource, wantRep))
+    .map(p => buildCandidate(p, records, enumTypes, standardMap, resource, wantRep))
     .filter((c): c is EnumCandidate => c !== undefined);
 
   const hasStandardValue = (c: EnumCandidate): boolean => c.values.length > 0 && standardMap.isStandardValue(c.values[0]);

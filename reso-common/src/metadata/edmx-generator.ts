@@ -86,7 +86,7 @@ const generateProperty = (field: ResoField, enumMode: EnumMode): string => {
 /** Generates an EDMX NavigationProperty element for an expansion field. */
 const generateNavigationProperty = (field: ResoField): string => {
   // Don't double-wrap Collection() — the type may already include it from the metadata report
-  const type = field.type.startsWith('Collection(') ? field.type : (field.isCollection ? `Collection(${field.type})` : field.type);
+  const type = field.type.startsWith('Collection(') ? field.type : field.isCollection ? `Collection(${field.type})` : field.type;
   return `        <NavigationProperty Name="${escapeXml(field.fieldName)}" Type="${escapeXml(type)}"/>`;
 };
 
@@ -173,7 +173,7 @@ const collectEnumTypes = (metadata: ResoMetadata, targetResources: ReadonlyArray
         .map((l, index) => ({
           name: l.lookupValue,
           value: index,
-          standardName: l.annotations.find(a => a.term === ANNOTATION_STANDARD_NAME)?.value,
+          standardName: l.annotations.find(a => a.term === ANNOTATION_STANDARD_NAME)?.value
         }));
 
       return { enumTypeName: shortName, members };
@@ -187,7 +187,7 @@ const generateEnumTypeXml = (enumType: EnumTypeDefinition): string => {
     .map(m =>
       m.standardName
         ? `        <Member Name="${escapeXml(m.name)}" Value="${m.value}">\n          <Annotation Term="${ANNOTATION_STANDARD_NAME}" String="${escapeXml(m.standardName)}"/>\n        </Member>`
-        : `        <Member Name="${escapeXml(m.name)}" Value="${m.value}"/>`,
+        : `        <Member Name="${escapeXml(m.name)}" Value="${m.value}"/>`
     )
     .join('\n');
 

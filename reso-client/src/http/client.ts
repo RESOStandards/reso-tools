@@ -93,7 +93,7 @@ export const createClient = async (config: ClientConfig): Promise<ODataClient> =
       'User-Agent': `RESO-Client-SDK/${SDK_VERSION}`,
       Authorization: `Bearer ${token}`,
       ...config.defaultHeaders,
-      ...options?.headers,
+      ...options?.headers
     };
 
     // Only send OData-Version if configured — some servers (e.g., FBS/Spark)

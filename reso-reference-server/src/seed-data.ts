@@ -18,10 +18,19 @@ import type { ResoMetadata } from './metadata/types.js';
  * (sqlite runs with foreign_keys = ON).
  */
 const SEED_ORDER: ReadonlyArray<string> = [
-  'OUID', 'Office', 'Member', 'Teams', 'TeamMembers',
+  'OUID',
+  'Office',
+  'Member',
+  'Teams',
+  'TeamMembers',
   'Property',
-  'Media', 'OpenHouse', 'Showing',
-  'PropertyGreenVerification', 'PropertyPowerProduction', 'PropertyRooms', 'PropertyUnitTypes'
+  'Media',
+  'OpenHouse',
+  'Showing',
+  'PropertyGreenVerification',
+  'PropertyPowerProduction',
+  'PropertyRooms',
+  'PropertyUnitTypes'
 ];
 
 type SeedDataset = Readonly<Record<string, ReadonlyArray<Record<string, unknown>>>>;

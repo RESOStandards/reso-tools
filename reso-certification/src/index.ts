@@ -46,7 +46,7 @@ export {
   isEnumProperty,
   extractPayloadFields,
   extractEnumerations,
-  extractExpansions,
+  extractExpansions
 } from './test-runner/payload-fields.js';
 export type { EnumerationDetail } from './test-runner/payload-fields.js';
 
@@ -101,7 +101,7 @@ export {
   scenariosForVersion,
   runCoreResourceScenarios,
   resolveTestParams,
-  WELL_KNOWN_RESOURCES,
+  WELL_KNOWN_RESOURCES
 } from './web-api-core/index.js';
 
 // ── SDK ──
@@ -112,7 +112,7 @@ export {
   runEntityEventCompliance,
   runCoreCompliance,
   createPipeline,
-  writeReports,
+  writeReports
 } from './sdk/index.js';
 
 export type {
@@ -124,7 +124,7 @@ export type {
   PipelineResult,
   StepResult,
   StepProgress,
-  ProgressCallback,
+  ProgressCallback
 } from './sdk/types.js';
 
 // ── Variations (standalone; also used by the DD pipeline) ──
@@ -134,7 +134,7 @@ export type {
   ComputeVariationsViaServiceInput,
   VariationsServiceReport,
   VariationsServiceErrorCode,
-  FindVariationsInput,
+  FindVariationsInput
 } from './variations/index.js';
 
 // ── Metadata source (--from-server: fetch $metadata from a live endpoint + serialize) ──

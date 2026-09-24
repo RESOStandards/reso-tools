@@ -34,7 +34,8 @@ export interface ToolDef {
 
 export const authenticateTool: ToolDef = {
   name: 'authenticate',
-  description: 'Obtain a bearer token using OAuth2 Client Credentials. Returns a token that can be used with all other tools. Tokens are cached and refreshed automatically.',
+  description:
+    'Obtain a bearer token using OAuth2 Client Credentials. Returns a token that can be used with all other tools. Tokens are cached and refreshed automatically.',
   scope: 'all',
   inputSchema: {
     type: 'object',
@@ -42,10 +43,10 @@ export const authenticateTool: ToolDef = {
       clientId: { type: 'string', description: 'OAuth2 client ID' },
       clientSecret: { type: 'string', description: 'OAuth2 client secret' },
       tokenUrl: { type: 'string', description: 'OAuth2 token endpoint URL' },
-      scope: { type: 'string', description: 'OAuth2 scope (optional)' },
+      scope: { type: 'string', description: 'OAuth2 scope (optional)' }
     },
-    required: ['clientId', 'clientSecret', 'tokenUrl'],
-  },
+    required: ['clientId', 'clientSecret', 'tokenUrl']
+  }
 };
 
 // ── Query Tools ──
@@ -55,12 +56,13 @@ const authProperties = {
   authToken: { type: 'string', description: 'Bearer token for authentication' },
   clientId: { type: 'string', description: 'OAuth2 client ID (alternative to authToken)' },
   clientSecret: { type: 'string', description: 'OAuth2 client secret' },
-  tokenUrl: { type: 'string', description: 'OAuth2 token endpoint URL' },
+  tokenUrl: { type: 'string', description: 'OAuth2 token endpoint URL' }
 };
 
 export const queryTool: ToolDef = {
   name: 'query',
-  description: 'Query a RESO OData server. Returns records from the specified resource with optional $filter, $select, $orderby, $top, $skip, and $count.',
+  description:
+    'Query a RESO OData server. Returns records from the specified resource with optional $filter, $select, $orderby, $top, $skip, and $count.',
   scope: 'all',
   inputSchema: {
     type: 'object',
@@ -74,10 +76,10 @@ export const queryTool: ToolDef = {
       top: { type: 'number', description: 'Maximum number of records to return' },
       skip: { type: 'number', description: 'Number of records to skip' },
       count: { type: 'boolean', description: 'Include @odata.count in response' },
-      expand: { type: 'string', description: 'OData $expand expression for navigation properties' },
+      expand: { type: 'string', description: 'OData $expand expression for navigation properties' }
     },
-    required: ['url', 'resource'],
-  },
+    required: ['url', 'resource']
+  }
 };
 
 export const metadataTool: ToolDef = {
@@ -89,24 +91,25 @@ export const metadataTool: ToolDef = {
     properties: {
       url: { type: 'string', description: 'OData service root URL' },
       ...authProperties,
-      resource: { type: 'string', description: 'Optional: return only this resource\'s entity type' },
+      resource: { type: 'string', description: "Optional: return only this resource's entity type" }
     },
-    required: ['url'],
-  },
+    required: ['url']
+  }
 };
 
 // ── Write Tools ──
 
 export const createTool: ToolDef = {
   name: 'create',
-  description: 'Create a new record on a RESO OData resource via POST. Returns the server response (typically the created record or its location).',
+  description:
+    'Create a new record on a RESO OData resource via POST. Returns the server response (typically the created record or its location).',
   scope: 'all',
   annotations: {
     title: 'Create record',
     readOnlyHint: false,
-    destructiveHint: false,  // POST adds, doesn't destroy
-    idempotentHint: false,   // re-running creates duplicates
-    openWorldHint: true,     // touches an external system
+    destructiveHint: false, // POST adds, doesn't destroy
+    idempotentHint: false, // re-running creates duplicates
+    openWorldHint: true // touches an external system
   },
   inputSchema: {
     type: 'object',
@@ -114,10 +117,10 @@ export const createTool: ToolDef = {
       url: { type: 'string', description: 'OData service root URL' },
       resource: { type: 'string', description: 'Resource name to create a record in (e.g., Property)' },
       ...authProperties,
-      record: { type: 'object', description: 'Field/value pairs for the new record' },
+      record: { type: 'object', description: 'Field/value pairs for the new record' }
     },
-    required: ['url', 'resource', 'record'],
-  },
+    required: ['url', 'resource', 'record']
+  }
 };
 
 export const updateTool: ToolDef = {
@@ -128,8 +131,8 @@ export const updateTool: ToolDef = {
     title: 'Update record',
     readOnlyHint: false,
     destructiveHint: false,
-    idempotentHint: true,    // same PATCH twice yields the same result
-    openWorldHint: true,
+    idempotentHint: true, // same PATCH twice yields the same result
+    openWorldHint: true
   },
   inputSchema: {
     type: 'object',
@@ -138,10 +141,10 @@ export const updateTool: ToolDef = {
       resource: { type: 'string', description: 'Resource name (e.g., Property)' },
       key: { type: 'string', description: 'Key value of the record to update (e.g., the ListingKey)' },
       ...authProperties,
-      record: { type: 'object', description: 'Field/value pairs to PATCH onto the record' },
+      record: { type: 'object', description: 'Field/value pairs to PATCH onto the record' }
     },
-    required: ['url', 'resource', 'key', 'record'],
-  },
+    required: ['url', 'resource', 'key', 'record']
+  }
 };
 
 export const deleteTool: ToolDef = {
@@ -151,9 +154,9 @@ export const deleteTool: ToolDef = {
   annotations: {
     title: 'Delete record',
     readOnlyHint: false,
-    destructiveHint: true,   // ← the big one — hosts should require confirmation
+    destructiveHint: true, // ← the big one — hosts should require confirmation
     idempotentHint: true,
-    openWorldHint: true,
+    openWorldHint: true
   },
   inputSchema: {
     type: 'object',
@@ -161,27 +164,28 @@ export const deleteTool: ToolDef = {
       url: { type: 'string', description: 'OData service root URL' },
       resource: { type: 'string', description: 'Resource name (e.g., Property)' },
       key: { type: 'string', description: 'Key value of the record to delete' },
-      ...authProperties,
+      ...authProperties
     },
-    required: ['url', 'resource', 'key'],
-  },
+    required: ['url', 'resource', 'key']
+  }
 };
 
 // ── Validation Tools ──
 
 export const validateTool: ToolDef = {
   name: 'validate',
-  description: 'Validate a record against RESO Data Dictionary field rules. Returns validation failures with field names, expected types, and error descriptions.',
+  description:
+    'Validate a record against RESO Data Dictionary field rules. Returns validation failures with field names, expected types, and error descriptions.',
   scope: 'all',
   inputSchema: {
     type: 'object',
     properties: {
       record: { type: 'object', description: 'The record to validate (key-value pairs)' },
       resource: { type: 'string', description: 'Resource name (e.g., Property) for looking up field rules' },
-      version: { type: 'string', description: 'DD version: "1.7" or "2.0"', default: '2.0' },
+      version: { type: 'string', description: 'DD version: "1.7" or "2.0"', default: '2.0' }
     },
-    required: ['record', 'resource'],
-  },
+    required: ['record', 'resource']
+  }
 };
 
 // ── Parser Tools ──
@@ -193,17 +197,18 @@ export const parseFilterTool: ToolDef = {
   inputSchema: {
     type: 'object',
     properties: {
-      filter: { type: 'string', description: 'OData $filter expression (e.g., "ListPrice gt 200000 and City eq \'Austin\'")' },
+      filter: { type: 'string', description: 'OData $filter expression (e.g., "ListPrice gt 200000 and City eq \'Austin\'")' }
     },
-    required: ['filter'],
-  },
+    required: ['filter']
+  }
 };
 
 // ── Certification Tools ──
 
 export const runComplianceTool: ToolDef = {
   name: 'run-compliance',
-  description: 'Run RESO certification compliance tests against an OData server. Supports Add/Edit (RCP-010), EntityEvent (RCP-027), and Web API Core endorsements.',
+  description:
+    'Run RESO certification compliance tests against an OData server. Supports Add/Edit (RCP-010), EntityEvent (RCP-027), and Web API Core endorsements.',
   scope: 'cert',
   inputSchema: {
     type: 'object',
@@ -211,7 +216,7 @@ export const runComplianceTool: ToolDef = {
       endorsement: {
         type: 'string',
         enum: ['add-edit', 'entity-event', 'core'],
-        description: 'Which endorsement to test',
+        description: 'Which endorsement to test'
       },
       url: { type: 'string', description: 'OData service root URL' },
       ...authProperties,
@@ -221,25 +226,26 @@ export const runComplianceTool: ToolDef = {
       resources: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Resources to test (core only, defaults to well-known list)',
-      },
+        description: 'Resources to test (core only, defaults to well-known list)'
+      }
     },
-    required: ['endorsement', 'url'],
-  },
+    required: ['endorsement', 'url']
+  }
 };
 
 export const metadataReportTool: ToolDef = {
   name: 'metadata-report',
-  description: 'Generate a RESO metadata compliance report from a server\'s $metadata. Checks entity types, fields, and annotations against the Data Dictionary.',
+  description:
+    "Generate a RESO metadata compliance report from a server's $metadata. Checks entity types, fields, and annotations against the Data Dictionary.",
   scope: 'cert',
   inputSchema: {
     type: 'object',
     properties: {
       url: { type: 'string', description: 'OData service root URL' },
-      ...authProperties,
+      ...authProperties
     },
-    required: ['url'],
-  },
+    required: ['url']
+  }
 };
 
 // ── All Tools ──
@@ -254,11 +260,9 @@ export const allTools: ReadonlyArray<ToolDef> = [
   validateTool,
   parseFilterTool,
   runComplianceTool,
-  metadataReportTool,
+  metadataReportTool
 ];
 
 /** Get tools filtered by scope. */
 export const toolsForScope = (scope: 'all' | 'cert'): ReadonlyArray<ToolDef> =>
-  scope === 'cert'
-    ? allTools.filter(t => t.scope === 'cert')
-    : allTools;
+  scope === 'cert' ? allTools.filter(t => t.scope === 'cert') : allTools;

@@ -65,7 +65,7 @@ const SPEC = {
     bindingPath: 'https://docs.oasis-open.org/odata/odata/v4.0/csd01/part3-csdl/odata-v4.0-csd01-part3-csdl.html#_Toc355092921',
     bindingTarget: 'https://docs.oasis-open.org/odata/odata/v4.0/csd01/part3-csdl/odata-v4.0-csd01-part3-csdl.html#_Toc355092922',
     navPropertyType: 'https://docs.oasis-open.org/odata/odata/v4.0/csd01/part3-csdl/odata-v4.0-csd01-part3-csdl.html#_Toc355092857',
-    referentialConstraint: 'https://docs.oasis-open.org/odata/odata/v4.0/csd01/part3-csdl/odata-v4.0-csd01-part3-csdl.html#_Toc355092861',
+    referentialConstraint: 'https://docs.oasis-open.org/odata/odata/v4.0/csd01/part3-csdl/odata-v4.0-csd01-part3-csdl.html#_Toc355092861'
   },
   v401: {
     entityContainer: 'https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_EntityContainer',
@@ -76,8 +76,8 @@ const SPEC = {
     bindingPath: 'https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_NavigationPropertyPathBinding',
     bindingTarget: 'https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_BindingTarget',
     navPropertyType: 'https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_NavigationProperty',
-    referentialConstraint: 'https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_ReferentialConstraint',
-  },
+    referentialConstraint: 'https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_ReferentialConstraint'
+  }
 } as const;
 
 interface SpecUrls {
@@ -118,7 +118,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
   if (!schema.namespace) {
     errors.push({
       path: 'Schema',
-      message: 'Schema namespace is missing or empty',
+      message: 'Schema namespace is missing or empty'
     });
   }
 
@@ -133,7 +133,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
         'No EntityContainer was found in the metadata. An OData service metadata document must contain a single ' +
         'entity container (commonly named "Default") that defines the resources the service exposes. Add a ' +
         '<Schema> containing an <EntityContainer> whose <EntitySet> entries list your resources (Property, Member, …).',
-      specUrl: spec.entityContainer,
+      specUrl: spec.entityContainer
     });
   }
 
@@ -148,11 +148,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
   // drives a referential-integrity check, NOT a check against any known/blessed FQDN set (there is none
   // for RESO): a reference is valid iff it links to a declaration here. Registering all kinds
   // symmetrically under their own namespace keeps this set consistent with declaredNamespaces below.
-  const declaredTypeFqdns = new Set([
-    ...schema.entityTypes.map(fqdn),
-    ...schema.enumTypes.map(fqdn),
-    ...schema.complexTypes.map(fqdn)
-  ]);
+  const declaredTypeFqdns = new Set([...schema.entityTypes.map(fqdn), ...schema.enumTypes.map(fqdn), ...schema.complexTypes.map(fqdn)]);
 
   // The namespaces this document actually declares a type in — the primary namespace plus every distinct
   // namespace any entity, enum, or complex type is declared in. A reference qualified with one of these
@@ -195,7 +191,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
       // reference into a namespace this document doesn't declare is external, and this validator allows it.
       errors.push({
         path: propPath,
-        message: `Property type '${propType}' is not a valid Edm primitive or known type`,
+        message: `Property type '${propType}' is not a valid Edm primitive or known type`
       });
     }
   };
@@ -209,7 +205,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
       errors.push({
         path: etPath,
         message: `Entity type '${entityType.name}' has no key properties defined`,
-        specUrl: spec.entityTypeKey,
+        specUrl: spec.entityTypeKey
       });
     }
 
@@ -220,7 +216,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
         errors.push({
           path: `${etPath}/Key`,
           message: `Entity type '${entityType.name}' lists '${keyProp}' as a Key property but '${keyProp}' isn't declared as one of its properties.`,
-          specUrl: spec.entityTypeKey,
+          specUrl: spec.entityTypeKey
         });
       }
     }
@@ -235,7 +231,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
         errors.push({
           path: `${etPath}/NavigationProperty(${navProp.name})`,
           message: `Navigation property references unknown entity type '${targetType}'`,
-          specUrl: spec.navPropertyType,
+          specUrl: spec.navPropertyType
         });
       }
     }
@@ -244,7 +240,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
       errors.push({
         path: etPath,
         message: `BaseType '${entityType.baseType}' is not a known entity type`,
-        specUrl: spec.entityTypeBaseType,
+        specUrl: spec.entityTypeBaseType
       });
     }
   }
@@ -257,7 +253,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
       errors.push({
         path: ctPath,
         message: `BaseType '${complexType.baseType}' is not a known complex type`,
-        specUrl: spec.complexTypeBaseType,
+        specUrl: spec.complexTypeBaseType
       });
     }
 
@@ -271,7 +267,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
         errors.push({
           path: `${ctPath}/NavigationProperty(${navProp.name})`,
           message: `Navigation property references unknown entity type '${targetType}'`,
-          specUrl: spec.navPropertyType,
+          specUrl: spec.navPropertyType
         });
       }
     }
@@ -279,9 +275,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
 
   // Build lookup maps for entity container validation (keyed by each entity's true FQDN, so a binding
   // or referential-constraint reference into a non-primary namespace resolves to the declared type).
-  const entityTypeMap = new Map(
-    schema.entityTypes.map(et => [fqdn(et), et])
-  );
+  const entityTypeMap = new Map(schema.entityTypes.map(et => [fqdn(et), et]));
   const entitySetMap = schema.entityContainer
     ? new Map(schema.entityContainer.entitySets.map(es => [es.name, es]))
     : new Map<string, CsdlEntitySet>();
@@ -298,7 +292,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
         errors.push({
           path: esPath,
           message: `Entity set references unknown entity type '${entitySet.entityType}'`,
-          specUrl: spec.entitySetEntityType,
+          specUrl: spec.entitySetEntityType
         });
       }
 
@@ -317,7 +311,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
               errors.push({
                 path: bindingPath,
                 message: `Binding path '${binding.path}' does not reference a navigation property on entity type '${sourceEntityType.name}'`,
-                specUrl: spec.bindingPath,
+                specUrl: spec.bindingPath
               });
             }
           }
@@ -328,7 +322,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
             errors.push({
               path: bindingPath,
               message: `Binding target '${binding.target}' does not reference a valid entity set in the container`,
-              specUrl: spec.bindingTarget,
+              specUrl: spec.bindingTarget
             });
           }
 
@@ -345,7 +339,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
                 errors.push({
                   path: bindingPath,
                   message: `Navigation property type '${navTargetType}' does not match binding target entity type '${targetEntitySet.entityType}'`,
-                  specUrl: spec.navPropertyType,
+                  specUrl: spec.navPropertyType
                 });
               }
             }
@@ -368,7 +362,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
             errors.push({
               path: `${etPath}/NavigationProperty(${navProp.name})/ReferentialConstraint`,
               message: `Constraint property '${constraint.property}' does not exist on entity type '${entityType.name}'`,
-              specUrl: spec.referentialConstraint,
+              specUrl: spec.referentialConstraint
             });
           }
 
@@ -380,7 +374,7 @@ export const validateCsdl = (schema: CsdlSchema, odataVersion: '4.0' | '4.01' = 
               errors.push({
                 path: `${etPath}/NavigationProperty(${navProp.name})/ReferentialConstraint`,
                 message: `Referenced property '${constraint.referencedProperty}' does not exist on target entity type '${targetEntityType.name}'`,
-                specUrl: spec.referentialConstraint,
+                specUrl: spec.referentialConstraint
               });
             }
           }

@@ -95,8 +95,7 @@ export const createODataRouter = (
   // Pre-build all ResourceContexts so resolveChildContext can reference any resource
   const contextMap = new Map<string, ResourceContext>();
 
-  const resolveChildContext = (resourceName: string): ResourceContext | undefined =>
-    contextMap.get(resourceName);
+  const resolveChildContext = (resourceName: string): ResourceContext | undefined => contextMap.get(resourceName);
 
   for (const resource of targetResources) {
     const fields = getFieldsForResource(metadata, resource);

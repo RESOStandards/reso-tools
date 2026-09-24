@@ -6,12 +6,12 @@ import chalk from 'chalk';
 import {
   LISTR_LOGGER_STDERR_LEVELS,
   Listr,
+  type ListrDefaultRendererOptions,
   ListrLogLevels,
   ListrLogger,
-  PRESET_TIMER,
-  Spinner,
-  type ListrDefaultRendererOptions,
   type ListrVerboseRendererOptions,
+  PRESET_TIMER,
+  Spinner
 } from 'listr2';
 import { runComplianceTests } from '../sdk/index.js';
 import { RUN_ADD_EDIT_SCENARIOS, RUN_CORE_SCENARIOS, RUN_ENTITY_EVENT_SCENARIOS } from '../sdk/step-names.js';
@@ -30,12 +30,18 @@ export const resolveRenderMode = (opts: { readonly verbose?: boolean; readonly o
 /** Map step status to a display icon. */
 const statusIcon = (status: StepProgress['status']): string => {
   switch (status) {
-    case 'passed': return '\u2713';
-    case 'failed': return '\u2717';
-    case 'incomplete': return '\u25D0'; // \u25D0 \u2014 ran out of time; partial results, rest not tested
-    case 'skipped': return '-';
-    case 'running': return '\u25CB';
-    case 'pending': return '\u00B7';
+    case 'passed':
+      return '\u2713';
+    case 'failed':
+      return '\u2717';
+    case 'incomplete':
+      return '\u25D0'; // \u25D0 \u2014 ran out of time; partial results, rest not tested
+    case 'skipped':
+      return '-';
+    case 'running':
+      return '\u25CB';
+    case 'pending':
+      return '\u00B7';
   }
 };
 
@@ -76,7 +82,11 @@ export const createCoreProgressView = () => {
 
   const apply = (d: CoreProgressDetail): void => {
     if (d.event === 'init') {
-      for (const r of d.resources ?? []) if (!state.has(r)) { order.push(r); state.set(r, { phase: 'queued' }); }
+      for (const r of d.resources ?? [])
+        if (!state.has(r)) {
+          order.push(r);
+          state.set(r, { phase: 'queued' });
+        }
     } else if (d.event === 'phase' && d.resource) {
       if (!state.has(d.resource)) order.push(d.resource);
       state.set(d.resource, { phase: d.phase ?? 'queued', counts: d.counts, outcome: d.outcome, note: d.note });
@@ -90,10 +100,14 @@ export const createCoreProgressView = () => {
   const icon = (s: CoreResourceState): string => {
     if (s.phase !== 'done') return s.phase === 'queued' ? chalk.dim('·') : chalk.cyan('○');
     switch (s.outcome) {
-      case 'failed': return chalk.red('✗');
-      case 'skipped': return chalk.yellow('-');
-      case 'not-applicable': return chalk.dim('·');
-      default: return chalk.green('✓');
+      case 'failed':
+        return chalk.red('✗');
+      case 'skipped':
+        return chalk.yellow('-');
+      case 'not-applicable':
+        return chalk.dim('·');
+      default:
+        return chalk.green('✓');
     }
   };
 
@@ -115,15 +129,21 @@ export const createCoreProgressView = () => {
     const counts = rows.filter(x => x.s.phase === 'done' && x.s.counts).map(x => x.s.counts!);
     const numW = (
       pick: (c: { passed: number; failed: number; skipped: number }) => number,
-      only?: (c: { passed: number; failed: number; skipped: number }) => boolean,
+      only?: (c: { passed: number; failed: number; skipped: number }) => boolean
     ): number => {
       const arr = (only ? counts.filter(only) : counts).map(pick);
       return arr.length ? Math.max(...arr.map(n => String(n).length)) : 0;
     };
     const pW = numW(c => c.passed);
     const tW = numW(c => c.passed + c.failed + c.skipped);
-    const fW = numW(c => c.failed, c => c.failed > 0);
-    const sW = numW(c => c.skipped, c => c.skipped > 0);
+    const fW = numW(
+      c => c.failed,
+      c => c.failed > 0
+    );
+    const sW = numW(
+      c => c.skipped,
+      c => c.skipped > 0
+    );
     // A fixed-width count cell: colored "N unit" when N>0, else blank of the same width so the next column aligns.
     const cell = (n: number, unit: string, width: number, color: (t: string) => string): string =>
       width === 0 ? '' : n > 0 ? color(`${String(n).padStart(width)} ${unit}`) : ' '.repeat(width + 1 + unit.length);
@@ -133,7 +153,10 @@ export const createCoreProgressView = () => {
       if (s.phase === 'done' && s.counts) {
         const c = s.counts;
         const tally = `${String(c.passed).padStart(pW)}/${String(c.passed + c.failed + c.skipped).padStart(tW)}`;
-        return `${head}   ${tally}   ${cell(c.failed, 'failed', fW, chalk.red)}  ${cell(c.skipped, 'skipped', sW, chalk.dim)}`.replace(/\s+$/, '');
+        return `${head}   ${tally}   ${cell(c.failed, 'failed', fW, chalk.red)}  ${cell(c.skipped, 'skipped', sW, chalk.dim)}`.replace(
+          /\s+$/,
+          ''
+        );
       }
       return `${head}   ${phaseWord(s)}`.replace(/\s+$/, '');
     });
@@ -151,9 +174,12 @@ export const createCoreProgressView = () => {
 /** Select listr2 renderer based on render mode. */
 const resolveRenderer = (mode: RenderMode): 'default' | 'verbose' | 'silent' => {
   switch (mode) {
-    case 'default': return 'default';
-    case 'verbose': return 'verbose';
-    case 'silent': return 'silent';
+    case 'default':
+      return 'default';
+    case 'verbose':
+      return 'verbose';
+    case 'silent':
+      return 'silent';
   }
 };
 
@@ -171,7 +197,7 @@ const defaultRendererOptions: ListrDefaultRendererOptions = {
   spinner: new ResoSpinner(),
   // A non-passing run throws to flip the parent task glyph to ✗; keep the "N passed, M failed" title and
   // suppress the raw error text — the concise failure list is printed by printRunSummary instead.
-  showErrorMessage: false,
+  showErrorMessage: false
 };
 
 /** Options for the verbose (non-TTY, `--verbose`) renderer. listr2's stock verbose logger prefixes every line
@@ -182,7 +208,7 @@ const defaultRendererOptions: ListrDefaultRendererOptions = {
 const verboseRendererOptions: ListrVerboseRendererOptions = {
   logger: new ListrLogger({ useIcons: true, toStderr: LISTR_LOGGER_STDERR_LEVELS }),
   timestamp: { condition: true, field: () => new Date().toISOString(), format: () => chalk.dim },
-  icon: { [ListrLogLevels.OUTPUT]: '' },
+  icon: { [ListrLogLevels.OUTPUT]: '' }
 };
 
 /** Renderer options per mode: verbose gets the timestamped logger; default/silent keep the interactive set. */
@@ -201,41 +227,42 @@ const runningTitle = (label: string, progress: StepProgress): string => {
 /** Shared progress → listr2 handler. Renders the Web API Core per-resource tree (default mode) or clean
  *  per-resource log lines (verbose) from {@link CoreProgressDetail}, and falls back to the step-line
  *  rendering for the other endorsements and the pre-scenario steps. */
-const handleProgress = (
-  task: { title: string; output: string },
-  label: string,
-  renderMode: RenderMode,
-  view: ReturnType<typeof createCoreProgressView>,
-) => (progress: StepProgress): void => {
-  const d = progress.detail;
-  if (d?.kind === 'core-progress') {
-    view.apply(d);
-    task.title = runningTitle(label, progress);
-    if (renderMode === 'verbose') {
-      // A scrolling log can't show a live tree, so emit the meaningful transitions: a resource finishing, and
-      // (dimmed) the request currently in flight so you can see what's being tested.
-      if (d.event === 'phase' && d.resource && d.phase === 'done') {
-        const c = d.counts;
-        const tally = c ? ` — ${c.passed}/${c.passed + c.failed + c.skipped}${c.failed ? `, ${c.failed} failed` : ''}` : d.note ? ` — ${d.note}` : '';
-        task.output = `○ ${d.resource}${tally}`;
-      } else if (d.event === 'request' && d.url) {
-        task.output = chalk.gray(`  → ${d.method ?? 'GET'} ${d.url}`);
+const handleProgress =
+  (task: { title: string; output: string }, label: string, renderMode: RenderMode, view: ReturnType<typeof createCoreProgressView>) =>
+  (progress: StepProgress): void => {
+    const d = progress.detail;
+    if (d?.kind === 'core-progress') {
+      view.apply(d);
+      task.title = runningTitle(label, progress);
+      if (renderMode === 'verbose') {
+        // A scrolling log can't show a live tree, so emit the meaningful transitions: a resource finishing, and
+        // (dimmed) the request currently in flight so you can see what's being tested.
+        if (d.event === 'phase' && d.resource && d.phase === 'done') {
+          const c = d.counts;
+          const tally = c
+            ? ` — ${c.passed}/${c.passed + c.failed + c.skipped}${c.failed ? `, ${c.failed} failed` : ''}`
+            : d.note
+              ? ` — ${d.note}`
+              : '';
+          task.output = `○ ${d.resource}${tally}`;
+        } else if (d.event === 'request' && d.url) {
+          task.output = chalk.gray(`  → ${d.method ?? 'GET'} ${d.url}`);
+        }
+      } else {
+        task.output = view.render();
       }
-    } else {
-      task.output = view.render();
+      return;
     }
-    return;
-  }
-  if (progress.status === 'running') {
-    task.title = runningTitle(label, progress);
-    const msg = progress.message?.trim();
-    if (renderMode === 'verbose' && msg && !msg.startsWith('{')) task.output = `○ ${msg}`;
-  } else if (progress.status !== 'pending') {
-    // Once the resource tree is up (Core scenarios started), keep it in default mode — its final state is the
-    // summary; otherwise show the completing step line (auth / service / metadata).
-    task.output = renderMode === 'default' && view.hasData() ? view.render() : formatStep(progress);
-  }
-};
+    if (progress.status === 'running') {
+      task.title = runningTitle(label, progress);
+      const msg = progress.message?.trim();
+      if (renderMode === 'verbose' && msg && !msg.startsWith('{')) task.output = `○ ${msg}`;
+    } else if (progress.status !== 'pending') {
+      // Once the resource tree is up (Core scenarios started), keep it in default mode — its final state is the
+      // summary; otherwise show the completing step line (auth / service / metadata).
+      task.output = renderMode === 'default' && view.hasData() ? view.render() : formatStep(progress);
+    }
+  };
 
 /** Shape of the per-resource scenario data the failure collectors read off the run context. */
 interface ReportScenario {
@@ -265,7 +292,7 @@ const scenarioFailureLines = (result: PipelineResult, include: (s: ReportScenari
           .filter((m): m is string => !!m);
         const detail = msgs.length ? `: ${msgs.slice(0, 2).join('; ')}` : '';
         return `${r.resource ?? 'Resource'} · ${s.name ?? s.tag ?? 'scenario'}${detail}`;
-      }),
+      })
   );
 };
 
@@ -295,9 +322,7 @@ export const collectWarnings = (result: PipelineResult): ReadonlyArray<string> =
     | ReadonlyArray<{ readonly resource?: string; readonly scenarios?: ReadonlyArray<ReportScenario> }>
     | undefined;
   return (reports ?? []).flatMap(r =>
-    (r.scenarios ?? []).flatMap(s =>
-      (s.warnings ?? []).map(w => `${r.resource ?? 'Resource'} · ${s.name ?? s.tag ?? 'scenario'}: ${w}`),
-    ),
+    (r.scenarios ?? []).flatMap(s => (s.warnings ?? []).map(w => `${r.resource ?? 'Resource'} · ${s.name ?? s.tag ?? 'scenario'}: ${w}`))
   );
 };
 
@@ -343,11 +368,7 @@ export const runHeaderSummary = (result: PipelineResult): string => {
 };
 
 /** Run a single pipeline with listr2 progress rendering. */
-export const runWithProgress = async (
-  config: ComplianceConfig,
-  label: string,
-  renderMode: RenderMode,
-): Promise<PipelineResult> => {
+export const runWithProgress = async (config: ComplianceConfig, label: string, renderMode: RenderMode): Promise<PipelineResult> => {
   let pipelineResult: PipelineResult | undefined;
 
   const tasks = new Listr(
@@ -363,17 +384,21 @@ export const runWithProgress = async (
           // (a green \u2713 over failed resources was misleading). listr2's own glyph is the single status indicator.
           if (pipelineResult.status !== 'passed') throw new Error('non-passing run');
         },
-        rendererOptions: { persistentOutput: true },
-      },
+        rendererOptions: { persistentOutput: true }
+      }
     ],
     {
       exitOnError: false,
       renderer: resolveRenderer(renderMode),
-      rendererOptions: resolveRendererOptions(renderMode),
-    },
+      rendererOptions: resolveRendererOptions(renderMode)
+    }
   );
 
-  try { await tasks.run(); } catch { /* the failing run throws to mark the task \u2717; the verdict is in pipelineResult */ }
+  try {
+    await tasks.run();
+  } catch {
+    /* the failing run throws to mark the task \u2717; the verdict is in pipelineResult */
+  }
   printRunSummary(pipelineResult!, renderMode);
   return pipelineResult!;
 };
@@ -381,7 +406,7 @@ export const runWithProgress = async (
 /** Run multiple config entries sequentially with listr2 progress rendering. */
 export const runConfigEntries = async (
   entries: ReadonlyArray<{ readonly config: ComplianceConfig; readonly label: string }>,
-  renderMode: RenderMode,
+  renderMode: RenderMode
 ): Promise<ReadonlyArray<PipelineResult>> => {
   const results: PipelineResult[] = [];
 
@@ -397,17 +422,21 @@ export const runConfigEntries = async (
         task.title = `${label} \u2014 ${runHeaderSummary(result)} (${humanizeDuration(result.duration)})`;
         if (result.status !== 'passed') throw new Error('non-passing run'); // parent glyph \u2192 \u2717 (see runWithProgress)
       },
-      rendererOptions: { persistentOutput: true },
+      rendererOptions: { persistentOutput: true }
     })),
     {
       concurrent: false,
       exitOnError: false,
       renderer: resolveRenderer(renderMode),
-      rendererOptions: resolveRendererOptions(renderMode),
-    },
+      rendererOptions: resolveRendererOptions(renderMode)
+    }
   );
 
-  try { await tasks.run(); } catch { /* failing runs throw to mark their tasks \u2717; verdicts are in results */ }
+  try {
+    await tasks.run();
+  } catch {
+    /* failing runs throw to mark their tasks \u2717; verdicts are in results */
+  }
   for (const result of results) printRunSummary(result, renderMode);
   return results;
 };

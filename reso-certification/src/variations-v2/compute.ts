@@ -29,7 +29,7 @@ const {
   normalizeDataElementName,
   classifySuggestionStrategy,
   getDDWikiUrl,
-  prepareResults,
+  prepareResults
 } = require('../legacy/lib/variations/index.js');
 const { distance } = require('fastest-levenshtein');
 
@@ -65,7 +65,7 @@ interface Accumulator {
  */
 const isSuggestedLookupTargetPresent = (
   reportMap: Json,
-  { suggestedResourceName, suggestedFieldName, suggestedLegacyODataValue, suggestedLookupValue }: Json,
+  { suggestedResourceName, suggestedFieldName, suggestedLegacyODataValue, suggestedLookupValue }: Json
 ): boolean => {
   const field = (reportMap as never)?.[suggestedResourceName as never]?.[suggestedFieldName as never] as
     | { legacyODataValues?: Json; lookupValues?: Json }
@@ -74,7 +74,7 @@ const isSuggestedLookupTargetPresent = (
   return !!(
     field.legacyODataValues?.[suggestedLegacyODataValue as never] ||
     field.lookupValues?.[suggestedLookupValue as never] ||
-    Object.values(field.lookupValues ?? {}).some((entry) => {
+    Object.values(field.lookupValues ?? {}).some(entry => {
       const { standardLookupValue = null } = entry as Json;
       return !!suggestedLookupValue && suggestedLookupValue === standardLookupValue;
     })
@@ -93,7 +93,7 @@ const machineMatch = (
   hasStandard: (standardValue: string) => boolean,
   makeSuggestion: (standardValue: string, extra: Json) => Json,
   collection: Json[],
-  fuzziness: number,
+  fuzziness: number
 ): void => {
   const normalizedLocal = normalizeDataElementName(localValue);
   const isMinMatchingLength = (localValue?.length ?? 0) > MIN_MATCHING_LENGTH;
@@ -127,7 +127,7 @@ const machineMatch = (
 
   // Exact filters the rest: if this element produced any exact match, emit only the exact(s)
   // and drop every substring / edit-distance suggestion; otherwise emit all that were produced.
-  const exacts = produced.filter((s) => s.exactMatch === true);
+  const exacts = produced.filter(s => s.exactMatch === true);
   collection.push(...(exacts.length ? exacts : produced));
 };
 
@@ -140,7 +140,7 @@ const emitSuggestionsUnlessSatisfied = (
   suggestions: ReadonlyArray<Json>,
   present: (s: Json) => boolean,
   emit: (s: Json) => Json[],
-  collection: Json[],
+  collection: Json[]
 ): void => {
   const satisfied = suggestions.some(present) ?? false;
   if (!satisfied) collection.push(...suggestions.flatMap(emit));
@@ -157,9 +157,7 @@ const bucketEnforcement = (variations: Json, currentMajor: number): void => {
     for (const item of (variations[level] as Json[]) ?? []) {
       const suggestions = (item.suggestions as Json[]) ?? [];
       const mustFix =
-        suggestions.length === 0
-          ? true
-          : suggestions.some((s) => s.targetMajor == null || (s.targetMajor as number) <= currentMajor);
+        suggestions.length === 0 ? true : suggestions.some(s => s.targetMajor == null || (s.targetMajor as number) <= currentMajor);
       item.enforcement = mustFix ? 'must-fix' : 'warning';
     }
   }
@@ -173,7 +171,7 @@ export const computeVariationsV2 = ({
   version = CURRENT_DD_VERSION,
   applyIntEnumFix = true,
   currentMajor,
-  applyVersionBucketing = true,
+  applyVersionBucketing = true
 }: ComputeInput): { description: string; version: string; fuzziness: number; variations: Json } => {
   const out: Accumulator = { resources: [], fields: [], lookupValues: [], legacyODataValues: [], expansions: [], complexTypes: [] };
 
@@ -194,7 +192,7 @@ export const computeVariationsV2 = ({
     description: 'Data Dictionary Variations Report',
     version,
     fuzziness: Number.parseFloat(String(fuzziness)),
-    variations,
+    variations
   };
 };
 
@@ -218,19 +216,24 @@ const resolveResource = (resourceName: string, ctx: Ctx): void => {
   if ((suggestions as Json[])?.length) {
     emitSuggestionsUnlessSatisfied(
       suggestions as Json[],
-      (s) => !!(metadataReportMap?.[s.suggestedResourceName as never] ||
-        Object.values((metadataReportMap?.[s.suggestedResourceName as never] as Json) ?? {}).some((entry) => {
-          const { standardResourceName = null } = entry as Json;
-          return !!s.suggestedResourceName && s.suggestedResourceName === standardResourceName;
-        })),
-      ({ suggestedResourceName, isAdminReview, isFastTrack, ...rest }) => [{
-        resourceName,
-        suggestedResourceName,
-        strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
-        ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName }),
-        ...rest,
-      }],
-      out.resources,
+      s =>
+        !!(
+          metadataReportMap?.[s.suggestedResourceName as never] ||
+          Object.values((metadataReportMap?.[s.suggestedResourceName as never] as Json) ?? {}).some(entry => {
+            const { standardResourceName = null } = entry as Json;
+            return !!s.suggestedResourceName && s.suggestedResourceName === standardResourceName;
+          })
+        ),
+      ({ suggestedResourceName, isAdminReview, isFastTrack, ...rest }) => [
+        {
+          resourceName,
+          suggestedResourceName,
+          strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
+          ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName }),
+          ...rest
+        }
+      ],
+      out.resources
     );
     return;
   }
@@ -239,15 +242,15 @@ const resolveResource = (resourceName: string, ctx: Ctx): void => {
     machineMatch(
       resourceName,
       Object.keys(standardMetadataMap),
-      (standardResourceName) => !!metadataReportMap?.[standardResourceName as never],
+      standardResourceName => !!metadataReportMap?.[standardResourceName as never],
       (suggestedResourceName, extra) => ({
         resourceName,
         suggestedResourceName,
         ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName }),
-        ...extra,
+        ...extra
       }),
       out.resources,
-      fuzziness,
+      fuzziness
     );
     return;
   }
@@ -263,7 +266,7 @@ const resolveField = (resourceName: string, fieldName: string, ctx: Ctx): void =
   const stdResource = (standardMetadataMap?.[resourceName] as Json) ?? {};
   const reportField = (metadataReportMap?.[resourceName] as Json)?.[fieldName] as Json;
   const isStandardField = !!stdResource?.[fieldName];
-  const { ignored = false, suggestions = [] } = (((sMap?.[resourceName] as Json) ?? {})?.[fieldName] as Json) ?? {};
+  const { ignored = false, suggestions = [] } = ((sMap?.[resourceName] as Json)?.[fieldName] as Json) ?? {};
 
   // NOTE: exact-name expansion conformance — a standard expansion the provider declared as a
   // non-NavigationProperty (Complex Type or plain field) — is the DD metadata gate's job
@@ -282,21 +285,28 @@ const resolveField = (resourceName: string, fieldName: string, ctx: Ctx): void =
   if ((suggestions as Json[])?.length) {
     emitSuggestionsUnlessSatisfied(
       suggestions as Json[],
-      (s) => !!((metadataReportMap?.[s.suggestedResourceName as never] as Json)?.[s.suggestedFieldName as never] ||
-        Object.values(((metadataReportMap?.[s.suggestedResourceName as never] as Json) ?? {})?.[s.suggestedFieldName as never] ?? {}).some((entry) => {
-          const { standardFieldName = null } = entry as Json;
-          return !!s.suggestedFieldName && s.suggestedFieldName === standardFieldName;
-        })),
-      ({ suggestedResourceName, suggestedFieldName, isAdminReview, isFastTrack, ...rest }) => [{
-        resourceName,
-        fieldName,
-        suggestedResourceName,
-        suggestedFieldName,
-        strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
-        ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName, fieldName: suggestedFieldName }),
-        ...rest,
-      }],
-      collection,
+      s =>
+        !!(
+          (metadataReportMap?.[s.suggestedResourceName as never] as Json)?.[s.suggestedFieldName as never] ||
+          Object.values(
+            (metadataReportMap?.[s.suggestedResourceName as never] as Json)?.[s.suggestedFieldName as never] ?? {}
+          ).some(entry => {
+            const { standardFieldName = null } = entry as Json;
+            return !!s.suggestedFieldName && s.suggestedFieldName === standardFieldName;
+          })
+        ),
+      ({ suggestedResourceName, suggestedFieldName, isAdminReview, isFastTrack, ...rest }) => [
+        {
+          resourceName,
+          fieldName,
+          suggestedResourceName,
+          suggestedFieldName,
+          strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
+          ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName, fieldName: suggestedFieldName }),
+          ...rest
+        }
+      ],
+      collection
     );
     return;
   }
@@ -304,17 +314,17 @@ const resolveField = (resourceName: string, fieldName: string, ctx: Ctx): void =
   if (!isStandardField) {
     machineMatch(
       fieldName,
-      Object.keys(stdResource).filter((sf) => (!!(stdResource?.[sf] as Json)?.isExpansion) === isExpansionField),
-      (standardFieldName) => !!(metadataReportMap?.[resourceName] as Json)?.[standardFieldName as never],
+      Object.keys(stdResource).filter(sf => !!(stdResource?.[sf] as Json)?.isExpansion === isExpansionField),
+      standardFieldName => !!(metadataReportMap?.[resourceName] as Json)?.[standardFieldName as never],
       (suggestedFieldName, extra) => ({
         resourceName,
         fieldName,
         suggestedFieldName,
         ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName, fieldName: suggestedFieldName }),
-        ...extra,
+        ...extra
       }),
       collection,
-      fuzziness,
+      fuzziness
     );
     return;
   }
@@ -328,7 +338,7 @@ const resolveLookupsAndLegacy = (resourceName: string, fieldName: string, ctx: C
   const reportField = ((metadataReportMap?.[resourceName] as Json)?.[fieldName] as Json) ?? {};
   const stdField = ((standardMetadataMap?.[resourceName] as Json)?.[fieldName] as Json) ?? {};
   const { lookupValues = {}, legacyODataValues = {} } = reportField as { lookupValues?: Json; legacyODataValues?: Json };
-  const fieldSuggestions = ((sMap?.[resourceName] as Json) ?? {})?.[fieldName] as Json;
+  const fieldSuggestions = (sMap?.[resourceName] as Json)?.[fieldName] as Json;
 
   // ── lookup values ──
   const standardLookupValues = (stdField?.lookupValues as Json) ?? {};
@@ -348,34 +358,47 @@ const resolveLookupsAndLegacy = (resourceName: string, fieldName: string, ctx: C
     if ((suggestions as Json[])?.length) {
       emitSuggestionsUnlessSatisfied(
         suggestions as Json[],
-        (s) => isSuggestedLookupTargetPresent(metadataReportMap, s),
-        ({ suggestedResourceName, suggestedFieldName, suggestedLookupValue, isAdminReview, isFastTrack, ...rest }) => [{
-          resourceName,
-          fieldName,
-          lookupValue,
-          suggestedResourceName,
-          suggestedFieldName,
-          suggestedLookupValue,
-          strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
-          ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName, fieldName: suggestedFieldName, lookupValue: suggestedLookupValue }),
-          ...rest,
-        }],
-        out.lookupValues,
+        s => isSuggestedLookupTargetPresent(metadataReportMap, s),
+        ({ suggestedResourceName, suggestedFieldName, suggestedLookupValue, isAdminReview, isFastTrack, ...rest }) => [
+          {
+            resourceName,
+            fieldName,
+            lookupValue,
+            suggestedResourceName,
+            suggestedFieldName,
+            suggestedLookupValue,
+            strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
+            ddWikiUrl: getDDWikiUrl({
+              version,
+              standardMetadataMap,
+              resourceName: suggestedResourceName,
+              fieldName: suggestedFieldName,
+              lookupValue: suggestedLookupValue
+            }),
+            ...rest
+          }
+        ],
+        out.lookupValues
       );
     } else if (!isStandardLookupValue) {
       machineMatch(
         lookupValue as string,
         Object.keys(standardLookupValues),
-        (sLV) => !!(reportField.lookupValues as Json)?.[sLV as never],
+        sLV => !!(reportField.lookupValues as Json)?.[sLV as never],
         (suggestedLookupValue, extra) => ({
           resourceName,
           fieldName,
           lookupValue,
-          ...(lookupValue !== suggestedLookupValue ? { suggestedLookupValue, ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName, fieldName, lookupValue: suggestedLookupValue }) } : {}),
-          ...extra,
+          ...(lookupValue !== suggestedLookupValue
+            ? {
+                suggestedLookupValue,
+                ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName, fieldName, lookupValue: suggestedLookupValue })
+              }
+            : {}),
+          ...extra
         }),
         out.lookupValues,
-        fuzziness,
+        fuzziness
       );
     }
   }
@@ -392,35 +415,63 @@ const resolveLookupsAndLegacy = (resourceName: string, fieldName: string, ctx: C
     if ((suggestions as Json[])?.length) {
       emitSuggestionsUnlessSatisfied(
         suggestions as Json[],
-        (s) => isSuggestedLookupTargetPresent(metadataReportMap, s),
-        ({ suggestedResourceName, suggestedFieldName, suggestedLegacyODataValue, suggestedLookupValue, isAdminReview, isFastTrack, ...rest }) => [{
-          resourceName,
-          fieldName,
-          legacyODataValue,
+        s => isSuggestedLookupTargetPresent(metadataReportMap, s),
+        ({
           suggestedResourceName,
           suggestedFieldName,
           suggestedLegacyODataValue,
-          ...(suggestedLookupValue != null ? { suggestedLookupValue } : {}),
-          strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
-          ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName, fieldName: suggestedFieldName, lookupValue: suggestedLookupValue, legacyODataValue: suggestedLegacyODataValue }),
-          ...rest,
-        }],
-        out.legacyODataValues,
+          suggestedLookupValue,
+          isAdminReview,
+          isFastTrack,
+          ...rest
+        }) => [
+          {
+            resourceName,
+            fieldName,
+            legacyODataValue,
+            suggestedResourceName,
+            suggestedFieldName,
+            suggestedLegacyODataValue,
+            ...(suggestedLookupValue != null ? { suggestedLookupValue } : {}),
+            strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
+            ddWikiUrl: getDDWikiUrl({
+              version,
+              standardMetadataMap,
+              resourceName: suggestedResourceName,
+              fieldName: suggestedFieldName,
+              lookupValue: suggestedLookupValue,
+              legacyODataValue: suggestedLegacyODataValue
+            }),
+            ...rest
+          }
+        ],
+        out.legacyODataValues
       );
     } else if (!isStandardLegacyODataValue) {
       machineMatch(
         legacyODataValue as string,
         Object.keys(standardLegacyODataValues),
-        (sODV) => !!(reportField.legacyODataValues as Json)?.[sODV as never],
+        sODV => !!(reportField.legacyODataValues as Json)?.[sODV as never],
         (suggestedLegacyODataValue, extra) => ({
           resourceName,
           fieldName,
           legacyODataValue,
-          ...(legacyODataValue !== suggestedLegacyODataValue ? { suggestedLegacyODataValue, ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName, fieldName, legacyODataValue: suggestedLegacyODataValue }) } : {}),
-          ...extra,
+          ...(legacyODataValue !== suggestedLegacyODataValue
+            ? {
+                suggestedLegacyODataValue,
+                ddWikiUrl: getDDWikiUrl({
+                  version,
+                  standardMetadataMap,
+                  resourceName,
+                  fieldName,
+                  legacyODataValue: suggestedLegacyODataValue
+                })
+              }
+            : {}),
+          ...extra
         }),
         out.legacyODataValues,
-        fuzziness,
+        fuzziness
       );
     }
   }

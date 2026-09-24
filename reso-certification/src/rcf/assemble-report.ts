@@ -23,9 +23,9 @@
 
 import type { MetadataReport, MetadataReportField, MetadataReportLookup } from '@reso-standards/reso-metadata-utils';
 import { aggregateFieldType } from './aggregate.js';
-import { buildKindMatcher, type KindMatcher } from './kind-match.js';
+import { type KindMatcher, buildKindMatcher } from './kind-match.js';
 import { classifyStringField, stringFieldStats } from './local-enum-detection.js';
-import { isValidValue, isNumericToken } from './values.js';
+import { isNumericToken, isValidValue } from './values.js';
 
 const DD_WIKI_URL_TERM = 'RESO.DDWikiUrl';
 
@@ -70,8 +70,7 @@ export interface InferMetadataReportInput {
   readonly description?: string;
 }
 
-const isPlainObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v);
+const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 const push = (cache: PayloadCache, resource: string, field: string, value: unknown): void => {
   (cache[resource] ??= {})[field] ??= [];
@@ -95,7 +94,7 @@ const collectExpansionShapes = (
   records: ReadonlyArray<unknown>,
   resourceName: string,
   referenceMap: ReferenceMap,
-  shapes: Map<string, ObservedShape>,
+  shapes: Map<string, ObservedShape>
 ): void => {
   for (const record of records) {
     if (!isPlainObject(record)) continue;
@@ -134,7 +133,7 @@ const collectExpansionShapes = (
 const resolveExpansionKinds = (
   recordsByResource: Readonly<Record<string, ReadonlyArray<unknown>>>,
   referenceMap: ReferenceMap,
-  matcher: KindMatcher,
+  matcher: KindMatcher
 ): ReadonlyMap<string, string> => {
   const shapes = new Map<string, ObservedShape>();
   for (const [resource, records] of Object.entries(recordsByResource)) collectExpansionShapes(records, resource, referenceMap, shapes);
@@ -191,7 +190,7 @@ export const buildPayloadCache = (
   // Records seen per resource — a field observed fewer times than its resource's record count
   // was absent from some records (jagged data), which the assembler treats as nullable.
   recordCounts: Record<string, number> = {},
-  resolvedKinds: ReadonlyMap<string, string> = new Map(),
+  resolvedKinds: ReadonlyMap<string, string> = new Map()
 ): PayloadCache => {
   for (const record of records) {
     if (!isPlainObject(record)) continue;
@@ -219,7 +218,7 @@ const ddFieldFromReference = (
   field: string,
   ref: ReferenceField,
   isEnumeration: boolean,
-  nullableByAbsence: boolean,
+  nullableByAbsence: boolean
 ): MetadataReportField => {
   const nullable = nullableByAbsence || ref.nullable === true;
   return {
@@ -234,7 +233,7 @@ const ddFieldFromReference = (
     // null/blank in the sample carries no lookups, so claiming isEnumeration would be inconsistent
     // (nothing to re-read, an empty enum downstream). Keep isEnumeration ⟺ has-lookups.
     ...(isEnumeration ? { isEnumeration: true } : {}),
-    annotations: ref.ddWikiUrl ? [{ term: DD_WIKI_URL_TERM, value: ref.ddWikiUrl }] : [],
+    annotations: ref.ddWikiUrl ? [{ term: DD_WIKI_URL_TERM, value: ref.ddWikiUrl }] : []
   };
 };
 
@@ -245,11 +244,7 @@ const ddFieldFromReference = (
  * would be dropped and the field would emit no lookups.
  */
 const distinctStrings = (values: ReadonlyArray<unknown>): ReadonlyArray<string> => [
-  ...new Set(
-    values
-      .flatMap(v => (Array.isArray(v) ? v : [v]))
-      .filter((v): v is string => typeof v === 'string' && isValidValue(v)),
-  ),
+  ...new Set(values.flatMap(v => (Array.isArray(v) ? v : [v])).filter((v): v is string => typeof v === 'string' && isValidValue(v)))
 ];
 
 /**
@@ -270,7 +265,7 @@ const ddLookups = (ref: ReferenceField, values: ReadonlyArray<unknown>): Metadat
       lookupName: ref.type,
       lookupValue: value,
       type: 'Edm.String',
-      ...(matched?.ddWikiUrl ? { annotations: [{ term: DD_WIKI_URL_TERM, value: matched.ddWikiUrl }] } : {}),
+      ...(matched?.ddWikiUrl ? { annotations: [{ term: DD_WIKI_URL_TERM, value: matched.ddWikiUrl }] } : {})
     };
   });
 
@@ -279,7 +274,7 @@ const localScalarField = (resource: string, field: string, type: string, extra: 
   fieldName: field,
   type,
   ...extra,
-  annotations: [],
+  annotations: []
 });
 
 /**
@@ -294,7 +289,7 @@ const localFieldAndLookups = (
   values: ReadonlyArray<unknown>,
   nullableByAbsence: boolean,
   // The DD resource a mis-named expansion's SHAPE matched, if any → becomes the field's typeName.
-  inferredKind?: string,
+  inferredKind?: string
 ): { readonly field: MetadataReportField; readonly lookups: ReadonlyArray<MetadataReportLookup> } => {
   const agg = aggregateFieldType(values);
   const extra: Partial<MetadataReportField> = {
@@ -306,7 +301,7 @@ const localFieldAndLookups = (
     ...(agg.nullable || nullableByAbsence ? { nullable: true } : {}),
     ...(agg.maxLength ? { maxLength: agg.maxLength } : {}),
     ...(agg.scale ? { scale: agg.scale } : {}),
-    ...(agg.precision ? { precision: agg.precision } : {}),
+    ...(agg.precision ? { precision: agg.precision } : {})
   };
 
   if (agg.type === 'Edm.String' && !agg.isExpansion && classifyStringField(stringFieldStats(values)) === 'enum') {
@@ -327,7 +322,7 @@ export const assembleReport = (
   generatedOn: string,
   description = 'RESO Data Dictionary Metadata Report (inferred from RESO Common Format samples)',
   recordCounts: Record<string, number> = {},
-  resolvedKinds: ReadonlyMap<string, string> = new Map(),
+  resolvedKinds: ReadonlyMap<string, string> = new Map()
 ): MetadataReport => {
   const fields: MetadataReportField[] = [];
   const lookups: MetadataReportLookup[] = [];

@@ -105,7 +105,10 @@ const fieldKey = (resourceName: string, fieldName: string): string => `${resourc
 
 /** Split a DD `synonyms` cell ("A, B, C") into trimmed, non-empty names. */
 const parseSynonyms = (synonyms: string | undefined): ReadonlyArray<string> =>
-  (synonyms ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  (synonyms ?? '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
 
 /**
  * Disallowed-synonym check: a provider MUST use the standard field name, not a known synonym. For
@@ -116,26 +119,23 @@ const parseSynonyms = (synonyms: string | undefined): ReadonlyArray<string> =>
  * Commander BDD: `Given that the following synonyms for "X" DO NOT exist in the "R" metadata`
  * (DataDictionary.java theFollowingSynonymsForDONOTExistInTheMetadata). The one NAMING check.
  */
-export const checkDisallowedSynonyms = (
-  report: MetadataReport,
-  reference: DdReference,
-): ReadonlyArray<MetadataCheckFinding> => {
-  const providerFields = new Set(report.fields.map((f) => fieldKey(f.resourceName, f.fieldName)));
-  const standardFields = new Set(reference.fields.map((f) => fieldKey(f.resourceName, f.fieldName)));
+export const checkDisallowedSynonyms = (report: MetadataReport, reference: DdReference): ReadonlyArray<MetadataCheckFinding> => {
+  const providerFields = new Set(report.fields.map(f => fieldKey(f.resourceName, f.fieldName)));
+  const standardFields = new Set(reference.fields.map(f => fieldKey(f.resourceName, f.fieldName)));
 
-  return reference.fields.flatMap((refField) =>
+  return reference.fields.flatMap(refField =>
     parseSynonyms(refField.synonyms)
-      .filter((syn) => {
+      .filter(syn => {
         const k = fieldKey(refField.resourceName, syn);
         return providerFields.has(k) && !standardFields.has(k);
       })
-      .map((syn) => ({
+      .map(syn => ({
         check: 'disallowed-synonym' as const,
         severity: 'error' as const,
         resourceName: refField.resourceName,
         fieldName: syn,
-        message: `"${syn}" in the "${refField.resourceName}" resource is a disallowed synonym of the standard field "${refField.fieldName}". Use "${refField.fieldName}".`,
-      })),
+        message: `"${syn}" in the "${refField.resourceName}" resource is a disallowed synonym of the standard field "${refField.fieldName}". Use "${refField.fieldName}".`
+      }))
   );
 };
 
@@ -193,10 +193,10 @@ const buildAllowedValues = (reference: DdReference, includeLegacy: boolean): Map
   reference.lookups.reduce((acc, l) => {
     const set = acc.get(l.lookupName) ?? new Set<string>();
     set.add(l.lookupValue);
-    const sn = l.annotations?.find((a) => a.term === STANDARD_NAME)?.value;
+    const sn = l.annotations?.find(a => a.term === STANDARD_NAME)?.value;
     if (sn) set.add(sn);
     if (includeLegacy) {
-      const lodv = l.annotations?.find((a) => a.term === LEGACY_ODATA_VALUE)?.value;
+      const lodv = l.annotations?.find(a => a.term === LEGACY_ODATA_VALUE)?.value;
       if (lodv) set.add(lodv);
     }
     return acc.set(l.lookupName, set);
@@ -212,12 +212,9 @@ const groupProviderLookups = (report: MetadataReport): Map<string, MetadataRepor
 
 /** Provider field types keyed by (resource, field). */
 const mapProviderFieldTypes = (report: MetadataReport): Map<string, string> =>
-  new Map(report.fields.map((f) => [fieldKey(f.resourceName, f.fieldName), f.type]));
+  new Map(report.fields.map(f => [fieldKey(f.resourceName, f.fieldName), f.type]));
 
-export const checkClosedEnumValues = (
-  report: MetadataReport,
-  reference: DdReference,
-): ReadonlyArray<MetadataCheckFinding> => {
+export const checkClosedEnumValues = (report: MetadataReport, reference: DdReference): ReadonlyArray<MetadataCheckFinding> => {
   // Allowed value identities per standard enum (reference lookupName/FQDN): machine value + StandardName.
   // (Legacy-value matching is deliberately NOT included here — closed-enum membership is unchanged; the SLV
   // check below opts into legacy matching. See buildAllowedValues.)
@@ -226,8 +223,8 @@ export const checkClosedEnumValues = (
   const providerFieldType = mapProviderFieldTypes(report);
 
   return reference.fields
-    .filter((f) => isClosedEnum(f.lookupStatus))
-    .flatMap((refField) => {
+    .filter(f => isClosedEnum(f.lookupStatus))
+    .flatMap(refField => {
       const allowed = allowedByEnum.get(refField.type);
       const providerType = providerFieldType.get(fieldKey(refField.resourceName, refField.fieldName));
       // No standard enum (shouldn't happen) or the provider doesn't declare the field (field
@@ -235,16 +232,16 @@ export const checkClosedEnumValues = (
       if (!allowed || providerType == null) return [];
 
       return (providerLookupsByName.get(providerType) ?? [])
-        .filter((v) => {
-          const sn = v.annotations?.find((a) => a.term === STANDARD_NAME)?.value;
+        .filter(v => {
+          const sn = v.annotations?.find(a => a.term === STANDARD_NAME)?.value;
           return !(allowed.has(v.lookupValue) || (sn != null && allowed.has(sn)));
         })
-        .map((v) => ({
+        .map(v => ({
           check: 'closed-enum-value' as const,
           severity: 'error' as const,
           resourceName: refField.resourceName,
           fieldName: refField.fieldName,
-          message: `"${v.lookupValue}" is not a permitted value of the closed enumeration "${refField.fieldName}" in the "${refField.resourceName}" resource. Closed enumerations may not carry values outside the Data Dictionary.`,
+          message: `"${v.lookupValue}" is not a permitted value of the closed enumeration "${refField.fieldName}" in the "${refField.resourceName}" resource. Closed enumerations may not carry values outside the Data Dictionary.`
         }));
     });
 };
@@ -268,48 +265,54 @@ export const checkClosedEnumValues = (
 export const checkStandardLookupValuePresent = (
   report: MetadataReport,
   reference: DdReference,
-  severity: MetadataCheckSeverity = 'warning',
+  severity: MetadataCheckSeverity = 'warning'
 ): ReadonlyArray<MetadataCheckFinding> => {
   const allowedByEnum = buildAllowedValues(reference, true); // include the LegacyODataValue form — both ref columns
   const providerLookupsByName = groupProviderLookups(report);
   const providerFieldType = mapProviderFieldTypes(report);
 
   return reference.fields
-    .filter((f) => f.isEnumeration && !f.isExpansion)
-    .flatMap((refField) => {
+    .filter(f => f.isEnumeration && !f.isExpansion)
+    .flatMap(refField => {
       const allowed = allowedByEnum.get(refField.type);
       const providerType = providerFieldType.get(fieldKey(refField.resourceName, refField.fieldName));
       // Empty catalog (purely-open enum) → no standard values → never fires (NO any-enum fallback). A field the
       // provider doesn't declare → nothing to check.
       if (!allowed || allowed.size === 0 || providerType == null) return [];
       return (providerLookupsByName.get(providerType) ?? [])
-        .filter((v) => {
+        .filter(v => {
           // String (Lookup Resource) representation only — its rows are typed Edm.String and carry the SLV
           // column. Edm.EnumType lookups have no StandardLookupValue, so requiring one there would false-fail.
           // (A string field's field-type is rewritten to its LookupName in the merged report, so the
           // representation must be read off the lookup ROW's type, not the field's.)
           if (unwrapCollection(String(v.type ?? '')) !== 'Edm.String') return false;
-          const slv = v.annotations?.find((a) => a.term === STANDARD_NAME)?.value;
+          const slv = v.annotations?.find(a => a.term === STANDARD_NAME)?.value;
           if (slv != null && String(slv).trim().length > 0) return false; // SLV present ⇒ satisfied
-          const lodv = v.annotations?.find((a) => a.term === LEGACY_ODATA_VALUE)?.value;
+          const lodv = v.annotations?.find(a => a.term === LEGACY_ODATA_VALUE)?.value;
           // Standard (its served value OR its legacy form is a DD-standard value for this field) but no SLV.
           return allowed.has(v.lookupValue) || (lodv != null && allowed.has(lodv));
         })
-        .map((v) => ({
+        .map(v => ({
           check: 'standard-lookup-value' as const,
           severity,
           resourceName: refField.resourceName,
           fieldName: refField.fieldName,
-          message: `"${v.lookupValue}" in the "${refField.fieldName}" lookup of the "${refField.resourceName}" resource is a standard Data Dictionary value served without a StandardLookupValue. StandardLookupValue is required for standard lookup values (DD Lookup Resource), regardless of LookupValue.`,
+          message: `"${v.lookupValue}" in the "${refField.fieldName}" lookup of the "${refField.resourceName}" resource is a standard Data Dictionary value served without a StandardLookupValue. StandardLookupValue is required for standard lookup values (DD Lookup Resource), regardless of LookupValue.`
         }));
     });
 };
 
 /** OData EDM type names (mirrors the Web API Commander TypeMappings.ODataTypes). */
 const EDM = {
-  INT16: 'Edm.Int16', INT32: 'Edm.Int32', INT64: 'Edm.Int64',
-  STRING: 'Edm.String', DATE: 'Edm.Date', DATETIME_OFFSET: 'Edm.DateTimeOffset',
-  BOOLEAN: 'Edm.Boolean', DECIMAL: 'Edm.Decimal', DOUBLE: 'Edm.Double',
+  INT16: 'Edm.Int16',
+  INT32: 'Edm.Int32',
+  INT64: 'Edm.Int64',
+  STRING: 'Edm.String',
+  DATE: 'Edm.Date',
+  DATETIME_OFFSET: 'Edm.DateTimeOffset',
+  BOOLEAN: 'Edm.Boolean',
+  DECIMAL: 'Edm.Decimal',
+  DOUBLE: 'Edm.Double'
 } as const;
 
 /** The DD data-type names the Commander asserts ("MUST be <name> data type"). */
@@ -334,8 +337,10 @@ const expectedDdDataType = (field: DdReferenceField): DdDataType | null => {
     return isCollection ? 'Multiple Enumeration' : 'Single Enumeration';
   }
   switch (base) {
-    case EDM.STRING: return 'String';
-    case EDM.DATE: return 'Date';
+    case EDM.STRING:
+      return 'String';
+    case EDM.DATE:
+      return 'Date';
     case EDM.DECIMAL:
     case EDM.DOUBLE:
       // DD numeric: scale 0 (an empty DD Suggested Max Precision) denotes an Integer — the Commander
@@ -344,10 +349,14 @@ const expectedDdDataType = (field: DdReferenceField): DdDataType | null => {
       return (field.scale ?? 0) === 0 ? 'Integer' : 'Decimal';
     case EDM.INT16:
     case EDM.INT32:
-    case EDM.INT64: return 'Integer';
-    case EDM.BOOLEAN: return 'Boolean';
-    case EDM.DATETIME_OFFSET: return 'Timestamp';
-    default: return null;
+    case EDM.INT64:
+      return 'Integer';
+    case EDM.BOOLEAN:
+      return 'Boolean';
+    case EDM.DATETIME_OFFSET:
+      return 'Timestamp';
+    default:
+      return null;
   }
 };
 
@@ -377,12 +386,15 @@ const validateFieldType = (expected: DdDataType, field: MetadataReportField, und
       if (isCollection) return 'single enumerations cannot be collections';
       if (found === EDM.STRING) return null; // string + Lookup Resource representation
       if (EDM_PRIMITIVES.has(found)) return `enumerated data types MUST declare a unique nominal (lookup) type, found primitive ${found}`;
-      if (!INT_TYPES.has(underlying ?? '')) return `enumerated types MUST use an underlying type of ${EDM.INT16}, ${EDM.INT32} or ${EDM.INT64}`;
+      if (!INT_TYPES.has(underlying ?? ''))
+        return `enumerated types MUST use an underlying type of ${EDM.INT16}, ${EDM.INT32} or ${EDM.INT64}`;
       return field.isFlags ? 'IsFlags="true" but MUST be false for single-valued enumerations' : null;
     case 'Multiple Enumeration':
-      if (found === EDM.STRING) return isCollection ? null : `multiple enumerations MUST use Collection(${EDM.STRING}), found ${EDM.STRING}`;
+      if (found === EDM.STRING)
+        return isCollection ? null : `multiple enumerations MUST use Collection(${EDM.STRING}), found ${EDM.STRING}`;
       if (EDM_PRIMITIVES.has(found)) return `enumerated data type MUST declare a unique nominal type, found primitive ${found}`;
-      if (!INT_TYPES.has(underlying ?? '')) return `enumerated types MUST use an underlying type of ${EDM.INT16}, ${EDM.INT32} or ${EDM.INT64}`;
+      if (!INT_TYPES.has(underlying ?? ''))
+        return `enumerated types MUST use an underlying type of ${EDM.INT16}, ${EDM.INT32} or ${EDM.INT64}`;
       return !isCollection && !field.isFlags ? 'multi-enumerations MUST have IsFlags="true"' : null;
   }
 };
@@ -397,14 +409,14 @@ const validateFieldType = (expected: DdDataType, field: MetadataReportField, und
  * derived per BDDProcessor build{Number,Integer,Decimal,Boolean,Date,Timestamp,String,Enum}Test).
  */
 export const checkFieldTypes = (report: MetadataReport, reference: DdReference): ReadonlyArray<MetadataCheckFinding> => {
-  const providerByKey = new Map(report.fields.map((f) => [fieldKey(f.resourceName, f.fieldName), f]));
+  const providerByKey = new Map(report.fields.map(f => [fieldKey(f.resourceName, f.fieldName), f]));
   // Provider enum underlying type: each lookup carries it as its `type`; first wins (uniform per enum).
   const providerUnderlying = report.lookups.reduce(
     (acc, l) => (acc.has(l.lookupName) ? acc : acc.set(l.lookupName, l.type)),
-    new Map<string, string>(),
+    new Map<string, string>()
   );
 
-  return reference.fields.flatMap((refField) => {
+  return reference.fields.flatMap(refField => {
     const provider = providerByKey.get(fieldKey(refField.resourceName, refField.fieldName));
     if (!provider || provider.isExpansion) return [];
     const expected = expectedDdDataType(refField);
@@ -412,7 +424,7 @@ export const checkFieldTypes = (report: MetadataReport, reference: DdReference):
     // A field carrying a LookupName annotation is the string + Lookup Resource representation; its EDM
     // type is Edm.String even though the merged report rewrites field.type to the LookupName for the
     // variations join. Use the effective EDM type so the type-class check routes to the string branch.
-    const isStringRep = provider.annotations.some((a) => a.term === LOOKUP_NAME_ANNOTATION);
+    const isStringRep = provider.annotations.some(a => a.term === LOOKUP_NAME_ANNOTATION);
     const isCollection = provider.isCollection === true || provider.type.startsWith('Collection(');
     const effectiveType = isStringRep ? (isCollection ? `Collection(${EDM.STRING})` : EDM.STRING) : provider.type;
     // Underlying type from the enum's lookups; an open enum with no standard members carries none, so
@@ -420,13 +432,15 @@ export const checkFieldTypes = (report: MetadataReport, reference: DdReference):
     const underlying = providerUnderlying.get(unwrapCollection(provider.type)) ?? EDM.INT32;
     const error = validateFieldType(expected, { ...provider, type: effectiveType }, underlying);
     return error
-      ? [{
-          check: 'field-type' as const,
-          severity: 'error' as const,
-          resourceName: refField.resourceName,
-          fieldName: refField.fieldName,
-          message: `"${refField.fieldName}" in the "${refField.resourceName}" resource MUST be a ${expected} data type: ${error}.`,
-        }]
+      ? [
+          {
+            check: 'field-type' as const,
+            severity: 'error' as const,
+            resourceName: refField.resourceName,
+            fieldName: refField.fieldName,
+            message: `"${refField.fieldName}" in the "${refField.resourceName}" resource MUST be a ${expected} data type: ${error}.`
+          }
+        ]
       : [];
   });
 };
@@ -443,23 +457,22 @@ export const checkFieldTypes = (report: MetadataReport, reference: DdReference):
  * structural conformance is a metadata issue (fail-fast here), while fuzzy expansion matching stays
  * the variations beat. The variations matcher therefore carries no structural exception.
  */
-export const checkExpansionStructure = (
-  report: MetadataReport,
-  reference: DdReference,
-): ReadonlyArray<MetadataCheckFinding> => {
-  const providerByKey = new Map(report.fields.map((f) => [fieldKey(f.resourceName, f.fieldName), f]));
+export const checkExpansionStructure = (report: MetadataReport, reference: DdReference): ReadonlyArray<MetadataCheckFinding> => {
+  const providerByKey = new Map(report.fields.map(f => [fieldKey(f.resourceName, f.fieldName), f]));
   return reference.fields
-    .filter((refField) => refField.isExpansion === true)
-    .flatMap((refField) => {
+    .filter(refField => refField.isExpansion === true)
+    .flatMap(refField => {
       const provider = providerByKey.get(fieldKey(refField.resourceName, refField.fieldName));
       if (!provider || provider.isExpansion === true) return [];
-      return [{
-        check: 'expansion-structure' as const,
-        severity: 'error' as const,
-        resourceName: refField.resourceName,
-        fieldName: refField.fieldName,
-        message: `"${refField.fieldName}" in the "${refField.resourceName}" resource is a standard expansion and MUST be declared as an OData NavigationProperty (expansion), not as a Complex Type or plain field. See ${STANDARD_NAMES_EXPANSIONS_WG_URL}.`,
-      }];
+      return [
+        {
+          check: 'expansion-structure' as const,
+          severity: 'error' as const,
+          resourceName: refField.resourceName,
+          fieldName: refField.fieldName,
+          message: `"${refField.fieldName}" in the "${refField.resourceName}" resource is a standard expansion and MUST be declared as an OData NavigationProperty (expansion), not as a Complex Type or plain field. See ${STANDARD_NAMES_EXPANSIONS_WG_URL}.`
+        }
+      ];
     });
 };
 
@@ -477,18 +490,15 @@ export const LOOKUP_MANDATORY_FIELDS: ReadonlyArray<string> = ['LookupKey', 'Loo
  * Commander BDD: `Then "Lookup" Resource data and metadata MUST contain the following fields`
  * (LookupResource.java, RCP-032 lookup-resource-tests.feature) — the metadata half.
  */
-export const checkLookupResourceFields = (
-  report: MetadataReport,
-  _reference: DdReference,
-): ReadonlyArray<MetadataCheckFinding> => {
-  const lookupFields = new Set(report.fields.filter((f) => f.resourceName === LOOKUP_RESOURCE).map((f) => f.fieldName));
+export const checkLookupResourceFields = (report: MetadataReport, _reference: DdReference): ReadonlyArray<MetadataCheckFinding> => {
+  const lookupFields = new Set(report.fields.filter(f => f.resourceName === LOOKUP_RESOURCE).map(f => f.fieldName));
   if (lookupFields.size === 0) return [];
-  return LOOKUP_MANDATORY_FIELDS.filter((mf) => !lookupFields.has(mf)).map((mf) => ({
+  return LOOKUP_MANDATORY_FIELDS.filter(mf => !lookupFields.has(mf)).map(mf => ({
     check: 'lookup-resource-fields' as const,
     severity: 'error' as const,
     resourceName: LOOKUP_RESOURCE,
     fieldName: mf,
-    message: `The "${LOOKUP_RESOURCE}" Resource MUST contain the field "${mf}".`,
+    message: `The "${LOOKUP_RESOURCE}" Resource MUST contain the field "${mf}".`
   }));
 };
 
@@ -500,25 +510,24 @@ export const checkLookupResourceFields = (
  * Commander BDD: `Then RESO Lookups using String or String Collection data types MUST have the
  * annotation "RESO.OData.Metadata.LookupName"` (LookupResource.java, RCP-032).
  */
-export const checkLookupNameAnnotations = (
-  report: MetadataReport,
-  reference: DdReference,
-): ReadonlyArray<MetadataCheckFinding> => {
+export const checkLookupNameAnnotations = (report: MetadataReport, reference: DdReference): ReadonlyArray<MetadataCheckFinding> => {
   const standardLookupFields = new Set(
-    reference.fields.filter((f) => f.isEnumeration && !f.isExpansion).map((f) => fieldKey(f.resourceName, f.fieldName)),
+    reference.fields.filter(f => f.isEnumeration && !f.isExpansion).map(f => fieldKey(f.resourceName, f.fieldName))
   );
-  return report.fields.flatMap((field) => {
+  return report.fields.flatMap(field => {
     if (!standardLookupFields.has(fieldKey(field.resourceName, field.fieldName))) return [];
     if (unwrapCollection(field.type) !== 'Edm.String') return []; // EnumType representation is exempt
-    return field.annotations.some((a) => a.term === LOOKUP_NAME_ANNOTATION)
+    return field.annotations.some(a => a.term === LOOKUP_NAME_ANNOTATION)
       ? []
-      : [{
-          check: 'lookup-name-annotation' as const,
-          severity: 'error' as const,
-          resourceName: field.resourceName,
-          fieldName: field.fieldName,
-          message: `"${field.fieldName}" in the "${field.resourceName}" resource is a string-enumeration field and MUST carry the "${LOOKUP_NAME_ANNOTATION}" annotation.`,
-        }];
+      : [
+          {
+            check: 'lookup-name-annotation' as const,
+            severity: 'error' as const,
+            resourceName: field.resourceName,
+            fieldName: field.fieldName,
+            message: `"${field.fieldName}" in the "${field.resourceName}" resource is a string-enumeration field and MUST carry the "${LOOKUP_NAME_ANNOTATION}" annotation.`
+          }
+        ];
   });
 };
 
@@ -531,19 +540,16 @@ export const checkLookupNameAnnotations = (
  * Commander BDD: `And "X" {precision|scale|length} SHOULD be equal to the RESO Suggested Max ...`
  * (DataDictionary.java {precision|scale|length}SHOULDBeEqualTo... — the only SHOULD/warning checks).
  */
-export const checkSuggestedMaxConstraints = (
-  report: MetadataReport,
-  reference: DdReference,
-): ReadonlyArray<MetadataCheckFinding> => {
-  const providerByKey = new Map(report.fields.map((f) => [fieldKey(f.resourceName, f.fieldName), f]));
+export const checkSuggestedMaxConstraints = (report: MetadataReport, reference: DdReference): ReadonlyArray<MetadataCheckFinding> => {
+  const providerByKey = new Map(report.fields.map(f => [fieldKey(f.resourceName, f.fieldName), f]));
 
   const attributes = [
     { name: 'Length', suggested: (f: DdReferenceField) => f.maxLength, actual: (f: MetadataReportField) => f.maxLength },
     { name: 'Precision', suggested: (f: DdReferenceField) => f.precision, actual: (f: MetadataReportField) => f.precision },
-    { name: 'Scale', suggested: (f: DdReferenceField) => f.scale, actual: (f: MetadataReportField) => f.scale },
+    { name: 'Scale', suggested: (f: DdReferenceField) => f.scale, actual: (f: MetadataReportField) => f.scale }
   ] as const;
 
-  return reference.fields.flatMap((refField) => {
+  return reference.fields.flatMap(refField => {
     const provider = providerByKey.get(fieldKey(refField.resourceName, refField.fieldName));
     if (!provider) return [];
     return attributes.flatMap(({ name, suggested, actual }) => {
@@ -552,13 +558,15 @@ export const checkSuggestedMaxConstraints = (
       const got = actual(provider);
       return got === want
         ? []
-        : [{
-            check: 'suggested-max' as const,
-            severity: 'warning' as const,
-            resourceName: refField.resourceName,
-            fieldName: refField.fieldName,
-            message: `${name} for "${refField.fieldName}" in the "${refField.resourceName}" resource SHOULD be equal to the RESO Suggested Max ${name} of ${want} but was ${got ?? 'not set'}.`,
-          }];
+        : [
+            {
+              check: 'suggested-max' as const,
+              severity: 'warning' as const,
+              resourceName: refField.resourceName,
+              fieldName: refField.fieldName,
+              message: `${name} for "${refField.fieldName}" in the "${refField.resourceName}" resource SHOULD be equal to the RESO Suggested Max ${name} of ${want} but was ${got ?? 'not set'}.`
+            }
+          ];
     });
   });
 };
@@ -581,7 +589,7 @@ export interface DdMetadataCheckOptions {
 export const runDdMetadataChecks = (
   report: MetadataReport,
   reference: DdReference,
-  options: DdMetadataCheckOptions = {},
+  options: DdMetadataCheckOptions = {}
 ): ReadonlyArray<MetadataCheckFinding> => [
   ...checkDisallowedSynonyms(report, reference),
   ...checkClosedEnumValues(report, reference),
@@ -590,5 +598,5 @@ export const runDdMetadataChecks = (
   ...checkExpansionStructure(report, reference),
   ...checkLookupResourceFields(report, reference),
   ...checkLookupNameAnnotations(report, reference),
-  ...checkSuggestedMaxConstraints(report, reference),
+  ...checkSuggestedMaxConstraints(report, reference)
 ];

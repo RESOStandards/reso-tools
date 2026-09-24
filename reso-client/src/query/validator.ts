@@ -6,8 +6,8 @@
  * reference validation.
  */
 
-import { parseFilter, parseExpand, ExpandParseError } from '@reso-standards/odata-expression-parser';
-import type { FilterExpression, ExpandExpression } from '@reso-standards/odata-expression-parser';
+import { ExpandParseError, parseExpand, parseFilter } from '@reso-standards/odata-expression-parser';
+import type { ExpandExpression, FilterExpression } from '@reso-standards/odata-expression-parser';
 import type { CsdlEntityType } from '@reso-standards/reso-metadata-utils';
 import type { ODataQueryOptions } from '../types.js';
 

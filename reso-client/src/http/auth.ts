@@ -24,7 +24,7 @@ export const fetchAccessToken = async (auth: ClientCredentialsAuth): Promise<Tok
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/x-www-form-urlencoded',
-    Accept: 'application/json',
+    Accept: 'application/json'
   };
 
   let url = auth.tokenUrl;
@@ -43,7 +43,7 @@ export const fetchAccessToken = async (auth: ClientCredentialsAuth): Promise<Tok
   const response = await fetch(url, {
     method: 'POST',
     headers,
-    body: params.toString(),
+    body: params.toString()
   });
 
   if (!response.ok) {
@@ -61,7 +61,7 @@ export const fetchAccessToken = async (auth: ClientCredentialsAuth): Promise<Tok
     access_token: accessToken,
     token_type: typeof json.token_type === 'string' ? json.token_type : 'bearer',
     expires_in: typeof json.expires_in === 'number' ? json.expires_in : undefined,
-    scope: typeof json.scope === 'string' ? json.scope : undefined,
+    scope: typeof json.scope === 'string' ? json.scope : undefined
   };
 };
 
@@ -73,26 +73,28 @@ export const fetchAccessToken = async (auth: ClientCredentialsAuth): Promise<Tok
 const createClientCredentialsProvider = (auth: ClientCredentialsAuth): TokenProvider => {
   const ref: { current: TokenState | null; pending: Promise<TokenState> | null } = {
     current: null,
-    pending: null,
+    pending: null
   };
 
   const expiresIn = auth.defaultExpiresIn ?? DEFAULT_EXPIRES_IN;
 
   const refresh = (): Promise<TokenState> => {
     if (ref.pending) return ref.pending;
-    ref.pending = fetchAccessToken(auth).then(tokenResponse => {
-      const ttl = tokenResponse.expires_in ?? expiresIn;
-      const state: TokenState = {
-        accessToken: tokenResponse.access_token,
-        expiresAt: Date.now() + ttl * 1000,
-      };
-      ref.current = state;
-      ref.pending = null;
-      return state;
-    }).catch(err => {
-      ref.pending = null;
-      throw err;
-    });
+    ref.pending = fetchAccessToken(auth)
+      .then(tokenResponse => {
+        const ttl = tokenResponse.expires_in ?? expiresIn;
+        const state: TokenState = {
+          accessToken: tokenResponse.access_token,
+          expiresAt: Date.now() + ttl * 1000
+        };
+        ref.current = state;
+        ref.pending = null;
+        return state;
+      })
+      .catch(err => {
+        ref.pending = null;
+        throw err;
+      });
     return ref.pending;
   };
 
@@ -123,22 +125,18 @@ const createClientCredentialsProvider = (auth: ClientCredentialsAuth): TokenProv
  * out. Sanitize at provider construction so every fetch site benefits.
  */
 const TOKEN_TRIM_QUOTES = new Set([
-  '"',      // U+0022 straight double quote
-  "'",      // U+0027 straight single quote / apostrophe
+  '"', // U+0022 straight double quote
+  "'", // U+0027 straight single quote / apostrophe
   '‘', // left single quotation mark
   '’', // right single quotation mark
   '“', // left double quotation mark
-  '”', // right double quotation mark
+  '”' // right double quotation mark
 ]);
 
 /** Strip surrounding whitespace and quote-like wrappers from a pasted bearer token. */
 export const sanitizeBearerToken = (raw: string): string => {
   let token = raw.trim();
-  while (
-    token.length >= 2 &&
-    TOKEN_TRIM_QUOTES.has(token[0]) &&
-    TOKEN_TRIM_QUOTES.has(token[token.length - 1])
-  ) {
+  while (token.length >= 2 && TOKEN_TRIM_QUOTES.has(token[0]) && TOKEN_TRIM_QUOTES.has(token[token.length - 1])) {
     token = token.slice(1, -1).trim();
   }
   return token;

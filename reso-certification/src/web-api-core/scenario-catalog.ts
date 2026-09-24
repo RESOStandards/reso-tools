@@ -52,9 +52,11 @@ export const describeScenario = (s: CoreScenario): string => {
       return `\`$filter\` with the \`${s.lambda}()\` lambda over a multi-valued collection.`;
     case 'error': {
       const cause =
-        s.expectedStatus === 400 ? 'A malformed query'
-        : s.expectedStatus === 404 ? 'A request for a resource that does not exist'
-        : 'An invalid request';
+        s.expectedStatus === 400
+          ? 'A malformed query'
+          : s.expectedStatus === 404
+            ? 'A request for a resource that does not exist'
+            : 'An invalid request';
       return `${cause} MUST return HTTP ${s.expectedStatus}.`;
     }
     case 'string-enum':
@@ -89,7 +91,7 @@ const CATEGORY_ORDER: ReadonlyArray<{ readonly key: CoreScenario['category']; re
     key: 'string-function',
     label: 'String Functions (Optional)',
     note: 'These string comparison operators are **not required** for Web API Core certification. They are exercised as OData functions because some providers support them, and we want to recognize that support – a failure here is only ever reported as "Not Supported" and never affects the Core verdict.'
-  },
+  }
 ];
 
 /**
@@ -110,9 +112,7 @@ export const generateScenarioCatalog = (): string => {
     if (note) lines.push(note, '');
     lines.push('| Scenario | Version | What it checks |', '| --- | --- | --- |');
     for (const s of rows) {
-      lines.push(
-        `| <a id="${scenarioAnchor(s.tag)}"></a>**\`${s.tag}\`** – ${s.name} | ${versionTag(s)} | ${describeScenario(s)} |`
-      );
+      lines.push(`| <a id="${scenarioAnchor(s.tag)}"></a>**\`${s.tag}\`** – ${s.name} | ${versionTag(s)} | ${describeScenario(s)} |`);
     }
     lines.push('');
   }

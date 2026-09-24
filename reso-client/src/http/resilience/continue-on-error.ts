@@ -46,8 +46,7 @@ export const skip = (reason: string): never => {
 const isSkip = (err: unknown): err is SkipSignal =>
   err instanceof Error && typeof (err as { resilientSkip?: unknown }).resilientSkip === 'string';
 
-const defaultIsFatal = (error: unknown): boolean =>
-  isResilienceError(error) && error.resilienceKind === 'fatal-auth';
+const defaultIsFatal = (error: unknown): boolean => isResilienceError(error) && error.resilienceKind === 'fatal-auth';
 
 /**
  * The primitive. Runs each item through `run` and yields its outcome. Stops (ends the
@@ -120,15 +119,13 @@ export const runSettled = async <T, R>(
   }
   const stoppedEarly = step.value;
 
-  const fatalOutcome = outcomes.find(
-    (o): o is Extract<UnitOutcome<T, R>, { status: 'failed' }> => o.status === 'failed' && o.fatal
-  );
+  const fatalOutcome = outcomes.find((o): o is Extract<UnitOutcome<T, R>, { status: 'failed' }> => o.status === 'failed' && o.fatal);
 
   return {
     outcomes,
-    succeeded: outcomes.flatMap((o) => (o.status === 'ok' ? [o.value] : [])),
-    failed: outcomes.flatMap((o) => (o.status === 'failed' ? [{ item: o.item, error: o.error }] : [])),
-    skipped: outcomes.flatMap((o) => (o.status === 'skipped' ? [{ item: o.item, reason: o.reason }] : [])),
+    succeeded: outcomes.flatMap(o => (o.status === 'ok' ? [o.value] : [])),
+    failed: outcomes.flatMap(o => (o.status === 'failed' ? [{ item: o.item, error: o.error }] : [])),
+    skipped: outcomes.flatMap(o => (o.status === 'skipped' ? [{ item: o.item, reason: o.reason }] : [])),
     stoppedEarly,
     ...(fatalOutcome ? { fatalError: fatalOutcome.error } : {})
   };

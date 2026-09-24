@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import type { Server } from 'node:http';
+import { resolve } from 'node:path';
 import express from 'express';
 import { createAdminRouter } from './admin/router.js';
 import { loadAuthConfig } from './auth/config.js';
@@ -96,7 +96,9 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
     console.log('MongoDB initialization complete.');
 
     dal = createMongoDal(db);
-    cleanupFn = () => { client.close(); };
+    cleanupFn = () => {
+      client.close();
+    };
     if (config.entityEvent) {
       const { createMongoEntityEventWriter } = await import('./db/entity-event-writers.js');
       const { createMongoCompactionRunner } = await import('./db/entity-event-compaction.js');
@@ -120,7 +122,9 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
     console.log(`SQLite schema initialized (${ddl.length} statements).`);
 
     dal = createSqliteDal(sqliteDb);
-    cleanupFn = () => { sqliteDb.close(); };
+    cleanupFn = () => {
+      sqliteDb.close();
+    };
     if (config.entityEvent) {
       const { createSqliteEntityEventWriter } = await import('./db/entity-event-writers.js');
       const { createSqliteCompactionRunner } = await import('./db/entity-event-compaction.js');
@@ -144,7 +148,9 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
     console.log('Database migrations complete.');
 
     dal = createPostgresDal(pool);
-    cleanupFn = () => { pool.end(); };
+    cleanupFn = () => {
+      pool.end();
+    };
     if (config.entityEvent) {
       const { createPostgresEntityEventWriter } = await import('./db/entity-event-writers.js');
       const { createPostgresCompactionRunner } = await import('./db/entity-event-compaction.js');
@@ -349,7 +355,7 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
       headers['OData-Version'] = odataVersion;
     }
     if (req.headers.authorization) {
-      headers['Authorization'] = req.headers.authorization;
+      headers.Authorization = req.headers.authorization;
     }
     if (req.headers['content-type']) {
       headers['Content-Type'] = req.headers['content-type'];
@@ -360,9 +366,9 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
         method: req.method,
         headers,
         body: ['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method)
-          ? (req.headers['content-type']?.includes('application/x-www-form-urlencoded')
+          ? req.headers['content-type']?.includes('application/x-www-form-urlencoded')
             ? new URLSearchParams(req.body as Record<string, string>).toString()
-            : JSON.stringify(req.body))
+            : JSON.stringify(req.body)
           : undefined
       });
 

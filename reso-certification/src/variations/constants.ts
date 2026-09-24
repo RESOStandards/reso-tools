@@ -24,5 +24,4 @@ export const VARIATIONS_REPORT_FILENAME = 'data-dictionary-variations.json';
 export const MAX_COMPUTE_PAYLOAD_BYTES = 6 * 1024 * 1024;
 
 /** Shared user-facing message for both the client-side pre-check and a gateway 413. */
-export const PAYLOAD_TOO_LARGE_MESSAGE =
-  'This metadata report is too large for the variations service. Please contact dev@reso.org.';
+export const PAYLOAD_TOO_LARGE_MESSAGE = 'This metadata report is too large for the variations service. Please contact dev@reso.org.';

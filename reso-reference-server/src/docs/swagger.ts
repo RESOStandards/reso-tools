@@ -27,9 +27,13 @@ export const createSwaggerRouter = (spec: Record<string, unknown>): Router => {
     `);
   });
 
-  router.use('/api-docs', swaggerUi.serve, swaggerUi.setup(spec, {
-    customJs: '/api-docs/back-btn.js',
-  }));
+  router.use(
+    '/api-docs',
+    swaggerUi.serve,
+    swaggerUi.setup(spec, {
+      customJs: '/api-docs/back-btn.js'
+    })
+  );
 
   return router;
 };

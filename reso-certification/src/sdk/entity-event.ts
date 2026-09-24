@@ -1,15 +1,15 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { resolveAuthToken } from '../test-runner/auth.js';
-import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, persistMetadataXml } from '../test-runner/metadata.js';
 import { runAllEntityEventScenarios } from '../entity-event/test-runner.js';
 import type { EntityEventConfig as EERunnerConfig } from '../entity-event/types.js';
-import type { BaseTestContext, EntityEventConfig, PipelineStep } from './types.js';
+import { resolveAuthToken } from '../test-runner/auth.js';
+import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, persistMetadataXml } from '../test-runner/metadata.js';
+import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
-import { entityEventReportGenerators, writeReports, prepareOutputDir } from './reports.js';
-import { validateMetadata, formatValidationSummary, collectValidationErrors } from './metadata-validation.js';
-import type { StepResult } from './types.js';
+import { entityEventReportGenerators, prepareOutputDir, writeReports } from './reports.js';
 import { FETCH_METADATA, RUN_ENTITY_EVENT_SCENARIOS } from './step-names.js';
+import type { BaseTestContext, EntityEventConfig, PipelineStep } from './types.js';
+import type { StepResult } from './types.js';
 
 // ── Pipeline Context ──
 
@@ -32,9 +32,9 @@ const serviceCheck: PipelineStep<EntityEventContext> = {
     // do not reject based on undici's default User-Agent of 'node'.
     const headers: Record<string, string> = {
       Accept: 'application/json',
-      'User-Agent': 'RESO-Cert/0.11',
+      'User-Agent': 'RESO-Cert/0.11'
     };
-    if (ctx.authToken) headers['Authorization'] = `Bearer ${ctx.authToken}`;
+    if (ctx.authToken) headers.Authorization = `Bearer ${ctx.authToken}`;
     const maxAttempts = 10;
     let lastStatus: number | undefined;
     let lastBody: string | undefined;
@@ -45,7 +45,11 @@ const serviceCheck: PipelineStep<EntityEventContext> = {
           return { context: ctx, summary: 'OData service is ready', requestDetails: [{ method: 'GET', url }] };
         }
         lastStatus = response.status;
-        try { lastBody = (await response.text()).slice(0, 500); } catch { /* ignore body read errors */ }
+        try {
+          lastBody = (await response.text()).slice(0, 500);
+        } catch {
+          /* ignore body read errors */
+        }
       } catch (err) {
         lastBody = err instanceof Error ? err.message : String(err);
       }
@@ -55,17 +59,22 @@ const serviceCheck: PipelineStep<EntityEventContext> = {
     const errorDetail = lastStatus
       ? `HTTP ${lastStatus}${lastBody ? ` — ${lastBody}` : ''}`
       : `No response after ${maxAttempts} attempts${lastBody ? ` (last error: ${lastBody})` : ''}`;
-    return { context: ctx, status: 'failed', errors: [`OData service did not respond: ${errorDetail}`], requestDetails: [{ method: 'GET', url, error: errorDetail }] };
-  },
+    return {
+      context: ctx,
+      status: 'failed',
+      errors: [`OData service did not respond: ${errorDetail}`],
+      requestDetails: [{ method: 'GET', url, error: errorDetail }]
+    };
+  }
 };
 
 /** Resolve the auth token from the config. */
 const resolveAuth = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
   name: 'Resolve authentication',
-  run: async (ctx) => {
+  run: async ctx => {
     const authToken = await resolveAuthToken(config.server.auth);
-    return { context: { ...ctx, authToken }, summary: `Auth credentials present` };
-  },
+    return { context: { ...ctx, authToken }, summary: 'Auth credentials present' };
+  }
 });
 
 /** Fetch and parse OData $metadata to verify EntityEvent exists. */
@@ -96,19 +105,19 @@ const fetchAndParseMetadata = (config: EntityEventConfig): PipelineStep<EntityEv
       summary: `Metadata parsed: ${eeMsg}. ${formatValidationSummary(validation)}`,
       counts: { entityTypes: metadata.entityTypes.length },
       ...(validationErrors.length > 0 ? { errors: validationErrors } : {}),
-      ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {}),
+      ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {})
     };
-  },
+  }
 });
 
 /** Generate payload files for full mode canary writes. */
 const generatePayloads = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
   name: 'Generate payloads',
-  run: async (ctx) => {
+  run: async ctx => {
     if (config.payloadsDir) {
       return {
         context: { ...ctx, payloadsDir: config.payloadsDir },
-        summary: `Using existing payloads from ${config.payloadsDir}`,
+        summary: `Using existing payloads from ${config.payloadsDir}`
       };
     }
 
@@ -123,13 +132,13 @@ const generatePayloads = (config: EntityEventConfig): PipelineStep<EntityEventCo
     await mkdir(outputDir, { recursive: true });
 
     const payload = {
-      ListPrice: 275000.00,
+      ListPrice: 275000.0,
       BedroomsTotal: 3,
       BathroomsTotalInteger: 2,
       City: 'EntityEvent Test City',
       StateOrProvince: 'TX',
       PostalCode: '78701',
-      Country: 'US',
+      Country: 'US'
     };
 
     await writeFile(join(outputDir, 'create-succeeds.json'), JSON.stringify(payload, null, 2));
@@ -137,9 +146,9 @@ const generatePayloads = (config: EntityEventConfig): PipelineStep<EntityEventCo
     return {
       context: { ...ctx, payloadsDir: outputDir },
       summary: 'Generated canary write payload',
-      artifacts: [{ label: 'Payloads', path: outputDir }],
+      artifacts: [{ label: 'Payloads', path: outputDir }]
     };
-  },
+  }
 });
 
 /** Run all EntityEvent compliance scenarios. */
@@ -156,14 +165,14 @@ const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> =
       batchSize: config.batchSize ?? 100,
       pollIntervalMs: config.pollInterval ?? 5000,
       pollTimeoutMs: config.pollTimeout ?? 30000,
-      strict: false,
+      strict: false
     };
 
-    const testReport = await runAllEntityEventScenarios(runnerConfig, (message) => {
+    const testReport = await runAllEntityEventScenarios(runnerConfig, message => {
       onProgress({ step: RUN_ENTITY_EVENT_SCENARIOS, status: 'running', message });
     });
     const { passed, failed } = testReport.summary;
-    const status = failed > 0 ? 'failed' as const : 'passed' as const;
+    const status = failed > 0 ? ('failed' as const) : ('passed' as const);
 
     return {
       context: { ...ctx, testReport },
@@ -173,10 +182,10 @@ const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> =
         total: testReport.scenarios.length,
         passed,
         failed,
-        eventsValidated: testReport.dataValidation.eventsValidated,
-      },
+        eventsValidated: testReport.dataValidation.eventsValidated
+      }
     };
-  },
+  }
 });
 
 /** Write generic and detailed compliance reports. */
@@ -187,31 +196,36 @@ const writeComplianceReports = (_config: EntityEventConfig): PipelineStep<Entity
     // pipeline starts (prepareOutputDir).
     const generators = entityEventReportGenerators('1.0.0');
 
-    const testReport = ctx.testReport as { scenarios: ReadonlyArray<unknown>; summary: { total: number; passed: number; failed: number; skipped?: number } };
+    const testReport = ctx.testReport as {
+      scenarios: ReadonlyArray<unknown>;
+      summary: { total: number; passed: number; failed: number; skipped?: number };
+    };
     const contextWithReports = {
       ...ctx,
-      resourceReports: [{
-        resource: 'EntityEvent',
-        summary: testReport.summary,
-        scenarios: testReport.scenarios,
-      }],
+      resourceReports: [
+        {
+          resource: 'EntityEvent',
+          summary: testReport.summary,
+          scenarios: testReport.scenarios
+        }
+      ]
     };
 
     const pipelineResult = {
-      status: testReport.summary.failed > 0 ? 'failed' as const : 'passed' as const,
+      status: testReport.summary.failed > 0 ? ('failed' as const) : ('passed' as const),
       endorsement: 'entity-event',
-      steps: ctx.pipelineSteps as ReadonlyArray<StepResult> ?? [],
+      steps: (ctx.pipelineSteps as ReadonlyArray<StepResult>) ?? [],
       context: contextWithReports,
-      duration: 0,
+      duration: 0
     };
 
     const written = await writeReports(pipelineResult, generators, ctx.outputPath, onProgress);
 
     return {
       context: { ...ctx, reports: written },
-      summary: `${written.length} reports written`,
+      summary: `${written.length} reports written`
     };
-  },
+  }
 });
 
 // ── Pipeline Assembly ──
@@ -224,13 +238,13 @@ export const createEntityEventPipeline = (config: EntityEventConfig) =>
     fetchAndParseMetadata(config),
     ...(config.mode === 'full' ? [generatePayloads(config)] : []),
     runTests(config),
-    writeComplianceReports(config),
+    writeComplianceReports(config)
   ]);
 
 /** Run EntityEvent compliance tests with a single function call. */
 export const runEntityEventCompliance = async (
   config: EntityEventConfig,
-  onProgress?: (progress: import('./types.js').StepProgress) => void,
+  onProgress?: (progress: import('./types.js').StepProgress) => void
 ) => {
   const pipeline = createEntityEventPipeline(config);
   const outputPath = await prepareOutputDir('entity-event', '1.0.0', config);
@@ -238,12 +252,8 @@ export const runEntityEventCompliance = async (
     serverUrl: config.server.url,
     mode: config.mode ?? 'observe',
     writableResource: config.writableResource ?? 'Property',
-    outputPath,
+    outputPath
   };
 
-  return pipeline.run(
-    initialContext,
-    onProgress,
-    { failFast: config.options?.failFast ?? false },
-  );
+  return pipeline.run(initialContext, onProgress, { failFast: config.options?.failFast ?? false });
 };

@@ -138,7 +138,10 @@ export const isSampleComplete = (body: unknown): boolean => {
  *  yields `sampledMin − 1`. Undefined when the field has no finite sampled values. */
 export const integerNotSentinelFor = (values: ReadonlyArray<unknown>): number | undefined => {
   // Drop null/undefined BEFORE coercion — Number(null) is 0, which would masquerade as a real floor of 0.
-  const nums = values.filter((v) => v != null).map(Number).filter(Number.isFinite);
+  const nums = values
+    .filter(v => v != null)
+    .map(Number)
+    .filter(Number.isFinite);
   return nums.length > 0 ? Math.min(-1, Math.min(...nums) - 1) : undefined;
 };
 
@@ -149,7 +152,7 @@ export const WELL_KNOWN_RESOURCES: ReadonlyArray<{ readonly resource: string; re
   { resource: 'Office', keyField: 'OfficeKey' },
   { resource: 'Media', keyField: 'MediaKey' },
   { resource: 'OpenHouse', keyField: 'OpenHouseKey' },
-  { resource: 'Showing', keyField: 'ShowingKey' },
+  { resource: 'Showing', keyField: 'ShowingKey' }
 ];
 
 /**
@@ -197,12 +200,9 @@ export type EnumMode = 'isflags' | 'collections' | 'string';
  *   - Default: 'string'
  */
 export const detectEnumMode = (entityType: EntityType): EnumMode => {
-  const hasStringLookup = entityType.properties.some(p =>
-    p.type === 'Edm.String' && !!p.annotations?.['RESO.OData.Metadata.LookupName']);
-  const hasEnumCollection = entityType.properties.some(p =>
-    p.type.startsWith('Collection(org.reso.metadata.enums.'));
-  const hasEnumType = entityType.properties.some(p =>
-    p.type.startsWith('org.reso.metadata.enums.') && !p.type.startsWith('Collection('));
+  const hasStringLookup = entityType.properties.some(p => p.type === 'Edm.String' && !!p.annotations?.['RESO.OData.Metadata.LookupName']);
+  const hasEnumCollection = entityType.properties.some(p => p.type.startsWith('Collection(org.reso.metadata.enums.'));
+  const hasEnumType = entityType.properties.some(p => p.type.startsWith('org.reso.metadata.enums.') && !p.type.startsWith('Collection('));
 
   if (hasStringLookup) return 'string';
   if (hasEnumCollection) return 'collections';
@@ -222,33 +222,43 @@ const SAMPLE_TOP = 1000;
  *  "100" and "100.00"; deduping by Number (not String) keeps a numerically single-valued field from
  *  over-counting its distinct values and wrongly failing a correct `ne`/`gt`/`lt`. */
 export const numericStats = (
-  values: ReadonlyArray<unknown>,
+  values: ReadonlyArray<unknown>
 ): { readonly min: number; readonly median: number; readonly max: number; readonly distinct: number } | undefined => {
   // Drop null/undefined BEFORE coercion — Number(null) is 0, which would inject a spurious 0 into the stats.
-  const nums = [...new Set(values.filter(v => v != null).map(Number).filter(Number.isFinite))].sort((a, b) => a - b);
-  return nums.length === 0 ? undefined : { min: nums[0], median: nums[Math.floor(nums.length / 2)], max: nums[nums.length - 1], distinct: nums.length };
+  const nums = [
+    ...new Set(
+      values
+        .filter(v => v != null)
+        .map(Number)
+        .filter(Number.isFinite)
+    )
+  ].sort((a, b) => a - b);
+  return nums.length === 0
+    ? undefined
+    : { min: nums[0], median: nums[Math.floor(nums.length / 2)], max: nums[nums.length - 1], distinct: nums.length };
 };
 
 /** Date-only min / median / max / distinct-count. ISO date strings sort chronologically, so a lexicographic
  *  sort suffices; the date-only slice normalizes any datetime-shaped value. */
 export const dateStats = (
-  values: ReadonlyArray<unknown>,
+  values: ReadonlyArray<unknown>
 ): { readonly min: string; readonly median: string; readonly max: string; readonly distinct: number } | undefined => {
   const dates = [...new Set(values.map(v => String(v).split('T')[0]))].sort();
-  return dates.length === 0 ? undefined : { min: dates[0], median: dates[Math.floor(dates.length / 2)], max: dates[dates.length - 1], distinct: dates.length };
+  return dates.length === 0
+    ? undefined
+    : { min: dates[0], median: dates[Math.floor(dates.length / 2)], max: dates[dates.length - 1], distinct: dates.length };
 };
 
 /** Min + max timestamp + distinct count of a field's sampled full-timestamp values (ISO sorts chronologically). */
-const timestampStats = (values: ReadonlyArray<unknown>): { readonly min: string; readonly max: string; readonly distinct: number } | undefined => {
+const timestampStats = (
+  values: ReadonlyArray<unknown>
+): { readonly min: string; readonly max: string; readonly distinct: number } | undefined => {
   const stamps = [...new Set(values.map(v => String(v)))].sort();
   return stamps.length === 0 ? undefined : { min: stamps[0], max: stamps[stamps.length - 1], distinct: stamps.length };
 };
 
 /** Collect all non-null distinct values for a field across records. */
-const collectValues = (
-  records: ReadonlyArray<Record<string, unknown>>,
-  field: string,
-): ReadonlyArray<unknown> => {
+const collectValues = (records: ReadonlyArray<Record<string, unknown>>, field: string): ReadonlyArray<unknown> => {
   const seen = new Set<string>();
   const values: unknown[] = [];
   for (const record of records) {
@@ -267,7 +277,7 @@ const collectValues = (
 const findBestField = (
   fields: ReadonlyArray<string>,
   records: ReadonlyArray<Record<string, unknown>>,
-  minDistinct = 3,
+  minDistinct = 3
 ): { readonly field: string; readonly values: ReadonlyArray<unknown> } | undefined => {
   let fallback: { readonly field: string; readonly values: ReadonlyArray<unknown> } | undefined;
 
@@ -283,7 +293,7 @@ const findBestField = (
 /** Find a timestamp field with no null values (best for orderby). */
 const findFullyPopulatedTimestamp = (
   fields: ReadonlyArray<string>,
-  records: ReadonlyArray<Record<string, unknown>>,
+  records: ReadonlyArray<Record<string, unknown>>
 ): string | undefined => {
   for (const field of fields) {
     const allPopulated = records.every(r => r[field] != null);
@@ -299,17 +309,17 @@ const findFullyPopulatedTimestamp = (
  *  else a generic populated datetime (last resort — a resource with no timestamp field is a DD-gate failure). */
 export const selectTimestampField = (
   datetimeFields: ReadonlyArray<string>,
-  records: ReadonlyArray<Record<string, unknown>>,
+  records: ReadonlyArray<Record<string, unknown>>
 ): string | undefined => {
   const isPopulated = (f: string): boolean => records.some(r => r[f] != null);
   const isStandardTimestamp = (f: string): boolean => f.endsWith(TIMESTAMP_FIELD_SUFFIX);
   return (
     (datetimeFields.includes(MODIFICATION_TIMESTAMP_FIELD) && isPopulated(MODIFICATION_TIMESTAMP_FIELD)
       ? MODIFICATION_TIMESTAMP_FIELD
-      : undefined)
-    ?? datetimeFields.filter(isStandardTimestamp).find(isPopulated)
-    ?? findFullyPopulatedTimestamp(datetimeFields, records)
-    ?? datetimeFields.find(isPopulated)
+      : undefined) ??
+    datetimeFields.filter(isStandardTimestamp).find(isPopulated) ??
+    findFullyPopulatedTimestamp(datetimeFields, records) ??
+    datetimeFields.find(isPopulated)
   );
 };
 
@@ -331,7 +341,7 @@ export const resolveTestParams = async (
   standardMap: StandardMap,
   enumModeOverride?: EnumMode,
   requester: ODataRequester = webRequester,
-  originatingSystem?: { readonly name?: string; readonly id?: string },
+  originatingSystem?: { readonly name?: string; readonly id?: string }
 ): Promise<TestParams> => {
   // enumMode is retained as an informational/coverage field only — selection and gating are now per-field
   // (resolveEnum), so the `--enumMode` override no longer steers field choice. Vestigial; a candidate for removal.
@@ -350,7 +360,7 @@ export const resolveTestParams = async (
   const osScopeClause = originatingSystemFilterClause(scopedOsn, scopedOsid);
   const osParams: Pick<TestParams, 'originatingSystemName' | 'originatingSystemId'> = {
     ...(scopedOsn ? { originatingSystemName: scopedOsn } : {}),
-    ...(scopedOsid ? { originatingSystemId: scopedOsid } : {}),
+    ...(scopedOsid ? { originatingSystemId: scopedOsid } : {})
   };
 
   // Fetch sample records. 1000 (up from 100) gives far better field/value coverage for enum selection —
@@ -365,7 +375,16 @@ export const resolveTestParams = async (
   const sampleComplete = isSampleComplete(body) && records.length < SAMPLE_TOP;
 
   if (records.length === 0) {
-    return { resource, keyField, keyValue: '', enumMode, integerValueHigh: 2147483647, sampleComplete, skippedTypes: [NO_RECORDS_SAMPLED], ...osParams };
+    return {
+      resource,
+      keyField,
+      keyValue: '',
+      enumMode,
+      integerValueHigh: 2147483647,
+      sampleComplete,
+      skippedTypes: [NO_RECORDS_SAMPLED],
+      ...osParams
+    };
   }
 
   const keyValue = String(records[0][keyField] ?? '');
@@ -521,6 +540,6 @@ export const resolveTestParams = async (
     expandField,
     expandNavs,
     lookupNameByField: Object.keys(lookupNameByField).length ? lookupNameByField : undefined,
-    skippedTypes,
+    skippedTypes
   };
 };

@@ -64,6 +64,6 @@ export {
   isEnumProperty,
   extractPayloadFields,
   extractEnumerations,
-  extractExpansions,
+  extractExpansions
 } from './payload-fields.js';
 export type { EnumerationDetail } from './payload-fields.js';

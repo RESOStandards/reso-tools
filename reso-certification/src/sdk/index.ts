@@ -13,7 +13,7 @@ export type {
   AddEditConfig,
   EntityEventConfig,
   CoreConfig,
-  ComplianceConfig,
+  ComplianceConfig
 } from './types.js';
 
 export { createPipeline } from './pipeline.js';
@@ -27,20 +27,17 @@ export {
   entityEventReportGenerators,
   coreReportGenerators,
   createGenericReportGenerator,
-  createDetailedReportGenerator,
+  createDetailedReportGenerator
 } from './reports.js';
 
-import type { ComplianceConfig, PipelineResult, ProgressCallback } from './types.js';
 import { runAddEditCompliance } from './add-edit.js';
-import { runEntityEventCompliance } from './entity-event.js';
 import { runCoreCompliance } from './core.js';
 import { runDDCompliance } from './dd.js';
+import { runEntityEventCompliance } from './entity-event.js';
+import type { ComplianceConfig, PipelineResult, ProgressCallback } from './types.js';
 
 /** Run compliance tests for any endorsement. Dispatches to the appropriate pipeline. */
-export const runComplianceTests = async (
-  config: ComplianceConfig,
-  onProgress?: ProgressCallback,
-): Promise<PipelineResult> => {
+export const runComplianceTests = async (config: ComplianceConfig, onProgress?: ProgressCallback): Promise<PipelineResult> => {
   switch (config.endorsement) {
     case 'add-edit':
       return runAddEditCompliance(config, onProgress);

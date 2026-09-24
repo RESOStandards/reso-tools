@@ -35,8 +35,7 @@ const widestInt = (types: ReadonlyArray<string>): string =>
 // element values, which can exceed the argument-count limit (~125k in V8) and overflow the call stack.
 const maxOf = (nums: ReadonlyArray<number>): number => nums.reduce((m, n) => (n > m ? n : m), 0);
 
-const withNullable = (base: AggregatedFieldType, nullable: boolean): AggregatedFieldType =>
-  nullable ? { ...base, nullable: true } : base;
+const withNullable = (base: AggregatedFieldType, nullable: boolean): AggregatedFieldType => (nullable ? { ...base, nullable: true } : base);
 
 /**
  * Fold a local field's raw sampled values into a single type descriptor.
@@ -74,10 +73,7 @@ export const aggregateFieldType = (values: ReadonlyArray<unknown>): AggregatedFi
     // would give precision 2, which cannot hold 12345.
     const intDigits = maxOf(valid.map(v => (typeof v === 'number' ? Math.abs(Math.trunc(v)).toString().length : 0)));
     const precision = intDigits + scale;
-    return withNullable(
-      { type: 'Edm.Decimal', ...(scale ? { scale } : {}), ...(precision ? { precision } : {}) },
-      nullable,
-    );
+    return withNullable({ type: 'Edm.Decimal', ...(scale ? { scale } : {}), ...(precision ? { precision } : {}) }, nullable);
   }
 
   // A single homogeneous temporal type is kept; strings (or any string/temporal mix) → Edm.String

@@ -6,8 +6,8 @@
  * pagination, then merges them into the base metadata report.
  */
 
-import { odataRequest, buildResourceUrl } from '../test-runner/index.js';
 import type { MetadataReport, MetadataReportField, MetadataReportLookup } from '@reso-standards/reso-metadata-utils';
+import { buildResourceUrl, odataRequest } from '../test-runner/index.js';
 
 // ── Constants ──
 
@@ -49,7 +49,7 @@ export const fetchLookupResource = async (
   serverUrl: string,
   authToken: string,
   onProgress?: (count: number) => void,
-  odataVersion?: string,
+  odataVersion?: string
 ): Promise<ReadonlyArray<RawLookupRecord> | undefined> => {
   const allRecords: RawLookupRecord[] = [];
   let url: string | undefined = `${buildResourceUrl(serverUrl, 'Lookup')}?$top=${PAGE_SIZE}`;
@@ -63,7 +63,12 @@ export const fetchLookupResource = async (
     if (response.status !== 200) {
       const errorBody = typeof response.body === 'object' ? JSON.stringify(response.body) : String(response.body ?? '');
       const err = new Error(`Lookup Resource returned HTTP ${response.status}`);
-      (err as unknown as Record<string, unknown>).requestDetails = { method: 'GET', url, status: response.status, responseBody: errorBody.slice(0, 500) };
+      (err as unknown as Record<string, unknown>).requestDetails = {
+        method: 'GET',
+        url,
+        status: response.status,
+        responseBody: errorBody.slice(0, 500)
+      };
       throw err;
     }
 
@@ -102,14 +107,11 @@ export const fetchLookupResource = async (
 /**
  * Serialize raw Lookup records to the dump format (matches Commander output).
  */
-export const serializeLookupResourceDump = (
-  records: ReadonlyArray<RawLookupRecord>,
-  version = '1.7',
-): LookupResourceDump => ({
+export const serializeLookupResourceDump = (records: ReadonlyArray<RawLookupRecord>, version = '1.7'): LookupResourceDump => ({
   description: 'Data Dictionary Lookup Resource Metadata',
   version,
   generatedOn: new Date().toISOString(),
-  lookups: records,
+  lookups: records
 });
 
 // ── Merge ──
@@ -133,7 +135,7 @@ const transformLookupRecord = (record: RawLookupRecord): MetadataReportLookup =>
     lookupName: record.LookupName,
     lookupValue: record.LookupValue,
     type: 'Edm.String',
-    ...(annotations.length > 0 ? { annotations } : {}),
+    ...(annotations.length > 0 ? { annotations } : {})
   };
 };
 
@@ -160,16 +162,10 @@ const transformFieldWithLookup = (field: MetadataReportField): MetadataReportFie
  * 1. Fields with LookupName annotations get their type replaced with the lookup name
  * 2. Lookup Resource records are transformed and appended to the lookups array
  */
-export const mergeWithLookupResource = (
-  baseReport: MetadataReport,
-  lookupRecords: ReadonlyArray<RawLookupRecord>,
-): MetadataReport => ({
+export const mergeWithLookupResource = (baseReport: MetadataReport, lookupRecords: ReadonlyArray<RawLookupRecord>): MetadataReport => ({
   ...baseReport,
   fields: baseReport.fields.map(transformFieldWithLookup),
-  lookups: [
-    ...baseReport.lookups,
-    ...lookupRecords.map(transformLookupRecord),
-  ],
+  lookups: [...baseReport.lookups, ...lookupRecords.map(transformLookupRecord)]
 });
 
 /** The unqualified (display) lookup name — the tail of a possibly-namespaced lookup name. */
@@ -214,16 +210,12 @@ export const synthesizeLookupResourceRecords = (report: MetadataReport): Readonl
       LookupName: parseLookupName(lookup.lookupName),
       LookupValue: lookup.lookupValue,
       ...(standardName ? { StandardLookupValue: standardName } : {}),
-      ...(legacyValue ? { LegacyODataValue: legacyValue } : {}),
+      ...(legacyValue ? { LegacyODataValue: legacyValue } : {})
     };
   });
 
   const enumsWithRecords = new Set(standardRecords.map(r => r.LookupName));
-  const referencedEnums = new Set(
-    report.fields
-      .filter(f => f.isEnumeration && !f.isExpansion)
-      .map(enumReferenceName),
-  );
+  const referencedEnums = new Set(report.fields.filter(f => f.isEnumeration && !f.isExpansion).map(enumReferenceName));
   const sampleRecords: ReadonlyArray<RawLookupRecord> = [...referencedEnums]
     .filter(name => !enumsWithRecords.has(name))
     .map(name => ({ LookupName: name, LookupValue: sampleEnumValue(name) }));
@@ -240,7 +232,7 @@ export const fetchAndMergeLookupResource = async (
   serverUrl: string,
   authToken: string,
   onProgress?: (count: number) => void,
-  odataVersion?: string,
+  odataVersion?: string
 ): Promise<{
   readonly report: MetadataReport;
   readonly lookupResourceAvailable: boolean;
@@ -257,6 +249,6 @@ export const fetchAndMergeLookupResource = async (
     report: mergeWithLookupResource(baseReport, lookupRecords),
     lookupResourceAvailable: true,
     lookupRecordCount: lookupRecords.length,
-    rawRecords: lookupRecords,
+    rawRecords: lookupRecords
   };
 };

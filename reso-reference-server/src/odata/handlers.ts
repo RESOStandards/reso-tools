@@ -5,7 +5,7 @@ import type { CollectionQueryOptions, DataAccessLayer, NavigationPropertyBinding
 import { buildAnnotations } from './annotations.js';
 import { resolveBaseUrl } from './base-url.js';
 import { buildODataError, buildValidationError } from './errors.js';
-import { setODataHeaders, type ODataHeaderOptions } from './headers.js';
+import { type ODataHeaderOptions, setODataHeaders } from './headers.js';
 import { validateRequestBody } from './validation.js';
 
 /** Returns true if the error is a client-facing filter validation error (e.g. unknown field). */
@@ -155,7 +155,12 @@ export const navigationPropertyHandler =
         setODataHeaders(res);
         res
           .status(400)
-          .json(buildValidationError([{ field: 'key', reason: "Missing resource key in URL. Use the format /Resource('key')/NavProp." }], 'Read'));
+          .json(
+            buildValidationError(
+              [{ field: 'key', reason: "Missing resource key in URL. Use the format /Resource('key')/NavProp." }],
+              'Read'
+            )
+          );
         return;
       }
 
@@ -372,9 +377,7 @@ export const collectionHandler =
 
       // How many records to fetch: the lesser of $top (per-page client limit) and
       // effective page size. $skip is an independent offset per OData spec.
-      const fetchLimit = clientTop !== undefined
-        ? Math.min(clientTop, effectivePageSize)
-        : effectivePageSize;
+      const fetchLimit = clientTop !== undefined ? Math.min(clientTop, effectivePageSize) : effectivePageSize;
 
       const options: CollectionQueryOptions = {
         ...(req.query.$filter && { $filter: req.query.$filter as string }),
@@ -402,7 +405,7 @@ export const collectionHandler =
       // is still owed more (or has no $top limit, meaning we page indefinitely).
       const returned = result.value.length;
       const isFullPage = returned === fetchLimit && fetchLimit > 0;
-      const clientSatisfied = clientTop !== undefined && (skip + returned) >= clientTop;
+      const clientSatisfied = clientTop !== undefined && skip + returned >= clientTop;
       if (isFullPage && !clientSatisfied) {
         const rawParams: RawQueryParams = {
           $filter: options.$filter,
@@ -413,14 +416,11 @@ export const collectionHandler =
           $count: options.$count,
           $expand: rawExpand
         };
-        body['@odata.nextLink'] = buildNextLink(
-          baseUrl, ctx.resourceCtx.resource, rawParams, fetchLimit, skip, clientTop
-        );
+        body['@odata.nextLink'] = buildNextLink(baseUrl, ctx.resourceCtx.resource, rawParams, fetchLimit, skip, clientTop);
       }
 
-      const headerOpts: ODataHeaderOptions = maxPageSize !== undefined
-        ? { preferenceApplied: `odata.maxpagesize=${Math.min(maxPageSize, MAX_PAGE_SIZE)}` }
-        : {};
+      const headerOpts: ODataHeaderOptions =
+        maxPageSize !== undefined ? { preferenceApplied: `odata.maxpagesize=${Math.min(maxPageSize, MAX_PAGE_SIZE)}` } : {};
       setODataHeaders(res, headerOpts);
       res.status(200).json(body);
     } catch (err) {

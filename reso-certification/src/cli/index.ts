@@ -17,49 +17,49 @@
 // like RESO_SERVICES_URL populated when they destructure process.env.
 import './env-bootstrap.js';
 
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
-import { Command } from 'commander';
-import { synthesizeResourcesFromFields } from '../metadata/index.js';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
+import { Command } from 'commander';
 import { startMockServer, stopMockServer } from '../add-edit/mock/server.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
-import { loadConfigFile, configEntryToAddEdit, configEntryToEntityEvent, configEntryToCore, configEntryToDD } from '../sdk/config.js';
-import type { AddEditConfig, EntityEventConfig, CoreConfig, DDConfig, PipelineResult } from '../sdk/types.js';
-import { resolveCliAuth, mintOAuth2ClientCredentialsToken } from './auth.js';
+import { synthesizeResourcesFromFields } from '../metadata/index.js';
+import { configEntryToAddEdit, configEntryToCore, configEntryToDD, configEntryToEntityEvent, loadConfigFile } from '../sdk/config.js';
+import { CURRENT_CORE_VERSION, SUPPORTED_CORE_VERSIONS, isCoreVersion } from '../sdk/core-versions.js';
+import { CERTIFIABLE_DD_VERSIONS, CURRENT_DD_VERSION, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
+import { fetchMetadataReportFromServer } from '../sdk/metadata-source.js';
+import type { AddEditConfig, CoreConfig, DDConfig, EntityEventConfig, PipelineResult } from '../sdk/types.js';
+import { resolveAuthToken } from '../test-runner/auth.js';
 import {
-  computeVariationsViaService,
-  updateVariationsViaService,
-  listVariationReviewItemsViaService,
-  listMyEndorsementsViaService,
-  listEndorsementsByReviewStatusViaService,
-  parseVariationsCsv,
-  findVariations,
-  DEFAULT_FUZZINESS,
   DEFAULT_DD_VERSION,
-  VARIATIONS_REPORT_FILENAME,
-  type VariationsServiceReport,
-  type VariationReviewElementType,
+  DEFAULT_FUZZINESS,
   type EndorsementReviewStatus,
+  VARIATIONS_REPORT_FILENAME,
+  type VariationReviewElementType,
+  type VariationsServiceReport,
+  computeVariationsViaService,
+  findVariations,
+  listEndorsementsByReviewStatusViaService,
+  listMyEndorsementsViaService,
+  listVariationReviewItemsViaService,
+  parseVariationsCsv,
+  updateVariationsViaService
 } from '../variations/index.js';
+import type { ODataVersion } from '../xsd/validate-csdl.js';
+import { mintOAuth2ClientCredentialsToken, resolveCliAuth } from './auth.js';
+import { runMetadataStep } from './metadata-command.js';
+import { resolveRcfExitCode, runRcf } from './rcf-command.js';
+import { resolveRenderMode, runConfigEntries, runWithProgress } from './render.js';
+import { REPLICATION_STRATEGY_VALUES, runReplicate } from './replicate-command.js';
+import { generateSchemaFromReport, loadSettings, validateSchemaPayload } from './schema-command.js';
+import { addAuthOptions, addOutputOptions } from './shared-options.js';
 import {
-  formatReviewItemsTable,
+  duplicateVariationKeys,
   formatEndorsementStatusTable,
   formatProvenance,
-  duplicateVariationKeys,
+  formatReviewItemsTable
 } from './variations-review-command.js';
-import { validateSchemaPayload, generateSchemaFromReport, loadSettings } from './schema-command.js';
-import { runMetadataStep } from './metadata-command.js';
-import { fetchMetadataReportFromServer } from '../sdk/metadata-source.js';
-import { runRcf, resolveRcfExitCode } from './rcf-command.js';
-import type { ODataVersion } from '../xsd/validate-csdl.js';
-import { addAuthOptions, addOutputOptions } from './shared-options.js';
-import { runReplicate, REPLICATION_STRATEGY_VALUES } from './replicate-command.js';
-import { resolveAuthToken } from '../test-runner/auth.js';
-import { CURRENT_DD_VERSION, CERTIFIABLE_DD_VERSIONS, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
-import { CURRENT_CORE_VERSION, SUPPORTED_CORE_VERSIONS, isCoreVersion } from '../sdk/core-versions.js';
-import { resolveRenderMode, runWithProgress, runConfigEntries } from './render.js';
-import { createRequire } from 'node:module';
 
 /** The CLI's own version, from package.json — the single source, so `reso-cert -V` never drifts from the
  *  published version (dist mirrors src under `tsc`, so `../../package.json` resolves in both dev and dist). */
@@ -145,9 +145,7 @@ addEditCmd.action(
 
       // Start mock server if requested
       if (opts.mock) {
-        const metadataXml = opts.metadata
-          ? await readFile(resolve(opts.metadata), 'utf-8')
-          : await loadDefaultMetadata();
+        const metadataXml = opts.metadata ? await readFile(resolve(opts.metadata), 'utf-8') : await loadDefaultMetadata();
         const mock = await startMockServer({ metadataXml, resource: opts.resource, port: DEFAULT_MOCK_PORT });
         mockServer = mock;
         if (renderMode !== 'silent') console.log(`Mock server started at ${mock.url}`);
@@ -168,12 +166,12 @@ addEditCmd.action(
             ...baseConfig,
             server: { ...baseConfig.server, auth },
             ...(entry.payloads ? { payloads: entry.payloads } : {}),
-            ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {}),
+            ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {})
           };
 
           return {
             config,
-            label: entry.description ?? `${entry.recipientUoi}-${entry.providerUsi}`,
+            label: entry.description ?? `${entry.recipientUoi}-${entry.providerUsi}`
           };
         });
 
@@ -185,7 +183,7 @@ addEditCmd.action(
           authToken: opts.authToken ?? (opts.mock ? 'mock-token' : undefined),
           clientId: opts.clientId,
           clientSecret: opts.clientSecret,
-          tokenUrl: opts.tokenUrl,
+          tokenUrl: opts.tokenUrl
         });
 
         const config: AddEditConfig = {
@@ -197,8 +195,8 @@ addEditCmd.action(
           specVersion: opts.specVersion,
           options: {
             skipHealthCheck: opts.mock,
-            ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {}),
-          },
+            ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {})
+          }
         };
 
         const result = await runWithProgress(config, 'Add/Edit Compliance', renderMode);
@@ -219,7 +217,7 @@ addEditCmd.action(
         await stopMockServer(mockServer.server);
       }
     }
-  },
+  }
 );
 
 // ── EntityEvent Subcommand ──
@@ -229,7 +227,7 @@ const entityEventCmd = program
   .description('RCP-027 EntityEvent change tracking compliance testing')
   .option('--url <url>', 'Service root URL')
   .option('--config <path>', 'Path to config file (mutually exclusive with --url)')
-  .option('--mode <mode>', 'Testing mode: observe or full (default: observe, or the config entry\'s entityEventOptions.mode)')
+  .option('--mode <mode>', "Testing mode: observe or full (default: observe, or the config entry's entityEventOptions.mode)")
   .option('--writable-resource <name>', 'Canary resource for full mode', 'Property')
   .option('--payloads-dir <dir>', 'Payloads directory for full mode canary writes')
   .option('--max-events <n>', 'Max EntityEvent records to validate (default: 1000)')
@@ -285,13 +283,11 @@ entityEventCmd.action(
 
       // Start mock server if requested
       if (opts.mock) {
-        const metadataXml = opts.metadata
-          ? await readFile(resolve(opts.metadata), 'utf-8')
-          : await loadDefaultMetadata();
+        const metadataXml = opts.metadata ? await readFile(resolve(opts.metadata), 'utf-8') : await loadDefaultMetadata();
         const mock = await startMockEntityEventServer({
           metadataXml,
           canaryResource: opts.writableResource,
-          port: DEFAULT_MOCK_PORT,
+          port: DEFAULT_MOCK_PORT
         });
         mockServer = mock;
         if (renderMode !== 'silent') console.log(`Mock EntityEvent server started at ${mock.url}`);
@@ -316,12 +312,12 @@ entityEventCmd.action(
             batchSize: numFlag(opts.batchSize, baseConfig.batchSize ?? 100),
             pollInterval: numFlag(opts.pollInterval, baseConfig.pollInterval ?? 5000),
             pollTimeout: numFlag(opts.pollTimeout, baseConfig.pollTimeout ?? 30000),
-            ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {}),
+            ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {})
           };
 
           return {
             config,
-            label: entry.description ?? `${entry.recipientUoi}-${entry.providerUsi}`,
+            label: entry.description ?? `${entry.recipientUoi}-${entry.providerUsi}`
           };
         });
 
@@ -333,7 +329,7 @@ entityEventCmd.action(
           authToken: opts.authToken ?? (opts.mock ? 'mock-token' : undefined),
           clientId: opts.clientId,
           clientSecret: opts.clientSecret,
-          tokenUrl: opts.tokenUrl,
+          tokenUrl: opts.tokenUrl
         });
 
         const config: EntityEventConfig = {
@@ -348,8 +344,8 @@ entityEventCmd.action(
           pollTimeout: numFlag(opts.pollTimeout, 30000),
           options: {
             skipHealthCheck: opts.mock,
-            ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {}),
-          },
+            ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {})
+          }
         };
 
         const result = await runWithProgress(config, 'EntityEvent Compliance', renderMode);
@@ -370,7 +366,7 @@ entityEventCmd.action(
         await stopMockEntityEventServer(mockServer.server);
       }
     }
-  },
+  }
 );
 
 // ── Web API Core Subcommand ──
@@ -384,7 +380,10 @@ const coreCmd = program
   // `--spec-version` (not `--version`, which is reserved for the program's own `-V`). Defaults to the current
   // minor, so a plain `reso-cert core --url …` certifies the latest Core without the caller passing a version.
   .option('--spec-version <version>', `Web API Core spec version: ${SUPPORTED_CORE_VERSIONS.join(' or ')}`, CURRENT_CORE_VERSION)
-  .option('--enum-mode <mode>', 'Enum mode: auto, string, collections, or isflags (default: the config entry\'s coreOptions.enumMode, else auto-detect)')
+  .option(
+    '--enum-mode <mode>',
+    "Enum mode: auto, string, collections, or isflags (default: the config entry's coreOptions.enumMode, else auto-detect)"
+  )
   .option('--full-coverage', 'Fail if any data type category has no coverage across all resources')
   .option('--originating-system-name <v>', 'Scope resource queries to OriginatingSystemName eq <v> (multi-tenant providers)')
   .option('--originating-system-id <v>', 'Scope resource queries to OriginatingSystemID eq <v> (used when no name; OSN takes precedence)');
@@ -448,11 +447,11 @@ coreCmd.action(
             ...baseConfig,
             server: { ...baseConfig.server, auth },
             enumMode: enumModeFlag ?? baseConfig.enumMode ?? 'auto',
-            ...(resources ?? baseConfig.resources ? { resources: resources ?? baseConfig.resources } : {}),
+            ...((resources ?? baseConfig.resources) ? { resources: resources ?? baseConfig.resources } : {}),
             ...(opts.fullCoverage || baseConfig.fullCoverage ? { fullCoverage: true } : {}),
             ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
             ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
-            ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {}),
+            ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {})
           };
 
           return { config, label: entry.description ?? `${entry.recipientUoi}-${entry.providerUsi}` };
@@ -464,7 +463,7 @@ coreCmd.action(
           authToken: opts.authToken,
           clientId: opts.clientId,
           clientSecret: opts.clientSecret,
-          tokenUrl: opts.tokenUrl,
+          tokenUrl: opts.tokenUrl
         });
 
         const config: CoreConfig = {
@@ -477,8 +476,8 @@ coreCmd.action(
           ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
           ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
           options: {
-            ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {}),
-          },
+            ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {})
+          }
         };
 
         const result = await runWithProgress(config, `Web API Core ${specVersion}`, renderMode);
@@ -494,7 +493,7 @@ coreCmd.action(
       console.error('Error:', error instanceof Error ? error.message : String(error));
       process.exitCode = 2;
     }
-  },
+  }
 );
 
 // ── Data Dictionary Subcommand ──
@@ -505,11 +504,14 @@ const ddCmd = program
   .option('--url <url>', 'Server base URL (mutually exclusive with --config)')
   .option('--config <path>', 'Path to a config file — runs every entry (mutually exclusive with --url)')
   .option('--dd-version <version>', `DD version (${CERTIFIABLE_DD_VERSIONS.join(' or ')})`, CURRENT_DD_VERSION)
-  .option('--limit <n>', 'Max records to replicate per resource (default: the config entry\'s ddOptions.limit, else 100000)')
+  .option('--limit <n>', "Max records to replicate per resource (default: the config entry's ddOptions.limit, else 100000)")
   .option('--strict', 'Strict mode: fail on variations and enforce JSON schema validation')
   .option('--batch-expand', 'Batch all expansions per resource into a single $expand request')
   .option('--originating-system-name <v>', 'Append OriginatingSystemName eq <v> to every replication query (multi-tenant providers)')
-  .option('--originating-system-id <v>', 'Append OriginatingSystemID eq <v> to every replication query (used when no name; OSN takes precedence)');
+  .option(
+    '--originating-system-id <v>',
+    'Append OriginatingSystemID eq <v> to every replication query (used when no name; OSN takes precedence)'
+  );
 
 addAuthOptions(ddCmd);
 addOutputOptions(ddCmd);
@@ -577,7 +579,7 @@ ddCmd.action(
             ...(opts.batchExpand ? { batchExpand: true } : {}),
             ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
             ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
-            ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {}),
+            ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {})
           };
 
           return { config, label: entry.description ?? `${entry.recipientUoi}-${entry.providerUsi}` };
@@ -589,7 +591,7 @@ ddCmd.action(
           authToken: opts.authToken,
           clientId: opts.clientId,
           clientSecret: opts.clientSecret,
-          tokenUrl: opts.tokenUrl,
+          tokenUrl: opts.tokenUrl
         });
 
         const config: DDConfig = {
@@ -604,8 +606,8 @@ ddCmd.action(
           ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
           ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
           options: {
-            ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {}),
-          },
+            ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {})
+          }
         };
 
         const result = await runWithProgress(config, `Data Dictionary ${ddVersion}`, renderMode);
@@ -621,7 +623,7 @@ ddCmd.action(
       console.error('Error:', error instanceof Error ? error.message : String(error));
       process.exitCode = 2;
     }
-  },
+  }
 );
 
 // ── Update Variations Subcommand (Admin) ──
@@ -663,7 +665,7 @@ program
 
         if ((opts.adminReview || opts.fastTrack) && !process.env.FT_ADMIN_SECRET) {
           console.error(
-            'Warning: admin-review / fast-track submissions need FT_ADMIN_SECRET in your .env to land; the service may reject them otherwise.',
+            'Warning: admin-review / fast-track submissions need FT_ADMIN_SECRET in your .env to land; the service may reject them otherwise.'
           );
         }
 
@@ -676,7 +678,7 @@ program
           overwrite: opts.overwrite,
           ...(bearerToken ? { bearerToken } : {}),
           ...(process.env.FT_ADMIN_SECRET ? { adminSecret: process.env.FT_ADMIN_SECRET } : {}),
-          ...(chunkSize ? { chunkSize } : {}),
+          ...(chunkSize ? { chunkSize } : {})
         });
 
         console.log(`Submitted ${result.submitted} suggestion(s) in ${result.chunks} chunk(s).`);
@@ -686,16 +688,14 @@ program
         }
         if (result.permissionDenied || result.validationFailed || result.corrections) {
           console.error(
-            `Not everything landed as submitted — permission-denied: ${result.permissionDenied}, ` +
-              `validation-failed: ${result.validationFailed}, corrections: ${result.corrections}. ` +
-              'Review before assuming the run was clean.',
+            `Not everything landed as submitted — permission-denied: ${result.permissionDenied}, validation-failed: ${result.validationFailed}, corrections: ${result.corrections}. Review before assuming the run was clean.`
           );
         }
       } catch (error) {
         console.error('Error:', error instanceof Error ? error.message : String(error));
         process.exitCode = 2;
       }
-    },
+    }
   );
 
 // ── Variations review (read side) ──
@@ -732,13 +732,13 @@ program
         ...(bearerToken ? { bearerToken } : {}),
         ...(opts.status ? { status: opts.status } : {}),
         ...(opts.elementType ? { elementType: opts.elementType as VariationReviewElementType } : {}),
-        ...(pageSize ? { limit: pageSize } : {}),
+        ...(pageSize ? { limit: pageSize } : {})
       });
       const duplicates = duplicateVariationKeys(items);
       if (duplicates.length > 0) {
         console.error(
           `Warning: the service returned ${duplicates.length} item(s) more than once across pages, with their provenance split ` +
-            `(${duplicates.join(', ')}). Rows are shown as served; a larger --page-size, or none, avoids the split.`,
+            `(${duplicates.join(', ')}). Rows are shown as served; a larger --page-size, or none, avoids the split.`
         );
       }
       if (opts.json) {
@@ -758,7 +758,10 @@ const ENDORSEMENT_REVIEW_STATUSES: ReadonlyArray<EndorsementReviewStatus> = ['no
 program
   .command('variations-review-status')
   .description('Show where each of your variations submissions stands (lifecycle and review status) — read-only')
-  .option('--review-status <status>', 'Admin: list every provider\'s submissions with this review status (none, in-review or resolved) instead of your own')
+  .option(
+    '--review-status <status>',
+    "Admin: list every provider's submissions with this review status (none, in-review or resolved) instead of your own"
+  )
   .option('--json', 'Print the rows exactly as the service returned them')
   .action(async (opts: { reviewStatus?: string; json?: boolean }) => {
     try {
@@ -785,9 +788,7 @@ program
 // reports so they can be loaded by tools that expect a DD 2.2-shaped
 // report (notably the Reference Server).
 
-const metadataReportCmd = program
-  .command('metadata-report')
-  .description('Utilities for working with metadata report JSON files');
+const metadataReportCmd = program.command('metadata-report').description('Utilities for working with metadata report JSON files');
 
 metadataReportCmd
   .command('adapt')
@@ -806,18 +807,14 @@ metadataReportCmd
       const parsed = JSON.parse(raw) as MetadataReport;
       const adapted = synthesizeResourcesFromFields(parsed);
 
-      const output = opts.pretty
-        ? JSON.stringify(adapted, null, 2)
-        : JSON.stringify(adapted);
+      const output = opts.pretty ? JSON.stringify(adapted, null, 2) : JSON.stringify(adapted);
 
       await writeFile(outPath, output, 'utf-8');
 
       const wasNoOp = adapted === parsed;
       const resourceCount = adapted.resources.length;
       const verb = wasNoOp ? 'passed through' : 'adapted';
-      console.error(
-        `${verb} ${inPath} → ${outPath} (${resourceCount} resources${wasNoOp ? ', already populated' : ', synthesized'})`
-      );
+      console.error(`${verb} ${inPath} → ${outPath} (${resourceCount} resources${wasNoOp ? ', already populated' : ', synthesized'})`);
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : String(error));
       process.exitCode = 2;
@@ -861,35 +858,48 @@ schemaCmd
   .requiredOption('-m, --metadata <file>', 'Metadata report JSON (metadata-report.json), or "-" for stdin')
   .requiredOption('-p, --payload <file>', 'Payload JSON — an OData collection { value: [...] } or a single record, or "-" for stdin')
   .option('-v, --version <version>', 'DD version for the schema context (e.g. 2.0)')
-  .option('-r, --resource <name>', 'Resource name when the payload carries no @reso.context (a present context names the resource); default Property')
+  .option(
+    '-r, --resource <name>',
+    'Resource name when the payload carries no @reso.context (a present context names the resource); default Property'
+  )
   .option('-s, --settings <file>', 'schema-validation-settings.json (else ./ then the pre-baked copy)')
   .option('-a, --additional-properties', 'Allow fields not present in the metadata (default: reject them)')
   .option('--output-dir <path>', 'Directory for the report (created if missing); "-" for stdout', '.')
-  .action(async (opts: { metadata: string; payload: string; version?: string; resource?: string; settings?: string; additionalProperties?: boolean; outputDir: string }) => {
-    try {
-      const validationConfig = await loadSettings(opts.settings);
-      const metadataReportJson = await readJsonInput(opts.metadata);
-      const jsonPayload = await readJsonInput(opts.payload);
-      const { totalErrors, report } = await validateSchemaPayload({
-        metadataReportJson,
-        jsonPayload,
-        resourceName: opts.resource,
-        version: opts.version, // normalized to the Data Dictionary form inside validateSchemaPayload
-        validationConfig,
-        additionalProperties: opts.additionalProperties,
-      });
-      const dest = await writeArtifact(opts.outputDir, 'schema-validation-report.json', report);
-      process.stderr.write(
-        totalErrors === 0
-          ? `PASS — 0 schema validation errors (report: ${dest})\n`
-          : `FAIL — ${totalErrors} schema validation error(s) (report: ${dest})\n`
-      );
-      process.exitCode = totalErrors > 0 ? 1 : 0;
-    } catch (err) {
-      process.stderr.write(`schema validate: ${err instanceof Error ? err.message : String(err)}\n`);
-      process.exitCode = 2;
+  .action(
+    async (opts: {
+      metadata: string;
+      payload: string;
+      version?: string;
+      resource?: string;
+      settings?: string;
+      additionalProperties?: boolean;
+      outputDir: string;
+    }) => {
+      try {
+        const validationConfig = await loadSettings(opts.settings);
+        const metadataReportJson = await readJsonInput(opts.metadata);
+        const jsonPayload = await readJsonInput(opts.payload);
+        const { totalErrors, report } = await validateSchemaPayload({
+          metadataReportJson,
+          jsonPayload,
+          resourceName: opts.resource,
+          version: opts.version, // normalized to the Data Dictionary form inside validateSchemaPayload
+          validationConfig,
+          additionalProperties: opts.additionalProperties
+        });
+        const dest = await writeArtifact(opts.outputDir, 'schema-validation-report.json', report);
+        process.stderr.write(
+          totalErrors === 0
+            ? `PASS — 0 schema validation errors (report: ${dest})\n`
+            : `FAIL — ${totalErrors} schema validation error(s) (report: ${dest})\n`
+        );
+        process.exitCode = totalErrors > 0 ? 1 : 0;
+      } catch (err) {
+        process.stderr.write(`schema validate: ${err instanceof Error ? err.message : String(err)}\n`);
+        process.exitCode = 2;
+      }
     }
-  });
+  );
 
 schemaCmd
   .command('generate')
@@ -930,7 +940,7 @@ program
         metadataXml,
         ddVersion: opts.version,
         odataVersion: opts.odataVersion as ODataVersion | undefined,
-        emitReport: opts.report,
+        emitReport: opts.report
       });
       process.stderr.write(`metadata: ${result.summary}\n`);
       for (const err of result.errors) process.stderr.write(`  - ${err}\n`);
@@ -938,7 +948,7 @@ program
         const dest = await writeArtifact(opts.outputDir, 'metadata-report.json', result.report);
         const { resources, fields, lookups } = result.report;
         process.stderr.write(
-          `metadata: report → ${dest} (${resources.length} resources, ${fields.length.toLocaleString()} fields, ${lookups.length.toLocaleString()} lookups)\n`,
+          `metadata: report → ${dest} (${resources.length} resources, ${fields.length.toLocaleString()} fields, ${lookups.length.toLocaleString()} lookups)\n`
         );
       }
       process.exitCode = result.passed ? 0 : 1;
@@ -1008,7 +1018,7 @@ program
           authToken: opts.authToken,
           clientId: opts.clientId,
           clientSecret: opts.clientSecret,
-          tokenUrl: opts.tokenUrl,
+          tokenUrl: opts.tokenUrl
         });
         const bearerToken = await resolveAuthToken(auth);
         const result = await runReplicate({
@@ -1034,18 +1044,18 @@ program
           onProgress: (info: Record<string, unknown>) => {
             const n = Number(info.totalRecordsFetched ?? 0);
             process.stderr.write(`replicate ${opts.strategy}: ${n.toLocaleString()} records\r`);
-          },
+          }
         });
         process.stderr.write(
           `\nreplicate: ${result.strategy} complete — ${result.stats.totalRecordsFetched.toLocaleString()} records, ` +
-            `${result.stats.totalRequests.toLocaleString()} requests → ${result.outputDir}\n`,
+            `${result.stats.totalRequests.toLocaleString()} requests → ${result.outputDir}\n`
         );
         process.exitCode = 0;
       } catch (err) {
         process.stderr.write(`\nreplicate: ${err instanceof Error ? err.message : String(err)}\n`);
         process.exitCode = 2;
       }
-    },
+    }
   );
 
 // ── Find Variations Subcommand (per-step util: DD variations review via the v2 Variations Service) ──
@@ -1063,9 +1073,7 @@ program
 
 /** Count non-empty variation categories in a service report, for the run summary. */
 const summarizeVariations = (report: VariationsServiceReport): { total: number; detail: string } => {
-  const counts = Object.entries(report.variations ?? {}).map(
-    ([key, value]) => [key, Array.isArray(value) ? value.length : 0] as const,
-  );
+  const counts = Object.entries(report.variations ?? {}).map(([key, value]) => [key, Array.isArray(value) ? value.length : 0] as const);
   const total = counts.reduce((sum, [, n]) => sum + n, 0);
   const detail = counts
     .filter(([, n]) => n > 0)
@@ -1127,8 +1135,8 @@ program
                 authToken: opts.authToken,
                 clientId: opts.clientId,
                 clientSecret: opts.clientSecret,
-                tokenUrl: opts.tokenUrl,
-              }),
+                tokenUrl: opts.tokenUrl
+              })
             );
             return fetchMetadataReportFromServer({ url, bearerToken, version });
           }
@@ -1151,7 +1159,7 @@ program
             version,
             fuzziness,
             fromCli: true,
-            ...(computeToken ? { bearerToken: computeToken } : {}),
+            ...(computeToken ? { bearerToken: computeToken } : {})
           });
           process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
         } else {
@@ -1161,13 +1169,13 @@ program
             fuzziness,
             fromCli: true,
             outputPath: resolve(opts.outputDir),
-            ...(computeToken ? { bearerToken: computeToken } : {}),
+            ...(computeToken ? { bearerToken: computeToken } : {})
           });
           const { total, detail } = summarizeVariations(report);
           process.stderr.write(
             total > 0
               ? `find-variations: ${total} variation(s) [${detail}] → ${resolve(opts.outputDir, VARIATIONS_REPORT_FILENAME)}\n`
-              : 'find-variations: no variations found\n',
+              : 'find-variations: no variations found\n'
           );
         }
         process.exitCode = 0;
@@ -1175,7 +1183,7 @@ program
         process.stderr.write(`find-variations: ${err instanceof Error ? err.message : String(err)}\n`);
         process.exitCode = 2;
       }
-    },
+    }
   );
 
 // ── RCF Subcommand (per-step util: RESO Common Format certification) ──
@@ -1191,8 +1199,14 @@ program
   .option('-v, --version <ver>', 'DD version (default: from the payload @reso.context, else 2.0)')
   .option('-f, --fuzziness <float>', `Variations fuzzy-match threshold (0–1, default ${DEFAULT_FUZZINESS})`, String(DEFAULT_FUZZINESS))
   .option('--output-dir <path>', 'Directory for the reports (created if missing)', '.')
-  .option('--schema-validate', 'Schema-validate each payload against the DD before inferring (RCF is taken as-is: local fields and values are accepted; a DD field must have the right type; length, precision and scale beyond the DD are warnings)')
-  .option('-a, --additional-properties', 'Accepted for compatibility: extension is always allowed on RCF (local fields and values), so this flag has no effect here')
+  .option(
+    '--schema-validate',
+    'Schema-validate each payload against the DD before inferring (RCF is taken as-is: local fields and values are accepted; a DD field must have the right type; length, precision and scale beyond the DD are warnings)'
+  )
+  .option(
+    '-a, --additional-properties',
+    'Accepted for compatibility: extension is always allowed on RCF (local fields and values), so this flag has no effect here'
+  )
   .option('--strict', 'Fail fast on the first schema-validation error (with --schema-validate)')
   .option('--no-variations', 'Skip the variations service call (infer + reports only)')
   .action(
@@ -1223,7 +1237,7 @@ program
           schemaValidate: opts.schemaValidate,
           generatedOn: new Date().toISOString(),
           runVariations: opts.variations,
-          ...(bearerToken ? { bearerToken } : {}),
+          ...(bearerToken ? { bearerToken } : {})
         });
 
         const dir = resolve(opts.outputDir);
@@ -1236,11 +1250,7 @@ program
 
         const s = result.stats;
         process.stderr.write(
-          `rcf: DD${result.version} — ${s.totalRecords.toLocaleString()} records → ${s.resources} resources, ` +
-            `${s.fields.toLocaleString()} fields, ${s.lookups.toLocaleString()} lookups` +
-            (opts.schemaValidate ? `; ${s.schemaErrors} schema error(s)` : '') +
-            (s.variationsTotal !== undefined ? `; ${s.variationsTotal} variation(s)` : '') +
-            ` → ${dir}\n`,
+          `rcf: DD${result.version} — ${s.totalRecords.toLocaleString()} records → ${s.resources} resources, ${s.fields.toLocaleString()} fields, ${s.lookups.toLocaleString()} lookups${opts.schemaValidate ? `; ${s.schemaErrors} schema error(s)` : ''}${s.variationsTotal !== undefined ? `; ${s.variationsTotal} variation(s)` : ''} → ${dir}\n`
         );
         if (result.variationsError) {
           process.stderr.write(`rcf: variations skipped — ${result.variationsError} (reports still written)\n`);
@@ -1250,8 +1260,9 @@ program
         }
         if (s.invalidContextFiles > 0) {
           process.stderr.write(
-            `rcf: ${s.invalidContextFiles} file(s) carry an unreadable @reso.context (${s.invalidContextRecords} record(s) not certified)` +
-              (opts.schemaValidate ? ' — counted among the schema errors above\n' : ' — run with --schema-validate to have them reported as schema errors\n'),
+            `rcf: ${s.invalidContextFiles} file(s) carry an unreadable @reso.context (${s.invalidContextRecords} record(s) not certified)${opts.schemaValidate
+                ? ' — counted among the schema errors above\n'
+                : ' — run with --schema-validate to have them reported as schema errors\n'}`
           );
         }
         // Zero-record (empty/unreadable) submissions and degraded variations runs must not read as a clean pass.
@@ -1261,7 +1272,7 @@ program
         process.stderr.write(`rcf: ${err instanceof Error ? err.message : String(err)}\n`);
         process.exitCode = schemaFailure ? 1 : 2;
       }
-    },
+    }
   );
 
 program.parse();

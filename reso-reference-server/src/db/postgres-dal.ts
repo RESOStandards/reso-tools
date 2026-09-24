@@ -6,8 +6,8 @@
  * multi-level $expand via recursive sub-query resolution.
  */
 
-import type pg from 'pg';
 import type { ExpandExpression } from '@reso-standards/odata-expression-parser';
+import type pg from 'pg';
 import type { ResoField } from '../metadata/types.js';
 import type {
   CollectionQueryOptions,
@@ -303,20 +303,12 @@ const resolveNestedExpand = async (
       const children = expanded[binding.name];
       if (!children) continue;
 
-      const childEntities = binding.isCollection
-        ? (children as ReadonlyArray<EntityRecord>)
-        : [children as EntityRecord];
+      const childEntities = binding.isCollection ? (children as ReadonlyArray<EntityRecord>) : [children as EntityRecord];
 
       if (childEntities.length === 0) continue;
 
       // For each child entity, resolve its nested expansions via sub-queries
-      const expandedChildren = await resolveChildExpand(
-        pool,
-        childCtx,
-        childEntities,
-        childBindings,
-        depth + 1
-      );
+      const expandedChildren = await resolveChildExpand(pool, childCtx, childEntities, childBindings, depth + 1);
 
       expanded[binding.name] = binding.isCollection ? expandedChildren : (expandedChildren[0] ?? null);
     }
@@ -432,9 +424,7 @@ const resolveChildExpand = async (
   });
 
   // Recurse for deeper levels before applying $select
-  const nestedBindings = expandBindings.filter(({ expandExpr }) =>
-    expandExpr.options.$expand && expandExpr.options.$expand.length > 0
-  );
+  const nestedBindings = expandBindings.filter(({ expandExpr }) => expandExpr.options.$expand && expandExpr.options.$expand.length > 0);
 
   if (nestedBindings.length > 0 && childCtx.resolveChildContext) {
     return applyExpandSelect(
@@ -469,9 +459,7 @@ export const createPostgresDal = (pool: pg.Pool): DataAccessLayer => {
     }
 
     // Resolve $expand bindings (before building SELECT so FK columns can be included)
-    const expandBindings = options?.$expand
-      ? resolveExpandBindings(options.$expand, ctx.navigationBindings)
-      : [];
+    const expandBindings = options?.$expand ? resolveExpandBindings(options.$expand, ctx.navigationBindings) : [];
 
     // Build SELECT columns for parent — include FK columns needed for $expand JOINs
     let expandSelect = options?.$select;
@@ -596,9 +584,7 @@ export const createPostgresDal = (pool: pg.Pool): DataAccessLayer => {
 
       // Resolve nested $expand (level 2+) before applying $select — nested
       // resolution may need FK columns that $select would strip.
-      const nestedBindings = expandBindings.filter(({ expandExpr }) =>
-        expandExpr.options.$expand && expandExpr.options.$expand.length > 0
-      );
+      const nestedBindings = expandBindings.filter(({ expandExpr }) => expandExpr.options.$expand && expandExpr.options.$expand.length > 0);
       if (nestedBindings.length > 0) {
         entities = await resolveNestedExpand(pool, entities, nestedBindings, ctx.resolveChildContext, 1);
       }

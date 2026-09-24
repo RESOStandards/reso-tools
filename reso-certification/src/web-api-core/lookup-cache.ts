@@ -45,9 +45,7 @@ interface CachedLookup {
 
 /** The three value forms present on a /Lookup row, as strings, null/undefined dropped. */
 const valueFormsOf = (row: Record<string, unknown>): ReadonlyArray<string> =>
-  [row[LOOKUP_VALUE_FIELD], row[STANDARD_LOOKUP_VALUE_FIELD], row[LEGACY_ODATA_VALUE_FIELD]]
-    .filter((v) => v != null)
-    .map((v) => String(v));
+  [row[LOOKUP_VALUE_FIELD], row[STANDARD_LOOKUP_VALUE_FIELD], row[LEGACY_ODATA_VALUE_FIELD]].filter(v => v != null).map(v => String(v));
 
 /**
  * Build a {@link LookupCache}. `deps.lookupNameFor` resolves a (resource, field) pair to the provider's
@@ -73,7 +71,7 @@ export const createLookupCache = (deps: {
     store.get(resolveName(resource, field))?.members.has(value) ?? false;
 
   const toStandard = (resource: string, field: string, value: string): string | undefined => {
-    const row = store.get(resolveName(resource, field))?.rows.find((r) => valueFormsOf(r).includes(value));
+    const row = store.get(resolveName(resource, field))?.rows.find(r => valueFormsOf(r).includes(value));
     const slv = row?.[STANDARD_LOOKUP_VALUE_FIELD];
     return slv != null ? String(slv) : undefined;
   };

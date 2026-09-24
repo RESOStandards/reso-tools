@@ -44,5 +44,4 @@ const keyifyResourceName = (resourceName: string): string => `${resourceName.tri
  * `isPrimaryKey` when the metadata carries it; this is the fallback for DD-reference generation,
  * where the DD does not encode keys.
  */
-export const getKeyFieldForResource = (resourceName: string): string =>
-  KEY_FIELD_MAP[resourceName] ?? keyifyResourceName(resourceName);
+export const getKeyFieldForResource = (resourceName: string): string => KEY_FIELD_MAP[resourceName] ?? keyifyResourceName(resourceName);

@@ -6,15 +6,8 @@
  * by reso-certification-utils for DD testing.
  */
 
-import { parseCsdlXml, getAllFields } from './csdl/parser.js';
-import type {
-  CsdlSchema,
-  CsdlEnumType,
-  CsdlEnumMember,
-  CsdlAction,
-  CsdlFunction,
-  FieldInfo,
-} from './csdl/types.js';
+import { getAllFields, parseCsdlXml } from './csdl/parser.js';
+import type { CsdlAction, CsdlEnumMember, CsdlEnumType, CsdlFunction, CsdlSchema, FieldInfo } from './csdl/types.js';
 
 // ── Output Types ──
 
@@ -132,11 +125,7 @@ export interface MetadataReport {
  *   - Collection(Edm.EnumType) for OData enum collections
  *   - Edm.EnumType with IsFlags = true
  */
-const detectEnumeration = (
-  field: FieldInfo,
-  enumTypeNames: ReadonlySet<string>,
-  isFlagsTypeNames: ReadonlySet<string>,
-): boolean => {
+const detectEnumeration = (field: FieldInfo, enumTypeNames: ReadonlySet<string>, isFlagsTypeNames: ReadonlySet<string>): boolean => {
   if (field.isExpansion) return false;
 
   const type = field.type;
@@ -151,7 +140,7 @@ const detectEnumeration = (
   if (isFlagsTypeNames.has(unwrapped)) return true;
 
   // String enum: Edm.String or Collection(Edm.String) with LookupName annotation
-  if ((unwrapped === 'Edm.String') && field.lookupName) return true;
+  if (unwrapped === 'Edm.String' && field.lookupName) return true;
 
   return false;
 };
@@ -160,7 +149,7 @@ const detectEnumeration = (
 const fieldInfoToReportField = (
   field: FieldInfo,
   enumTypeNames: ReadonlySet<string>,
-  isFlagsTypeNames: ReadonlySet<string>,
+  isFlagsTypeNames: ReadonlySet<string>
 ): MetadataReportField => {
   const isEnum = detectEnumeration(field, enumTypeNames, isFlagsTypeNames);
   // The field's enum type declares IsFlags="true" (carried for the DD field-type check; matches the
@@ -182,24 +171,18 @@ const fieldInfoToReportField = (
     ...(isEnum ? { isEnumeration: true } : {}),
     ...(isFlagsEnum ? { isFlags: true } : {}),
     ...(field.isPrimaryKey ? { isPrimaryKey: true } : {}),
-    annotations: field.annotations,
+    annotations: field.annotations
   };
 };
 
 /** Convert a CsdlEnumType member to a MetadataReportLookup. */
-const enumMemberToLookup = (
-  enumType: CsdlEnumType,
-  member: CsdlEnumMember,
-  namespace: string,
-): MetadataReportLookup => {
+const enumMemberToLookup = (enumType: CsdlEnumType, member: CsdlEnumMember, namespace: string): MetadataReportLookup => {
   const lookupName = `${namespace}.${enumType.name}`;
   const type = enumType.underlyingType ?? 'Edm.Int32';
 
   // Carry member annotations (e.g. StandardName) so the report keeps BOTH values: the legacy
   // OData value (lookupValue) and the standard display name (annotation).
-  const annotations = member.annotations
-    ? Object.entries(member.annotations).map(([term, value]) => ({ term, value }))
-    : [];
+  const annotations = member.annotations ? Object.entries(member.annotations).map(([term, value]) => ({ term, value })) : [];
 
   return {
     lookupName,
@@ -218,21 +201,17 @@ const enumMemberToLookup = (
  * @param version DD version (e.g., "2.0")
  * @returns MetadataReport matching server-metadata.json format
  */
-export const serializeMetadataReport = (
-  schema: CsdlSchema,
-  version: string,
-): MetadataReport => {
+export const serializeMetadataReport = (schema: CsdlSchema, version: string): MetadataReport => {
   if (!schema.entityContainer) {
     throw new Error(
       'Metadata is missing the required EntityContainer. ' +
-      'OData 4.01 requires a single EntityContainer per metadata document. ' +
-      'See https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_EntityContainer'
+        'OData 4.01 requires a single EntityContainer per metadata document. ' +
+        'See https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_EntityContainer'
     );
   }
 
   // Resources from entity container
-  const resources: ReadonlyArray<MetadataReportResource> =
-    schema.entityContainer.entitySets.map(es => ({ resourceName: es.name }));
+  const resources: ReadonlyArray<MetadataReportResource> = schema.entityContainer.entitySets.map(es => ({ resourceName: es.name }));
 
   // Build sets for enumeration detection, keyed by each enum's full FQDN. The enum's true
   // namespace (CsdlEnumType.namespace) is used so a field's type matches at the transport level —
@@ -262,9 +241,11 @@ export const serializeMetadataReport = (
     parameters: op.parameters.map(p => ({
       name: p.name,
       type: p.type,
-      ...(p.nullable != null ? { nullable: p.nullable } : {}),
+      ...(p.nullable != null ? { nullable: p.nullable } : {})
     })),
-    ...(op.returnType ? { returnType: { type: op.returnType.type, ...(op.returnType.nullable != null ? { nullable: op.returnType.nullable } : {}) } } : {}),
+    ...(op.returnType
+      ? { returnType: { type: op.returnType.type, ...(op.returnType.nullable != null ? { nullable: op.returnType.nullable } : {}) } }
+      : {})
   });
 
   const actions = schema.actions.map(serializeOperation);
@@ -278,7 +259,7 @@ export const serializeMetadataReport = (
     fields,
     lookups,
     actions,
-    functions,
+    functions
   };
 };
 
@@ -289,10 +270,7 @@ export const serializeMetadataReport = (
  * @param version DD version (e.g., "2.0")
  * @returns MetadataReport matching server-metadata.json format
  */
-export const generateMetadataReport = (
-  edmxXml: string,
-  version: string,
-): MetadataReport => {
+export const generateMetadataReport = (edmxXml: string, version: string): MetadataReport => {
   const schema = parseCsdlXml(edmxXml);
   return serializeMetadataReport(schema, version);
 };

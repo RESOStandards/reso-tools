@@ -25,8 +25,7 @@
 import type { MetadataReport, MetadataReportResource } from '@reso-standards/reso-metadata-utils';
 
 /** True if the report's `resources[]` is missing, undefined, or empty. */
-const needsSynthesis = (report: MetadataReport): boolean =>
-  !report.resources || report.resources.length === 0;
+const needsSynthesis = (report: MetadataReport): boolean => !report.resources || report.resources.length === 0;
 
 /**
  * Return a metadata report with a populated top-level `resources[]`
@@ -43,19 +42,15 @@ export const synthesizeResourcesFromFields = (report: MetadataReport): MetadataR
   // resourceName values (which would represent malformed fields) are
   // skipped rather than producing a `{ resourceName: '' }` entry.
   const distinctNames = Array.from(
-    new Set(
-      report.fields
-        .map(f => f.resourceName)
-        .filter((name): name is string => typeof name === 'string' && name.length > 0)
-    )
+    new Set(report.fields.map(f => f.resourceName).filter((name): name is string => typeof name === 'string' && name.length > 0))
   ).sort();
 
   const resources: ReadonlyArray<MetadataReportResource> = distinctNames.map(resourceName => ({
-    resourceName,
+    resourceName
   }));
 
   return {
     ...report,
-    resources,
+    resources
   };
 };

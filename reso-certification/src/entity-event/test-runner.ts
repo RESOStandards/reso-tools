@@ -365,7 +365,7 @@ const runIncrementalSync = async (
   authToken: string,
   highWaterMark: number,
   config: EntityEventConfig,
-  onProgress?: (message: string) => void,
+  onProgress?: (message: string) => void
 ): Promise<{ readonly result: ScenarioResult; readonly pollDurationMs: number; readonly newEvents: number }> => {
   const start = Date.now();
   const assertions: TestAssertion[] = [];
@@ -653,7 +653,7 @@ const runDeleteTriggersEvent = async (
  */
 export const runAllEntityEventScenarios = async (
   config: EntityEventConfig,
-  onProgress?: (message: string) => void,
+  onProgress?: (message: string) => void
 ): Promise<EntityEventTestReport> => {
   const authToken = await resolveAuthToken(config.auth);
 

@@ -6,13 +6,8 @@
  * - Per-scenario details with fields, enumerations, expansions, and failure info
  */
 
+import { type EnumerationDetail, extractEnumerations, extractExpansions, extractPayloadFields } from '../test-runner/payload-fields.js';
 import type { EntityType, ScenarioResult, TestReport } from '../test-runner/types.js';
-import {
-  extractPayloadFields,
-  extractEnumerations,
-  extractExpansions,
-  type EnumerationDetail,
-} from '../test-runner/payload-fields.js';
 
 // Re-export so existing consumers that imported EnumerationDetail from
 // this module continue to compile.

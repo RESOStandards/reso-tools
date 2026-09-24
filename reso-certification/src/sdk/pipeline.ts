@@ -6,7 +6,7 @@ import type {
   ProgressCallback,
   StepOutput,
   StepResult,
-  TestFunction,
+  TestFunction
 } from './types.js';
 
 /** No-op progress callback for callers that don't need progress updates. */
@@ -25,7 +25,7 @@ const executeStepFunctions = async <TContext extends PipelineContext>(
   functions: ReadonlyArray<TestFunction<TContext>>,
   mode: 'sequential' | 'parallel',
   context: Readonly<TContext>,
-  onProgress: ProgressCallback,
+  onProgress: ProgressCallback
 ): Promise<StepOutput<TContext>> => {
   if (functions.length === 0) {
     return { context: { ...context } as TContext };
@@ -37,28 +37,20 @@ const executeStepFunctions = async <TContext extends PipelineContext>(
 
   if (mode === 'parallel') {
     // TODO: respect step.concurrency limit
-    const results = await Promise.all(
-      functions.map(fn => fn(context, onProgress))
-    );
+    const results = await Promise.all(functions.map(fn => fn(context, onProgress)));
 
     // Merge outputs: contexts merge (last wins), summaries join, errors concat
-    const mergedContext = results.reduce(
-      (acc, r) => ({ ...acc, ...r.context }),
-      { ...context } as TContext,
-    );
+    const mergedContext = results.reduce((acc, r) => ({ ...acc, ...r.context }), { ...context } as TContext);
     const summaries = results.map(r => r.summary).filter(Boolean);
     const errors = results.flatMap(r => r.errors ?? []);
     const artifacts = results.flatMap(r => r.artifacts ?? []);
-    const counts = results.reduce(
-      (acc, r) => ({ ...acc, ...r.counts }),
-      {} as Record<string, number>,
-    );
+    const counts = results.reduce((acc, r) => ({ ...acc, ...r.counts }), {} as Record<string, number>);
     // Merge sub-status with the same precedence as the sequential runner: failed > incomplete > passed.
     const mergedStatus = results.some(r => r.status === 'failed')
-      ? 'failed' as const
+      ? ('failed' as const)
       : results.some(r => r.status === 'incomplete')
-        ? 'incomplete' as const
-        : 'passed' as const;
+        ? ('incomplete' as const)
+        : ('passed' as const);
 
     return {
       context: mergedContext,
@@ -66,7 +58,7 @@ const executeStepFunctions = async <TContext extends PipelineContext>(
       summary: summaries.join('; '),
       errors: errors.length > 0 ? errors : undefined,
       artifacts: artifacts.length > 0 ? artifacts : undefined,
-      counts: Object.keys(counts).length > 0 ? counts : undefined,
+      counts: Object.keys(counts).length > 0 ? counts : undefined
     };
   }
 
@@ -78,11 +70,11 @@ const executeStepFunctions = async <TContext extends PipelineContext>(
   const allArtifacts: Array<{ readonly label: string; readonly path: string }> = [];
   const allSummaries: string[] = [];
 
-  const wrappedFunctions = functions.map((fn) => async () => {
+  const wrappedFunctions = functions.map(fn => async () => {
     const output = await fn(currentContext, onProgress);
     // Emit sub-step completion with the function's summary as detail
     if (output.summary) {
-      onProgress({ step: `sub:done`, status: output.status ?? 'passed', message: output.summary });
+      onProgress({ step: 'sub:done', status: output.status ?? 'passed', message: output.summary });
     }
     return output;
   });
@@ -103,7 +95,7 @@ const executeStepFunctions = async <TContext extends PipelineContext>(
         summary: allSummaries.join('; '),
         errors: allErrors.length > 0 ? allErrors : undefined,
         artifacts: allArtifacts.length > 0 ? allArtifacts : undefined,
-        counts: lastOutput.counts,
+        counts: lastOutput.counts
       };
     }
   }
@@ -115,20 +107,17 @@ const executeStepFunctions = async <TContext extends PipelineContext>(
     errors: allErrors.length > 0 ? allErrors : undefined,
     artifacts: allArtifacts.length > 0 ? allArtifacts : undefined,
     counts: lastOutput.counts,
-    params: lastOutput.params,
+    params: lastOutput.params
   };
 };
 
 /** Create a pipeline from an ordered list of steps and execute it. */
-export const createPipeline = <TContext extends PipelineContext>(
-  endorsement: string,
-  steps: ReadonlyArray<PipelineStep<TContext>>,
-) => ({
+export const createPipeline = <TContext extends PipelineContext>(endorsement: string, steps: ReadonlyArray<PipelineStep<TContext>>) => ({
   /** Run all steps in sequence, accumulating context and emitting progress. */
   run: async (
     initialContext: TContext,
     onProgress: ProgressCallback = noopProgress,
-    options: PipelineOptions = {},
+    options: PipelineOptions = {}
   ): Promise<PipelineResult<TContext>> => {
     const { failFast = true } = options;
     const startTime = Date.now();
@@ -144,8 +133,7 @@ export const createPipeline = <TContext extends PipelineContext>(
 
       try {
         // Resolve test functions: use `functions` array if provided, fall back to `run`
-        const functions: ReadonlyArray<TestFunction<TContext>> =
-          step.functions ?? (step.run ? [step.run] : []);
+        const functions: ReadonlyArray<TestFunction<TContext>> = step.functions ?? (step.run ? [step.run] : []);
         const mode = step.mode ?? 'sequential';
 
         const output = await executeStepFunctions(functions, mode, context as Readonly<TContext>, onProgress);
@@ -162,7 +150,7 @@ export const createPipeline = <TContext extends PipelineContext>(
           artifacts: output.artifacts,
           counts: output.counts,
           errors: output.errors,
-          requestDetails: output.requestDetails,
+          requestDetails: output.requestDetails
         };
 
         stepResults.push(result);
@@ -173,7 +161,7 @@ export const createPipeline = <TContext extends PipelineContext>(
           status,
           duration,
           message: output.summary,
-          artifacts: output.artifacts,
+          artifacts: output.artifacts
         });
 
         if (status === 'failed') {
@@ -188,7 +176,9 @@ export const createPipeline = <TContext extends PipelineContext>(
         const duration = Date.now() - stepStart;
         const errorMessage = err instanceof Error ? err.message : String(err);
         const errDetail = (err as Record<string, unknown>)?.requestDetails as Record<string, unknown> | undefined;
-        const requestDetails = errDetail ? [errDetail as { method: string; url: string; status?: number; error?: string; responseBody?: string }] : undefined;
+        const requestDetails = errDetail
+          ? [errDetail as { method: string; url: string; status?: number; error?: string; responseBody?: string }]
+          : undefined;
 
         stepResults.push({
           name: step.name,
@@ -196,14 +186,14 @@ export const createPipeline = <TContext extends PipelineContext>(
           status: 'failed',
           duration,
           errors: [errorMessage],
-          requestDetails,
+          requestDetails
         });
 
         onProgress({
           step: step.name,
           status: 'failed',
           duration,
-          message: errorMessage,
+          message: errorMessage
         });
 
         pipelineStatus = 'failed';
@@ -225,8 +215,7 @@ export const createPipeline = <TContext extends PipelineContext>(
       const stepStart = Date.now();
       onProgress({ step: step.name, status: 'running' });
       try {
-        const functions: ReadonlyArray<TestFunction<TContext>> =
-          step.functions ?? (step.run ? [step.run] : []);
+        const functions: ReadonlyArray<TestFunction<TContext>> = step.functions ?? (step.run ? [step.run] : []);
         const mode = step.mode ?? 'sequential';
         const output = await executeStepFunctions(functions, mode, context as Readonly<TContext>, onProgress);
         const duration = Date.now() - stepStart;
@@ -241,7 +230,7 @@ export const createPipeline = <TContext extends PipelineContext>(
           artifacts: output.artifacts,
           counts: output.counts,
           errors: output.errors,
-          requestDetails: output.requestDetails,
+          requestDetails: output.requestDetails
         };
         stepResults.push(result);
         context = { ...output.context, pipelineSteps: [...stepResults] };
@@ -250,7 +239,7 @@ export const createPipeline = <TContext extends PipelineContext>(
           status,
           duration,
           message: output.summary,
-          artifacts: output.artifacts,
+          artifacts: output.artifacts
         });
       } catch (err) {
         const duration = Date.now() - stepStart;
@@ -263,7 +252,7 @@ export const createPipeline = <TContext extends PipelineContext>(
           endorsement,
           status: 'failed',
           duration,
-          errors: [errorMessage],
+          errors: [errorMessage]
         });
         onProgress({ step: step.name, status: 'failed', duration, message: errorMessage });
       }
@@ -277,7 +266,7 @@ export const createPipeline = <TContext extends PipelineContext>(
           name: step.name,
           endorsement,
           status: 'skipped',
-          duration: 0,
+          duration: 0
         });
         onProgress({ step: step.name, status: 'skipped' });
       }
@@ -299,7 +288,7 @@ export const createPipeline = <TContext extends PipelineContext>(
       endorsement,
       steps: orderedStepResults,
       context,
-      duration: Date.now() - startTime,
+      duration: Date.now() - startTime
     };
-  },
+  }
 });

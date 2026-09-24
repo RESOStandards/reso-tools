@@ -14,7 +14,7 @@ export {
   type UpdateVariationsViaServiceInput,
   type UpdateVariationsResult,
   type VariationsServiceReport,
-  type VariationsServiceErrorCode,
+  type VariationsServiceErrorCode
 } from './service.js';
 
 export {
@@ -28,7 +28,7 @@ export {
   type VariationReviewItem,
   type VariationReviewProvenance,
   type VariationReviewElementType,
-  type EndorsementStatusRow,
+  type EndorsementStatusRow
 } from './review.js';
 export { findVariations, type FindVariationsInput } from './find-variations.js';
 

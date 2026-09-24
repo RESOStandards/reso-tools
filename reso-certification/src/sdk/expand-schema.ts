@@ -136,9 +136,7 @@ const asRecord = (v: unknown): Record<string, unknown> | undefined =>
 export const errorMessagesFromCache = (errorCache: Record<string, unknown> | undefined): ReadonlyArray<string> =>
   Object.entries(errorCache ?? {}).map(([message, entry]) => {
     const resources = asRecord(asRecord(entry)?.resources);
-    const fields = resources
-      ? [...new Set(Object.values(resources).flatMap((r) => Object.keys(asRecord(asRecord(r)?.fields) ?? {})))]
-      : [];
+    const fields = resources ? [...new Set(Object.values(resources).flatMap(r => Object.keys(asRecord(asRecord(r)?.fields) ?? {})))] : [];
     return fields.length > 0 ? `${message} (field${fields.length === 1 ? '' : 's'}: ${fields.join(', ')})` : message;
   });
 
@@ -153,7 +151,7 @@ export const isEnumerationIgnored = (
   config: Readonly<Record<string, unknown>>,
   version: string,
   resource: string,
-  field: string,
+  field: string
 ): boolean => {
   const ddVersion = toDataDictionaryVersion(version);
   const fieldNode = asRecord(asRecord(asRecord(config[ddVersion])?.[resource])?.[field]);
@@ -183,7 +181,7 @@ const unwrapCollectionElementTypes = (report: MetadataReport): MetadataReport =>
       if (match) return { ...field, type: match[1] };
     }
     return field;
-  }),
+  })
 });
 
 export interface CreateExpandSchemaValidatorInput {
@@ -220,7 +218,7 @@ const buildExpandSchema = async (
   mod: LegacySchemaModule,
   report: MetadataReport,
   ddVersion: string,
-  validationConfig: unknown,
+  validationConfig: unknown
 ): Promise<BuiltSchema | undefined> => {
   try {
     const normalized = unwrapCollectionElementTypes(report);
@@ -237,10 +235,18 @@ const buildExpandSchema = async (
     // reach is caught per item instead, and because validate() restores the shared schema on every exit, it
     // leaves nothing behind for the next resource.
     const undeterminable = new Set<string>();
-    const resources = [...new Set(normalized.fields.map((field) => field.resourceName))];
+    const resources = [...new Set(normalized.fields.map(field => field.resourceName))];
     for (const resourceName of resources) {
       try {
-        mod.validate({ jsonSchema, jsonPayload: {}, resourceName, version: ddVersion, validationConfig, errorMap: {}, acquisition: 'transport' });
+        mod.validate({
+          jsonSchema,
+          jsonPayload: {},
+          resourceName,
+          version: ddVersion,
+          validationConfig,
+          errorMap: {},
+          acquisition: 'transport'
+        });
         return { jsonSchema, undeterminable };
       } catch {
         undeterminable.add(resourceName);
@@ -261,9 +267,7 @@ const buildExpandSchema = async (
  * failure is surfaced as `undefined` rather than swallowed — the gate never silently passes an item it could
  * not actually validate.
  */
-export const createExpandSchemaValidator = async (
-  input: CreateExpandSchemaValidatorInput,
-): Promise<ExpandItemValidator | undefined> => {
+export const createExpandSchemaValidator = async (input: CreateExpandSchemaValidatorInput): Promise<ExpandItemValidator | undefined> => {
   const mod = await loadLegacySchemaModule();
   const ddVersion = toDataDictionaryVersion(input.version);
   const validationConfig = input.validationConfig ?? (await loadValidationConfig());
@@ -296,7 +300,7 @@ export const createExpandSchemaValidator = async (
           // an $expand child item is transport-acquired (#298): DD/Core rules, never the advisory RCF mode; it is
           // embedded in the page, so an absent context on the item itself is never a finding (even from DD 3.0)
           acquisition: 'transport',
-          embedded: true,
+          embedded: true
         }) as LegacyValidateResult;
         const totalErrors = result.stats?.totalErrors ?? 0;
         // A payload-level failure (recorded outside the tally) means the item was not evaluated: indeterminate,
@@ -304,7 +308,12 @@ export const createExpandSchemaValidator = async (
         // today, since such a failure fails the warm-up, and guarded here so it stays closed).
         const payloadErrors = Object.keys(result.payloadErrors ?? {});
         if (payloadErrors.length > 0) {
-          return { valid: false, indeterminate: true, errors: [], reason: `validator recorded a payload error for a ${targetType} item: ${payloadErrors.join(', ')}` };
+          return {
+            valid: false,
+            indeterminate: true,
+            errors: [],
+            reason: `validator recorded a payload error for a ${targetType} item: ${payloadErrors.join(', ')}`
+          };
         }
         // Field-qualified messages so a schema-invalid expanded item names the offending field(s) — the
         // errorCache already carries them; the old Object.keys(errorCache) surfaced only the generic rule.
@@ -321,6 +330,6 @@ export const createExpandSchemaValidator = async (
         const message = err instanceof Error ? err.message : String(err);
         return { valid: false, indeterminate: true, errors: [], reason: `validator could not evaluate a ${targetType} item: ${message}` };
       }
-    },
+    }
   };
 };

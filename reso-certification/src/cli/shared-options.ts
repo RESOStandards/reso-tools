@@ -34,10 +34,7 @@ export const addAuthOptions = (cmd: Command, context?: string): Command =>
  * parameter; the `-u` alias and the base wording do not vary. `context` adds a
  * command-specific hint (e.g. `'(no resource name or query)'`).
  */
-export const addServerUrlOption = (
-  cmd: Command,
-  opts: { readonly required?: boolean; readonly context?: string } = {},
-): Command => {
+export const addServerUrlOption = (cmd: Command, opts: { readonly required?: boolean; readonly context?: string } = {}): Command => {
   const flags = '-u, --url <url>';
   const description = `OData service root URL${suffix(opts.context)}`;
   return opts.required ? cmd.requiredOption(flags, description) : cmd.option(flags, description);
@@ -59,7 +56,5 @@ export const addOutputOptions = (cmd: Command): Command =>
  * the report-generating steps (schema, metadata, rcf, variations) write a
  * single artifact and do not take `--verbose`/`--output`.
  */
-export const addReportDirOption = (
-  cmd: Command,
-  description = 'Directory for the report (created if missing); "-" for stdout',
-): Command => cmd.option('--output-dir <path>', description, '.');
+export const addReportDirOption = (cmd: Command, description = 'Directory for the report (created if missing); "-" for stdout'): Command =>
+  cmd.option('--output-dir <path>', description, '.');

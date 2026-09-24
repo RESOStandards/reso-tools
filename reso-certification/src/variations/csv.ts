@@ -42,7 +42,7 @@ const COLUMNS: ReadonlyArray<{ readonly header: string; readonly field: keyof Va
   { header: 'Suggested Related Resource Name', field: 'suggestedRelatedResourceName' },
   { header: 'Suggested Related Field Name', field: 'suggestedRelatedFieldName' },
   { header: 'Suggested Related Lookup Value', field: 'suggestedRelatedLookupValue' },
-  { header: 'Outcome', field: 'outcome' },
+  { header: 'Outcome', field: 'outcome' }
 ];
 
 export interface ParsedVariationsCsv {
@@ -122,9 +122,9 @@ export const parseVariationsCsv = (csvData: string): ParsedVariationsCsv => {
   const [headerRow, ...dataRows] = rows;
   const recognized: string[] = [];
   const skipped: string[] = [];
-  const fieldByIndex: ReadonlyArray<keyof VariationSuggestionItem | undefined> = headerRow.map((cell) => {
+  const fieldByIndex: ReadonlyArray<keyof VariationSuggestionItem | undefined> = headerRow.map(cell => {
     const name = cell.trim();
-    const column = COLUMNS.find((c) => c.header.toLowerCase() === name.toLowerCase());
+    const column = COLUMNS.find(c => c.header.toLowerCase() === name.toLowerCase());
     if (column) {
       recognized.push(column.header);
       return column.field;
@@ -135,10 +135,7 @@ export const parseVariationsCsv = (csvData: string): ParsedVariationsCsv => {
 
   if (!recognized.includes('Resource Name')) {
     throw new Error(
-      `Variations CSV must include a "Resource Name" column. ` +
-        `Recognized: [${recognized.join(', ')}]` +
-        (skipped.length ? `; unrecognized: [${skipped.join(', ')}]` : '') +
-        '.',
+      `Variations CSV must include a "Resource Name" column. Recognized: [${recognized.join(', ')}]${skipped.length ? `; unrecognized: [${skipped.join(', ')}]` : ''}.`
     );
   }
 
@@ -146,10 +143,10 @@ export const parseVariationsCsv = (csvData: string): ParsedVariationsCsv => {
     // +2: the header is row 1, and dataRows are 0-indexed. Computed from the
     // original position so blank-row skipping never drifts the reported number.
     const rowNumber = index + 2;
-    if (cells.every((value) => value.trim() === '')) return [];
+    if (cells.every(value => value.trim() === '')) return [];
     if (cells.length > headerRow.length) {
       throw new Error(
-        `Variations CSV row ${rowNumber} has ${cells.length} columns but the header has ${headerRow.length} — check for an unquoted comma.`,
+        `Variations CSV row ${rowNumber} has ${cells.length} columns but the header has ${headerRow.length} — check for an unquoted comma.`
       );
     }
     const item = fieldByIndex.reduce<Partial<VariationSuggestionItem>>((acc, field, i) => {
@@ -161,7 +158,7 @@ export const parseVariationsCsv = (csvData: string): ParsedVariationsCsv => {
     }
     if (!item.outcome && !item.suggestedResourceName) {
       throw new Error(
-        `Variations CSV row ${rowNumber} has neither a suggestion (Suggested Resource Name) nor an Outcome — it would do nothing.`,
+        `Variations CSV row ${rowNumber} has neither a suggestion (Suggested Resource Name) nor an Outcome — it would do nothing.`
       );
     }
     return [item];

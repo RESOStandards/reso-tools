@@ -34,8 +34,8 @@ export interface ServerConfig {
 /** Reads configuration from environment variables, with optional programmatic overrides. */
 export const loadConfig = (overrides?: Partial<ServerConfig>): ServerConfig => {
   const port = overrides?.port ?? Number(process.env.PORT ?? 8080);
-  const dbBackend = overrides?.dbBackend ?? (process.env.DB_BACKEND ?? 'postgres') as DbBackend;
-  const enumMode = overrides?.enumMode ?? (process.env.ENUM_MODE ?? 'string') as EnumMode;
+  const dbBackend = overrides?.dbBackend ?? ((process.env.DB_BACKEND ?? 'postgres') as DbBackend);
+  const enumMode = overrides?.enumMode ?? ((process.env.ENUM_MODE ?? 'string') as EnumMode);
   const databaseUrl = overrides?.databaseUrl ?? process.env.DATABASE_URL ?? 'postgresql://reso:reso@localhost:5432/reso_reference';
   const mongodbUrl = overrides?.mongodbUrl ?? process.env.MONGODB_URL ?? 'mongodb://localhost:27017/reso_reference';
   const sqliteDbPath = overrides?.sqliteDbPath ?? process.env.SQLITE_DB_PATH ?? resolve(import.meta.dirname, '../reso_reference.db');
@@ -48,9 +48,7 @@ export const loadConfig = (overrides?: Partial<ServerConfig>): ServerConfig => {
   const entityEventResourceRecordUrl = overrides?.entityEventResourceRecordUrl ?? process.env.ENTITY_EVENT_RESOURCE_RECORD_URL === 'true';
   const compactionIntervalMs = overrides?.compactionIntervalMs ?? Number(process.env.COMPACTION_INTERVAL_MS ?? 3600000);
   // Default serverRoot: when running from dist/, resolve to src/ where asset files live
-  const defaultRoot = import.meta.dirname.endsWith('/dist')
-    ? resolve(import.meta.dirname, '../src')
-    : import.meta.dirname;
+  const defaultRoot = import.meta.dirname.endsWith('/dist') ? resolve(import.meta.dirname, '../src') : import.meta.dirname;
   const serverRoot = overrides?.serverRoot ?? defaultRoot;
 
   if (dbBackend !== 'postgres' && dbBackend !== 'mongodb' && dbBackend !== 'sqlite') {

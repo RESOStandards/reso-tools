@@ -57,22 +57,17 @@ const unwrap = (type: string): string => (isCollection(type) ? type.slice('Colle
 /** OData string literal: wrap in single quotes, doubling any embedded single quote. */
 const odataString = (value: string): string => `'${value.replace(/'/g, "''")}'`;
 
-const asArray = (value: string | ReadonlyArray<string>): ReadonlyArray<string> =>
-  typeof value === 'string' ? [value] : value;
+const asArray = (value: string | ReadonlyArray<string>): ReadonlyArray<string> => (typeof value === 'string' ? [value] : value);
 
 const CANONICAL_OP: Record<EnumRepresentation, EnumFilterOp> = {
   SINGLE_STRING: 'eq',
   SINGLE_ENUM: 'eq',
   COLLECTION_STRING: 'any',
   COLLECTION_ENUM: 'any',
-  FLAGS_ENUM: 'has',
+  FLAGS_ENUM: 'has'
 };
 
-const buildEnumFilter = (
-  field: string,
-  value: string | ReadonlyArray<string>,
-  op: EnumFilterOp,
-): string => {
+const buildEnumFilter = (field: string, value: string | ReadonlyArray<string>, op: EnumFilterOp): string => {
   const values = asArray(value);
   // An empty value set has no valid OData filter form (`F in ()` is invalid grammar; `F has`/`any`
   // of nothing is an empty clause that a server may 400 on or silently treat as unconstrained). Fail
@@ -90,19 +85,15 @@ const buildEnumFilter = (
     case 'in':
       return `${field} in (${values.map(odataString).join(',')})`;
     case 'has':
-      return values.map((v) => `${field} has ${odataString(v)}`).join(' and ');
+      return values.map(v => `${field} has ${odataString(v)}`).join(' and ');
     case 'any':
-      return values.map((v) => `${field}/any(x:x eq ${odataString(v)})`).join(' and ');
+      return values.map(v => `${field}/any(x:x eq ${odataString(v)})`).join(' and ');
     case 'all':
-      return values.map((v) => `${field}/all(x:x eq ${odataString(v)})`).join(' and ');
+      return values.map(v => `${field}/all(x:x eq ${odataString(v)})`).join(' and ');
   }
 };
 
-const decodeEnumValue = (
-  representation: EnumRepresentation,
-  enumType: CsdlEnumType | undefined,
-  raw: unknown,
-): ReadonlyArray<string> => {
+const decodeEnumValue = (representation: EnumRepresentation, enumType: CsdlEnumType | undefined, raw: unknown): ReadonlyArray<string> => {
   if (raw === null || raw === undefined) return [];
   switch (representation) {
     case 'COLLECTION_STRING':
@@ -111,9 +102,12 @@ const decodeEnumValue = (
       // coerce a non-string element into a phantom member). Tolerate a comma-string, which some
       // servers serialize instead of an array.
       return Array.isArray(raw)
-        ? raw.filter((el): el is string => typeof el === 'string' && el.trim().length > 0).map((el) => el.trim())
+        ? raw.filter((el): el is string => typeof el === 'string' && el.trim().length > 0).map(el => el.trim())
         : typeof raw === 'string'
-          ? raw.split(',').map((t) => t.trim()).filter((t) => t.length > 0)
+          ? raw
+              .split(',')
+              .map(t => t.trim())
+              .filter(t => t.length > 0)
           : [];
     case 'FLAGS_ENUM':
       // comma-joined names or an integer bitmask — the shared decoder handles both. A non-string,
@@ -122,7 +116,10 @@ const decodeEnumValue = (
       return enumType !== undefined
         ? decodeFlagsValue(enumType, raw)
         : typeof raw === 'string'
-          ? raw.split(',').map((t) => t.trim()).filter((t) => t.length > 0)
+          ? raw
+              .split(',')
+              .map(t => t.trim())
+              .filter(t => t.length > 0)
           : [];
     case 'SINGLE_STRING':
     case 'SINGLE_ENUM': {
@@ -134,10 +131,7 @@ const decodeEnumValue = (
   }
 };
 
-const encodeEnumValue = (
-  representation: EnumRepresentation,
-  members: ReadonlyArray<string>,
-): string | ReadonlyArray<string> => {
+const encodeEnumValue = (representation: EnumRepresentation, members: ReadonlyArray<string>): string | ReadonlyArray<string> => {
   switch (representation) {
     case 'COLLECTION_STRING':
     case 'COLLECTION_ENUM':
@@ -152,19 +146,15 @@ const encodeEnumValue = (
   }
 };
 
-const makeEnumField = (
-  fieldName: string,
-  representation: EnumRepresentation,
-  enumType: CsdlEnumType | undefined,
-): EnumField => ({
+const makeEnumField = (fieldName: string, representation: EnumRepresentation, enumType: CsdlEnumType | undefined): EnumField => ({
   fieldName,
   representation,
   isMultiValued: representation !== 'SINGLE_STRING' && representation !== 'SINGLE_ENUM',
   ...(enumType !== undefined && { enumType }),
   defaultOp: CANONICAL_OP[representation],
   buildFilter: (value, op) => buildEnumFilter(fieldName, value, op ?? CANONICAL_OP[representation]),
-  decodeValue: (raw) => decodeEnumValue(representation, enumType, raw),
-  encodeValue: (members) => encodeEnumValue(representation, members),
+  decodeValue: raw => decodeEnumValue(representation, enumType, raw),
+  encodeValue: members => encodeEnumValue(representation, members)
 });
 
 /**
@@ -187,12 +177,8 @@ export const resolveEnum = (field: EnumFieldInput, schema: Pick<CsdlSchema, 'enu
   // Enum-typed lookups: the unwrapped type resolves to a CSDL enum type. Only `enumTypes` is needed, so
   // the param is widened to `Pick<CsdlSchema, 'enumTypes'>` — a full schema or the cert tool's
   // ParsedMetadata (which carries enumTypes) both satisfy it, with no fabricated schema at the call site.
-  const enumType = schema.enumTypes.find((et) => et.name === extractTypeName(field.type));
+  const enumType = schema.enumTypes.find(et => et.name === extractTypeName(field.type));
   if (enumType === undefined) return null;
-  const representation: EnumRepresentation = collection
-    ? 'COLLECTION_ENUM'
-    : enumType.isFlags
-      ? 'FLAGS_ENUM'
-      : 'SINGLE_ENUM';
+  const representation: EnumRepresentation = collection ? 'COLLECTION_ENUM' : enumType.isFlags ? 'FLAGS_ENUM' : 'SINGLE_ENUM';
   return makeEnumField(field.name, representation, enumType);
 };

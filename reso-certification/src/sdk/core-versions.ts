@@ -25,8 +25,7 @@ export const isCoreVersion = (version: string): version is CoreVersion =>
 
 /** Split a dotted version into numeric segments; a missing or non-numeric segment reads as 0. Tolerates both
  *  two-part (`2.1`) and three-part (`2.1.0`) input so a comparison never hinges on the exact string shape. */
-const versionSegments = (version: string): ReadonlyArray<number> =>
-  version.split('.').map((segment) => Number.parseInt(segment, 10) || 0);
+const versionSegments = (version: string): ReadonlyArray<number> => version.split('.').map(segment => Number.parseInt(segment, 10) || 0);
 
 /** `true` when `version` is greater than or equal to `target` by numeric segment comparison. Shape-tolerant:
  *  `coreVersionGte('2.1', '2.1.0')` is `true`. This is the ONE comparator every version-gated branch routes
@@ -36,9 +35,7 @@ export const coreVersionGte = (version: string, target: string): boolean => {
   const actual = versionSegments(version);
   const required = versionSegments(target);
   const width = Math.max(actual.length, required.length);
-  const firstDifference = Array.from({ length: width }, (_, i) => (actual[i] ?? 0) - (required[i] ?? 0)).find(
-    (delta) => delta !== 0,
-  );
+  const firstDifference = Array.from({ length: width }, (_, i) => (actual[i] ?? 0) - (required[i] ?? 0)).find(delta => delta !== 0);
   return (firstDifference ?? 0) >= 0;
 };
 
@@ -58,7 +55,7 @@ export const isCore21OrLater = (version: string): boolean => coreVersionGte(vers
 export const coerceCoreVersion = (version: string | undefined): CoreVersion => {
   if (version && isCoreVersion(version)) return version;
   const [major, minor] = (version ?? '').split('.');
-  const match = SUPPORTED_CORE_VERSIONS.find((candidate) => {
+  const match = SUPPORTED_CORE_VERSIONS.find(candidate => {
     const [candidateMajor, candidateMinor] = candidate.split('.');
     return candidateMajor === major && candidateMinor === minor;
   });

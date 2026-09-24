@@ -7,12 +7,12 @@
  * pure over its inputs so it can be unit-tested without a process.
  */
 
-import { normalizeDDVersion } from '../sdk/dd-versions.js';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { normalizeDDVersion } from '../sdk/dd-versions.js';
 
 const requireLegacy = createRequire(import.meta.url);
 
@@ -98,7 +98,7 @@ export const validateSchemaPayload = async (opts: {
   const mod = loadSchemaModule();
   const jsonSchema = await mod.generateJsonSchema({
     metadataReportJson: opts.metadataReportJson,
-    additionalProperties: opts.additionalProperties ?? false,
+    additionalProperties: opts.additionalProperties ?? false
   });
   // A single generated schema (not a version Map), so `isResoDataDictionarySchema` stays false (validate's default).
   const errorMap = mod.validate({
@@ -108,7 +108,7 @@ export const validateSchemaPayload = async (opts: {
     // the exemptions in validationConfig are keyed by the Data Dictionary form (2.1, never 2.1.0)
     version: opts.version === undefined ? undefined : normalizeDDVersion(opts.version),
     validationConfig: opts.validationConfig ?? {},
-    errorMap: {},
+    errorMap: {}
   });
   const combined = mod.combineErrors(errorMap);
   return { totalErrors: combined.totalErrors ?? 0, report: combined };
@@ -121,7 +121,7 @@ export const generateSchemaFromReport = async (opts: {
 }): Promise<unknown> =>
   loadSchemaModule().generateJsonSchema({
     metadataReportJson: opts.metadataReportJson,
-    additionalProperties: opts.additionalProperties ?? false,
+    additionalProperties: opts.additionalProperties ?? false
   });
 
 export interface DdSchemaValidator {
@@ -130,7 +130,7 @@ export interface DdSchemaValidator {
     jsonPayload: unknown,
     resourceName?: string,
     version?: string,
-    errorMap?: Record<string, unknown>,
+    errorMap?: Record<string, unknown>
   ) => Record<string, unknown>;
   /** Total + combine an accumulated error map into a report. */
   readonly combine: (errorMap: Record<string, unknown>) => { readonly totalErrors: number; readonly report: Record<string, unknown> };
@@ -157,16 +157,24 @@ export const createDdSchemaValidator = async (opts: {
   const mod = loadSchemaModule();
   const jsonSchema = await mod.generateJsonSchema({
     metadataReportJson: opts.metadataReportJson,
-    additionalProperties: opts.additionalProperties ?? false,
+    additionalProperties: opts.additionalProperties ?? false
   });
   return {
     validate: (jsonPayload, resourceName, version, errorMap = {}) =>
-      mod.validate({ jsonSchema, jsonPayload, resourceName, version, validationConfig: opts.validationConfig ?? {}, errorMap, ...(opts.acquisition ? { acquisition: opts.acquisition } : {}) }),
+      mod.validate({
+        jsonSchema,
+        jsonPayload,
+        resourceName,
+        version,
+        validationConfig: opts.validationConfig ?? {},
+        errorMap,
+        ...(opts.acquisition ? { acquisition: opts.acquisition } : {})
+      }),
     combine: errorMap => {
       // Every validate() exit now returns its caches; the default keeps `combine` total on an untouched
       // accumulator (a stream that validated nothing) without dereferencing `stats` on undefined.
       const combined = mod.combineErrors({ stats: { totalErrors: 0, totalWarnings: 0 }, ...errorMap });
       return { totalErrors: combined.totalErrors ?? 0, report: combined };
-    },
+    }
   };
 };

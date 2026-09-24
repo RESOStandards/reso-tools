@@ -1,8 +1,33 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.0/schema.json",
   "files": {
-    "include": ["tools/**/*.ts", "tools/**/*.tsx"],
-    "ignore": ["**/node_modules", "**/dist", "**/*.d.ts", "**/*.example.ts"]
+    "include": [
+      "odata-expression-parser/src/**/*.ts",
+      "odata-expression-parser/src/**/*.tsx",
+      "odata-expression-parser/src/**/*.js",
+      "reso-certification/src/**/*.ts",
+      "reso-certification/src/**/*.tsx",
+      "reso-certification/src/**/*.js",
+      "reso-client/src/**/*.ts",
+      "reso-client/src/**/*.tsx",
+      "reso-client/src/**/*.js",
+      "reso-common/src/**/*.ts",
+      "reso-common/src/**/*.tsx",
+      "reso-common/src/**/*.js",
+      "reso-mcp-server/src/**/*.ts",
+      "reso-mcp-server/src/**/*.tsx",
+      "reso-mcp-server/src/**/*.js",
+      "reso-metadata-utils/src/**/*.ts",
+      "reso-metadata-utils/src/**/*.tsx",
+      "reso-metadata-utils/src/**/*.js",
+      "reso-reference-server/src/**/*.ts",
+      "reso-reference-server/src/**/*.tsx",
+      "reso-reference-server/src/**/*.js",
+      "reso-validation/src/**/*.ts",
+      "reso-validation/src/**/*.tsx",
+      "reso-validation/src/**/*.js"
+    ],
+    "ignore": ["**/node_modules", "**/dist", "**/*.d.ts", "**/*.example.ts", "reso-certification/src/legacy/**"]
   },
   "linter": {
     "enabled": true,

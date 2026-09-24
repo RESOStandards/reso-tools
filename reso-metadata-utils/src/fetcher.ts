@@ -53,7 +53,7 @@ export class MetadataFetchError extends Error {
     readonly status: number,
     readonly statusText: string,
     readonly headers: Readonly<Record<string, string>>,
-    readonly url: string,
+    readonly url: string
   ) {
     super(message);
   }
@@ -82,7 +82,11 @@ export const fetchRawMetadata = async (baseUrl: string, token: string, options: 
 };
 
 /** Fetch raw metadata and detect the server's OData version. */
-export const fetchRawMetadataWithVersion = async (baseUrl: string, token: string, options: MetadataFetchOptions = {}): Promise<MetadataFetchResult> => {
+export const fetchRawMetadataWithVersion = async (
+  baseUrl: string,
+  token: string,
+  options: MetadataFetchOptions = {}
+): Promise<MetadataFetchResult> => {
   const formatParam = options.useFormatParam ? '?$format=application/xml' : '';
   const metadataUrl = `${baseUrl.replace(/\/$/, '')}/$metadata${formatParam}`;
   const response = await fetch(metadataUrl, {
@@ -100,13 +104,15 @@ export const fetchRawMetadataWithVersion = async (baseUrl: string, token: string
     // OData servers send `OData-Version` / `odata-version` / etc. and
     // callers shouldn't have to remember which.
     const headers: Record<string, string> = {};
-    response.headers.forEach((value, key) => { headers[key.toLowerCase()] = value; });
+    response.headers.forEach((value, key) => {
+      headers[key.toLowerCase()] = value;
+    });
     throw new MetadataFetchError(
       `Failed to fetch metadata from ${metadataUrl}: ${response.status} ${response.statusText}`,
       response.status,
       response.statusText,
       headers,
-      metadataUrl,
+      metadataUrl
     );
   }
 

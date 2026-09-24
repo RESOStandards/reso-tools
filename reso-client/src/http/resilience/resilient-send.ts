@@ -31,7 +31,7 @@ export interface SendDeps {
 }
 
 const realSendDeps: SendDeps = {
-  sleep: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+  sleep: (ms: number) => new Promise(resolve => setTimeout(resolve, ms)),
   random: Math.random,
   now: () => Date.now()
 };
@@ -57,11 +57,9 @@ export const resilientSend = async (
 
   // The run's absolute wall-clock deadline (or undefined for no total cap). Once now is at
   // or past it, we stop rather than issue another request or wait out another retry.
-  const deadlineMs =
-    config.totalTimeoutMs !== undefined ? session.startedAtMs + config.totalTimeoutMs : undefined;
+  const deadlineMs = config.totalTimeoutMs !== undefined ? session.startedAtMs + config.totalTimeoutMs : undefined;
   const pastDeadline = (now: number): boolean => deadlineMs !== undefined && now >= deadlineMs;
-  const wouldOverrunDeadline = (waitMs: number, now: number): boolean =>
-    deadlineMs !== undefined && now + waitMs >= deadlineMs;
+  const wouldOverrunDeadline = (waitMs: number, now: number): boolean => deadlineMs !== undefined && now + waitMs >= deadlineMs;
 
   const attempt = async (retriesUsed: number): Promise<ODataResponse> => {
     if (pastDeadline(deps.now())) {
@@ -101,10 +99,7 @@ export const resilientSend = async (
       }
 
       // health-relevant response failure (throttle-429 / transient-5xx)
-      const canRetry =
-        shouldRetry(classification, method) &&
-        statusAllowsRetry(classification) &&
-        retriesUsed < config.backoff.maxRetries;
+      const canRetry = shouldRetry(classification, method) && statusAllowsRetry(classification) && retriesUsed < config.backoff.maxRetries;
       if (!canRetry) {
         breaker.onSuccess(key); // the server responded (429/5xx) — reachable, just erroring
         return response; // exhausted or not retryable — surface the 429/5xx for the consumer to judge
@@ -112,11 +107,7 @@ export const resilientSend = async (
       const retryAfterMs = parseRetryAfterMs(response.headers['retry-after'], deps.now());
       if (retryAfterMs !== null && retryAfterMs > config.maxRetryWaitMs) {
         breaker.onSuccess(key); // still a live response — the wait is just too long to hold open
-        throw resilienceError(
-          'retry-wait-exceeded',
-          `Retry-After exceeds the ${config.maxRetryWaitMs}ms ceiling.`,
-          classification
-        );
+        throw resilienceError('retry-wait-exceeded', `Retry-After exceeds the ${config.maxRetryWaitMs}ms ceiling.`, classification);
       }
       const fallback =
         classification.kind === 'throttle-429'
@@ -136,10 +127,7 @@ export const resilientSend = async (
     // A thrown failure has no HTTP status, so an allowlist (which lists statuses) never
     // admits it — a caller that restricts retries to specific statuses does not retry
     // network drops or timeouts.
-    const canRetry =
-      shouldRetry(classification, method) &&
-      statusAllowsRetry(classification) &&
-      retriesUsed < config.backoff.maxRetries;
+    const canRetry = shouldRetry(classification, method) && statusAllowsRetry(classification) && retriesUsed < config.backoff.maxRetries;
     if (!canRetry) {
       breaker.onFailure(key);
       throw resilienceError('exhausted', classification.message, classification);
