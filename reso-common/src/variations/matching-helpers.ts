@@ -105,6 +105,28 @@ export interface PreparedVariations {
  * resource-level, field-level, and merged lookup/legacyOData suggestions (deduped per
  * suggested target). Faithful port — keeps the legacy grouping/dedup exactly.
  */
+/**
+ * Group flat `(resourceName, fieldName, ...suggestion)` records into one entry per
+ * element, carrying a `suggestions[]` array. Shared by every element-level bucket so
+ * fields, expansions and complex types have one record shape — a consumer that reads
+ * `suggestions` reads all three the same way.
+ */
+const groupByResourceAndField = (records: ReadonlyArray<Json>): Json[] =>
+  Object.values(
+    records.reduce<Record<string, Record<string, Json>>>((acc, { resourceName, fieldName, ...suggestion }) => {
+      const rKey = resourceName as string;
+      const fKey = fieldName as string;
+      if (!acc?.[rKey]) {
+        acc[rKey] = {};
+      }
+      if (!acc?.[rKey]?.[fKey]) {
+        acc[rKey][fKey] = { resourceName, fieldName, suggestions: [] };
+      }
+      (acc[rKey][fKey].suggestions as Json[]).push(suggestion);
+      return acc;
+    }, {})
+  ).flatMap(Object.values);
+
 export const prepareResults = ({
   resources = [],
   fields = [],
@@ -125,20 +147,7 @@ export const prepareResults = ({
           return acc;
         }, {})
       ) || [],
-    fields: Object.values(
-      fields.reduce<Record<string, Record<string, Json>>>((acc, { resourceName, fieldName, ...suggestion }) => {
-        const rKey = resourceName as string;
-        const fKey = fieldName as string;
-        if (!acc?.[rKey]) {
-          acc[rKey] = {};
-        }
-        if (!acc?.[rKey]?.[fKey]) {
-          acc[rKey][fKey] = { resourceName, fieldName, suggestions: [] };
-        }
-        (acc[rKey][fKey].suggestions as Json[]).push(suggestion);
-        return acc;
-      }, {})
-    ).flatMap(Object.values),
+    fields: groupByResourceAndField(fields),
     lookups: Object.values(
       [...lookupValues, ...legacyODataValues].reduce<Record<string, Record<string, Record<string, Json>>>>(
         (acc, { resourceName, fieldName, lookupValue, legacyODataValue, ...rest }) => {
@@ -179,7 +188,7 @@ export const prepareResults = ({
         {}
       )
     ).flatMap(item => Object.values(Object.values(item).flatMap(Object.values))),
-    expansions,
-    complexTypes
+    expansions: groupByResourceAndField(expansions),
+    complexTypes: groupByResourceAndField(complexTypes)
   };
 };
