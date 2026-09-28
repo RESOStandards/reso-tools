@@ -437,6 +437,18 @@ export const startServer = (app: express.Express, config: ServerConfig): Server 
 export { loadConfig } from './config.js';
 export type { ServerConfig, DbBackend, EnumMode } from './config.js';
 
+// Metadata utilities and the DAL types, so a host embedding this server can
+// mount its own routes against the same metadata and data access the built-in
+// routes use. `AppInstance` already hands back the `dal`; these make it usable
+// from outside without reaching into the package's internals, which the
+// `exports` map blocks. The remaining metadata helpers a caller is likely to
+// want -- getFieldsForResource, getKeyFieldForResource, getLookupsForType,
+// isEnumType -- are already public from @reso-standards/reso-common, as are the
+// ResoMetadata / ResoField / ResoLookup types.
+export { TARGET_RESOURCES } from './metadata/types.js';
+export { reconcileLookups } from './metadata/lookup-reconciler.js';
+export type { DataAccessLayer, ResourceContext } from './db/data-access.js';
+
 // CLI entry point — only runs when executed directly (not when imported as library).
 // Check argv only (not import.meta.url) to avoid false positives when bundled.
 const isDirectExecution = process.argv[1]?.endsWith('/dist/index.js') === true;
