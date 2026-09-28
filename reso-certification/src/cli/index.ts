@@ -630,9 +630,8 @@ ddCmd.action(
 //
 // Submit human-reviewed variation suggestions from a CSV to the v2 admin
 // endpoint (POST /v2/certification/variations). Auth: an OAuth2 client_credentials
-// token from .env (TOKEN_URI / CLIENT_ID / CLIENT_SECRET); the FT_ADMIN_SECRET
-// env var is sent as the x-ft-admin-secret admin gate. Review flags
-// (--admin-review XOR --fast-track, --overwrite) apply to the whole submission.
+// token from .env. Review flags (--admin-review XOR --fast-track, --overwrite)
+// apply to the whole submission.
 
 program
   .command('update-variations')
@@ -663,12 +662,6 @@ program
         }
         console.log(`Parsed ${items.length} suggestion(s) from columns: ${recognizedColumns.join(', ')}.`);
 
-        if ((opts.adminReview || opts.fastTrack) && !process.env.FT_ADMIN_SECRET) {
-          console.error(
-            'Warning: admin-review / fast-track submissions need FT_ADMIN_SECRET in your .env to land; the service may reject them otherwise.'
-          );
-        }
-
         const bearerToken = await mintOAuth2ClientCredentialsToken();
         const result = await updateVariationsViaService({
           items,
@@ -686,10 +679,18 @@ program
           console.log('Stats:');
           for (const [key, value] of Object.entries(result.stats)) console.log(`  • ${key}: ${value}`);
         }
+        if (result.overwriteRequired) {
+          console.error(
+            `${result.overwriteRequired} of your values would overwrite existing values. If you meant to do this, pass the --overwrite flag.`
+          );
+        }
         if (result.permissionDenied || result.validationFailed || result.corrections) {
           console.error(
-            `Not everything landed as submitted — permission-denied: ${result.permissionDenied}, validation-failed: ${result.validationFailed}, corrections: ${result.corrections}. Review before assuming the run was clean.`
+            `Not everything landed as submitted. permission-denied: ${result.permissionDenied}, validation-failed: ${result.validationFailed}, corrections: ${result.corrections}. Review before assuming the run was clean.`
           );
+          for (const [reason, count] of Object.entries(result.permissionDeniedReasons)) {
+            console.error(`  refused (${count}): ${reason}`);
+          }
         }
       } catch (error) {
         console.error('Error:', error instanceof Error ? error.message : String(error));

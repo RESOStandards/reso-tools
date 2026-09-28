@@ -220,9 +220,7 @@ reso-cert metadata-report adapt --in report-2.0.json --out report-adapted.json -
 
 ### `update-variations`
 Submit human-reviewed variation suggestions from a CSV to the cloud Variations Service.
-Auth is an OAuth2 client-credentials token minted from `.env` (`TOKEN_URI` / `CLIENT_ID`
-/ `CLIENT_SECRET`); `FT_ADMIN_SECRET` is sent as the admin gate for review-flagged
-submissions.
+Auth is an OAuth2 client-credentials token minted from `.env`.
 
 ```bash
 reso-cert update-variations -s suggestions.csv --admin-review
