@@ -2,6 +2,23 @@
 
 ---
 
+## reso-certification 0.10.7 + reso-reference-server 0.8.1 – 2026-09-28
+
+A published-package patch to two packages – no monorepo release. Both already declared `@reso-standards/reso-common ^0.3.0` in source, but neither had been republished since, so the versions on npm still carried `^0.2.0`. Every consumer therefore resolved reso-common to 0.2.x and nothing could reach 0.3.0, however recently it had been installed.
+
+### What that cost
+
+- **Pre-rollback DD 2.1.** reso-common 0.2.1 ships the DD 2.1 reference metadata from before the 2026-09-18 sheet rollback – 44 resources and 2,167 fields, still carrying the `Model` resource. 0.3.0 ships the corrected 43 / 2,140.
+- **No element level.** The variations record model landed in reso-common 0.3.0. Consumers pinned to 0.2.x have no element-level surface, so code written to read the level falls back to inferring it – which is how expansions came to be reported as fields with no suggestion.
+
+### The change
+
+Version numbers only. Both dependency ranges were already correct; npm simply rejects a republish at an unchanged version, so `reso-certification` goes 0.10.6 → 0.10.7 and `reso-reference-server` 0.8.0 → 0.8.1. Consumers on `^0.10.0` and `^0.8.0` pick these up automatically, and reso-common then resolves to 0.3.0.
+
+No behaviour change in either package beyond what the newer reso-common brings.
+
+---
+
 ## Web API Core 2.1.0 — `$expand` data-validation + version normalization (desktop v1.0.0-beta.12) – 2026-09-11
 
 A coordinated patch across `reso-metadata-utils` (0.1.1 → 0.1.2) and `reso-certification` (0.10.5 → 0.10.6), shipped in desktop **v1.0.0-beta.12**. Consumers on `^0.1.0` / `^0.10.0` pick these up automatically. Three separate bugs let Web API Core 2.1.0 `$expand` per-item schema validation silently skip in real (desktop / config-mode) runs; this closes all three and tightens the `$expand` gate.
