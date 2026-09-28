@@ -121,8 +121,8 @@ export interface UpdateVariationsViaServiceInput {
   readonly items: ReadonlyArray<VariationSuggestionItem>;
   /** Logged-in session bearer (Desktop / UI). Omit to mint from `.env` (CLI). */
   readonly bearerToken?: string;
-  /** The FT admin secret (`FT_ADMIN_SECRET`). Required to land Admin- and
-   *  Fast-Track-flagged canonical entries; sent as `x-ft-admin-secret`. */
+  /** Optional elevated-privilege credential for the admin write path. Leave
+   *  unset unless you have been issued one. */
   readonly adminSecret?: string;
   /** Flag the whole submission as admin-review. Mutually exclusive with `fastTrack`. */
   readonly adminReview?: boolean;
@@ -145,6 +145,13 @@ export interface UpdateVariationsResult {
    *  summed across chunks. Surfaced so a run that submits N but lands fewer is visible
    *  rather than reading as clean. Mirrors the reference caller's rollup. */
   readonly permissionDenied: number;
+  /** Denial reason to the number of items refused under it, so a caller can say WHY
+   *  a submission did not land rather than only how many did not. */
+  readonly permissionDeniedReasons: Readonly<Record<string, number>>;
+  /** Items left unchanged because they already exist and the caller did not pass
+   *  `overwrite`. Not a permission failure: the caller held the authority and did
+   *  not ask to replace what was there, so it is reported on its own. */
+  readonly overwriteRequired: number;
   readonly validationFailed: number;
   readonly corrections: number;
 }
@@ -160,7 +167,7 @@ const hasItemsArray = (value: unknown): value is { readonly items: ReadonlyArray
  * Submit human-reviewed variation suggestions to the v2 admin endpoint
  * (`POST /v2/certification/variations`). This is the admin-write counterpart to
  * `computeVariationsViaService`: it replaces the legacy `updateVariations`,
- * repointed to v2 with OAuth2 bearer auth and the `x-ft-admin-secret` admin gate.
+ * repointed to v2 with OAuth2 bearer auth.
  *
  * The submission's review flags are batch-level: `adminReview` XOR `fastTrack`
  * (mutually exclusive, as the service requires) and `overwrite` apply to every
@@ -177,6 +184,17 @@ export const updateVariationsViaService = async (input: UpdateVariationsViaServi
   }
   if (input.items.length === 0) {
     throw serviceError('SERVICE_ERROR', 'No variation suggestions to submit.');
+  }
+  // A fast-track submission asserts Fast Track authority, so refuse to send one
+  // without the credential that carries it. Checked before a token is minted, so
+  // a refusal makes no request.
+  if (input.fastTrack && !input.adminSecret) {
+    throw serviceError(
+      'AUTH_REQUIRED',
+      input.fromCli
+        ? 'A fast-track submission requires FT_ADMIN_SECRET to be set in your .env.'
+        : 'A fast-track submission requires the Fast Track admin credential (adminSecret).'
+    );
   }
 
   const token = input.bearerToken ?? (await mintProviderToken());
@@ -203,7 +221,8 @@ export const updateVariationsViaService = async (input: UpdateVariationsViaServi
   const url = `${servicesUrl}/v2/certification/variations`;
 
   const stats: Record<string, number> = {};
-  const rejected = { permissionDenied: 0, validationFailed: 0, corrections: 0 };
+  const rejected = { permissionDenied: 0, overwriteRequired: 0, validationFailed: 0, corrections: 0 };
+  const deniedReasons: Record<string, number> = {};
 
   // Sequential by design: concurrent admin writes race on the store's ETag.
   for (const [index, batch] of chunks.entries()) {
@@ -232,7 +251,16 @@ export const updateVariationsViaService = async (input: UpdateVariationsViaServi
       if (typeof value === 'number') stats[key] = (stats[key] ?? 0) + value;
     }
     if (Array.isArray(body.permissionDenied)) {
-      rejected.permissionDenied += body.permissionDenied.reduce<number>(
+      for (const group of body.permissionDenied) {
+        if (!hasItemsArray(group)) continue;
+        rejected.permissionDenied += group.items.length;
+        const raw = (group as { reason?: unknown }).reason;
+        const reason = typeof raw === 'string' && raw.trim() !== '' ? raw : 'unspecified';
+        deniedReasons[reason] = (deniedReasons[reason] ?? 0) + group.items.length;
+      }
+    }
+    if (Array.isArray(body.overwriteRequired)) {
+      rejected.overwriteRequired += body.overwriteRequired.reduce<number>(
         (n, group) => n + (hasItemsArray(group) ? group.items.length : 0),
         0
       );
@@ -246,6 +274,8 @@ export const updateVariationsViaService = async (input: UpdateVariationsViaServi
     chunks: chunks.length,
     stats,
     permissionDenied: rejected.permissionDenied,
+    permissionDeniedReasons: deniedReasons,
+    overwriteRequired: rejected.overwriteRequired,
     validationFailed: rejected.validationFailed,
     corrections: rejected.corrections
   };

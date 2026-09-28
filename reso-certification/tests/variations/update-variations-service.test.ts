@@ -53,6 +53,8 @@ describe('updateVariationsViaService', () => {
       chunks: 1,
       stats: { updatedFields: 1, ignoredFields: 0 },
       permissionDenied: 0,
+      permissionDeniedReasons: {},
+      overwriteRequired: 0,
       validationFailed: 0,
       corrections: 0,
     });
@@ -104,9 +106,60 @@ describe('updateVariationsViaService', () => {
   it('sends isFastTrack for fast-track submissions', async () => {
     const fetchMock = vi.fn().mockResolvedValue(okResponse({}));
     vi.stubGlobal('fetch', fetchMock);
-    await updateVariationsViaService({ items, bearerToken: 'tok', fastTrack: true });
+    await updateVariationsViaService({ items, bearerToken: 'tok', fastTrack: true, adminSecret: 'sekret' });
     expect(fetchMock.mock.calls[0][1].headers.isFastTrack).toBe('true');
     expect(fetchMock.mock.calls[0][1].headers.isAdminReview).toBeUndefined();
+  });
+
+  it('refuses a fast-track submission with no Fast Track credential, before any request', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okResponse({}));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(updateVariationsViaService({ items, bearerToken: 'tok', fastTrack: true })).rejects.toThrow(
+      /fast-track submission requires/
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('leaves an admin-review submission alone when no Fast Track credential is set', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okResponse({}));
+    vi.stubGlobal('fetch', fetchMock);
+    await updateVariationsViaService({ items, bearerToken: 'tok', adminReview: true });
+    expect(fetchMock.mock.calls[0][1].headers.isAdminReview).toBe('true');
+  });
+
+  it('counts overwrite-required items separately from permission denials', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      okResponse({
+        ignoredLookups: 0,
+        overwriteRequired: [
+          { reason: 'Modification of a flagged mapping requires overwrite=true.', items: [{}, {}, {}] }
+        ]
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await updateVariationsViaService({ items, bearerToken: 'tok' });
+    expect(result.overwriteRequired).toBe(3);
+    expect(result.permissionDenied).toBe(0);
+    expect(result.permissionDeniedReasons).toEqual({});
+  });
+
+  it('reports each permission-denial reason with its item count', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      okResponse({
+        ignoredLookups: 0,
+        permissionDenied: [
+          { reason: 'Modification of a flagged mapping requires overwrite=true.', items: [{}, {}, {}] },
+          { reason: 'Fast Track mappings can only be modified by a Fast Track admin.', items: [{}] }
+        ]
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await updateVariationsViaService({ items, bearerToken: 'tok' });
+    expect(result.permissionDenied).toBe(4);
+    expect(result.permissionDeniedReasons).toEqual({
+      'Modification of a flagged mapping requires overwrite=true.': 3,
+      'Fast Track mappings can only be modified by a Fast Track admin.': 1
+    });
   });
 
   it('rejects a submission flagged both admin-review and fast-track', async () => {
