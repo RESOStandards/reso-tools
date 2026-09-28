@@ -2,6 +2,23 @@
 
 ---
 
+## reso-reference-server 0.8.2 – exported metadata utilities for embedding hosts – 2026-09-28
+
+A published-package patch – no monorepo release. Additive: four symbols exported from the package root, no behaviour change.
+
+`createApp` returns `{ app, dal, cleanup }`, so a host embedding the server can already mount its own routes on the Express app before listening. But anything it mounts needs the same metadata and data access the built-in routes use, and the package's `exports` map is `.` only, which blocks deep imports into `dist/`. So an embedding host could reach the `dal` and then do nothing useful with it.
+
+Now exported from the root:
+
+- `TARGET_RESOURCES` and `reconcileLookups`
+- the `DataAccessLayer` and `ResourceContext` types
+
+The other metadata helpers a caller is likely to want – `getFieldsForResource`, `getKeyFieldForResource`, `getLookupsForType`, `isEnumType` – are already public from `@reso-standards/reso-common`, as are the `ResoMetadata`, `ResoField` and `ResoLookup` types. So this closes the gap rather than opening a new surface.
+
+Prompted by the desktop client, which mounts a data generator of its own and had been reaching the server's internals through a patched build rather than a supported entry point.
+
+---
+
 ## reso-certification 0.10.7 + reso-reference-server 0.8.1 – 2026-09-28
 
 A published-package patch to two packages – no monorepo release. Both already declared `@reso-standards/reso-common ^0.3.0` in source, but neither had been republished since, so the versions on npm still carried `^0.2.0`. Every consumer therefore resolved reso-common to 0.2.x and nothing could reach 0.3.0, however recently it had been installed.
