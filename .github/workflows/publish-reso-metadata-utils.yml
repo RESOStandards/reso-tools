@@ -24,9 +24,15 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false
 
-      # Trusted Publishing requires npm >= 11.5.1
+      # Trusted Publishing requires npm >= 11.5.1. Pinned to the 11 line rather
+      # than @latest: npm 12 blocks dependency install scripts unless they are
+      # covered by allowScripts, which silently skips better-sqlite3's native
+      # build and leaves the reference-server tests with no binding. build.yml
+      # pins npm@11 for the same reason, so this keeps publish on what the gate
+      # actually exercises. 11.20.0 and 12.1.0 shipped the same day, so this is
+      # the maintained line, not an old one.
       - name: Ensure recent npm
-        run: npm install -g npm@latest
+        run: npm install -g npm@11
 
       - name: Verify tag matches package version
         if: github.ref_type == 'tag'
