@@ -1,5 +1,10 @@
 /**
- * Lock identifiers for certification variations resources.
+ * Identifiers for certification variations resources.
+ *
+ * These name the thing, not the mechanism acting on it — a report, or an environment's
+ * canonical store. Locking is the first consumer and the one that forced the shape, but
+ * the same identifier is what any other use would want: a notification about a report, an
+ * audit entry, a permission attached to one.
  *
  * A lock is coordinated by string equality on an identifier and nothing else — there
  * is no requirement on what a lock may be taken on, and the table holding them is
@@ -48,7 +53,7 @@
 
 /** The stem every certification variations lock identifier shares. Exported so a
  *  consumer can recognise one without re-deriving the prefix. */
-export const VARIATIONS_LOCK_URN_STEM = 'urn:reso:certification:variations';
+export const VARIATIONS_URN_STEM = 'urn:reso:certification:variations';
 
 /**
  * Guard against building a malformed identifier.
@@ -66,10 +71,10 @@ export const VARIATIONS_LOCK_URN_STEM = 'urn:reso:certification:variations';
  */
 const assertSegment = (name: string, value: string): void => {
   if (!value) {
-    throw new Error(`variations lock URN: ${name} is required; an empty position would collide with any other identifier missing it`);
+    throw new Error(`variations URN: ${name} is required; an empty position would collide with any other identifier missing it`);
   }
   if (value.includes(':')) {
-    throw new Error(`variations lock URN: ${name} may not contain ':' — it would shift every position after it (got "${value}")`);
+    throw new Error(`variations URN: ${name} may not contain ':' — it would shift every position after it (got "${value}")`);
   }
 };
 
@@ -84,7 +89,7 @@ const assertSegment = (name: string, value: string): void => {
  *
  * @throws if any coordinate is empty or contains the `:` separator.
  */
-export const variationsReportLockUrn = (
+export const variationsReportUrn = (
   environmentName: string,
   ddVersion: string,
   providerUoi: string,
@@ -96,7 +101,7 @@ export const variationsReportLockUrn = (
   assertSegment('providerUoi', providerUoi);
   assertSegment('providerUsi', providerUsi);
   assertSegment('recipientUoi', recipientUoi);
-  return `${VARIATIONS_LOCK_URN_STEM}:report:${environmentName}:${ddVersion}:${providerUoi}:${providerUsi}:${recipientUoi}`;
+  return `${VARIATIONS_URN_STEM}:report:${environmentName}:${ddVersion}:${providerUoi}:${providerUsi}:${recipientUoi}`;
 };
 
 /**
@@ -108,7 +113,7 @@ export const variationsReportLockUrn = (
  *
  * @throws if the environment is empty or contains the `:` separator.
  */
-export const variationsCanonicalLockUrn = (environmentName: string): string => {
+export const variationsCanonicalStoreUrn = (environmentName: string): string => {
   assertSegment('environmentName', environmentName);
-  return `${VARIATIONS_LOCK_URN_STEM}:canonical:${environmentName}`;
+  return `${VARIATIONS_URN_STEM}:canonical:${environmentName}`;
 };

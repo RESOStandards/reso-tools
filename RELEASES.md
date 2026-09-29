@@ -12,9 +12,11 @@ Drift between two such copies is silent. A lock exists that nobody else can addr
 
 Now exported from the package root:
 
-- `variationsReportLockUrn(environmentName, ddVersion, providerUoi, providerUsi, recipientUoi)`
-- `variationsCanonicalLockUrn(environmentName)`
-- `VARIATIONS_LOCK_URN_STEM`
+- `variationsReportUrn(environmentName, ddVersion, providerUoi, providerUsi, recipientUoi)`
+- `variationsCanonicalStoreUrn(environmentName)`
+- `VARIATIONS_URN_STEM`
+
+They name the thing rather than the mechanism acting on it. Locking is the first consumer and the one that forced the shape, but the same identifier is what any other use would want – a notification about a report, an audit entry, a permission attached to one. A lock stores it as its `resourceId`: the id of the resource being locked, not an id of the lock.
 
 The form follows the ARN discipline rather than any existing `urn:reso:` precedent – every scoping dimension is a named position, and the resource type precedes the identity so it selects which rules apply. Past the `urn:reso` stem each sub-branch is owned by different functionality and governs its own grammar, so this subtree owes its shape to neither `metadata` nor `upi`.
 
