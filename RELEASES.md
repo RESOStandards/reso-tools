@@ -2,6 +2,30 @@
 
 ---
 
+## reso-common 0.4.0 – shared lock identifiers for certification variations – 2026-09-29
+
+Additive. Two builders and a stem constant, no behaviour change to anything existing.
+
+A variations lock is coordinated by string equality on an identifier and nothing else. There is no requirement on what a lock may be taken on, and the table holding them is shared with other resource kinds, so the identifier is the entire contract. It was being built independently by the certification service, to find a lock, and by the review client, to take one – in two repositories that share no package.
+
+Drift between two such copies is silent. A lock exists that nobody else can address, its holder believes they hold the resource, everyone else sees it free, and both proceed. Nothing errors. A test on each side spelling out the format catches an accidental edit but not a deliberate one-sided change, which is how the two came to disagree while both suites stayed green.
+
+Now exported from the package root:
+
+- `variationsReportLockUrn(environmentName, ddVersion, providerUoi, providerUsi, recipientUoi)`
+- `variationsCanonicalLockUrn(environmentName)`
+- `VARIATIONS_LOCK_URN_STEM`
+
+The form follows the ARN discipline rather than any existing `urn:reso:` precedent – every scoping dimension is a named position, and the resource type precedes the identity so it selects which rules apply. Past the `urn:reso` stem each sub-branch is owned by different functionality and governs its own grammar, so this subtree owes its shape to neither `metadata` nor `upi`.
+
+Two dimensions the previous path-shaped keys were missing. The **environment**, without which the same report in QA and in production produced the identical key and a reviewer in one environment locked out a reviewer in the other – there is one locks table and the row carries no environment. And the **resource type**, without which a report lock and the canonical-store lock shared a prefix and were told apart by counting segments; a validation check that inferred the type that way would have rejected the canonical lock and broken the decisions endpoint.
+
+The builders refuse an empty coordinate or one carrying the `:` separator. Both produce a well-formed-looking identifier that silently means the wrong thing: an empty position collides with any other identifier missing the same one, and an embedded separator shifts every position after it, so `('A:B', 'C')` and `('A', 'B:C')` are the same string. This validates construction, which is a different thing from validating an identifier handed in – the latter imposes a shape the system does not require.
+
+Safe to re-format at any time: every lock expires on its TTL, so no identifier minted under an earlier grammar is ever read back.
+
+---
+
 ## reso-reference-server 0.8.2 – exported metadata utilities for embedding hosts – 2026-09-28
 
 A published-package patch – no monorepo release. Additive: four symbols exported from the package root, no behaviour change.
