@@ -194,6 +194,22 @@ export const REQUIRED_RESOURCES_V21 = ['Property', 'Member', 'Office', 'Field', 
  */
 export const NO_RECORDS_SAMPLED = 'all — no records found';
 
+/**
+ * Marker pushed into a resource's `skippedTypes` when its EntityType declares NO key property.
+ *
+ * OData requires every entity type to define at least one key (a compound key is several), and the CSDL validator
+ * already reports a violation with the spec citation ("Entity type 'X' has no key properties defined"). Core reads
+ * the key from the provider's own `<Key>` and does not substitute one: every scenario projects the key into
+ * `$select`, and the single-entity scenario addresses by it, so a fabricated key turns one metadata defect into a
+ * 400 on every scenario, misattributed to the server. The previous `?? 'ListingKey'` was also wrong for every
+ * resource but Property.
+ *
+ * Josh, 2026-10-01: "we should just get their key and fail if their resource doesn't have a key definition,
+ * standard or local, if we try and do anything that requires a key." So the Core pipeline FAILS the resource on
+ * this marker (`noKeyDeclaredReport`) rather than skipping it, and no sample request is issued for it.
+ */
+export const NO_KEY_DECLARED = 'all — no key declared in $metadata';
+
 // ── Type matchers ──
 
 const INTEGER_TYPES = ['Edm.Int16', 'Edm.Int32', 'Edm.Int64'];
@@ -447,7 +463,21 @@ export const resolveTestParams = async (
   // enumMode is retained as an informational/coverage field only — selection and gating are now per-field
   // (resolveEnum), so the `--enumMode` override no longer steers field choice. Vestigial; a candidate for removal.
   const enumMode = enumModeOverride ?? detectEnumMode(entityType);
-  const keyField = entityType.keyProperties[0] ?? 'ListingKey';
+  // The key comes from the provider's CSDL `<Key>` and nowhere else — never a convention, never a literal. An
+  // EntityType with no key cannot be certified (see NO_KEY_DECLARED), so return before issuing any request: there
+  // is nothing to sample for a resource we are about to fail.
+  const keyField = entityType.keyProperties[0];
+  if (keyField === undefined) {
+    return {
+      resource,
+      keyField: '',
+      keyValue: '',
+      enumMode,
+      integerValueHigh: 2147483647,
+      sampleComplete: false,
+      skippedTypes: [NO_KEY_DECLARED]
+    };
+  }
   const skippedTypes: string[] = [];
 
   // Resource-aware OriginatingSystem (OSN/OSID) scope: apply the recipient-org filter ONLY when this resource's
