@@ -16,7 +16,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ODataRequester } from '../../src/test-runner/requester.js';
 import type { EntityType, ODataResponse } from '../../src/test-runner/types.js';
-import { type TestParams, rankCollectionNavs, resolveTestParams } from '../../src/web-api-core/sampling.js';
+import { type TestParams, numericStats, rankCollectionNavs, resolveTestParams } from '../../src/web-api-core/sampling.js';
 import { selectScalarCandidates } from '../../src/web-api-core/scalar-selection.js';
 
 import type { StandardMap } from '../../src/web-api-core/standard-map.js';
@@ -136,9 +136,11 @@ describe('scalar sampling: a local field is reached only when no standard field 
     expect((params.dateCandidates ?? []).map(c => c.field)).toEqual(['LocalClosingDate']);
   });
 
-  it('prefers a standard field even when it is SPARSER than a local one — RESO-first is strict, and the ladder carries the risk', async () => {
-    // One distinct standard value against three local ones. The standard field still leads; if the server will
-    // not serve it, the ladder falls through to the local field rather than stranding the type.
+  it('prefers a standard field even when it is SPARSER than a local one — the filter precedes the ranking', async () => {
+    // The candidates are filtered to the standard elements and ranked on usage FROM THERE, so usage never
+    // promotes a local field over a standard one. One distinct standard value against three local ones: the
+    // standard field still leads, and if the server will not serve it the ladder falls through to the local one
+    // rather than stranding the type.
     const params = await sample(
       makeEntityType(DATE_PROPERTIES),
       [
@@ -152,25 +154,42 @@ describe('scalar sampling: a local field is reached only when no standard field 
     expect((params.dateCandidates ?? []).map(c => c.field)).toEqual(['ListingContractDate', 'LocalClosingDate']);
   });
 
-  it('within one rank, a field with enough distinct values outranks a sparser one, then fill rate decides', () => {
+  it('inside the standard set, USAGE leads — a fully populated single-valued field outranks a sparser richer one', () => {
+    // The requirement is "filtered by what's in the standard and then ranked on usage from there" (#315: "most-used
+    // among standard fields means, in the engine, fill rate in the sample"). Distinct count is NOT a key ahead of
+    // usage: HighUsageOneValue is 6/6 populated with one value, LowUsageThreeValues only 3/6 with three. Usage wins.
+    // Where the standard set is too thin to settle an operator, the ladder recovers — not a reordering of the set.
     const records = [
-      { Rich: 1, Sparse: 7, Fuller: 5, Emptier: 9 },
-      { Rich: 2, Sparse: 7, Fuller: 6, Emptier: null },
-      { Rich: 3, Sparse: 7, Fuller: 7, Emptier: null }
+      { HighUsageOneValue: 7, LowUsageThreeValues: 1, TieMoreDistinct: 10 },
+      { HighUsageOneValue: 7, LowUsageThreeValues: 2, TieMoreDistinct: 20 },
+      { HighUsageOneValue: 7, LowUsageThreeValues: 3, TieMoreDistinct: 30 },
+      { HighUsageOneValue: 7, LowUsageThreeValues: null, TieMoreDistinct: 40 },
+      { HighUsageOneValue: 7, LowUsageThreeValues: null, TieMoreDistinct: 10 },
+      { HighUsageOneValue: 7, LowUsageThreeValues: null, TieMoreDistinct: 20 }
     ];
-    const numeric = (values: ReadonlyArray<unknown>) => {
-      const nums = [...new Set(values.map(Number))].sort((a, b) => a - b);
-      return { min: nums[0], median: nums[Math.floor(nums.length / 2)], max: nums[nums.length - 1], distinct: nums.length };
-    };
-    // All four are standard, so the distinct floor and then the fill rate do the ordering.
+    const allStandard = standardMapFor(['HighUsageOneValue', 'LowUsageThreeValues', 'TieMoreDistinct']);
     const ranked = selectScalarCandidates(
-      ['Sparse', 'Rich', 'Emptier', 'Fuller'],
+      ['HighUsageOneValue', 'LowUsageThreeValues', 'TieMoreDistinct'],
       records,
-      standardMapFor(['Sparse', 'Rich', 'Emptier', 'Fuller']),
+      allStandard,
       'Property',
-      numeric
+      numericStats
     );
-    expect(ranked.map(c => c.field)).toEqual(['Rich', 'Fuller', 'Sparse', 'Emptier']);
+    // TieMoreDistinct and HighUsageOneValue are both 6/6, so distinct count breaks THAT tie and nothing else;
+    // LowUsageThreeValues is last on usage despite carrying the second-most distinct values.
+    expect(ranked.map(c => c.field)).toEqual(['TieMoreDistinct', 'HighUsageOneValue', 'LowUsageThreeValues']);
+    expect(ranked.map(c => c.fillRate)).toEqual([1, 1, 0.5]);
+  });
+
+  it('falls back to the local fields ranked by usage when nothing standard is available', () => {
+    const records = [
+      { LocalFuller: 1, LocalSparser: 9 },
+      { LocalFuller: 2, LocalSparser: null },
+      { LocalFuller: 3, LocalSparser: null },
+      { LocalFuller: 4, LocalSparser: null }
+    ];
+    const ranked = selectScalarCandidates(['LocalSparser', 'LocalFuller'], records, ALL_LOCAL, 'Property', numericStats);
+    expect(ranked.map(c => c.field)).toEqual(['LocalFuller', 'LocalSparser']);
   });
 
   it('excludes a field whose sampled values the type cannot use, instead of certifying the type on it', async () => {
