@@ -350,13 +350,20 @@ export const emptyContextFor = (scenario: CoreScenario, params: TestParams): Emp
     }
     return undefined;
   })();
+  // For `lt/le now()`: did the field we queried carry a past value? Sampling sets `timestampFieldForNow` only when
+  // some datetime field on the resource does, so its absence IS the all-future case, where empty is correct.
+  const fieldHasPastValues =
+    scenario.category === 'filter' && scenario.dataType === 'datetime' && scenario.valueParam === 'now'
+      ? params.timestampFieldForNow !== undefined
+      : undefined;
   // When the query was built over one record's OWN collection (all() / has-and), an empty result is a
   // DETERMINATE defect (the guaranteeing record must come back), not the legitimate-empty skip — see emptyVerdict.
   const derivedSet = recordDerivedSet(scenario, params) !== undefined;
   return {
     ...(distinct !== undefined && { distinctValueCount: distinct }),
     complete: params.sampleComplete,
-    ...(derivedSet && { recordDerivedSet: true })
+    ...(derivedSet && { recordDerivedSet: true }),
+    ...(fieldHasPastValues !== undefined && { fieldHasPastValues })
   };
 };
 
@@ -1048,6 +1055,50 @@ const paramsWithDateCandidate = (params: TestParams, c: ScalarCandidate<string>)
   dateDistinctCount: c.stats.distinct
 });
 
+/** Scenarios grounded on the sampled timestamp field — every datetime filter and the `$orderby` scenarios that sort
+ *  on it. These are where the missing-`ModificationTimestamp` warning belongs, because they are the ones running on a
+ *  substitute field. */
+const usesTimestampField = (scenario: CoreScenario): boolean =>
+  (scenario.category === 'filter' && scenario.dataType === 'datetime') ||
+  (scenario.category === 'orderby' && scenario.fieldParam === 'timestampField');
+
+/**
+ * Attach the resource's missing-`ModificationTimestamp` warning to the FIRST result that ran on the timestamp field.
+ *
+ * Once per resource, not once per scenario: eleven scenarios share that field, and `summarizeScenarios` counts
+ * warnings, so emitting it per scenario would report one root cause as eleven warnings and misstate the severity.
+ * First-in-catalog-order keeps it deterministic. Returns the results unchanged when there is no warning, or when no
+ * scenario in the run used the field.
+ */
+export const withTimestampWarning = (
+  results: ReadonlyArray<ScenarioResult>,
+  scenarios: ReadonlyArray<CoreScenario>,
+  warning: string | undefined
+): ReadonlyArray<ScenarioResult> => {
+  if (!warning) return results;
+  const tags = new Set(scenarios.filter(usesTimestampField).map(sc => sc.tag));
+  const at = results.findIndex(r => tags.has(r.tag));
+  return at === -1 ? results : results.map((r, i) => (i === at ? { ...r, warnings: [...(r.warnings ?? []), warning] } : r));
+};
+
+/** The `now()`-ORDERED datetime scenarios: `lt now()` and `le now()`. These are the only scenarios whose field must
+ *  carry a value at or before now — `ne now()` is satisfied by future values too. They run on
+ *  `timestampFieldForNow` when the resource has such a field, rather than on the general timestamp slot, which is
+ *  free to be a well-populated future-dated field (#315, Josh 2026-10-01). */
+const isNowOrderedScenario = (scenario: CoreScenario): boolean =>
+  scenario.category === 'filter' &&
+  scenario.dataType === 'datetime' &&
+  scenario.valueParam === 'now' &&
+  (scenario.op === 'lt' || scenario.op === 'le');
+
+/** Swap the general timestamp slot for the past-capable one on a `lt/le now()` scenario. Inert for every other
+ *  scenario, and inert when the resource has no datetime field carrying a past value (the empty-verdict then stops
+ *  asserting a hit — see `EmptyContext.fieldHasPastValues`). */
+const paramsForTimestampScenario = (scenario: CoreScenario, params: TestParams): TestParams =>
+  isNowOrderedScenario(scenario) && params.timestampFieldForNow !== undefined
+    ? { ...params, timestampField: params.timestampFieldForNow }
+    : params;
+
 /** A filter scenario on one of the laddered scalar types — its `dataType` IS the slot, so the two can never
  *  disagree. `datetime` filters are excluded by the type, which is why they keep the single-execution path. */
 export type ScalarFilterScenario = FilterScenario & { readonly dataType: ScalarSlot };
@@ -1526,7 +1577,16 @@ const runScenario = async (
       return runScalarFilterScenario(serverUrl, resource, scenario, params, authToken, start, requester);
     }
     // Other standard scenarios (orderby / expand / lookup-resource, and the datetime filters): a single execution.
-    const { result } = await executeStandardScenario(serverUrl, resource, scenario, params, authToken, start, requester);
+    // `lt/le now()` runs on the past-capable timestamp field; everything else on the general slot.
+    const { result } = await executeStandardScenario(
+      serverUrl,
+      resource,
+      scenario,
+      paramsForTimestampScenario(scenario, params),
+      authToken,
+      start,
+      requester
+    );
     return result;
   } catch (err) {
     if (isDeadlineError(err)) throw err; // out of run budget — propagate so the run stops gracefully
@@ -2322,12 +2382,15 @@ export const runCoreResourceScenarios = async (
     }
   }
 
+  // Non-gating: a resource with no usable ModificationTimestamp gets one warning on the first scenario that ran on
+  // the substitute field. Reported, never failed — keys and timestamps are assessed by Data Dictionary testing.
+  const reported = withTimestampWarning(results, scenarios, params.timestampWarning);
   return {
     resource,
     params,
     coverage: buildCoverage(params),
-    scenarios: results,
-    summary: summarizeScenarios(results),
+    scenarios: reported,
+    summary: summarizeScenarios(reported),
     ...(deadlineReached ? { deadlineReached: true } : {})
   };
 };

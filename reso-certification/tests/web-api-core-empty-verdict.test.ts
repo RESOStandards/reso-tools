@@ -123,3 +123,39 @@ describe('emptyVerdict — ne / gt / lt depend on distinct count + completeness'
     expect(emptyVerdict(neNow, NONE)).toBe('fail');
   });
 });
+
+// #315 / Josh, 2026-10-01: "lt-now and le-now would just be false on a future date, which is correct."
+// A field whose sampled values are ALL in the future legitimately matches nothing for `lt/le now()`, so failing it
+// false-fails a compliant server. `ne now()` is the exception that proves the rule: a future value IS ≠ now, so it
+// matches, and an empty result there is still a real defect.
+describe('emptyVerdict — lt/le now() over an all-future field is the server being right', () => {
+  const nowFilter = (op: string) => filter(op, { valueParam: 'now', dataType: 'datetime', fieldParam: 'timestampField' });
+
+  it('lt/le now() → SKIP when the queried field carried no past value', () => {
+    for (const op of ['lt', 'le']) {
+      expect(emptyVerdict(nowFilter(op), { fieldHasPastValues: false })).toBe('skip');
+    }
+  });
+
+  it('lt/le now() → fail when the field DID carry a past value (a hit was mandatory)', () => {
+    for (const op of ['lt', 'le']) {
+      expect(emptyVerdict(nowFilter(op), { fieldHasPastValues: true })).toBe('fail');
+    }
+  });
+
+  it('lt/le now() → fail when past-ness is UNKNOWN — fail-closed, unknown never excuses a server', () => {
+    for (const op of ['lt', 'le']) {
+      expect(emptyVerdict(nowFilter(op), NONE)).toBe('fail');
+    }
+  });
+
+  it('ne now() → fail even on an all-future field: every value other than now satisfies it', () => {
+    expect(emptyVerdict(nowFilter('ne'), { fieldHasPastValues: false })).toBe('fail');
+  });
+
+  it('the carve-out does not leak to a sampled-value datetime comparison', () => {
+    // `lt datetimeValueMax` keeps the distinct-count logic; fieldHasPastValues is not consulted.
+    const sampled = filter('lt', { dataType: 'datetime', fieldParam: 'timestampField', valueParam: 'datetimeValueMax' });
+    expect(emptyVerdict(sampled, { fieldHasPastValues: false, distinctValueCount: 2 })).toBe('fail');
+  });
+});

@@ -4,7 +4,7 @@ import type { CoreScenario } from '../../src/web-api-core/scenarios.js';
 import type { TestParams } from '../../src/web-api-core/sampling.js';
 import type { ODataRequester } from '../../src/test-runner/requester.js';
 import type { ODataResponse } from '../../src/test-runner/types.js';
-import { runEnumFamilyScenario, summarizeScenarios } from '../../src/web-api-core/test-runner.js';
+import { runEnumFamilyScenario, summarizeScenarios, withTimestampWarning } from '../../src/web-api-core/test-runner.js';
 import type { ScenarioResult } from '../../src/web-api-core/test-runner.js';
 
 // The non-gating WARNING channel: warnings ride ScenarioResult.warnings, are counted verdict-neutrally by
@@ -62,5 +62,53 @@ describe('single-enum `ne` — a value violation WARNS, never fails (pending WG)
     const result = await runEnumFamilyScenario('http://x', 'Property', neScenario, paramsWithSingleEnum(singleEnumCand('StandardStatus', 'Active')), 'tok', 0, 'ne', req);
     expect(result.passed).toBe(true);
     expect(result.warnings).toBeUndefined();
+  });
+});
+
+// #315: a resource with no usable ModificationTimestamp gets ONE warning, on the first scenario that ran on the
+// substitute timestamp field. Once per resource, not once per scenario — eleven scenarios share that field and
+// summarizeScenarios counts warnings, so per-scenario emission would report one root cause as eleven.
+const tsScenario = (tag: string, over: Record<string, unknown> = {}): CoreScenario =>
+  ({ tag, name: tag, category: 'filter', dataType: 'datetime', op: 'ge', fieldParam: 'timestampField', valueParam: 'datetimeValue', minVersion: '2.0.0', ...over }) as CoreScenario;
+const intScenario = (tag: string): CoreScenario =>
+  ({ tag, name: tag, category: 'filter', dataType: 'integer', op: 'eq', fieldParam: 'integerField', valueParam: 'integerValueLow', minVersion: '2.0.0' }) as CoreScenario;
+const orderbyScenario = (tag: string): CoreScenario =>
+  ({ tag, name: tag, category: 'orderby', fieldParam: 'timestampField', minVersion: '2.0.0' }) as CoreScenario;
+
+describe('withTimestampWarning — one warning per resource, on the first scenario that used the field', () => {
+  const scenarios = [intScenario('filter-int-eq'), tsScenario('filter-datetime-ge'), tsScenario('filter-datetime-le'), orderbyScenario('orderby-timestamp-desc')];
+  const results = [r({ tag: 'filter-int-eq' }), r({ tag: 'filter-datetime-ge' }), r({ tag: 'filter-datetime-le' }), r({ tag: 'orderby-timestamp-desc' })];
+
+  it('attaches it exactly once, and to the first timestamp-grounded result', () => {
+    const out = withTimestampWarning(results, scenarios, 'no ModificationTimestamp');
+    expect(out.map(x => x.warnings?.length ?? 0)).toEqual([0, 1, 0, 0]);
+    expect(summarizeScenarios(out).warnings).toBe(1);
+  });
+
+  it('never attaches it to a scenario that did not run on the timestamp field', () => {
+    const out = withTimestampWarning(results, scenarios, 'no ModificationTimestamp');
+    expect(out[0].warnings).toBeUndefined();
+  });
+
+  it('preserves warnings a result already carried', () => {
+    const withExisting = [r({ tag: 'filter-int-eq' }), r({ tag: 'filter-datetime-ge', warnings: ['existing'] })];
+    const out = withTimestampWarning(withExisting, scenarios, 'no ModificationTimestamp');
+    expect(out[1].warnings).toEqual(['existing', 'no ModificationTimestamp']);
+  });
+
+  it('is a no-op when there is no warning — the ordinary case must stay untouched', () => {
+    expect(withTimestampWarning(results, scenarios, undefined)).toBe(results);
+  });
+
+  it('is a no-op when no scenario in the run used the timestamp field', () => {
+    const only = [r({ tag: 'filter-int-eq' })];
+    expect(withTimestampWarning(only, [intScenario('filter-int-eq')], 'w')).toEqual(only);
+  });
+
+  it('is verdict-neutral: the carrying result keeps its passed/skipped state', () => {
+    const failing = [r({ tag: 'filter-datetime-ge', passed: false })];
+    const out = withTimestampWarning(failing, scenarios, 'w');
+    expect(out[0].passed).toBe(false);
+    expect(summarizeScenarios(out).failed).toBe(1);
   });
 });

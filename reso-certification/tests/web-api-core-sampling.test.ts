@@ -1,5 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { dateStats, integerNotSentinelFor, isSampleComplete, numericStats, selectTimestampField } from '../src/web-api-core/sampling.js';
+import {
+  dateStats,
+  integerNotSentinelFor,
+  isSampleComplete,
+  modificationTimestampWarning,
+  numericStats,
+  rankDatetimeFields,
+  selectTimestampField,
+  selectTimestampFieldForNow,
+} from '../src/web-api-core/sampling.js';
+import type { StandardMap } from '../src/web-api-core/standard-map.js';
+
+// Only isStandardField matters to timestamp ranking; the value-level members are inert here.
+const standardMapFor = (standardFields: ReadonlyArray<string>): StandardMap => ({
+  isStandardField: (_resource, field) => standardFields.includes(field),
+  isStandardValue: () => false,
+  standardValues: () => new Set<string>(),
+  standardValuesForField: () => undefined,
+  isClosedEnumField: () => false,
+});
+
+// A fixed "now" so past/future classification is deterministic.
+const NOW = Date.parse('2026-06-01T00:00:00Z');
+const PAST = '2026-01-01T00:00:00Z';
+const FUTURE = '2099-01-01T00:00:00Z';
 
 // The `ne` empty-verdict may only rule "empty is correct / pass" when the sample WAS the whole resource.
 // Core 2.1.0 signals "more results exist" with a forward @odata.nextLink, so its absence is our completeness proof.
@@ -76,37 +100,120 @@ describe('dateStats — chronological min / max and date-only dedup', () => {
   });
 });
 
-describe('selectTimestampField — grounds the now() scenarios on an always-<=-now field (F1)', () => {
+describe('timestamp selection — the general slot (#315: standard-first, most-used, name-shape gone)', () => {
   it('prefers ModificationTimestamp even when a future-dated datetime is populated first', () => {
-    // OpenHouse-style: a future-dated field leads the datetime list; picking it would false-fail `lt now()`.
-    const datetimeFields = ['OpenHouseStartTime', 'OpenHouseEndTime', 'ModificationTimestamp'];
+    // OpenHouse-style: a future-dated field leads the datetime list. ModificationTimestamp is RESO-required and is
+    // the semantically correct change-tracking field, so it wins whenever it carries a value.
+    const fields = ['OpenHouseStartTime', 'OpenHouseEndTime', 'ModificationTimestamp'];
     const records = [
-      { OpenHouseStartTime: '2099-06-01T10:00:00Z', OpenHouseEndTime: '2099-06-01T12:00:00Z', ModificationTimestamp: '2026-01-01T00:00:00Z' },
-      { OpenHouseStartTime: '2099-07-01T10:00:00Z', OpenHouseEndTime: '2099-07-01T12:00:00Z', ModificationTimestamp: '2026-02-01T00:00:00Z' },
+      { OpenHouseStartTime: FUTURE, OpenHouseEndTime: FUTURE, ModificationTimestamp: PAST },
+      { OpenHouseStartTime: FUTURE, OpenHouseEndTime: FUTURE, ModificationTimestamp: PAST },
     ];
-    expect(selectTimestampField(datetimeFields, records)).toBe('ModificationTimestamp');
+    expect(selectTimestampField(fields, records, standardMapFor(fields), 'OpenHouse')).toBe('ModificationTimestamp');
   });
 
-  it('falls back to another standard *Timestamp field when ModificationTimestamp is absent', () => {
-    // ShowingStartTime is future-dated (ends in "Time", not "Timestamp") → excluded; OriginalEntryTimestamp wins.
-    const datetimeFields = ['ShowingStartTime', 'OriginalEntryTimestamp'];
-    const records = [{ ShowingStartTime: '2099-06-01T10:00:00Z', OriginalEntryTimestamp: '2026-01-01T00:00:00Z' }];
-    expect(selectTimestampField(datetimeFields, records)).toBe('OriginalEntryTimestamp');
+  it('ranks a DD-standard field ahead of a local one even when the local is FULLER', () => {
+    // The filter precedes the ranking, exactly as for the scalar groups: usage never promotes a local field.
+    const fields = ['LocalAuditTime', 'OriginalEntryTimestamp'];
+    const records = [
+      { LocalAuditTime: PAST, OriginalEntryTimestamp: PAST },
+      { LocalAuditTime: PAST, OriginalEntryTimestamp: null },
+    ];
+    expect(selectTimestampField(fields, records, standardMapFor(['OriginalEntryTimestamp']), 'Property')).toBe('OriginalEntryTimestamp');
   });
 
-  it('falls back to another *Timestamp when ModificationTimestamp is present but unpopulated', () => {
-    const datetimeFields = ['ModificationTimestamp', 'PhotosChangeTimestamp'];
-    const records = [{ ModificationTimestamp: null, PhotosChangeTimestamp: '2026-01-01T00:00:00Z' }];
-    expect(selectTimestampField(datetimeFields, records)).toBe('PhotosChangeTimestamp');
+  it('ranks the standard fields by usage among themselves', () => {
+    const fields = ['PhotosChangeTimestamp', 'OriginalEntryTimestamp'];
+    const records = [
+      { PhotosChangeTimestamp: null, OriginalEntryTimestamp: PAST },
+      { PhotosChangeTimestamp: PAST, OriginalEntryTimestamp: PAST },
+    ];
+    expect(rankDatetimeFields(fields, records, standardMapFor(fields), 'Property')).toEqual([
+      'OriginalEntryTimestamp',
+      'PhotosChangeTimestamp',
+    ]);
   });
 
-  it('last resort: a generic populated datetime when the resource has no *Timestamp field', () => {
-    const datetimeFields = ['SomeLocalDateTime'];
-    const records = [{ SomeLocalDateTime: '2026-01-01T00:00:00Z' }];
-    expect(selectTimestampField(datetimeFields, records)).toBe('SomeLocalDateTime');
+  it('no longer ranks on the field NAME: a local "*Timestamp" does not outrank a standard field without the suffix', () => {
+    // The old implementation tested endsWith('Timestamp'), so a local MyCustomTimestamp ranked as though the DD
+    // defined it. Standard-ness now comes from the DD reference only.
+    const fields = ['MyCustomTimestamp', 'CloseDate'];
+    const records = [{ MyCustomTimestamp: PAST, CloseDate: PAST }];
+    expect(selectTimestampField(fields, records, standardMapFor(['CloseDate']), 'Property')).toBe('CloseDate');
+  });
+
+  it('may be a FUTURE-dated field — the nine non-now() scenarios work the same on it', () => {
+    // Only lt/le now() need a past value. Excluding future-dated fields from the whole family would leave a
+    // well-populated standard field untested.
+    const fields = ['ShowingStartTime'];
+    const records = [{ ShowingStartTime: FUTURE }, { ShowingStartTime: FUTURE }];
+    expect(selectTimestampField(fields, records, standardMapFor(fields), 'Showing')).toBe('ShowingStartTime');
+  });
+
+  it('skips ModificationTimestamp when it is declared but unpopulated', () => {
+    const fields = ['ModificationTimestamp', 'PhotosChangeTimestamp'];
+    const records = [{ ModificationTimestamp: null, PhotosChangeTimestamp: PAST }];
+    expect(selectTimestampField(fields, records, standardMapFor(fields), 'Property')).toBe('PhotosChangeTimestamp');
+  });
+
+  it('falls through to a local field when no standard one is populated', () => {
+    const fields = ['SomeLocalDateTime'];
+    const records = [{ SomeLocalDateTime: PAST }];
+    expect(selectTimestampField(fields, records, standardMapFor([]), 'LocalResource')).toBe('SomeLocalDateTime');
   });
 
   it('returns undefined when no datetime field is populated', () => {
-    expect(selectTimestampField(['ModificationTimestamp'], [{ ModificationTimestamp: null }])).toBeUndefined();
+    expect(
+      selectTimestampField(['ModificationTimestamp'], [{ ModificationTimestamp: null }], standardMapFor(['ModificationTimestamp']), 'Property'),
+    ).toBeUndefined();
+  });
+});
+
+describe('timestamp selection — the lt/le now() slot needs a field carrying a PAST value (#315)', () => {
+  it('skips an all-future field for the now() slot even though it leads the general ranking', () => {
+    const fields = ['ShowingStartTime', 'OriginalEntryTimestamp'];
+    const records = [{ ShowingStartTime: FUTURE, OriginalEntryTimestamp: PAST }];
+    const map = standardMapFor(fields);
+    expect(selectTimestampField(fields, records, map, 'Showing')).toBe('ShowingStartTime');
+    expect(selectTimestampFieldForNow(fields, records, map, 'Showing', NOW)).toBe('OriginalEntryTimestamp');
+  });
+
+  it('accepts a MIXED past/future field — lt now() returns its past rows, so the operator is testable', () => {
+    // The criterion is "has a past value", not "is entirely past": a mixed field is a valid target.
+    const fields = ['AuctionStartTime'];
+    const records = [{ AuctionStartTime: FUTURE }, { AuctionStartTime: PAST }];
+    expect(selectTimestampFieldForNow(fields, records, standardMapFor(fields), 'Property', NOW)).toBe('AuctionStartTime');
+  });
+
+  it('excludes a standard field that ENDS in Timestamp but holds only future values', () => {
+    // InternetTrackingSummary.StartTimestamp / EndTimestamp are real DD fields: the name said "past", the data
+    // says otherwise, which is why the suffix test had to go.
+    const fields = ['StartTimestamp', 'EndTimestamp'];
+    const records = [{ StartTimestamp: FUTURE, EndTimestamp: FUTURE }];
+    expect(selectTimestampFieldForNow(fields, records, standardMapFor(fields), 'InternetTrackingSummary', NOW)).toBeUndefined();
+  });
+
+  it('is undefined when every datetime field on the resource is all-future (the verdict then stops asserting a hit)', () => {
+    const fields = ['OpenHouseStartTime', 'OpenHouseEndTime'];
+    const records = [{ OpenHouseStartTime: FUTURE, OpenHouseEndTime: FUTURE }];
+    expect(selectTimestampFieldForNow(fields, records, standardMapFor(fields), 'OpenHouse', NOW)).toBeUndefined();
+  });
+});
+
+describe('modificationTimestampWarning — reported, never failed by Core (#315)', () => {
+  it('is undefined when ModificationTimestamp is present and populated', () => {
+    expect(modificationTimestampWarning(['ModificationTimestamp'], [{ ModificationTimestamp: PAST }], 'Property', 'ModificationTimestamp')).toBeUndefined();
+  });
+
+  it('warns and names the substitute when the resource does not declare it', () => {
+    const w = modificationTimestampWarning(['OriginalEntryTimestamp'], [{ OriginalEntryTimestamp: PAST }], 'Property', 'OriginalEntryTimestamp');
+    expect(w).toContain('does not declare it');
+    expect(w).toContain("'OriginalEntryTimestamp'");
+    expect(w).toContain('Data Dictionary');
+  });
+
+  it('distinguishes declared-but-unpopulated from not declared at all', () => {
+    const w = modificationTimestampWarning(['ModificationTimestamp', 'PhotosChangeTimestamp'], [{ ModificationTimestamp: null, PhotosChangeTimestamp: PAST }], 'Property', 'PhotosChangeTimestamp');
+    expect(w).toContain('sampled no value for it');
   });
 });
