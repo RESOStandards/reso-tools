@@ -7,7 +7,14 @@
 
 export { allScenarios, scenariosForVersion } from './scenarios.js';
 export type { CoreScenario } from './scenarios.js';
-export { resolveTestParams, detectEnumMode, WELL_KNOWN_RESOURCES, REQUIRED_RESOURCES_V21, NO_RECORDS_SAMPLED } from './sampling.js';
+export {
+  resolveTestParams,
+  detectEnumMode,
+  WELL_KNOWN_RESOURCES,
+  REQUIRED_RESOURCES_V21,
+  NO_RECORDS_SAMPLED,
+  NO_KEY_DECLARED
+} from './sampling.js';
 export type { TestParams, EnumMode } from './sampling.js';
 export { buildStandardMap, buildStandardMapFrom } from './standard-map.js';
 export type { StandardMap } from './standard-map.js';

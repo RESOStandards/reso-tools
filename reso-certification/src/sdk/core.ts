@@ -10,7 +10,14 @@ import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata, getEntityType, loadMetadataFromFile, parseMetadataXml, persistMetadataXml } from '../test-runner/metadata.js';
 import { type ODataRequester, createCertSession, createSessionRequester } from '../test-runner/requester.js';
-import { NO_RECORDS_SAMPLED, WELL_KNOWN_RESOURCES, buildStandardMap, createLookupCache, resolveTestParams } from '../web-api-core/index.js';
+import {
+  NO_KEY_DECLARED,
+  NO_RECORDS_SAMPLED,
+  WELL_KNOWN_RESOURCES,
+  buildStandardMap,
+  createLookupCache,
+  resolveTestParams
+} from '../web-api-core/index.js';
 import { resolveNoRecordsOutcome, resolveServingDecision } from '../web-api-core/serving.js';
 import {
   type ResourceTestReport,
@@ -204,7 +211,38 @@ export const requiredResourceNotServedReport = (resource: string): ResourceTestR
 });
 
 /**
- * A non-required well-known resource (Media, OpenHouse, Showing, …) that is determinately declared-but-not-
+ * A resource whose EntityType declares no key property.
+ *
+ * OData requires at least one (a compound key is several), so this is a metadata defect, and the CSDL validator
+ * already reports it with the spec citation. Core reads the key from the provider's own `<Key>` and substitutes
+ * nothing, so without one there is no way to project the key or address a single entity — and anything requiring
+ * a key FAILS rather than running against a fabricated one (Josh, 2026-10-01). Standard or local resource alike.
+ * No sample request was issued, so this never sets `deadlineReached`.
+ */
+export const noKeyDeclaredReport = (resource: string): ResourceTestReport => ({
+  resource,
+  params: stubParams(resource),
+  scenarios: [
+    {
+      tag: 'no-key-declared',
+      name: `${resource} declares no key property in $metadata`,
+      passed: false,
+      skipped: false,
+      assertions: [
+        {
+          passed: false,
+          message: `No key declared — the EntityType for ${resource} defines no key property, which OData requires of every entity type (at least one; a compound key is several). Core certifies against the key in the provider's own <Key> element and never substitutes a conventional name, so every scenario that projects or addresses by the key is untestable here. See the metadata validation report for the CSDL violation and its spec reference.`
+        }
+      ],
+      duration: 0
+    }
+  ],
+  coverage: [],
+  summary: { total: 1, passed: 0, failed: 1, skipped: 0, optional: { passed: 0, notSupported: 0, notTested: 0 } }
+});
+
+/**
+ * A non-required well-known resource (Media, OpenHouse, Showing, …) that is determinately declared-but-
  * served at the top level (Core 2.1.0 carve-out). Reported Not Applicable — a single SKIPPED scenario with a
  * passed:true assertion (the clean-render skip pattern, so it shows as NA, not a failure). No sampling request
  * was issued; it counts 0 failed and never sets `deadlineReached`.
@@ -452,6 +490,19 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
             detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'skipped', note: 'ran out of time' }
           });
           return deadlineResourceReport(resource);
+        }
+
+        // No key in the EntityType: a metadata defect that makes every key-projecting and key-addressing scenario
+        // untestable, so the resource FAILS rather than running against a substituted key. Checked before
+        // availability because no sample request was issued for it.
+        if (params.skippedTypes.includes(NO_KEY_DECLARED)) {
+          onProgress({
+            step: RUN_CORE_SCENARIOS,
+            status: 'running',
+            message: `${resource}: EntityType declares no key property — failure`,
+            detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'failed', note: 'no key declared' }
+          });
+          return noKeyDeclaredReport(resource);
         }
 
         // Runtime top-level availability — the "Media rule". If the sample page came back with no records, this
