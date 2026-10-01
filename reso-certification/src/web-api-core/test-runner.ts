@@ -27,8 +27,9 @@ import { type EmptyContext, type EmptyVerdict, emptyVerdict } from './empty-verd
 import type { EnumCandidate } from './enum-selection.js';
 import { type LookupCache, createLookupCache } from './lookup-cache.js';
 import { buildLookupUrl, buildScenarioQuery, originatingSystemFilterClause, recordDerivedSet } from './queries.js';
-import type { TestParams } from './sampling.js';
-import { type ComparisonOp, type CoreScenario, type ExpandScenario, scenariosForVersion } from './scenarios.js';
+import { type TestParams, integerNotSentinelFor } from './sampling.js';
+import type { ScalarCandidate } from './scalar-selection.js';
+import { type ComparisonOp, type CoreScenario, type ExpandScenario, type FilterScenario, scenariosForVersion } from './scenarios.js';
 import { parseServiceDocument } from './serving.js';
 import { type StandardMap, buildStandardMap } from './standard-map.js';
 
@@ -155,6 +156,10 @@ export const isInOperatorSkippedForVersion = (scenario: CoreScenario, detectedOD
   scenario.category === 'in-operator' && detectedODataVersion !== '4.01';
 
 /** Build coverage matrix from resolved test params. */
+/** Which field represented each sampled type. `field` is the field the ladder STARTS on — the top-ranked,
+ *  RESO-first candidate — which is the field certified in the ordinary case. When a server rejects `$filter` on
+ *  it, the scenario is certified on an alternate instead, and the field actually queried is the one named in that
+ *  scenario's `requestUrl`. The enum slots have always behaved this way; since #315 the scalar slots do too. */
 const buildCoverage = (params: TestParams): ReadonlyArray<TypeCoverage> => [
   { type: 'integer', field: params.integerField, hasData: params.integerValueLow != null },
   { type: 'decimal', field: params.decimalField, hasData: params.decimalValueLow != null },
@@ -953,6 +958,159 @@ export const executeStandardScenario = async (
   }
 };
 
+/** What walking a candidate ladder observed. `determinate` short-circuits everything else: the first candidate
+ *  that produced a real pass/fail IS the verdict. Otherwise the caller decides, from: the first candidate the
+ *  server REJECTED (non-200), whether ANY candidate was accepted (a 200 — which vetoes an all-reject operator
+ *  gap), and the last accepted-but-inconclusive result (it carries the empty-verdict's own diagnostic). */
+interface LadderOutcome {
+  readonly determinate?: ScenarioResult;
+  readonly firstRejection?: ScenarioResult;
+  readonly lastInconclusive?: ScenarioResult;
+  readonly anyAccepted: boolean;
+}
+
+/**
+ * Try each candidate's params in rank order until one yields a determinate result.
+ *
+ * The bookkeeping is subtle and identical for every ladder (enum and scalar alike), so it lives here once: an
+ * early exit on the first determinate pass/fail, the first rejection kept for the all-reject verdict, and
+ * `anyAccepted` to veto that verdict when some field DID accept the operator. Callers map the outcome to a
+ * verdict themselves, because the right fallback differs per family.
+ */
+const walkCandidateLadder = async (
+  serverUrl: string,
+  resource: string,
+  scenario: CoreScenario,
+  attempts: ReadonlyArray<TestParams>,
+  authToken: string,
+  start: number,
+  requester: ODataRequester
+): Promise<LadderOutcome> => {
+  // Local mutable accumulators, scoped to this walk and never leaked — the returned outcome is readonly.
+  let anyAccepted = false;
+  let firstRejection: ScenarioResult | undefined;
+  let lastInconclusive: ScenarioResult | undefined;
+  for (const attempt of attempts) {
+    const { result, retryable, rejected, accepted } = await executeStandardScenario(
+      serverUrl,
+      resource,
+      scenario,
+      attempt,
+      authToken,
+      start,
+      requester
+    );
+    if (!retryable) return { determinate: result, firstRejection, lastInconclusive, anyAccepted: anyAccepted || accepted };
+    if (accepted) {
+      anyAccepted = true;
+      lastInconclusive = result;
+    }
+    if (rejected) firstRejection ??= result;
+  }
+  return { firstRejection, lastInconclusive, anyAccepted };
+};
+
+/** The scalar slots that carry a RESO-first candidate ladder. `datetime` is absent on purpose: the timestamp
+ *  field is NOT ranked by this mechanism — `ModificationTimestamp` is required on every standard resource and is
+ *  the only field guaranteed to be <= now, so `selectTimestampField` keeps choosing it (issue #315, per Josh). */
+type ScalarSlot = 'integer' | 'decimal' | 'date';
+
+/** Substitute an integer candidate's field + its OWN statistics into the integer slot, so an alternate is never
+ *  queried with the primary field's numbers. The not() sentinel is re-derived from this field's raw values. */
+const paramsWithIntegerCandidate = (params: TestParams, c: ScalarCandidate<number>): TestParams => ({
+  ...params,
+  integerField: c.field,
+  integerValueLow: c.stats.median,
+  integerValueMin: c.stats.min,
+  integerValueMax: c.stats.max,
+  integerDistinctCount: c.stats.distinct,
+  integerNotSentinel: integerNotSentinelFor(c.values)
+});
+
+/** Substitute a decimal candidate (median serves both the low and the `le` high slot, as in sampling). */
+const paramsWithDecimalCandidate = (params: TestParams, c: ScalarCandidate<number>): TestParams => ({
+  ...params,
+  decimalField: c.field,
+  decimalValueLow: c.stats.median,
+  decimalValueHigh: c.stats.median,
+  decimalValueMin: c.stats.min,
+  decimalValueMax: c.stats.max,
+  decimalDistinctCount: c.stats.distinct
+});
+
+/** Substitute a date candidate. */
+const paramsWithDateCandidate = (params: TestParams, c: ScalarCandidate<string>): TestParams => ({
+  ...params,
+  dateField: c.field,
+  dateValue: c.stats.median,
+  dateValueMin: c.stats.min,
+  dateValueMax: c.stats.max,
+  dateDistinctCount: c.stats.distinct
+});
+
+/** A filter scenario on one of the laddered scalar types — its `dataType` IS the slot, so the two can never
+ *  disagree. `datetime` filters are excluded by the type, which is why they keep the single-execution path. */
+export type ScalarFilterScenario = FilterScenario & { readonly dataType: ScalarSlot };
+
+/** Does this scenario filter on a laddered scalar type? Narrows, so the caller needs no cast. */
+const isScalarFilterScenario = (scenario: CoreScenario): scenario is ScalarFilterScenario =>
+  scenario.category === 'filter' && scenario.dataType !== 'datetime';
+
+/** One TestParams per ranked candidate for the scenario's scalar slot, standard-first (see selectScalarCandidates). */
+const scalarAttempts = (slot: ScalarSlot, params: TestParams): ReadonlyArray<TestParams> =>
+  slot === 'integer'
+    ? (params.integerCandidates ?? []).map(c => paramsWithIntegerCandidate(params, c))
+    : slot === 'decimal'
+      ? (params.decimalCandidates ?? []).map(c => paramsWithDecimalCandidate(params, c))
+      : (params.dateCandidates ?? []).map(c => paramsWithDateCandidate(params, c));
+
+/**
+ * Run a scalar filter scenario (Integer / Decimal / Date) over its RESO-first candidate ladder — the scalar
+ * counterpart of {@link runEnumFamilyScenario}, closing issue #315.
+ *
+ * Before this, the type was certified on ONE field picked in metadata declaration order, so a server that
+ * rejected `$filter` on that field failed every scenario of the type even with other fields available (observed
+ * 2026-09-21: a local `Edm.Date` first, a 500, six Date failures). Now the standard fields are tried first and
+ * the ladder continues past a rejection.
+ *
+ * The verdict rules are the scalar path's existing ones, unchanged: a rejection with NO acceptance anywhere is a
+ * genuine operator gap → FAIL (a lone candidate that 400s still fails, exactly as before); an acceptance with
+ * nothing to assert cannot prove a gap → the empty-verdict's own inconclusive result.
+ */
+export const runScalarFilterScenario = async (
+  serverUrl: string,
+  resource: string,
+  scenario: ScalarFilterScenario,
+  params: TestParams,
+  authToken: string,
+  start: number,
+  requester: ODataRequester = webRequester
+): Promise<ScenarioResult> => {
+  const slot = scenario.dataType;
+  const attempts = scalarAttempts(slot, params);
+  if (attempts.length === 0) {
+    // No sampled field of this type at all — the pre-existing "can't build the query" skip, reached the same way.
+    const { result } = await executeStandardScenario(serverUrl, resource, scenario, params, authToken, start, requester);
+    return result;
+  }
+  const { determinate, firstRejection, lastInconclusive, anyAccepted } = await walkCandidateLadder(
+    serverUrl,
+    resource,
+    scenario,
+    attempts,
+    authToken,
+    start,
+    requester
+  );
+  if (determinate) return determinate;
+  if (firstRejection && !anyAccepted) return firstRejection;
+  return (
+    lastInconclusive ??
+    firstRejection ??
+    skipResult(scenario, start, `"${scenario.op}" not conclusively testable across ${attempts.length} ${slot} field(s)`)
+  );
+};
+
 /**
  * Run an enum-family scenario. Candidates are pinned to the scenario's OWN representation ({@link scenarioTargetsRep})
  * intersected with the operator that representation supports ({@link opValidForRep}: flags→has, single→eq/ne/in,
@@ -988,22 +1146,18 @@ export const runEnumFamilyScenario = async (
     );
   }
 
-  let anyAccepted = false; // some eligible field returned 200 — the operator ran, so it is not an all-reject gap
-  let firstRejection: ScenarioResult | undefined;
-  for (const candidate of eligible) {
-    const { result, retryable, rejected, accepted } = await executeStandardScenario(
-      serverUrl,
-      resource,
-      scenario,
-      paramsWithCandidate(params, slot, candidate),
-      authToken,
-      start,
-      requester
-    );
-    if (!retryable) return result; // determinate pass/fail (incl. a guaranteed-match 200-empty → fail) — done
-    if (accepted) anyAccepted = true;
-    if (rejected) firstRejection ??= result;
-  }
+  // Walk the ladder (shared with the scalar path — see walkCandidateLadder): the first determinate pass/fail
+  // (incl. a guaranteed-match 200-empty → fail) is the verdict.
+  const { determinate, firstRejection, anyAccepted } = await walkCandidateLadder(
+    serverUrl,
+    resource,
+    scenario,
+    eligible.map(candidate => paramsWithCandidate(params, slot, candidate)),
+    authToken,
+    start,
+    requester
+  );
+  if (determinate) return determinate;
   // No determinate result. A rejection with NO acceptance anywhere is a genuine operator gap → FAIL (as the
   // scalar path treats a 400). An untestable candidate (unbuildable query, transport error) is NEUTRAL — it
   // neither proves nor disproves a gap. If a field accepted the operator (200) but had no data to assert, we
@@ -1365,7 +1519,13 @@ const runScenario = async (
         requestUrl: query.url
       };
     }
-    // Other standard scenarios (filter / orderby / expand / lookup-resource): a single execution.
+    // Scalar filter scenarios (Integer / Decimal / Date) walk their RESO-first candidate ladder, so a server that
+    // will not filter on one field no longer fails the whole type (#315). `datetime` is excluded — its field is
+    // ModificationTimestamp by requirement, not by ranking.
+    if (isScalarFilterScenario(scenario)) {
+      return runScalarFilterScenario(serverUrl, resource, scenario, params, authToken, start, requester);
+    }
+    // Other standard scenarios (orderby / expand / lookup-resource, and the datetime filters): a single execution.
     const { result } = await executeStandardScenario(serverUrl, resource, scenario, params, authToken, start, requester);
     return result;
   } catch (err) {
