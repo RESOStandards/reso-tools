@@ -7,8 +7,9 @@
  * is the provider's operator misbehaving, not a bad test value:
  *
  * - **fail** — `eq` / `ge` / `le` / `in` / `has` / `any` against a sampled value (the value's own record must
- *   satisfy it), any `now()` comparison (matches every past record), and a `-1`-sentinel `not` (`not(field le
- *   -1)` returns every record): a hit is mandatory, so empty = broken.
+ *   satisfy it), a `now()` comparison over a field we observed holding a past value, and a `-1`-sentinel `not`
+ *   (`not(field le -1)` returns every record): a hit is mandatory, so empty = broken. The one exception is
+ *   `lt/le now()` on a field whose sampled values are ALL in the future — see {@link EmptyContext.fieldHasPastValues}.
  * - **skip** — `all` (the record's whole collection must sit inside the set — legitimately often empty),
  *   `has A and has B` (needs both flags on one record — the two values may come from different records), and
  *   any compound `field op X and/or field op2 Y` filter (two conditions, legitimately often empty). BUT when the
@@ -35,6 +36,10 @@ export interface EmptyContext {
    *  queries.ts `recordDerivedSet`). That record is guaranteed to satisfy the filter, so an empty result is a
    *  determinate operator FAIL rather than the legitimately-empty skip. */
   readonly recordDerivedSet?: boolean;
+  /** For a `lt/le now()` scenario: did the field actually queried carry at least one sampled value at or before
+   *  now? `false` means every sampled value is in the FUTURE, so the server matching nothing is CORRECT and must
+   *  not be failed (Josh, 2026-10-01). Undefined keeps the strict reading — unknown never excuses a server. */
+  readonly fieldHasPastValues?: boolean;
 }
 
 export const emptyVerdict = (scenario: CoreScenario, ctx: EmptyContext): EmptyVerdict => {
@@ -48,9 +53,17 @@ export const emptyVerdict = (scenario: CoreScenario, ctx: EmptyContext): EmptyVe
     case 'filter':
       if (scenario.negated) return 'fail'; // `not(field le -1)` → every record → a hit is mandatory
       if (scenario.compound) return 'skip'; // `gt X and lt Y` — two conditions, legitimately often empty
-      // Any `now()` comparison (`lt/le/ne now()`) matches every past record, so empty is a defect regardless
-      // of the sampled data — a guaranteed match, not the distinct-count logic.
-      if (scenario.valueParam === 'now') return 'fail';
+      if (scenario.valueParam === 'now') {
+        // `ne now()` is satisfied by every value other than now, FUTURE values included, so it can never be
+        // legitimately empty — a hit stays mandatory whatever the field holds.
+        if (scenario.op === 'ne') return 'fail';
+        // `lt/le now()` match only values at or before now. Normally the field holds past records, so a hit is
+        // mandatory and empty is a defect. But on a field whose sampled values are ALL in the future (OpenHouse
+        // start times, Showing appointments) matching nothing is the server being CORRECT, so that is a skip, not
+        // a fail. Sampling steers these two onto a field with a past value whenever the resource has one
+        // (`selectTimestampFieldForNow`); this is the residue, for a resource where none does.
+        return ctx.fieldHasPastValues === false ? 'skip' : 'fail';
+      }
       // `eq/ge/le` against a value sampled from the field: the value's OWN record must satisfy it → guaranteed.
       // `gt/lt` compare against the sampled MIN/MAX, so a match exists only if the field holds a value beyond
       // that bound — the same data-dependent 3-way as `ne`: ≥2 distinct ⇒ another value provably exists ⇒

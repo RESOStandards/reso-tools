@@ -55,6 +55,16 @@ export interface TestParams {
   readonly dateValueMin?: string;
   readonly dateValueMax?: string;
   readonly timestampField?: string;
+  /** The field the `lt now()` / `le now()` scenarios use: the top-ranked datetime field carrying at least one
+   *  sampled value at or before now. Those two are the only scenarios needing it — an empty result on a `now()`
+   *  comparison is a fail, so a field whose values are all in the future false-fails a compliant server. ABSENT
+   *  when no datetime field on the resource carries a past value; they then run on {@link timestampField} and the
+   *  empty-verdict stops asserting a hit for them, because empty is then the correct answer. */
+  readonly timestampFieldForNow?: string;
+  /** Non-gating warning when the resource carries no usable `ModificationTimestamp`, so the timestamp scenarios
+   *  were grounded on a substitute. Rides `ScenarioResult.warnings` on every scenario that uses the timestamp
+   *  field; never touches `passed`, the verdict or the exit code. See {@link modificationTimestampWarning}. */
+  readonly timestampWarning?: string;
   /** The sampled MIN timestamp — used for `gt` / `ge`. `gt min` is gated on {@link datetimeDistinctCount};
    *  the previous first-seen value was the global MAX under a `…DESC` default sort, making `gt max` a false fail. */
   readonly datetimeValue?: string;
@@ -187,9 +197,8 @@ const DATE_TYPES = ['Edm.Date'];
 const DATETIME_TYPES = ['Edm.DateTimeOffset'];
 
 // The RESO-required modification timestamp — always <= now, so the safe field to ground the `lt/le now()`
-// scenarios on. Fields ending in this suffix are system modification/event timestamps (likewise always past).
+// scenarios on.
 const MODIFICATION_TIMESTAMP_FIELD = 'ModificationTimestamp';
-const TIMESTAMP_FIELD_SUFFIX = 'Timestamp';
 
 const isIntegerType = (type: string): boolean => INTEGER_TYPES.includes(type);
 const isDecimalType = (type: string): boolean => DECIMAL_TYPES.includes(type);
@@ -285,37 +294,102 @@ export const rankCollectionNavs = <T extends { readonly name: string }>(
   return [...navs].sort((a, b) => rank(a) - rank(b));
 };
 
-/** Find a timestamp field with no null values (best for orderby). */
-const findFullyPopulatedTimestamp = (
-  fields: ReadonlyArray<string>,
-  records: ReadonlyArray<Record<string, unknown>>
-): string | undefined => {
-  for (const field of fields) {
-    const allPopulated = records.every(r => r[field] != null);
-    if (allPopulated) return field;
-  }
-  return undefined;
+/**
+ * Rank a resource's populated `Edm.DateTimeOffset` fields for the timestamp scenarios.
+ *
+ * `ModificationTimestamp` first whenever it carries a value: it is RESO-required on every standard resource and is
+ * the semantically correct change-tracking field, not merely an eligible one. Then the DD-standard fields,
+ * most-used first, then the local ones, most-used first — the same filter-then-rank-on-usage rule the scalar
+ * groups follow (see selectScalarCandidates). Usage is fill rate in the sample. The sort is stable, so metadata
+ * declaration order remains the tiebreak at equal usage.
+ *
+ * Standard-ness comes from the DD reference, never from the field name. The previous implementation ranked on
+ * `endsWith('Timestamp')`, which was wrong in both directions: it admitted a local `MyCustomTimestamp` as though
+ * the DD defined it, and the DD itself carries start/end times ending in "Timestamp"
+ * (`InternetTrackingSummary.StartTimestamp` / `EndTimestamp`). The type filter is applied by the caller, which
+ * passes only `Edm.DateTimeOffset` fields.
+ *
+ * A future-dated field is NOT excluded here. Of the scenarios grounded on this slot, only `lt now()` and
+ * `le now()` need a value at or before now; the rest compare against a SAMPLED value or only sort, and work the
+ * same on a future-dated field. Restricting the whole family for those two would leave a well-populated
+ * future-dated field untested (Josh, 2026-10-01). Those two draw from {@link selectTimestampFieldForNow} instead.
+ */
+export const rankDatetimeFields = (
+  datetimeFields: ReadonlyArray<string>,
+  records: ReadonlyArray<Record<string, unknown>>,
+  standardMap: StandardMap,
+  resource: string
+): ReadonlyArray<string> => {
+  const isPopulated = (f: string): boolean => records.some(r => r[f] != null);
+  const usage = (f: string): number => (records.length > 0 ? collectFieldValues(records, f).fillCount / records.length : 0);
+  const mostUsedFirst = (fields: ReadonlyArray<string>): ReadonlyArray<string> => [...fields].sort((a, b) => usage(b) - usage(a));
+  const populated = datetimeFields.filter(isPopulated);
+  const rest = populated.filter(f => f !== MODIFICATION_TIMESTAMP_FIELD);
+  return [
+    ...populated.filter(f => f === MODIFICATION_TIMESTAMP_FIELD),
+    ...mostUsedFirst(rest.filter(f => standardMap.isStandardField(resource, f))),
+    ...mostUsedFirst(rest.filter(f => !standardMap.isStandardField(resource, f)))
+  ];
 };
 
-/** Choose the field for the timestamp scenarios. The `lt/le now()` scenarios need a field guaranteed to be
- *  <= now, or a future-dated datetime (OpenHouse start times, Showing appointments) legitimately returns empty
- *  for `lt now()` and would false-fail a compliant server. Prefer ModificationTimestamp (RESO-required, always
- *  past); else another standard `*Timestamp` field (system modification/event timestamps, likewise always past);
- *  else a generic populated datetime (last resort — a resource with no timestamp field is a DD-gate failure). */
+/** True when the field carries at least ONE sampled value at or before `now`.
+ *
+ *  This — not "every value is past" — is what `lt/le now()` needs: a field mixing past and future values still
+ *  returns its past rows, so the operator is testable on it. Only a field whose sampled values are ALL in the
+ *  future makes an empty result correct. Parsed to epoch rather than compared as strings, because a provider may
+ *  serialize `Z` and `+00:00` forms in the same feed. */
+const hasPastValue = (field: string, records: ReadonlyArray<Record<string, unknown>>, now: number): boolean =>
+  collectValues(records, field)
+    .map(v => Date.parse(String(v)))
+    .filter(Number.isFinite)
+    .some(t => t <= now);
+
+/** The general timestamp slot: the top-ranked populated datetime field (see {@link rankDatetimeFields}). Undefined
+ *  only when the resource has no populated datetime field at all. */
 export const selectTimestampField = (
   datetimeFields: ReadonlyArray<string>,
-  records: ReadonlyArray<Record<string, unknown>>
+  records: ReadonlyArray<Record<string, unknown>>,
+  standardMap: StandardMap,
+  resource: string
+): string | undefined => rankDatetimeFields(datetimeFields, records, standardMap, resource)[0];
+
+/**
+ * The field for the `lt now()` / `le now()` scenarios: the top-ranked candidate carrying at least one sampled value
+ * at or before now.
+ *
+ * Those two are the only scenarios needing that, and they need it absolutely, because the empty-verdict makes an
+ * empty result on a `now()` comparison a FAIL: run them against a field whose values are all in the FUTURE and a
+ * compliant server is false-failed for correctly matching nothing. `ne now()` is deliberately NOT in this set —
+ * every value other than now satisfies it, future ones included, so it can never be legitimately empty.
+ *
+ * Undefined when NO datetime field on the resource carries a past value. The two scenarios then run on the general
+ * slot, and the empty-verdict stops asserting a hit for them (see `EmptyContext.fieldHasPastValues`) — the empty
+ * result is the server being right.
+ */
+export const selectTimestampFieldForNow = (
+  datetimeFields: ReadonlyArray<string>,
+  records: ReadonlyArray<Record<string, unknown>>,
+  standardMap: StandardMap,
+  resource: string,
+  now: number = Date.now()
+): string | undefined => rankDatetimeFields(datetimeFields, records, standardMap, resource).find(f => hasPastValue(f, records, now));
+
+/** The non-gating warning for a resource whose sampled data carries no usable `ModificationTimestamp`. Core does
+ *  not fail for it — a standard resource missing the field is a Data Dictionary matter, not a Core one (Josh,
+ *  2026-10-01) — but the tester should hear it, because keys and timestamps are required for DD testing and the
+ *  timestamp scenarios are now grounded on a substitute field. Undefined when the field is present and populated. */
+export const modificationTimestampWarning = (
+  datetimeFields: ReadonlyArray<string>,
+  records: ReadonlyArray<Record<string, unknown>>,
+  resource: string,
+  chosenField: string | undefined
 ): string | undefined => {
-  const isPopulated = (f: string): boolean => records.some(r => r[f] != null);
-  const isStandardTimestamp = (f: string): boolean => f.endsWith(TIMESTAMP_FIELD_SUFFIX);
-  return (
-    (datetimeFields.includes(MODIFICATION_TIMESTAMP_FIELD) && isPopulated(MODIFICATION_TIMESTAMP_FIELD)
-      ? MODIFICATION_TIMESTAMP_FIELD
-      : undefined) ??
-    datetimeFields.filter(isStandardTimestamp).find(isPopulated) ??
-    findFullyPopulatedTimestamp(datetimeFields, records) ??
-    datetimeFields.find(isPopulated)
-  );
+  const present = datetimeFields.includes(MODIFICATION_TIMESTAMP_FIELD);
+  const populated = present && records.some(r => r[MODIFICATION_TIMESTAMP_FIELD] != null);
+  if (populated) return undefined;
+  const why = present ? 'declares it but sampled no value for it' : 'does not declare it';
+  const instead = chosenField ? `grounded the timestamp scenarios on '${chosenField}' instead` : 'found no usable datetime field';
+  return `${resource} ${why} for '${MODIFICATION_TIMESTAMP_FIELD}' — ${instead}. Keys and timestamps are required for Data Dictionary testing, so this is reported here and assessed there, not failed by Core.`;
 };
 
 // ── Main resolver ──
@@ -433,7 +507,9 @@ export const resolveTestParams = async (
 
   // Resolve timestamp field + value (prefer fully populated for orderby). datetimeValue = sampled MIN (feeds
   // gt/ge); the previous first-seen value was the global MAX under a `…DESC` default sort → `gt max` false-fail.
-  const timestampField = selectTimestampField(datetimeFields, records);
+  const timestampField = selectTimestampField(datetimeFields, records, standardMap, resource);
+  const timestampFieldForNow = selectTimestampFieldForNow(datetimeFields, records, standardMap, resource);
+  const timestampWarning = modificationTimestampWarning(datetimeFields, records, resource, timestampField);
   const tsStats = timestampField ? timestampStats(collectValues(records, timestampField)) : undefined;
   const datetimeValue = tsStats?.min;
   const datetimeValueMax = tsStats?.max;
@@ -515,6 +591,8 @@ export const resolveTestParams = async (
     dateValueMin,
     dateValueMax,
     timestampField,
+    timestampFieldForNow,
+    timestampWarning,
     datetimeValue,
     datetimeValueMax,
     sampleComplete,
