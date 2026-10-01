@@ -19,11 +19,6 @@
 
 import type { StandardMap } from './standard-map.js';
 
-/** The default distinct-value floor. The `ne` / `gt` / `lt` verdicts need a second distinct value to prove the
- *  field holds one (so an empty result is a defect rather than the correct answer), and three keeps a median
- *  strictly inside the range. Matches the floor the previous `findBestField` applied. */
-export const MIN_DISTINCT_VALUES = 3;
-
 /** Min / median / max over a field's sampled values, plus the type-aware distinct count. Produced by the
  *  caller's own stats function (`numericStats` for Integer/Decimal, `dateStats` for Date), so the count is
  *  deduped the way that type requires — numerically for numerics, date-only for dates. */
@@ -45,9 +40,9 @@ export interface ScalarCandidate<V> {
   /** The field's own min / median / max / distinct count — every scenario value for this candidate comes
    *  from here, so an alternate is never queried with the primary field's numbers. */
   readonly stats: ScalarStats<V>;
-  /** Fraction of sampled records carrying a non-null value for this field (0–1). Josh's rule is
-   *  "most-used standard elements first, and only then revert to highly populated locals"; the engine has no
-   *  adoption data, so fill rate in the sample is what "most-used" means here. */
+  /** Fraction of sampled records carrying a non-null value for this field (0–1). This is the ranking key
+   *  within a rank: the candidates are filtered to the standard elements and then ranked on USAGE from there.
+   *  The engine carries no adoption data, so fill rate in the sample is what "most-used" means here. */
   readonly fillRate: number;
 }
 
@@ -76,13 +71,17 @@ export const collectFieldValues = (
 };
 
 /**
- * Rank the testable fields of one scalar type for a resource, RESO-first.
+ * Rank the testable fields of one scalar type for a resource: **filter to the standard elements, then rank on
+ * usage from there** (Josh, 2026-10-01).
  *
- * Two ranks, standard before local — a local field is reached only after every standard field has been tried.
- * Within a rank, a field carrying at least `minDistinct` distinct values comes first (the `ne` / `gt` / `lt`
- * verdicts need the second value to be provable), then the higher fill rate: a fuller field is likelier to
- * return a non-empty result and more resistant to record drift between sampling and the live query. The sort is
- * stable, so metadata declaration order remains the final tiebreak and selection stays deterministic.
+ * Two ranks, standard before local — the standard elements are the set a type is certified from, and a local
+ * field is reached only after every standard one has been tried. Usage is the ranking key INSIDE a rank: the
+ * fuller field is likelier to return a non-empty result and more resistant to record drift between sampling and
+ * the live query. Distinct count breaks a usage tie only, never leads it — a sparsely populated standard field
+ * still outranks a richer local one, because the filter comes before the ranking. Where the whole standard set
+ * is too thin to settle an operator, the ladder below is what recovers, not a reordering of the set.
+ *
+ * The sort is stable, so metadata declaration order remains the final tiebreak and selection stays deterministic.
  *
  * The list is deliberately uncapped. A provider may restrict `$filter` to a subset of its fields and reject the
  * rest, so a queryable field can sit at any rank; the runner walks the whole ladder and only reports an
@@ -93,8 +92,7 @@ export const selectScalarCandidates = <V>(
   records: ReadonlyArray<Record<string, unknown>>,
   standardMap: StandardMap,
   resource: string,
-  stats: (values: ReadonlyArray<unknown>) => ScalarStats<V> | undefined,
-  minDistinct: number = MIN_DISTINCT_VALUES
+  stats: (values: ReadonlyArray<unknown>) => ScalarStats<V> | undefined
 ): ReadonlyArray<ScalarCandidate<V>> => {
   const candidates = fields
     .map(field => {
@@ -113,7 +111,7 @@ export const selectScalarCandidates = <V>(
     })
     .filter((c): c is ScalarCandidate<V> => c !== undefined);
 
+  // Standard before local (the filter), then usage, then distinct count as a usage tiebreak only.
   const rank = (c: ScalarCandidate<V>): number => (c.isStandard ? 0 : 1);
-  const hasEnough = (c: ScalarCandidate<V>): number => (c.stats.distinct >= minDistinct ? 0 : 1);
-  return [...candidates].sort((a, b) => rank(a) - rank(b) || hasEnough(a) - hasEnough(b) || b.fillRate - a.fillRate);
+  return [...candidates].sort((a, b) => rank(a) - rank(b) || b.fillRate - a.fillRate || b.stats.distinct - a.stats.distinct);
 };
