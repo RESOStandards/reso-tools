@@ -15,6 +15,8 @@ export { createLookupCache } from './lookup-cache.js';
 export type { LookupCache } from './lookup-cache.js';
 export { selectEnumCandidates, isSingleRep, isMultiRep } from './enum-selection.js';
 export type { EnumCandidate } from './enum-selection.js';
+export { selectScalarCandidates, MIN_DISTINCT_VALUES } from './scalar-selection.js';
+export type { ScalarCandidate, ScalarStats } from './scalar-selection.js';
 export { buildScenarioQuery } from './queries.js';
 export type { QuerySpec } from './queries.js';
 export {

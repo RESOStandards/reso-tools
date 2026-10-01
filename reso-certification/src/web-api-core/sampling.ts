@@ -13,6 +13,7 @@ import { type ODataRequester, buildResourceUrl, webRequester } from '../test-run
 import type { EntityType } from '../test-runner/types.js';
 import { type EnumCandidate, isMultiRep, isSingleRep, selectEnumCandidates } from './enum-selection.js';
 import { ORIGINATING_SYSTEM_ID_FIELD, ORIGINATING_SYSTEM_NAME_FIELD, originatingSystemFilterClause } from './queries.js';
+import { type ScalarCandidate, collectFieldValues, selectScalarCandidates } from './scalar-selection.js';
 import type { StandardMap } from './standard-map.js';
 
 /** Resolved test parameters for one resource. */
@@ -91,6 +92,12 @@ export interface TestParams {
    *  field isn't queryable — we're not guaranteed a given field can be filtered on. */
   readonly singleLookupCandidates?: ReadonlyArray<EnumCandidate>;
   readonly multiLookupCandidates?: ReadonlyArray<EnumCandidate>;
+  /** Ranked candidate fields for the SCALAR slots (standard-first — see selectScalarCandidates), the scalar
+   *  counterpart of the enum ladders above. The runner substitutes each in turn when the primary field is not
+   *  queryable, so a server that rejects `$filter` on one field no longer fails the whole type. */
+  readonly integerCandidates?: ReadonlyArray<ScalarCandidate<number>>;
+  readonly decimalCandidates?: ReadonlyArray<ScalarCandidate<number>>;
+  readonly dateCandidates?: ReadonlyArray<ScalarCandidate<string>>;
   /** Map from single-lookup field name to its RESO.OData.Metadata.LookupName
    *  annotation value. Used by the Lookup Resource validation scenario
    *  (`GET /Lookup?$filter=LookupName eq '<lookupName>'`). Sampled from the
@@ -258,36 +265,24 @@ const timestampStats = (
 };
 
 /** Collect all non-null distinct values for a field across records. */
-const collectValues = (records: ReadonlyArray<Record<string, unknown>>, field: string): ReadonlyArray<unknown> => {
-  const seen = new Set<string>();
-  const values: unknown[] = [];
-  for (const record of records) {
-    const val = record[field];
-    if (val == null) continue;
-    const key = String(val);
-    if (!seen.has(key)) {
-      seen.add(key);
-      values.push(val);
-    }
-  }
-  return values;
-};
+const collectValues = (records: ReadonlyArray<Record<string, unknown>>, field: string): ReadonlyArray<unknown> =>
+  collectFieldValues(records, field).values;
 
-/** Find the best field of a given type: prefers 3+ distinct values, falls back to any with values. */
-const findBestField = (
-  fields: ReadonlyArray<string>,
-  records: ReadonlyArray<Record<string, unknown>>,
-  minDistinct = 3
-): { readonly field: string; readonly values: ReadonlyArray<unknown> } | undefined => {
-  let fallback: { readonly field: string; readonly values: ReadonlyArray<unknown> } | undefined;
-
-  for (const field of fields) {
-    const values = collectValues(records, field);
-    if (values.length >= minDistinct) return { field, values };
-    if (values.length > 0 && !fallback) fallback = { field, values };
-  }
-
-  return fallback;
+/**
+ * Rank a resource's COLLECTION navigation properties RESO-first — a standard DD expansion for the resource
+ * before a local one — so `expandField` (the RRK warning's default and the single-field query path) is the first
+ * STANDARD navigation rather than whichever the metadata happened to declare first, and the per-nav results list
+ * standard expansions first. Every declared collection nav is still tested ("see it, test it"): the ranking
+ * decides order and the default, never coverage. The sort is stable, so declaration order remains the tiebreak
+ * within each rank and selection stays deterministic.
+ */
+export const rankCollectionNavs = <T extends { readonly name: string }>(
+  navs: ReadonlyArray<T>,
+  standardMap: StandardMap,
+  resource: string
+): ReadonlyArray<T> => {
+  const rank = (nav: T): number => (standardMap.isStandardField(resource, nav.name) ? 0 : 1);
+  return [...navs].sort((a, b) => rank(a) - rank(b));
 };
 
 /** Find a timestamp field with no null values (best for orderby). */
@@ -400,37 +395,40 @@ export const resolveTestParams = async (
   const singleLookupCandidates = selectEnumCandidates(entityType.properties, records, enumTypes, standardMap, resource, isSingleRep);
   const multiLookupCandidates = selectEnumCandidates(entityType.properties, records, enumTypes, standardMap, resource, isMultiRep);
 
-  // Resolve integer field + values. median → eq/ge/le/ne; min → gt; max → lt (the gt/lt targets must be the
-  // extremes so a match exists iff another value lies beyond them — the empty-verdict gates gt/lt on distinct).
-  const intResult = findBestField(integerFields, records);
-  const integerField = intResult?.field;
-  const intStats = intResult ? numericStats(intResult.values) : undefined;
-  const integerValueLow = intStats?.median;
-  const integerValueMin = intStats?.min;
-  const integerValueMax = intStats?.max;
-  const integerDistinctCount = intStats?.distinct;
+  // Resolve integer field + values from the RESO-first ladder (standard DD fields before local ones; see
+  // selectScalarCandidates). The primary is the top-ranked candidate; the runner walks the rest when the server
+  // will not filter on it. median → eq/ge/le/ne; min → gt; max → lt (the gt/lt targets must be the extremes so a
+  // match exists iff another value lies beyond them — the empty-verdict gates gt/lt on distinct).
+  const integerCandidates = selectScalarCandidates(integerFields, records, standardMap, resource, numericStats);
+  const intPrimary = integerCandidates[0];
+  const integerField = intPrimary?.field;
+  const integerValueLow = intPrimary?.stats.median;
+  const integerValueMin = intPrimary?.stats.min;
+  const integerValueMax = intPrimary?.stats.max;
+  const integerDistinctCount = intPrimary?.stats.distinct;
   if (!integerField) skippedTypes.push('integer');
-  const integerNotSentinel = intResult ? integerNotSentinelFor(intResult.values) : undefined;
+  const integerNotSentinel = intPrimary ? integerNotSentinelFor(intPrimary.values) : undefined;
 
-  // Resolve decimal field + values (same median/min/max scheme).
-  const decResult = findBestField(decimalFields, records);
-  const decimalField = decResult?.field;
-  const decStats = decResult ? numericStats(decResult.values) : undefined;
-  const decimalValueLow = decStats?.median;
-  const decimalValueHigh = decStats?.median; // le uses the high slot; median satisfies le (all ≤ median)
-  const decimalValueMin = decStats?.min;
-  const decimalValueMax = decStats?.max;
-  const decimalDistinctCount = decStats?.distinct;
+  // Resolve decimal field + values (same ladder, same median/min/max scheme).
+  const decimalCandidates = selectScalarCandidates(decimalFields, records, standardMap, resource, numericStats);
+  const decPrimary = decimalCandidates[0];
+  const decimalField = decPrimary?.field;
+  const decimalValueLow = decPrimary?.stats.median;
+  const decimalValueHigh = decPrimary?.stats.median; // le uses the high slot; median satisfies le (all ≤ median)
+  const decimalValueMin = decPrimary?.stats.min;
+  const decimalValueMax = decPrimary?.stats.max;
+  const decimalDistinctCount = decPrimary?.stats.distinct;
   if (!decimalField) skippedTypes.push('decimal');
 
-  // Resolve date field + values.
-  const dateResult = findBestField(dateFields, records);
-  const dateField = dateResult?.field;
-  const dtStats = dateResult ? dateStats(dateResult.values) : undefined;
-  const dateValue = dtStats?.median;
-  const dateValueMin = dtStats?.min;
-  const dateValueMax = dtStats?.max;
-  const dateDistinctCount = dtStats?.distinct;
+  // Resolve date field + values (same ladder). This is the group the 2026-09-21 run failed on: a local Edm.Date
+  // declared first, a 500 on its $filter, and all six Date scenarios failed with standard Date fields available.
+  const dateCandidates = selectScalarCandidates(dateFields, records, standardMap, resource, dateStats);
+  const datePrimary = dateCandidates[0];
+  const dateField = datePrimary?.field;
+  const dateValue = datePrimary?.stats.median;
+  const dateValueMin = datePrimary?.stats.min;
+  const dateValueMax = datePrimary?.stats.max;
+  const dateDistinctCount = datePrimary?.stats.distinct;
   if (!dateField) skippedTypes.push('date');
 
   // Resolve timestamp field + value (prefer fully populated for orderby). datetimeValue = sampled MIN (feeds
@@ -470,13 +468,18 @@ export const resolveTestParams = async (
   const stringField = stringSample?.field;
   const stringValue = stringSample?.value;
 
-  // Collection navigation properties drive the 2.1.0 $expand scenario, now tested PER nav (GATING). Selection
-  // is declaration order (deterministic, so tests stay stable); a collection is what `$top=5` and the RRK
-  // child-collection check expect. `expandField` = the FIRST collection nav (kept for the RRK warning's default
-  // field resolution + the single-field query path); `expandNavs` = ALL of them with their unqualified target
-  // entity type names, so the runner can test each declared collection nav one at a time. No collection nav (or
-  // no navigation properties at all) ⇒ both stay empty ⇒ the $expand scenario skips gracefully (N/A).
-  const collectionNavs = (entityType.navigationProperties ?? []).filter(np => np.isCollection);
+  // Collection navigation properties drive the 2.1.0 $expand scenario, now tested PER nav (GATING). Selection is
+  // RESO-first (rankCollectionNavs: standard DD expansions for this resource before local ones, declaration order
+  // within a rank — still deterministic, so tests stay stable); a collection is what `$top=5` and the RRK
+  // child-collection check expect. `expandField` = the first RANKED collection nav (kept for the RRK warning's
+  // default field resolution + the single-field query path); `expandNavs` = ALL of them with their unqualified
+  // target entity type names, so the runner can test each declared collection nav one at a time. No collection nav
+  // (or no navigation properties at all) ⇒ both stay empty ⇒ the $expand scenario skips gracefully (N/A).
+  const collectionNavs = rankCollectionNavs(
+    (entityType.navigationProperties ?? []).filter(np => np.isCollection),
+    standardMap,
+    resource
+  );
   const expandField = collectionNavs[0]?.name;
   const expandNavs = collectionNavs.map(np => ({ name: np.name, targetType: np.targetType }));
 
@@ -528,6 +531,9 @@ export const resolveTestParams = async (
     ...(single?.enumType && { singleLookupEnumType: single.enumType }),
     ...(single && { singleLookupDistinctCount: single.distinctValueCount }),
     singleLookupCandidates,
+    integerCandidates,
+    decimalCandidates,
+    dateCandidates,
     multiLookupField,
     multiLookupValue1,
     multiLookupValue2,
