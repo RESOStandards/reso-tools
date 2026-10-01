@@ -124,38 +124,64 @@ describe('emptyVerdict — ne / gt / lt depend on distinct count + completeness'
   });
 });
 
-// #315 / Josh, 2026-10-01: "lt-now and le-now would just be false on a future date, which is correct."
-// A field whose sampled values are ALL in the future legitimately matches nothing for `lt/le now()`, so failing it
-// false-fails a compliant server. `ne now()` is the exception that proves the rule: a future value IS ≠ now, so it
-// matches, and an empty result there is still a real defect.
-describe('emptyVerdict — lt/le now() over an all-future field is the server being right', () => {
+// #315 / Josh, 2026-10-01. Two rulings, both about what an EMPTY result means for `lt/le now()`:
+//   "lt-now and le-now would just be false on a future date, which is correct."  → empty must not fail there, and
+//   because we can prove it, the operator is still certified: empty is a PASS.
+//   "a set with null everything across the board that checks logically still shouldn't be issued a cert, we didn't
+//   actually compare anything."                                                   → and that pass must never be
+//   reachable when nothing was compared.
+// `ne now()` is the exception that proves the rule: a future value IS != now, so it matches, and empty stays a defect.
+describe('emptyVerdict — what empty means for lt/le now() is decided by the field\u2019s own sampled data', () => {
   const nowFilter = (op: string) => filter(op, { valueParam: 'now', dataType: 'datetime', fieldParam: 'timestampField' });
 
-  it('lt/le now() → SKIP when the queried field carried no past value', () => {
+  it('has-past → fail: a value at or before now exists, so a hit was mandatory', () => {
     for (const op of ['lt', 'le']) {
-      expect(emptyVerdict(nowFilter(op), { fieldHasPastValues: false })).toBe('skip');
+      expect(emptyVerdict(nowFilter(op), { nowFieldPastness: 'has-past', complete: true })).toBe('fail');
     }
   });
 
-  it('lt/le now() → fail when the field DID carry a past value (a hit was mandatory)', () => {
+  it('all-future over a COMPLETE sample → PASS: empty is provably the correct answer, so the operator is certified', () => {
     for (const op of ['lt', 'le']) {
-      expect(emptyVerdict(nowFilter(op), { fieldHasPastValues: true })).toBe('fail');
+      expect(emptyVerdict(nowFilter(op), { nowFieldPastness: 'all-future', complete: true })).toBe('pass');
     }
   });
 
-  it('lt/le now() → fail when past-ness is UNKNOWN — fail-closed, unknown never excuses a server', () => {
+  it('all-future over a PARTIAL sample → skip: a past value may exist beyond the sample, so empty is unknowable', () => {
+    for (const op of ['lt', 'le']) {
+      expect(emptyVerdict(nowFilter(op), { nowFieldPastness: 'all-future', complete: false })).toBe('skip');
+      expect(emptyVerdict(nowFilter(op), { nowFieldPastness: 'all-future' })).toBe('skip');
+    }
+  });
+
+  it('no-values → skip, NEVER pass, even over a complete sample: nothing was compared, so nothing is certified', () => {
+    // The all-null (or unparseable) field. A filter over it returns empty and "checks out logically", which is
+    // exactly the cert that must not be issued.
+    for (const op of ['lt', 'le']) {
+      expect(emptyVerdict(nowFilter(op), { nowFieldPastness: 'no-values', complete: true })).toBe('skip');
+    }
+  });
+
+  it('unknown pastness → fail: unknown never excuses a server', () => {
     for (const op of ['lt', 'le']) {
       expect(emptyVerdict(nowFilter(op), NONE)).toBe('fail');
+      expect(emptyVerdict(nowFilter(op), { complete: true })).toBe('fail');
     }
   });
 
-  it('ne now() → fail even on an all-future field: every value other than now satisfies it', () => {
-    expect(emptyVerdict(nowFilter('ne'), { fieldHasPastValues: false })).toBe('fail');
+  it('ne now() → fail in EVERY pastness state, including all-future and no-values', () => {
+    // Every value other than now satisfies ne, future ones included, so it can never be legitimately empty.
+    for (const pastness of ['has-past', 'all-future', 'no-values'] as const) {
+      expect(emptyVerdict(nowFilter('ne'), { nowFieldPastness: pastness, complete: true })).toBe('fail');
+    }
   });
 
   it('the carve-out does not leak to a sampled-value datetime comparison', () => {
-    // `lt datetimeValueMax` keeps the distinct-count logic; fieldHasPastValues is not consulted.
+    // `lt datetimeValueMax` keeps the distinct-count logic; pastness is not consulted.
     const sampled = filter('lt', { dataType: 'datetime', fieldParam: 'timestampField', valueParam: 'datetimeValueMax' });
-    expect(emptyVerdict(sampled, { fieldHasPastValues: false, distinctValueCount: 2 })).toBe('fail');
+    expect(emptyVerdict(sampled, { nowFieldPastness: 'all-future', complete: true, distinctValueCount: 2 })).toBe('fail');
+  });
+
+  it('the carve-out does not leak to a non-datetime now-less filter', () => {
+    expect(emptyVerdict(filter('eq'), { nowFieldPastness: 'all-future', complete: true })).toBe('fail');
   });
 });

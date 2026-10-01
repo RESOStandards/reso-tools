@@ -350,11 +350,11 @@ export const emptyContextFor = (scenario: CoreScenario, params: TestParams): Emp
     }
     return undefined;
   })();
-  // For `lt/le now()`: did the field we queried carry a past value? Sampling sets `timestampFieldForNow` only when
-  // some datetime field on the resource does, so its absence IS the all-future case, where empty is correct.
-  const fieldHasPastValues =
+  // For `lt/le now()`: what the sampled data says about the field we queried — a hit is mandatory, empty is
+  // provably correct, or nothing was compared. Computed at sampling time (`nowFieldPastnessFor`).
+  const nowFieldPastness =
     scenario.category === 'filter' && scenario.dataType === 'datetime' && scenario.valueParam === 'now'
-      ? params.timestampFieldForNow !== undefined
+      ? params.nowFieldPastness
       : undefined;
   // When the query was built over one record's OWN collection (all() / has-and), an empty result is a
   // DETERMINATE defect (the guaranteeing record must come back), not the legitimate-empty skip — see emptyVerdict.
@@ -363,7 +363,7 @@ export const emptyContextFor = (scenario: CoreScenario, params: TestParams): Emp
     ...(distinct !== undefined && { distinctValueCount: distinct }),
     complete: params.sampleComplete,
     ...(derivedSet && { recordDerivedSet: true }),
-    ...(fieldHasPastValues !== undefined && { fieldHasPastValues })
+    ...(nowFieldPastness !== undefined && { nowFieldPastness })
   };
 };
 
@@ -371,7 +371,8 @@ export const emptyContextFor = (scenario: CoreScenario, params: TestParams): Emp
  *  are DETERMINATE (`retryable: false`): a guaranteed-match empty is a real defect that retrying another
  *  field would MASK, and a correct `ne` empty is likewise conclusive. Only `skip` stays retryable. */
 export const emptyOutcome = (
-  verdict: EmptyVerdict
+  verdict: EmptyVerdict,
+  scenario?: CoreScenario
 ): { readonly passed: boolean; readonly skipped: boolean; readonly retryable: boolean; readonly message: string } => {
   switch (verdict) {
     case 'fail':
@@ -387,7 +388,13 @@ export const emptyOutcome = (
         passed: true,
         skipped: false,
         retryable: false,
-        message: 'ne over a single-valued field across the complete resource correctly returned no other records'
+        // Two different operators can prove an empty result correct, and the report must not attribute one to the
+        // other: `ne` over a single-valued complete resource, and `lt/le now()` over a field whose every sampled
+        // value is in the future.
+        message:
+          scenario?.category === 'filter' && scenario.valueParam === 'now'
+            ? `'${scenario.op} now()' correctly returned no records: every sampled value of this field is in the future, across the complete resource`
+            : 'ne over a single-valued field across the complete resource correctly returned no other records'
       };
     default:
       return {
@@ -886,7 +893,7 @@ export const executeStandardScenario = async (
       // sentinel `not`), so empty there is a determinate FAIL; `ne` over a single-valued COMPLETE resource is
       // a determinate PASS; anything else is inconclusive → keep looking (retry the next candidate).
       const verdict = emptyVerdict(scenario, emptyContextFor(scenario, params));
-      const outcome = emptyOutcome(verdict);
+      const outcome = emptyOutcome(verdict, scenario);
       assertions.push({ passed: verdict !== 'fail', message: outcome.message });
       return {
         result: {

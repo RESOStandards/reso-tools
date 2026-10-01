@@ -102,3 +102,30 @@ describe('rebaseNextLink — follow a proxy/wrong-host @odata.nextLink safely', 
     expect(rebaseNextLink('/Lookup?$skip=100', 'not-a-valid-base-url')).toBe('/Lookup?$skip=100');
   });
 });
+
+// #315: two different operators can prove an empty result correct — `ne` over a single-valued complete resource, and
+// `lt/le now()` over an all-future field. The pass message must say which, or the report attributes one to the other.
+describe('emptyOutcome — the pass message names the operator that actually proved it', () => {
+  const nowScenario = (op: string) =>
+    ({ tag: 't', name: 'n', category: 'filter', dataType: 'datetime', op, fieldParam: 'timestampField', valueParam: 'now', minVersion: '2.0.0' }) as never;
+
+  it("describes an all-future lt/le now() pass, not a ne pass", () => {
+    for (const op of ['lt', 'le']) {
+      const m = emptyOutcome('pass', nowScenario(op)).message;
+      expect(m).toContain(`'${op} now()'`);
+      expect(m).toContain('in the future');
+      expect(m).not.toContain('ne over a single-valued field');
+    }
+  });
+
+  it('still describes the ne pass for a sampled-value scenario, and with no scenario at all', () => {
+    const sampled = ({ tag: 't', name: 'n', category: 'filter', dataType: 'integer', op: 'ne', fieldParam: 'integerField', valueParam: 'integerValueLow', minVersion: '2.0.0' }) as never;
+    expect(emptyOutcome('pass', sampled).message).toContain('ne over a single-valued field');
+    expect(emptyOutcome('pass').message).toContain('ne over a single-valued field');
+  });
+
+  it('leaves the fail and skip messages untouched by the scenario', () => {
+    expect(emptyOutcome('fail', nowScenario('lt')).message).toContain('Guaranteed-match filter');
+    expect(emptyOutcome('skip', nowScenario('lt'))).toMatchObject({ passed: true, skipped: true });
+  });
+});
