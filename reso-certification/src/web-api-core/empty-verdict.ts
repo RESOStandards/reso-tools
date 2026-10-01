@@ -27,6 +27,21 @@ import type { CoreScenario } from './scenarios.js';
 
 export type EmptyVerdict = 'fail' | 'pass' | 'skip';
 
+/**
+ * What the sampled data says about the field a `lt/le now()` scenario actually queried. A plain boolean cannot
+ * express this: "no past value" and "no value at all" are different answers that must not share a branch, and an
+ * `Array.some` over no values returns false for both. Conflating them would certify a field we never compared
+ * anything on (Josh, 2026-10-01: "a set with null everything across the board that checks logically still
+ * shouldn't be issued a cert, we didn't actually compare anything").
+ *
+ *  - `has-past`   — at least one sampled value is at or before now, so `lt/le now()` MUST return it.
+ *  - `all-future` — at least one parseable value, every one of them strictly after now, so returning nothing is
+ *                   the correct answer and the operator can still be certified on it.
+ *  - `no-values`  — no parseable timestamp was sampled (all null, or unparseable). Nothing was compared, so there
+ *                   is nothing to certify either way.
+ */
+export type NowFieldPastness = 'has-past' | 'all-future' | 'no-values';
+
 /** Data the empty-result decision needs: distinct value count in the sample, whether the sample was the COMPLETE
  *  resource (no `@odata.nextLink` past it), and whether the operator's value set was RECORD-DERIVED. */
 export interface EmptyContext {
@@ -36,10 +51,9 @@ export interface EmptyContext {
    *  queries.ts `recordDerivedSet`). That record is guaranteed to satisfy the filter, so an empty result is a
    *  determinate operator FAIL rather than the legitimately-empty skip. */
   readonly recordDerivedSet?: boolean;
-  /** For a `lt/le now()` scenario: did the field actually queried carry at least one sampled value at or before
-   *  now? `false` means every sampled value is in the FUTURE, so the server matching nothing is CORRECT and must
-   *  not be failed (Josh, 2026-10-01). Undefined keeps the strict reading — unknown never excuses a server. */
-  readonly fieldHasPastValues?: boolean;
+  /** For a `lt/le now()` scenario: what the sampled data says about the field actually queried (see
+   *  {@link NowFieldPastness}). Undefined keeps the strict reading — unknown never excuses a server. */
+  readonly nowFieldPastness?: NowFieldPastness;
 }
 
 export const emptyVerdict = (scenario: CoreScenario, ctx: EmptyContext): EmptyVerdict => {
@@ -57,12 +71,26 @@ export const emptyVerdict = (scenario: CoreScenario, ctx: EmptyContext): EmptyVe
         // `ne now()` is satisfied by every value other than now, FUTURE values included, so it can never be
         // legitimately empty — a hit stays mandatory whatever the field holds.
         if (scenario.op === 'ne') return 'fail';
-        // `lt/le now()` match only values at or before now. Normally the field holds past records, so a hit is
-        // mandatory and empty is a defect. But on a field whose sampled values are ALL in the future (OpenHouse
-        // start times, Showing appointments) matching nothing is the server being CORRECT, so that is a skip, not
-        // a fail. Sampling steers these two onto a field with a past value whenever the resource has one
-        // (`selectTimestampFieldForNow`); this is the residue, for a resource where none does.
-        return ctx.fieldHasPastValues === false ? 'skip' : 'fail';
+        // `lt/le now()` match only values at or before now, so what empty MEANS is decided by the field's own
+        // sampled data. Sampling steers these two onto a field holding a past value whenever the resource has one
+        // (`selectTimestampFieldForNow`); the other two cases are the residue for a resource where none does.
+        switch (ctx.nowFieldPastness) {
+          // Every sampled value is strictly in the future, so `lt/le now()` MUST return nothing. Over a COMPLETE
+          // sample that is the whole resource, so empty is provably correct and the operator is certified — a real
+          // PASS, not a skip. (The other direction needs no help here: if the server returns future-dated rows,
+          // assertData's per-record check fails them.) Over a PARTIAL sample a past value may exist beyond it, so
+          // empty is unknowable and must not be stamped correct.
+          case 'all-future':
+            return ctx.complete === true ? 'pass' : 'skip';
+          // No parseable timestamp was sampled, so the filter compared nothing. Empty is neither the server's
+          // defect nor evidence of conformance: never a pass, and never a fail either.
+          case 'no-values':
+            return 'skip';
+          // `has-past`, or unknown: a value at or before now exists, so a hit is mandatory. Unknown stays strict —
+          // it never excuses a server.
+          default:
+            return 'fail';
+        }
       }
       // `eq/ge/le` against a value sampled from the field: the value's OWN record must satisfy it → guaranteed.
       // `gt/lt` compare against the sampled MIN/MAX, so a match exists only if the field holds a value beyond

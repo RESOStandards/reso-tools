@@ -5,6 +5,7 @@ import {
   isSampleComplete,
   modificationTimestampWarning,
   numericStats,
+  nowFieldPastnessFor,
   rankDatetimeFields,
   selectTimestampField,
   selectTimestampFieldForNow,
@@ -215,5 +216,74 @@ describe('modificationTimestampWarning — reported, never failed by Core (#315)
   it('distinguishes declared-but-unpopulated from not declared at all', () => {
     const w = modificationTimestampWarning(['ModificationTimestamp', 'PhotosChangeTimestamp'], [{ ModificationTimestamp: null, PhotosChangeTimestamp: PAST }], 'Property', 'PhotosChangeTimestamp');
     expect(w).toContain('sampled no value for it');
+  });
+});
+
+// Drive resolveTestParams end to end for the pastness fields: a scripted single-page sample, all fields standard.
+const sampleForPastness = async (records: ReadonlyArray<Record<string, unknown>>) => {
+  const { resolveTestParams } = await import('../src/web-api-core/sampling.js');
+  const names = [...new Set(records.flatMap(r => Object.keys(r)))].filter(n => n !== 'ListingKey');
+  const entityType = {
+    name: 'OpenHouse',
+    keyProperties: ['ListingKey'],
+    properties: [{ name: 'ListingKey', type: 'Edm.String' }, ...names.map(n => ({ name: n, type: 'Edm.DateTimeOffset' }))],
+  };
+  const page = { status: 200, headers: { 'odata-version': '4.01' }, body: { value: records }, rawBody: '' };
+  return resolveTestParams('http://x', 'OpenHouse', entityType as never, 'tok', [], standardMapFor([...names]), undefined, {
+    request: async () => page as never,
+  });
+};
+
+// The classifier that keeps "every value is in the future" apart from "there was nothing to compare". An
+// Array.some returns false for both, and they demand opposite verdicts — the first certifies the operator, the
+// second certifies nothing (Josh: a set of nulls that "checks out logically" must not be issued a cert).
+describe('nowFieldPastnessFor — three states, never two (#315)', () => {
+  it('has-past when sampling already steered the now() scenarios onto a past-capable field', () => {
+    expect(nowFieldPastnessFor('ShowingStartTime', 'OriginalEntryTimestamp', [{ OriginalEntryTimestamp: PAST }], NOW)).toBe('has-past');
+  });
+
+  it('all-future when the queried field has parseable values and every one is after now', () => {
+    const records = [{ OpenHouseStartTime: FUTURE }, { OpenHouseStartTime: FUTURE }];
+    expect(nowFieldPastnessFor('OpenHouseStartTime', undefined, records, NOW)).toBe('all-future');
+  });
+
+  it('has-past when even ONE sampled value is at or before now — a mixed field is testable', () => {
+    const records = [{ AuctionStartTime: FUTURE }, { AuctionStartTime: PAST }];
+    expect(nowFieldPastnessFor('AuctionStartTime', undefined, records, NOW)).toBe('has-past');
+  });
+
+  it('no-values when the field is null across the board — the cert that must not be issued', () => {
+    const records = [{ SomeTime: null }, { SomeTime: null }];
+    expect(nowFieldPastnessFor('SomeTime', undefined, records, NOW)).toBe('no-values');
+  });
+
+  it('no-values when the field is POPULATED but holds nothing parseable as a timestamp', () => {
+    // "populated" means some record is non-null, which is not the same as carrying a timestamp. A field serving
+    // 'N/A' would otherwise read as all-future and pass on empty, having compared nothing.
+    const records = [{ SomeTime: 'N/A' }, { SomeTime: 'unknown' }];
+    expect(nowFieldPastnessFor('SomeTime', undefined, records, NOW)).toBe('no-values');
+  });
+
+  it('no-values when the resource has no timestamp field at all', () => {
+    expect(nowFieldPastnessFor(undefined, undefined, [{ ListingKey: '1' }], NOW)).toBe('no-values');
+  });
+
+  it('ignores unparseable values alongside real ones rather than letting them mask the classification', () => {
+    const records = [{ SomeTime: 'N/A' }, { SomeTime: PAST }];
+    expect(nowFieldPastnessFor('SomeTime', undefined, records, NOW)).toBe('has-past');
+  });
+});
+
+describe('resolveTestParams carries the pastness of the field the now() scenarios will query (#315)', () => {
+  it('reports all-future for a resource whose only datetime field is future-dated', async () => {
+    const params = await sampleForPastness([{ ListingKey: 'P1', OpenHouseStartTime: FUTURE }]);
+    expect(params.timestampField).toBe('OpenHouseStartTime');
+    expect(params.timestampFieldForNow).toBeUndefined();
+    expect(params.nowFieldPastness).toBe('all-future');
+  });
+
+  it('reports has-past once any datetime field carries a past value', async () => {
+    const params = await sampleForPastness([{ ListingKey: 'P1', OpenHouseStartTime: FUTURE, ModificationTimestamp: PAST }]);
+    expect(params.nowFieldPastness).toBe('has-past');
   });
 });

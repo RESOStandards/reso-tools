@@ -11,6 +11,7 @@ import type { EnumRepresentation } from '@reso-standards/reso-client';
 import type { CsdlEnumType } from '@reso-standards/reso-metadata-utils';
 import { type ODataRequester, buildResourceUrl, webRequester } from '../test-runner/index.js';
 import type { EntityType } from '../test-runner/types.js';
+import type { NowFieldPastness } from './empty-verdict.js';
 import { type EnumCandidate, isMultiRep, isSingleRep, selectEnumCandidates } from './enum-selection.js';
 import { ORIGINATING_SYSTEM_ID_FIELD, ORIGINATING_SYSTEM_NAME_FIELD, originatingSystemFilterClause } from './queries.js';
 import { type ScalarCandidate, collectFieldValues, selectScalarCandidates } from './scalar-selection.js';
@@ -61,6 +62,10 @@ export interface TestParams {
    *  when no datetime field on the resource carries a past value; they then run on {@link timestampField} and the
    *  empty-verdict stops asserting a hit for them, because empty is then the correct answer. */
   readonly timestampFieldForNow?: string;
+  /** What the sampled data says about the field the `lt/le now()` scenarios will query, which decides what an empty
+   *  result MEANS for them: a hit is mandatory, empty is provably correct, or nothing was compared at all. Feeds
+   *  `EmptyContext.nowFieldPastness`. See {@link nowFieldPastnessFor}. */
+  readonly nowFieldPastness?: NowFieldPastness;
   /** Non-gating warning when the resource carries no usable `ModificationTimestamp`, so the timestamp scenarios
    *  were grounded on a substitute. Rides `ScenarioResult.warnings` on every scenario that uses the timestamp
    *  field; never touches `passed`, the verdict or the exit code. See {@link modificationTimestampWarning}. */
@@ -338,11 +343,38 @@ export const rankDatetimeFields = (
  *  returns its past rows, so the operator is testable on it. Only a field whose sampled values are ALL in the
  *  future makes an empty result correct. Parsed to epoch rather than compared as strings, because a provider may
  *  serialize `Z` and `+00:00` forms in the same feed. */
-const hasPastValue = (field: string, records: ReadonlyArray<Record<string, unknown>>, now: number): boolean =>
+const parseableTimestamps = (field: string, records: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<number> =>
   collectValues(records, field)
     .map(v => Date.parse(String(v)))
-    .filter(Number.isFinite)
-    .some(t => t <= now);
+    .filter(Number.isFinite);
+
+const hasPastValue = (field: string, records: ReadonlyArray<Record<string, unknown>>, now: number): boolean =>
+  parseableTimestamps(field, records).some(t => t <= now);
+
+/**
+ * Classify the field a `lt/le now()` scenario will actually query (see {@link NowFieldPastness}).
+ *
+ * The three states must stay distinct. `hasPastValue` alone cannot do it: it is an `Array.some`, which returns
+ * false both for "every value is in the future" and for "there were no values to look at", and those demand
+ * opposite answers — the first certifies the operator, the second certifies nothing. Note that a field can be
+ * "populated" (some record non-null) and still yield NO parseable timestamp, e.g. one serving the string 'N/A',
+ * which is why this reads parseable values rather than non-null ones.
+ */
+export const nowFieldPastnessFor = (
+  timestampField: string | undefined,
+  timestampFieldForNow: string | undefined,
+  records: ReadonlyArray<Record<string, unknown>>,
+  now: number = Date.now()
+): NowFieldPastness => {
+  // Sampling already found a field holding a past value, and those scenarios are steered onto it.
+  if (timestampFieldForNow !== undefined) return 'has-past';
+  if (timestampField === undefined) return 'no-values';
+  const stamps = parseableTimestamps(timestampField, records);
+  // Defensive: `timestampFieldForNow` being absent already implies no past value on any ranked field. Re-deriving
+  // it here keeps this function true on its own inputs rather than on that invariant holding elsewhere.
+  if (stamps.length === 0) return 'no-values';
+  return stamps.some(t => t <= now) ? 'has-past' : 'all-future';
+};
 
 /** The general timestamp slot: the top-ranked populated datetime field (see {@link rankDatetimeFields}). Undefined
  *  only when the resource has no populated datetime field at all. */
@@ -510,6 +542,7 @@ export const resolveTestParams = async (
   const timestampField = selectTimestampField(datetimeFields, records, standardMap, resource);
   const timestampFieldForNow = selectTimestampFieldForNow(datetimeFields, records, standardMap, resource);
   const timestampWarning = modificationTimestampWarning(datetimeFields, records, resource, timestampField);
+  const nowFieldPastness = nowFieldPastnessFor(timestampField, timestampFieldForNow, records);
   const tsStats = timestampField ? timestampStats(collectValues(records, timestampField)) : undefined;
   const datetimeValue = tsStats?.min;
   const datetimeValueMax = tsStats?.max;
@@ -592,6 +625,7 @@ export const resolveTestParams = async (
     dateValueMax,
     timestampField,
     timestampFieldForNow,
+    nowFieldPastness,
     timestampWarning,
     datetimeValue,
     datetimeValueMax,
