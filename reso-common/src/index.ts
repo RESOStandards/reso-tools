@@ -12,3 +12,4 @@ export * from './metadata/edmx-generator.js';
 export * from './metadata/metadata-map.js';
 export * from './variations/matching-helpers.js';
 export * from './variations/urns.js';
+export * from './progress/replication.js';
