@@ -4,7 +4,7 @@ Ready-to-edit configuration files for each endorsement. Download one, replace th
 
 | Sample | Endorsement | Download |
 |---|---|---|
-| `data-dictionary-config.json` | Data Dictionary | [download](https://github.com/RESOStandards/reso-tools/raw/HEAD/reso-certification/sample-configs/data-dictionary-config.json) |
+| `dd-config.json` | Data Dictionary | [download](https://github.com/RESOStandards/reso-tools/raw/HEAD/reso-certification/sample-configs/dd-config.json) |
 | `core-config.json` | Web API Core | [download](https://github.com/RESOStandards/reso-tools/raw/HEAD/reso-certification/sample-configs/core-config.json) |
 | `entity-event-config.json` | EntityEvent | [download](https://github.com/RESOStandards/reso-tools/raw/HEAD/reso-certification/sample-configs/entity-event-config.json) |
 | `add-edit-config.json` | Add/Edit | [download](https://github.com/RESOStandards/reso-tools/raw/HEAD/reso-certification/sample-configs/add-edit-config.json) |
