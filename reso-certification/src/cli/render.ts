@@ -215,53 +215,76 @@ const verboseRendererOptions: ListrVerboseRendererOptions = {
 const resolveRendererOptions = (mode: RenderMode): ListrDefaultRendererOptions | ListrVerboseRendererOptions =>
   mode === 'verbose' ? verboseRendererOptions : defaultRendererOptions;
 
-/** Interactive spinner title on a *running* update: prefer the step's live message (e.g. "Sampling Property…",
- *  "Testing Member…") so a long-running step shows WHAT is currently running, not just its name. Falls back to
- *  the step name, and ignores structured JSON detail messages (e.g. DD replication-progress) so they don't
- *  render raw. */
-const runningTitle = (label: string, progress: StepProgress): string => {
-  const msg = progress.message?.trim();
-  return msg && !msg.startsWith('{') ? `${label}: ${msg}` : `${label}: ${progress.step}...`;
-};
+/** Renders the indented block shown beneath a run's title, for the CLI.
+ *
+ *  CLI-specific, hence the name: it returns an ANSI-colored string for listr2. A user interface renders
+ *  from the SDK's `ProgressCallback` instead.
+ *
+ *  A provider CLAIMS an update, then renders it. The two are separate because `undefined` from `render`
+ *  means "leave the block alone", which is not the same as "not mine" -- a verbose Core run only emits on
+ *  some events, and an unclaimed update must still fall through to the default provider. */
+interface CliProgressRenderer {
+  readonly claims: (progress: StepProgress) => boolean;
+  readonly render: (progress: StepProgress, renderMode: RenderMode) => string | undefined;
+}
 
-/** Shared progress → listr2 handler. Renders the Web API Core per-resource tree (default mode) or clean
- *  per-resource log lines (verbose) from {@link CoreProgressDetail}, and falls back to the step-line
- *  rendering for the other endorsements and the pre-scenario steps. */
+/** The nesting is defined once here, so every endorsement's inner info lines up under its title. */
+const detailLine = (text: string): string => chalk.gray(`  \u2192 ${text}`);
+
+/** Web API Core's inner info: the live per-resource tree in the interactive renderer, or the meaningful
+ *  transitions as log lines in verbose, where a scrolling log cannot show a tree. */
+const coreProgressRenderer = (view: ReturnType<typeof createCoreProgressView>): CliProgressRenderer => ({
+  claims: progress => progress.detail?.kind === 'core-progress',
+  render: (progress, renderMode) => {
+    const d = progress.detail;
+    if (d?.kind !== 'core-progress') return undefined;
+    view.apply(d);
+    if (renderMode !== 'verbose') return view.render();
+    if (d.event === 'phase' && d.resource && d.phase === 'done') {
+      const c = d.counts;
+      const tally = c
+        ? ` \u2014 ${c.passed}/${c.passed + c.failed + c.skipped}${c.failed ? `, ${c.failed} failed` : ''}`
+        : d.note
+          ? ` \u2014 ${d.note}`
+          : '';
+      return `\u25cb ${d.resource}${tally}`;
+    }
+    if (d.event === 'request' && d.url) return detailLine(`${d.method ?? 'GET'} ${d.url}`);
+    return undefined;
+  }
+});
+
+/** The default inner info, used by every endorsement that does not supply its own: the step's live message
+ *  while running, then the completed step line. Structured JSON detail messages (Data Dictionary
+ *  replication progress, for one) are not shown raw -- the step name stands in. */
+const stepProgressRenderer = (view: ReturnType<typeof createCoreProgressView>): CliProgressRenderer => ({
+  claims: () => true,
+  render: (progress, renderMode) => {
+    const msg = progress.message?.trim();
+    const shown = msg && !msg.startsWith('{') ? msg : undefined;
+    if (progress.status === 'running') {
+      // Verbose is a scrolling log and keeps its own marker; the interactive renderer gets the indented
+      // arrow line, which is where the combined title used to put this.
+      if (renderMode === 'verbose') return shown ? `\u25cb ${shown}` : undefined;
+      return detailLine(shown ?? `${progress.step}...`);
+    }
+    if (progress.status === 'pending') return undefined;
+    // Once the Core resource tree is up, its final state IS the summary; otherwise show the step line.
+    return renderMode === 'default' && view.hasData() ? view.render() : formatStep(progress);
+  }
+});
+
+/** Generic progress renderer. The title is always the run's identity and never changes mid-run; the body is
+ *  whichever provider claims the update. An endorsement with its own inner info goes in the list ahead of
+ *  `stepProgressRenderer`, which claims everything left over. */
 const handleProgress =
   (task: { title: string; output: string }, label: string, renderMode: RenderMode, view: ReturnType<typeof createCoreProgressView>) =>
   (progress: StepProgress): void => {
-    const d = progress.detail;
-    if (d?.kind === 'core-progress') {
-      view.apply(d);
-      task.title = runningTitle(label, progress);
-      if (renderMode === 'verbose') {
-        // A scrolling log can't show a live tree, so emit the meaningful transitions: a resource finishing, and
-        // (dimmed) the request currently in flight so you can see what's being tested.
-        if (d.event === 'phase' && d.resource && d.phase === 'done') {
-          const c = d.counts;
-          const tally = c
-            ? ` — ${c.passed}/${c.passed + c.failed + c.skipped}${c.failed ? `, ${c.failed} failed` : ''}`
-            : d.note
-              ? ` — ${d.note}`
-              : '';
-          task.output = `○ ${d.resource}${tally}`;
-        } else if (d.event === 'request' && d.url) {
-          task.output = chalk.gray(`  → ${d.method ?? 'GET'} ${d.url}`);
-        }
-      } else {
-        task.output = view.render();
-      }
-      return;
-    }
-    if (progress.status === 'running') {
-      task.title = runningTitle(label, progress);
-      const msg = progress.message?.trim();
-      if (renderMode === 'verbose' && msg && !msg.startsWith('{')) task.output = `○ ${msg}`;
-    } else if (progress.status !== 'pending') {
-      // Once the resource tree is up (Core scenarios started), keep it in default mode — its final state is the
-      // summary; otherwise show the completing step line (auth / service / metadata).
-      task.output = renderMode === 'default' && view.hasData() ? view.render() : formatStep(progress);
-    }
+    task.title = label;
+    const renderers: ReadonlyArray<CliProgressRenderer> = [coreProgressRenderer(view), stepProgressRenderer(view)];
+    const claimed = renderers.find(r => r.claims(progress));
+    const rendered = claimed?.render(progress, renderMode);
+    if (rendered !== undefined) task.output = rendered;
   };
 
 /** Shape of the per-resource scenario data the failure collectors read off the run context. */
