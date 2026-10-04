@@ -275,6 +275,18 @@ export const configEntryToAddEdit = (entry: ConfigEntry, providerUoi: string): A
   ...((entry.addEditOptions?.payloadsDir ?? entry.payloadsDir)
     ? { payloadsDir: entry.addEditOptions?.payloadsDir ?? entry.payloadsDir }
     : {}),
+  // The three identifiers `buildOutputPath` reads off the config. They were used here only to
+  // compose `outputDir`, so the nested path fell back to LOCAL placeholders on every run even
+  // when the config declared them -- and the LOCAL providerUoi carries a timestamp, so each run
+  // landed in a fresh tree and `archiveCurrentResults` never fired.
+  //
+  // TRUTHINESS, not presence: `normalizeConfigEntry` fills a missing identifier with '', and
+  // `buildOutputPath` guards with `??`, which passes '' straight through and collapses the path
+  // segment. Spreading only a non-empty value keeps a genuinely absent one ABSENT, so the
+  // intended LOCAL fallback still fires.
+  ...(providerUoi?.trim() ? { providerUoi } : {}),
+  ...(entry.providerUsi?.trim() ? { providerUsi: entry.providerUsi } : {}),
+  ...(entry.recipientUoi?.trim() ? { recipientUoi: entry.recipientUoi } : {}),
   options: {
     outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/add-edit`
   }
@@ -292,6 +304,18 @@ export const configEntryToEntityEvent = (entry: ConfigEntry, providerUoi: string
   ...(entry.entityEventOptions?.maxEvents !== undefined ? { maxEvents: entry.entityEventOptions.maxEvents } : {}),
   ...(entry.entityEventOptions?.pollInterval !== undefined ? { pollInterval: entry.entityEventOptions.pollInterval } : {}),
   ...(entry.entityEventOptions?.pollTimeout !== undefined ? { pollTimeout: entry.entityEventOptions.pollTimeout } : {}),
+  // The three identifiers `buildOutputPath` reads off the config. They were used here only to
+  // compose `outputDir`, so the nested path fell back to LOCAL placeholders on every run even
+  // when the config declared them -- and the LOCAL providerUoi carries a timestamp, so each run
+  // landed in a fresh tree and `archiveCurrentResults` never fired.
+  //
+  // TRUTHINESS, not presence: `normalizeConfigEntry` fills a missing identifier with '', and
+  // `buildOutputPath` guards with `??`, which passes '' straight through and collapses the path
+  // segment. Spreading only a non-empty value keeps a genuinely absent one ABSENT, so the
+  // intended LOCAL fallback still fires.
+  ...(providerUoi?.trim() ? { providerUoi } : {}),
+  ...(entry.providerUsi?.trim() ? { providerUsi: entry.providerUsi } : {}),
+  ...(entry.recipientUoi?.trim() ? { recipientUoi: entry.recipientUoi } : {}),
   options: {
     outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/entity-event`
   }
@@ -311,6 +335,18 @@ export const configEntryToCore = (entry: ConfigEntry, providerUoi: string): Core
   ...(entry.coreOptions?.preferFields?.length ? { preferFields: entry.coreOptions.preferFields } : {}),
   ...(osn(entry.coreOptions, entry) ? { originatingSystemName: osn(entry.coreOptions, entry) } : {}),
   ...(osid(entry.coreOptions, entry) ? { originatingSystemId: osid(entry.coreOptions, entry) } : {}),
+  // The three identifiers `buildOutputPath` reads off the config. They were used here only to
+  // compose `outputDir`, so the nested path fell back to LOCAL placeholders on every run even
+  // when the config declared them -- and the LOCAL providerUoi carries a timestamp, so each run
+  // landed in a fresh tree and `archiveCurrentResults` never fired.
+  //
+  // TRUTHINESS, not presence: `normalizeConfigEntry` fills a missing identifier with '', and
+  // `buildOutputPath` guards with `??`, which passes '' straight through and collapses the path
+  // segment. Spreading only a non-empty value keeps a genuinely absent one ABSENT, so the
+  // intended LOCAL fallback still fires.
+  ...(providerUoi?.trim() ? { providerUoi } : {}),
+  ...(entry.providerUsi?.trim() ? { providerUsi: entry.providerUsi } : {}),
+  ...(entry.recipientUoi?.trim() ? { recipientUoi: entry.recipientUoi } : {}),
   options: {
     outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/core`
   }
@@ -331,6 +367,18 @@ export const configEntryToDD = (entry: ConfigEntry, providerUoi: string): DDConf
   ...(entry.ddOptions?.rateLimitWait !== undefined ? { rateLimitWait: entry.ddOptions.rateLimitWait } : {}),
   ...(osn(entry.ddOptions, entry) ? { originatingSystemName: osn(entry.ddOptions, entry) } : {}),
   ...(osid(entry.ddOptions, entry) ? { originatingSystemId: osid(entry.ddOptions, entry) } : {}),
+  // The three identifiers `buildOutputPath` reads off the config. They were used here only to
+  // compose `outputDir`, so the nested path fell back to LOCAL placeholders on every run even
+  // when the config declared them -- and the LOCAL providerUoi carries a timestamp, so each run
+  // landed in a fresh tree and `archiveCurrentResults` never fired.
+  //
+  // TRUTHINESS, not presence: `normalizeConfigEntry` fills a missing identifier with '', and
+  // `buildOutputPath` guards with `??`, which passes '' straight through and collapses the path
+  // segment. Spreading only a non-empty value keeps a genuinely absent one ABSENT, so the
+  // intended LOCAL fallback still fires.
+  ...(providerUoi?.trim() ? { providerUoi } : {}),
+  ...(entry.providerUsi?.trim() ? { providerUsi: entry.providerUsi } : {}),
+  ...(entry.recipientUoi?.trim() ? { recipientUoi: entry.recipientUoi } : {}),
   options: {
     outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/dd`
   }
