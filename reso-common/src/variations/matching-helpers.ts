@@ -20,7 +20,7 @@ export const MATCHING_STRATEGIES = Object.freeze({
   EDIT_DISTANCE: 'Edit Distance',
   ADMIN_REVIEW: 'Admin Review',
   FAST_TRACK: 'Fast Track',
-  EXTERNAL_SUGGESTION: 'Suggestion'
+  EXTERNAL_SUGGESTION: 'External Suggestion'
 } as const);
 
 /** Lowercase and strip everything but [0-9a-z]; falls back to the input when that empties it. */

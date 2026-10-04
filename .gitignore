@@ -30,7 +30,10 @@ metadata-report*.json
 data-dictionary*.json
 reso-replication-output/
 schema-validation-report.json
+# `/out/` is root-anchored; the CLI's --output-dir ./out is run from the package dir, so
+# cover that too. Run output carries provider metadata and endpoints — never committed.
 /out/
+reso-certification/out/
 reso-variations.json
 upi-validation-report.json
 *.resoscript
@@ -49,6 +52,10 @@ upi-validation-report.json
 .packs/
 
 # local cert run logs (provider data — never committed)
+# Run logs carry provider endpoints and every query URL, so none of them belong in git. The two narrow
+# patterns below were not enough: a verbose Core run saved as `fmls2.log` matched neither and showed up
+# untracked (2026-10-03). Ignore the extension outright and keep the specific ones for documentation.
+*.log
 *-core.log
 *.verbose.log
 vendor-logs/

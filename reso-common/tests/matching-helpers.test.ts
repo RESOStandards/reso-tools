@@ -16,7 +16,7 @@ describe('matching helpers', () => {
     expect(MIN_MATCHING_LENGTH).toBe(3);
     expect(CLOSE_MATCH_DISTANCE).toBe(1);
     expect(MATCHING_STRATEGIES.SUBSTRING).toBe('Substring');
-    expect(MATCHING_STRATEGIES.EXTERNAL_SUGGESTION).toBe('Suggestion');
+    expect(MATCHING_STRATEGIES.EXTERNAL_SUGGESTION).toBe('External Suggestion');
   });
 
   it('normalizeDataElementName lowercases + strips non-alphanumerics', () => {
@@ -28,7 +28,7 @@ describe('matching helpers', () => {
   it('classifySuggestionStrategy maps provenance flags', () => {
     expect(classifySuggestionStrategy({ isAdminReview: true })).toBe('Admin Review');
     expect(classifySuggestionStrategy({ isFastTrack: true })).toBe('Fast Track');
-    expect(classifySuggestionStrategy()).toBe('Suggestion');
+    expect(classifySuggestionStrategy()).toBe('External Suggestion');
   });
 
   it('getDDWikiUrl builds the dd.reso.org shapes (display value, URL-encoded)', () => {

@@ -386,7 +386,12 @@ const coreCmd = program
   )
   .option('--full-coverage', 'Fail if any data type category has no coverage across all resources')
   .option('--originating-system-name <v>', 'Scope resource queries to OriginatingSystemName eq <v> (multi-tenant providers)')
-  .option('--originating-system-id <v>', 'Scope resource queries to OriginatingSystemID eq <v> (used when no name; OSN takes precedence)');
+  .option('--originating-system-id <v>', 'Scope resource queries to OriginatingSystemID eq <v> (used when no name; OSN takes precedence)')
+  .option(
+    '--prefer-fields <list>',
+    'Comma-separated field-selection preferences, Resource.Field or bare Field (e.g. Office.FeedTypes). Re-orders ' +
+      'the ranked candidates; auto-selection decides everything else. Overrides coreOptions.preferFields from a config.'
+  );
 
 addAuthOptions(coreCmd);
 addOutputOptions(coreCmd);
@@ -401,6 +406,7 @@ coreCmd.action(
     fullCoverage?: boolean;
     originatingSystemName?: string;
     originatingSystemId?: string;
+    preferFields?: string;
     authToken?: string;
     clientId?: string;
     clientSecret?: string;
@@ -424,6 +430,15 @@ coreCmd.action(
 
       // Flags apply only when given: a config entry's coreOptions block is the next source, then auto-detect.
       const enumModeFlag = opts.enumMode as 'auto' | 'isflags' | 'collections' | 'string' | undefined;
+      // A preference list from the flag replaces the config's rather than merging: an override the operator
+      // typed should be exactly what runs, with no invisible union from the file.
+      const preferFieldsFlag: ReadonlyArray<string> | undefined =
+        typeof opts.preferFields === 'string' && opts.preferFields.trim().length > 0
+          ? opts.preferFields
+              .split(',')
+              .map((v: string) => v.trim())
+              .filter((v: string) => v.length > 0)
+          : undefined;
       if (enumModeFlag !== undefined && !['auto', 'isflags', 'collections', 'string'].includes(enumModeFlag)) {
         throw new Error(`Invalid enum mode "${opts.enumMode}". Must be "auto", "string", "collections", or "isflags".`);
       }
@@ -451,6 +466,7 @@ coreCmd.action(
             ...(opts.fullCoverage || baseConfig.fullCoverage ? { fullCoverage: true } : {}),
             ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
             ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
+            ...((preferFieldsFlag ?? baseConfig.preferFields) ? { preferFields: preferFieldsFlag ?? baseConfig.preferFields } : {}),
             ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {})
           };
 
@@ -475,6 +491,7 @@ coreCmd.action(
           resources,
           ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
           ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
+          ...(preferFieldsFlag ? { preferFields: preferFieldsFlag } : {}),
           options: {
             ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {})
           }

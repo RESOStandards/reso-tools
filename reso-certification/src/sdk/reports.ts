@@ -193,6 +193,25 @@ export const createGenericReportGenerator = (
 
 // ── Detailed Report Generator ──
 
+/**
+ * Per-resource sampling evidence. Field selection ranks the standard set on fill rate within the sample, so a
+ * thin sample quietly weakens selection; recording what the sample actually was makes "did we sample this
+ * resource adequately" answerable from the report rather than by re-reading source. Omitted when the params
+ * carry none, so an older report shape stays valid.
+ */
+const sampleEvidence = (params: unknown): Record<string, unknown> => {
+  const p = params as Record<string, unknown> | undefined;
+  if (p?.sampleRecordCount === undefined) return {};
+  return {
+    sample: {
+      recordCount: p.sampleRecordCount,
+      pagesFetched: p.samplePagesFetched,
+      stopReason: p.sampleStopReason,
+      complete: p.sampleComplete
+    }
+  };
+};
+
 /** Create a detailed report generator that extends the generic format with step results. */
 export const createDetailedReportGenerator = (
   description: string,
@@ -205,12 +224,18 @@ export const createDetailedReportGenerator = (
     // Extract resource-level test reports if available (Core, Add/Edit, EntityEvent)
     const ctx = result.context as Record<string, unknown>;
     const resourceReports = ctx.resourceReports as ReadonlyArray<Record<string, unknown>> | undefined;
+    // Field-selection preferences steer WHAT WAS TESTED, so a steered run says so in its report. Absent
+    // on an ordinary run rather than present and empty, so the key's presence is itself the signal. The
+    // value carries `requested`, `applied` and (when they differ) `unmatched` — the presence of the key
+    // means a preference was GIVEN, never that one took effect; `applied` is what answers that.
+    const fieldPreferences = ctx.fieldPreferences as { readonly requested: ReadonlyArray<string> } | undefined;
 
     return {
       description,
       version,
       softwareVersion: SOFTWARE_VERSION,
       generatedOn: new Date().toISOString(),
+      ...(fieldPreferences && fieldPreferences.requested.length > 0 ? { fieldPreferences } : {}),
       remarks: serializeRemarks(result),
       outcome: result.status,
       endorsement: result.endorsement,
@@ -230,6 +255,7 @@ export const createDetailedReportGenerator = (
         ? {
             resourceReports: resourceReports.map((r: Record<string, unknown>) => ({
               resource: r.resource,
+              ...sampleEvidence(r.params),
               summary: r.summary,
               scenarios: ((r.scenarios as ReadonlyArray<Record<string, unknown>>) ?? []).map(s => ({
                 name: s.name ?? s.scenario,

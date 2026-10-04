@@ -7,12 +7,15 @@
  * 3. Pick the best field + median value for each required type
  */
 
-import type { EnumRepresentation } from '@reso-standards/reso-client';
+import { type EnumRepresentation, isDeadlineError } from '@reso-standards/reso-client';
 import type { CsdlEnumType } from '@reso-standards/reso-metadata-utils';
 import { type ODataRequester, buildResourceUrl, webRequester } from '../test-runner/index.js';
 import type { EntityType } from '../test-runner/types.js';
+import { extractNextLink } from './assertions.js';
 import type { NowFieldPastness } from './empty-verdict.js';
 import { type EnumCandidate, isMultiRep, isSingleRep, selectEnumCandidates } from './enum-selection.js';
+import { MIN_DISCRIMINATING_VALUES, NO_FIELD_PREFERENCES, type PreferredFields, matchedPreferences } from './field-preference.js';
+import { rebaseNextLink } from './next-link.js';
 import { ORIGINATING_SYSTEM_ID_FIELD, ORIGINATING_SYSTEM_NAME_FIELD, originatingSystemFilterClause } from './queries.js';
 import { type ScalarCandidate, collectFieldValues, selectScalarCandidates } from './scalar-selection.js';
 import type { StandardMap } from './standard-map.js';
@@ -130,6 +133,14 @@ export interface TestParams {
    *  empty-verdict needs this to distinguish "the field genuinely holds one value across the whole resource"
    *  (empty is correct → pass) from "our sample only saw one value" (unknowable → skip). */
   readonly sampleComplete: boolean;
+  /** How many records the sample actually holds. Recorded because fill rate within the standard set is the
+   *  field-ranking key, so a thin sample silently weakens selection — this makes "did we sample this
+   *  adequately" answerable from the report instead of by reading source. */
+  readonly sampleRecordCount?: number;
+  /** How many page requests the sample cost. 1 means the first page answered it. */
+  readonly samplePagesFetched?: number;
+  /** Why sampling stopped. See {@link SampleStopReason}. */
+  readonly sampleStopReason?: SampleStopReason;
   /** Distinct sampled value counts for the chosen scalar fields — the `ne` verdict needs ≥2 to prove the
    *  field holds another value (so an empty `field ne <sampled>` result is a defect, not the correct answer).
    *  Enum slots carry their own count on the candidate (`EnumCandidate.distinctValueCount`). */
@@ -143,7 +154,18 @@ export interface TestParams {
   readonly singleLookupDistinctCount?: number;
   readonly multiLookupDistinctCount?: number;
   readonly skippedTypes: ReadonlyArray<string>;
+  /** Field preferences that actually matched a candidate on this resource, exactly as the operator wrote them.
+   *  A preference re-orders selection, so it changes WHAT WAS TESTED — the report has to say so, or a steered
+   *  run is indistinguishable from an unsteered one and a provider could influence their own certification.
+   *  Only matched entries appear: a preference naming a field this resource does not carry had no effect and
+   *  must not be reported as though it did. */
+  readonly appliedFieldPreferences?: ReadonlyArray<string>;
 }
+
+/** The promotion rule, mirrored from the selectors so `applied` reports only what actually took effect: a
+ *  preference naming a non-discriminating field was refused there and must not be reported as honored here. */
+const enumCanDiscriminate = (c: EnumCandidate): boolean => c.distinctValueCount >= MIN_DISCRIMINATING_VALUES;
+const scalarCanDiscriminate = (c: ScalarCandidate<unknown>): boolean => c.stats.distinct >= MIN_DISCRIMINATING_VALUES;
 
 /** A sampled page is COMPLETE (the whole resource) when the OData response carries no forward
  *  `@odata.nextLink`. Core 2.1.0 requires that link when more results exist, so its absence means we sampled
@@ -253,6 +275,119 @@ export const detectEnumMode = (entityType: EntityType): EnumMode => {
  *  resource; a full page (== SAMPLE_TOP) may be `$top`-capped with more records beyond it, so it is NOT proof
  *  of completeness — treating it as complete would let a `ne` false-PASS through. */
 const SAMPLE_TOP = 1000;
+
+/** Backstop on sample page requests. A server that pages in very small chunks would otherwise cost one request
+ *  per page all the way to SAMPLE_TOP; the run deadline already bounds total time, this bounds the request
+ *  count for a single resource. Hitting it is recorded, never silent. */
+const MAX_SAMPLE_PAGES = 60;
+
+/** Ask for a full page up front. `odata.maxpagesize` is advisory per OData, so the nextLink loop still does the
+ *  real work — but a server that honors it hands us SAMPLE_TOP in one round trip instead of dozens. */
+const SAMPLE_PREFER_HEADER: Readonly<Record<string, string>> = { Prefer: `odata.maxpagesize=${SAMPLE_TOP}` };
+
+/** Why sampling stopped. Recorded per resource so "did we sample this adequately" is answerable from the
+ *  report instead of by reading source. */
+export type SampleStopReason =
+  /** The server ran out of pages — the sample IS the complete resource. */
+  | 'exhausted'
+  /** We collected SAMPLE_TOP records. More may exist beyond them. */
+  | 'reached-target'
+  /** A page request failed, or answered non-200. Sampled with the records already in hand. */
+  | 'page-error'
+  /** A page carried a forward link but no records, so paging made no progress. */
+  | 'empty-page'
+  /** MAX_SAMPLE_PAGES was reached. */
+  | 'page-cap';
+
+/** A resource's sample, with the evidence of how it was obtained. */
+export interface SampledRecords {
+  readonly records: ReadonlyArray<Record<string, unknown>>;
+  readonly pagesFetched: number;
+  readonly stopReason: SampleStopReason;
+  /** True ONLY when the sample is provably the whole resource: the server ran out of pages AND the total came
+   *  in under SAMPLE_TOP. Anything else is conservatively incomplete, because this drives the `ne`/`gt`/`lt`
+   *  empty-verdict's pass-vs-skip split and a false "complete" would let a `ne` false-PASS through. */
+  readonly complete: boolean;
+}
+
+/**
+ * Collect up to {@link SAMPLE_TOP} records, following `@odata.nextLink` until the target is met or the server
+ * runs out of pages (Josh, 2026-10-03: "if we can page we need to sample up to 1000"). Before this, sampling
+ * issued a single `$top=1000` and kept whatever came back, so a provider whose page size is capped below 1000
+ * was silently under-sampled — and since fill rate within the standard set is the field-ranking key, a thin
+ * sample degrades selection without saying so.
+ *
+ * `@odata.count` is deliberately NOT consulted. Providers' counts are frequently wrong (Josh, 2026-10-03:
+ * "they're off all the time"), so the only trusted stopping conditions are our own record tally and the
+ * absence of a forward link.
+ */
+const sampleRecords = async (firstUrl: string, authToken: string, requester: ODataRequester): Promise<SampledRecords> => {
+  const first = await requester.request({ method: 'GET', url: firstUrl, authToken, headers: SAMPLE_PREFER_HEADER });
+  const pageRecords = (body: unknown): ReadonlyArray<Record<string, unknown>> =>
+    (body as { value?: ReadonlyArray<Record<string, unknown>> } | null)?.value ?? [];
+
+  // The FIRST page gets the same status gate as every later one. reso-client does not throw on a non-200, so a
+  // 500 or an expired-token 401 arrives as an ordinary value whose body carries no `value` and no forward link.
+  // Read literally that looks identical to an empty resource, and the resource would be reported as provably
+  // complete and genuinely empty — which fails a REQUIRED resource and blames the provider for our own failed
+  // request. An errored sample is `page-error` and is never complete.
+  if (first.status !== 200) {
+    return { records: [], pagesFetched: 1, stopReason: 'page-error', complete: false };
+  }
+
+  // Local mutable accumulators for the paging walk, scoped to this function and never leaked.
+  const records: Record<string, unknown>[] = [...pageRecords(first.body)];
+  let nextLink = extractNextLink(first.body);
+  let pagesFetched = 1;
+  // Only the ABNORMAL exits are recorded as we go. The normal pair is derived at the end from the final state,
+  // because the two are distinguishable only there: a server that fills the `$top` window has no reason to emit
+  // a forward link, so "no nextLink" means exhausted ONLY when the tally came in under the target.
+  let earlyExit: SampleStopReason | undefined;
+
+  while (nextLink !== undefined && records.length < SAMPLE_TOP) {
+    if (pagesFetched >= MAX_SAMPLE_PAGES) {
+      earlyExit = 'page-cap';
+      break;
+    }
+    const pageUrl = rebaseNextLink(nextLink, firstUrl);
+    const page = await requester
+      .request({ method: 'GET', url: pageUrl, authToken, headers: SAMPLE_PREFER_HEADER })
+      .catch((err: unknown) => {
+        if (isDeadlineError(err)) throw err; // out of run budget — stop the run, not just paging
+        return undefined; // a page fetch failed; sample with what we have rather than failing the resource
+      });
+    if (page === undefined) {
+      earlyExit = 'page-error';
+      break;
+    }
+    pagesFetched += 1;
+    if (page.status !== 200) {
+      earlyExit = 'page-error';
+      break;
+    }
+    const got = pageRecords(page.body);
+    if (got.length === 0) {
+      // A forward link with no rows behind it makes no progress; continuing would spin.
+      earlyExit = 'empty-page';
+      break;
+    }
+    records.push(...got);
+    nextLink = extractNextLink(page.body);
+  }
+
+  // Trim an over-long final page so the sample size is deterministic at the target.
+  const sampled = records.length > SAMPLE_TOP ? records.slice(0, SAMPLE_TOP) : records;
+  // `exhausted` requires BOTH no forward link AND a tally under the target. A full sample with no link is
+  // `reached-target`: the window was satisfied, which is not evidence that the resource ran out.
+  const ranOut = nextLink === undefined && sampled.length < SAMPLE_TOP;
+  const stopReason: SampleStopReason = earlyExit ?? (ranOut ? 'exhausted' : 'reached-target');
+  return {
+    records: sampled,
+    pagesFetched,
+    stopReason,
+    complete: stopReason === 'exhausted'
+  };
+};
 
 /** Numeric min / median / max / distinct-count of a field's sampled values, NUMERICALLY deduped. An
  *  IEEE754Compatible server serializes Edm.Decimal/Int64 as JSON strings, so the same value can arrive as
@@ -458,7 +593,8 @@ export const resolveTestParams = async (
   standardMap: StandardMap,
   enumModeOverride?: EnumMode,
   requester: ODataRequester = webRequester,
-  originatingSystem?: { readonly name?: string; readonly id?: string }
+  originatingSystem?: { readonly name?: string; readonly id?: string },
+  preferFields: PreferredFields = NO_FIELD_PREFERENCES
 ): Promise<TestParams> => {
   // enumMode is retained as an informational/coverage field only — selection and gating are now per-field
   // (resolveEnum), so the `--enumMode` override no longer steers field choice. Vestigial; a candidate for removal.
@@ -494,16 +630,20 @@ export const resolveTestParams = async (
     ...(scopedOsid ? { originatingSystemId: scopedOsid } : {})
   };
 
-  // Fetch sample records. 1000 (up from 100) gives far better field/value coverage for enum selection —
-  // more fields are populated across the wider sample — while staying a single fast request. Scoped to the
-  // recipient org when OSN/OSID applies to this resource (above), matching the scenario queries.
+  // Fetch sample records, paging to SAMPLE_TOP. A wide sample is what makes field selection meaningful: more
+  // fields carry a value, and fill rate within the standard set is the ranking key. Scoped to the recipient
+  // org when OSN/OSID applies to this resource (above), matching the scenario queries.
   const url = `${buildResourceUrl(serverUrl, resource)}?$top=${SAMPLE_TOP}${osScopeClause ? `&$filter=${encodeURIComponent(osScopeClause)}` : ''}`;
-  const response = await requester.request({ method: 'GET', url, authToken });
-  const body = response.body as { value?: ReadonlyArray<Record<string, unknown>> } | null;
-  const records = body?.value ?? [];
-  // Was this page the COMPLETE resource? Drives the ne/gt/lt empty-verdict's pass-vs-skip split. A full page
-  // (== SAMPLE_TOP) with no nextLink may still be `$top`-capped, so require BOTH no-nextLink AND a short page.
-  const sampleComplete = isSampleComplete(body) && records.length < SAMPLE_TOP;
+  const sample = await sampleRecords(url, authToken, requester);
+  const records = sample.records;
+  // Was the sample the COMPLETE resource? Drives the ne/gt/lt empty-verdict's pass-vs-skip split, so it is true
+  // only when the server ran out of pages AND the total came in under SAMPLE_TOP (see SampledRecords.complete).
+  const sampleComplete = sample.complete;
+  const sampleStats: Pick<TestParams, 'sampleRecordCount' | 'samplePagesFetched' | 'sampleStopReason'> = {
+    sampleRecordCount: records.length,
+    samplePagesFetched: sample.pagesFetched,
+    sampleStopReason: sample.stopReason
+  };
 
   if (records.length === 0) {
     return {
@@ -513,6 +653,7 @@ export const resolveTestParams = async (
       enumMode,
       integerValueHigh: 2147483647,
       sampleComplete,
+      ...sampleStats,
       skippedTypes: [NO_RECORDS_SAMPLED],
       ...osParams
     };
@@ -528,14 +669,30 @@ export const resolveTestParams = async (
   // Enum fields: classify each by its REAL representation (resolveEnum), decode its sampled values, and
   // rank candidates standard-first — replacing the resource-wide name-shape heuristic. A ladder of up to 3
   // per group lets the runner try alternates when a field isn't queryable.
-  const singleLookupCandidates = selectEnumCandidates(entityType.properties, records, enumTypes, standardMap, resource, isSingleRep);
-  const multiLookupCandidates = selectEnumCandidates(entityType.properties, records, enumTypes, standardMap, resource, isMultiRep);
+  const singleLookupCandidates = selectEnumCandidates(
+    entityType.properties,
+    records,
+    enumTypes,
+    standardMap,
+    resource,
+    isSingleRep,
+    preferFields
+  );
+  const multiLookupCandidates = selectEnumCandidates(
+    entityType.properties,
+    records,
+    enumTypes,
+    standardMap,
+    resource,
+    isMultiRep,
+    preferFields
+  );
 
   // Resolve integer field + values from the RESO-first ladder (standard DD fields before local ones; see
   // selectScalarCandidates). The primary is the top-ranked candidate; the runner walks the rest when the server
   // will not filter on it. median → eq/ge/le/ne; min → gt; max → lt (the gt/lt targets must be the extremes so a
   // match exists iff another value lies beyond them — the empty-verdict gates gt/lt on distinct).
-  const integerCandidates = selectScalarCandidates(integerFields, records, standardMap, resource, numericStats);
+  const integerCandidates = selectScalarCandidates(integerFields, records, standardMap, resource, numericStats, preferFields);
   const intPrimary = integerCandidates[0];
   const integerField = intPrimary?.field;
   const integerValueLow = intPrimary?.stats.median;
@@ -546,7 +703,7 @@ export const resolveTestParams = async (
   const integerNotSentinel = intPrimary ? integerNotSentinelFor(intPrimary.values) : undefined;
 
   // Resolve decimal field + values (same ladder, same median/min/max scheme).
-  const decimalCandidates = selectScalarCandidates(decimalFields, records, standardMap, resource, numericStats);
+  const decimalCandidates = selectScalarCandidates(decimalFields, records, standardMap, resource, numericStats, preferFields);
   const decPrimary = decimalCandidates[0];
   const decimalField = decPrimary?.field;
   const decimalValueLow = decPrimary?.stats.median;
@@ -558,7 +715,19 @@ export const resolveTestParams = async (
 
   // Resolve date field + values (same ladder). This is the group the 2026-09-21 run failed on: a local Edm.Date
   // declared first, a 500 on its $filter, and all six Date scenarios failed with standard Date fields available.
-  const dateCandidates = selectScalarCandidates(dateFields, records, standardMap, resource, dateStats);
+  const dateCandidates = selectScalarCandidates(dateFields, records, standardMap, resource, dateStats, preferFields);
+
+  // Record which preferences took effect on THIS resource, for the report. Union across every candidate
+  // family, deduplicated, written as the operator wrote them.
+  const appliedPreferences = [
+    ...new Set([
+      ...matchedPreferences(singleLookupCandidates, preferFields, resource, c => c.field, enumCanDiscriminate),
+      ...matchedPreferences(multiLookupCandidates, preferFields, resource, c => c.field, enumCanDiscriminate),
+      ...matchedPreferences(integerCandidates, preferFields, resource, c => c.field, scalarCanDiscriminate),
+      ...matchedPreferences(decimalCandidates, preferFields, resource, c => c.field, scalarCanDiscriminate),
+      ...matchedPreferences(dateCandidates, preferFields, resource, c => c.field, scalarCanDiscriminate)
+    ])
+  ];
   const datePrimary = dateCandidates[0];
   const dateField = datePrimary?.field;
   const dateValue = datePrimary?.stats.median;
@@ -660,6 +829,7 @@ export const resolveTestParams = async (
     datetimeValue,
     datetimeValueMax,
     sampleComplete,
+    ...sampleStats,
     // Distinct value counts (NUMERICALLY deduped for numerics — see numericStats) — the ne/gt/lt verdict's gate.
     integerDistinctCount,
     decimalDistinctCount,
@@ -688,6 +858,7 @@ export const resolveTestParams = async (
     expandField,
     expandNavs,
     lookupNameByField: Object.keys(lookupNameByField).length ? lookupNameByField : undefined,
-    skippedTypes
+    skippedTypes,
+    appliedFieldPreferences: appliedPreferences.length > 0 ? appliedPreferences : undefined
   };
 };

@@ -374,3 +374,30 @@ describe('SOFTWARE_VERSION provenance', () => {
     expect(resolveSoftwareVersion(new URL('./nonexistent-package-xyz.json', import.meta.url))).toBe('unknown');
   });
 });
+
+describe('detailed report: field-preference steering', () => {
+  const generate = (fieldPreferences: unknown) =>
+    createDetailedReportGenerator('Core', '2.1.0', () => '').generate(
+      makeResult({ context: fieldPreferences === undefined ? {} : { fieldPreferences } })
+    ) as Record<string, unknown>;
+
+  it('carries the APPLIED set, not just the request', () => {
+    // The gap this closes: `appliedFieldPreferences` was computed per resource and read by nothing, so the
+    // report echoed the requested spec. A run that honored no preference reported as steered.
+    const report = generate({ requested: ['Office.FeedTypes'], applied: ['Office.FeedTypes'] });
+    expect(report.fieldPreferences).toEqual({ requested: ['Office.FeedTypes'], applied: ['Office.FeedTypes'] });
+  });
+
+  it('makes an unsteered run distinguishable from a steered one', () => {
+    const steered = generate({ requested: ['SyndicateTo'], applied: ['SyndicateTo'] });
+    const notSteered = generate({ requested: ['Office.FeedTypes'], applied: [], unmatched: ['Office.FeedTypes'] });
+    expect(steered.fieldPreferences).not.toEqual(notSteered.fieldPreferences);
+    expect((notSteered.fieldPreferences as Record<string, unknown>).applied).toEqual([]);
+    expect((notSteered.fieldPreferences as Record<string, unknown>).unmatched).toEqual(['Office.FeedTypes']);
+  });
+
+  it('omits the key on an ordinary unsteered run', () => {
+    expect(generate(undefined)).not.toHaveProperty('fieldPreferences');
+    expect(generate({ requested: [], applied: [] })).not.toHaveProperty('fieldPreferences');
+  });
+});

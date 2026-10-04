@@ -10,6 +10,7 @@ import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata, getEntityType, loadMetadataFromFile, parseMetadataXml, persistMetadataXml } from '../test-runner/metadata.js';
 import { type ODataRequester, createCertSession, createSessionRequester } from '../test-runner/requester.js';
+import { type FieldPreferenceSummary, parseFieldPreferences, summarizeFieldPreferences } from '../web-api-core/field-preference.js';
 import {
   NO_KEY_DECLARED,
   NO_RECORDS_SAMPLED,
@@ -40,6 +41,10 @@ interface CoreContext extends BaseTestContext {
   readonly enumMode: 'auto' | 'isflags' | 'collections' | 'string';
   readonly resources: ReadonlyArray<string>;
   readonly resourceReports?: ReadonlyArray<ResourceTestReport>;
+  /** Field-selection steering for this run: requested, applied, and what matched nothing. Recorded
+   *  because a preference changes WHAT WAS TESTED, so a reviewer has to be able to see both that a run
+   *  was steered and whether the steering actually landed. */
+  readonly fieldPreferences?: FieldPreferenceSummary;
   readonly [key: string]: unknown;
 }
 
@@ -325,6 +330,9 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     const metadata = parseMetadataXml(ctx.metadataXml);
     const version = ctx.version;
     // Standard map (DD reference) built once per run — field/value membership for standard-first selection.
+    // Parse the operator's field preferences once for the run: config (`coreOptions.preferFields`, which the
+    // desktop writes) and the CLI flag land in the same place by the time they reach here.
+    const fieldPreferences = parseFieldPreferences(config.preferFields);
     const standardMap = buildStandardMap(version);
 
     // Lookup Resource validation dependencies, built ONCE per run and shared across resources:
@@ -477,7 +485,10 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           requester,
           // Resource-aware OriginatingSystem scope (multi-tenant): resolveTestParams applies it only to
           // resources whose metadata carries the field, and to its own sample fetch. Inert when unset.
-          { name: config.originatingSystemName, id: config.originatingSystemId }
+          { name: config.originatingSystemName, id: config.originatingSystemId },
+          // Field preferences re-order the ranked candidates for this resource. Parsed once per run,
+          // inert when the config and the flag both leave it unset.
+          fieldPreferences
         ).catch((err: unknown) => {
           if (isDeadlineError(err)) return null;
           throw err;
@@ -671,12 +682,41 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     const deadlineReached = resourceReports.some(r => r.deadlineReached);
     const status = coreVerdict({ totalFailed, coverageFailed, deadlineReached });
 
+    // A preference that matched no candidate on any resource changed nothing. Say so out loud rather than
+    // letting the operator assume the run was steered: a field only becomes preferable once it has a sampled
+    // value AND its representation matches a scenario, and neither is obvious from the outside.
+    const preferenceSummary =
+      fieldPreferences.entries.length > 0
+        ? summarizeFieldPreferences(
+            fieldPreferences,
+            resourceReports.map(r => r.params.appliedFieldPreferences ?? [])
+          )
+        : undefined;
+    if (preferenceSummary?.unmatched?.length) {
+      onProgress({
+        step: RUN_CORE_SCENARIOS,
+        status: 'running',
+        message: `Field preference had no effect: ${preferenceSummary.unmatched.join(', ')} — matched no steerable candidate on any resource`,
+        detail: { kind: 'core-progress', event: 'phase', phase: 'done', outcome: 'skipped', note: 'field preference unmatched' }
+      });
+    }
+
     const coverageMsg = fullCoverage ? 'Full type coverage achieved' : `Missing coverage: ${missingTypes.join(', ')}`;
     const modeMsg = requireFullCoverage ? ' (--full-coverage enabled)' : '';
     const incompleteMsg = deadlineReached ? 'INCOMPLETE — run deadline reached; remaining resources/scenarios not tested. ' : '';
 
     return {
-      context: { ...ctx, resourceReports, coverageMatrix: { coveredTypes, missingTypes, fullCoverage } },
+      context: {
+        ...ctx,
+        resourceReports,
+        coverageMatrix: { coveredTypes, missingTypes, fullCoverage },
+        // Only when the run was actually steered, so an unsteered report carries no empty key. Reporting the
+        // REQUESTED spec alone would be worse than reporting nothing: a preference naming a field that never
+        // qualified changes nothing, and a report that echoed the request would make that run indistinguishable
+        // from one the preference actually steered. So requested and applied are reported separately, and what
+        // matched nothing anywhere is named outright.
+        ...(preferenceSummary ? { fieldPreferences: preferenceSummary } : {})
+      },
       status,
       summary: `${incompleteMsg}${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped${totalWarnings > 0 ? `, ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}` : ''}${optTotal > 0 ? `; optional: ${optPassed} passed, ${optNotSupported} not supported, ${optNotTested} not tested` : ''} (${totalScenarios} scenarios across ${resourceReports.length} resources). ${coverageMsg}${modeMsg}`,
       counts: {
