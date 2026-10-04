@@ -3,6 +3,7 @@
  */
 
 import chalk from 'chalk';
+import { parseReplicationProgress, summarizeReplicationProgress } from '@reso-standards/reso-common';
 import {
   LISTR_LOGGER_STDERR_LEVELS,
   Listr,
@@ -254,6 +255,30 @@ const coreProgressRenderer = (view: ReturnType<typeof createCoreProgressView>): 
   }
 });
 
+/** Data Dictionary replication's inner info.
+ *
+ *  A replication step reports live telemetry as a JSON object in its message. This used to be thrown
+ *  away -- the default renderer skips anything starting with `{` and shows the step name instead -- so a
+ *  terminal run said "Fetching Lookup Resource..." while the same payload drew a per-resource bar chart in
+ *  the browser. The shape, the parser and the formatters now live in `reso-common`, and both surfaces read
+ *  the same one.
+ *
+ *  Claimed only when the message really is replication telemetry, so an ordinary message falls through. */
+const replicationProgressRenderer = (): CliProgressRenderer => {
+  const parse = (progress: StepProgress) => parseReplicationProgress(progress.message?.trim() ?? '');
+  return {
+    claims: progress => parse(progress) !== null,
+    render: (progress, renderMode) => {
+      const data = parse(progress);
+      if (!data) return undefined;
+      const summary = summarizeReplicationProgress(data);
+      // An update with nothing quantified yet leaves the display alone rather than blanking it.
+      if (!summary) return undefined;
+      return renderMode === 'verbose' ? `\u25cb ${summary}` : detailLine(summary);
+    }
+  };
+};
+
 /** The default inner info, used by every endorsement that does not supply its own: the step's live message
  *  while running, then the completed step line. Structured JSON detail messages (Data Dictionary
  *  replication progress, for one) are not shown raw -- the step name stands in. */
@@ -281,7 +306,11 @@ const handleProgress =
   (task: { title: string; output: string }, label: string, renderMode: RenderMode, view: ReturnType<typeof createCoreProgressView>) =>
   (progress: StepProgress): void => {
     task.title = label;
-    const renderers: ReadonlyArray<CliProgressRenderer> = [coreProgressRenderer(view), stepProgressRenderer(view)];
+    const renderers: ReadonlyArray<CliProgressRenderer> = [
+      coreProgressRenderer(view),
+      replicationProgressRenderer(),
+      stepProgressRenderer(view)
+    ];
     const claimed = renderers.find(r => r.claims(progress));
     const rendered = claimed?.render(progress, renderMode);
     if (rendered !== undefined) task.output = rendered;
