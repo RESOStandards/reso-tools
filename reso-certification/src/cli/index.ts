@@ -25,6 +25,7 @@ import { Command } from 'commander';
 import { startMockServer, stopMockServer } from '../add-edit/mock/server.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
 import { synthesizeResourcesFromFields } from '../metadata/index.js';
+import { lockHolderOf } from '../sdk/common.js';
 import { configEntryToAddEdit, configEntryToCore, configEntryToDD, configEntryToEntityEvent, loadConfigFile } from '../sdk/config.js';
 import { CURRENT_CORE_VERSION, SUPPORTED_CORE_VERSIONS, isCoreVersion } from '../sdk/core-versions.js';
 import { CERTIFIABLE_DD_VERSIONS, CURRENT_DD_VERSION, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
@@ -46,6 +47,7 @@ import {
   parseVariationsCsv,
   updateVariationsViaService
 } from '../variations/index.js';
+import { submitVariationsReportViaService } from '../variations/submit.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { mintOAuth2ClientCredentialsToken, resolveCliAuth } from './auth.js';
 import { runMetadataStep } from './metadata-command.js';
@@ -1294,5 +1296,90 @@ program
       }
     }
   );
+
+// ── Submit a variations report (write side) ──
+//
+// Pushing a report IS starting a review: the same request writes the review rows,
+// so there is no separate "start" call. A CLI run produces a COMPLETE report, so
+// this is always a full replace of whatever is on record -- the destructive shape
+// the service's lock gate guards.
+//
+// CONSENT IS A FLAG, NOT A MODE. There is no TTY branch here and no prompt: the
+// command behaves identically whether a person or an agent runs it, following the
+// convention `update-variations` already set -- do the safe thing, report what
+// would have been destructive, and name the flag. A command that did different
+// things depending on where it ran is how automation quietly performs the act a
+// human would have been warned about.
+//
+// A LOCK IS NOT OVERRIDABLE. `--overwrite` covers a pending review with no lock
+// and nothing more. A lock means somebody is actively working, and one a
+// stateless call could clear would not be a lock.
+
+program
+  .command('submit-variations-report')
+  .description('Submit a variations report from a DD run to the Variations Service — starts or refreshes a review')
+  .requiredOption('-r, --report <path>', 'Path to the variations-report.json a DD run produced')
+  .option('--overwrite', 'Proceed over an existing pending review (never over a lock)')
+  .option('--dry-run', 'Report what would be submitted and send nothing')
+  .option('--json', 'Print the result as JSON')
+  .action(async (opts: { report: string; overwrite?: boolean; dryRun?: boolean; json?: boolean }) => {
+    try {
+      // The Variations Service takes an OAuth2 client-credentials token minted from the tools .env
+      // (TOKEN_URI / CLIENT_ID / CLIENT_SECRET), exactly as update-variations and the review commands
+      // do. `mintProviderToken` in the SDK reads the CERT_AUTH_API_* variables instead, which this
+      // .env does not carry -- so the CLI mints here and passes the token down rather than letting
+      // the SDK fall back to a mechanism that is not configured.
+      //
+      // Skipped entirely for a dry run, which contacts nothing and so should not demand credentials.
+      const bearerToken = opts.dryRun ? undefined : await mintOAuth2ClientCredentialsToken();
+
+      const result = await submitVariationsReportViaService({
+        reportPath: opts.report,
+        fromCli: true,
+        ...(bearerToken ? { bearerToken } : {}),
+        ...(opts.overwrite ? { overwrite: true } : {}),
+        ...(opts.dryRun ? { dryRun: true } : {})
+      });
+
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+
+      const where = `${result.providerUoi} / ${result.providerUsi} → ${result.recipientUoi}, DD ${result.version}`;
+
+      if (result.dryRun) {
+        console.log('Dry run — nothing was sent.');
+        console.log(`  Would submit ${result.changeCount} change(s) for ${where}.`);
+        console.log('  This is a FULL replace: it replaces the review rows currently on record for this report.');
+        console.log('  Re-run without --dry-run to submit.');
+        return;
+      }
+
+      console.log(`Submitted ${result.changeCount} change(s) for ${where}.`);
+      if (result.variationsReportId) {
+        // The handle. A stateless run has nothing else to quote in a support request.
+        console.log(`  Report id: ${result.variationsReportId}`);
+      }
+    } catch (error) {
+      const code = (error as Error & { code?: string }).code;
+      console.error(error instanceof Error ? error.message : String(error));
+
+      // A lock is somebody else working, not a fault. Separate exit code so a
+      // script can tell "come back later" from "this is broken".
+      if (code === 'LOCKED') {
+        const lock = lockHolderOf(error);
+        if (lock) {
+          console.error(`  Held by: ${lock.displayName} <${lock.email}>`);
+          console.error(`  Until:   ${lock.expiresAt}`);
+        }
+        console.error('  No flag overrides a lock. --overwrite covers a pending review with no lock.');
+        process.exitCode = 3;
+        return;
+      }
+
+      process.exitCode = 2;
+    }
+  });
 
 program.parse();

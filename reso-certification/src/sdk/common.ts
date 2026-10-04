@@ -3,8 +3,13 @@
 // today, others to come — reuses these so token minting and auth-error semantics
 // stay defined in one place rather than copied per service.
 
-/** Auth/setup errors carry one of these on `error.code`. */
-export type ServiceErrorCode = 'AUTH_REQUIRED' | 'AUTH_REJECTED' | 'SERVICE_ERROR';
+/** Auth/setup errors carry one of these on `error.code`.
+ *
+ *  `LOCKED` is deliberately NOT folded into `SERVICE_ERROR`. A lock refusal is not an auth failure
+ *  and not a service fault -- it means somebody else is legitimately working on the thing. Collapsing
+ *  it would make "retry when they are done" indistinguishable from "something is broken", and a
+ *  caller cannot render the right message from a code that does not distinguish them. */
+export type ServiceErrorCode = 'AUTH_REQUIRED' | 'AUTH_REJECTED' | 'SERVICE_ERROR' | 'LOCKED' | 'REVIEW_IN_PLACE';
 
 /** Build an Error carrying a machine-readable `code` for a service-call failure. */
 export const serviceError = (code: ServiceErrorCode, message: string): Error => {
@@ -12,6 +17,29 @@ export const serviceError = (code: ServiceErrorCode, message: string): Error => 
   (error as Error & { code: ServiceErrorCode }).code = code;
   return error;
 };
+
+/** Who holds a lock, as the service reports it on a refusal.
+ *
+ *  Carried on the error so both the CLI and the desktop can say "Anna has this open until 14:30,
+ *  contact her" rather than printing a status code. `heldByProviderUoi` is the HOLDER's organization,
+ *  which lets a caller tell a colleague from a RESO administrator by comparing it with its own. */
+export interface LockHolderInfo {
+  readonly displayName: string;
+  readonly email: string;
+  readonly expiresAt: string;
+  readonly heldByProviderUoi?: string;
+}
+
+/** Build a LOCKED error carrying the holder, so the caller can act rather than just fail. */
+export const lockedError = (message: string, lock?: LockHolderInfo): Error => {
+  const error = serviceError('LOCKED', message);
+  if (lock) (error as Error & { lock?: LockHolderInfo }).lock = lock;
+  return error;
+};
+
+/** The holder carried on a LOCKED error, when the service named one. */
+export const lockHolderOf = (error: unknown): LockHolderInfo | undefined =>
+  error instanceof Error ? (error as Error & { lock?: LockHolderInfo }).lock : undefined;
 
 /** True for the two auth failures — the UI uses this to decide to prompt login. */
 export const isServiceAuthError = (error: unknown): boolean => {
