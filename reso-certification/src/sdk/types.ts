@@ -318,6 +318,9 @@ export interface CoreConfig extends BaseComplianceConfig {
   readonly originatingSystemName?: string;
   /** Optional filter — `OriginatingSystemID eq '<value>'` when no name is provided (OSN takes precedence). */
   readonly originatingSystemId?: string;
+  /** Sparse field-selection override — see `ConfigCoreOptions.preferFields`. Re-orders ranked candidates;
+   *  never adds one, never pins a failing field (the ladder falls through). Applied entries are reported. */
+  readonly preferFields?: ReadonlyArray<string>;
 }
 
 /** Discriminated union of all endorsement configs. */

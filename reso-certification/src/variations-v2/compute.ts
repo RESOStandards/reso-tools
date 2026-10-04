@@ -148,6 +148,25 @@ const emitSuggestionsUnlessSatisfied = (
 };
 
 /**
+ * `strategy` records WHERE A MAPPING CAME FROM, and it never changes once set (Josh, 2026-10-03: "strategy is
+ * what the tool used to check their results, and it never changes"). So a strategy the producer already
+ * recorded WINS, and the flag-derived classification is only a fallback for a suggestion that carries none.
+ *
+ * This is written out rather than left to object-literal ordering. The emitters below spread `...rest` after
+ * `strategy:`, so an incoming strategy already survives today — but only because of where that line sits.
+ * Spreading rest first is the more common idiom, and reordering those keys would silently destroy the
+ * producer's record with no test noticing. Stating the precedence makes the rule legible and testable.
+ *
+ * Note what this CANNOT repair: when the store returns an entry that is merely under review, it emits no
+ * `strategy` at all, so the fallback runs and a review-state flag decides the label. That is fixed where the
+ * value is dropped (the service's review blend), not here.
+ */
+const resolveStrategy = (incoming: unknown, flags: { readonly isAdminReview?: unknown; readonly isFastTrack?: unknown }): string =>
+  typeof incoming === 'string' && incoming.length > 0
+    ? incoming
+    : classifySuggestionStrategy({ isAdminReview: !!flags.isAdminReview, isFastTrack: !!flags.isFastTrack });
+
+/**
  * Tag each variation with its enforcement bucket: must-fix when any suggestion
  * applies now (targetMajor <= currentMajor, or absent — machine matches /
  * current major), warning when every suggestion targets a future major. Items
@@ -234,11 +253,11 @@ const resolveResource = (resourceName: string, ctx: Ctx): void => {
             return !!s.suggestedResourceName && s.suggestedResourceName === standardResourceName;
           })
         ),
-      ({ suggestedResourceName, isAdminReview, isFastTrack, ...rest }) => [
+      ({ suggestedResourceName, strategy: incomingStrategy, isAdminReview, isFastTrack, ...rest }) => [
         {
           resourceName,
           suggestedResourceName,
-          strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
+          strategy: resolveStrategy(incomingStrategy, { isAdminReview, isFastTrack }),
           ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName }),
           ...rest
         }
@@ -305,13 +324,13 @@ const resolveField = (resourceName: string, fieldName: string, ctx: Ctx): void =
             }
           )
         ),
-      ({ suggestedResourceName, suggestedFieldName, isAdminReview, isFastTrack, ...rest }) => [
+      ({ suggestedResourceName, suggestedFieldName, strategy: incomingStrategy, isAdminReview, isFastTrack, ...rest }) => [
         {
           resourceName,
           fieldName,
           suggestedResourceName,
           suggestedFieldName,
-          strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
+          strategy: resolveStrategy(incomingStrategy, { isAdminReview, isFastTrack }),
           ddWikiUrl: getDDWikiUrl({ version, standardMetadataMap, resourceName: suggestedResourceName, fieldName: suggestedFieldName }),
           ...rest
         }
@@ -369,7 +388,15 @@ const resolveLookupsAndLegacy = (resourceName: string, fieldName: string, ctx: C
       emitSuggestionsUnlessSatisfied(
         suggestions as Json[],
         s => isSuggestedLookupTargetPresent(metadataReportMap, s),
-        ({ suggestedResourceName, suggestedFieldName, suggestedLookupValue, isAdminReview, isFastTrack, ...rest }) => [
+        ({
+          suggestedResourceName,
+          suggestedFieldName,
+          suggestedLookupValue,
+          strategy: incomingStrategy,
+          isAdminReview,
+          isFastTrack,
+          ...rest
+        }) => [
           {
             resourceName,
             fieldName,
@@ -377,7 +404,7 @@ const resolveLookupsAndLegacy = (resourceName: string, fieldName: string, ctx: C
             suggestedResourceName,
             suggestedFieldName,
             suggestedLookupValue,
-            strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
+            strategy: resolveStrategy(incomingStrategy, { isAdminReview, isFastTrack }),
             ddWikiUrl: getDDWikiUrl({
               version,
               standardMetadataMap,
@@ -431,6 +458,7 @@ const resolveLookupsAndLegacy = (resourceName: string, fieldName: string, ctx: C
           suggestedFieldName,
           suggestedLegacyODataValue,
           suggestedLookupValue,
+          strategy: incomingStrategy,
           isAdminReview,
           isFastTrack,
           ...rest
@@ -443,7 +471,7 @@ const resolveLookupsAndLegacy = (resourceName: string, fieldName: string, ctx: C
             suggestedFieldName,
             suggestedLegacyODataValue,
             ...(suggestedLookupValue != null ? { suggestedLookupValue } : {}),
-            strategy: classifySuggestionStrategy({ isAdminReview, isFastTrack }),
+            strategy: resolveStrategy(incomingStrategy, { isAdminReview, isFastTrack }),
             ddWikiUrl: getDDWikiUrl({
               version,
               standardMetadataMap,

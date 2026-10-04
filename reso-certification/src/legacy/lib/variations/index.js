@@ -37,7 +37,7 @@ const MATCHING_STRATEGIES = Object.freeze({
   EDIT_DISTANCE: 'Edit Distance',
   ADMIN_REVIEW: 'Admin Review',
   FAST_TRACK: 'Fast Track',
-  EXTERNAL_SUGGESTION: 'Suggestion'
+  EXTERNAL_SUGGESTION: 'External Suggestion'
 });
 
 /**

@@ -16,6 +16,7 @@
 import { type EnumRepresentation, resolveEnum } from '@reso-standards/reso-client';
 import type { CsdlEnumType } from '@reso-standards/reso-metadata-utils';
 import type { EntityProperty } from '../test-runner/types.js';
+import { MIN_DISCRIMINATING_VALUES, NO_FIELD_PREFERENCES, type PreferredFields, applyFieldPreferences } from './field-preference.js';
 import type { StandardMap } from './standard-map.js';
 
 const LOOKUP_NAME_ANNOTATION = 'RESO.OData.Metadata.LookupName';
@@ -148,7 +149,8 @@ export const selectEnumCandidates = (
   enumTypes: ReadonlyArray<CsdlEnumType>,
   standardMap: StandardMap,
   resource: string,
-  wantRep: (rep: EnumRepresentation) => boolean
+  wantRep: (rep: EnumRepresentation) => boolean,
+  preferred: PreferredFields = NO_FIELD_PREFERENCES
 ): ReadonlyArray<EnumCandidate> => {
   const candidates = properties
     .map(p => buildCandidate(p, records, enumTypes, standardMap, resource, wantRep))
@@ -159,5 +161,16 @@ export const selectEnumCandidates = (
   // Sort by rank: standard field + standard value (0) → standard field/local value (1) → local (2/3). Within
   // a rank, the higher fill rate wins — a fuller field is more likely to yield a non-empty result and is more
   // resistant to record drift between sampling and the live query.
-  return [...candidates].sort((a, b) => rank(a) - rank(b) || b.fillRate - a.fillRate);
+  const ranked = [...candidates].sort((a, b) => rank(a) - rank(b) || b.fillRate - a.fillRate);
+  // A provider preference re-orders the ranked list; it never adds or removes a candidate, so the
+  // ladder still falls through to the automatic order when a preferred field is not queryable.
+  // A preference may only promote a candidate that can actually exercise the operators — see
+  // MIN_DISCRIMINATING_VALUES. Ranking is unaffected; this only bounds what steering may reorder.
+  return applyFieldPreferences(
+    ranked,
+    preferred,
+    resource,
+    c => c.field,
+    c => c.distinctValueCount >= MIN_DISCRIMINATING_VALUES
+  );
 };

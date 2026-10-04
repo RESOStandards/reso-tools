@@ -47,6 +47,12 @@ interface ConfigCoreOptions {
   readonly fullCoverage?: boolean;
   readonly originatingSystemName?: string;
   readonly originatingSystemId?: string;
+  /** Sparse "use auto except for these" override on field selection — `Office.FeedTypes` to scope it to one
+   *  resource, or a bare `FeedTypes` to apply wherever the field appears. A preference re-orders the ranked
+   *  candidates and nothing else: it cannot add a candidate, and the runner still falls through to automatic
+   *  order when a preferred field is not queryable. Written here rather than only as a CLI flag so the desktop
+   *  client can author it. Every applied preference is recorded in the compliance report. */
+  readonly preferFields?: ReadonlyArray<string>;
 }
 interface ConfigAddEditOptions {
   readonly resource?: string;
@@ -302,6 +308,7 @@ export const configEntryToCore = (entry: ConfigEntry, providerUoi: string): Core
   ...(entry.coreOptions?.enumMode ? { enumMode: entry.coreOptions.enumMode } : {}),
   ...(coreResources(entry.coreOptions?.resources) ? { resources: coreResources(entry.coreOptions?.resources) } : {}),
   ...(entry.coreOptions?.fullCoverage ? { fullCoverage: true } : {}),
+  ...(entry.coreOptions?.preferFields?.length ? { preferFields: entry.coreOptions.preferFields } : {}),
   ...(osn(entry.coreOptions, entry) ? { originatingSystemName: osn(entry.coreOptions, entry) } : {}),
   ...(osid(entry.coreOptions, entry) ? { originatingSystemId: osid(entry.coreOptions, entry) } : {}),
   options: {

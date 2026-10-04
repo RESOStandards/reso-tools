@@ -559,7 +559,7 @@ describe('Variations Service suggestion tests', () => {
     const [{ suggestedResourceName, strategy }, ...remainingSuggestions] = suggestions;
 
     expect(suggestedResourceName).toBe('Property');
-    expect(strategy).toBe('Suggestion');
+    expect(strategy).toBe('External Suggestion');
     expect(remainingSuggestions?.length).toBe(0);
   });
 
@@ -637,7 +637,7 @@ describe('Variations Service suggestion tests', () => {
 
     expect(suggestedResourceName).toBe('Property');
     expect(suggestedFieldName).toBe('ListPrice');
-    expect(strategy).toBe('Suggestion');
+    expect(strategy).toBe('External Suggestion');
     expect(remainingSuggestions?.length).toBe(0);
   });
 
@@ -736,7 +736,7 @@ describe('Variations Service suggestion tests', () => {
     expect(suggestedFieldName).toBe('StandardStatus');
     expect(suggestedLookupValue).toBe('Active Under Contract');
     expect(!suggestedLegacyODataValue).toBe(true);
-    expect(strategy).toBe('Suggestion');
+    expect(strategy).toBe('External Suggestion');
     expect(remainingSuggestions?.length).toBe(0);
   });
 
@@ -844,7 +844,7 @@ describe('Variations Service suggestion tests', () => {
     expect(suggestedFieldName).toBe('StandardStatus');
     expect(suggestedLookupValue).toBe('Active Under Contract');
     expect(!suggestedLegacyODataValue).toBe(true);
-    expect(strategy).toBe('Suggestion');
+    expect(strategy).toBe('External Suggestion');
     expect(remainingSuggestions?.length).toBe(0);
   });
 
@@ -955,7 +955,7 @@ describe('Variations Service suggestion tests', () => {
     expect(suggestedFieldName).toBe('ExteriorFeatures');
     expect(suggestedLegacyODataValue).toBe('GasGrill');
     expect(!suggestedLookupValue).toBe(true);
-    expect(strategy).toBe('Suggestion');
+    expect(strategy).toBe('External Suggestion');
     expect(remainingSuggestions?.length).toBe(0);
   });
 

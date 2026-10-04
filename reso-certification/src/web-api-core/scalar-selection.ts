@@ -17,6 +17,7 @@
  * that field by construction; the standard map is a ranking input, never a value source.
  */
 
+import { MIN_DISCRIMINATING_VALUES, NO_FIELD_PREFERENCES, type PreferredFields, applyFieldPreferences } from './field-preference.js';
 import type { StandardMap } from './standard-map.js';
 
 /** Min / median / max over a field's sampled values, plus the type-aware distinct count. Produced by the
@@ -92,7 +93,8 @@ export const selectScalarCandidates = <V>(
   records: ReadonlyArray<Record<string, unknown>>,
   standardMap: StandardMap,
   resource: string,
-  stats: (values: ReadonlyArray<unknown>) => ScalarStats<V> | undefined
+  stats: (values: ReadonlyArray<unknown>) => ScalarStats<V> | undefined,
+  preferred: PreferredFields = NO_FIELD_PREFERENCES
 ): ReadonlyArray<ScalarCandidate<V>> => {
   const candidates = fields
     .map(field => {
@@ -113,5 +115,13 @@ export const selectScalarCandidates = <V>(
 
   // Standard before local (the filter), then usage, then distinct count as a usage tiebreak only.
   const rank = (c: ScalarCandidate<V>): number => (c.isStandard ? 0 : 1);
-  return [...candidates].sort((a, b) => rank(a) - rank(b) || b.fillRate - a.fillRate || b.stats.distinct - a.stats.distinct);
+  const ranked = [...candidates].sort((a, b) => rank(a) - rank(b) || b.fillRate - a.fillRate || b.stats.distinct - a.stats.distinct);
+  // See MIN_DISCRIMINATING_VALUES: steering may not promote a field that cannot exercise ne/gt/lt.
+  return applyFieldPreferences(
+    ranked,
+    preferred,
+    resource,
+    c => c.field,
+    c => c.stats.distinct >= MIN_DISCRIMINATING_VALUES
+  );
 };
