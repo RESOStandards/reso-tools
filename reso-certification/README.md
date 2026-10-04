@@ -111,13 +111,39 @@ reso-cert core --url https://api.example.com --auth-token TOKEN --output-dir ./r
 
 ## Config Files
 
-Run tests from a JSON config file instead of CLI flags. Each entry in the `configs` array is tested sequentially.
+Run tests from a JSON config file instead of CLI flags. Each entry in the `configs` array is tested sequentially, so one file can cover several recipients or systems.
 
 ```bash
-reso-cert add-edit --config sample-configs/add-edit-config.json
+reso-cert dd --config path/to/config.json
+reso-cert core --config path/to/config.json
+reso-cert entity-event --config path/to/config.json
+reso-cert add-edit --config path/to/config.json
 ```
 
-See [`sample-configs/`](sample-configs/) for examples.
+**The same entry serves Data Dictionary, Web API Core and EntityEvent.** Every endorsement-specific option has a default, so nothing beyond the common fields is required for those three.
+
+**Add/Edit is the exception**, because it writes to the server and has to know what a valid and an invalid record look like. It needs `payloads` inline or a `payloadsDir`.
+
+```json
+{
+  "providerUoi": "T00000012",
+  "configs": [
+    {
+      "description": "Production feed",
+      "serviceRootUri": "https://api.example.com/odata",
+      "recipientUoi": "M00000554",
+      "providerUsi": "50039",
+      "token": "your-bearer-token"
+    }
+  ]
+}
+```
+
+All three identifiers appear in the output path as `{providerUoi}-{providerUsi}/{recipientUoi}`. One left out of the config shows up there as its own name, so a segment reading `providerUsi` means that field was not supplied.
+
+`OriginatingSystemName` and `OriginatingSystemID` scope a feed carrying more than one originating system. **Data Dictionary and Web API Core read them; Add/Edit and EntityEvent ignore them.** Either may sit at entry level or inside that endorsement's options block, where the block wins, and Name takes precedence over ID when both are present.
+
+See [`sample-configs/`](sample-configs/README.md) for a downloadable sample per endorsement and the full field reference.
 
 ## Metadata Report Utilities
 

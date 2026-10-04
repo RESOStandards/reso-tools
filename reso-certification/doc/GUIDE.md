@@ -156,6 +156,75 @@ node --env-file=.env $(which reso-cert) core --url https://api.example.com
 
 ---
 
+## Configuration Files
+
+Flags are fine for one server. A configuration file is better once you are testing more than one recipient, more than one system, or the same server repeatedly, because it keeps the identifiers and the credentials in one place and runs each entry in sequence.
+
+```bash
+reso-cert dd --config path/to/config.json
+```
+
+A minimal file needs five things: the organization being certified, and then per entry the service root, the recipient, the system and some credentials.
+
+```json
+{
+  "providerUoi": "T00000012",
+  "configs": [
+    {
+      "description": "Production feed",
+      "serviceRootUri": "https://api.example.com/odata",
+      "recipientUoi": "M00000554",
+      "providerUsi": "50039",
+      "token": "your-bearer-token"
+    }
+  ]
+}
+```
+
+### One File Runs Three of the Four Endorsements
+
+**Data Dictionary, Web API Core and EntityEvent all run from that same entry**, with no additions. Every option specific to those endorsements has a default, so the file above works for all three and only the command changes.
+
+**Add/Edit is the exception.** It creates, updates and deletes records, so it has to know what a valid and an invalid record look like for the server under test. Give it `payloads` inline or point it at a directory with `payloadsDir`. Without either it will try to sample the server to build them, which often works but cannot always succeed – an update or delete payload with no key field, and no create payload to chain from, leaves it nothing to act on.
+
+### Scoping a Multi-Tenant Feed
+
+A feed that carries records from several originating systems needs to be narrowed to the one being certified, using either `originatingSystemName` or `originatingSystemId`.
+
+Three rules are worth knowing, because each is easy to get wrong:
+
+- **Data Dictionary and Web API Core read them. Add/Edit and EntityEvent ignore them.**
+- They may sit at entry level or inside that endorsement's own options block. **The options block wins** when both are set.
+- **Name takes precedence over ID** when both are present, so supply one.
+
+```json
+{
+  "serviceRootUri": "https://api.example.com/odata",
+  "recipientUoi": "M00000554",
+  "providerUsi": "50039",
+  "token": "your-bearer-token",
+  "originatingSystemName": "MYSYSTEM"
+}
+```
+
+### Where the Reports Land
+
+Each run writes to a directory keyed by the identifiers in the config:
+
+```
+{output-dir}/{endorsement}-{version}/{providerUoi}-{providerUsi}/{recipientUoi}/current
+```
+
+The previous run is moved to `archived/{timestamp}` beside it, so repeated runs against the same server build up a history rather than overwriting one another.
+
+An identifier missing from the config appears in that path as its own name. A segment reading `providerUsi` is therefore a signal that the field was not supplied, rather than a system actually called that.
+
+### Samples
+
+A downloadable sample for each endorsement, with the full field reference, is in [`sample-configs/`](../sample-configs/README.md).
+
+---
+
 ## Choosing the Output Format
 
 The default output is a progress display with spinners – good for interactive runs where a human is watching. For everything else, there are three other formats:
