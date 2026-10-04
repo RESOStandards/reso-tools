@@ -67,6 +67,28 @@ import {
  *  published version (dist mirrors src under `tsc`, so `../../package.json` resolves in both dev and dist). */
 const { version: CLI_VERSION } = createRequire(import.meta.url)('../../package.json') as { readonly version: string };
 
+/** A run's label: the three identifiers, each named.
+ *
+ *  The terse form was `${entry.recipientUoi}-${entry.providerUsi}`, which is a two-token dash
+ *  string -- exactly like the output path's `{providerUoi}-{providerUsi}` segment, but holding
+ *  DIFFERENT fields in the OPPOSITE order. Reading one as the other is an easy mistake and was
+ *  made during the investigation that produced this. Naming each value removes the ambiguity.
+ *
+ *  A missing identifier shows as `<name>` rather than being omitted, so the line always has the
+ *  same three slots and a gap is visible as a gap. That matches what the output path does, so a
+ *  log line and a directory name can be read against each other. */
+const runLabel = (
+  entry: { readonly providerUsi?: string; readonly recipientUoi?: string },
+  providerUoi: string | undefined
+): string => {
+  const show = (value: string | undefined, name: string): string => (value?.trim() ? value : `<${name}>`);
+  return [
+    `ProviderUoi: ${show(providerUoi, 'providerUoi')}`,
+    `ProviderUsi: ${show(entry.providerUsi, 'providerUsi')}`,
+    `RecipientUoi: ${show(entry.recipientUoi, 'recipientUoi')}`
+  ].join(', ');
+};
+
 /** Default port for mock OData servers when started via --mock. */
 const DEFAULT_MOCK_PORT = 8800;
 
@@ -173,7 +195,7 @@ addEditCmd.action(
 
           return {
             config,
-            label: entry.description ?? `${entry.recipientUoi}-${entry.providerUsi}`
+            label: entry.description ?? runLabel(entry, configFile.providerUoi)
           };
         });
 
@@ -319,7 +341,7 @@ entityEventCmd.action(
 
           return {
             config,
-            label: entry.description ?? `${entry.recipientUoi}-${entry.providerUsi}`
+            label: entry.description ?? runLabel(entry, configFile.providerUoi)
           };
         });
 
@@ -472,7 +494,7 @@ coreCmd.action(
             ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {})
           };
 
-          return { config, label: entry.description ?? `${entry.recipientUoi}-${entry.providerUsi}` };
+          return { config, label: entry.description ?? runLabel(entry, configFile.providerUoi) };
         });
 
         results = await runConfigEntries(entries, renderMode);
@@ -601,7 +623,7 @@ ddCmd.action(
             ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {})
           };
 
-          return { config, label: entry.description ?? `${entry.recipientUoi}-${entry.providerUsi}` };
+          return { config, label: entry.description ?? runLabel(entry, configFile.providerUoi) };
         });
 
         results = await runConfigEntries(entries, renderMode);
