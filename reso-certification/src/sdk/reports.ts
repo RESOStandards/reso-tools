@@ -58,9 +58,25 @@ const DEFAULT_RESULTS_PATH = '.reso-cert';
  */
 export const buildOutputPath = (endorsementSlug: string, version: string, config: BaseComplianceConfig): string => {
   const resultsPath = config.options?.outputDir ?? join(process.cwd(), DEFAULT_RESULTS_PATH);
-  const providerUoi = config.providerUoi ?? `LOCAL-${Date.now()}`;
-  const providerUsi = config.providerUsi ?? 'LOCAL-SYSTEM';
-  const recipientUoi = config.recipientUoi ?? 'LOCAL-RECIPIENT';
+  // A missing identifier falls back to its own PARAMETER NAME, so the path states which one was
+  // not supplied: `T00000012-providerUsi` reads directly where `T00000012-LOCAL-SYSTEM` has to be
+  // mapped back. The names carry no hyphen, so the `{providerUoi}-{providerUsi}` segment stays
+  // parseable, and no segment is ever dropped. Successive runs that never fill the identifiers in
+  // share one tree and rotate through `archived/`, which is what handles the collision.
+  //
+  // Not `??`, because blank must count as absent. `normalizeConfigEntry` fills a missing
+  // identifier with '' rather than undefined, so '' is the common case rather than an exotic one,
+  // and `??` would pass it through and collapse a path segment -- `T00000012-/current`, trailing
+  // dash, recipient dropped by `join`. Whitespace-only is treated the same way. The mappers guard
+  // this too; this is the backstop for any other caller of an exported function.
+  //
+  // The desktop client mirrors this function rather than importing it (reso-tools-private,
+  // `resolveOutputPath`). These three strings must change on both sides together.
+  const orName = (value: string | undefined, name: string): string => (value?.trim() ? value : name);
+  const providerUoi = orName(config.providerUoi, 'providerUoi');
+  const providerUsi = orName(config.providerUsi, 'providerUsi');
+  const recipientUoi = orName(config.recipientUoi, 'recipientUoi');
+
   return join(resultsPath, `${endorsementSlug}-${version}`, `${providerUoi}-${providerUsi}`, recipientUoi, 'current');
 };
 
