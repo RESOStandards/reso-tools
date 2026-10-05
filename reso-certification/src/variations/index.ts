@@ -43,7 +43,6 @@ export {
   VARIATION_KEY_SEPARATOR,
   type Decision,
   type DecisionAction,
-  type DecisionActor,
   type DecisionReport,
   type DecisionSheetRow,
   type ReportChange,

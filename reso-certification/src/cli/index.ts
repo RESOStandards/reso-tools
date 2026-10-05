@@ -1429,8 +1429,6 @@ program
   .requiredOption('-r, --report <path>', 'Path to the variations-report.json the review was opened from')
   .requiredOption('-d, --decisions <path>', 'Path to the decisions CSV (Resource Name, Field Name, Lookup Value, Action, Comment)')
   .option('--open-review', 'Save the report first even with no comments, to open a review that does not exist yet')
-  .option('--as-org <uoi>', 'UOI of the organization the comments come from — required when any row carries a comment')
-  .option('--editor-name <name>', 'Display name recorded as the editor and used on the notifications')
   .option('--dry-run', 'Show what would be sent and send nothing')
   .option('--json', 'Print the service result as JSON')
   .action(
@@ -1438,8 +1436,6 @@ program
       report: string;
       decisions: string;
       openReview?: boolean;
-      asOrg?: string;
-      editorName?: string;
       dryRun?: boolean;
       json?: boolean;
     }) => {
@@ -1457,14 +1453,15 @@ program
           );
         }
 
-        // The acting organization becomes the comment's `from`, and it comes from the flag. The
-        // report carries two UOIs that would both pass a glance -- its provider and its recipient --
-        // and neither is the administrator writing the comment. Nothing is substituted here: with no
-        // --as-org and a comment to attribute, the plan refuses.
+        // NO IDENTITY IS PASSED IN. Who is acting is established by the token, and the authorizer
+        // puts all six values -- isAdmin, providerUoi, recipientUoi, username, email,
+        // environmentName -- into the request context, every one of which reaches the handler. None
+        // of it is reachable from here: the bearer token is an opaque row key, not a JWT with claims
+        // to read. So there is nothing for an operator to supply, and asking would only invite a
+        // mistyped UOI that misattributes a comment in a thread its subject reads.
         const plan = planDecisionPush({
           report: report as never,
           rows: items,
-          actor: { providerUoi: opts.asOrg ?? '', ...(opts.editorName ? { displayName: opts.editorName } : {}) },
           now: new Date().toISOString(),
           ...(opts.openReview ? { openReview: true } : {})
         });
@@ -1521,7 +1518,6 @@ program
           decisions: plan.decisions,
           fromCli: true,
           ...(typeof report.version === 'string' ? { ddVersion: report.version } : {}),
-          ...(opts.editorName ? { userDisplayName: opts.editorName } : {}),
           ...(bearerToken ? { bearerToken } : {})
         });
 

@@ -20,7 +20,6 @@ import type { SaveVariationDecisionsResult } from '../../src/variations/submit.j
 
 const US = VARIATION_KEY_SEPARATOR;
 const NOW = '2026-10-05T04:30:00.000Z';
-const ADMIN = { providerUoi: 'RESO', username: 'admin-user' };
 
 const report = () => ({
   version: '2.1',
@@ -34,7 +33,7 @@ const report = () => ({
 });
 
 const plan = (rows: ReadonlyArray<Record<string, unknown>>, over: Record<string, unknown> = {}) =>
-  planDecisionPush({ report: report(), rows: rows as never, actor: ADMIN, now: NOW, ...over });
+  planDecisionPush({ report: report(), rows: rows as never, now: NOW, ...over });
 
 const emptyResult = (over: Partial<SaveVariationDecisionsResult> = {}): SaveVariationDecisionsResult => ({
   applied: [],
@@ -78,43 +77,30 @@ describe('planning', () => {
 
   it('leaves the report object untouched when there is nothing to attach', async () => {
     const before = report();
-    const result = planDecisionPush({ report: before, rows: [{ resourceName: 'Property', fieldName: 'OKC_SoilType', action: 'ignore' }], actor: ADMIN, now: NOW });
+    const result = planDecisionPush({ report: before, rows: [{ resourceName: 'Property', fieldName: 'OKC_SoilType', action: 'ignore' }], now: NOW });
     expect(result.report).toBe(before);
   });
 });
 
-describe('attribution is supplied, never substituted', () => {
-  it('refuses a comment when no acting organization was named', async () => {
-    // The report carries two UOIs that would both pass a glance -- its provider and its recipient --
-    // and neither is the administrator writing the comment. Using either would label an admin's
-    // comment as coming from an organization that did not write it, in a thread that organization
-    // reads. So an unattributable comment is refused rather than attributed to whoever is at hand.
+describe('a comment names who may read it, and nothing about who wrote it', () => {
+  it('addresses the comment to the report’s organization and asserts no author', async () => {
+    // Josh, 2026-10-04: "it's from Admin targeted at providerUoi", and "that means anyone who has an
+    // account at providerUoi sees it." So `to` is a visibility scope, read off the report. `from` is
+    // filled from the auth context, which a client cannot read: the identity is columns on the token
+    // row and the bearer token is an opaque key with no claims in it.
+    const result = plan([{ resourceName: 'Property', fieldName: 'OKC_SoilType', comment: 'a note' }]);
+    expect(result.report.changes[1].conversations?.[0]).toEqual({ timestamp: NOW, to: 'T00000045', message: 'a note' });
+  });
+
+  it('needs no identity passed in to attach one', async () => {
     const result = planDecisionPush({
       report: report(),
       rows: [{ resourceName: 'Property', fieldName: 'OKC_SoilType', action: 'ignore', comment: 'a note' }],
-      actor: { providerUoi: '' },
-      now: NOW
-    });
-    expect(result.errors.some(e => /organization it comes from/i.test(e))).toBe(true);
-    expect(result.decisions).toEqual([]);
-  });
-
-  it('does not require one when no row carries a comment', async () => {
-    const result = planDecisionPush({
-      report: report(),
-      rows: [{ resourceName: 'Property', fieldName: 'OKC_SoilType', action: 'ignore' }],
-      actor: { providerUoi: '' },
       now: NOW
     });
     expect(result.errors).toEqual([]);
+    expect(result.commentsAdded).toBe(1);
     expect(result.decisions).toHaveLength(1);
-  });
-
-  it('records the named organization as the comment’s origin and the report’s provider as its destination', async () => {
-    const result = plan([{ resourceName: 'Property', fieldName: 'OKC_SoilType', comment: 'a note' }]);
-    const comment = result.report.changes[1].conversations?.[0];
-    expect(comment?.from).toBe('RESO');
-    expect(comment?.to).toBe('T00000045');
   });
 });
 
