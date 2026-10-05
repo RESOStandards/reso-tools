@@ -55,6 +55,32 @@ afterEach(() => {
 const submit = (over: Record<string, unknown> = {}) =>
   submitVariationsReportViaService({ report: REPORT, bearerToken: 'tok', fromCli: true, ...over });
 
+describe('the report’s size is read from its level buckets', () => {
+  it('counts the five buckets, because an on-disk report has no changes array', async () => {
+    // A run writes resources/fields/lookups/expansions/complexTypes. `changes` is what the SERVICE
+    // stores, built on its side, and no report on disk carries one -- so reading it reported every
+    // real submission as "0 change(s)", on the one line an operator reads to confirm the push.
+    const bucketed = {
+      version: '2.1',
+      providerUoi: 'T00000045',
+      providerUsi: '50013',
+      recipientUoi: 'M00000574',
+      fields: [{ level: 'field', resourceName: 'Property', fieldName: 'OKC_SoilType' }],
+      lookups: [
+        { level: 'lookup', resourceName: 'Property', fieldName: 'LeaseTerm', lookupValue: 'Months - 3' },
+        { level: 'lookup', resourceName: 'Property', fieldName: 'LeaseTerm', lookupValue: 'Months - 4' }
+      ]
+    };
+    const result = await submitVariationsReportViaService({ report: bucketed, bearerToken: 'tok', fromCli: true });
+    expect(result.changeCount).toBe(3);
+  });
+
+  it('still honors a flat changes array, which a report fetched back from the service has', async () => {
+    const result = await submit();
+    expect(result.changeCount).toBe(2);
+  });
+});
+
 describe('a submission is a full replace, declared explicitly', () => {
   it('declares replaceReviewRows so the service does not have to infer it', async () => {
     // A fresh run is a COMPLETE report, never a delta. Absence of the flag means delta, so the safe
