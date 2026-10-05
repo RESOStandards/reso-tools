@@ -7,7 +7,8 @@
  */
 
 import type { MetadataReport, MetadataReportField, MetadataReportLookup } from '@reso-standards/reso-metadata-utils';
-import { buildResourceUrl, odataRequest } from '../test-runner/index.js';
+import { REPLICATION_STRATEGIES, replicationIterator } from '../replication/replication-iterator.js';
+import type { ODataRequester } from '../test-runner/index.js';
 
 // ── Constants ──
 
@@ -15,6 +16,7 @@ const LOOKUP_NAME_ANNOTATION_TERM = 'RESO.OData.Metadata.LookupName';
 const STANDARD_NAME_ANNOTATION_TERM = 'RESO.OData.Metadata.StandardName';
 const LEGACY_ODATA_VALUE_TERM = 'RESO.OData.Metadata.LegacyODataValue';
 const PAGE_SIZE = 1000;
+const LOOKUP_RESOURCE_NAME = 'Lookup';
 
 // ── Raw Lookup Resource Types ──
 
@@ -40,65 +42,56 @@ export interface LookupResourceDump {
 // ── Fetch ──
 
 /**
- * Fetch all Lookup records from the server.
- * Uses @odata.nextLink pagination by default, falls back to $top/$skip
- * if the server doesn't provide nextLinks.
+ * Fetch every Lookup record from the server.
+ *
+ * Replication is `$top`/`$skip`, which is what the Data Dictionary rules prescribe for this
+ * resource. See {@link replicationIterator} for that grounding and for the two paging mistakes it
+ * avoids — advancing the cursor by the requested window rather than the served count, and reading
+ * a short page as end-of-data. The records accumulate in memory; the iterator's optional disk dump
+ * is unused here because the caller serializes the complete set itself.
+ *
+ * Everything certification-specific stays here rather than in the iterator, which has no opinion
+ * about what a status means: a 404 on the first request means the provider does not serve this
+ * resource, any other non-200 is a failure carrying the request that produced it, and progress is
+ * reported per page.
+ *
  * Returns undefined if the Lookup resource doesn't exist (HTTP 404).
  */
 export const fetchLookupResource = async (
   serverUrl: string,
   authToken: string,
   onProgress?: (count: number) => void,
-  odataVersion?: string
+  odataVersion?: string,
+  requester?: ODataRequester
 ): Promise<ReadonlyArray<RawLookupRecord> | undefined> => {
   const allRecords: RawLookupRecord[] = [];
-  let url: string | undefined = `${buildResourceUrl(serverUrl, 'Lookup')}?$top=${PAGE_SIZE}`;
-  let useNextLink = true;
-  let skip = 0;
 
-  while (url) {
-    const response = await odataRequest({ method: 'GET', url, authToken, odataVersion });
+  for await (const page of replicationIterator({
+    serviceRootUri: serverUrl,
+    resourceName: LOOKUP_RESOURCE_NAME,
+    strategy: REPLICATION_STRATEGIES.TOP_AND_SKIP,
+    authToken,
+    pageSize: PAGE_SIZE,
+    odataVersion,
+    requester
+  })) {
+    // Only the FIRST request can tell us the resource is absent. A 404 partway through a walk is a
+    // failure on a resource we have already read from, not an absence.
+    if (page.status === 404 && page.pageNumber === 1) return undefined;
 
-    if (response.status === 404) return undefined;
-    if (response.status !== 200) {
-      const errorBody = typeof response.body === 'object' ? JSON.stringify(response.body) : String(response.body ?? '');
-      const err = new Error(`Lookup Resource returned HTTP ${response.status}`);
+    if (page.status !== 200) {
+      const err = new Error(`Lookup Resource returned HTTP ${page.status}`);
       (err as unknown as Record<string, unknown>).requestDetails = {
         method: 'GET',
-        url,
-        status: response.status,
-        responseBody: errorBody.slice(0, 500)
+        url: page.requestUrl,
+        status: page.status,
+        responseBody: (page.errorBody ?? '').slice(0, 500)
       };
       throw err;
     }
 
-    const body = response.body as {
-      value?: ReadonlyArray<RawLookupRecord>;
-      '@odata.nextLink'?: string;
-    } | null;
-
-    const records = body?.value ?? [];
-    if (records.length === 0) break;
-    allRecords.push(...records);
-    onProgress?.(allRecords.length);
-
-    // Prefer @odata.nextLink for pagination
-    const nextLink = body?.['@odata.nextLink'];
-    if (nextLink) {
-      url = nextLink;
-      useNextLink = true;
-    } else if (useNextLink && records.length >= PAGE_SIZE) {
-      // First page had no nextLink — fall back to $top/$skip
-      useNextLink = false;
-      skip += PAGE_SIZE;
-      url = `${buildResourceUrl(serverUrl, 'Lookup')}?$top=${PAGE_SIZE}&$skip=${skip}`;
-    } else if (!useNextLink && records.length >= PAGE_SIZE) {
-      // Continue $top/$skip fallback
-      skip += PAGE_SIZE;
-      url = `${buildResourceUrl(serverUrl, 'Lookup')}?$top=${PAGE_SIZE}&$skip=${skip}`;
-    } else {
-      break;
-    }
+    allRecords.push(...(page.records as ReadonlyArray<RawLookupRecord>));
+    if (page.records.length > 0) onProgress?.(allRecords.length);
   }
 
   return allRecords;
