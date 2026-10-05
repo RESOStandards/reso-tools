@@ -108,6 +108,115 @@ const tokenizeCsv = (text: string): ReadonlyArray<ReadonlyArray<string>> => {
 const isComplete = (item: Partial<VariationSuggestionItem>): item is VariationSuggestionItem =>
   typeof item.resourceName === 'string' && item.resourceName.length > 0;
 
+// ── Decision sheets ──────────────────────────────────────────────────
+
+/**
+ * One decision-sheet row: which element, optionally what to do, optionally what to say.
+ *
+ * A DIFFERENT sheet from the update sheet above, and deliberately a different parser. An update row
+ * carries an `Outcome` and writes the CANONICAL store; a decision row carries an `Action` and a
+ * `Comment` and drives a REVIEW — the pool row and the report's comment thread. Their validation
+ * differs: an update row must carry an outcome or a suggestion, while a decision row may legitimately
+ * carry a comment and no action.
+ *
+ * They share `tokenizeCsv` and nothing else. Relaxing `parseVariationsCsv`'s guard so one parser could
+ * read both would let an operator submit an update sheet to the review route, or the reverse, and
+ * receive a success report for the wrong thing.
+ */
+export interface DecisionCsvItem {
+  readonly resourceName: string;
+  readonly fieldName?: string;
+  readonly lookupValue?: string;
+  readonly action?: string;
+  readonly comment?: string;
+  readonly suggestedResourceName?: string;
+  readonly suggestedFieldName?: string;
+  readonly suggestedLookupValue?: string;
+  readonly suggestedLegacyODataValue?: string;
+  readonly suggestedRelatedResourceName?: string;
+  readonly suggestedRelatedFieldName?: string;
+  readonly suggestedRelatedLookupValue?: string;
+}
+
+const DECISION_COLUMNS: ReadonlyArray<{ readonly header: string; readonly field: keyof DecisionCsvItem }> = [
+  { header: 'Resource Name', field: 'resourceName' },
+  { header: 'Field Name', field: 'fieldName' },
+  { header: 'Lookup Value', field: 'lookupValue' },
+  { header: 'Action', field: 'action' },
+  { header: 'Comment', field: 'comment' },
+  { header: 'Suggested Resource Name', field: 'suggestedResourceName' },
+  { header: 'Suggested Field Name', field: 'suggestedFieldName' },
+  { header: 'Suggested Lookup Value', field: 'suggestedLookupValue' },
+  { header: 'Suggested Legacy OData Value', field: 'suggestedLegacyODataValue' },
+  { header: 'Suggested Related Resource Name', field: 'suggestedRelatedResourceName' },
+  { header: 'Suggested Related Field Name', field: 'suggestedRelatedFieldName' },
+  { header: 'Suggested Related Lookup Value', field: 'suggestedRelatedLookupValue' }
+];
+
+export interface ParsedDecisionsCsv {
+  readonly items: ReadonlyArray<DecisionCsvItem>;
+  readonly recognizedColumns: ReadonlyArray<string>;
+  readonly skippedColumns: ReadonlyArray<string>;
+}
+
+/**
+ * Parse a decision sheet. Throws with the offending row number rather than dropping content, for the
+ * same reason the update parser does: a sheet that silently loses a row reports success for work that
+ * never happened.
+ */
+export const parseDecisionsCsv = (csvData: string): ParsedDecisionsCsv => {
+  const rows = tokenizeCsv(csvData.trim());
+  if (rows.length === 0) throw new Error('Decision CSV is empty.');
+
+  const [headerRow, ...dataRows] = rows;
+  const recognized: string[] = [];
+  const skipped: string[] = [];
+  const fieldByIndex: ReadonlyArray<keyof DecisionCsvItem | undefined> = headerRow.map(cell => {
+    const name = cell.trim();
+    const column = DECISION_COLUMNS.find(c => c.header.toLowerCase() === name.toLowerCase());
+    if (column) {
+      recognized.push(column.header);
+      return column.field;
+    }
+    if (name !== '') skipped.push(name);
+    return undefined;
+  });
+
+  if (!recognized.includes('Resource Name')) {
+    throw new Error(
+      `Decision CSV must include a "Resource Name" column. Recognized: [${recognized.join(', ')}]${skipped.length ? `; unrecognized: [${skipped.join(', ')}]` : ''}.`
+    );
+  }
+
+  const items = dataRows.flatMap((cells, index) => {
+    // +2: the header is row 1 and dataRows are 0-indexed. Computed from the original position so
+    // blank-row skipping never drifts the reported number.
+    const rowNumber = index + 2;
+    if (cells.every(value => value.trim() === '')) return [];
+    if (cells.length > headerRow.length) {
+      throw new Error(
+        `Decision CSV row ${rowNumber} has ${cells.length} columns but the header has ${headerRow.length} — check for an unquoted comma.`
+      );
+    }
+    const item = fieldByIndex.reduce<{ -readonly [K in keyof DecisionCsvItem]?: DecisionCsvItem[K] }>((acc, field, i) => {
+      const value = cells[i]?.trim();
+      if (field && value) acc[field] = value;
+      return acc;
+    }, {});
+    if (typeof item.resourceName !== 'string' || item.resourceName.length === 0) {
+      throw new Error(`Decision CSV row ${rowNumber} is missing a Resource Name.`);
+    }
+    if (!item.action && !item.comment) {
+      throw new Error(`Decision CSV row ${rowNumber} has neither an Action nor a Comment — it names an element and asks for nothing.`);
+    }
+    return [item as DecisionCsvItem];
+  });
+
+  if (items.length === 0) throw new Error('Decision CSV has a header but no decision rows.');
+
+  return { items, recognizedColumns: recognized, skippedColumns: skipped };
+};
+
 /**
  * Parse a variations suggestions CSV into ingest items. Throws with a specific
  * message (bad header, missing identity column, or the row number missing a

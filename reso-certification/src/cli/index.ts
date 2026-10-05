@@ -44,12 +44,14 @@ import {
   listEndorsementsByReviewStatusViaService,
   listMyEndorsementsViaService,
   listVariationReviewItemsViaService,
+  parseDecisionsCsv,
   parseVariationsCsv,
   updateVariationsViaService
 } from '../variations/index.js';
-import { submitVariationsReportViaService } from '../variations/submit.js';
+import { saveVariationDecisionsViaService, submitVariationsReportViaService } from '../variations/submit.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { mintOAuth2ClientCredentialsToken, resolveCliAuth } from './auth.js';
+import { decisionExitCode, displayKey as displayDecisionKey, formatDecisionResult, planDecisionPush } from './decisions-command.js';
 import { runMetadataStep } from './metadata-command.js';
 import { resolveRcfExitCode, runRcf } from './rcf-command.js';
 import { resolveRenderMode, runConfigEntries, runWithProgress } from './render.js';
@@ -1400,5 +1402,148 @@ program
       process.exitCode = 2;
     }
   });
+
+// ── Record decisions on a review (write side, admin) ──
+//
+// The second half of the flow `submit-variations-report` starts. The report push opens the review
+// with every item `pending`; this records what the reviewer decided about named items, from a sheet
+// carrying an Action and a Comment per row.
+//
+// THE ORDER IS FORCED, NOT CHOSEN. A comment is persisted by saving the report -- the same place the
+// review UI keeps it -- and a report save resets every pool row it touches to `pending` with the
+// outcome wiped. So the comment goes first and the decision second. There is no flag to reorder
+// them, and the report is saved only when a comment actually needs persisting (or on --open-review),
+// because a save with nothing to persist would revert decisions an earlier run applied for no gain.
+//
+// ADMIN AUTHORITY IS REQUIRED and the service checks it before anything else: one decision resolves
+// the item for every organization that flagged it, since the canonical store holds one winner per
+// key. A provider asking for an outcome travels on the report submission instead.
+//
+// A 200 IS NOT A SUCCESS REPORT. Four of the service's buckets mean something did not happen, so
+// every one is printed and a partial run exits 4 -- a scripted replay has to be able to tell a
+// partial result from a clean one without reading the output.
+
+program
+  .command('submit-variation-decisions')
+  .description('Record review decisions and comments from a sheet against an open review (admin)')
+  .requiredOption('-r, --report <path>', 'Path to the variations-report.json the review was opened from')
+  .requiredOption('-d, --decisions <path>', 'Path to the decisions CSV (Resource Name, Field Name, Lookup Value, Action, Comment)')
+  .option('--open-review', 'Save the report first even with no comments, to open a review that does not exist yet')
+  .option('--as-org <uoi>', 'UOI of the organization the comments come from — required when any row carries a comment')
+  .option('--editor-name <name>', 'Display name recorded as the editor and used on the notifications')
+  .option('--dry-run', 'Show what would be sent and send nothing')
+  .option('--json', 'Print the service result as JSON')
+  .action(
+    async (opts: {
+      report: string;
+      decisions: string;
+      openReview?: boolean;
+      asOrg?: string;
+      editorName?: string;
+      dryRun?: boolean;
+      json?: boolean;
+    }) => {
+      try {
+        const report = JSON.parse(await readFile(resolve(opts.report), 'utf-8')) as Record<string, unknown>;
+        const { items, recognizedColumns, skippedColumns } = parseDecisionsCsv(await readFile(resolve(opts.decisions), 'utf-8'));
+        if (skippedColumns.length) {
+          console.error(`Ignoring unrecognized columns: ${skippedColumns.join(', ')}`);
+        }
+        console.log(`Parsed ${items.length} row(s) from columns: ${recognizedColumns.join(', ')}.`);
+
+        if (!Array.isArray(report.changes)) {
+          throw new Error(
+            `${opts.report} carries no changes array. A variations report produced by a DD run does; this may be the wrong artifact.`
+          );
+        }
+
+        // The acting organization becomes the comment's `from`, and it comes from the flag. The
+        // report carries two UOIs that would both pass a glance -- its provider and its recipient --
+        // and neither is the administrator writing the comment. Nothing is substituted here: with no
+        // --as-org and a comment to attribute, the plan refuses.
+        const plan = planDecisionPush({
+          report: report as never,
+          rows: items,
+          actor: { providerUoi: opts.asOrg ?? '', ...(opts.editorName ? { displayName: opts.editorName } : {}) },
+          now: new Date().toISOString(),
+          ...(opts.openReview ? { openReview: true } : {})
+        });
+
+        if (plan.errors.length > 0) {
+          // Nothing is sent. The comment and the decision are two requests, so a half-valid sheet
+          // could otherwise leave a comment persisted with no decision behind it.
+          console.error(`The sheet has ${plan.errors.length} unusable row(s). Nothing was sent.`);
+          for (const error of plan.errors) console.error(`  • ${error}`);
+          process.exitCode = 2;
+          return;
+        }
+
+        if (plan.decisions.length === 0 && !plan.needsReportSave) {
+          console.log('Nothing to do: no row carries an action or a comment.');
+          return;
+        }
+
+        if (opts.dryRun) {
+          console.log('Dry run — nothing was sent.');
+          if (plan.needsReportSave) {
+            console.log(`  Would save the report to persist ${plan.commentsAdded} comment(s), then push the decisions.`);
+            console.log('  That save resets every item in this report to pending and wipes prior outcomes.');
+          }
+          for (const decision of plan.decisions) {
+            console.log(`  Would record ${decision.action} on ${displayDecisionKey(decision.variationKey)}.`);
+          }
+          console.log('  Re-run without --dry-run to send.');
+          return;
+        }
+
+        const bearerToken = await mintOAuth2ClientCredentialsToken();
+
+        // 1. The comment, carried by a report save. First, because the save resets statuses.
+        if (plan.needsReportSave) {
+          const saved = await submitVariationsReportViaService({
+            report: plan.report as Record<string, unknown>,
+            fromCli: true,
+            ...(bearerToken ? { bearerToken } : {})
+          });
+          console.log(
+            `Saved the report with ${plan.commentsAdded} comment(s)${saved.variationsReportId ? ` (report id ${saved.variationsReportId})` : ''}.`
+          );
+          console.log('  Every item in this report is now pending; the decisions below follow.');
+        }
+
+        // 2. The decisions, against the review that save just opened or refreshed.
+        if (plan.decisions.length === 0) {
+          console.log('No decisions in the sheet — the comments were saved and nothing else was sent.');
+          return;
+        }
+
+        const result = await saveVariationDecisionsViaService({
+          decisions: plan.decisions,
+          fromCli: true,
+          ...(typeof report.version === 'string' ? { ddVersion: report.version } : {}),
+          ...(opts.editorName ? { userDisplayName: opts.editorName } : {}),
+          ...(bearerToken ? { bearerToken } : {})
+        });
+
+        console.log(opts.json ? JSON.stringify(result, null, 2) : formatDecisionResult(result));
+        process.exitCode = decisionExitCode(result);
+      } catch (error) {
+        const code = (error as Error & { code?: string }).code;
+        console.error(error instanceof Error ? error.message : String(error));
+
+        if (code === 'LOCKED') {
+          const lock = lockHolderOf(error);
+          if (lock) {
+            console.error(`  Held by: ${lock.displayName} <${lock.email}>`);
+            console.error(`  Until:   ${lock.expiresAt}`);
+          }
+          process.exitCode = 3;
+          return;
+        }
+
+        process.exitCode = 2;
+      }
+    }
+  );
 
 program.parse();

@@ -33,5 +33,34 @@ export {
 export { findVariations, type FindVariationsInput } from './find-variations.js';
 
 export { parseVariationsCsv, type VariationSuggestionItem, type ParsedVariationsCsv } from './csv.js';
+export { parseDecisionsCsv, type DecisionCsvItem, type ParsedDecisionsCsv } from './csv.js';
+
+export {
+  decisionsFromSheet,
+  annotateReportWithComments,
+  variationKeyFor,
+  DECISION_ACTIONS,
+  VARIATION_KEY_SEPARATOR,
+  type Decision,
+  type DecisionAction,
+  type DecisionActor,
+  type DecisionReport,
+  type DecisionSheetRow,
+  type ReportChange,
+  type ReportComment
+} from './decisions.js';
+
+export {
+  submitVariationsReportViaService,
+  saveVariationDecisionsViaService,
+  type SubmitVariationsReportInput,
+  type SubmitVariationsReportResult,
+  type SaveVariationDecisionsInput,
+  type SaveVariationDecisionsResult,
+  type AppliedDecision,
+  type StaleDecision,
+  type DeclinedDecision,
+  type LockedDecision
+} from './submit.js';
 
 export { DEFAULT_DD_VERSION, DEFAULT_FUZZINESS, VARIATIONS_REPORT_FILENAME } from './constants.js';
