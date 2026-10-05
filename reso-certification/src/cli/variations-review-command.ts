@@ -41,7 +41,7 @@ export const displayMapping = (mapping: VariationReviewItem['mapping']): string 
 const earliest = (item: VariationReviewItem): string =>
   item.provenance.reduce<string | undefined>((min, p) => (min === undefined || p.submittedAt < min ? p.submittedAt : min), undefined) ?? '';
 
-/** One line per item: status, element, mapping, strategy, how many tuples flagged it and when the earliest did. */
+/** One line per item: status, element, mapping, strategy, how many submissions flagged it and when the earliest did. */
 export const formatReviewItemsTable = (items: ReadonlyArray<VariationReviewItem>): string => {
   if (items.length === 0) return 'No items in review.';
   const rows = items.map(item => [
@@ -53,10 +53,10 @@ export const formatReviewItemsTable = (items: ReadonlyArray<VariationReviewItem>
     cell(earliest(item).slice(0, 19) || undefined),
     cell(item.outcome)
   ]);
-  return renderTable(['status', 'element', 'mapping', 'strategy', 'tuples', 'first submitted', 'outcome'], rows);
+  return renderTable(['status', 'element', 'mapping', 'strategy', 'submissions', 'first submitted', 'outcome'], rows);
 };
 
-/** One line per submission: the tuple, the endorsement, and where the review stands. */
+/** One line per submission: the identifiers it came in under, the endorsement, and where the review stands. */
 export const formatEndorsementStatusTable = (rows: ReadonlyArray<EndorsementStatusRow>): string => {
   if (rows.length === 0) return 'No submissions.';
   const lines = rows.map(r => [
@@ -72,7 +72,7 @@ export const formatEndorsementStatusTable = (rows: ReadonlyArray<EndorsementStat
   return renderTable(['provider', 'usi', 'recipient', 'endorsement', 'version', 'lifecycle', 'review', 'updated'], lines);
 };
 
-/** Provenance one tuple per line, indented under its item — the `--provenance` view. */
+/** Provenance one submission per line, indented under its item — the `--provenance` view. */
 export const formatProvenance = (items: ReadonlyArray<VariationReviewItem>): string =>
   items
     .map(item => {

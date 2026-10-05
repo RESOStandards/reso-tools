@@ -35,7 +35,14 @@ export interface VariationReviewProvenance {
   readonly lastUpdatedAt?: string;
 }
 
-/** One item in review — a variation key collapsed across every tuple that flagged it. */
+/**
+ * One item in review — a variation key collapsed across every submission that flagged it.
+ *
+ * A submission is one `(providerUoi, providerUsi, recipientUoi)` triple, so a provider feeding
+ * several MLSs contributes one per recipient. `provenance.length` is therefore a count of feeds
+ * rather than of organizations: three submissions can be three providers or one provider with three
+ * recipients, and the number alone cannot tell you which.
+ */
 export interface VariationReviewItem {
   readonly variationKey: string;
   readonly resourceName: string;
