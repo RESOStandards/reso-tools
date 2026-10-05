@@ -2,8 +2,8 @@
  * Progress rendering bridge — maps SDK ProgressCallback to listr2 tasks.
  */
 
-import chalk from 'chalk';
 import { parseReplicationProgress, summarizeReplicationProgress } from '@reso-standards/reso-common';
+import chalk from 'chalk';
 import {
   LISTR_LOGGER_STDERR_LEVELS,
   Listr,
@@ -229,8 +229,13 @@ interface CliProgressRenderer {
   readonly render: (progress: StepProgress, renderMode: RenderMode) => string | undefined;
 }
 
-/** The nesting is defined once here, so every endorsement's inner info lines up under its title. */
-const detailLine = (text: string): string => chalk.gray(`  \u2192 ${text}`);
+/** The inner-info line, defined once so every endorsement's lines up under its title.
+ *
+ *  NO leading indent. Both renderers supply their own: the interactive renderer prefixes task output with
+ *  `\u203a` and indents it, and the verbose logger prefixes a timestamp. Adding spaces here produced
+ *  `  \u203a   \u2192 text` -- three spaces and two glyphs. Core never showed it because its arrow line only
+ *  runs in verbose, where there is no `\u203a`. */
+const detailLine = (text: string): string => chalk.gray(`\u2192 ${text}`);
 
 /** Web API Core's inner info: the live per-resource tree in the interactive renderer, or the meaningful
  *  transitions as log lines in verbose, where a scrolling log cannot show a tree. */
@@ -282,39 +287,59 @@ const replicationProgressRenderer = (): CliProgressRenderer => {
 /** The default inner info, used by every endorsement that does not supply its own: the step's live message
  *  while running, then the completed step line. Structured JSON detail messages (Data Dictionary
  *  replication progress, for one) are not shown raw -- the step name stands in. */
-const stepProgressRenderer = (view: ReturnType<typeof createCoreProgressView>): CliProgressRenderer => ({
-  claims: () => true,
-  render: (progress, renderMode) => {
-    const msg = progress.message?.trim();
-    const shown = msg && !msg.startsWith('{') ? msg : undefined;
-    if (progress.status === 'running') {
-      // Verbose is a scrolling log and keeps its own marker; the interactive renderer gets the indented
-      // arrow line, which is where the combined title used to put this.
-      if (renderMode === 'verbose') return shown ? `\u25cb ${shown}` : undefined;
-      return detailLine(shown ?? `${progress.step}...`);
+const stepProgressRenderer = (view: ReturnType<typeof createCoreProgressView>): CliProgressRenderer => {
+  // Local mutable state, scoped to this closure and never leaked: the last completed step line.
+  //
+  // `task.output` is a SINGLE slot. Before the title carried the running message, nothing wrote that slot
+  // on a running update, so the last completed step sat there visibly -- which is why `\u2713 Service check`
+  // stayed on screen. Moving the activity into the slot overwrote it on the next update and swallowed
+  // every completed step. Both belong on screen, so the completed line is kept and reprinted above the
+  // active one.
+  let lastCompleted: string | undefined;
+  return {
+    claims: () => true,
+    render: (progress, renderMode) => {
+      const msg = progress.message?.trim();
+      const shown = msg && !msg.startsWith('{') ? msg : undefined;
+      if (progress.status === 'running') {
+        // Verbose is a scrolling log, so each line stands on its own and keeps its own marker.
+        if (renderMode === 'verbose') return shown ? `\u25cb ${shown}` : undefined;
+        const active = detailLine(shown ?? `${progress.step}...`);
+        return lastCompleted ? `${lastCompleted}\n${active}` : active;
+      }
+      if (progress.status === 'pending') return undefined;
+      // Once the Core resource tree is up, its final state IS the summary; otherwise show the step line.
+      const completed = renderMode === 'default' && view.hasData() ? view.render() : formatStep(progress);
+      lastCompleted = completed;
+      return completed;
     }
-    if (progress.status === 'pending') return undefined;
-    // Once the Core resource tree is up, its final state IS the summary; otherwise show the step line.
-    return renderMode === 'default' && view.hasData() ? view.render() : formatStep(progress);
-  }
-});
+  };
+};
 
 /** Generic progress renderer. The title is always the run's identity and never changes mid-run; the body is
  *  whichever provider claims the update. An endorsement with its own inner info goes in the list ahead of
  *  `stepProgressRenderer`, which claims everything left over. */
-const handleProgress =
-  (task: { title: string; output: string }, label: string, renderMode: RenderMode, view: ReturnType<typeof createCoreProgressView>) =>
-  (progress: StepProgress): void => {
+const handleProgress = (
+  task: { title: string; output: string },
+  label: string,
+  renderMode: RenderMode,
+  view: ReturnType<typeof createCoreProgressView>
+) => {
+  // Built ONCE per run, not per event. They were being reallocated on every progress update, which was
+  // wasteful and, more importantly, made it impossible for a renderer to remember anything between
+  // updates -- which is exactly what keeping the last completed step needs.
+  const renderers: ReadonlyArray<CliProgressRenderer> = [
+    coreProgressRenderer(view),
+    replicationProgressRenderer(),
+    stepProgressRenderer(view)
+  ];
+  return (progress: StepProgress): void => {
     task.title = label;
-    const renderers: ReadonlyArray<CliProgressRenderer> = [
-      coreProgressRenderer(view),
-      replicationProgressRenderer(),
-      stepProgressRenderer(view)
-    ];
     const claimed = renderers.find(r => r.claims(progress));
     const rendered = claimed?.render(progress, renderMode);
     if (rendered !== undefined) task.output = rendered;
   };
+};
 
 /** Shape of the per-resource scenario data the failure collectors read off the run context. */
 interface ReportScenario {
