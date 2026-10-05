@@ -755,7 +755,7 @@ program
   .description('List the variations in review (your own as a provider, the whole pool as an admin) — read-only')
   .option('--status <status>', 'Filter by pool status: pending, ft-submitted or resolved')
   .option('--element-type <type>', 'Filter by element type: resource, field or lookup')
-  .option('--provenance', 'Show every submitting tuple under each item instead of the summary table')
+  .option('--provenance', 'Show every submission under each item instead of the summary table')
   .option('--page-size <n>', 'Items per request to the service; every page is fetched regardless')
   .option('--json', 'Print the items exactly as the service returned them')
   .action(async (opts: { status?: string; elementType?: string; provenance?: boolean; pageSize?: string; json?: boolean }) => {

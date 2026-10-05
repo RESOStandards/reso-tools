@@ -66,10 +66,10 @@ describe('displayMapping', () => {
 });
 
 describe('formatReviewItemsTable', () => {
-  it('renders one row per item with the tuple count and the earliest submission', () => {
+  it('renders one row per item with the submission count and the earliest submission', () => {
     const out = formatReviewItemsTable([item()]);
     const lines = out.split('\n');
-    expect(lines[0]).toMatch(/^status\s+element\s+mapping\s+strategy\s+tuples\s+first submitted\s+outcome$/);
+    expect(lines[0]).toMatch(/^status\s+element\s+mapping\s+strategy\s+submissions\s+first submitted\s+outcome$/);
     expect(lines[2]).toMatch(/^pending\s+Property\.BuyerAgentKeyNumeric\s+Buyer\s+-\s+2\s+2026-08-28T08:25:02\s+-$/);
   });
   it('shows the strategy when the pool has one and the outcome once decided', () => {
@@ -82,7 +82,7 @@ describe('formatReviewItemsTable', () => {
 });
 
 describe('formatProvenance', () => {
-  it('lists every tuple under its item, in the order served', () => {
+  it('lists every submission under its item, in the order served', () => {
     const out = formatProvenance([item()]);
     const lines = out.split('\n');
     expect(lines[0]).toBe('Property.BuyerAgentKeyNumeric → Buyer [pending]');
