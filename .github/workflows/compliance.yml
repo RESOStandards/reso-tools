@@ -1,8 +1,12 @@
 name: CI & Compliance
 
 on:
+  # The base branch, not the head. `main` alone meant this never fired for pull requests into the
+  # effective mainline, so the one workflow that runs the endorsements was silently absent from
+  # every release-candidate review — and a workflow nobody notices not running looks like one that
+  # passed.
   pull_request:
-    branches: [main]
+    branches: [main, v1.0.0-pre]
   workflow_dispatch:
 
 jobs:
@@ -92,11 +96,34 @@ jobs:
         if: always()
         working-directory: reso-reference-server
         run: |
-          mkdir -p compliance/results
-          for c in compliance-dd compliance-core; do
-            docker cp "reso-reference-server-${c}-1:/reso-certification-utils/results/." compliance/results/ 2>/dev/null || true
-            docker cp "reso-reference-server-${c}-1:/commander/build/certification/." compliance/results/ 2>/dev/null || true
+          # Three things were wrong here and each hid the next.
+          #
+          # The paths were `/reso-certification-utils/results` and `/commander/build/certification`,
+          # which belong to the previous generation of tooling and do not exist in these containers.
+          # Every entrypoint writes to /tmp/compliance-results. With both copies suppressed by
+          # `2>/dev/null || true`, the step collected nothing for ANY endorsement and still passed,
+          # so the uploaded artifact was empty and no CI run was ever citable as evidence.
+          #
+          # The loop also covered only DD and Core, while the job runs Add/Edit and EntityEvent too.
+          # And a flat target lets two endorsements emitting the same filename overwrite each other.
+          #
+          # So: the real path, every endorsement the job ran, one directory each, and a per-container
+          # file count printed. A copy may legitimately fail for an endorsement that crashed before
+          # writing, which is why one empty container is tolerated — but all of them empty means the
+          # paths are wrong again, and that fails the step instead of passing quietly.
+          collected=0
+          for c in compliance-dd compliance-core compliance-addedit compliance-entity-event; do
+            mkdir -p "compliance/results/${c}"
+            docker cp "reso-reference-server-${c}-1:/tmp/compliance-results/." "compliance/results/${c}/" 2>/dev/null || true
+            n=$(find "compliance/results/${c}" -type f | wc -l | tr -d ' ')
+            echo "${c}: ${n} file(s)"
+            collected=$((collected + n))
           done
+          echo "total files collected: ${collected}"
+          if [ "$collected" -eq 0 ]; then
+            echo "::error::Collected 0 files from every compliance container. The copy path is wrong, so this run has produced no evidence."
+            exit 1
+          fi
 
       - name: Upload results
         if: always()
@@ -137,11 +164,21 @@ jobs:
         if: always()
         working-directory: reso-reference-server
         run: |
-          mkdir -p compliance/results
-          for c in compliance-dd-mongo compliance-core-mongo; do
-            docker cp "reso-reference-server-${c}-1:/reso-certification-utils/results/." compliance/results/ 2>/dev/null || true
-            docker cp "reso-reference-server-${c}-1:/commander/build/certification/." compliance/results/ 2>/dev/null || true
+          # Same three defects as the PostgreSQL job, and the same fix. The MongoDB services share
+          # the very same entrypoints, so they write to /tmp/compliance-results as well.
+          collected=0
+          for c in compliance-dd-mongo compliance-core-mongo compliance-addedit-mongo compliance-entity-event-mongo; do
+            mkdir -p "compliance/results/${c}"
+            docker cp "reso-reference-server-${c}-1:/tmp/compliance-results/." "compliance/results/${c}/" 2>/dev/null || true
+            n=$(find "compliance/results/${c}" -type f | wc -l | tr -d ' ')
+            echo "${c}: ${n} file(s)"
+            collected=$((collected + n))
           done
+          echo "total files collected: ${collected}"
+          if [ "$collected" -eq 0 ]; then
+            echo "::error::Collected 0 files from every compliance container. The copy path is wrong, so this run has produced no evidence."
+            exit 1
+          fi
 
       - name: Upload results
         if: always()
@@ -182,11 +219,21 @@ jobs:
         if: always()
         working-directory: reso-reference-server
         run: |
-          mkdir -p compliance/results
-          for c in compliance-dd-sqlite compliance-core-sqlite; do
-            docker cp "reso-reference-server-${c}-1:/reso-certification-utils/results/." compliance/results/ 2>/dev/null || true
-            docker cp "reso-reference-server-${c}-1:/commander/build/certification/." compliance/results/ 2>/dev/null || true
+          # Same three defects as the other two jobs, and the same fix. This job also runs four
+          # endorsements and collected two.
+          collected=0
+          for c in compliance-dd-sqlite compliance-core-sqlite compliance-addedit-sqlite compliance-entity-event-sqlite; do
+            mkdir -p "compliance/results/${c}"
+            docker cp "reso-reference-server-${c}-1:/tmp/compliance-results/." "compliance/results/${c}/" 2>/dev/null || true
+            n=$(find "compliance/results/${c}" -type f | wc -l | tr -d ' ')
+            echo "${c}: ${n} file(s)"
+            collected=$((collected + n))
           done
+          echo "total files collected: ${collected}"
+          if [ "$collected" -eq 0 ]; then
+            echo "::error::Collected 0 files from every compliance container. The copy path is wrong, so this run has produced no evidence."
+            exit 1
+          fi
 
       - name: Upload results
         if: always()
