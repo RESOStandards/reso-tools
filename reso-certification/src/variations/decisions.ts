@@ -51,8 +51,31 @@ const ACTION_FIELD: Readonly<Record<SheetAction, 'ignore' | 'remove' | 'flaggedF
 /** True for a string the report save understands as a requested action. A guard, because a person typed it. */
 const isSheetAction = (value: string): value is SheetAction => (SHEET_ACTIONS as ReadonlyArray<string>).includes(value);
 
-/** One sheet row: which element, optionally what to ask for, optionally what to say about it. */
-export interface DecisionSheetRow {
+/**
+ * The coordinates naming WHICH MAPPING a row is about, as opposed to which element.
+ *
+ * A variation can carry several suggestions, so an action on the element and an action on one of its
+ * suggestions are different requests. The service reads every one of these off the change to build
+ * the pool row's `mapping`, including the fallback `suggestedStandardLookupValue ?? suggestedLookupValue`,
+ * which is why the sheet's own column name works unchanged.
+ *
+ * Nothing on the server derives this from the change's `suggestions` array, so a change that omits
+ * them lands a row with no mapping at all -- the state the review UI renders as "No suggestion".
+ */
+const MAPPING_FIELDS = [
+  'suggestedResourceName',
+  'suggestedFieldName',
+  'suggestedLookupValue',
+  'suggestedLegacyODataValue',
+  'suggestedRelatedResourceName',
+  'suggestedRelatedFieldName',
+  'suggestedRelatedLookupValue'
+] as const;
+
+type MappingField = (typeof MAPPING_FIELDS)[number];
+
+/** One sheet row: which element, which mapping of it, optionally what to ask for and what to say. */
+export interface DecisionSheetRow extends Partial<Record<MappingField, string>> {
   readonly resourceName: string;
   readonly fieldName?: string;
   readonly lookupValue?: string;
@@ -60,6 +83,55 @@ export interface DecisionSheetRow {
   readonly action?: string;
   readonly comment?: string;
 }
+
+const present = (v: string | undefined): boolean => typeof v === 'string' && v.length > 0;
+
+/** The mapping coordinates a row names, or undefined when it names none. */
+const mappingFrom = (row: DecisionSheetRow): Readonly<Record<string, string>> | undefined => {
+  const entries = MAPPING_FIELDS.flatMap(f => (present(row[f]) ? [[f, row[f] as string] as const] : []));
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+};
+
+/**
+ * A row's target depth must equal its suggestion depth.
+ *
+ * Resource to suggested resource, resource-and-field to suggested-resource-and-field, and so on down
+ * to the lookup value. A row naming an element three levels deep and a suggestion one level deep has
+ * not said what it wants done; a row naming a target and no suggestion at all is the shape that lands
+ * a bare pool row.
+ *
+ * The `suggestedRelated*` trio is a different axis -- the element a value relates TO -- so it is
+ * carried through without entering the depth comparison.
+ */
+const depthMismatch = (row: DecisionSheetRow): string | undefined => {
+  const targetDepth = present(row.lookupValue) ? 3 : present(row.fieldName) ? 2 : 1;
+
+  const named: ReadonlyArray<[number, string, boolean]> = [
+    [1, 'Suggested Resource Name', present(row.suggestedResourceName)],
+    [2, 'Suggested Field Name', present(row.suggestedFieldName)],
+    [3, 'Suggested Lookup Value', present(row.suggestedLookupValue) || present(row.suggestedLegacyODataValue)]
+  ];
+
+  // A row claiming nothing about a target is fine: it carries an action or a comment on the element.
+  if (!named.some(([, , yes]) => yes)) return undefined;
+
+  const TARGET = ['Resource Name', 'Field Name', 'Lookup Value'].slice(0, targetDepth).join(' + ');
+
+  // COMPLETENESS at the target depth, not merely reaching it. A row naming only a Suggested Lookup
+  // Value reaches depth 3 by its deepest field while saying nothing about which resource or field
+  // the value belongs to -- which is the shape that made a single-suggestion ignore unexpressible.
+  const missing = named.filter(([d, , yes]) => d <= targetDepth && !yes).map(([, name]) => name);
+  if (missing.length > 0) {
+    return `names ${TARGET} but does not name ${missing.join(' + ')} — give the suggestion at the same depth as the target.`;
+  }
+
+  const beyond = named.filter(([d, , yes]) => d > targetDepth && yes).map(([, name]) => name);
+  if (beyond.length > 0) {
+    return `names ${TARGET} but also names ${beyond.join(' + ')} — the suggestion goes deeper than the target.`;
+  }
+
+  return undefined;
+};
 
 /**
  * A comment in a variations conversation thread: what was said, when, and who may read it.
@@ -148,6 +220,8 @@ export interface AppliedRow {
   readonly element: string;
   readonly action?: SheetAction;
   readonly commented: boolean;
+  /** The suggestion the row targeted, when it named one. */
+  readonly mapping?: Readonly<Record<string, string>>;
 }
 
 export interface ApplySheetResult {
@@ -175,7 +249,16 @@ export const applySheetToReport = (report: DecisionReport, rows: ReadonlyArray<D
   const errors: string[] = [];
   const applied: AppliedRow[] = [];
   // Keyed by `bucket:index`, so two rows touching one entry both land, in row order.
-  const edits = new Map<string, { bucket: VariationLevelKey; index: number; action?: SheetAction; comments: ReportComment[] }>();
+  const edits = new Map<
+    string,
+    {
+      bucket: VariationLevelKey;
+      index: number;
+      action?: SheetAction;
+      mapping?: Readonly<Record<string, string>>;
+      comments: ReportComment[];
+    }
+  >();
 
   const needsComment = rows.some(r => typeof r.comment === 'string' && r.comment.length > 0);
 
@@ -206,7 +289,14 @@ export const applySheetToReport = (report: DecisionReport, rows: ReadonlyArray<D
       );
       continue;
     }
-    if (row.action === undefined && !hasComment) continue;
+    const mismatch = depthMismatch(row);
+    if (mismatch) {
+      errors.push(`${rowLabel(row)}: ${mismatch}`);
+      continue;
+    }
+
+    const mapping = mappingFrom(row);
+    if (row.action === undefined && !hasComment && !mapping) continue;
 
     const matched = matchEntries(report, row);
     if (matched.length === 0) {
@@ -229,9 +319,17 @@ export const applySheetToReport = (report: DecisionReport, rows: ReadonlyArray<D
       continue;
     }
 
+    // Two rows naming one element but different suggestions are two different requests, and a change
+    // carries one mapping. Picking either would silently drop the other's target.
+    if (mapping && existing.mapping && JSON.stringify(existing.mapping) !== JSON.stringify(mapping)) {
+      errors.push(`${entryLabel(entry)}: two rows target different suggestions on the same element — submit them separately.`);
+      continue;
+    }
+
     edits.set(key, {
       ...existing,
       ...(row.action !== undefined ? { action: row.action } : {}),
+      ...(mapping ? { mapping } : {}),
       comments: hasComment
         ? [...existing.comments, { timestamp: now, to: to as string, message: row.comment as string }]
         : existing.comments
@@ -241,7 +339,8 @@ export const applySheetToReport = (report: DecisionReport, rows: ReadonlyArray<D
       bucket,
       element: entryLabel(entry),
       ...(row.action !== undefined ? { action: row.action } : {}),
-      commented: hasComment
+      commented: hasComment,
+      ...(mapping ? { mapping } : {})
     });
   }
 
@@ -259,6 +358,10 @@ export const applySheetToReport = (report: DecisionReport, rows: ReadonlyArray<D
         return {
           ...entry,
           ...(edit.action ? { [ACTION_FIELD[edit.action]]: true } : {}),
+          // The targeted suggestion, flat on the change. The service builds the pool row's mapping
+          // from exactly these and derives nothing from the `suggestions` array beside them, so a
+          // change without them lands a row reading "No suggestion".
+          ...(edit.mapping ?? {}),
           // Comments APPEND. A thread is a conversation between the provider and RESO, so replacing
           // it would destroy the half the other side wrote. The service appends too, keyed on the
           // same resource/field/value identity, so this is consistent rather than redundant.

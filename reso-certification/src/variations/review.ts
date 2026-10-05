@@ -192,12 +192,34 @@ export const listVariationReviewItemsViaService = async (
  * The caller's endorsements with their `lifecycleStatus` / `reviewStatus` —
  * one row per submission. The route serves `{ endorsements: [...] }`.
  */
-export const listMyEndorsementsViaService = async (input: ListMyEndorsementsInput = {}): Promise<ReadonlyArray<EndorsementStatusRow>> => {
+/** The caller's own submissions, and which organization "own" meant. */
+export interface MyEndorsements {
+  readonly endorsements: ReadonlyArray<EndorsementStatusRow>;
+  /**
+   * The organization the caller's token belongs to, when the service reports it.
+   *
+   * Optional because it is the only thing on that route that survives an empty list, and a service
+   * that has not yet shipped it returns nothing here. A caller cannot determine this for itself: the
+   * bearer token is an opaque row key, no route echoes the auth context, and every other identity in
+   * a response comes off a stored row.
+   */
+  readonly providerUoi?: string;
+}
+
+export const listMyEndorsementsViaService = async (input: ListMyEndorsementsInput = {}): Promise<MyEndorsements> => {
   const what = 'Fetching review status';
   const servicesUrl = resolveServicesUrl();
   const token = await resolveToken(input, what);
 
-  return endorsementsAt(new URL(`${servicesUrl}${MY_ENDORSEMENTS_ROUTE}`), token, input, what);
+  const url = new URL(`${servicesUrl}${MY_ENDORSEMENTS_ROUTE}`);
+  const body = await getJson(url, token, input, what);
+  if (!isRecord(body) || !Array.isArray(body.endorsements)) {
+    throw serviceError('SERVICE_ERROR', `${what} failed: the service returned no endorsements array.`);
+  }
+  return {
+    endorsements: body.endorsements as ReadonlyArray<EndorsementStatusRow>,
+    ...(typeof body.providerUoi === 'string' && body.providerUoi ? { providerUoi: body.providerUoi } : {})
+  };
 };
 
 /**

@@ -811,10 +811,11 @@ program
       }
       const bearerToken = await mintOAuth2ClientCredentialsToken();
       const auth = { fromCli: true, ...(bearerToken ? { bearerToken } : {}) };
-      const rows = opts.reviewStatus
-        ? await listEndorsementsByReviewStatusViaService({ ...auth, reviewStatus: opts.reviewStatus as EndorsementReviewStatus })
-        : await listMyEndorsementsViaService(auth);
-      console.log(opts.json ? JSON.stringify(rows, null, 2) : formatEndorsementStatusTable(rows));
+      const mine = opts.reviewStatus ? undefined : await listMyEndorsementsViaService(auth);
+      const rows = mine
+        ? mine.endorsements
+        : await listEndorsementsByReviewStatusViaService({ ...auth, reviewStatus: opts.reviewStatus as EndorsementReviewStatus });
+      console.log(opts.json ? JSON.stringify(rows, null, 2) : formatEndorsementStatusTable(rows, opts.reviewStatus, mine?.providerUoi));
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : String(error));
       process.exitCode = 2;

@@ -56,9 +56,24 @@ export const formatReviewItemsTable = (items: ReadonlyArray<VariationReviewItem>
   return renderTable(['status', 'element', 'mapping', 'strategy', 'submissions', 'first submitted', 'outcome'], rows);
 };
 
-/** One line per submission: the identifiers it came in under, the endorsement, and where the review stands. */
-export const formatEndorsementStatusTable = (rows: ReadonlyArray<EndorsementStatusRow>): string => {
-  if (rows.length === 0) return 'No submissions.';
+/**
+ * One line per submission: the identifiers it came in under, the endorsement, and where the review stands.
+ *
+ * The empty case says WHICH question was asked, because the two are easy to confuse and the bare
+ * command answers the narrower one. `endorsements/me` lists submissions made under the CALLER's own
+ * organization, so an administrator acting on behalf of providers has none — their submissions belong
+ * to the provider. "No submissions" is then true and useless, and the queue is one flag away.
+ */
+export const formatEndorsementStatusTable = (
+  rows: ReadonlyArray<EndorsementStatusRow>,
+  reviewStatus?: string,
+  providerUoi?: string
+): string => {
+  if (rows.length === 0) {
+    if (reviewStatus) return `No submissions with review status '${reviewStatus}'.`;
+    const whose = providerUoi ? `for provider UOI ${providerUoi}` : 'under your own organization';
+    return `No submissions ${whose}. Submissions you made on behalf of a provider belong to that provider — run with --review-status in-review to see the review queue.`;
+  }
   const lines = rows.map(r => [
     cell(r.providerUoi),
     cell(r.providerUsi),

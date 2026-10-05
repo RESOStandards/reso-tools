@@ -110,8 +110,8 @@ describe('formatEndorsementStatusTable', () => {
     expect(lines[0]).toMatch(/^provider\s+usi\s+recipient\s+endorsement\s+version\s+lifecycle\s+review\s+updated$/);
     expect(lines[2]).toMatch(/^T00000001\s+1001\s+M00000001\s+data-dictionary\s+2\.1\s+in-review\s+in-review\s+2026-09-16T15:27:11$/);
   });
-  it('says so when there is nothing', () => {
-    expect(formatEndorsementStatusTable([])).toBe('No submissions.');
+  it('says so when there is nothing, and whose submissions it checked', () => {
+    expect(formatEndorsementStatusTable([])).toMatch(/your own organization/i);
   });
 });
 
@@ -122,5 +122,30 @@ describe('duplicateVariationKeys', () => {
     expect(duplicateVariationKeys([twice, once, twice])).toEqual(['Property.BuyerAgentKeyNumeric']);
     expect(duplicateVariationKeys([once, twice])).toEqual([]);
     expect(duplicateVariationKeys([])).toEqual([]);
+  });
+});
+
+describe('the empty case says which question was asked', () => {
+  it('names the organization when the service reports it', () => {
+    // The caller cannot determine this for itself -- the token is opaque and no route echoes the auth
+    // context -- so the UOI is present only once the service returns it on `endorsements/me`.
+    expect(formatEndorsementStatusTable([], undefined, 'T00000012')).toMatch(/No submissions for provider UOI T00000012\./);
+  });
+
+  it('falls back to describing whose when the service does not report it', () => {
+    expect(formatEndorsementStatusTable([])).toMatch(/under your own organization/i);
+  });
+
+  it('points an admin at the queue, because the bare command asks the narrower question', () => {
+    // `endorsements/me` lists submissions made under the CALLER's own organization. An administrator
+    // acting on behalf of providers has none -- those belong to the provider -- so a bare
+    // "No submissions." is true and tells them nothing, while the queue is one flag away.
+    const text = formatEndorsementStatusTable([]);
+    expect(text).toMatch(/your own organization/i);
+    expect(text).toMatch(/--review-status in-review/);
+  });
+
+  it('names the status instead when one was asked for', () => {
+    expect(formatEndorsementStatusTable([], 'resolved')).toBe("No submissions with review status 'resolved'.");
   });
 });

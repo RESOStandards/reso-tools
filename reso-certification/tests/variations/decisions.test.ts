@@ -251,3 +251,94 @@ describe('a sheet that cannot be applied cleanly is not applied at all', () => {
     expect(SHEET_ACTIONS).toEqual(['ignore', 'remove', 'submit-to-ft']);
   });
 });
+
+describe('a row carries the suggestion it targets', () => {
+  it('puts the coordinates flat on the change, where the service reads them', () => {
+    // The service builds the pool row's `mapping` from exactly these fields and derives nothing from
+    // the `suggestions` array beside them. A change without them lands a row reading "No suggestion",
+    // which is how two September rows ended up bare.
+    const out = apply([
+      {
+        resourceName: 'Property',
+        fieldName: 'LeaseTerm',
+        lookupValue: 'Months - 4',
+        suggestedResourceName: 'Property',
+        suggestedFieldName: 'LeaseTerm',
+        suggestedLookupValue: '3 Months',
+        action: 'submit-to-ft'
+      }
+    ]);
+    expect(out.errors).toEqual([]);
+    const entry = lookupAt(out.report, 'Months - 4');
+    expect(entry?.suggestedResourceName).toBe('Property');
+    expect(entry?.suggestedFieldName).toBe('LeaseTerm');
+    expect(entry?.suggestedLookupValue).toBe('3 Months');
+    expect(entry?.flaggedForFastTrack).toBe(true);
+    // The offered set survives beside the chosen one: mapping is what was picked, suggestions what was offered.
+    expect((entry?.suggestions as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it('reports the targeted suggestion on the applied row', () => {
+    const out = apply([
+      { resourceName: 'Property', fieldName: 'OKC_SoilType', suggestedResourceName: 'Property', suggestedFieldName: 'SoilType', action: 'ignore' }
+    ]);
+    expect(out.applied[0].mapping).toEqual({ suggestedResourceName: 'Property', suggestedFieldName: 'SoilType' });
+  });
+
+  it('allows a row that names only a mapping, with no action and no comment', () => {
+    const out = apply([
+      { resourceName: 'Property', fieldName: 'OKC_SoilType', suggestedResourceName: 'Property', suggestedFieldName: 'SoilType' }
+    ]);
+    expect(out.errors).toEqual([]);
+    expect(out.report.fields?.[0].suggestedFieldName).toBe('SoilType');
+  });
+});
+
+describe('a suggestion must be named at the same depth as its target', () => {
+  it('refuses a lookup-level target with only a suggested lookup value', () => {
+    // The shape of the Realtracs ignore sheet: it named `9 Months` and neither the resource nor the
+    // field, so the row did not say what it wanted done at the level it was asking about.
+    const out = apply([
+      { resourceName: 'Property', fieldName: 'LeaseTerm', lookupValue: 'Months - 3', suggestedLookupValue: '9 Months', action: 'ignore' }
+    ]);
+    expect(out.errors[0]).toMatch(/does not name Suggested Resource Name \+ Suggested Field Name/);
+    expect(out.errors[0]).toMatch(/same depth/);
+  });
+
+  it('refuses a field-level target with a lookup-level suggestion', () => {
+    const out = apply([
+      { resourceName: 'Property', fieldName: 'OKC_SoilType', suggestedResourceName: 'Property', suggestedFieldName: 'SoilType', suggestedLookupValue: 'Clay', action: 'ignore' }
+    ]);
+    expect(out.errors[0]).toMatch(/goes deeper than the target/);
+  });
+
+  it('accepts a matching field-level pair', () => {
+    const out = apply([
+      { resourceName: 'Property', fieldName: 'OKC_SoilType', suggestedResourceName: 'Property', suggestedFieldName: 'SoilType', action: 'ignore' }
+    ]);
+    expect(out.errors).toEqual([]);
+  });
+
+  it('accepts a row naming no suggestion at all', () => {
+    // Still allowed: an action or a comment on an element, with nothing claimed about a target.
+    const out = apply([{ resourceName: 'Property', fieldName: 'OKC_SoilType', action: 'ignore' }]);
+    expect(out.errors).toEqual([]);
+  });
+
+  it('treats the legacy OData form as the same depth as a lookup value', () => {
+    const out = apply([
+      { resourceName: 'Property', fieldName: 'LeaseTerm', lookupValue: 'Months - 4', suggestedResourceName: 'Property', suggestedFieldName: 'LeaseTerm', suggestedLegacyODataValue: 'ThreeMonths', action: 'ignore' }
+    ]);
+    expect(out.errors).toEqual([]);
+  });
+});
+
+describe('two rows cannot target different suggestions on one element', () => {
+  it('refuses rather than picking one', () => {
+    const out = apply([
+      { resourceName: 'Property', fieldName: 'OKC_SoilType', suggestedResourceName: 'Property', suggestedFieldName: 'SoilType', action: 'ignore' },
+      { resourceName: 'Property', fieldName: 'OKC_SoilType', suggestedResourceName: 'Property', suggestedFieldName: 'SoilClass', comment: 'or this one' }
+    ]);
+    expect(out.errors[0]).toMatch(/different suggestions on the same element/);
+  });
+});
