@@ -898,7 +898,9 @@ schemaCmd
   .description("Validate a payload against a metadata report's JSON Schema")
   .requiredOption('-m, --metadata <file>', 'Metadata report JSON (metadata-report.json), or "-" for stdin')
   .requiredOption('-p, --payload <file>', 'Payload JSON — an OData collection { value: [...] } or a single record, or "-" for stdin')
-  .option('-v, --version <version>', 'DD version for the schema context (e.g. 2.0)')
+  // `--dd-version`, not `-v, --version`: the program's own version flag wins over a subcommand's,
+  // so the old spelling printed the package version and exited 0 without ever running the command.
+  .option('--dd-version <version>', 'DD version for the schema context', CURRENT_DD_VERSION)
   .option(
     '-r, --resource <name>',
     'Resource name when the payload carries no @reso.context (a present context names the resource); default Property'
@@ -910,7 +912,7 @@ schemaCmd
     async (opts: {
       metadata: string;
       payload: string;
-      version?: string;
+      ddVersion?: string;
       resource?: string;
       settings?: string;
       additionalProperties?: boolean;
@@ -924,7 +926,7 @@ schemaCmd
           metadataReportJson,
           jsonPayload,
           resourceName: opts.resource,
-          version: opts.version, // normalized to the Data Dictionary form inside validateSchemaPayload
+          version: opts.ddVersion, // normalized to the Data Dictionary form inside validateSchemaPayload
           validationConfig,
           additionalProperties: opts.additionalProperties
         });
@@ -970,16 +972,18 @@ program
   .command('metadata')
   .description('Metadata step — validate OData CSDL/EDMX (XSD + semantic) and convert it to a RESO Format metadata report')
   .requiredOption('-m, --metadata <path>', 'Path to the CSDL/EDMX XML metadata file, or "-" for stdin')
-  .option('-v, --version <ddVersion>', 'DD version stamped into the generated report', '2.0')
+  // `--dd-version`, not `-v, --version`: the program's own version flag wins over a subcommand's,
+  // so the old spelling printed the package version and exited 0 without ever running the command.
+  .option('--dd-version <ddVersion>', 'DD version stamped into the generated report', CURRENT_DD_VERSION)
   .option('--odata-version <version>', 'OData version override for validation (4.0 | 4.01); auto-detected when omitted')
   .option('--output-dir <path>', 'Directory for metadata-report.json (created if missing); "-" for stdout', '.')
   .option('--no-report', 'Validate only; do not generate the metadata report')
-  .action(async (opts: { metadata: string; version: string; odataVersion?: string; outputDir: string; report: boolean }) => {
+  .action(async (opts: { metadata: string; ddVersion: string; odataVersion?: string; outputDir: string; report: boolean }) => {
     try {
       const metadataXml = await readTextInput(opts.metadata);
       const result = await runMetadataStep({
         metadataXml,
-        ddVersion: opts.version,
+        ddVersion: opts.ddVersion,
         odataVersion: opts.odataVersion as ODataVersion | undefined,
         emitReport: opts.report
       });
@@ -1019,7 +1023,9 @@ program
   .option('--max-page-size <n>', 'odata.maxpagesize preference (NextLink strategy)')
   .option('-l, --limit <n>', 'Stop after this many total records')
   .option('--output-dir <dir>', 'Directory for the report and any saved pages (created if missing)', '.')
-  .option('-v, --version <ddVersion>', 'Data Dictionary version', '2.0')
+  // `--dd-version`, not `-v, --version`: the program's own version flag wins over a subcommand's,
+  // so the old spelling printed the package version and exited 0 without ever running the command.
+  .option('--dd-version <ddVersion>', 'Data Dictionary version', CURRENT_DD_VERSION)
   .option('--save-results', 'Also write every raw response page to disk')
   .option('--json-schema-validation', 'Validate each payload against a schema generated from the metadata')
   .option('--strict', 'Fail on schema-validation errors')
@@ -1042,7 +1048,7 @@ program
       maxPageSize?: string;
       limit?: string;
       outputDir: string;
-      version: string;
+      ddVersion: string;
       saveResults?: boolean;
       jsonSchemaValidation?: boolean;
       strict?: boolean;
@@ -1075,7 +1081,7 @@ program
           maxPageSize: toInt(opts.maxPageSize),
           limit: toInt(opts.limit),
           outputPath: opts.outputDir,
-          version: opts.version,
+          version: opts.ddVersion,
           shouldGenerateReports: !!opts.metadata,
           jsonSchemaValidation: opts.jsonSchemaValidation || opts.strict,
           strictMode: opts.strict,
@@ -1130,7 +1136,14 @@ program
   .option('--from-server', 'Fetch metadata from a live OData endpoint instead of a file (requires --url)')
   .option('-u, --url <url>', 'OData service root URL (with --from-server)')
   .option('-f, --fuzziness <float>', `Fuzzy-match threshold (0–1, default ${DEFAULT_FUZZINESS})`, String(DEFAULT_FUZZINESS))
-  .option('-v, --version <version>', `Data Dictionary version (default ${DEFAULT_DD_VERSION})`, DEFAULT_DD_VERSION)
+  // `--dd-version`, matching the `dd` command.
+  //
+  // NOT `-v, --version`, which this command used to declare and which COULD NEVER FIRE. The program
+  // registers its own version flag (`program.version(CLI_VERSION)` above), and that one wins: a
+  // subcommand `--version` printed the package version and exited 0, so the command never ran and
+  // nothing said so. Five commands carried that dead option. Removing it breaks nothing, because
+  // nothing could ever have depended on it.
+  .option('--dd-version <version>', 'Data Dictionary version', DEFAULT_DD_VERSION)
   .option('--output-dir <path>', 'Directory for data-dictionary-variations.json (created if missing); "-" for stdout', '.')
   .option('--auth-token <token>', 'Bearer token for the --from-server endpoint')
   .option('--client-id <id>', 'OAuth2 client_id for the --from-server endpoint (with --client-secret and --token-url)')
@@ -1142,7 +1155,7 @@ program
       fromServer?: boolean;
       url?: string;
       fuzziness: string;
-      version: string;
+      ddVersion: string;
       outputDir: string;
       authToken?: string;
       clientId?: string;
@@ -1162,7 +1175,7 @@ program
         if (!Number.isFinite(fuzziness) || fuzziness < 0 || fuzziness > 1) {
           throw new Error(`--fuzziness must be a number in [0, 1], got '${opts.fuzziness}'`);
         }
-        const { version } = opts;
+        const version = opts.ddVersion;
 
         // Resolve the metadata report to an in-memory object. --from-server fetches the endpoint's
         // $metadata (authenticated with the provider-endpoint auth flags) and serializes it;
@@ -1237,7 +1250,9 @@ program
   .command('rcf')
   .description('RESO Common Format — infer a DD-2.0 metadata report from RCF data and run variations')
   .requiredOption('-i, --input <path>', 'RCF input: a .json file, a .zip, or a directory of payloads/records')
-  .option('-v, --version <ver>', 'DD version (default: from the payload @reso.context, else 2.0)')
+  // `--dd-version`, not `-v, --version`: the program's own version flag wins over a subcommand's,
+  // so the old spelling printed the package version and exited 0 without ever running the command.
+  .option('--dd-version <ver>', `DD version; the payload's @reso.context wins when present, else ${CURRENT_DD_VERSION}`)
   .option('-f, --fuzziness <float>', `Variations fuzzy-match threshold (0–1, default ${DEFAULT_FUZZINESS})`, String(DEFAULT_FUZZINESS))
   .option('--output-dir <path>', 'Directory for the reports (created if missing)', '.')
   .option(
@@ -1253,7 +1268,7 @@ program
   .action(
     async (opts: {
       input: string;
-      version?: string;
+      ddVersion?: string;
       fuzziness: string;
       outputDir: string;
       schemaValidate?: boolean;
@@ -1271,7 +1286,7 @@ program
 
         const result = await runRcf({
           input: resolve(opts.input),
-          version: opts.version,
+          version: opts.ddVersion,
           fuzziness,
           additionalProperties: opts.additionalProperties,
           strict: opts.strict,

@@ -1,3 +1,5 @@
+import { CURRENT_DD_VERSION } from '../sdk/dd-versions.js';
+import type { DDVersion } from '../sdk/dd-versions.js';
 /**
  * Testable core for the `reso-cert metadata` command — the metadata cert step.
  *
@@ -14,7 +16,7 @@ import type { MetadataValidationResult } from '../sdk/metadata-validation.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
 
 /** DD version stamped into the generated report when the caller does not specify one. */
-export const DEFAULT_DD_VERSION = '2.0';
+export const DEFAULT_DD_VERSION: DDVersion = CURRENT_DD_VERSION;
 
 export interface MetadataStepResult {
   /** The step passes iff the metadata validates (XSD + semantic) AND — when a report was requested — it
