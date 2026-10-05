@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { mergeWithLookupResource, serializeLookupResourceDump, synthesizeLookupResourceRecords } from '../../src/metadata/lookup-resource.js';
+import {
+  fetchLookupResource,
+  mergeWithLookupResource,
+  serializeLookupResourceDump,
+  synthesizeLookupResourceRecords
+} from '../../src/metadata/lookup-resource.js';
+import type { ODataRequester } from '../../src/test-runner/index.js';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import type { RawLookupRecord } from '../../src/metadata/lookup-resource.js';
 
@@ -187,5 +193,88 @@ describe('serializeLookupResourceDump', () => {
   // field mapping against a reintroduced default by asserting a version that is NOT the old one.
   it.each(['2.0', '2.1'])('stamps the version it is handed rather than a default — %s', (version) => {
     expect(serializeLookupResourceDump(lookupRecords, version).version).toBe(version);
+  });
+});
+
+/**
+ * The fetch itself, end to end through the caller.
+ *
+ * `fetchLookupResource` had no tests at all, which is why a truncation that lost two thirds of one
+ * provider's lookup rows shipped and then produced reports that read as clean. The first test here
+ * is that exact provider shape.
+ */
+describe('fetchLookupResource', () => {
+  const ROOT = 'https://example.com/odata';
+
+  const rows = (count: number): Array<Record<string, unknown>> =>
+    Array.from({ length: count }, (_, i) => ({ LookupKey: `K${i}`, LookupName: 'Roof', LookupValue: `V${i}` }));
+
+  /** Serves at most `cap` rows per response regardless of `$top`, and offers a nextLink when asked to. */
+  const server = (data: Array<Record<string, unknown>>, cap: number, offerNextLink = false): ODataRequester => ({
+    request: async ({ url }) => {
+      const parsed = new URL(url);
+      const top = Number(parsed.searchParams.get('$top') ?? '0');
+      const skip = Number(parsed.searchParams.get('$skip') ?? '0');
+      const page = data.slice(skip, skip + Math.min(top, cap));
+      const body: Record<string, unknown> = { value: page };
+      // `$top` bounds a server-driven walk — the server offers links until `$top` is satisfied or
+      // the rows run out. Modeling that budget is what reproduces the truncation: a fixture that
+      // keeps offering links past `$top` lets the OLD implementation pass, which is how a
+      // regression test for this defect becomes vacuous.
+      const remaining = top - page.length;
+      if (offerNextLink && remaining > 0 && skip + page.length < data.length) {
+        body['@odata.nextLink'] = `${ROOT}/Lookup?$skip=${skip + page.length}&$top=${remaining}`;
+      }
+      return { status: 200, headers: {}, body, rawBody: JSON.stringify(body) };
+    }
+  });
+
+  const failing = (status: number, onRequest = 1): ODataRequester => {
+    let seen = 0;
+    return {
+      request: async ({ url }) => {
+        seen += 1;
+        if (seen === onRequest) {
+          const body = { error: { code: String(status), message: 'nope' } };
+          return { status, headers: {}, body, rawBody: JSON.stringify(body) };
+        }
+        const parsed = new URL(url);
+        const skip = Number(parsed.searchParams.get('$skip') ?? '0');
+        const body = { value: rows(2909).slice(skip, skip + 200) };
+        return { status: 200, headers: {}, body, rawBody: JSON.stringify(body) };
+      }
+    };
+  };
+
+  it('fetches all 2,909 rows from a provider serving 200 per page with a nextLink', async () => {
+    const records = await fetchLookupResource(ROOT, 'token', undefined, undefined, server(rows(2909), 200, true));
+    expect(records).toHaveLength(2909);
+  });
+
+  it('reports progress as the running total, not the page size', async () => {
+    const seen: number[] = [];
+    await fetchLookupResource(ROOT, 'token', n => seen.push(n), undefined, server(rows(450), 200));
+    expect(seen).toEqual([200, 400, 450]);
+  });
+
+  it('returns undefined when the provider does not serve a Lookup resource', async () => {
+    expect(await fetchLookupResource(ROOT, 'token', undefined, undefined, failing(404))).toBeUndefined();
+  });
+
+  it('throws on a 404 partway through a walk rather than reporting an absent resource', async () => {
+    // A resource we have already read 200 rows from is not absent. Returning undefined here would
+    // turn a mid-walk failure into "this provider has no lookups", which is a clean-looking lie.
+    await expect(fetchLookupResource(ROOT, 'token', undefined, undefined, failing(404, 2))).rejects.toThrow(/HTTP 404/);
+  });
+
+  it('throws with the failing request attached on a non-200', async () => {
+    await expect(
+      fetchLookupResource(ROOT, 'token', undefined, undefined, failing(500))
+    ).rejects.toMatchObject({ requestDetails: { status: 500, method: 'GET' } });
+  });
+
+  it('returns an empty array for a provider that serves the resource with no rows', async () => {
+    const records = await fetchLookupResource(ROOT, 'token', undefined, undefined, server([], 200));
+    expect(records).toEqual([]);
   });
 });
