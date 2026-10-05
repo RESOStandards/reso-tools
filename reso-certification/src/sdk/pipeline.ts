@@ -138,6 +138,43 @@ export const createPipeline = <TContext extends PipelineContext>(endorsement: st
     // Precedence: a real failure outranks an incomplete (deadline) run, which outranks passed.
     let pipelineStatus: 'passed' | 'failed' | 'incomplete' = 'passed';
 
+    /**
+     * The step list as a consumer of `context` should see it: the full declared set, with anything not
+     * yet completed shown as `skipped`.
+     *
+     * A report written from inside the pipeline can only describe what the context carries, and the
+     * genuinely-skipped steps are appended only after the loop below — too late for the `alwaysRun`
+     * finalizer that is writing the artifact. Before this, such a report simply omitted them, so a
+     * reader could not tell that replication had been skipped rather than passed.
+     *
+     * `skipped` is accurate at the only moment this is read. The report writers run after a failFast
+     * break, by which point a step that has not run will not run. `pending` deliberately never appears:
+     * a written report describes a run that has finished, so a pending step in an artifact would mean
+     * the report was written mid-flight, which is a defect rather than a record of one.
+     *
+     * Skips are seeded only once a break has happened (`afterBreak`), because that is the only moment
+     * "has not run" means "will not run". Before a break the context carries exactly what ran, which is
+     * both the pre-existing behavior and the honest one: a step still to come is pending, not skipped.
+     *
+     * That timing is also what keeps a step from seeing *itself* as skipped. Only `alwaysRun` steps run
+     * after a break, and those are left out of the seed — one is never skipped by definition, and
+     * seeding it would make a report describe itself as skipped while it is the thing writing. This
+     * matters past DD: only `dd.ts` writes reports from an `alwaysRun` finalizer, while Core, Add/Edit
+     * and EntityEvent write theirs from an ordinary step, which would otherwise be seeded as skipped
+     * while running.
+     *
+     * `stepResults` stays the untouched record of what actually ran, so the array the pipeline RETURNS
+     * is unchanged: same entries, same order, no duplicates.
+     */
+    const seededSteps = (afterBreak: boolean): StepResult[] => {
+      const completed = new Map(stepResults.map(r => [r.name, r]));
+      return steps.flatMap(s => {
+        const done = completed.get(s.name);
+        if (done) return [done];
+        return afterBreak && !s.alwaysRun ? [{ name: s.name, endorsement, status: 'skipped' as const, duration: 0 }] : [];
+      });
+    };
+
     for (const step of steps) {
       const stepStart = Date.now();
 
@@ -166,7 +203,7 @@ export const createPipeline = <TContext extends PipelineContext>(endorsement: st
         };
 
         stepResults.push(result);
-        context = { ...output.context, pipelineSteps: [...stepResults] };
+        context = { ...output.context, pipelineSteps: seededSteps(status === 'failed' && failFast) };
 
         onProgress({
           step: step.name,
@@ -200,6 +237,13 @@ export const createPipeline = <TContext extends PipelineContext>(endorsement: st
           errors: [errorMessage],
           requestDetails
         });
+
+        // A thrown step has no `output.context` to spread, so the success path's refresh above never
+        // runs here. Without this an `alwaysRun` finalizer reads a stale `pipelineSteps` in which
+        // nothing failed, and a report deriving its verdict from that list claims the run passed.
+        // Build on the context already accumulated — the step threw before producing one — and
+        // replace only the step list.
+        context = { ...context, pipelineSteps: seededSteps(failFast) };
 
         onProgress({
           step: step.name,
@@ -245,7 +289,7 @@ export const createPipeline = <TContext extends PipelineContext>(endorsement: st
           requestDetails: output.requestDetails
         };
         stepResults.push(result);
-        context = { ...output.context, pipelineSteps: [...stepResults] };
+        context = { ...output.context, pipelineSteps: seededSteps(true) };
         onProgress({
           step: step.name,
           status,
