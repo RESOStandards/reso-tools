@@ -126,18 +126,61 @@ export const loadValidationConfig = async (): Promise<Record<string, unknown>> =
 const asRecord = (v: unknown): Record<string, unknown> | undefined =>
   typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : undefined;
 
+/** Offending values listed per field before the remainder is counted. A field with many bad values must not
+ *  grow one rule's message without bound: `validateExpandedItems` previews only the first few entries, and a
+ *  long message crowds out a distinct second rule just as fanning out per field once did. */
+const MAX_VALUES_PER_FIELD = 5;
+
 /**
  * Turn the legacy validator's errorCache into ONE message per failing RULE, each naming its offending
- * field(s): "<message> (fields: A, B)". A schema-invalid expanded item then names the field, not just the
- * generic rule — while keeping one entry per rule so a truncated inline preview (validateExpandedItems shows
- * only the first few) never crowds out a distinct second rule. The errorCache is keyed by message; each value
- * nests resources → fields. Falls back to the bare message when no field is attributed. Exported for testing.
+ * field(s) and — where the rule failed on a VALUE — the values themselves:
+ * "<message> (field: ConstructionMaterials [Brick, Frame])".
+ *
+ * Naming the value matters because two different rules share one message text. `utils.js` raises
+ * `MUST be advertised in the metadata` for an unadvertised ENUM VALUE, while `validate.js` raises
+ * `Fields MUST be advertised in the metadata` for an unadvertised FIELD. The first reads as a statement about
+ * the field it names, so a reader sees "MUST be advertised in the metadata (field: ConstructionMaterials)" for
+ * a field that IS advertised, and has nothing to go on. Observed on a live Core run 2026-10-04, where it cost
+ * four wrong explanations before anyone looked at the cache: the value was always there.
+ *
+ * The validator already records it — `fields[name].lookups` is keyed by the failing value
+ * (`utils.js` `updateCacheAndStats`) — so this is a read the summarizer was simply not doing. Nothing in
+ * `src/legacy/` changes, which keeps the carried-over copy aligned with the live cert-utils, and the message
+ * CONSTANTS are untouched, so anything matching on them still matches.
+ *
+ * Shape notes. Field order stays INSERTION order, which is the order the validator met them, because a
+ * truncated field list that reorders between runs is noise in a report diff and a test pins it. Values ARE
+ * sorted, for the same stability reason — their order in the cache is map-insertion order and carries no
+ * meaning. A field with no recorded values renders exactly as before, so a field-level rule's message is
+ * byte-identical to what it was.
+ *
+ * Falls back to the bare message when no field is attributed. Exported for testing.
  */
 export const errorMessagesFromCache = (errorCache: Record<string, unknown> | undefined): ReadonlyArray<string> =>
   Object.entries(errorCache ?? {}).map(([message, entry]) => {
     const resources = asRecord(asRecord(entry)?.resources);
-    const fields = resources ? [...new Set(Object.values(resources).flatMap(r => Object.keys(asRecord(asRecord(r)?.fields) ?? {})))] : [];
-    return fields.length > 0 ? `${message} (field${fields.length === 1 ? '' : 's'}: ${fields.join(', ')})` : message;
+    if (!resources) return message;
+
+    // Keyed by field name, so a field appearing under several resources is one entry — and a Map preserves
+    // the insertion order the previous `new Set(...)` relied on.
+    const valuesByField = new Map<string, Set<string>>();
+    for (const resource of Object.values(resources)) {
+      for (const [fieldName, fieldNode] of Object.entries(asRecord(asRecord(resource)?.fields) ?? {})) {
+        const bucket = valuesByField.get(fieldName) ?? new Set<string>();
+        for (const value of Object.keys(asRecord(asRecord(fieldNode)?.lookups) ?? {})) bucket.add(value);
+        valuesByField.set(fieldName, bucket);
+      }
+    }
+    if (valuesByField.size === 0) return message;
+
+    const rendered = [...valuesByField].map(([fieldName, values]) => {
+      if (values.size === 0) return fieldName;
+      const sorted = [...values].sort();
+      const shown = sorted.slice(0, MAX_VALUES_PER_FIELD);
+      const remaining = sorted.length - shown.length;
+      return `${fieldName} [${shown.join(', ')}${remaining > 0 ? `, +${remaining} more` : ''}]`;
+    });
+    return `${message} (field${valuesByField.size === 1 ? '' : 's'}: ${rendered.join(', ')})`;
   });
 
 /**
