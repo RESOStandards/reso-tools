@@ -278,3 +278,48 @@ describe('fetchLookupResource', () => {
     expect(records).toEqual([]);
   });
 });
+
+describe('fetchLookupResource — a server whose cursor does not move', () => {
+  const ROOT2 = 'https://example.com/odata';
+
+  const rows2 = (count: number): Array<Record<string, unknown>> =>
+    Array.from({ length: count }, (_, i) => ({ LookupKey: `K${i}`, LookupName: 'Roof', LookupValue: `V${i}` }));
+
+  it('stops instead of walking forever against a server that ignores $skip', async () => {
+    // The same rows at every cursor position. Those pages are never empty, so the walk's only
+    // termination condition never fires: without the guard this call does not return, and this test
+    // fails by timing out rather than by assertion. The explicit timeout is there so a regression
+    // fails fast instead of hanging the suite.
+    const data = rows2(300);
+    const ignoresSkip: ODataRequester = {
+      request: async () => {
+        const body = { value: data.slice(0, 100) };
+        return { status: 200, headers: {}, body, rawBody: JSON.stringify(body) };
+      }
+    };
+
+    await expect(fetchLookupResource(ROOT2, 'token', undefined, undefined, ignoresSkip)).rejects.toThrow(
+      /not honoring \$skip/i
+    );
+  }, 5000);
+
+  it('does not trip on a server that merely repeats a boundary record', async () => {
+    // The guard must catch "the cursor is stuck", not "the page overlaps". A server that starts each
+    // page one row early still contributes new records, so the walk continues. An over-eager guard
+    // would fail a provider here, which is worse than the loop it is protecting against.
+    const data = rows2(250);
+    const overlapsByOne: ODataRequester = {
+      request: async ({ url }) => {
+        const skip = Number(new URL(url).searchParams.get('$skip') ?? '0');
+        const body = { value: data.slice(skip === 0 ? 0 : skip - 1, (skip === 0 ? 0 : skip - 1) + 100) };
+        return { status: 200, headers: {}, body, rawBody: JSON.stringify(body) };
+      }
+    };
+
+    const records = await fetchLookupResource(ROOT2, 'token', undefined, undefined, overlapsByOne);
+
+    // 250 distinct rows plus the one boundary record the server repeated. The count is the server's
+    // doing, not ours; what matters is that the walk completed rather than being refused.
+    expect(records).toHaveLength(251);
+  }, 5000);
+});

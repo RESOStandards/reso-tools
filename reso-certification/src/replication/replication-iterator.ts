@@ -150,9 +150,28 @@ const readAdvertisedCount = (body: unknown): number | undefined => {
   return typeof count === 'number' && Number.isFinite(count) ? count : undefined;
 };
 
-const readRecords = (body: unknown): ReadonlyArray<Record<string, unknown>> => {
+/**
+ * The page's records.
+ *
+ * A `value` that is present but is not an array is a malformed collection response, and it is
+ * refused rather than read as an empty page. Substituting `[]` there would end the walk and report
+ * "the resource exists and has no rows", which is a clean-looking wrong answer of exactly the kind
+ * this module was rewritten to remove. Refusing is protocol validation, not a certification verdict:
+ * the caller still decides what a failure means.
+ *
+ * An absent or null `value` is still treated as an empty page. That is the prior behavior and is
+ * left alone deliberately, so this change cannot newly fail a provider that answers an empty
+ * collection that way.
+ */
+const readRecords = (body: unknown, requestUrl: string): ReadonlyArray<Record<string, unknown>> => {
   const value = (body as { value?: unknown } | null)?.value;
-  return Array.isArray(value) ? (value as ReadonlyArray<Record<string, unknown>>) : [];
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) {
+    throw new Error(
+      `Malformed OData collection response from ${requestUrl}: "value" is ${typeof value}, not an array. Refusing to read it as an empty page.`
+    );
+  }
+  return value as ReadonlyArray<Record<string, unknown>>;
 };
 
 const stringifyBody = (body: unknown): string => (typeof body === 'object' && body !== null ? JSON.stringify(body) : String(body ?? ''));
@@ -207,7 +226,7 @@ export async function* replicationIterator(config: ReplicationConfig): AsyncGene
       return;
     }
 
-    const records = readRecords(response.body);
+    const records = readRecords(response.body, requestUrl);
     skip += records.length;
 
     if (config.outputPath && records.length > 0) {

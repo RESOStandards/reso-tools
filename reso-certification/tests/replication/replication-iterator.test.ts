@@ -338,3 +338,27 @@ describe('replicationIterator — the optional record dump', () => {
   // empty, which passes whatever the iterator does. A test that cannot fail is worse than no test,
   // because it reads as coverage.
 });
+
+describe('replicationIterator — malformed responses', () => {
+  const respond = (body: unknown): ODataRequester => ({
+    request: async () => ({ status: 200, headers: {}, body, rawBody: JSON.stringify(body) })
+  });
+
+  it.each([
+    ['an object', { value: { nope: true } }],
+    ['a string', { value: 'nope' }],
+    ['a number', { value: 7 }]
+  ])('refuses a 200 whose value is %s rather than reading it as an empty page', async (_label, body) => {
+    // Substituting [] would end the walk and report "the resource exists and has no rows", which is
+    // a clean-looking wrong answer. The previous implementation threw here too, but only by accident,
+    // via a TypeError on spreading a non-iterable.
+    await expect(walk(respond(body))).rejects.toThrow(/"value" is .*not an array/i);
+  });
+
+  it('still treats an absent value as an empty page, which is the prior behavior', async () => {
+    // Left deliberately tolerant so this change cannot newly fail a provider that answers an empty
+    // collection without the member.
+    const { records } = await walk(respond({}));
+    expect(records).toEqual([]);
+  });
+});
