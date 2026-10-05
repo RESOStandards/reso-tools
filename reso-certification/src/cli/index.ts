@@ -543,7 +543,9 @@ const ddCmd = program
   .description('Data Dictionary compliance testing')
   .option('--url <url>', 'Server base URL (mutually exclusive with --config)')
   .option('--config <path>', 'Path to a config file — runs every entry (mutually exclusive with --url)')
-  .option('--dd-version <version>', `DD version (${CERTIFIABLE_DD_VERSIONS.join(' or ')})`, CURRENT_DD_VERSION)
+  // No Commander default here on purpose. With one, the action cannot tell `--dd-version 2.1` from
+  // nothing supplied, and config mode needs that distinction to let an explicit flag win.
+  .option('--dd-version <version>', `DD version (${CERTIFIABLE_DD_VERSIONS.join(' or ')}; default ${CURRENT_DD_VERSION})`)
   .option('--limit <n>', "Max records to replicate per resource (default: the config entry's ddOptions.limit, else 100000)")
   .option('--strict', 'Strict mode: fail on variations and enforce JSON schema validation')
   .option('--batch-expand', 'Batch all expansions per resource into a single $expand request')
@@ -560,7 +562,7 @@ ddCmd.action(
   async (opts: {
     url?: string;
     config?: string;
-    ddVersion: string;
+    ddVersion?: string;
     limit: string;
     strict?: boolean;
     batchExpand?: boolean;
@@ -582,7 +584,7 @@ ddCmd.action(
         throw new Error('Provide --url or --config.');
       }
 
-      const ddVersion = normalizeDDVersion(opts.ddVersion);
+      const ddVersion = normalizeDDVersion(opts.ddVersion ?? CURRENT_DD_VERSION);
 
       // The variations step authenticates to the Variations Service with the tools .env
       // OAuth2 client credentials (TOKEN_URI / CLIENT_ID / CLIENT_SECRET), as find-variations
@@ -600,8 +602,12 @@ ddCmd.action(
 
       if (opts.config) {
         // Config-file mode — run every entry. The entry supplies server/auth/version/OSN (reso-certification-utils
-        // format); CLI flags apply run-level knobs (limit / strict / batch-expand) and can override auth/OSN. Entry
-        // version wins (parallel to add-edit/entity-event); --dd-version applies only in direct mode below.
+        // format); CLI flags apply run-level knobs (limit / strict / batch-expand) and can override auth/OSN.
+        //
+        // The entry's version wins UNLESS --dd-version was explicitly supplied, in which case the flag does.
+        // Certifying one config against two Dictionary versions to compare them is an ordinary thing to want,
+        // and the flag used to be accepted and discarded here -- the only evidence being the version in the
+        // output path.
         const configFile = await loadConfigFile(resolve(opts.config));
         const authFlags = { authToken: opts.authToken, clientId: opts.clientId, clientSecret: opts.clientSecret, tokenUrl: opts.tokenUrl };
 
@@ -611,6 +617,7 @@ ddCmd.action(
 
           const config: DDConfig = {
             ...baseConfig,
+            ...(opts.ddVersion ? { version: ddVersion } : {}),
             fromCli: true,
             ...(servicesAuthToken ? { servicesAuthToken } : {}),
             server: { ...baseConfig.server, auth },
