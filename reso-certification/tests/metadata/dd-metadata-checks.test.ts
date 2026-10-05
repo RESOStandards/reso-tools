@@ -285,6 +285,140 @@ describe('checkSuggestedMaxConstraints (SHOULD warnings)', () => {
   });
 });
 
+/**
+ * A facet can only be compared where CSDL defines it for the type the provider actually served, and
+ * the type that decides it is the PROVIDER's, not the DD's. Observed on a real DD 2.1 run (CDL,
+ * 2026-10-04): 786 suggested-max warnings, of which 643 asked for a facet the served type cannot
+ * carry — 469 Length on numerics, temporals and enums, and 87 Precision + 87 Scale on `Edm.IntX`.
+ *
+ * `Property.BathroomsFull` is the case that shows why it matters. DD 2.1 carries it as
+ * `Edm.Decimal(3, 0)`, a scale-0 decimal — which is an Integer, and `checkFieldTypes` REQUIRES be
+ * served as `Edm.IntX`. The provider served `Edm.Int16`, obeying that check, and was handed three
+ * warnings for it, because `Edm.Int16` defines no MaxLength, Precision or Scale facet to put the
+ * DD's numbers in. The DD's width is satisfied by picking an Int wide enough to hold the digits.
+ */
+describe('checkSuggestedMaxConstraints — only facets the SERVED type can carry', () => {
+  it('is silent on a DD scale-0 decimal served as Edm.Int16, which carries none of the three facets', () => {
+    // The DD type says Decimal; the provider type says Int16. Keying off the DD type would warn 3×.
+    const reference: DdReference = {
+      fields: [{ resourceName: 'Property', fieldName: 'BathroomsFull', type: 'Edm.Decimal', maxLength: 3, precision: 3, scale: 0 }],
+      lookups: [],
+    };
+    const report = makeReport([{ resourceName: 'Property', fieldName: 'BathroomsFull', type: 'Edm.Int16' }], []);
+    expect(checkSuggestedMaxConstraints(report, reference)).toEqual([]);
+  });
+
+  it.each(['Edm.Int16', 'Edm.Int32', 'Edm.Int64'])('is silent for %s, any width the provider picks', (type) => {
+    // Any int wide enough for the DD's digit count is acceptable, and none of them take a facet.
+    const reference: DdReference = {
+      fields: [{ resourceName: 'Property', fieldName: 'BathroomsFull', type: 'Edm.Decimal', maxLength: 3, precision: 3, scale: 0 }],
+      lookups: [],
+    };
+    expect(checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Property', fieldName: 'BathroomsFull', type }], []), reference)).toEqual([]);
+  });
+
+  it('drops Length on an Edm.Decimal while keeping Precision and Scale', () => {
+    // Property.BelowGradeUnfinishedArea: served Precision="14" Scale="2", no MaxLength — because CSDL
+    // defines none for Decimal. The DD's maxLength of 14 is its misnamed column for the digit width,
+    // which the served Precision already satisfies.
+    const reference: DdReference = {
+      fields: [{ resourceName: 'Property', fieldName: 'BelowGradeUnfinishedArea', type: 'Edm.Decimal', maxLength: 14, precision: 14, scale: 2 }],
+      lookups: [],
+    };
+    const report = makeReport([{ resourceName: 'Property', fieldName: 'BelowGradeUnfinishedArea', type: 'Edm.Decimal', precision: 14, scale: 2 }], []);
+    expect(checkSuggestedMaxConstraints(report, reference)).toEqual([]);
+  });
+
+  it('still warns on a real Precision deviation, because Precision IS a Decimal facet', () => {
+    // Property.Latitude on the same run: DD 12, served 10. Signal that must survive the gate.
+    const reference: DdReference = {
+      fields: [{ resourceName: 'Property', fieldName: 'Latitude', type: 'Edm.Decimal', maxLength: 12, precision: 12, scale: 8 }],
+      lookups: [],
+    };
+    const findings = checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Property', fieldName: 'Latitude', type: 'Edm.Decimal', precision: 10, scale: 8 }], []), reference);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toMatchObject({ check: 'suggested-max', severity: 'warning', fieldName: 'Latitude' });
+    expect(findings[0].message).toContain('Suggested Max Precision of 12 but was 10');
+  });
+
+  it('still warns when an Edm.String leaves MaxLength unset, because String DOES take it', () => {
+    const reference: DdReference = {
+      fields: [{ resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String', maxLength: 4000 }],
+      lookups: [],
+    };
+    const findings = checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String' }], []), reference);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].message).toContain('Suggested Max Length of 4000 but was not set');
+  });
+
+  it.each(['Edm.Binary', 'Edm.Stream'])('treats %s as taking MaxLength, like String', (type) => {
+    const reference: DdReference = {
+      fields: [{ resourceName: 'Media', fieldName: 'Thumbnail', type: 'Edm.String', maxLength: 100 }],
+      lookups: [],
+    };
+    expect(checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Media', fieldName: 'Thumbnail', type }], []), reference)).toHaveLength(1);
+  });
+
+  it('is silent on a named enum type, qualified or bare', () => {
+    // metadata-report.json carries enum types both ways — fully qualified and as a bare name — so the
+    // rule cannot be a prefix test on `org.reso.metadata.enums.`; it is membership in the Edm facet sets.
+    const reference: DdReference = {
+      fields: [
+        { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus', maxLength: 50 },
+        { resourceName: 'Property', fieldName: 'LotSizeUnits', type: 'org.reso.metadata.enums.LinearUnits', maxLength: 25 },
+      ],
+      lookups: [],
+    };
+    const report = makeReport([
+      { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus' },
+      { resourceName: 'Property', fieldName: 'LotSizeUnits', type: 'LinearUnits' },
+    ], []);
+    expect(checkSuggestedMaxConstraints(report, reference)).toEqual([]);
+  });
+
+  it('drops Length and Scale on a temporal type but keeps Precision, which CSDL does define there', () => {
+    const reference: DdReference = {
+      fields: [{ resourceName: 'Property', fieldName: 'ModificationTimestamp', type: 'Edm.DateTimeOffset', maxLength: 27, precision: 3, scale: 0 }],
+      lookups: [],
+    };
+    const findings = checkSuggestedMaxConstraints(
+      makeReport([{ resourceName: 'Property', fieldName: 'ModificationTimestamp', type: 'Edm.DateTimeOffset', precision: 6 }], []),
+      reference,
+    );
+    expect(findings).toHaveLength(1);
+    expect(findings[0].message).toContain('Suggested Max Precision of 3 but was 6');
+  });
+
+  it('is silent on Edm.Date, which takes none of the three', () => {
+    const reference: DdReference = {
+      fields: [{ resourceName: 'Property', fieldName: 'CloseDate', type: 'Edm.Date', maxLength: 10, precision: 0, scale: 0 }],
+      lookups: [],
+    };
+    expect(checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Property', fieldName: 'CloseDate', type: 'Edm.Date' }], []), reference)).toEqual([]);
+  });
+
+  it('never raises an error, so no facet decision can gate certification', () => {
+    // The gate fails on `error` findings only (sdk/dd.ts). These checks are SHOULD and must stay warnings.
+    const reference: DdReference = {
+      fields: [
+        { resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String', maxLength: 4000 },
+        { resourceName: 'Property', fieldName: 'Latitude', type: 'Edm.Decimal', maxLength: 12, precision: 12, scale: 8 },
+        { resourceName: 'Property', fieldName: 'BathroomsFull', type: 'Edm.Decimal', maxLength: 3, precision: 3, scale: 0 },
+      ],
+      lookups: [],
+    };
+    const report = makeReport([
+      { resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String', maxLength: 2000 },
+      { resourceName: 'Property', fieldName: 'Latitude', type: 'Edm.Decimal', precision: 10, scale: 8 },
+      { resourceName: 'Property', fieldName: 'BathroomsFull', type: 'Edm.Int16' },
+    ], []);
+    const findings = checkSuggestedMaxConstraints(report, reference);
+    expect(findings).toHaveLength(2);
+    expect(findings.every((f) => f.severity === 'warning')).toBe(true);
+  });
+});
+
+
 describe('Lookup Resource checks', () => {
   const LN = 'RESO.OData.Metadata.LookupName';
   const reference: DdReference = {
