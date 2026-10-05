@@ -15,6 +15,54 @@ Every command sets a **process exit code**: `0` = pass / valid, `1` = one or mor
 failures, `2` = runtime or IO error. Machine-readable output goes to **stdout**; the
 human-readable summary goes to **stderr**, so you can pipe `--output json` cleanly.
 
+> **There is no `--version` option on any subcommand.** `--version` belongs to `reso-cert` itself and
+> prints the package version, so a subcommand could never receive it: passing it printed the version
+> and exited `0` without running the command. Data Dictionary versions are `--dd-version`, the Web API
+> Core and Add/Edit spec versions are `--spec-version`.
+
+## Environment (`.env`)
+
+Several commands take their service URL and credentials from the environment rather than from flags,
+so a working `.env` is often the difference between a command running and a command refusing.
+
+**Where it is found.** At startup the CLI looks for a file literally named `.env` in three places, in
+order, and the **first one found wins** — the rest are not read:
+
+1. the current working directory
+2. the `reso-certification` package root
+3. the `reso-tools` monorepo root
+
+A variable already set in the real environment is **never** overwritten by the file, so
+`RESO_SERVICES_URL=… npx reso-cert …` overrides whatever `.env` says.
+
+**Which environment a run touches is decided by `TOKEN_URI`, and by nothing else.**
+`RESO_SERVICES_URL` is the **same value for every environment**, so reading it tells you nothing
+about which one you are pointed at. The environment is fixed when the token is minted: authenticating
+against the QA certification host produces a token carrying `qa`, the production host produces one
+carrying `production`, and every later call reads that off the token. If you want to know which
+environment a command will write to, look at the host in `TOKEN_URI`.
+
+### The variables
+
+| Variable | Used by | What it is |
+|---|---|---|
+| `RESO_SERVICES_URL` | `find-variations`, `rcf`, `update-variations`, the variations-review commands | Base URL of the Variations Service. Same for every environment. |
+| `TOKEN_URI` | the same commands | OAuth2 token endpoint. **This is what selects QA versus production.** |
+| `CLIENT_ID`, `CLIENT_SECRET` | the same commands | OAuth2 client credentials the token is minted from. |
+| `FT_ADMIN_SECRET` | `update-variations --fast-track` | Fast Track admin credential. A fast-track submission is refused without it, before any request is made. |
+| `CERT_AUTH_API_BASE_URL`, `CERT_AUTH_API_USERNAME`, `CERTIFICATION_API_KEY`, `CURRENT_PROVIDER_UOI` | the SDK's provider-token fallback | The second auth path, used when the OAuth2 variables are absent. |
+
+**Two auth paths, in that order.** A command first tries an OAuth2 client-credentials token from
+`TOKEN_URI` / `CLIENT_ID` / `CLIENT_SECRET`. If those are not configured it falls back to minting a
+provider token from the `CERT_AUTH_API_*` set. A command that reports "requires authentication" is
+telling you neither set is complete, not that one of them was rejected — a rejected credential
+reports separately.
+
+**Nothing here is passed on the command line**, and there is no flag that overrides the service URL.
+Commands that talk to a live OData server take their own `--url`, `--auth-token` and
+`--client-id`/`--client-secret`/`--token-url`; those are for the *provider's* endpoint and are a
+different thing from the RESO service credentials above.
+
 ## Commands at a glance
 
 | Command | What it does |
@@ -96,14 +144,14 @@ performs canary writes), `--writable-resource <name>` (default `Property`),
 Web API Core 2.0.0 / 2.1.0 compliance.
 
 ```bash
-reso-cert core --url https://api.example.com --auth-token TOKEN --version 2.1.0
+reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2.1.0
 ```
 
 | Option | Default | Meaning |
 |---|---|---|
 | `--url <url>` | *(required)* | Server base URL |
 | `--resources <list>` | well-known list | Comma-separated resource names |
-| `--version <2.0.0\|2.1.0>` | `2.0.0` | Spec version |
+| `--spec-version <2.0.0\|2.1.0>` | `2.1.0` | Spec version. Config-file mode takes the version from the config entry and ignores this flag. |
 | `--enum-mode <auto\|string\|collections\|isflags>` | `auto` | How enumerations are represented (auto-detected by default) |
 | `--full-coverage` | — | Fail if any data-type category has no coverage across all resources |
 
@@ -141,8 +189,8 @@ reso-cert metadata -m $metadata.xml -v 2.0 --output-dir ./out
 cat $metadata.xml | reso-cert metadata -m - --no-report      # validate only, from stdin
 ```
 
-`-m, --metadata <path>` (required; `-` for stdin) · `-v, --version <ddVersion>`
-(default `2.0`, stamped into the report) · `--odata-version <4.0|4.01>` (auto-detected
+`-m, --metadata <path>` (required; `-` for stdin) · `--dd-version <ddVersion>`
+(default `2.1`, stamped into the report) · `--odata-version <4.0|4.01>` (auto-detected
 when omitted) · `--output-dir <path>` (default `.`; `-` for stdout) · `--no-report`
 (validate only). Exit `0` valid / `1` invalid / `2` IO.
 
@@ -158,7 +206,7 @@ reso-cert schema validate -m metadata-report.json -p payload.json --output-dir -
   (required; `-` stdin) · `-a, --additional-properties` · `--output-dir` (`-` stdout).
 - **`schema validate`** — validate a payload against a report's schema. `-m, --metadata`
   (required) · `-p, --payload` (required; an OData collection `{ value: [...] }` or a
-  single record; `-` stdin) · `-v, --version` · `-r, --resource` (else inferred from the
+  single record; `-` stdin) · `--dd-version` (default `2.1`) · `-r, --resource` (else inferred from the
   payload `@odata.context`) · `-s, --settings <schema-validation-settings.json>` ·
   `-a, --additional-properties` (default: reject unknown fields) · `--output-dir`.
   Exit `0` pass / `1` schema errors / `2` IO.
@@ -183,7 +231,7 @@ reso-cert replicate -u https://api.example.com -s TimestampDesc -r Property -l 1
 | `-t, --top <n>` / `--max-page-size <n>` | Page size / `odata.maxpagesize` (NextLink) |
 | `--orderby <expr>` | OData `$orderby` |
 | `-l, --limit <n>` | Stop after N total records |
-| `-v, --version <ddVersion>` | DD version (default `2.0`) |
+| `--dd-version <ddVersion>` | DD version (default `2.1`) |
 | `--save-results` | Also write every raw response page to disk |
 | `--json-schema-validation` / `--strict` | Validate each payload against the metadata schema / fail on errors |
 | `--originating-system-name <v>` / `--originating-system-id <v>` | Append an `OriginatingSystem*` filter to every query |
@@ -201,7 +249,7 @@ reso-cert find-variations --from-server -u https://api.example.com --auth-token 
 
 Exactly one metadata source: `-m, --metadata <file>` (`-` stdin) **or** `--from-server`
 with `-u, --url <url>` (fetches and serializes the endpoint's `$metadata` in memory).
-`-f, --fuzziness <0–1>` · `-v, --version` · `--output-dir` (`-` stdout). Two auth
+`-f, --fuzziness <0–1>` · `--dd-version` (default `2.1`) · `--output-dir` (`-` stdout). Two auth
 contexts: the auth flags authenticate the `--from-server` fetch; the `/compute` call
 authenticates to the Variations Service with `.env` service credentials.
 
