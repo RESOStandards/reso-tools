@@ -48,10 +48,10 @@ import {
   parseVariationsCsv,
   updateVariationsViaService
 } from '../variations/index.js';
-import { saveVariationDecisionsViaService, submitVariationsReportViaService } from '../variations/submit.js';
+import { submitVariationsReportViaService } from '../variations/submit.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { mintOAuth2ClientCredentialsToken, resolveCliAuth } from './auth.js';
-import { decisionExitCode, displayKey as displayDecisionKey, formatDecisionResult, planDecisionPush } from './decisions-command.js';
+import { formatPlan, planDecisionPush } from './decisions-command.js';
 import { runMetadataStep } from './metadata-command.js';
 import { resolveRcfExitCode, runRcf } from './rcf-command.js';
 import { resolveRenderMode, runConfigEntries, runWithProgress } from './render.js';
@@ -1403,143 +1403,102 @@ program
     }
   });
 
-// ── Record decisions on a review (write side, admin) ──
+// ── Mark a variations report and push it (write side) ──
 //
-// The second half of the flow `submit-variations-report` starts. The report push opens the review
-// with every item `pending`; this records what the reviewer decided about named items, from a sheet
-// carrying an Action and a Comment per row.
+// The same thing the review UI's Submit does. Josh, 2026-10-04: "client passes the variations report
+// and comments and the backend should do everything from there", and it "should make the same output
+// as if a user is on the UI".
 //
-// THE ORDER IS FORCED, NOT CHOSEN. A comment is persisted by saving the report -- the same place the
-// review UI keeps it -- and a report save resets every pool row it touches to `pending` with the
-// outcome wiped. So the comment goes first and the decision second. There is no flag to reorder
-// them, and the report is saved only when a comment actually needs persisting (or on --open-review),
-// because a save with nothing to persist would revert decisions an earlier run applied for no gain.
+// SO THIS IS ONE REQUEST. Marking an item is a field on its change, not a separate call. A sheet row
+// sets `ignore`, `remove` or `flaggedForFastTrack` on the entry it names and optionally appends a
+// comment; the service derives the pool row's `requestedAction` from those flags, derives
+// `editorInfo` from the auth context, writes the rows and notifies. Nothing identifying is sent,
+// because nothing identifying is knowable here: the caller's identity is columns on the token row,
+// read by the Lambda authorizer.
 //
-// ADMIN AUTHORITY IS REQUIRED and the service checks it before anything else: one decision resolves
-// the item for every organization that flagged it, since the canonical store holds one winner per
-// key. A provider asking for an outcome travels on the report submission instead.
+// THE REPORT GOES AS THE RUN PRODUCED IT. A Data Dictionary run writes five level buckets --
+// resources, fields, lookups, expansions, complexTypes -- and the service flattens them. An earlier
+// version of this command demanded a flat `changes` array and rejected the real artifact as "the
+// wrong file", which was a false accusation of a correct input.
 //
-// A 200 IS NOT A SUCCESS REPORT. Four of the service's buckets mean something did not happen, so
-// every one is printed and a partial run exits 4 -- a scripted replay has to be able to tell a
-// partial result from a clean one without reading the output.
+// PUSHING IS A FULL REPLACE of the review rows this report owns, which is why a sheet with one bad
+// row pushes nothing at all.
 
 program
   .command('submit-variation-decisions')
-  .description('Record review decisions and comments from a sheet against an open review (admin)')
-  .requiredOption('-r, --report <path>', 'Path to the variations-report.json the review was opened from')
-  .requiredOption('-d, --decisions <path>', 'Path to the decisions CSV (Resource Name, Field Name, Lookup Value, Action, Comment)')
-  .option('--open-review', 'Save the report first even with no comments, to open a review that does not exist yet')
-  .option('--dry-run', 'Show what would be sent and send nothing')
-  .option('--json', 'Print the service result as JSON')
-  .action(
-    async (opts: {
-      report: string;
-      decisions: string;
-      openReview?: boolean;
-      dryRun?: boolean;
-      json?: boolean;
-    }) => {
-      try {
-        const report = JSON.parse(await readFile(resolve(opts.report), 'utf-8')) as Record<string, unknown>;
-        const { items, recognizedColumns, skippedColumns } = parseDecisionsCsv(await readFile(resolve(opts.decisions), 'utf-8'));
-        if (skippedColumns.length) {
-          console.error(`Ignoring unrecognized columns: ${skippedColumns.join(', ')}`);
-        }
-        console.log(`Parsed ${items.length} row(s) from columns: ${recognizedColumns.join(', ')}.`);
-
-        if (!Array.isArray(report.changes)) {
-          throw new Error(
-            `${opts.report} carries no changes array. A variations report produced by a DD run does; this may be the wrong artifact.`
-          );
-        }
-
-        // NO IDENTITY IS PASSED IN. Who is acting is established by the token, and the authorizer
-        // puts all six values -- isAdmin, providerUoi, recipientUoi, username, email,
-        // environmentName -- into the request context, every one of which reaches the handler. None
-        // of it is reachable from here: the bearer token is an opaque row key, not a JWT with claims
-        // to read. So there is nothing for an operator to supply, and asking would only invite a
-        // mistyped UOI that misattributes a comment in a thread its subject reads.
-        const plan = planDecisionPush({
-          report: report as never,
-          rows: items,
-          now: new Date().toISOString(),
-          ...(opts.openReview ? { openReview: true } : {})
-        });
-
-        if (plan.errors.length > 0) {
-          // Nothing is sent. The comment and the decision are two requests, so a half-valid sheet
-          // could otherwise leave a comment persisted with no decision behind it.
-          console.error(`The sheet has ${plan.errors.length} unusable row(s). Nothing was sent.`);
-          for (const error of plan.errors) console.error(`  • ${error}`);
-          process.exitCode = 2;
-          return;
-        }
-
-        if (plan.decisions.length === 0 && !plan.needsReportSave) {
-          console.log('Nothing to do: no row carries an action or a comment.');
-          return;
-        }
-
-        if (opts.dryRun) {
-          console.log('Dry run — nothing was sent.');
-          if (plan.needsReportSave) {
-            console.log(`  Would save the report to persist ${plan.commentsAdded} comment(s), then push the decisions.`);
-            console.log('  That save resets every item in this report to pending and wipes prior outcomes.');
-          }
-          for (const decision of plan.decisions) {
-            console.log(`  Would record ${decision.action} on ${displayDecisionKey(decision.variationKey)}.`);
-          }
-          console.log('  Re-run without --dry-run to send.');
-          return;
-        }
-
-        const bearerToken = await mintOAuth2ClientCredentialsToken();
-
-        // 1. The comment, carried by a report save. First, because the save resets statuses.
-        if (plan.needsReportSave) {
-          const saved = await submitVariationsReportViaService({
-            report: plan.report as Record<string, unknown>,
-            fromCli: true,
-            ...(bearerToken ? { bearerToken } : {})
-          });
-          console.log(
-            `Saved the report with ${plan.commentsAdded} comment(s)${saved.variationsReportId ? ` (report id ${saved.variationsReportId})` : ''}.`
-          );
-          console.log('  Every item in this report is now pending; the decisions below follow.');
-        }
-
-        // 2. The decisions, against the review that save just opened or refreshed.
-        if (plan.decisions.length === 0) {
-          console.log('No decisions in the sheet — the comments were saved and nothing else was sent.');
-          return;
-        }
-
-        const result = await saveVariationDecisionsViaService({
-          decisions: plan.decisions,
-          fromCli: true,
-          ...(typeof report.version === 'string' ? { ddVersion: report.version } : {}),
-          ...(bearerToken ? { bearerToken } : {})
-        });
-
-        console.log(opts.json ? JSON.stringify(result, null, 2) : formatDecisionResult(result));
-        process.exitCode = decisionExitCode(result);
-      } catch (error) {
-        const code = (error as Error & { code?: string }).code;
-        console.error(error instanceof Error ? error.message : String(error));
-
-        if (code === 'LOCKED') {
-          const lock = lockHolderOf(error);
-          if (lock) {
-            console.error(`  Held by: ${lock.displayName} <${lock.email}>`);
-            console.error(`  Until:   ${lock.expiresAt}`);
-          }
-          process.exitCode = 3;
-          return;
-        }
-
-        process.exitCode = 2;
+  .description('Mark a variations report from a sheet of actions and comments, and submit it for review')
+  .requiredOption('-r, --report <path>', 'Path to the variations-report.json a DD run produced')
+  .requiredOption('-d, --decisions <path>', 'Path to the sheet (Resource Name, Field Name, Lookup Value, Action, Comment)')
+  .option('--dry-run', 'Show what would be marked and send nothing')
+  .option('--json', 'Print the marked report instead of submitting it')
+  .action(async (opts: { report: string; decisions: string; dryRun?: boolean; json?: boolean }) => {
+    try {
+      const report = JSON.parse(await readFile(resolve(opts.report), 'utf-8')) as Record<string, unknown>;
+      const { items, recognizedColumns, skippedColumns } = parseDecisionsCsv(await readFile(resolve(opts.decisions), 'utf-8'));
+      if (skippedColumns.length) {
+        console.error(`Ignoring unrecognized columns: ${skippedColumns.join(', ')}`);
       }
+
+      const plan = planDecisionPush({ report: report as never, rows: items, now: new Date().toISOString() });
+      console.log(`Parsed ${items.length} row(s) from columns: ${recognizedColumns.join(', ')}.`);
+      console.log(`The report carries ${plan.entryCount} variation(s).`);
+
+      if (plan.errors.length > 0) {
+        // Nothing is pushed. The push replaces this report's review rows, so landing a destructive
+        // replace that carries only part of what the operator meant is worse than landing nothing.
+        console.error(`The sheet has ${plan.errors.length} unusable row(s). Nothing was sent.`);
+        for (const error of plan.errors) console.error(`  • ${error}`);
+        process.exitCode = 2;
+        return;
+      }
+
+      if (!plan.changed) {
+        console.log('Nothing to do: no row asked for an action or carried a comment.');
+        return;
+      }
+
+      console.log(`Marking ${plan.applied.length} variation(s):`);
+      console.log(formatPlan(plan));
+
+      if (opts.json) {
+        console.log(JSON.stringify(plan.report, null, 2));
+        return;
+      }
+
+      if (opts.dryRun) {
+        console.log('Dry run — nothing was sent.');
+        console.log('  Submitting is a FULL replace: it replaces the review rows currently on record for this report.');
+        console.log('  Re-run without --dry-run to submit.');
+        return;
+      }
+
+      const bearerToken = await mintOAuth2ClientCredentialsToken();
+      const result = await submitVariationsReportViaService({
+        report: plan.report as Record<string, unknown>,
+        fromCli: true,
+        ...(bearerToken ? { bearerToken } : {})
+      });
+
+      console.log(`Submitted for ${result.providerUoi} / ${result.providerUsi} → ${result.recipientUoi}, DD ${result.version}.`);
+      if (result.variationsReportId) {
+        console.log(`  Report id: ${result.variationsReportId}`);
+      }
+    } catch (error) {
+      const code = (error as Error & { code?: string }).code;
+      console.error(error instanceof Error ? error.message : String(error));
+
+      if (code === 'LOCKED') {
+        const lock = lockHolderOf(error);
+        if (lock) {
+          console.error(`  Held by: ${lock.displayName} <${lock.email}>`);
+          console.error(`  Until:   ${lock.expiresAt}`);
+        }
+        process.exitCode = 3;
+        return;
+      }
+
+      process.exitCode = 2;
     }
-  );
+  });
 
 program.parse();

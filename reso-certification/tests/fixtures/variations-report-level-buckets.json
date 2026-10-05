@@ -1,0 +1,93 @@
+{
+  "_fixtureNote": "Derived from a real DD 2.1 run (MLS Grid -> Realtracs, 2026-10-04): the top-level shape, the five level buckets and the lookups entries are verbatim. One fields entry and one expansions entry were ADDED, because that run produced none and field- and expansion-level matching needs covering. Every earlier fixture in this suite used a flat changes array, which is the shape the SERVICE stores rather than the one a run writes - and that mismatch is why a command that demanded changes was not caught before it rejected a real report.",
+  "version": "2.1",
+  "providerUoi": "T00000045",
+  "providerUsi": "50013",
+  "recipientUoi": "M00000574",
+  "generatedOn": "2026-10-05T04:02:17.049Z",
+  "fuzziness": 0.25,
+  "resources": [],
+  "fields": [
+    {
+      "level": "field",
+      "resourceName": "Property",
+      "fieldName": "OKC_SoilType",
+      "suggestions": [],
+      "enforcement": "must-fix"
+    }
+  ],
+  "lookups": [
+    {
+      "level": "lookup",
+      "resourceName": "Property",
+      "fieldName": "ConstructionMaterials",
+      "lookupValue": "Hardboard Siding",
+      "suggestions": [
+        {
+          "suggestedResourceName": "Property",
+          "suggestedFieldName": "ConstructionMaterials",
+          "suggestedLookupValue": "Masonite",
+          "strategy": "Fast Track",
+          "ddWikiUrl": "https://dd.reso.org/DD2.1/lookups/ConstructionMaterials/Masonite/"
+        }
+      ],
+      "enforcement": "must-fix"
+    },
+    {
+      "level": "lookup",
+      "resourceName": "Property",
+      "fieldName": "LeaseTerm",
+      "lookupValue": "Months - 3",
+      "suggestions": [
+        {
+          "suggestedLookupValue": "3 Months",
+          "ddWikiUrl": "https://dd.reso.org/DD2.1/lookups/LeaseTerm/3%20Months/",
+          "distance": 2,
+          "maxDistance": 2,
+          "strategy": "Edit Distance"
+        },
+        {
+          "suggestedLookupValue": "9 Months",
+          "ddWikiUrl": "https://dd.reso.org/DD2.1/lookups/LeaseTerm/9%20Months/",
+          "distance": 2,
+          "maxDistance": 2,
+          "strategy": "Edit Distance"
+        }
+      ],
+      "enforcement": "must-fix"
+    },
+    {
+      "level": "lookup",
+      "resourceName": "Property",
+      "fieldName": "LeaseTerm",
+      "lookupValue": "Months - 4",
+      "suggestions": [
+        {
+          "suggestedLookupValue": "3 Months",
+          "ddWikiUrl": "https://dd.reso.org/DD2.1/lookups/LeaseTerm/3%20Months/",
+          "distance": 2,
+          "maxDistance": 2,
+          "strategy": "Edit Distance"
+        },
+        {
+          "suggestedLookupValue": "9 Months",
+          "ddWikiUrl": "https://dd.reso.org/DD2.1/lookups/LeaseTerm/9%20Months/",
+          "distance": 2,
+          "maxDistance": 2,
+          "strategy": "Edit Distance"
+        }
+      ],
+      "enforcement": "must-fix"
+    }
+  ],
+  "expansions": [
+    {
+      "level": "expansion",
+      "resourceName": "Property",
+      "fieldName": "RIAR_Description",
+      "suggestions": [],
+      "enforcement": "must-fix"
+    }
+  ],
+  "complexTypes": []
+}

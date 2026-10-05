@@ -36,30 +36,30 @@ export { parseVariationsCsv, type VariationSuggestionItem, type ParsedVariations
 export { parseDecisionsCsv, type DecisionCsvItem, type ParsedDecisionsCsv } from './csv.js';
 
 export {
-  decisionsFromSheet,
-  annotateReportWithComments,
-  variationKeyFor,
-  DECISION_ACTIONS,
-  VARIATION_KEY_SEPARATOR,
-  type Decision,
-  type DecisionAction,
+  applySheetToReport,
+  countEntries,
+  SHEET_ACTIONS,
+  type AppliedRow,
+  type ApplySheetResult,
   type DecisionReport,
   type DecisionSheetRow,
-  type ReportChange,
-  type ReportComment
+  type ReportComment,
+  type SheetAction
 } from './decisions.js';
 
 export {
   submitVariationsReportViaService,
-  saveVariationDecisionsViaService,
   type SubmitVariationsReportInput,
-  type SubmitVariationsReportResult,
-  type SaveVariationDecisionsInput,
-  type SaveVariationDecisionsResult,
-  type AppliedDecision,
-  type StaleDecision,
-  type DeclinedDecision,
-  type LockedDecision
+  type SubmitVariationsReportResult
 } from './submit.js';
 
-export { DEFAULT_DD_VERSION, DEFAULT_FUZZINESS, VARIATIONS_REPORT_FILENAME } from './constants.js';
+export {
+  DEFAULT_DD_VERSION,
+  DEFAULT_FUZZINESS,
+  VARIATIONS_REPORT_FILENAME,
+  VARIATION_LEVEL_KEYS,
+  countBucketedEntries,
+  type LevelBuckets,
+  type ReportEntry,
+  type VariationLevelKey
+} from './constants.js';
