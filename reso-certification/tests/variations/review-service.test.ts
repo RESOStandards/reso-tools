@@ -208,13 +208,29 @@ describe('listMyEndorsementsViaService', () => {
     const [url, opts] = fetchMock.mock.calls[0];
     expect(url).toBe('https://services.example.org/v2/certification/endorsements/me');
     expect(opts.headers.Authorization).toBe('Bearer tok');
-    expect(got).toEqual(rows);
+    expect(got.endorsements).toEqual(rows);
+  });
+
+  it('carries the caller own organization when the service reports it', async () => {
+    // The only thing on this route that survives an empty list, and the only way a caller can learn
+    // its own organization: the bearer token is an opaque row key and no route echoes the auth context.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse({ endorsements: [], providerUoi: 'T00000012' })));
+    await expect(listMyEndorsementsViaService({ bearerToken: 'tok' })).resolves.toEqual({
+      endorsements: [],
+      providerUoi: 'T00000012'
+    });
+  });
+
+  it('omits the organization rather than inventing one, against a service that does not report it', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse({ endorsements: [] })));
+    const got = await listMyEndorsementsViaService({ bearerToken: 'tok' });
+    expect(got.providerUoi).toBeUndefined();
   });
 
   it('an empty endorsements array is an empty result, not an error', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse({ endorsements: [] })));
 
-    await expect(listMyEndorsementsViaService({ bearerToken: 'tok' })).resolves.toEqual([]);
+    await expect(listMyEndorsementsViaService({ bearerToken: 'tok' })).resolves.toEqual({ endorsements: [] });
   });
 
   it.each([401, 403])('throws AUTH_REJECTED on %s', async status => {
