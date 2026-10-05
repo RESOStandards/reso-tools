@@ -1,3 +1,4 @@
+import { ensureHttps } from '../sdk/common.js';
 /**
  * CLI auth resolution chain: flags > config entry > .env file > env vars.
  */
@@ -55,7 +56,9 @@ export const loadDotEnv = (searchPaths?: ReadonlyArray<string>): void => {
  * token (variations service, future provider-services endpoints, etc.).
  */
 export const mintOAuth2ClientCredentialsToken = async (): Promise<string | undefined> => {
-  const tokenUri = process.env.TOKEN_URI;
+  // Credentials travel on this one, so it is never allowed to be plain HTTP.
+  const tokenUriRaw = process.env.TOKEN_URI;
+  const tokenUri = tokenUriRaw ? ensureHttps(tokenUriRaw, 'TOKEN_URI') : undefined;
   const clientId = process.env.CLIENT_ID;
   const clientSecret = process.env.CLIENT_SECRET;
   if (!tokenUri || !clientId || !clientSecret) return undefined;
