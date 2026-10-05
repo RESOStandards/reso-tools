@@ -14,7 +14,8 @@
  */
 
 import { resolve } from 'node:path';
-import { normalizeDDVersion } from '../sdk/dd-versions.js';
+import { CURRENT_DD_VERSION, normalizeDDVersion } from '../sdk/dd-versions.js';
+import type { DDVersion } from '../sdk/dd-versions.js';
 
 // @ts-expect-error — legacy CJS
 import certUtilsCommon from '../legacy/common.js';
@@ -37,7 +38,7 @@ const { REPLICATION_STRATEGIES } = certUtilsReplicationUtils as {
 /** The four accepted replication strategies, sourced from the legacy engine (never hardcoded). */
 export const REPLICATION_STRATEGY_VALUES: ReadonlyArray<string> = Object.values(REPLICATION_STRATEGIES);
 
-const DEFAULT_DD_VERSION = '2.0';
+const DEFAULT_DD_VERSION: DDVersion = CURRENT_DD_VERSION;
 
 export interface ReplicationStats {
   readonly totalRecordsFetched: number;
