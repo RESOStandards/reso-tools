@@ -135,6 +135,156 @@ describe('createPipeline', () => {
     expect(result.steps).toHaveLength(2);
   });
 
+  it('shows a finalizer the step that THREW, not just steps that returned a failure', async () => {
+    // A report written from inside the pipeline can only be as truthful as what the finalizer can
+    // see. The pipeline's own status is not computed until after the step loop, so a finalizer
+    // derives its verdict from ctx.pipelineSteps — and the catch path used to push the failed step
+    // into stepResults without refreshing the context, leaving the finalizer looking at a stale
+    // array in which nothing had failed. A DD report written on that path claimed compliance.
+    const seen: Array<Array<[string, string]>> = [];
+    const writeReports: PipelineStep = {
+      name: 'write-reports',
+      alwaysRun: true,
+      run: async (ctx) => {
+        const steps = (ctx.pipelineSteps as ReadonlyArray<{ name: string; status: string }>) ?? [];
+        seen.push(steps.map(s => [s.name, s.status]));
+        return { context: ctx };
+      },
+    };
+    const throwingStep: PipelineStep = {
+      name: 'validate',
+      run: async () => {
+        throw new Error('metadata fetch exploded');
+      },
+    };
+
+    const result = await createPipeline('test', [makeStep('step-1'), throwingStep, writeReports]).run({});
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toContainEqual(['validate', 'failed']);
+    // And the pipeline's own verdict is unchanged by the fix.
+    expect(result.status).toBe('failed');
+  });
+
+  it('preserves accumulated context when a step throws, replacing only pipelineSteps', async () => {
+    // The catch path has no output.context to spread — the step threw before returning one — so the
+    // refresh must build on the context already accumulated. Losing it would break every later step
+    // and finalizer across all four endorsements, not just the report verdict.
+    let finalizerCtx: Record<string, unknown> = {};
+    const writeReports: PipelineStep = {
+      name: 'write-reports',
+      alwaysRun: true,
+      run: async (ctx) => {
+        finalizerCtx = { ...ctx };
+        return { context: ctx };
+      },
+    };
+    const throwingStep: PipelineStep = {
+      name: 'validate',
+      run: async () => {
+        throw new Error('boom');
+      },
+    };
+
+    await createPipeline('test', [makeStep('step-1'), makeStep('step-2'), throwingStep, writeReports]).run({
+      seeded: 'value',
+    });
+
+    expect(finalizerCtx.seeded).toBe('value');
+    expect(finalizerCtx['step-1_ran']).toBe(true);
+    expect(finalizerCtx['step-2_ran']).toBe(true);
+  });
+
+  it('shows a finalizer every declared step, with the unrun ones marked skipped', async () => {
+    // A report written from inside the pipeline is only as complete as ctx.pipelineSteps. Before this,
+    // the context carried just the steps that had finished, so a report written by an alwaysRun
+    // finalizer silently omitted the steps failFast skipped — a reader could not tell replication had
+    // been skipped rather than passed. The pipeline appends those as 'skipped' only AFTER the loop,
+    // which is too late for the finalizer that is writing the artifact.
+    const seen: Array<Array<[string, string]>> = [];
+    const writeReports: PipelineStep = {
+      name: 'write-reports',
+      alwaysRun: true,
+      run: async (ctx) => {
+        const steps = (ctx.pipelineSteps as ReadonlyArray<{ name: string; status: string }>) ?? [];
+        seen.push(steps.map((s) => [s.name, s.status]));
+        return { context: ctx };
+      },
+    };
+
+    await createPipeline('test', [
+      makeStep('step-1'),
+      makeStep('step-2', { status: 'failed' }),
+      makeStep('step-3'),
+      writeReports,
+    ]).run({});
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toEqual([
+      ['step-1', 'passed'],
+      ['step-2', 'failed'],
+      ['step-3', 'skipped'],
+    ]);
+  });
+
+  it('does not seed an alwaysRun step as skipped, since one is never skipped', async () => {
+    // Seeding the finalizer itself would make the report describe itself as skipped while it runs,
+    // which is a false statement rather than a missing one. An alwaysRun step appears only once it
+    // has a real result, which it cannot have while it is the thing writing.
+    let seenNames: ReadonlyArray<string> = [];
+    const writeReports: PipelineStep = {
+      name: 'write-reports',
+      alwaysRun: true,
+      run: async (ctx) => {
+        seenNames = ((ctx.pipelineSteps as ReadonlyArray<{ name: string }>) ?? []).map((s) => s.name);
+        return { context: ctx };
+      },
+    };
+    await createPipeline('test', [makeStep('step-1', { status: 'failed' }), makeStep('step-2'), writeReports]).run({});
+    expect(seenNames).not.toContain('write-reports');
+    expect(seenNames).toEqual(['step-1', 'step-2']);
+  });
+
+  it('leaves the RETURNED steps array unchanged — one entry per step, declaration order', async () => {
+    // The invariant the seed must not break: the terminal renders from the returned result, and the
+    // pipeline already appends skipped steps after the loop. A seed that leaked into stepResults would
+    // double-add them.
+    const writeReports: PipelineStep = { name: 'write-reports', alwaysRun: true, run: async (ctx) => ({ context: ctx }) };
+    const result = await createPipeline('test', [
+      makeStep('step-1'),
+      makeStep('step-2', { status: 'failed' }),
+      makeStep('step-3'),
+      writeReports,
+    ]).run({});
+
+    expect(result.steps.map((s) => [s.name, s.status])).toEqual([
+      ['step-1', 'passed'],
+      ['step-2', 'failed'],
+      ['step-3', 'skipped'],
+      ['write-reports', 'passed'],
+    ]);
+    expect(result.steps).toHaveLength(4);
+    expect(new Set(result.steps.map((s) => s.name)).size).toBe(4);
+  });
+
+  it('is invisible on a clean run — every step carries its real result', async () => {
+    const seen: Array<Array<[string, string]>> = [];
+    const writeReports: PipelineStep = {
+      name: 'write-reports',
+      alwaysRun: true,
+      run: async (ctx) => {
+        const steps = (ctx.pipelineSteps as ReadonlyArray<{ name: string; status: string }>) ?? [];
+        seen.push(steps.map((s) => [s.name, s.status]));
+        return { context: ctx };
+      },
+    };
+    await createPipeline('test', [makeStep('step-1'), makeStep('step-2'), writeReports]).run({});
+    expect(seen[0]).toEqual([
+      ['step-1', 'passed'],
+      ['step-2', 'passed'],
+    ]);
+  });
+
   it('continues after failure when failFast is false', async () => {
     const pipeline = createPipeline('test', [
       makeStep('step-1'),
