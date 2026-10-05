@@ -42,6 +42,15 @@ export interface LookupResourceDump {
 // ── Fetch ──
 
 /**
+ * What distinguishes one Lookup record from another, for detecting a server whose cursor is not
+ * moving. `LookupKey` is a required field on this resource, so it is the identity whenever it is
+ * present. The serialized record is the fallback, so a provider that omits the field is still
+ * covered rather than silently exempt from the check.
+ */
+const lookupRecordIdentity = (record: RawLookupRecord): string =>
+  typeof record.LookupKey === 'string' && record.LookupKey.length > 0 ? `k:${record.LookupKey}` : `r:${JSON.stringify(record)}`;
+
+/**
  * Fetch every Lookup record from the server.
  *
  * Replication is `$top`/`$skip`, which is what the Data Dictionary rules prescribe for this
@@ -65,6 +74,7 @@ export const fetchLookupResource = async (
   requester?: ODataRequester
 ): Promise<ReadonlyArray<RawLookupRecord> | undefined> => {
   const allRecords: RawLookupRecord[] = [];
+  const seen = new Set<string>();
 
   for await (const page of replicationIterator({
     serviceRootUri: serverUrl,
@@ -90,8 +100,35 @@ export const fetchLookupResource = async (
       throw err;
     }
 
-    allRecords.push(...(page.records as ReadonlyArray<RawLookupRecord>));
-    if (page.records.length > 0) onProgress?.(allRecords.length);
+    const records = page.records as ReadonlyArray<RawLookupRecord>;
+
+    // A server that ignores `$skip` serves the same rows at every cursor position. Because those
+    // pages are never empty, the walk's only termination condition never fires, so it would run
+    // forever on growing memory. The iterator cannot catch this — the URLs it builds differ each
+    // time, so nothing about the request shape looks wrong — and it has no business inspecting
+    // record contents. The caller does, so the guard lives here.
+    //
+    // A page that carries rows and yet contributes nothing new means the cursor is not moving.
+    // Partial overlap still contributes something, so a server that merely repeats a boundary
+    // record does not trip this.
+    const fresh = records.filter(record => !seen.has(lookupRecordIdentity(record)));
+    for (const record of records) seen.add(lookupRecordIdentity(record));
+
+    if (records.length > 0 && fresh.length === 0) {
+      const err = new Error(
+        `Lookup Resource returned ${records.length} record(s) that had all been served already, so the server is not honoring $skip. Stopping rather than replicating the same page indefinitely.`
+      );
+      (err as unknown as Record<string, unknown>).requestDetails = {
+        method: 'GET',
+        url: page.requestUrl,
+        status: page.status,
+        responseBody: `${allRecords.length} record(s) fetched before the repeat`
+      };
+      throw err;
+    }
+
+    allRecords.push(...records);
+    if (records.length > 0) onProgress?.(allRecords.length);
   }
 
   return allRecords;
