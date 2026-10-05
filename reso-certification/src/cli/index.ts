@@ -77,10 +77,7 @@ const { version: CLI_VERSION } = createRequire(import.meta.url)('../../package.j
  *  A missing identifier shows as `<name>` rather than being omitted, so the line always has the
  *  same three slots and a gap is visible as a gap. That matches what the output path does, so a
  *  log line and a directory name can be read against each other. */
-const runLabel = (
-  entry: { readonly providerUsi?: string; readonly recipientUoi?: string },
-  providerUoi: string | undefined
-): string => {
+const runLabel = (entry: { readonly providerUsi?: string; readonly recipientUoi?: string }, providerUoi: string | undefined): string => {
   const show = (value: string | undefined, name: string): string => (value?.trim() ? value : `<${name}>`);
   return [
     `ProviderUoi: ${show(providerUoi, 'providerUoi')}`,
