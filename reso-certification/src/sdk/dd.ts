@@ -187,7 +187,7 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
     if (lookupResourceAvailable && rawRecords) {
       // Write raw lookup resource data
       const { serializeLookupResourceDump } = await import('../metadata/lookup-resource.js');
-      const lookupDump = serializeLookupResourceDump(rawRecords);
+      const lookupDump = serializeLookupResourceDump(rawRecords, ctx.version);
       await writeFile(join(ctx.outputPath, 'lookup-resource-lookup-metadata.json'), JSON.stringify(lookupDump, null, 2));
 
       // Pre-merge metadata report (provenance): the base before the Lookup Resource merge.
@@ -574,7 +574,28 @@ const ddReportGenerators = (version: string) => [
   createDetailedReportGenerator('Data Dictionary', version, serializeDDRemarks)
 ];
 
-const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext> => ({
+/**
+ * The verdict for a report written from inside the pipeline.
+ *
+ * `Write reports` is an `alwaysRun` finalizer, and `createPipeline` does not compute its own status
+ * until after the step loop, so this step cannot read it. It has to reach the same conclusion from
+ * the steps recorded so far, and the precedence mirrors `pipeline.ts` exactly: a real failure
+ * outranks an incomplete (deadline-truncated) run, which outranks passed. A skipped step is not a
+ * defect — DD runs failFast, so a skip is either a step after a break or one that did not apply.
+ *
+ * Hardcoding `'passed'` here, as this did until 2026-10-04, made every DD report assert compliance.
+ * The CDL DD 2.1 run carried `outcome: "passed"` and "Data Dictionary compliance test passed." in
+ * the same document as the failed `Validate DD metadata` step that produced two conformance errors.
+ */
+const deriveStatus = (steps: ReadonlyArray<StepResult>): 'passed' | 'failed' | 'incomplete' =>
+  steps.some(s => s.status === 'failed') ? 'failed' : steps.some(s => s.status === 'incomplete') ? 'incomplete' : 'passed';
+
+/**
+ * Exported so the report's verdict can be tested against the steps it reports on. `createPipeline`
+ * returns only `{ run }`, so a test cannot otherwise reach this step, and the verdict is decided
+ * here rather than in the generators.
+ */
+export const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Write reports',
   // DD runs with failFast: true, so an earlier step failure (e.g.,
   // variations detected) breaks the pipeline. Without alwaysRun, Write
@@ -585,12 +606,18 @@ const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext> => ({
   alwaysRun: true,
   run: async (ctx, onProgress) => {
     const generators = ddReportGenerators(config.version);
+    const steps = (ctx.pipelineSteps as ReadonlyArray<StepResult>) ?? [];
     const pipelineResult = {
-      status: 'passed' as const,
+      status: deriveStatus(steps),
       endorsement: 'dd',
-      steps: (ctx.pipelineSteps as ReadonlyArray<StepResult>) ?? [],
+      steps,
       context: ctx,
-      duration: 0
+      // Summed from the recorded steps for the same reason the status is derived: the pipeline's own
+      // wall clock is not available to a finalizer. DD steps run in sequence, so the sum tracks wall
+      // clock closely, short by the between-step overhead and by this step's own time, which is not
+      // recorded until after it returns. `pipelineSteps` arrives through an unchecked cast, so a
+      // missing number is coerced rather than allowed to turn the total into NaN.
+      duration: steps.reduce((total, s) => total + (s.duration ?? 0), 0)
     };
     const written = await writeReports(pipelineResult, generators, ctx.outputPath, onProgress);
     return {

@@ -107,7 +107,7 @@ export const fetchLookupResource = async (
 /**
  * Serialize raw Lookup records to the dump format (matches Commander output).
  */
-export const serializeLookupResourceDump = (records: ReadonlyArray<RawLookupRecord>, version = '1.7'): LookupResourceDump => ({
+export const serializeLookupResourceDump = (records: ReadonlyArray<RawLookupRecord>, version: string): LookupResourceDump => ({
   description: 'Data Dictionary Lookup Resource Metadata',
   version,
   generatedOn: new Date().toISOString(),

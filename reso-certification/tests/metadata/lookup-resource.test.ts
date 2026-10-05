@@ -178,4 +178,14 @@ describe('serializeLookupResourceDump', () => {
     expect(dump.lookups).toHaveLength(3);
     expect(dump.lookups[0].LookupName).toBe('StandardStatus');
   });
+
+  // `version` carried a default of '1.7', and the DD pipeline's caller passed only `records`, so every
+  // run stamped the dump "1.7" regardless of the DD version under test — observed 2026-10-04 on two
+  // DD 2.1 runs whose every other artifact said 2.1. The default is now gone, which makes omitting the
+  // argument a compile error rather than a silently wrong label; that type signature is the real control,
+  // since no runtime test can observe a caller that does not exist in the test. These cases guard the
+  // field mapping against a reintroduced default by asserting a version that is NOT the old one.
+  it.each(['2.0', '2.1'])('stamps the version it is handed rather than a default — %s', (version) => {
+    expect(serializeLookupResourceDump(lookupRecords, version).version).toBe(version);
+  });
 });
