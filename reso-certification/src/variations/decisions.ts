@@ -75,10 +75,26 @@ export interface ReportChange {
   readonly [key: string]: unknown;
 }
 
-/** A comment in a variations conversation thread, as the report and the review UI carry it. */
+/**
+ * A comment in a variations conversation thread: what was said, when, and who may read it.
+ *
+ * `from` IS ABSENT and is filled from the auth context. Josh, 2026-10-04: "there's no comment
+ * attribution, it comes from the submitter", and "it's from Admin targeted at providerUoi". Which is
+ * also the only shape a client could honestly produce: the caller's identity is columns on the token
+ * row -- `providerUoi`, `username`, `email`, `isAdmin` -- read by the Lambda authorizer and handed to
+ * the handler in the request context. The bearer token is an opaque key, not a JWT with claims to
+ * read, so a client asserting a `from` would be asserting what it cannot know.
+ *
+ * `to` IS REQUIRED, and it is not a label. Josh: "the provider here controls who can see it - the
+ * to", and "that means anyone who has an account at providerUoi sees it." It is the comment's
+ * VISIBILITY SCOPE, so it is read off the report's own `providerUoi` -- a fact about the report, not
+ * a claim about the caller -- and an absent one is a refusal rather than an empty string. An empty
+ * `to` is not "addressed to nobody": it is a scope nothing defines, on a field that decides who
+ * reads an administrator's remarks about a provider's data.
+ */
 export interface ReportComment {
   readonly timestamp: string;
-  readonly from: string;
+  /** The organization that may read this. Anyone with an account there sees it. */
   readonly to: string;
   readonly message: string;
 }
@@ -88,13 +104,6 @@ export interface DecisionReport {
   readonly providerUoi?: string;
   readonly changes: ReadonlyArray<ReportChange>;
   readonly [key: string]: unknown;
-}
-
-/** Who is acting. `providerUoi` is the commenter's own organization, which becomes the comment's `from`. */
-export interface DecisionActor {
-  readonly providerUoi: string;
-  readonly username?: string;
-  readonly displayName?: string;
 }
 
 /** One decision as `save-variation-decisions` ingests it. */
@@ -213,15 +222,28 @@ export interface AnnotateResult {
  * `now` is a parameter rather than read from the clock, so the output is a function of its inputs and a
  * test can assert the whole report. The original is never mutated: a new report is returned and the
  * caller decides whether to save it.
+ *
+ * No actor is taken: `from` is filled from the auth context, and `to` is the report's own
+ * `providerUoi`, which scopes who may read the comment. See `ReportComment`.
  */
-export const annotateReportWithComments = (
-  report: DecisionReport,
-  rows: ReadonlyArray<DecisionSheetRow>,
-  actor: DecisionActor,
-  now: string
-): AnnotateResult => {
+export const annotateReportWithComments = (report: DecisionReport, rows: ReadonlyArray<DecisionSheetRow>, now: string): AnnotateResult => {
   const withComments = rows.filter(r => typeof r.comment === 'string' && r.comment.length > 0);
   if (withComments.length === 0) return { report, changed: false, errors: [] };
+
+  // `to` scopes who can read the comment, so it is established or nothing is written. Defaulting it
+  // would not produce an unaddressed comment, it would produce one whose readership is undefined --
+  // and this is the field that decides whether a provider's people can see what an administrator
+  // said about their data.
+  const to = report.providerUoi;
+  if (!to) {
+    return {
+      report,
+      changed: false,
+      errors: [
+        'The report carries no providerUoi, so there is no organization to address these comments to. A comment is visible to everyone with an account at the organization it names, and that scope is not inferred.'
+      ]
+    };
+  }
 
   const errors: string[] = [];
   // Keyed by index into `changes`, so two rows commenting on one change both land, in row order.
@@ -248,12 +270,7 @@ export const annotateReportWithComments = (
     }
 
     const bucket = additions.get(indices[0]) ?? [];
-    bucket.push({
-      timestamp: now,
-      from: actor.providerUoi,
-      to: report.providerUoi ?? '',
-      message: row.comment as string
-    });
+    bucket.push({ timestamp: now, to, message: row.comment as string });
     additions.set(indices[0], bucket);
   }
 

@@ -17,13 +17,12 @@
  */
 
 import { annotateReportWithComments, decisionsFromSheet } from '../variations/decisions.js';
-import type { Decision, DecisionActor, DecisionReport, DecisionSheetRow } from '../variations/decisions.js';
+import type { Decision, DecisionReport, DecisionSheetRow } from '../variations/decisions.js';
 import type { SaveVariationDecisionsResult } from '../variations/submit.js';
 
 export interface PlanDecisionPushInput {
   readonly report: DecisionReport;
   readonly rows: ReadonlyArray<DecisionSheetRow>;
-  readonly actor: DecisionActor;
   /** Passed in, not read from the clock, so a plan is a function of its inputs. */
   readonly now: string;
   /** Save the report even when no row carries a comment — the explicit "open the review" case. */
@@ -49,23 +48,14 @@ export interface DecisionPushPlan {
 
 /** Build the two requests from a sheet, or the reasons the sheet cannot produce them. */
 export const planDecisionPush = (input: PlanDecisionPushInput): DecisionPushPlan => {
-  const annotated = annotateReportWithComments(input.report, input.rows, input.actor, input.now);
+  const annotated = annotateReportWithComments(input.report, input.rows, input.now);
   const decided = decisionsFromSheet(input.report, input.rows);
 
   // Both are consulted even when the first has already failed, so one run names every bad row
   // rather than making the operator fix them one request at a time.
   const commentsAdded = input.rows.filter(r => typeof r.comment === 'string' && r.comment.length > 0).length;
 
-  // A comment is attributed to an organization, and that organization has to be NAMED. There is a
-  // plausible-looking value at hand -- the report's own recipient -- and using it would label an
-  // administrator's comment as coming from the MLS whose data is under review, in a thread that MLS
-  // reads. An unattributable comment is refused rather than attributed to whoever is convenient.
-  const attribution =
-    commentsAdded > 0 && !input.actor.providerUoi
-      ? ['A comment needs the organization it comes from. Pass the acting organization explicitly; it is not inferred from the report.']
-      : [];
-
-  const errors = [...attribution, ...annotated.errors, ...decided.errors];
+  const errors = [...annotated.errors, ...decided.errors];
 
   if (errors.length > 0) {
     return { report: input.report, decisions: [], commentsAdded: 0, needsReportSave: false, errors };

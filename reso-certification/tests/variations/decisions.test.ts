@@ -37,7 +37,6 @@ const report = () => ({
 });
 
 const NOW = '2026-10-05T04:30:00.000Z';
-const ADMIN = { username: 'admin-user', displayName: 'Admin User', providerUoi: 'RESO' };
 
 describe('decisionsFromSheet', () => {
   it('derives the variationKey from the matched change, never from the sheet', () => {
@@ -139,30 +138,26 @@ describe('annotateReportWithComments', () => {
     const out = annotateReportWithComments(
       report(),
       [{ resourceName: 'Property', fieldName: 'LeaseTerm', lookupValue: 'Months - 4', action: 'submit-to-ft', comment: 'DD has no 4-month term.' }],
-      ADMIN,
       NOW
     );
     const touched = out.report.changes.filter(c => (c.conversations ?? []).length > 0);
     expect(touched).toHaveLength(1);
     expect(touched[0].lookupValue).toBe('Months - 4');
-    expect(touched[0].conversations?.[0]).toEqual({
-      timestamp: NOW,
-      from: 'RESO',
-      to: 'T00000045',
-      message: 'DD has no 4-month term.'
-    });
+    // No `from`: it is filled from the auth context, and a client cannot know it -- the identity is
+    // columns on the token row, read by the authorizer. `to` IS present, because it scopes who may
+    // read the comment: everyone with an account at that organization.
+    expect(touched[0].conversations?.[0]).toEqual({ timestamp: NOW, to: 'T00000045', message: 'DD has no 4-month term.' });
   });
 
   it('appends to an existing thread rather than replacing it', () => {
     const base = report();
     base.changes[0] = {
       ...base.changes[0],
-      conversations: [{ timestamp: '2026-10-01T00:00:00.000Z', from: 'T00000045', to: 'RESO', message: 'earlier' }]
+      conversations: [{ timestamp: '2026-10-01T00:00:00.000Z', to: 'T00000045', message: 'earlier' }]
     } as never;
     const out = annotateReportWithComments(
       base,
       [{ resourceName: 'Property', fieldName: 'LeaseTerm', lookupValue: 'Months - 4', comment: 'later' }],
-      ADMIN,
       NOW
     );
     const thread = out.report.changes[0].conversations ?? [];
@@ -176,7 +171,6 @@ describe('annotateReportWithComments', () => {
     const out = annotateReportWithComments(
       before,
       [{ resourceName: 'Property', fieldName: 'OKC_SoilType', action: 'ignore' }],
-      ADMIN,
       NOW
     );
     expect(out.changed).toBe(false);
@@ -189,17 +183,28 @@ describe('annotateReportWithComments', () => {
     annotateReportWithComments(
       before,
       [{ resourceName: 'Property', fieldName: 'OKC_SoilType', comment: 'note' }],
-      ADMIN,
       NOW
     );
     expect(JSON.stringify(before)).toBe(snapshot);
+  });
+
+  it('refuses every comment when the report names no organization to address them to', () => {
+    // `to` decides who sees the comment: anyone with an account at that organization. An absent one
+    // is not "addressed to nobody", it is a readership nothing defines, so nothing is written.
+    const { providerUoi, ...withoutProvider } = report();
+    const out = annotateReportWithComments(
+      withoutProvider as never,
+      [{ resourceName: 'Property', fieldName: 'OKC_SoilType', comment: 'a note' }],
+      NOW
+    );
+    expect(out.changed).toBe(false);
+    expect(out.errors[0]).toMatch(/no organization to address/i);
   });
 
   it('reports a comment row that matches no change instead of dropping it', () => {
     const out = annotateReportWithComments(
       report(),
       [{ resourceName: 'Property', fieldName: 'NotThere', comment: 'orphan' }],
-      ADMIN,
       NOW
     );
     expect(out.errors).toHaveLength(1);
@@ -208,8 +213,8 @@ describe('annotateReportWithComments', () => {
   });
 
   it('takes the timestamp as an argument so the output is deterministic', () => {
-    const a = annotateReportWithComments(report(), [{ resourceName: 'Property', fieldName: 'OKC_SoilType', comment: 'x' }], ADMIN, NOW);
-    const b = annotateReportWithComments(report(), [{ resourceName: 'Property', fieldName: 'OKC_SoilType', comment: 'x' }], ADMIN, NOW);
+    const a = annotateReportWithComments(report(), [{ resourceName: 'Property', fieldName: 'OKC_SoilType', comment: 'x' }], NOW);
+    const b = annotateReportWithComments(report(), [{ resourceName: 'Property', fieldName: 'OKC_SoilType', comment: 'x' }], NOW);
     expect(JSON.stringify(a.report)).toBe(JSON.stringify(b.report));
   });
 });
