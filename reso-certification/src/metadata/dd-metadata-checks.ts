@@ -532,10 +532,32 @@ export const checkLookupNameAnnotations = (report: MetadataReport, reference: Dd
 };
 
 /**
+ * The served types for which CSDL defines each facet (OData 4.01 CSDL, type facets): `MaxLength` on
+ * Binary, Stream and String; `Precision` on DateTimeOffset, Decimal, Duration and TimeOfDay; `Scale`
+ * on Decimal alone. Enum and complex types define none of the three, so any type outside these sets —
+ * including every `Edm.IntX` and every named enum — carries no facet to compare.
+ */
+const MAX_LENGTH_FACET_TYPES: ReadonlySet<string> = new Set(['Edm.String', 'Edm.Binary', 'Edm.Stream']);
+const PRECISION_FACET_TYPES: ReadonlySet<string> = new Set(['Edm.DateTimeOffset', 'Edm.Decimal', 'Edm.Duration', 'Edm.TimeOfDay']);
+const SCALE_FACET_TYPES: ReadonlySet<string> = new Set(['Edm.Decimal']);
+
+/**
  * Suggested-max checks (SHOULD): the DD's maxLength / precision / scale are recommendations, not
  * requirements, so a provider value that differs from the suggested maximum yields a WARNING, not a
  * gate failure — matching the Commander, which only logs these. Only fields the provider declares
- * are checked, and only the attributes the DD actually suggests for each field.
+ * are checked, only the attributes the DD actually suggests for each field, and only the facets the
+ * provider's SERVED type can carry.
+ *
+ * That last qualifier is what keys this off `provider.type` rather than the DD's type. A provider
+ * cannot declare a facet its served type does not define, so comparing one asks for something the
+ * type forbids, and the provider is marked down for a value it had no way to supply. It bites
+ * hardest on DD numerics, because DD 2.1 names its columns one position off from CSDL: the DD's
+ * "Suggested Max Length" is the digit width (CSDL `Precision`) and the DD's "Precision" is the count
+ * of decimal places (CSDL `Scale`). A DD scale-0 Decimal is an Integer, which `checkFieldTypes`
+ * REQUIRES be served as `Edm.IntX` — and the DD's width is then satisfied by choosing an Int wide
+ * enough to hold that many digits, not by any facet, since `Edm.IntX` defines none of the three.
+ * Without this gate such a field collects three warnings for obeying the type check. The DD naming
+ * is to be corrected in DD 2.2; keying off the served type is correct under either naming.
  *
  * Commander BDD: `And "X" {precision|scale|length} SHOULD be equal to the RESO Suggested Max ...`
  * (DataDictionary.java {precision|scale|length}SHOULDBeEqualTo... — the only SHOULD/warning checks).
@@ -544,15 +566,31 @@ export const checkSuggestedMaxConstraints = (report: MetadataReport, reference: 
   const providerByKey = new Map(report.fields.map(f => [fieldKey(f.resourceName, f.fieldName), f]));
 
   const attributes = [
-    { name: 'Length', suggested: (f: DdReferenceField) => f.maxLength, actual: (f: MetadataReportField) => f.maxLength },
-    { name: 'Precision', suggested: (f: DdReferenceField) => f.precision, actual: (f: MetadataReportField) => f.precision },
-    { name: 'Scale', suggested: (f: DdReferenceField) => f.scale, actual: (f: MetadataReportField) => f.scale }
+    {
+      name: 'Length',
+      facetTypes: MAX_LENGTH_FACET_TYPES,
+      suggested: (f: DdReferenceField) => f.maxLength,
+      actual: (f: MetadataReportField) => f.maxLength
+    },
+    {
+      name: 'Precision',
+      facetTypes: PRECISION_FACET_TYPES,
+      suggested: (f: DdReferenceField) => f.precision,
+      actual: (f: MetadataReportField) => f.precision
+    },
+    {
+      name: 'Scale',
+      facetTypes: SCALE_FACET_TYPES,
+      suggested: (f: DdReferenceField) => f.scale,
+      actual: (f: MetadataReportField) => f.scale
+    }
   ] as const;
 
   return reference.fields.flatMap(refField => {
     const provider = providerByKey.get(fieldKey(refField.resourceName, refField.fieldName));
     if (!provider) return [];
-    return attributes.flatMap(({ name, suggested, actual }) => {
+    return attributes.flatMap(({ name, facetTypes, suggested, actual }) => {
+      if (!facetTypes.has(provider.type)) return [];
       const want = suggested(refField);
       if (want == null) return [];
       const got = actual(provider);
