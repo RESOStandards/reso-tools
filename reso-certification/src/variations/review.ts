@@ -15,7 +15,7 @@
  * configuration errors carry the shared `code` (see `../sdk/common`).
  */
 
-import { mintProviderToken, serviceError } from '../sdk/common.js';
+import { mintProviderToken, resolveServicesUrl, serviceError } from '../sdk/common.js';
 
 /** One submission of a variation key, as the items route reports it. */
 export interface VariationReviewProvenance {
@@ -113,14 +113,6 @@ const ENDORSEMENTS_ROUTE = '/v2/certification/endorsements';
 const MAX_PAGES = 1000;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
-
-const resolveServicesUrl = (): string => {
-  const servicesUrl = process.env.RESO_SERVICES_URL;
-  if (!servicesUrl) {
-    throw serviceError('SERVICE_ERROR', 'Variations Service: RESO_SERVICES_URL is not set.');
-  }
-  return servicesUrl;
-};
 
 const resolveToken = async (input: ServiceAuthInput, what: string): Promise<string> => {
   const token = input.bearerToken ?? (await mintProviderToken());

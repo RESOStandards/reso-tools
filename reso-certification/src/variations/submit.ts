@@ -24,7 +24,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { lockedError, mintProviderToken, serviceError } from '../sdk/common.js';
+import { lockedError, mintProviderToken, resolveServicesUrl, serviceError } from '../sdk/common.js';
 import type { LockHolderInfo } from '../sdk/common.js';
 import { countBucketedEntries } from './constants.js';
 import type { LevelBuckets } from './constants.js';
@@ -66,12 +66,6 @@ export interface SubmitVariationsReportResult {
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
-
-const resolveServicesUrl = (): string => {
-  const servicesUrl = process.env.RESO_SERVICES_URL;
-  if (!servicesUrl) throw serviceError('SERVICE_ERROR', 'Variations Service: RESO_SERVICES_URL is not set.');
-  return servicesUrl;
-};
 
 /** The two auth fields both write paths carry. Structural, so `resolveToken` serves either input. */
 interface ServiceAuthInput {

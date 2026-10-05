@@ -67,3 +67,66 @@ export const mintProviderToken = async (): Promise<string | undefined> => {
     return undefined;
   }
 };
+
+// ── Service addresses ────────────────────────────────────────────────────────
+
+/**
+ * Make a RESO service address start with `https://`.
+ *
+ * Two problems, one function. Legacy configurations carry a bare host with no scheme --
+ * `services.reso.org` rather than `https://services.reso.org` -- and a bare host concatenated into a
+ * request path produces a relative URL that fails at `fetch` with an error naming neither the
+ * variable nor the value. And an address written as `http://` sends a bearer token, or mints one
+ * from a client secret, in the clear.
+ *
+ * So a missing scheme becomes `https`, and an explicit `http` is UPGRADED rather than refused.
+ * Upgrading is the right call: refusing would fail a run over something nobody can have intended,
+ * since no operator means to send credentials unencrypted. There is no loopback exemption, because
+ * these addresses name RESO services and never a local one -- a local reference server is a
+ * PROVIDER address, which travels on `--url` and is validated separately.
+ *
+ * Any other scheme is a misconfiguration rather than a downgrade, so it is refused and named.
+ * A trailing slash is dropped, since every caller appends a rooted path.
+ */
+export const ensureHttps = (raw: string, variableName = 'URL'): string => {
+  const value = raw.trim();
+  if (!value) throw serviceError('SERVICE_ERROR', `${variableName} is empty.`);
+
+  // A scheme is `name://`, matched with a pattern rather than by parsing: `new URL()` reads
+  // `services.reso.org:8443` as the scheme `services.reso.org:` and would hide the missing scheme.
+  const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value) ? value : `https://${value.replace(/^\/\//, '')}`;
+
+  const parsed = ((): URL | undefined => {
+    try {
+      return new URL(withScheme);
+    } catch {
+      return undefined;
+    }
+  })();
+  if (!parsed) {
+    throw serviceError('SERVICE_ERROR', `${variableName} ${JSON.stringify(raw)} is not a usable address.`);
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw serviceError(
+      'SERVICE_ERROR',
+      `${variableName} ${JSON.stringify(raw)} uses the ${parsed.protocol.replace(':', '')} scheme; an https address is required.`
+    );
+  }
+  parsed.protocol = 'https:';
+
+  return parsed.toString().replace(/\/+$/, '');
+};
+
+/**
+ * The Variations Service base URL from the environment, as https.
+ *
+ * One implementation, because this was resolved in four places with the same two lines and none of
+ * them normalized anything.
+ */
+export const resolveServicesUrl = (): string => {
+  const raw = process.env.RESO_SERVICES_URL;
+  if (!raw || !raw.trim()) {
+    throw serviceError('SERVICE_ERROR', 'Variations Service: RESO_SERVICES_URL is not set.');
+  }
+  return ensureHttps(raw, 'RESO_SERVICES_URL');
+};

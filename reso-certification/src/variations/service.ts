@@ -17,7 +17,7 @@
  */
 
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { isServiceAuthError, mintProviderToken, serviceError } from '../sdk/common.js';
+import { isServiceAuthError, mintProviderToken, resolveServicesUrl, serviceError } from '../sdk/common.js';
 import type { ServiceErrorCode } from '../sdk/common.js';
 import { MAX_COMPUTE_PAYLOAD_BYTES, PAYLOAD_TOO_LARGE_MESSAGE } from './constants.js';
 import type { VariationSuggestionItem } from './csv.js';
@@ -47,10 +47,7 @@ export type VariationsServiceErrorCode = ServiceErrorCode;
 export const isVariationsAuthError = isServiceAuthError;
 
 export const computeVariationsViaService = async (input: ComputeVariationsViaServiceInput): Promise<VariationsServiceReport> => {
-  const servicesUrl = process.env.RESO_SERVICES_URL;
-  if (!servicesUrl) {
-    throw serviceError('SERVICE_ERROR', 'Variations Service: RESO_SERVICES_URL is not set.');
-  }
+  const servicesUrl = resolveServicesUrl();
 
   const token = input.bearerToken ?? (await mintProviderToken());
   if (!token) {
@@ -175,10 +172,7 @@ const hasItemsArray = (value: unknown): value is { readonly items: ReadonlyArray
  * carry `AUTH_REQUIRED` / `AUTH_REJECTED` so the CLI and UI can react.
  */
 export const updateVariationsViaService = async (input: UpdateVariationsViaServiceInput): Promise<UpdateVariationsResult> => {
-  const servicesUrl = process.env.RESO_SERVICES_URL;
-  if (!servicesUrl) {
-    throw serviceError('SERVICE_ERROR', 'Variations Service: RESO_SERVICES_URL is not set.');
-  }
+  const servicesUrl = resolveServicesUrl();
   if (input.adminReview && input.fastTrack) {
     throw serviceError('SERVICE_ERROR', 'A submission cannot be both admin-review and fast-track; the two flags are mutually exclusive.');
   }
