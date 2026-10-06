@@ -107,13 +107,22 @@ export const prepareOutputDir = async (endorsementSlug: string, version: string,
 // ── Report Types ──
 
 /** Base fields shared by all report formats (required by the Cert API). */
-export interface BaseReport {
+export type BaseReport = {
   readonly description: string;
   readonly version: string;
   readonly softwareVersion: string;
   readonly generatedOn: string;
   readonly remarks: string;
-}
+  /**
+   * The run's verdict, machine-readable.
+   *
+   * `report.json` shipped without this, carrying the verdict only inside the English `remarks`
+   * sentence. A consumer had to pattern-match prose to learn whether a run passed, and on a real
+   * failed run that sentence said "passed" — the one signal the file offered was the wrong one.
+   * `report-detailed.json` at least carried a contradictory steps array a reader could catch it on.
+   */
+  readonly outcome: PipelineResult['status'];
+};
 
 /** A report generator produces a report object from pipeline results. */
 export interface ReportGenerator<TContext extends PipelineContext = PipelineContext> {
@@ -198,12 +207,16 @@ export const createGenericReportGenerator = (
 ): ReportGenerator => ({
   name: 'Generic',
   filename: 'report.json',
-  generate: result => ({
+  // Annotated `BaseReport` rather than left to infer. `ReportGenerator.generate` is typed
+  // `Record<string, unknown>`, so a dropped field would otherwise type-check cleanly and the only
+  // control would be a test. With the annotation, removing `outcome` here fails the build.
+  generate: (result): BaseReport => ({
     description,
     version,
     softwareVersion: SOFTWARE_VERSION,
     generatedOn: new Date().toISOString(),
-    remarks: serializeRemarks(result)
+    remarks: serializeRemarks(result),
+    outcome: result.status
   })
 });
 

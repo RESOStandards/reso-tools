@@ -168,8 +168,22 @@ describe('createGenericReportGenerator', () => {
     expect(report.softwareVersion).toBeTruthy();
     expect(report.generatedOn).toBeTruthy();
     expect(report.remarks).toBe('test remarks');
-    // Base fields, including the RESO Tools software version for provenance
-    expect(Object.keys(report)).toEqual(['description', 'version', 'softwareVersion', 'generatedOn', 'remarks']);
+    expect(report.outcome).toBe('passed');
+    // Base fields: the Cert API's required set, plus the RESO Tools software version for provenance
+    // and the run's own verdict.
+    //
+    // Exact equality on purpose. This is a guard against a field arriving in a submitted artifact
+    // without anyone deciding it should — it caught `outcome` being added, which is the behavior
+    // wanted. Adding a key here is a deliberate act, so update this list only alongside a reason.
+    // It asserts what we EMIT; it is not evidence about what the Cert API would reject.
+    expect(Object.keys(report)).toEqual([
+      'description',
+      'version',
+      'softwareVersion',
+      'generatedOn',
+      'remarks',
+      'outcome'
+    ]);
   });
 
   it('has correct filename', () => {
@@ -399,5 +413,56 @@ describe('detailed report: field-preference steering', () => {
   it('omits the key on an ordinary unsteered run', () => {
     expect(generate(undefined)).not.toHaveProperty('fieldPreferences');
     expect(generate({ requested: [], applied: [] })).not.toHaveProperty('fieldPreferences');
+  });
+});
+
+/**
+ * `report.json` must state its own verdict.
+ *
+ * Observed on a real DD 2.1 run (2026-10-04): `report.json`'s keys were exactly
+ * `['description','generatedOn','remarks','softwareVersion','version']` — no verdict field at all.
+ * Its sibling `report-detailed.json` carried `outcome` AND a contradictory `steps` array, so a
+ * careful reader of that file could catch a wrong headline. A reader of `report.json` could not:
+ * the English remarks sentence was the only verdict signal, and on a failed run it said "passed".
+ *
+ * There is no compile-time control available here. `BaseReport` is documentation — nothing
+ * implements it — and `ReportGenerator.generate` returns `Record<string, unknown>`, so a generator
+ * that drops the field type-checks cleanly. These tests are the only thing standing between the
+ * field and a silent regression, which is why they assert per endorsement rather than once.
+ */
+describe('report.json carries its own outcome', () => {
+  const generic = (gens: ReadonlyArray<{ filename: string; generate: (r: PipelineResult) => Record<string, unknown> }>) =>
+    gens.find(g => g.filename === 'report.json');
+
+  const SETS: ReadonlyArray<readonly [string, ReadonlyArray<{ filename: string; generate: (r: PipelineResult) => Record<string, unknown> }>]> = [
+    ['Add/Edit', addEditReportGenerators('1.0.0')],
+    ['EntityEvent', entityEventReportGenerators('1.0.0')],
+    ['Core', coreReportGenerators('2.1.0')],
+  ];
+
+  it.each(['passed', 'failed', 'incomplete'] as const)('states outcome %s, not only in prose', status => {
+    const gen = createGenericReportGenerator('Data Dictionary', '2.1', () => `Data Dictionary compliance test ${status}.`);
+    const report = gen.generate(makeResult({ status }));
+    expect(report.outcome).toBe(status);
+  });
+
+  // The fix lives in the ONE shared generator, so every endorsement that uses it inherits the field.
+  // Asserting that per endorsement rather than trusting the wiring: the call sites were miscounted
+  // twice while diagnosing this, once too few and once too many.
+  it.each(SETS)('%s emits report.json with an outcome', (_label, gens) => {
+    const gen = generic(gens);
+    expect(gen).toBeDefined();
+    const report = gen!.generate(makeResult({ status: 'failed' }));
+    expect(report.outcome).toBe('failed');
+  });
+
+  it('never lets report.json disagree with report-detailed.json', () => {
+    // The two files are generated independently from the same result. A reader comparing them must
+    // never find two different verdicts, which is the precise failure the DD run exhibited.
+    const remarks = () => 'Web API Server Core compliance test failed.';
+    const result = makeResult({ status: 'failed' });
+    const summary = createGenericReportGenerator('Web API Server Core', '2.1.0', remarks).generate(result);
+    const detailed = createDetailedReportGenerator('Web API Server Core', '2.1.0', remarks).generate(result);
+    expect(summary.outcome).toBe(detailed.outcome);
   });
 });
