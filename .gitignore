@@ -53,6 +53,12 @@ upi-validation-report.json
 # Local MCP server config (may contain bearer tokens)
 .mcp.json
 
+# A filled-in certification config carries a live bearer token. The samples under
+# reso-certification/sample-configs/ are tracked, and the README used to say to edit one in place
+# and run it, which walks an implementer into committing a credential. The documented path is now
+# to copy a sample to this name, which git will not take.
+*.local.json
+
 # pack:all output — tarballs for linking into reso-tools-private (never committed)
 .packs/
 
