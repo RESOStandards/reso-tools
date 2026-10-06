@@ -50,12 +50,28 @@ jobs:
 
       - name: Build shared libraries
         run: |
-          cd reso-validation && npx tsc && cd ..
-          cd odata-expression-parser && npx tsc && cd ..
-          cd reso-client && npx tsc && cd ..
-          cd reso-reference-server && npx tsc && cd ..
-          cd reso-certification && npx tsc && rm -rf dist/legacy dist/etl && cp -r src/legacy dist/legacy && cp -r src/etl dist/etl && cd ..
-          cd reso-mcp-server && npx tsc && cd ..
+          # Topological order. A package can only build after every @reso-standards
+          # package it imports, because tsc resolves those through the dist the
+          # dependency's package.json points at, and the workspace symlink does not
+          # create that dist.
+          #
+          # reso-metadata-utils and reso-common were missing from this list entirely.
+          # They have no internal dependencies, so nothing else built them, and
+          # reso-client imports reso-metadata-utils: the result was TS2307 "Cannot
+          # find module '@reso-standards/reso-metadata-utils'" on five reso-client
+          # files, and every later implicit-any error cascaded from that one
+          # unresolved module. It passed locally only because a developer's dist
+          # already existed from an earlier build.
+          #
+          # Subshells rather than `cd X && npx tsc && cd ..`: a failing tsc
+          # short-circuits before the trailing cd, so every later line ran from the
+          # wrong directory and reported a missing path instead of the real failure.
+          # That is what hid the cause above.
+          for dir in reso-metadata-utils reso-common reso-validation odata-expression-parser reso-client reso-reference-server; do
+            (cd "$dir" && npx tsc)
+          done
+          (cd reso-certification && npx tsc && rm -rf dist/legacy dist/etl && cp -r src/legacy dist/legacy && cp -r src/etl dist/etl)
+          (cd reso-mcp-server && npx tsc)
 
       - name: Run all tests
         run: npm test
