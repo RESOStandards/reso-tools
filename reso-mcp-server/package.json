@@ -1,7 +1,7 @@
 {
   "name": "@reso-standards/reso-mcp-server",
   "version": "0.8.0",
-  "description": "RESO MCP server — exposes OData query, validation, certification, and metadata tools for AI agents",
+  "description": "RESO MCP server \u2014 exposes OData query, validation, certification, and metadata tools for AI agents",
   "type": "module",
   "engines": {
     "node": ">=22.0.0"
@@ -12,7 +12,7 @@
     "reso-mcp": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"require('fs').chmodSync('dist/index.js', 0o755)\"",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",

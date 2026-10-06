@@ -34,7 +34,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc && rm -rf dist/legacy dist/etl && cp -r src/legacy dist/legacy && cp -r src/etl dist/etl",
+    "build": "tsc && rm -rf dist/legacy dist/etl && cp -r src/legacy dist/legacy && cp -r src/etl dist/etl && node -e \"require('fs').chmodSync('dist/cli/index.js', 0o755)\"",
     "prepublishOnly": "npm run build",
     "dev": "tsc --watch",
     "test": "vitest run",
