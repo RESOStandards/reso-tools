@@ -37,13 +37,17 @@ echo ""
 
 # Run JSON-RPC requests through the MCP server, capture all responses
 echo "Running MCP smoke test..."
+# Invoked relative to the image's WORKDIR, which is the package root. It was an
+# absolute /app/... path, which broke when the images moved to building the whole
+# workspace and the package stopped being the filesystem root of the image. A
+# relative path survives the next relocation too.
 RESULT=$({
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"1.0"}}}'
   printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
   printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"metadata\",\"arguments\":{\"url\":\"$SERVER_URL\",\"authToken\":\"$AUTH_TOKEN\"}}}"
   printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"query\",\"arguments\":{\"url\":\"$SERVER_URL\",\"resource\":\"Property\",\"authToken\":\"$AUTH_TOKEN\",\"top\":1,\"select\":\"ListingKey\"}}}"
   printf '%s\n' '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"parse-filter","arguments":{"filter":"ListPrice gt 200000"}}}'
-} | node /app/dist/index.js 2>&1)
+} | node dist/index.js 2>&1)
 
 # Verify each expected response is present in the output. Each MCP response is
 # a single JSON line; we extract by id then check for required content/no error.

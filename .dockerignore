@@ -1,3 +1,68 @@
+# Build context exclusions.
+#
+# This file is a sibling of .gitignore, not a copy of it. .gitignore keeps things out of
+# the repository; this keeps them out of the image. The two lists overlap because the
+# same artifacts are unwanted in both, and the consequence here is worse: a build context
+# is sent to the daemon and anything in it can be baked into a published layer.
+#
+# A local certification run writes its output under the package directory. Before this
+# file covered it, a developer's own run output entered the context and the image: 2.0 GB
+# of report data carrying provider endpoints, identifiers and payloads. Continuous
+# integration never saw it, because it builds from a clean checkout, so the only machine
+# that could notice was one with real run data on it. Provider data is excluded here by
+# default, and a new output path is added to this list at the same time it is added to
+# .gitignore.
+
+# Dependencies and build output — rebuilt inside the image
 **/node_modules
 **/dist
+**/coverage
+
+# Version control and editor state
 **/.git
+**/.gitignore
+.vscode
+**/.DS_Store
+
+# Certification run output — carries provider endpoints, identifiers and payloads
+**/out
+**/.reso-cert
+**/reso-replication-output
+**/vendor-logs
+**/data-availability*.json
+**/metadata-report*.json
+**/data-dictionary*.json
+**/schema-validation-report.json
+**/upi-validation-report.json
+**/reso-variations.json
+**/compliance-results.zip
+**/*.resoscript
+
+# Run logs — every query URL, so every provider endpoint
+**/*.log
+
+# Credentials and local configuration
+**/.env
+**/.env.*
+**/*.env
+**/.mcp.json
+
+# Local databases
+**/*.db
+**/*.db-shm
+**/*.db-wal
+
+# Local tooling state
+**/.packs
+**/__pycache__
+**/*.pyc
+reso-certification/.venv-dd-lint
+
+# Working notes that are not part of any image
+PLAN.md
+PR.md
+**/results.*
+lefthook-local.yml
+
+# Sample fixtures are intentional and tracked, so the patterns above must not take them
+!sample-reports
