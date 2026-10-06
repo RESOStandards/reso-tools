@@ -195,8 +195,8 @@ report. This is the first cert step and the one that gates the rest — if the m
 is invalid nothing downstream is meaningful.
 
 ```bash
-reso-cert metadata -m $metadata.xml -v 2.0 --output-dir ./out
-cat $metadata.xml | reso-cert metadata -m - --no-report      # validate only, from stdin
+reso-cert metadata -m metadata.xml --dd-version 2.0 --output-dir ./out
+cat metadata.xml | reso-cert metadata -m - --no-report       # validate only, from stdin
 ```
 
 `-m, --metadata <path>` (required; `-` for stdin) · `--dd-version <ddVersion>`

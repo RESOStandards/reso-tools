@@ -1,4 +1,4 @@
-# @reso-standards/validation
+# @reso-standards/reso-validation
 
 Isomorphic TypeScript validation library for RESO Data Dictionary records. Validates field types, lengths and ranges against metadata, plus resource-specific business rules with cross-field constraints. Zero external dependencies.
 
@@ -21,8 +21,8 @@ To consume the SDK from another project, link it locally with `npm link` or use 
 ## Usage
 
 ```typescript
-import { validateRecord, validateBusinessRules, getBusinessRules } from '@reso-standards/validation';
-import type { ResoField, ValidationFailure } from '@reso-standards/validation';
+import { validateRecord, validateBusinessRules, getBusinessRules } from '@reso-standards/reso-validation';
+import type { ResoField, ValidationFailure } from '@reso-standards/reso-validation';
 
 // Validate a record against field metadata
 const failures = validateRecord(record, fields);
@@ -102,7 +102,7 @@ interface CrossFieldRule {
 
 ## Integration
 
-Used by both the reference server (request body validation on POST/PATCH) and the React UI (client-side form validation). Also used by `@reso-standards/certification` for payload validation in compliance testing.
+Used by both the reference server (request body validation on POST/PATCH) and the React UI (client-side form validation). Also used by `@reso-standards/reso-certification` for payload validation in compliance testing.
 
 ## License
 

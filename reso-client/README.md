@@ -221,8 +221,7 @@ live in [`@reso-standards/reso-metadata-utils`](../reso-metadata-utils); reso-cl
 metadata fetchers.
 
 ```typescript
-import { fetchAndParseMetadata } from "@reso-standards/reso-client";
-import { parseCsdlXml, validateCsdl, getEntityType } from "@reso-standards/reso-metadata-utils";
+import { fetchAndParseMetadata, parseCsdlXml, validateCsdl, getEntityType } from "@reso-standards/reso-metadata-utils";
 
 // Fetch and parse from a server
 const schema = await fetchAndParseMetadata("http://localhost:8080", "my-token");

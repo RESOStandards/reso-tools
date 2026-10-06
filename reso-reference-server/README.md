@@ -254,17 +254,17 @@ Validates Create, Update and Delete operations with representation and minimal r
 docker compose --profile compliance-addedit up --build --exit-code-from compliance-addedit
 
 # Local CLI
-cd ../certification
-npx reso-cert \
+cd ../reso-certification
+npx reso-cert add-edit \
   --url http://localhost:8080 \
   --resource Property \
   --payloads ./sample-payloads \
   --auth-token test \
-  --compliance-report ./compliance-report.json \
+  --output-dir ./out \
   --spec-version 2.0.0
 ```
 
-The `--compliance-report` flag generates a structured JSON compliance report with per-scenario details suitable for API submission.
+The `--output-dir` flag writes the report tree: `report.json` carries the machine-readable verdict and `report-detailed.json` adds the per-step and per-scenario detail, which is the shape the certification submission expects.
 
 ### CI/CD
 
