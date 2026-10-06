@@ -8,8 +8,8 @@ describe('errorMessagesFromCache — field-qualified expand errors', () => {
   it('names the offending field(s) in ONE entry per rule', () => {
     const errorCache = {
       'MUST be advertised in the metadata': {
-        resources: { Media: { fields: { PhotoUrl: { count: 1 }, ImageOf: { count: 2 } }, count: 3 } },
-      },
+        resources: { Media: { fields: { PhotoUrl: { count: 1 }, ImageOf: { count: 2 } }, count: 3 } }
+      }
     };
     const msgs = errorMessagesFromCache(errorCache);
     expect(msgs).toEqual(['MUST be advertised in the metadata (fields: PhotoUrl, ImageOf)']);
@@ -29,9 +29,9 @@ describe('errorMessagesFromCache — field-qualified expand errors', () => {
       'MUST be integer or null but found decimal': {
         resources: {
           Property: { fields: { MobileWidth: { count: 1 } } },
-          Unit: { fields: { MobileWidth: { count: 1 } } },
-        },
-      },
+          Unit: { fields: { MobileWidth: { count: 1 } } }
+        }
+      }
     };
     const msgs = errorMessagesFromCache(errorCache);
     expect(msgs).toEqual(['MUST be integer or null but found decimal (field: MobileWidth)']);
@@ -46,23 +46,23 @@ describe('errorMessagesFromCache — field-qualified expand errors', () => {
     const errorCache = {
       'MUST be advertised in the metadata': {
         resources: {
-          Property: { fields: { ConstructionMaterials: { lookups: { Frame: { count: 2 }, Brick: { count: 1 } } } } },
-        },
-      },
+          Property: { fields: { ConstructionMaterials: { lookups: { Frame: { count: 2 }, Brick: { count: 1 } } } } }
+        }
+      }
     };
     // Sorted, so the message does not change between runs on map order alone.
     expect(errorMessagesFromCache(errorCache)).toEqual([
-      'MUST be advertised in the metadata (field: ConstructionMaterials [Brick, Frame])',
+      'MUST be advertised in the metadata (field: ConstructionMaterials [Brick, Frame])'
     ]);
   });
 
   it('caps the values listed and counts the remainder', () => {
-    const lookups = Object.fromEntries(['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7'].map((v) => [v, { count: 1 }]));
+    const lookups = Object.fromEntries(['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7'].map(v => [v, { count: 1 }]));
     const errorCache = {
-      'MUST be advertised in the metadata': { resources: { Property: { fields: { Appliances: { lookups } } } } },
+      'MUST be advertised in the metadata': { resources: { Property: { fields: { Appliances: { lookups } } } } }
     };
     expect(errorMessagesFromCache(errorCache)).toEqual([
-      'MUST be advertised in the metadata (field: Appliances [v1, v2, v3, v4, v5, +2 more])',
+      'MUST be advertised in the metadata (field: Appliances [v1, v2, v3, v4, v5, +2 more])'
     ]);
   });
 
@@ -70,12 +70,12 @@ describe('errorMessagesFromCache — field-qualified expand errors', () => {
     const errorCache = {
       'MUST be advertised in the metadata': {
         resources: {
-          Property: { fields: { ConstructionMaterials: { lookups: { Brick: { count: 1 } } }, PhotoUrl: { count: 1 } } },
-        },
-      },
+          Property: { fields: { ConstructionMaterials: { lookups: { Brick: { count: 1 } } }, PhotoUrl: { count: 1 } } }
+        }
+      }
     };
     expect(errorMessagesFromCache(errorCache)).toEqual([
-      'MUST be advertised in the metadata (fields: ConstructionMaterials [Brick], PhotoUrl)',
+      'MUST be advertised in the metadata (fields: ConstructionMaterials [Brick], PhotoUrl)'
     ]);
   });
 
@@ -84,13 +84,11 @@ describe('errorMessagesFromCache — field-qualified expand errors', () => {
       'MUST be advertised in the metadata': {
         resources: {
           Property: { fields: { View: { lookups: { Ocean: { count: 1 } } } } },
-          Unit: { fields: { View: { lookups: { Ocean: { count: 3 }, Mountain: { count: 1 } } } } },
-        },
-      },
+          Unit: { fields: { View: { lookups: { Ocean: { count: 3 }, Mountain: { count: 1 } } } } }
+        }
+      }
     };
-    expect(errorMessagesFromCache(errorCache)).toEqual([
-      'MUST be advertised in the metadata (field: View [Mountain, Ocean])',
-    ]);
+    expect(errorMessagesFromCache(errorCache)).toEqual(['MUST be advertised in the metadata (field: View [Mountain, Ocean])']);
   });
 
   // Adversarial-review regression: fanning out per FIELD let one message's fields crowd distinct RULES out
@@ -98,10 +96,10 @@ describe('errorMessagesFromCache — field-qualified expand errors', () => {
   it('keeps distinct rules as separate entries so a truncated preview never drops a second rule', () => {
     const errorCache = {
       'Fields MUST be advertised in the metadata': { resources: { Media: { fields: { A: {}, B: {}, C: {}, D: {} } } } },
-      'MUST have a maximum advertised length': { resources: { Media: { fields: { LongText: {} } } } },
+      'MUST have a maximum advertised length': { resources: { Media: { fields: { LongText: {} } } } }
     };
     const msgs = errorMessagesFromCache(errorCache);
     expect(msgs).toHaveLength(2);
-    expect(msgs.some((m) => m.startsWith('MUST have a maximum advertised length'))).toBe(true);
+    expect(msgs.some(m => m.startsWith('MUST have a maximum advertised length'))).toBe(true);
   });
 });

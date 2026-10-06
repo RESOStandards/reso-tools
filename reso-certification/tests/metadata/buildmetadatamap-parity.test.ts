@@ -5,9 +5,9 @@
  * exactly. Retire the legacy copy once nothing in reso-tools imports it.
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
 import { buildMetadataMap as buildCommon } from '@reso-standards/reso-common';
+import { describe, expect, it } from 'vitest';
 
 const createRequire = (await import('node:module')).createRequire;
 const require = createRequire(import.meta.url);
@@ -15,7 +15,7 @@ const { buildMetadataMap: buildLegacy } = require(resolve(import.meta.dirname, '
 const { getReferenceMetadata } = require(resolve(import.meta.dirname, '../../src/etl/index.cjs'));
 
 describe('buildMetadataMap parity — reso-common port === legacy', () => {
-  it.each(['1.7', '2.0', '2.1'])('DD %s reference → identical metadataMap + stats', (version) => {
+  it.each(['1.7', '2.0', '2.1'])('DD %s reference → identical metadataMap + stats', version => {
     const ref = getReferenceMetadata(version);
     const legacy = buildLegacy(ref);
     const common = buildCommon(ref);

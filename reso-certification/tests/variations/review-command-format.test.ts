@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  displayVariationKey,
   displayMapping,
-  formatReviewItemsTable,
+  displayVariationKey,
+  duplicateVariationKeys,
   formatEndorsementStatusTable,
   formatProvenance,
-  duplicateVariationKeys,
+  formatReviewItemsTable
 } from '../../src/cli/variations-review-command.js';
 import type { VariationReviewItem } from '../../src/variations/review.js';
 
@@ -29,7 +29,7 @@ const item = (overrides: Partial<VariationReviewItem> = {}): VariationReviewItem
       submittedAt: '2026-09-16T15:27:11.915Z',
       environmentName: 'qa',
       submittedByProviderUoi: 'T00000009',
-      lastEditorRole: 'admin',
+      lastEditorRole: 'admin'
     },
     {
       providerUoi: 'T00000002',
@@ -38,11 +38,11 @@ const item = (overrides: Partial<VariationReviewItem> = {}): VariationReviewItem
       submittedAt: '2026-08-28T08:25:02.044Z',
       environmentName: 'qa',
       submittedByProviderUoi: 'T00000009',
-      lastEditorRole: 'admin',
-    },
+      lastEditorRole: 'admin'
+    }
   ],
   otherDrafts: [],
-  ...overrides,
+  ...overrides
 });
 
 describe('displayVariationKey', () => {
@@ -74,7 +74,9 @@ describe('formatReviewItemsTable', () => {
   });
   it('shows the strategy when the pool has one and the outcome once decided', () => {
     const out = formatReviewItemsTable([item({ strategy: 'Substring', status: 'resolved', outcome: 'ignored' })]);
-    expect(out.split('\n')[2]).toMatch(/^resolved\s+Property\.BuyerAgentKeyNumeric\s+Buyer\s+Substring\s+2\s+2026-08-28T08:25:02\s+ignored$/);
+    expect(out.split('\n')[2]).toMatch(
+      /^resolved\s+Property\.BuyerAgentKeyNumeric\s+Buyer\s+Substring\s+2\s+2026-08-28T08:25:02\s+ignored$/
+    );
   });
   it('says so when there is nothing', () => {
     expect(formatReviewItemsTable([])).toBe('No items in review.');
@@ -103,8 +105,8 @@ describe('formatEndorsementStatusTable', () => {
         version: '2.1',
         lifecycleStatus: 'in-review',
         reviewStatus: 'in-review',
-        updatedAt: '2026-09-16T15:27:11.915Z',
-      },
+        updatedAt: '2026-09-16T15:27:11.915Z'
+      }
     ]);
     const lines = out.split('\n');
     expect(lines[0]).toMatch(/^provider\s+usi\s+recipient\s+endorsement\s+version\s+lifecycle\s+review\s+updated$/);

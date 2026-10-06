@@ -13,8 +13,8 @@
  * Real DD 1.7 StandardStatus values; synthetic inputs — no vendor reports or identifiers.
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { computeVariationsV2 } from '../../src/variations-v2/compute.js';
 
 const createRequire = (await import('node:module')).createRequire;
@@ -30,15 +30,22 @@ const suggestedLookups = (annotationValue: string): string[] => {
   const metadataReportJson = {
     fields: [{ resourceName: 'Property', fieldName: 'StandardStatus', type: 'StandardStatusLookups' }],
     lookups: [
-      { lookupName: 'StandardStatusLookups', type: 'Edm.String', lookupValue: 'Active UC', annotations: [{ term: SN, value: annotationValue }] },
-    ],
+      {
+        lookupName: 'StandardStatusLookups',
+        type: 'Edm.String',
+        lookupValue: 'Active UC',
+        annotations: [{ term: SN, value: annotationValue }]
+      }
+    ]
   };
   const suggestionsMap = {
     Property: {
       StandardStatus: {
-        'Active UC': { suggestions: [{ suggestedResourceName: 'Property', suggestedFieldName: 'StandardStatus', suggestedLookupValue: 'Pending' }] },
-      },
-    },
+        'Active UC': {
+          suggestions: [{ suggestedResourceName: 'Property', suggestedFieldName: 'StandardStatus', suggestedLookupValue: 'Pending' }]
+        }
+      }
+    }
   };
   const { variations } = computeVariationsV2({
     metadataReportJson,
@@ -46,11 +53,11 @@ const suggestedLookups = (annotationValue: string): string[] => {
     suggestionsMap,
     version: VERSION,
     fuzziness: 0.25,
-    applyVersionBucketing: false,
-  }) as { variations: { lookups?: Array<Record<string, unknown>> } };
-  return (variations.lookups ?? []).flatMap((l) => {
+    applyVersionBucketing: false
+  }) as unknown as { variations: { lookups?: Array<Record<string, unknown>> } };
+  return (variations.lookups ?? []).flatMap(l => {
     const direct = l.suggestedLookupValue as string | undefined;
-    const nested = ((l.suggestions as Array<Record<string, unknown>>) ?? []).map((s) => s.suggestedLookupValue as string);
+    const nested = ((l.suggestions as Array<Record<string, unknown>>) ?? []).map(s => s.suggestedLookupValue as string);
     return [direct, ...nested].filter((v): v is string => !!v);
   });
 };

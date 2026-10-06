@@ -12,13 +12,13 @@
  * as both agree. These pin the shape itself, so a revert on both sides is still caught.
  */
 
-import { describe, expect, it } from 'vitest';
 import { prepareResults } from '@reso-standards/reso-common';
+import { describe, expect, it } from 'vitest';
 
 describe('prepareResults — one record shape across every bucket', () => {
   it('groups an expansion into a suggestions array', () => {
     const { expansions } = prepareResults({
-      expansions: [{ resourceName: 'Property', fieldName: 'OpenHouse', suggestedFieldName: 'OpenHouses', strategy: 'Substring' }],
+      expansions: [{ resourceName: 'Property', fieldName: 'OpenHouse', suggestedFieldName: 'OpenHouses', strategy: 'Substring' }]
     });
 
     expect(expansions).toHaveLength(1);
@@ -32,8 +32,8 @@ describe('prepareResults — one record shape across every bucket', () => {
     const { expansions } = prepareResults({
       expansions: [
         { resourceName: 'Teams', fieldName: 'SocialMedia', suggestedFieldName: 'Media', strategy: 'Substring' },
-        { resourceName: 'Teams', fieldName: 'SocialMedia', suggestedFieldName: 'TeamsSocialMedia', strategy: 'Substring' },
-      ],
+        { resourceName: 'Teams', fieldName: 'SocialMedia', suggestedFieldName: 'TeamsSocialMedia', strategy: 'Substring' }
+      ]
     });
 
     expect(expansions).toHaveLength(1);
@@ -42,7 +42,7 @@ describe('prepareResults — one record shape across every bucket', () => {
 
   it('groups complex types the same way', () => {
     const { complexTypes } = prepareResults({
-      complexTypes: [{ resourceName: 'Property', fieldName: 'Address', suggestedFieldName: 'Addresses', strategy: 'Substring' }],
+      complexTypes: [{ resourceName: 'Property', fieldName: 'Address', suggestedFieldName: 'Addresses', strategy: 'Substring' }]
     });
 
     expect(complexTypes).toHaveLength(1);
@@ -53,7 +53,7 @@ describe('prepareResults — one record shape across every bucket', () => {
     const out = prepareResults({
       fields: [{ resourceName: 'Property', fieldName: 'ListPrce', suggestedFieldName: 'ListPrice' }],
       expansions: [{ resourceName: 'Property', fieldName: 'OpenHouse', suggestedFieldName: 'OpenHouses' }],
-      complexTypes: [{ resourceName: 'Property', fieldName: 'Address', suggestedFieldName: 'Addresses' }],
+      complexTypes: [{ resourceName: 'Property', fieldName: 'Address', suggestedFieldName: 'Addresses' }]
     });
 
     for (const bucket of [out.fields, out.expansions, out.complexTypes]) {
@@ -72,7 +72,7 @@ describe('prepareResults — one record shape across every bucket', () => {
       fields: [{ resourceName: 'Property', fieldName: 'ListPrce', suggestedFieldName: 'ListPrice' }],
       expansions: [{ resourceName: 'Property', fieldName: 'OpenHouse', suggestedFieldName: 'OpenHouses' }],
       complexTypes: [{ resourceName: 'Property', fieldName: 'Address', suggestedFieldName: 'Addresses' }],
-      lookupValues: [{ resourceName: 'Property', fieldName: 'StandardStatus', lookupValue: 'Active UC' }],
+      lookupValues: [{ resourceName: 'Property', fieldName: 'StandardStatus', lookupValue: 'Active UC' }]
     });
 
     expect(out.resources[0].level).toBe('resource');
@@ -85,7 +85,7 @@ describe('prepareResults — one record shape across every bucket', () => {
   it('distinguishes a field from an expansion that populates the same keys', () => {
     const out = prepareResults({
       fields: [{ resourceName: 'Property', fieldName: 'Media', suggestedFieldName: 'Medias' }],
-      expansions: [{ resourceName: 'Property', fieldName: 'Media', suggestedFieldName: 'Medias' }],
+      expansions: [{ resourceName: 'Property', fieldName: 'Media', suggestedFieldName: 'Medias' }]
     });
 
     // Identical records, distinguishable only by the level they carry.
@@ -105,7 +105,7 @@ describe('prepareResults — one record shape across every bucket', () => {
       fields: [{ resourceName: '__proto__', fieldName: 'polluted', suggestedFieldName: 'X' }],
       expansions: [{ resourceName: 'Property', fieldName: '__proto__', suggestedFieldName: 'X' }],
       resources: [{ resourceName: '__proto__', suggestedResourceName: 'X' }],
-      lookupValues: [{ resourceName: '__proto__', fieldName: '__proto__', lookupValue: 'v' }],
+      lookupValues: [{ resourceName: '__proto__', fieldName: '__proto__', lookupValue: 'v' }]
     });
 
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();

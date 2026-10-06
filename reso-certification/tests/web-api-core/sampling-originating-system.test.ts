@@ -3,8 +3,8 @@ import type { ODataRequester } from '../../src/test-runner/requester.js';
 import type { EntityType, ODataResponse } from '../../src/test-runner/types.js';
 import { buildScenarioQuery } from '../../src/web-api-core/queries.js';
 import { resolveTestParams } from '../../src/web-api-core/sampling.js';
-import type { StandardMap } from '../../src/web-api-core/standard-map.js';
 import type { FilterScenario } from '../../src/web-api-core/scenarios.js';
+import type { StandardMap } from '../../src/web-api-core/standard-map.js';
 
 // Resource-aware OriginatingSystem (OSN/OSID) scoping: resolveTestParams applies the recipient-org filter ONLY
 // to resources whose metadata carries the field, both to its own sample fetch AND (via the returned params) to
@@ -15,14 +15,14 @@ const noopStandardMap: StandardMap = {
   isStandardValue: () => false,
   standardValues: () => new Set<string>(),
   standardValuesForField: () => undefined,
-  isClosedEnumField: () => false,
+  isClosedEnumField: () => false
 };
 
 const sampleResponse: ODataResponse = {
   status: 200,
   headers: { 'odata-version': '4.01' },
   body: { value: [{ ListingKey: 'P1', OriginatingSystemName: 'MyMLS', OriginatingSystemID: 'MLS-42', ListPrice: 100 }] },
-  rawBody: '{}',
+  rawBody: '{}'
 };
 
 /** A requester that records every requested URL into `urls`, so a test can assert the sample fetch's scoping. */
@@ -30,7 +30,7 @@ const capturingRequester = (urls: string[]): ODataRequester => ({
   request: async ({ url }) => {
     urls.push(url);
     return sampleResponse;
-  },
+  }
 });
 
 const KEY = { name: 'ListingKey', type: 'Edm.String' } as const;
@@ -41,14 +41,11 @@ const OSID = { name: 'OriginatingSystemID', type: 'Edm.String' } as const;
 const entityType = (properties: EntityType['properties']): EntityType => ({
   name: 'Property',
   keyProperties: ['ListingKey'],
-  properties,
+  properties
 });
 
-const resolve = (
-  et: EntityType,
-  originatingSystem: { readonly name?: string; readonly id?: string } | undefined,
-  urls: string[],
-) => resolveTestParams('http://x', 'Property', et, 'tok', [], noopStandardMap, undefined, capturingRequester(urls), originatingSystem);
+const resolve = (et: EntityType, originatingSystem: { readonly name?: string; readonly id?: string } | undefined, urls: string[]) =>
+  resolveTestParams('http://x', 'Property', et, 'tok', [], noopStandardMap, undefined, capturingRequester(urls), originatingSystem);
 
 describe('resolveTestParams — resource-aware OriginatingSystem scoping', () => {
   it('scopes the sample fetch AND sets params when the resource carries OriginatingSystemName', async () => {
@@ -94,7 +91,16 @@ describe('resolveTestParams — resource-aware OriginatingSystem scoping', () =>
   it('the OSN it set flows end-to-end: buildScenarioQuery scopes a resource-data filter query', async () => {
     const urls: string[] = [];
     const params = await resolve(entityType([KEY, OSN, PRICE]), { name: 'MyMLS' }, urls);
-    const scenario: FilterScenario = { tag: 'filter-int-gt', name: 'Int gt', category: 'filter', dataType: 'integer', op: 'gt', fieldParam: 'integerField', valueParam: 'integerValueMin', minVersion: '2.0.0' };
+    const scenario: FilterScenario = {
+      tag: 'filter-int-gt',
+      name: 'Int gt',
+      category: 'filter',
+      dataType: 'integer',
+      op: 'gt',
+      fieldParam: 'integerField',
+      valueParam: 'integerValueMin',
+      minVersion: '2.0.0'
+    };
     const query = buildScenarioQuery('http://x', 'Property', scenario, params);
     expect(decodeURIComponent(query?.url ?? '')).toContain("and OriginatingSystemName eq 'MyMLS'");
   });

@@ -1,18 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import type { DdReference } from '../../src/metadata/dd-metadata-checks.js';
+import type { ODataRequester } from '../../src/test-runner/requester.js';
 import type { EnumCandidate } from '../../src/web-api-core/enum-selection.js';
 import { createLookupCache } from '../../src/web-api-core/lookup-cache.js';
+import type { TestParams } from '../../src/web-api-core/sampling.js';
 import type { CoreScenario } from '../../src/web-api-core/scenarios.js';
 import { buildStandardMapFrom } from '../../src/web-api-core/standard-map.js';
-import type { TestParams } from '../../src/web-api-core/sampling.js';
 import { type LookupResourceContext, runLookupResourceScenario } from '../../src/web-api-core/test-runner.js';
-import type { ODataRequester } from '../../src/test-runner/requester.js';
 
 const ref: DdReference = {
   fields: [{ resourceName: 'Property', fieldName: 'PropertyType', type: 'org.reso.metadata.enums.PropertyType' }],
   lookups: [
-    { lookupName: 'org.reso.metadata.enums.PropertyType', lookupValue: 'Residential', annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Residential' }] },
-  ],
+    {
+      lookupName: 'org.reso.metadata.enums.PropertyType',
+      lookupValue: 'Residential',
+      annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Residential' }]
+    }
+  ]
 };
 
 const candidate: EnumCandidate = {
@@ -23,7 +27,7 @@ const candidate: EnumCandidate = {
   lookupSampleValues: ['Residential'],
   distinctValueCount: 1,
   fillRate: 1,
-  lookupName: 'PropertyType',
+  lookupName: 'PropertyType'
 };
 
 const params: TestParams = {
@@ -36,7 +40,7 @@ const params: TestParams = {
   sampleComplete: true,
   singleLookupField: 'PropertyType',
   singleLookupCandidates: [candidate],
-  lookupNameByField: { PropertyType: 'PropertyType' },
+  lookupNameByField: { PropertyType: 'PropertyType' }
 };
 
 const scenario: CoreScenario = {
@@ -46,26 +50,28 @@ const scenario: CoreScenario = {
   assertion: 'lookup-resource-validation',
   fieldParam: 'singleLookupField',
   valueParam: 'singleLookupValue',
-  minVersion: '2.1.0',
+  minVersion: '2.1.0'
 };
 
 // A requester that FAILS the test if it is ever called — the whole point of a cache hit is that no request goes out.
 const throwingRequester: ODataRequester = {
   request: async () => {
     throw new Error('runLookupResourceScenario issued a request on a cache hit — the fetch was not skipped');
-  },
+  }
 };
 
 describe('runLookupResourceScenario — cache hit skips the fetch', () => {
   it('reuses the pre-filled rows, issues no request, and still returns a valid gating result', async () => {
     const cache = createLookupCache({ lookupNameFor: (_res, f) => (f === 'PropertyType' ? 'PropertyType' : undefined) });
     // A prior resource already fetched (and 200-verified) this LookupName's rows.
-    cache.put('PropertyType', [{ LookupName: 'PropertyType', LookupValue: 'Residential', StandardLookupValue: 'Residential', LegacyODataValue: 'Residential' }]);
+    cache.put('PropertyType', [
+      { LookupName: 'PropertyType', LookupValue: 'Residential', StandardLookupValue: 'Residential', LegacyODataValue: 'Residential' }
+    ]);
 
     const lookupCtx: LookupResourceContext = {
       cache,
       standardMap: buildStandardMapFrom(ref),
-      isEnumerationIgnored: () => false,
+      isEnumerationIgnored: () => false
     };
 
     const result = await runLookupResourceScenario('http://server', 'Property', scenario, params, 'tok', 0, throwingRequester, lookupCtx);
@@ -81,15 +87,24 @@ describe('runLookupResourceScenario — page-size preference', () => {
     const cache = createLookupCache({ lookupNameFor: (_res, f) => (f === 'PropertyType' ? 'PropertyType' : undefined) });
     const captured: { headers?: Readonly<Record<string, string>> } = {};
     const recordingRequester: ODataRequester = {
-      request: async (options) => {
+      request: async options => {
         captured.headers = options.headers;
         return {
           status: 200,
           headers: {},
-          body: { value: [{ LookupName: 'PropertyType', LookupValue: 'Residential', StandardLookupValue: 'Residential', LegacyODataValue: 'Residential' }] },
-          rawBody: '',
+          body: {
+            value: [
+              {
+                LookupName: 'PropertyType',
+                LookupValue: 'Residential',
+                StandardLookupValue: 'Residential',
+                LegacyODataValue: 'Residential'
+              }
+            ]
+          },
+          rawBody: ''
         };
-      },
+      }
     };
     const lookupCtx: LookupResourceContext = { cache, standardMap: buildStandardMapFrom(ref), isEnumerationIgnored: () => false };
 

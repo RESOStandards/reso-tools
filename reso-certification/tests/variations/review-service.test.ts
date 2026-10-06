@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  listVariationReviewItemsViaService,
-  listMyEndorsementsViaService,
-  listEndorsementsByReviewStatusViaService,
   type VariationReviewItem,
+  listEndorsementsByReviewStatusViaService,
+  listMyEndorsementsViaService,
+  listVariationReviewItemsViaService
 } from '../../src/variations/review.js';
 import { isVariationsAuthError } from '../../src/variations/service.js';
 
@@ -12,7 +12,7 @@ const okResponse = (body: unknown) => ({
   status: 200,
   statusText: 'OK',
   json: async () => body,
-  text: async () => JSON.stringify(body),
+  text: async () => JSON.stringify(body)
 });
 
 const failResponse = (status: number, statusText = 'Nope') => ({
@@ -20,7 +20,7 @@ const failResponse = (status: number, statusText = 'Nope') => ({
   status,
   statusText,
   json: async () => ({ message: statusText }),
-  text: async () => statusText,
+  text: async () => statusText
 });
 
 const item = (key: string, extra: Partial<VariationReviewItem> = {}): VariationReviewItem => ({
@@ -36,19 +36,31 @@ const item = (key: string, extra: Partial<VariationReviewItem> = {}): VariationR
   provenance: [],
   lastUpdatedAt: '2026-09-16T15:27:11.915Z',
   otherDrafts: [],
-  ...extra,
+  ...extra
 });
 
 describe('listVariationReviewItemsViaService', () => {
   beforeEach(() => {
     process.env.RESO_SERVICES_URL = 'https://services.example.org';
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.CERT_AUTH_API_BASE_URL;
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.CERT_AUTH_API_USERNAME;
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.CERTIFICATION_API_KEY;
   });
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.RESO_SERVICES_URL;
   });
 
@@ -107,10 +119,10 @@ describe('listVariationReviewItemsViaService', () => {
           providerUsi: '1',
           recipientUoi: 'M00000001',
           submittedAt: '2026-08-28T08:25:02.044Z',
-          environmentName: 'qa',
-        },
+          environmentName: 'qa'
+        }
       ],
-      strategy: 'Substring',
+      strategy: 'Substring'
     });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse({ items: [served] })));
 
@@ -125,7 +137,7 @@ describe('listVariationReviewItemsViaService', () => {
 
     await expect(listVariationReviewItemsViaService({ fromCli: true })).rejects.toMatchObject({
       code: 'AUTH_REQUIRED',
-      message: expect.stringMatching(/TOKEN_URI.*CLIENT_SECRET.*CERT_AUTH_API_BASE_URL.*\.env/),
+      message: expect.stringMatching(/TOKEN_URI.*CLIENT_SECRET.*CERT_AUTH_API_BASE_URL.*\.env/)
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -148,17 +160,20 @@ describe('listVariationReviewItemsViaService', () => {
 
     await expect(listVariationReviewItemsViaService({ bearerToken: 'tok' })).rejects.toMatchObject({
       code: 'SERVICE_ERROR',
-      message: expect.stringContaining('500'),
+      message: expect.stringContaining('500')
     });
   });
 
   it('throws SERVICE_ERROR when RESO_SERVICES_URL is not set', async () => {
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.RESO_SERVICES_URL;
     vi.stubGlobal('fetch', vi.fn());
 
     await expect(listVariationReviewItemsViaService({ bearerToken: 'tok' })).rejects.toMatchObject({
       code: 'SERVICE_ERROR',
-      message: expect.stringContaining('RESO_SERVICES_URL'),
+      message: expect.stringContaining('RESO_SERVICES_URL')
     });
   });
 
@@ -166,7 +181,7 @@ describe('listVariationReviewItemsViaService', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse({ message: 'unexpected' })));
 
     await expect(listVariationReviewItemsViaService({ bearerToken: 'tok' })).rejects.toMatchObject({
-      code: 'SERVICE_ERROR',
+      code: 'SERVICE_ERROR'
     });
   });
 });
@@ -174,13 +189,25 @@ describe('listVariationReviewItemsViaService', () => {
 describe('listMyEndorsementsViaService', () => {
   beforeEach(() => {
     process.env.RESO_SERVICES_URL = 'https://services.example.org';
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.CERT_AUTH_API_BASE_URL;
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.CERT_AUTH_API_USERNAME;
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.CERTIFICATION_API_KEY;
   });
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.RESO_SERVICES_URL;
   });
 
@@ -197,8 +224,8 @@ describe('listMyEndorsementsViaService', () => {
         reviewStatus: 'in-review',
         environmentName: 'qa',
         createdAt: '2026-09-16T15:27:11.915Z',
-        updatedAt: '2026-09-16T15:27:11.915Z',
-      },
+        updatedAt: '2026-09-16T15:27:11.915Z'
+      }
     ];
     const fetchMock = vi.fn().mockResolvedValue(okResponse({ endorsements: rows }));
     vi.stubGlobal('fetch', fetchMock);
@@ -249,13 +276,25 @@ describe('listMyEndorsementsViaService', () => {
 describe('listEndorsementsByReviewStatusViaService', () => {
   beforeEach(() => {
     process.env.RESO_SERVICES_URL = 'https://services.example.org';
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.CERT_AUTH_API_BASE_URL;
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.CERT_AUTH_API_USERNAME;
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.CERTIFICATION_API_KEY;
   });
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.RESO_SERVICES_URL;
   });
 

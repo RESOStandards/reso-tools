@@ -2,7 +2,7 @@ import { createResilienceSession } from '@reso-standards/reso-client';
 import { describe, expect, it, vi } from 'vitest';
 
 // Mock the underlying odataRequest so we can assert the session is threaded onto every request.
-vi.mock('../src/test-runner/client.js', async (importOriginal) => {
+vi.mock('../src/test-runner/client.js', async importOriginal => {
   const actual = await importOriginal<typeof import('../src/test-runner/client.js')>();
   return {
     ...actual,

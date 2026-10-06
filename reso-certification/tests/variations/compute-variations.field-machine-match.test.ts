@@ -11,8 +11,8 @@
  * Oracle: legacy `computeVariations` (src/legacy).
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 const createRequire = (await import('node:module')).createRequire;
 const require = createRequire(import.meta.url);
@@ -22,7 +22,11 @@ const { computeVariations } = require(resolve(legacyRoot, 'lib/variations/index.
 const FUZZINESS = 0.25;
 const DD_1_7 = '1.7';
 
-type FieldVariation = { resourceName: string; fieldName: string; suggestions: Array<{ suggestedFieldName?: string; closeMatch?: boolean }> };
+type FieldVariation = {
+  resourceName: string;
+  fieldName: string;
+  suggestions: Array<{ suggestedFieldName?: string; closeMatch?: boolean }>;
+};
 
 const fieldsOf = async (metadataReportJson: unknown): Promise<FieldVariation[]> => {
   const { variations } = (await computeVariations({ metadataReportJson, fuzziness: FUZZINESS, version: DD_1_7 })) as {
@@ -38,43 +42,43 @@ describe('computeVariations: field-level machine matching', () => {
         { resourceName: 'Property', fieldName: 'ListtPrice' },
         { resourceName: 'Property', fieldName: 'CancelationDate' },
         { resourceName: 'Office', fieldName: 'MoodificationTimestamp' },
-        { resourceName: 'Member', fieldName: 'MemmberEmail' },
-      ],
+        { resourceName: 'Member', fieldName: 'MemmberEmail' }
+      ]
     };
     const fields = await fieldsOf(report);
     expect(fields).toHaveLength(report.fields.length);
     for (const f of fields) {
-      expect(f.suggestions.some((s) => s.closeMatch)).toBe(true);
+      expect(f.suggestions.some(s => s.closeMatch)).toBe(true);
     }
   });
 
   it('suggests a standard field when it is not already present', async () => {
     const fields = await fieldsOf({ fields: [{ resourceName: 'Property', fieldName: 'APIModificationTimestamp' }] });
-    const hits = fields.filter((f) => f.fieldName === 'APIModificationTimestamp');
+    const hits = fields.filter(f => f.fieldName === 'APIModificationTimestamp');
     expect(hits).toHaveLength(1);
-    expect(hits[0].suggestions.some((s) => s.suggestedFieldName === 'ModificationTimestamp')).toBe(true);
+    expect(hits[0].suggestions.some(s => s.suggestedFieldName === 'ModificationTimestamp')).toBe(true);
   });
 
   it('does not suggest a standard field the provider already has', async () => {
     const fields = await fieldsOf({
       fields: [
         { resourceName: 'Property', fieldName: 'APIModificationTimestamp' },
-        { resourceName: 'Property', fieldName: 'ModificationTimestamp' },
-      ],
+        { resourceName: 'Property', fieldName: 'ModificationTimestamp' }
+      ]
     });
-    expect(fields.filter((f) => f.fieldName === 'APIModificationTimestamp')).toHaveLength(0);
+    expect(fields.filter(f => f.fieldName === 'APIModificationTimestamp')).toHaveLength(0);
   });
 
   it('excludes an already-present standard from a still-matching local field’s suggestions', async () => {
     const fields = await fieldsOf({
       fields: [
         { resourceName: 'Property', fieldName: 'Price' },
-        { resourceName: 'Property', fieldName: 'ListPrice' },
-      ],
+        { resourceName: 'Property', fieldName: 'ListPrice' }
+      ]
     });
-    const hits = fields.filter((f) => f.fieldName === 'Price');
+    const hits = fields.filter(f => f.fieldName === 'Price');
     expect(hits).toHaveLength(1);
     expect(hits[0].suggestions.length).toBeGreaterThan(0);
-    expect(hits[0].suggestions.some((s) => s.suggestedFieldName === 'ListPrice')).toBe(false);
+    expect(hits[0].suggestions.some(s => s.suggestedFieldName === 'ListPrice')).toBe(false);
   });
 });

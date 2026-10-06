@@ -16,8 +16,8 @@
  * All inputs are anonymized synthetic — no vendor reports or identifiers.
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { computeVariationsV2 } from '../../src/variations-v2/compute.js';
 
 const createRequire = (await import('node:module')).createRequire;
@@ -38,18 +38,18 @@ const fieldSuggestion = (targetMajor?: number): Record<string, unknown> => ({
           suggestedResourceName: 'Property',
           suggestedFieldName: 'ListPrice',
           isFastTrack: true,
-          ...(targetMajor != null ? { targetMajor } : {}),
-        },
-      ],
-    },
-  },
+          ...(targetMajor != null ? { targetMajor } : {})
+        }
+      ]
+    }
+  }
 });
 
 const REPORT = { fields: [{ resourceName: 'Property', fieldName: 'CustomFieldXYZ' }] };
 
 const run = (
   suggestionsMap: Record<string, unknown>,
-  opts: Record<string, unknown> = {},
+  opts: Record<string, unknown> = {}
 ): { variations: { fields: Array<{ enforcement?: string; suggestions: unknown[] }> } } =>
   computeVariationsV2({
     metadataReportJson: REPORT,
@@ -57,7 +57,7 @@ const run = (
     suggestionsMap,
     version: '2.1',
     fuzziness: FUZZINESS,
-    ...opts,
+    ...opts
   }) as never;
 
 const enforcementOf = (r: ReturnType<typeof run>): string | undefined => r.variations.fields[0]?.enforcement;
@@ -85,10 +85,10 @@ describe('computeVariationsV2: version bucketing (enforcement)', () => {
         CustomFieldXYZ: {
           suggestions: [
             { suggestedResourceName: 'Property', suggestedFieldName: 'ListPrice', isFastTrack: true, targetMajor: 3 },
-            { suggestedResourceName: 'Property', suggestedFieldName: 'CloseDate', isFastTrack: true, targetMajor: 2 },
-          ],
-        },
-      },
+            { suggestedResourceName: 'Property', suggestedFieldName: 'CloseDate', isFastTrack: true, targetMajor: 2 }
+          ]
+        }
+      }
     };
     const r = run(map);
     // both targets are absent from the report → both suggestions emit on the one field
@@ -103,10 +103,10 @@ describe('computeVariationsV2: version bucketing (enforcement)', () => {
         CustomFieldXYZ: {
           suggestions: [
             { suggestedResourceName: 'Property', suggestedFieldName: 'ListPrice', isFastTrack: true, targetMajor: 3 },
-            { suggestedResourceName: 'Property', suggestedFieldName: 'CloseDate', isFastTrack: true, targetMajor: 4 },
-          ],
-        },
-      },
+            { suggestedResourceName: 'Property', suggestedFieldName: 'CloseDate', isFastTrack: true, targetMajor: 4 }
+          ]
+        }
+      }
     };
     const r = run(map);
     expect(r.variations.fields[0].suggestions).toHaveLength(2);
@@ -118,7 +118,7 @@ describe('computeVariationsV2: version bucketing (enforcement)', () => {
       metadataReportJson: { fields: [{ resourceName: 'Property', fieldName: 'list_price' }] },
       referenceMetadata: REF,
       version: '2.1',
-      fuzziness: FUZZINESS,
+      fuzziness: FUZZINESS
     }) as ReturnType<typeof run>;
     expect(r.variations.fields[0].enforcement).toBe('must-fix');
   });
@@ -140,7 +140,7 @@ describe('computeVariationsV2: version bucketing (enforcement)', () => {
       metadataReportJson: REPORT,
       referenceMetadata: REF,
       suggestionsMap: fieldSuggestion(3),
-      fuzziness: FUZZINESS,
+      fuzziness: FUZZINESS
     }) as ReturnType<typeof run>;
     expect(future.variations.fields[0].enforcement).toBe('warning'); // 3 > 2
 
@@ -148,7 +148,7 @@ describe('computeVariationsV2: version bucketing (enforcement)', () => {
       metadataReportJson: REPORT,
       referenceMetadata: REF,
       suggestionsMap: fieldSuggestion(2),
-      fuzziness: FUZZINESS,
+      fuzziness: FUZZINESS
     }) as ReturnType<typeof run>;
     expect(now.variations.fields[0].enforcement).toBe('must-fix'); // 2 <= 2
   });

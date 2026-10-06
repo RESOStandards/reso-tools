@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { parseCsdlXml, getAllFields } from '../src/index.js';
+import { describe, expect, it } from 'vitest';
+import { getAllFields, parseCsdlXml } from '../src/index.js';
 
 /**
  * Enum types declared in a separate namespaced schema (org.reso.metadata.enums) from the
@@ -36,7 +36,7 @@ describe('CSDL enum namespace + member annotations', () => {
   const schema = parseCsdlXml(edmx);
   const enumType = schema.enumTypes.find(e => e.name === 'StandardStatus');
 
-  it('captures the enum type\'s own namespace from its split schema', () => {
+  it("captures the enum type's own namespace from its split schema", () => {
     expect(enumType?.namespace).toBe('org.reso.metadata.enums');
   });
 
@@ -77,9 +77,7 @@ describe('CSDL schema Alias resolution', () => {
 
   it('canonicalizes an alias-qualified field type to its namespace form', () => {
     const schema = parseCsdlXml(aliasedEdmx);
-    const field = schema.entityTypes
-      .find(e => e.name === 'Property')
-      ?.properties.find(p => p.name === 'StandardStatus');
+    const field = schema.entityTypes.find(e => e.name === 'Property')?.properties.find(p => p.name === 'StandardStatus');
     expect(field?.type).toBe('org.reso.metadata.enums.StandardStatus');
   });
 });
@@ -111,9 +109,7 @@ describe('XML entity decoding in annotation values', () => {
 
   it('decodes &amp; in a member StandardName', () => {
     const schema = parseCsdlXml(edmx);
-    const member = schema.enumTypes
-      .find(e => e.name === 'PropertySubcategory')
-      ?.members.find(m => m.name === 'FlexRAndD');
+    const member = schema.enumTypes.find(e => e.name === 'PropertySubcategory')?.members.find(m => m.name === 'FlexRAndD');
     expect(member?.annotations?.['RESO.OData.Metadata.StandardName']).toBe('Flex R&D');
   });
 });

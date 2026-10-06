@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 /**
  * Issue-2 suppression tests for the legacy v3.0.0 `computeVariations`.
  *
@@ -15,8 +16,7 @@
  * These tests assert that invariant. Case 3 (no canonical present anywhere)
  * confirms a genuine variation still flags.
  */
-import { describe, it, expect } from 'vitest';
-import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 const createRequire = (await import('node:module')).createRequire;
 const require = createRequire(import.meta.url);
@@ -34,7 +34,7 @@ const field = {
   type: APPLIANCES_ENUM,
   typeName: 'Appliances',
   nullable: true,
-  annotations: [],
+  annotations: []
 };
 const lookup = (lookupValue: string, standardName?: string) => ({
   lookupName: APPLIANCES_ENUM,
@@ -42,26 +42,23 @@ const lookup = (lookupValue: string, standardName?: string) => ({
   type: 'Edm.Int64',
   annotations: [
     { term: 'RESO.OData.Metadata.StandardName', value: standardName ?? lookupValue },
-    { term: 'RESO.OData.Metadata.TrestleName', value: lookupValue },
-  ],
+    { term: 'RESO.OData.Metadata.TrestleName', value: lookupValue }
+  ]
 });
 const metadataReport = (lookups: ReturnType<typeof lookup>[]) => ({
   description: 'Suppression-test synthetic metadata report',
   version: DD_2_0,
   generatedOn: new Date().toISOString(),
   fields: [field],
-  lookups,
+  lookups
 });
 const suggestionsFor = (sourceKey: string, sug: Record<string, unknown>) => ({
-  Property: { Appliances: { [sourceKey]: { suggestions: [sug] } } },
+  Property: { Appliances: { [sourceKey]: { suggestions: [sug] } } }
 });
 const wasFlagged = (report: unknown, sourceKey: string): boolean => {
   const entries = (report as { variations?: { lookups?: Array<Record<string, unknown>> } })?.variations?.lookups ?? [];
   return entries.some(
-    (e) =>
-      e.resourceName === 'Property' &&
-      e.fieldName === 'Appliances' &&
-      (e.legacyODataValue === sourceKey || e.lookupValue === sourceKey)
+    e => e.resourceName === 'Property' && e.fieldName === 'Appliances' && (e.legacyODataValue === sourceKey || e.lookupValue === sourceKey)
   );
 };
 
@@ -73,18 +70,15 @@ describe('computeVariations: Issue 2 suppression (v3.0.0)', () => {
   // vendor's `lookupValues` map (keyed by StandardName) → suppressed.
   it('display-form suggestion + vendor canonical present → suppressed (Issue 2)', async () => {
     const result = await computeVariations({
-      metadataReportJson: metadataReport([
-        lookup('WaterHeater', 'Water Heater'),
-        lookup('CommonWaterHeater', 'Common Water Heater'),
-      ]),
+      metadataReportJson: metadataReport([lookup('WaterHeater', 'Water Heater'), lookup('CommonWaterHeater', 'Common Water Heater')]),
       version: DD_2_0,
       fuzziness: FUZZ,
       suggestionsMap: suggestionsFor('CommonWaterHeater', {
         suggestedResourceName: 'Property',
         suggestedFieldName: 'Appliances',
         suggestedLookupValue: 'Water Heater',
-        isFastTrack: true,
-      }),
+        isFastTrack: true
+      })
     });
     expect(wasFlagged(result, 'CommonWaterHeater')).toBe(false);
   });
@@ -94,18 +88,15 @@ describe('computeVariations: Issue 2 suppression (v3.0.0)', () => {
   // suggestion matches the `lookupValues` map → suppressed.
   it('vendor has literal display-form lookupValue + matching display-form suggestion → suppressed', async () => {
     const result = await computeVariations({
-      metadataReportJson: metadataReport([
-        lookup('Water Heater', 'Water Heater'),
-        lookup('CommonWaterHeater', 'Common Water Heater'),
-      ]),
+      metadataReportJson: metadataReport([lookup('Water Heater', 'Water Heater'), lookup('CommonWaterHeater', 'Common Water Heater')]),
       version: DD_2_0,
       fuzziness: FUZZ,
       suggestionsMap: suggestionsFor('CommonWaterHeater', {
         suggestedResourceName: 'Property',
         suggestedFieldName: 'Appliances',
         suggestedLookupValue: 'Water Heater',
-        isFastTrack: true,
-      }),
+        isFastTrack: true
+      })
     });
     expect(wasFlagged(result, 'CommonWaterHeater')).toBe(false);
   });
@@ -115,17 +106,15 @@ describe('computeVariations: Issue 2 suppression (v3.0.0)', () => {
   // so nothing suppresses it.
   it('no canonical present + display-form suggestion → flags (correct)', async () => {
     const result = await computeVariations({
-      metadataReportJson: metadataReport([
-        lookup('CommonWaterHeater', 'Common Water Heater'),
-      ]),
+      metadataReportJson: metadataReport([lookup('CommonWaterHeater', 'Common Water Heater')]),
       version: DD_2_0,
       fuzziness: FUZZ,
       suggestionsMap: suggestionsFor('CommonWaterHeater', {
         suggestedResourceName: 'Property',
         suggestedFieldName: 'Appliances',
         suggestedLookupValue: 'Water Heater',
-        isFastTrack: true,
-      }),
+        isFastTrack: true
+      })
     });
     expect(wasFlagged(result, 'CommonWaterHeater')).toBe(true);
   });
@@ -137,18 +126,15 @@ describe('computeVariations: Issue 2 suppression (v3.0.0)', () => {
   // dual-form check now matches it against `legacyODataValues` → suppressed.
   it('wire-form suggestion + vendor canonical wire form present → suppressed', async () => {
     const result = await computeVariations({
-      metadataReportJson: metadataReport([
-        lookup('WaterHeater', 'Water Heater'),
-        lookup('CommonWaterHeater', 'Common Water Heater'),
-      ]),
+      metadataReportJson: metadataReport([lookup('WaterHeater', 'Water Heater'), lookup('CommonWaterHeater', 'Common Water Heater')]),
       version: DD_2_0,
       fuzziness: FUZZ,
       suggestionsMap: suggestionsFor('CommonWaterHeater', {
         suggestedResourceName: 'Property',
         suggestedFieldName: 'Appliances',
         suggestedLegacyODataValue: 'WaterHeater',
-        isFastTrack: true,
-      }),
+        isFastTrack: true
+      })
     });
     expect(wasFlagged(result, 'CommonWaterHeater')).toBe(false);
   });
@@ -163,14 +149,8 @@ describe('computeVariations: Issue 2 suppression (v3.0.0)', () => {
     const result = await computeVariations({
       metadataReportJson: {
         ...metadataReport([lookup('Barbecue', 'Barbecue')]),
-        fields: [
-          field,
-          { ...field, fieldName: 'ExteriorFeatures', type: EXTERIOR, typeName: 'ExteriorFeatures' },
-        ],
-        lookups: [
-          lookup('Barbecue', 'Barbecue'),
-          { ...lookup('Barbecue', 'Barbecue'), lookupName: EXTERIOR },
-        ],
+        fields: [field, { ...field, fieldName: 'ExteriorFeatures', type: EXTERIOR, typeName: 'ExteriorFeatures' }],
+        lookups: [lookup('Barbecue', 'Barbecue'), { ...lookup('Barbecue', 'Barbecue'), lookupName: EXTERIOR }]
       },
       version: DD_2_0,
       fuzziness: FUZZ,
@@ -178,8 +158,8 @@ describe('computeVariations: Issue 2 suppression (v3.0.0)', () => {
         suggestedResourceName: 'Property',
         suggestedFieldName: 'ExteriorFeatures',
         suggestedLookupValue: 'Barbecue',
-        isFastTrack: true,
-      }),
+        isFastTrack: true
+      })
     });
     expect(wasFlagged(result, 'Barbecue')).toBe(false);
   });
@@ -188,13 +168,13 @@ describe('computeVariations: Issue 2 suppression (v3.0.0)', () => {
 describe('computeVariations: suppression is entry-level any-one + form-agnostic, both transports', () => {
   // Several suggestions on one source value (the entry-level any-one axis).
   const multiSuggestionsFor = (sourceKey: string, sugs: Record<string, unknown>[]) => ({
-    Property: { Appliances: { [sourceKey]: { suggestions: sugs } } },
+    Property: { Appliances: { [sourceKey]: { suggestions: sugs } } }
   });
   const sug = (extra: Record<string, unknown>) => ({
     suggestedResourceName: 'Property',
     suggestedFieldName: 'Appliances',
     isFastTrack: true,
-    ...extra,
+    ...extra
   });
   // A local non-canonical value the vendor stores, with distinct wire ('LocalHeater')
   // and display ('Local Heater') forms — so the suggestions-map key selects which
@@ -207,11 +187,12 @@ describe('computeVariations: suppression is entry-level any-one + form-agnostic,
   it('wire source · several suggestions · one already present → whole entry passes (any-one)', async () => {
     const result = await computeVariations({
       metadataReportJson: metadataReport([LOCAL, CANON]),
-      version: DD_2_0, fuzziness: FUZZ,
+      version: DD_2_0,
+      fuzziness: FUZZ,
       suggestionsMap: multiSuggestionsFor('LocalHeater', [
         sug({ suggestedLookupValue: 'Water Heater' }), // present (vendor has it)
-        sug({ suggestedLookupValue: 'Dishwasher' }),   // absent
-      ]),
+        sug({ suggestedLookupValue: 'Dishwasher' }) // absent
+      ])
     });
     expect(wasFlagged(result, 'LocalHeater')).toBe(false);
   });
@@ -219,11 +200,12 @@ describe('computeVariations: suppression is entry-level any-one + form-agnostic,
   it('wire source · several suggestions · none present → whole entry fails', async () => {
     const result = await computeVariations({
       metadataReportJson: metadataReport([LOCAL]),
-      version: DD_2_0, fuzziness: FUZZ,
+      version: DD_2_0,
+      fuzziness: FUZZ,
       suggestionsMap: multiSuggestionsFor('LocalHeater', [
         sug({ suggestedLookupValue: 'Water Heater' }), // absent
-        sug({ suggestedLookupValue: 'Dishwasher' }),   // absent
-      ]),
+        sug({ suggestedLookupValue: 'Dishwasher' }) // absent
+      ])
     });
     expect(wasFlagged(result, 'LocalHeater')).toBe(true);
   });
@@ -231,11 +213,12 @@ describe('computeVariations: suppression is entry-level any-one + form-agnostic,
   it('display source · several suggestions · one already present → whole entry passes (any-one)', async () => {
     const result = await computeVariations({
       metadataReportJson: metadataReport([LOCAL, CANON]),
-      version: DD_2_0, fuzziness: FUZZ,
+      version: DD_2_0,
+      fuzziness: FUZZ,
       suggestionsMap: multiSuggestionsFor('Local Heater', [
         sug({ suggestedLookupValue: 'Water Heater' }), // present
-        sug({ suggestedLookupValue: 'Dishwasher' }),   // absent
-      ]),
+        sug({ suggestedLookupValue: 'Dishwasher' }) // absent
+      ])
     });
     expect(wasFlagged(result, 'Local Heater')).toBe(false);
   });
@@ -243,11 +226,12 @@ describe('computeVariations: suppression is entry-level any-one + form-agnostic,
   it('display source · several suggestions · none present → whole entry fails', async () => {
     const result = await computeVariations({
       metadataReportJson: metadataReport([LOCAL]),
-      version: DD_2_0, fuzziness: FUZZ,
+      version: DD_2_0,
+      fuzziness: FUZZ,
       suggestionsMap: multiSuggestionsFor('Local Heater', [
         sug({ suggestedLookupValue: 'Water Heater' }), // absent
-        sug({ suggestedLookupValue: 'Dishwasher' }),   // absent
-      ]),
+        sug({ suggestedLookupValue: 'Dishwasher' }) // absent
+      ])
     });
     expect(wasFlagged(result, 'Local Heater')).toBe(true);
   });
@@ -256,10 +240,11 @@ describe('computeVariations: suppression is entry-level any-one + form-agnostic,
   it('display source · wire-form suggestion · vendor has wire form → passes (display site checks wire too)', async () => {
     const result = await computeVariations({
       metadataReportJson: metadataReport([LOCAL, CANON]),
-      version: DD_2_0, fuzziness: FUZZ,
+      version: DD_2_0,
+      fuzziness: FUZZ,
       suggestionsMap: multiSuggestionsFor('Local Heater', [
-        sug({ suggestedLegacyODataValue: 'WaterHeater' }), // wire-form target; vendor has WaterHeater (wire)
-      ]),
+        sug({ suggestedLegacyODataValue: 'WaterHeater' }) // wire-form target; vendor has WaterHeater (wire)
+      ])
     });
     expect(wasFlagged(result, 'Local Heater')).toBe(false);
   });
@@ -267,10 +252,11 @@ describe('computeVariations: suppression is entry-level any-one + form-agnostic,
   it('wire source · display-form suggestion · vendor has display form → passes (wire site checks display too)', async () => {
     const result = await computeVariations({
       metadataReportJson: metadataReport([LOCAL, CANON]),
-      version: DD_2_0, fuzziness: FUZZ,
+      version: DD_2_0,
+      fuzziness: FUZZ,
       suggestionsMap: multiSuggestionsFor('LocalHeater', [
-        sug({ suggestedLookupValue: 'Water Heater' }), // display-form target; vendor has Water Heater (display)
-      ]),
+        sug({ suggestedLookupValue: 'Water Heater' }) // display-form target; vendor has Water Heater (display)
+      ])
     });
     expect(wasFlagged(result, 'LocalHeater')).toBe(false);
   });

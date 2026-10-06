@@ -20,9 +20,9 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { describe, it, expect } from 'vitest';
-import { applySheetToReport, countEntries, SHEET_ACTIONS } from '../../src/variations/decisions.js';
+import { describe, expect, it } from 'vitest';
 import { VARIATION_LEVEL_KEYS } from '../../src/variations/constants.js';
+import { SHEET_ACTIONS, applySheetToReport, countEntries } from '../../src/variations/decisions.js';
 import type { DecisionReport } from '../../src/variations/decisions.js';
 
 const NOW = '2026-10-05T04:30:00.000Z';
@@ -30,8 +30,7 @@ const NOW = '2026-10-05T04:30:00.000Z';
 const report = (): DecisionReport =>
   JSON.parse(readFileSync(new URL('../fixtures/variations-report-level-buckets.json', import.meta.url), 'utf-8')) as DecisionReport;
 
-const apply = (rows: ReadonlyArray<Record<string, unknown>>, r: DecisionReport = report()) =>
-  applySheetToReport(r, rows as never, NOW);
+const apply = (rows: ReadonlyArray<Record<string, unknown>>, r: DecisionReport = report()) => applySheetToReport(r, rows as never, NOW);
 
 /** The entry a row landed on, found by its identity rather than by index. */
 const lookupAt = (r: DecisionReport, value: string) => (r.lookups ?? []).find(e => e.lookupValue === value);
@@ -132,7 +131,9 @@ describe('a comment names who may read it', () => {
   it('appends the comment with the report’s organization as its audience', () => {
     // Josh: "it's from Admin targeted at providerUoi", "anyone who has an account at providerUoi
     // sees it". No `from`: that is filled from the auth context, which a client cannot read.
-    const out = apply([{ resourceName: 'Property', fieldName: 'LeaseTerm', lookupValue: 'Months - 4', comment: 'DD has no 4-month term.' }]);
+    const out = apply([
+      { resourceName: 'Property', fieldName: 'LeaseTerm', lookupValue: 'Months - 4', comment: 'DD has no 4-month term.' }
+    ]);
     expect(lookupAt(out.report, 'Months - 4')?.conversations).toEqual([
       { timestamp: NOW, to: 'T00000045', message: 'DD has no 4-month term.' }
     ]);
@@ -140,12 +141,23 @@ describe('a comment names who may read it', () => {
 
   it('carries an action and a comment on the same row', () => {
     const out = apply([
-      { resourceName: 'Property', fieldName: 'LeaseTerm', lookupValue: 'Months - 4', action: 'submit-to-ft', comment: 'Is the enumeration sufficient?' }
+      {
+        resourceName: 'Property',
+        fieldName: 'LeaseTerm',
+        lookupValue: 'Months - 4',
+        action: 'submit-to-ft',
+        comment: 'Is the enumeration sufficient?'
+      }
     ]);
     const entry = lookupAt(out.report, 'Months - 4');
     expect(entry?.flaggedForFastTrack).toBe(true);
     expect(entry?.conversations).toHaveLength(1);
-    expect(out.applied[0]).toEqual({ bucket: 'lookups', element: 'Property.LeaseTerm.Months - 4', action: 'submit-to-ft', commented: true });
+    expect(out.applied[0]).toEqual({
+      bucket: 'lookups',
+      element: 'Property.LeaseTerm.Months - 4',
+      action: 'submit-to-ft',
+      commented: true
+    });
   });
 
   it('appends to an existing thread rather than replacing it', () => {
@@ -153,7 +165,9 @@ describe('a comment names who may read it', () => {
     const withThread: DecisionReport = {
       ...base,
       lookups: (base.lookups ?? []).map(e =>
-        e.lookupValue === 'Months - 4' ? { ...e, conversations: [{ timestamp: '2026-10-01T00:00:00.000Z', to: 'RESO', message: 'earlier' }] } : e
+        e.lookupValue === 'Months - 4'
+          ? { ...e, conversations: [{ timestamp: '2026-10-01T00:00:00.000Z', to: 'RESO', message: 'earlier' }] }
+          : e
       )
     };
     const out = apply([{ resourceName: 'Property', fieldName: 'LeaseTerm', lookupValue: 'Months - 4', comment: 'later' }], withThread);
@@ -280,7 +294,13 @@ describe('a row carries the suggestion it targets', () => {
 
   it('reports the targeted suggestion on the applied row', () => {
     const out = apply([
-      { resourceName: 'Property', fieldName: 'OKC_SoilType', suggestedResourceName: 'Property', suggestedFieldName: 'SoilType', action: 'ignore' }
+      {
+        resourceName: 'Property',
+        fieldName: 'OKC_SoilType',
+        suggestedResourceName: 'Property',
+        suggestedFieldName: 'SoilType',
+        action: 'ignore'
+      }
     ]);
     expect(out.applied[0].mapping).toEqual({ suggestedResourceName: 'Property', suggestedFieldName: 'SoilType' });
   });
@@ -307,14 +327,27 @@ describe('a suggestion must be named at the same depth as its target', () => {
 
   it('refuses a field-level target with a lookup-level suggestion', () => {
     const out = apply([
-      { resourceName: 'Property', fieldName: 'OKC_SoilType', suggestedResourceName: 'Property', suggestedFieldName: 'SoilType', suggestedLookupValue: 'Clay', action: 'ignore' }
+      {
+        resourceName: 'Property',
+        fieldName: 'OKC_SoilType',
+        suggestedResourceName: 'Property',
+        suggestedFieldName: 'SoilType',
+        suggestedLookupValue: 'Clay',
+        action: 'ignore'
+      }
     ]);
     expect(out.errors[0]).toMatch(/goes deeper than the target/);
   });
 
   it('accepts a matching field-level pair', () => {
     const out = apply([
-      { resourceName: 'Property', fieldName: 'OKC_SoilType', suggestedResourceName: 'Property', suggestedFieldName: 'SoilType', action: 'ignore' }
+      {
+        resourceName: 'Property',
+        fieldName: 'OKC_SoilType',
+        suggestedResourceName: 'Property',
+        suggestedFieldName: 'SoilType',
+        action: 'ignore'
+      }
     ]);
     expect(out.errors).toEqual([]);
   });
@@ -327,7 +360,15 @@ describe('a suggestion must be named at the same depth as its target', () => {
 
   it('treats the legacy OData form as the same depth as a lookup value', () => {
     const out = apply([
-      { resourceName: 'Property', fieldName: 'LeaseTerm', lookupValue: 'Months - 4', suggestedResourceName: 'Property', suggestedFieldName: 'LeaseTerm', suggestedLegacyODataValue: 'ThreeMonths', action: 'ignore' }
+      {
+        resourceName: 'Property',
+        fieldName: 'LeaseTerm',
+        lookupValue: 'Months - 4',
+        suggestedResourceName: 'Property',
+        suggestedFieldName: 'LeaseTerm',
+        suggestedLegacyODataValue: 'ThreeMonths',
+        action: 'ignore'
+      }
     ]);
     expect(out.errors).toEqual([]);
   });
@@ -336,8 +377,20 @@ describe('a suggestion must be named at the same depth as its target', () => {
 describe('two rows cannot target different suggestions on one element', () => {
   it('refuses rather than picking one', () => {
     const out = apply([
-      { resourceName: 'Property', fieldName: 'OKC_SoilType', suggestedResourceName: 'Property', suggestedFieldName: 'SoilType', action: 'ignore' },
-      { resourceName: 'Property', fieldName: 'OKC_SoilType', suggestedResourceName: 'Property', suggestedFieldName: 'SoilClass', comment: 'or this one' }
+      {
+        resourceName: 'Property',
+        fieldName: 'OKC_SoilType',
+        suggestedResourceName: 'Property',
+        suggestedFieldName: 'SoilType',
+        action: 'ignore'
+      },
+      {
+        resourceName: 'Property',
+        fieldName: 'OKC_SoilType',
+        suggestedResourceName: 'Property',
+        suggestedFieldName: 'SoilClass',
+        comment: 'or this one'
+      }
     ]);
     expect(out.errors[0]).toMatch(/different suggestions on the same element/);
   });

@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
+import { describe, expect, it } from 'vitest';
+import { mergeWithLookupResource, synthesizeLookupResourceRecords } from '../../src/metadata/lookup-resource.js';
 import { generateReferenceEdmx } from '../../src/metadata/reference-edmx.js';
-import { synthesizeLookupResourceRecords, mergeWithLookupResource } from '../../src/metadata/lookup-resource.js';
 
 /** A minimal Property report: an Edm primitive key plus one enum field with two lookup values. */
 const report: MetadataReport = {
@@ -12,14 +12,30 @@ const report: MetadataReport = {
   resources: [{ resourceName: 'Property' }],
   fields: [
     { resourceName: 'Property', fieldName: 'ListingKey', type: 'Edm.String', annotations: [] },
-    { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus', isEnumeration: true, annotations: [] },
+    {
+      resourceName: 'Property',
+      fieldName: 'StandardStatus',
+      type: 'org.reso.metadata.enums.StandardStatus',
+      isEnumeration: true,
+      annotations: []
+    }
   ],
   lookups: [
-    { lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Active', type: 'Edm.Int32', annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Active' }] },
-    { lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Pending', type: 'Edm.Int32', annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Pending Sale' }] },
+    {
+      lookupName: 'org.reso.metadata.enums.StandardStatus',
+      lookupValue: 'Active',
+      type: 'Edm.Int32',
+      annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Active' }]
+    },
+    {
+      lookupName: 'org.reso.metadata.enums.StandardStatus',
+      lookupValue: 'Pending',
+      type: 'Edm.Int32',
+      annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Pending Sale' }]
+    }
   ],
   actions: [],
-  functions: [],
+  functions: []
 };
 
 describe('generateReferenceEdmx', () => {
@@ -32,7 +48,7 @@ describe('generateReferenceEdmx', () => {
 
   // The self-test contract in miniature: generate EDMX from the DD report, parse it back to a
   // report, and the enum field is still detected as an enumeration in BOTH representations.
-  it.each(['enum-type', 'string'] as const)('round-trips the enum field as an enumeration in %s mode', (enumMode) => {
+  it.each(['enum-type', 'string'] as const)('round-trips the enum field as an enumeration in %s mode', enumMode => {
     const edmx = generateReferenceEdmx(report, ['Property'], enumMode);
     const roundTripped = generateMetadataReport(edmx, '2.1');
     const field = roundTripped.fields.find(f => f.fieldName === 'StandardStatus');
@@ -124,13 +140,17 @@ describe('primary key in the metadata report', () => {
   // reference, which does not encode keys through 2.1, still yields a keyed report.
   it('blends the {ResourceName}Key convention into <Key> and serializes it back as isPrimaryKey', () => {
     const conv: MetadataReport = {
-      description: 'test', version: '2.1', generatedOn: '2026-06-19T00:00:00.000Z',
+      description: 'test',
+      version: '2.1',
+      generatedOn: '2026-06-19T00:00:00.000Z',
       resources: [{ resourceName: 'Member' }],
       fields: [
         { resourceName: 'Member', fieldName: 'MemberKey', type: 'Edm.String', annotations: [] },
-        { resourceName: 'Member', fieldName: 'MemberFirstName', type: 'Edm.String', annotations: [] },
+        { resourceName: 'Member', fieldName: 'MemberFirstName', type: 'Edm.String', annotations: [] }
       ],
-      lookups: [], actions: [], functions: [],
+      lookups: [],
+      actions: [],
+      functions: []
     };
     const rt = generateMetadataReport(generateReferenceEdmx(conv, ['Member'], 'string'), '2.1');
     expect(rt.fields.find(f => f.fieldName === 'MemberKey')?.isPrimaryKey).toBe(true);
@@ -141,13 +161,17 @@ describe('primary key in the metadata report', () => {
   // the convention: generateEdmx prefers the field's own isPrimaryKey for the <Key>.
   it('prefers a data-carried isPrimaryKey over the convention fallback', () => {
     const dataKeyed: MetadataReport = {
-      description: 'test', version: '2.2', generatedOn: '2026-06-19T00:00:00.000Z',
+      description: 'test',
+      version: '2.2',
+      generatedOn: '2026-06-19T00:00:00.000Z',
       resources: [{ resourceName: 'Widget' }],
       fields: [
         { resourceName: 'Widget', fieldName: 'CustomId', type: 'Edm.String', isPrimaryKey: true, annotations: [] },
-        { resourceName: 'Widget', fieldName: 'WidgetKey', type: 'Edm.String', annotations: [] },
+        { resourceName: 'Widget', fieldName: 'WidgetKey', type: 'Edm.String', annotations: [] }
       ],
-      lookups: [], actions: [], functions: [],
+      lookups: [],
+      actions: [],
+      functions: []
     };
     const edmx = generateReferenceEdmx(dataKeyed, ['Widget'], 'string');
     expect(edmx).toContain('<PropertyRef Name="CustomId"/>');
@@ -162,14 +186,18 @@ describe('primary key in the metadata report', () => {
   // single-key, but live-server metadata can be compound.)
   it('emits a PropertyRef per isPrimaryKey field for a compound key and round-trips all of them', () => {
     const compound: MetadataReport = {
-      description: 'test', version: '2.2', generatedOn: '2026-06-19T00:00:00.000Z',
+      description: 'test',
+      version: '2.2',
+      generatedOn: '2026-06-19T00:00:00.000Z',
       resources: [{ resourceName: 'Pair' }],
       fields: [
         { resourceName: 'Pair', fieldName: 'PartA', type: 'Edm.String', isPrimaryKey: true, annotations: [] },
         { resourceName: 'Pair', fieldName: 'PartB', type: 'Edm.String', isPrimaryKey: true, annotations: [] },
-        { resourceName: 'Pair', fieldName: 'Payload', type: 'Edm.String', annotations: [] },
+        { resourceName: 'Pair', fieldName: 'Payload', type: 'Edm.String', annotations: [] }
       ],
-      lookups: [], actions: [], functions: [],
+      lookups: [],
+      actions: [],
+      functions: []
     };
     const edmx = generateReferenceEdmx(compound, ['Pair'], 'string');
     expect(edmx).toContain('<PropertyRef Name="PartA"/>');

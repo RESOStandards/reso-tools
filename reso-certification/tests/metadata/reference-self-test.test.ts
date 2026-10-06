@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 /**
  * DD reference self-test — the reference must be silent under its own checks.
  *
@@ -13,13 +15,11 @@
  * is intact end-to-end. The TEETH tests below deliberately corrupt a value and require a flag —
  * without them, a mis-wired harness would pass silently (the false-negative silent killer).
  */
-import { describe, it, expect } from 'vitest';
-import { resolve } from 'node:path';
-import { computeVariationsV2 } from '../../src/variations-v2/compute.js';
-import { generateReferenceArtifacts } from '../../src/metadata/reference-artifacts.js';
+import { describe, expect, it } from 'vitest';
 import { runDdMetadataChecks } from '../../src/metadata/dd-metadata-checks.js';
 import type { DdReference } from '../../src/metadata/dd-metadata-checks.js';
-import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
+import { generateReferenceArtifacts } from '../../src/metadata/reference-artifacts.js';
+import { computeVariationsV2 } from '../../src/variations-v2/compute.js';
 
 const createRequire = (await import('node:module')).createRequire;
 const require = createRequire(import.meta.url);
@@ -34,47 +34,50 @@ const REP_MODES = ['string', 'enum-type'] as const;
 const VERSION = '2.1';
 
 const variationCounts = (variations: Json): Record<string, number> =>
-  Object.fromEntries(VARIATION_LEVELS.map((l) => [l, ((variations[l] as unknown[]) ?? []).length]));
-const totalVariations = (variations: Json): number =>
-  VARIATION_LEVELS.reduce((n, l) => n + ((variations[l] as unknown[]) ?? []).length, 0);
+  Object.fromEntries(VARIATION_LEVELS.map(l => [l, ((variations[l] as unknown[]) ?? []).length]));
+const totalVariations = (variations: Json): number => VARIATION_LEVELS.reduce((n, l) => n + ((variations[l] as unknown[]) ?? []).length, 0);
 
 const runSelfCheck = (report: MetadataReport, ref: Json): Json =>
-  (computeVariationsV2({ metadataReportJson: report as Json, referenceMetadata: ref, version: VERSION }) as { variations: Json }).variations;
+  (
+    computeVariationsV2({ metadataReportJson: report as unknown as Json, referenceMetadata: ref, version: VERSION }) as unknown as {
+      variations: Json;
+    }
+  ).variations;
 
 describe('DD reference self-test (DD 2.1)', () => {
   const ref = getReferenceMetadata(VERSION) as MetadataReport;
   const targetResources = ref.resources as unknown as string[];
 
-  it.each(REP_MODES)('rep=%s: the generated reference produces ZERO variations against the DD', (enumMode) => {
+  it.each(REP_MODES)('rep=%s: the generated reference produces ZERO variations against the DD', enumMode => {
     const { metadataReport } = generateReferenceArtifacts(ref, targetResources, enumMode, VERSION);
-    const variations = runSelfCheck(metadataReport, ref as Json);
+    const variations = runSelfCheck(metadataReport, ref as unknown as Json);
     // Per-level breakdown so a regression shows exactly which level drifted.
-    expect(variationCounts(variations)).toEqual(Object.fromEntries(VARIATION_LEVELS.map((l) => [l, 0])));
+    expect(variationCounts(variations)).toEqual(Object.fromEntries(VARIATION_LEVELS.map(l => [l, 0])));
   });
 
-  it.each(REP_MODES)('rep=%s TEETH: a corrupted lookup value surfaces a variation (the check is live)', (enumMode) => {
+  it.each(REP_MODES)('rep=%s TEETH: a corrupted lookup value surfaces a variation (the check is live)', enumMode => {
     const { metadataReport } = generateReferenceArtifacts(ref, targetResources, enumMode, VERSION);
     // Corrupt one StandardStatus value end-to-end (machine value + every annotation) to a near-miss
     // of its canonical — flags via the lookup path (string rep) or the legacyOData path (enum-type).
-    const corrupt = (v: string): string =>
-      v === 'ActiveUnderContract' || v === 'Active Under Contract' ? `${v}Xyz` : v;
+    const corrupt = (v: string): string => (v === 'ActiveUnderContract' || v === 'Active Under Contract' ? `${v}Xyz` : v);
     const corrupted: MetadataReport = {
       ...metadataReport,
-      lookups: metadataReport.lookups.map((l) =>
+      lookups: metadataReport.lookups.map(l =>
         String(l.lookupName).endsWith('StandardStatus') && l.lookupValue === 'ActiveUnderContract'
-          ? { ...l, lookupValue: `${l.lookupValue}Xyz`, annotations: (l.annotations ?? []).map((a) => ({ ...a, value: corrupt(a.value) })) }
-          : l),
+          ? { ...l, lookupValue: `${l.lookupValue}Xyz`, annotations: (l.annotations ?? []).map(a => ({ ...a, value: corrupt(a.value) })) }
+          : l
+      )
     };
-    expect(totalVariations(runSelfCheck(corrupted, ref as Json))).toBeGreaterThan(0);
+    expect(totalVariations(runSelfCheck(corrupted, ref as unknown as Json))).toBeGreaterThan(0);
   });
 
   it('TEETH (fields): a corrupted field name surfaces a field variation (the check is live)', () => {
     const { metadataReport } = generateReferenceArtifacts(ref, targetResources, 'string', VERSION);
     const corrupted: MetadataReport = {
       ...metadataReport,
-      fields: metadataReport.fields.map((f, i) => (i === 0 ? { ...f, fieldName: `${f.fieldName}Xyz` } : f)),
+      fields: metadataReport.fields.map((f, i) => (i === 0 ? { ...f, fieldName: `${f.fieldName}Xyz` } : f))
     };
-    expect(((runSelfCheck(corrupted, ref as Json).fields as unknown[]) ?? []).length).toBeGreaterThan(0);
+    expect(((runSelfCheck(corrupted, ref as unknown as Json).fields as unknown[]) ?? []).length).toBeGreaterThan(0);
   });
 
   // Coverage caveat: an EnumType member must be a valid OData SimpleIdentifier, so the enum-type rep
@@ -86,7 +89,7 @@ describe('DD reference self-test (DD 2.1)', () => {
     const stringLookups = generateReferenceArtifacts(ref, targetResources, 'string', VERSION).metadataReport.lookups;
     const enumLookups = generateReferenceArtifacts(ref, targetResources, 'enum-type', VERSION).metadataReport.lookups;
 
-    const nonIdentifier = enumLookups.filter((l) => !SIMPLE_IDENTIFIER.test(String(l.lookupValue)));
+    const nonIdentifier = enumLookups.filter(l => !SIMPLE_IDENTIFIER.test(String(l.lookupValue)));
     expect(nonIdentifier).toEqual([]);
     expect(stringLookups.length).toBeGreaterThanOrEqual(enumLookups.length);
   });
@@ -98,9 +101,9 @@ describe('DD metadata gate self-test (DD 2.1)', () => {
   const ref = getReferenceMetadata(VERSION) as MetadataReport;
   const targetResources = ref.resources as unknown as string[];
   const gateErrors = (report: MetadataReport) =>
-    runDdMetadataChecks(report, ref as unknown as DdReference).filter((f) => f.severity === 'error');
+    runDdMetadataChecks(report, ref as unknown as DdReference).filter(f => f.severity === 'error');
 
-  it.each(REP_MODES)('rep=%s: the generated reference passes the metadata gate with ZERO errors', (enumMode) => {
+  it.each(REP_MODES)('rep=%s: the generated reference passes the metadata gate with ZERO errors', enumMode => {
     const { metadataReport } = generateReferenceArtifacts(ref, targetResources, enumMode, VERSION);
     expect(gateErrors(metadataReport)).toEqual([]);
   });
@@ -110,10 +113,13 @@ describe('DD metadata gate self-test (DD 2.1)', () => {
     // NormalizedListingStatus is a disallowed synonym of Property.StandardStatus.
     const corrupted: MetadataReport = {
       ...metadataReport,
-      fields: [...metadataReport.fields, { resourceName: 'Property', fieldName: 'NormalizedListingStatus', type: 'Edm.String', annotations: [] }],
+      fields: [
+        ...metadataReport.fields,
+        { resourceName: 'Property', fieldName: 'NormalizedListingStatus', type: 'Edm.String', annotations: [] }
+      ]
     };
     const errors = gateErrors(corrupted);
-    expect(errors.some((e) => e.check === 'disallowed-synonym')).toBe(true);
+    expect(errors.some(e => e.check === 'disallowed-synonym')).toBe(true);
   });
 
   it('TEETH: a wrong field data type surfaces a gate error', () => {
@@ -121,9 +127,10 @@ describe('DD metadata gate self-test (DD 2.1)', () => {
     // Force the Decimal field ListPrice to an Edm.String type.
     const corrupted: MetadataReport = {
       ...metadataReport,
-      fields: metadataReport.fields.map((f) =>
-        f.resourceName === 'Property' && f.fieldName === 'ListPrice' ? { ...f, type: 'Edm.String', isEnumeration: false } : f),
+      fields: metadataReport.fields.map(f =>
+        f.resourceName === 'Property' && f.fieldName === 'ListPrice' ? { ...f, type: 'Edm.String', isEnumeration: false } : f
+      )
     };
-    expect(gateErrors(corrupted).some((e) => e.check === 'field-type')).toBe(true);
+    expect(gateErrors(corrupted).some(e => e.check === 'field-type')).toBe(true);
   });
 });

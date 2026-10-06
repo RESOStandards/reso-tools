@@ -4,15 +4,61 @@ import type { CoreScenario } from '../src/web-api-core/scenarios.js';
 
 // Minimal scenario fixtures (only the fields emptyVerdict reads).
 const filter = (op: string, extra: Record<string, unknown> = {}): CoreScenario =>
-  ({ tag: 't', name: 'n', category: 'filter', dataType: 'integer', op, fieldParam: 'integerField', valueParam: 'integerValueLow', minVersion: '2.0.0', ...extra }) as CoreScenario;
+  ({
+    tag: 't',
+    name: 'n',
+    category: 'filter',
+    dataType: 'integer',
+    op,
+    fieldParam: 'integerField',
+    valueParam: 'integerValueLow',
+    minVersion: '2.0.0',
+    ...extra
+  }) as CoreScenario;
 const enumS = (op: string, extra: Record<string, unknown> = {}): CoreScenario =>
-  ({ tag: 't', name: 'n', category: 'enum', enumType: 'single', op, fieldParam: 'singleLookupField', valueParam: 'singleLookupValue', minVersion: '2.0.0', ...extra }) as CoreScenario;
+  ({
+    tag: 't',
+    name: 'n',
+    category: 'enum',
+    enumType: 'single',
+    op,
+    fieldParam: 'singleLookupField',
+    valueParam: 'singleLookupValue',
+    minVersion: '2.0.0',
+    ...extra
+  }) as CoreScenario;
 const coll = (lambda: string): CoreScenario =>
-  ({ tag: 't', name: 'n', category: 'collection', lambda, fieldParam: 'multiLookupField', valueParam: 'multiLookupValue1', minVersion: '2.0.0' }) as CoreScenario;
+  ({
+    tag: 't',
+    name: 'n',
+    category: 'collection',
+    lambda,
+    fieldParam: 'multiLookupField',
+    valueParam: 'multiLookupValue1',
+    minVersion: '2.0.0'
+  }) as CoreScenario;
 const strEnum = (op: string, extra: Record<string, unknown> = {}): CoreScenario =>
-  ({ tag: 't', name: 'n', category: 'string-enum', enumType: 'single', op, fieldParam: 'singleLookupField', valueParam: 'singleLookupValue', minVersion: '2.1.0', ...extra }) as CoreScenario;
+  ({
+    tag: 't',
+    name: 'n',
+    category: 'string-enum',
+    enumType: 'single',
+    op,
+    fieldParam: 'singleLookupField',
+    valueParam: 'singleLookupValue',
+    minVersion: '2.1.0',
+    ...extra
+  }) as CoreScenario;
 const inOp = (): CoreScenario =>
-  ({ tag: 't', name: 'n', category: 'in-operator', enumType: 'single', fieldParam: 'singleLookupField', valueParams: ['a', 'b'], minVersion: '2.1.0' }) as CoreScenario;
+  ({
+    tag: 't',
+    name: 'n',
+    category: 'in-operator',
+    enumType: 'single',
+    fieldParam: 'singleLookupField',
+    valueParams: ['a', 'b'],
+    minVersion: '2.1.0'
+  }) as CoreScenario;
 const structural = (): CoreScenario =>
   ({ tag: 't', name: 'n', category: 'structural', assertion: 'metadata', minVersion: '2.0.0' }) as CoreScenario;
 
@@ -81,7 +127,9 @@ describe('emptyVerdict — RECORD-DERIVED all() / has-and flips skip → fail (t
   });
   it('recordDerivedSet is inert to ne / scalar / compound (never a record-derived set there)', () => {
     expect(emptyVerdict(enumS('ne'), { recordDerivedSet: true })).toBe('skip'); // ne with no distinct info → skip
-    expect(emptyVerdict(filter('gt', { compound: { op2: 'lt', valueParam2: 'integerValueHigh', logical: 'and' } }), { recordDerivedSet: true })).toBe('skip');
+    expect(
+      emptyVerdict(filter('gt', { compound: { op2: 'lt', valueParam2: 'integerValueHigh', logical: 'and' } }), { recordDerivedSet: true })
+    ).toBe('skip');
   });
 });
 

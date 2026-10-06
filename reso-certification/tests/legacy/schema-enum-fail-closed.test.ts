@@ -1,11 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { generateJsonSchema, validate, combineErrors } = require(
-  resolve(import.meta.dirname, '../../src/legacy/lib/schema/index.js')
-);
+const { generateJsonSchema, validate, combineErrors } = require(resolve(import.meta.dirname, '../../src/legacy/lib/schema/index.js'));
 
 // Coverage for the schema-generator enum rules established alongside the isLookupField / fail-closed
 // change in src/legacy/lib/schema/generate.js. The canonical narrative lives in the registry's
@@ -104,7 +102,13 @@ describe('schema fail-closed — declared enumeration advertising zero values', 
 
 describe('ComplexTypes are not enumerations — never fail-closed', () => {
   // A nominal (non-Edm) type with no advertised values, no LookupName annotation, no isEnumeration.
-  const complex = { resourceName: 'Property', fieldName: 'SomeComplex', type: 'org.reso.metadata.SomeComplexType', isCollection: false, nullable: true };
+  const complex = {
+    resourceName: 'Property',
+    fieldName: 'SomeComplex',
+    type: 'org.reso.metadata.SomeComplexType',
+    isCollection: false,
+    nullable: true
+  };
   const fields = [KEY, complex];
   it('is typed as an object with no enum', async () => {
     const def = await defOf(fields, 'SomeComplex');

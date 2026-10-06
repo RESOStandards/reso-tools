@@ -4,11 +4,11 @@ import {
   integerNotSentinelFor,
   isSampleComplete,
   modificationTimestampWarning,
-  numericStats,
   nowFieldPastnessFor,
+  numericStats,
   rankDatetimeFields,
   selectTimestampField,
-  selectTimestampFieldForNow,
+  selectTimestampFieldForNow
 } from '../src/web-api-core/sampling.js';
 import type { StandardMap } from '../src/web-api-core/standard-map.js';
 
@@ -18,7 +18,7 @@ const standardMapFor = (standardFields: ReadonlyArray<string>): StandardMap => (
   isStandardValue: () => false,
   standardValues: () => new Set<string>(),
   standardValuesForField: () => undefined,
-  isClosedEnumField: () => false,
+  isClosedEnumField: () => false
 });
 
 // A fixed "now" so past/future classification is deterministic.
@@ -88,7 +88,7 @@ describe('numericStats — min / max / median and NUMERIC distinct dedup', () =>
   it('drops non-finite values and returns undefined when nothing finite remains', () => {
     expect(numericStats(['abc', null, undefined])).toBeUndefined();
     expect(numericStats([])).toBeUndefined();
-    expect(numericStats([NaN, Number.POSITIVE_INFINITY, 7]).distinct).toBe(1); // only 7 survives
+    expect(numericStats([Number.NaN, Number.POSITIVE_INFINITY, 7])?.distinct).toBe(1); // only 7 survives
   });
 });
 
@@ -108,7 +108,7 @@ describe('timestamp selection — the general slot (#315: standard-first, most-u
     const fields = ['OpenHouseStartTime', 'OpenHouseEndTime', 'ModificationTimestamp'];
     const records = [
       { OpenHouseStartTime: FUTURE, OpenHouseEndTime: FUTURE, ModificationTimestamp: PAST },
-      { OpenHouseStartTime: FUTURE, OpenHouseEndTime: FUTURE, ModificationTimestamp: PAST },
+      { OpenHouseStartTime: FUTURE, OpenHouseEndTime: FUTURE, ModificationTimestamp: PAST }
     ];
     expect(selectTimestampField(fields, records, standardMapFor(fields), 'OpenHouse')).toBe('ModificationTimestamp');
   });
@@ -118,7 +118,7 @@ describe('timestamp selection — the general slot (#315: standard-first, most-u
     const fields = ['LocalAuditTime', 'OriginalEntryTimestamp'];
     const records = [
       { LocalAuditTime: PAST, OriginalEntryTimestamp: PAST },
-      { LocalAuditTime: PAST, OriginalEntryTimestamp: null },
+      { LocalAuditTime: PAST, OriginalEntryTimestamp: null }
     ];
     expect(selectTimestampField(fields, records, standardMapFor(['OriginalEntryTimestamp']), 'Property')).toBe('OriginalEntryTimestamp');
   });
@@ -127,11 +127,11 @@ describe('timestamp selection — the general slot (#315: standard-first, most-u
     const fields = ['PhotosChangeTimestamp', 'OriginalEntryTimestamp'];
     const records = [
       { PhotosChangeTimestamp: null, OriginalEntryTimestamp: PAST },
-      { PhotosChangeTimestamp: PAST, OriginalEntryTimestamp: PAST },
+      { PhotosChangeTimestamp: PAST, OriginalEntryTimestamp: PAST }
     ];
     expect(rankDatetimeFields(fields, records, standardMapFor(fields), 'Property')).toEqual([
       'OriginalEntryTimestamp',
-      'PhotosChangeTimestamp',
+      'PhotosChangeTimestamp'
     ]);
   });
 
@@ -165,7 +165,12 @@ describe('timestamp selection — the general slot (#315: standard-first, most-u
 
   it('returns undefined when no datetime field is populated', () => {
     expect(
-      selectTimestampField(['ModificationTimestamp'], [{ ModificationTimestamp: null }], standardMapFor(['ModificationTimestamp']), 'Property'),
+      selectTimestampField(
+        ['ModificationTimestamp'],
+        [{ ModificationTimestamp: null }],
+        standardMapFor(['ModificationTimestamp']),
+        'Property'
+      )
     ).toBeUndefined();
   });
 });
@@ -203,18 +208,30 @@ describe('timestamp selection — the lt/le now() slot needs a field carrying a 
 
 describe('modificationTimestampWarning — reported, never failed by Core (#315)', () => {
   it('is undefined when ModificationTimestamp is present and populated', () => {
-    expect(modificationTimestampWarning(['ModificationTimestamp'], [{ ModificationTimestamp: PAST }], 'Property', 'ModificationTimestamp')).toBeUndefined();
+    expect(
+      modificationTimestampWarning(['ModificationTimestamp'], [{ ModificationTimestamp: PAST }], 'Property', 'ModificationTimestamp')
+    ).toBeUndefined();
   });
 
   it('warns and names the substitute when the resource does not declare it', () => {
-    const w = modificationTimestampWarning(['OriginalEntryTimestamp'], [{ OriginalEntryTimestamp: PAST }], 'Property', 'OriginalEntryTimestamp');
+    const w = modificationTimestampWarning(
+      ['OriginalEntryTimestamp'],
+      [{ OriginalEntryTimestamp: PAST }],
+      'Property',
+      'OriginalEntryTimestamp'
+    );
     expect(w).toContain('does not declare it');
     expect(w).toContain("'OriginalEntryTimestamp'");
     expect(w).toContain('Data Dictionary');
   });
 
   it('distinguishes declared-but-unpopulated from not declared at all', () => {
-    const w = modificationTimestampWarning(['ModificationTimestamp', 'PhotosChangeTimestamp'], [{ ModificationTimestamp: null, PhotosChangeTimestamp: PAST }], 'Property', 'PhotosChangeTimestamp');
+    const w = modificationTimestampWarning(
+      ['ModificationTimestamp', 'PhotosChangeTimestamp'],
+      [{ ModificationTimestamp: null, PhotosChangeTimestamp: PAST }],
+      'Property',
+      'PhotosChangeTimestamp'
+    );
     expect(w).toContain('sampled no value for it');
   });
 });
@@ -226,11 +243,11 @@ const sampleForPastness = async (records: ReadonlyArray<Record<string, unknown>>
   const entityType = {
     name: 'OpenHouse',
     keyProperties: ['ListingKey'],
-    properties: [{ name: 'ListingKey', type: 'Edm.String' }, ...names.map(n => ({ name: n, type: 'Edm.DateTimeOffset' }))],
+    properties: [{ name: 'ListingKey', type: 'Edm.String' }, ...names.map(n => ({ name: n, type: 'Edm.DateTimeOffset' }))]
   };
   const page = { status: 200, headers: { 'odata-version': '4.01' }, body: { value: records }, rawBody: '' };
   return resolveTestParams('http://x', 'OpenHouse', entityType as never, 'tok', [], standardMapFor([...names]), undefined, {
-    request: async () => page as never,
+    request: async () => page as never
   });
 };
 

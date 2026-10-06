@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { basename, resolve } from 'node:path';
 import { createRequire } from 'node:module';
-import { validateSchemaPayload, resolveSettingsPath, loadSettings } from '../src/cli/schema-command.js';
+import { basename, resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { loadSettings, resolveSettingsPath, validateSchemaPayload } from '../src/cli/schema-command.js';
 
 const require = createRequire(import.meta.url);
 const { getReferenceMetadata } = require(resolve(import.meta.dirname, '../src/etl/index.cjs'));
@@ -13,7 +13,7 @@ const { valuePayload, enumMismatchPayload } = require(resolve(import.meta.dirnam
 const CITY = 'org.reso.metadata.enums.City';
 const advertise = (meta: { lookups: unknown[] }, entries: ReadonlyArray<readonly [string, string]>) => ({
   ...meta,
-  lookups: [...meta.lookups, ...entries.map(([lookupName, lookupValue]) => ({ lookupName, lookupValue, type: 'Edm.String' }))],
+  lookups: [...meta.lookups, ...entries.map(([lookupName, lookupValue]) => ({ lookupName, lookupValue, type: 'Edm.String' }))]
 });
 const metadata = advertise(getReferenceMetadata('2.0'), [[CITY, 'SampleCityEnumValue']]);
 
@@ -23,7 +23,7 @@ describe('validateSchemaPayload — the schema command verdict core', () => {
       metadataReportJson: metadata,
       jsonPayload: valuePayload,
       resourceName: 'Property',
-      version: '2.0',
+      version: '2.0'
     });
     expect(totalErrors).toBe(0);
   });
@@ -33,7 +33,7 @@ describe('validateSchemaPayload — the schema command verdict core', () => {
       metadataReportJson: metadata,
       jsonPayload: enumMismatchPayload,
       resourceName: 'Property',
-      version: '2.0',
+      version: '2.0'
     });
     expect(totalErrors).toBeGreaterThan(0);
     expect(report).toBeDefined();
@@ -50,7 +50,7 @@ describe('validateSchemaPayload — the schema command verdict core', () => {
       metadataReportJson: metadata,
       jsonPayload: contextless,
       resourceName: 'NotAResource',
-      version: '2.0',
+      version: '2.0'
     });
     expect(totalErrors).toBeGreaterThan(0);
     expect(JSON.stringify(report)).toMatch(/NotAResource.*not defined|not defined.*NotAResource/);
@@ -60,7 +60,7 @@ describe('validateSchemaPayload — the schema command verdict core', () => {
     const { totalErrors, report } = await validateSchemaPayload({
       metadataReportJson: metadata,
       jsonPayload: { '@reso.context': 'urn:reso:metadata:2.0:resource:NotAResource', value: [{ ListingKey: 'x' }] },
-      version: '2.0',
+      version: '2.0'
     });
     expect(totalErrors).toBe(1);
     expect(JSON.stringify(report)).toMatch(/NotAResource.*not defined/);
@@ -71,11 +71,13 @@ describe('validateSchemaPayload — the schema command verdict core', () => {
       const { totalErrors, report } = await validateSchemaPayload({
         metadataReportJson: metadata,
         jsonPayload: { '@reso.context': context, value: [{ ListingKey: 'x' }] },
-        version: '2.0',
+        version: '2.0'
       });
       expect(totalErrors).toBe(1);
       expect(JSON.stringify(report)).toMatch(/could not be resolved to a resource/);
-      const resourceKeys = Object.values((report as { errors: Record<string, { resources: Record<string, unknown> }> }).errors).flatMap(e => Object.keys(e.resources));
+      const resourceKeys = Object.values((report as { errors: Record<string, { resources: Record<string, unknown> }> }).errors).flatMap(e =>
+        Object.keys(e.resources)
+      );
       expect(resourceKeys).not.toContain('');
     }
   });
@@ -84,9 +86,22 @@ describe('validateSchemaPayload — the schema command verdict core', () => {
     // the settings file is keyed by the Data Dictionary form; an unnormalized 2.1.0 missed every exemption
     const meta21 = getReferenceMetadata('2.1');
     const settings = await loadSettings(resolveSettingsPath());
-    const payload = { '@reso.context': 'urn:reso:metadata:2.1:resource:property', value: [{ ListingKey: 'x', MLSAreaMajor: 'NotAnAdvertisedValue' }] };
-    const asDd = await validateSchemaPayload({ metadataReportJson: meta21, jsonPayload: payload, version: '2.1', validationConfig: settings });
-    const asCore = await validateSchemaPayload({ metadataReportJson: meta21, jsonPayload: payload, version: '2.1.0', validationConfig: settings });
+    const payload = {
+      '@reso.context': 'urn:reso:metadata:2.1:resource:property',
+      value: [{ ListingKey: 'x', MLSAreaMajor: 'NotAnAdvertisedValue' }]
+    };
+    const asDd = await validateSchemaPayload({
+      metadataReportJson: meta21,
+      jsonPayload: payload,
+      version: '2.1',
+      validationConfig: settings
+    });
+    const asCore = await validateSchemaPayload({
+      metadataReportJson: meta21,
+      jsonPayload: payload,
+      version: '2.1.0',
+      validationConfig: settings
+    });
     expect(asDd.totalErrors).toBe(0);
     expect(asCore.totalErrors).toBe(0); // before: 1 (the exemption keyed "2.1" was not found under "2.1.0")
     expect((asCore.report as { totalWarnings: number }).totalWarnings).toBe((asDd.report as { totalWarnings: number }).totalWarnings);
@@ -94,7 +109,9 @@ describe('validateSchemaPayload — the schema command verdict core', () => {
 
   it('a top-level payload that is neither an object nor a collection (a bare array, a string, a number) is refused, never PASS', async () => {
     for (const jsonPayload of [[{ ListingKey: 'x' }], 'not a payload', 42, null]) {
-      await expect(validateSchemaPayload({ metadataReportJson: metadata, jsonPayload, resourceName: 'Property', version: '2.0' })).rejects.toThrow(/payload must be a JSON object/);
+      await expect(
+        validateSchemaPayload({ metadataReportJson: metadata, jsonPayload, resourceName: 'Property', version: '2.0' })
+      ).rejects.toThrow(/payload must be a JSON object/);
     }
   });
 });

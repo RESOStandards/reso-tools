@@ -19,7 +19,7 @@ describe('createCertSession — cert resilience configuration', () => {
     const { breaker } = createCertSession();
 
     // Ten times the default threshold — well past anything a real run could produce.
-    Array.from({ length: DEFAULT_BREAKER.threshold * 10 }).forEach(() => breaker.onFailure(COLLAPSED_KEY));
+    for (let i = 0; i < DEFAULT_BREAKER.threshold * 10; i++) breaker.onFailure(COLLAPSED_KEY);
 
     expect(breaker.stateOf(COLLAPSED_KEY)).toBe('closed');
     expect(breaker.canProceed(COLLAPSED_KEY)).toBe(true);
@@ -28,7 +28,7 @@ describe('createCertSession — cert resilience configuration', () => {
   it('is non-vacuous: the SDK-default session WOULD open on the same burst (that is the regression this guards)', () => {
     const { breaker } = createResilienceSession();
 
-    Array.from({ length: DEFAULT_BREAKER.threshold }).forEach(() => breaker.onFailure(COLLAPSED_KEY));
+    for (let i = 0; i < DEFAULT_BREAKER.threshold; i++) breaker.onFailure(COLLAPSED_KEY);
 
     expect(breaker.stateOf(COLLAPSED_KEY)).toBe('open');
     expect(breaker.canProceed(COLLAPSED_KEY)).toBe(false);

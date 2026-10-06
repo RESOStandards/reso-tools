@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createGovernor, type GovernorDeps } from '../src/http/resilience/rate-governor.js';
+import { type GovernorDeps, createGovernor } from '../src/http/resilience/rate-governor.js';
 
 /** A fake clock whose `sleep` advances virtual time and resolves instantly — no real waits. */
 const fakeClock = (): GovernorDeps & { elapsed: () => number } => {

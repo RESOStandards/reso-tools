@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 
@@ -336,10 +336,16 @@ describe('Schema validation tests', async () => {
     const report = combineErrors(errorMap);
     expect(report.totalErrors).toBe(1);
     expect(!!report.errors?.[expectedErrorMessage]).toBeTruthy();
-    expect(!!report.errors[expectedErrorMessage].resources?.[resourceName]?.fields?.[expectedInvalidField]).toBeTruthy();
-    expect('lookups' in report.errors[expectedErrorMessage].resources?.[resourceName]?.fields?.[expectedInvalidField]).toBe(
-      false
-    );
+
+    // Bound once, then asserted present, then used. The previous form repeated the whole optional
+    // chain three times and ended with `'lookups' in <optional chain>` — and `in` throws a
+    // TypeError on undefined rather than failing an assertion. It never fired only because the
+    // line above happened to assert the same chain was truthy first, so the guard was a
+    // neighbouring line rather than the code. The `?.` also contradicted the `in`: one says the
+    // value may be absent, the other requires it present.
+    const field = report.errors[expectedErrorMessage].resources?.[resourceName]?.fields?.[expectedInvalidField];
+    expect(field).toBeDefined();
+    expect('lookups' in field).toBe(false);
   });
 
   it('Should find maxLength warnings and have proper message - RCF Testing', async () => {
@@ -410,7 +416,7 @@ describe('Schema validation tests', async () => {
     });
     const report = combineErrors(errorMap);
     expect(report.totalErrors).toBe(0);
-    delete metadata.fields.find(f => f.type === 'Edm.Int64').maxLength;
+    metadata.fields.find(f => f.type === 'Edm.Int64').maxLength = undefined;
   });
 
   it('Should find errors when Integer field exceeds its limit', async () => {
@@ -465,24 +471,22 @@ describe('Schema validation tests', async () => {
       !!report.errors[expectedErrorMessage2].resources?.[expectedInvalidParentResource]?.fields?.[expectedInvalidParentField]
     ).toBeTruthy();
     expect(
-      report.errors[expectedErrorMessage].resources?.[expectedInvalidParentResource]?.fields?.[expectedInvalidParentField]
-        ?.sourceModel
+      report.errors[expectedErrorMessage].resources?.[expectedInvalidParentResource]?.fields?.[expectedInvalidParentField]?.sourceModel
     ).toBe(expectedInvalidSourceModel);
     expect(
-      report.errors[expectedErrorMessage2].resources?.[expectedInvalidParentResource]?.fields?.[expectedInvalidParentField]
-        ?.sourceModel
+      report.errors[expectedErrorMessage2].resources?.[expectedInvalidParentResource]?.fields?.[expectedInvalidParentField]?.sourceModel
     ).toBe(expectedInvalidSourceModel);
     expect(
-      report.errors[expectedErrorMessage].resources?.[expectedInvalidParentResource]?.fields?.[expectedInvalidParentField]
-        ?.sourceModelField
+      report.errors[expectedErrorMessage].resources?.[expectedInvalidParentResource]?.fields?.[expectedInvalidParentField]?.sourceModelField
     ).toBe(expectedInvalidSourceModelField);
     expect(
       report.errors[expectedErrorMessage2].resources?.[expectedInvalidParentResource]?.fields?.[expectedInvalidParentField]
         ?.sourceModelField
     ).toBe(expectedInvalidSourceModelField2);
     expect(
-      report.errors[expectedErrorMessage2].resources?.[expectedInvalidParentResource]?.fields?.[expectedInvalidParentField]
-        ?.lookups?.[expectedInvalidLookup]?.count
+      report.errors[expectedErrorMessage2].resources?.[expectedInvalidParentResource]?.fields?.[expectedInvalidParentField]?.lookups?.[
+        expectedInvalidLookup
+      ]?.count
     ).toBe(1);
   });
 
@@ -502,9 +506,7 @@ describe('Schema validation tests', async () => {
     const report = combineErrors(errorMap);
     expect(report.totalErrors).toBe(1);
     expect(!!report.errors?.[expectedErrorMessage]).toBeTruthy();
-    expect(
-      !!report.errors[expectedErrorMessage].resources?.[expectedInvalidResource]?.fields?.[expectedInvalidField]
-    ).toBeTruthy();
+    expect(!!report.errors[expectedErrorMessage].resources?.[expectedInvalidResource]?.fields?.[expectedInvalidField]).toBeTruthy();
     expect(originalPayload).toEqual(nestedCollectionPayloadError);
   });
 
@@ -525,16 +527,13 @@ describe('Schema validation tests', async () => {
     const report = combineErrors(errorMap);
     expect(report.totalErrors).toBe(1);
     expect(!!report.errors?.[expectedErrorMessage]).toBeTruthy();
-    expect(
-      !!report.errors[expectedErrorMessage].resources?.[expectedInvalidResource]?.fields?.[expectedInvalidField]
-    ).toBeTruthy();
-    expect(
-      report.errors[expectedErrorMessage].resources?.[expectedInvalidResource]?.fields?.[expectedInvalidField]?.sourceModel
-    ).toBe(expectedInvalidSourceModel);
-    expect(
-      report.errors[expectedErrorMessage].resources?.[expectedInvalidResource]?.fields?.[expectedInvalidField]
-        ?.sourceModelField
-    ).toBe(expectedInvalidSourceModelField);
+    expect(!!report.errors[expectedErrorMessage].resources?.[expectedInvalidResource]?.fields?.[expectedInvalidField]).toBeTruthy();
+    expect(report.errors[expectedErrorMessage].resources?.[expectedInvalidResource]?.fields?.[expectedInvalidField]?.sourceModel).toBe(
+      expectedInvalidSourceModel
+    );
+    expect(report.errors[expectedErrorMessage].resources?.[expectedInvalidResource]?.fields?.[expectedInvalidField]?.sourceModelField).toBe(
+      expectedInvalidSourceModelField
+    );
   });
 
   it('Should not find error when nested non-collection expansion is null', async () => {
@@ -565,9 +564,7 @@ describe('Schema validation tests', async () => {
     const report = combineErrors(errorMap);
     expect(report.totalErrors).toBe(1);
     expect(!!report.errors?.[expectedErrorMessage]).toBeTruthy();
-    expect(
-      !!report.errors[expectedErrorMessage].resources?.[expectedInvalidResource]?.fields?.[expectedInvalidField]
-    ).toBeTruthy();
+    expect(!!report.errors[expectedErrorMessage].resources?.[expectedInvalidResource]?.fields?.[expectedInvalidField]).toBeTruthy();
   });
 
   it('Should find error when nested collection expansion has type error', async () => {
@@ -587,16 +584,13 @@ describe('Schema validation tests', async () => {
     const report = combineErrors(errorMap);
     expect(report.totalErrors).toBe(1);
     expect(!!report.errors?.[expectedErrorMessage]).toBeTruthy();
-    expect(
-      !!report.errors[expectedErrorMessage].resources?.[expectedInvalidResource]?.fields?.[expectedInvalidField]
-    ).toBeTruthy();
-    expect(
-      report.errors[expectedErrorMessage].resources?.[expectedInvalidResource]?.fields?.[expectedInvalidField]?.sourceModel
-    ).toBe(expectedInvalidSourceModel);
-    expect(
-      report.errors[expectedErrorMessage].resources?.[expectedInvalidResource]?.fields?.[expectedInvalidField]
-        ?.sourceModelField
-    ).toBe(expectedInvalidSourceModelField);
+    expect(!!report.errors[expectedErrorMessage].resources?.[expectedInvalidResource]?.fields?.[expectedInvalidField]).toBeTruthy();
+    expect(report.errors[expectedErrorMessage].resources?.[expectedInvalidResource]?.fields?.[expectedInvalidField]?.sourceModel).toBe(
+      expectedInvalidSourceModel
+    );
+    expect(report.errors[expectedErrorMessage].resources?.[expectedInvalidResource]?.fields?.[expectedInvalidField]?.sourceModelField).toBe(
+      expectedInvalidSourceModelField
+    );
   });
 
   it('Should ignore errors for payload fields with @ in the middle of the string', async () => {
@@ -641,13 +635,13 @@ describe('Schema validation tests', async () => {
     expect(!!report.errors[expectedErrorMessage2].resources?.[expectedResource2]?.fields?.[expectedField2]).toBeTruthy();
     expect(report.errors[expectedErrorMessage2].resources?.[expectedResource2]?.fields?.[expectedField2]?.count).toBe(2);
 
-    expect(
-      report.errors[expectedErrorMessage2].resources?.[expectedResource2]?.fields?.[expectedField2]?.sourceModel
-    ).toBe(expectedInvalidSourceModel);
+    expect(report.errors[expectedErrorMessage2].resources?.[expectedResource2]?.fields?.[expectedField2]?.sourceModel).toBe(
+      expectedInvalidSourceModel
+    );
 
-    expect(
-      report.errors[expectedErrorMessage2].resources?.[expectedResource2]?.fields?.[expectedField2]?.sourceModelField
-    ).toBe(expectedInvalidSourceModelField);
+    expect(report.errors[expectedErrorMessage2].resources?.[expectedResource2]?.fields?.[expectedField2]?.sourceModelField).toBe(
+      expectedInvalidSourceModelField
+    );
   });
 
   it('Should correctly classify resource and fields in case of errors in collection expansions', async () => {
@@ -671,13 +665,13 @@ describe('Schema validation tests', async () => {
     expect(!!report.errors[expectedErrorMessage1].resources?.[expectedResource1]?.fields?.[expectedField1]).toBeTruthy();
     expect(report.errors[expectedErrorMessage1].resources?.[expectedResource1]?.fields?.[expectedField1]?.count).toBe(1);
 
-    expect(
-      report.errors[expectedErrorMessage1].resources?.[expectedResource1]?.fields?.[expectedField1]?.sourceModel
-    ).toBe(expectedInvalidSourceModel);
+    expect(report.errors[expectedErrorMessage1].resources?.[expectedResource1]?.fields?.[expectedField1]?.sourceModel).toBe(
+      expectedInvalidSourceModel
+    );
 
-    expect(
-      report.errors[expectedErrorMessage1].resources?.[expectedResource1]?.fields?.[expectedField1]?.sourceModelField
-    ).toBe(expectedInvalidSourceModelField);
+    expect(report.errors[expectedErrorMessage1].resources?.[expectedResource1]?.fields?.[expectedField1]?.sourceModelField).toBe(
+      expectedInvalidSourceModelField
+    );
   });
 
   it('Should correctly parse single value expansion errors', () => {
@@ -702,12 +696,12 @@ describe('Schema validation tests', async () => {
     expect(
       !!report.errors[expectedErrorMessage].resources?.[expectedResource]?.fields?.[expectedField]?.lookups?.[expectedEnumValue]
     ).toBeTruthy();
-    expect(
-      report.errors[expectedErrorMessage].resources?.[expectedResource]?.fields?.[expectedField]?.sourceModel
-    ).toBe(expectedSourceModel);
-    expect(
-      report.errors[expectedErrorMessage].resources?.[expectedResource]?.fields?.[expectedField]?.sourceModelField
-    ).toBe(expectedSourceModelField);
+    expect(report.errors[expectedErrorMessage].resources?.[expectedResource]?.fields?.[expectedField]?.sourceModel).toBe(
+      expectedSourceModel
+    );
+    expect(report.errors[expectedErrorMessage].resources?.[expectedResource]?.fields?.[expectedField]?.sourceModelField).toBe(
+      expectedSourceModelField
+    );
   });
 
   it('Should not find errors if there are extra properties on top-level alongside "value"', async () => {

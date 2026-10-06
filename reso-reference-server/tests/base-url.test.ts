@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
 import type { Request } from 'express';
+import { describe, expect, it } from 'vitest';
 import { resolveBaseUrl } from '../src/odata/base-url.js';
 
 /** Minimal Express Request stub: only the fields resolveBaseUrl reads (protocol, Host header, hostname). */
@@ -8,9 +8,7 @@ const req = (protocol: string, host: string | undefined, hostname = 'fallback-ho
 
 describe('resolveBaseUrl', () => {
   it('an explicit override always wins and ignores the request (the pin-a-canonical-URL / CDN case)', () => {
-    expect(resolveBaseUrl(req('http', 'localhost:53810'), 'https://reference-server.reso.org')).toBe(
-      'https://reference-server.reso.org',
-    );
+    expect(resolveBaseUrl(req('http', 'localhost:53810'), 'https://reference-server.reso.org')).toBe('https://reference-server.reso.org');
   });
 
   it('derives protocol + host from the request when there is no override (local / desktop)', () => {

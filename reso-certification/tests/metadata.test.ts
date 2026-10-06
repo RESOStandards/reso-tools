@@ -103,7 +103,7 @@ describe('parseMetadataXml — navigation property preservation', () => {
     const property = getEntityType(parseMetadataXml(navXml), 'Property')!;
     expect(property.navigationProperties).toEqual([
       { name: 'Media', isCollection: true, targetType: 'Media' },
-      { name: 'ListOffice', isCollection: false, targetType: 'Office' },
+      { name: 'ListOffice', isCollection: false, targetType: 'Office' }
     ]);
   });
 

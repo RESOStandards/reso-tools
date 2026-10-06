@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { serializeMetadataReport, generateMetadataReport } from '../src/serializer.js';
+import { describe, expect, it } from 'vitest';
 import { parseCsdlXml } from '../src/csdl/parser.js';
+import { generateMetadataReport, serializeMetadataReport } from '../src/serializer.js';
 
 // Minimal but complete EDMX with entity container, properties, enums, and navigation
 const testEdmx = `<?xml version="1.0" encoding="utf-8"?>

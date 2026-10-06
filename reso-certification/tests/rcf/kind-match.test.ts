@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
-import { buildKindMatcher, DEFAULT_KIND_MATCH_OPTIONS, type KindMatchOptions } from '../../src/rcf/kind-match.js';
+import { describe, expect, it } from 'vitest';
 import type { ReferenceMap } from '../../src/rcf/assemble-report.js';
+import { DEFAULT_KIND_MATCH_OPTIONS, type KindMatchOptions, buildKindMatcher } from '../../src/rcf/kind-match.js';
 
 // A small synthetic reference with controlled field distribution, so idf and every gate are exact.
 // ModificationTimestamp is in ALL four resources → idf 0 (noise). Resource-specific fields are df=1.
@@ -9,7 +9,7 @@ import type { ReferenceMap } from '../../src/rcf/assemble-report.js';
 const lookup = (name: string, values: ReadonlyArray<string>) => ({
   type: 'org.reso.metadata.enums.X',
   isLookupField: true,
-  lookupValues: Object.fromEntries(values.map(v => [v, { type: 'x', lookupName: name, lookupValue: v }])),
+  lookupValues: Object.fromEntries(values.map(v => [v, { type: 'x', lookupName: name, lookupValue: v }]))
 });
 
 const REF: ReferenceMap = {
@@ -21,7 +21,7 @@ const REF: ReferenceMap = {
     SharedA: { type: 'Edm.String' },
     SharedB: { type: 'Edm.String' },
     SharedC: { type: 'Edm.String' },
-    ModificationTimestamp: { type: 'Edm.DateTimeOffset' },
+    ModificationTimestamp: { type: 'Edm.DateTimeOffset' }
   },
   Media: {
     MediaKey: { type: 'Edm.String' },
@@ -31,19 +31,19 @@ const REF: ReferenceMap = {
     SharedA: { type: 'Edm.String' },
     SharedB: { type: 'Edm.String' },
     SharedC: { type: 'Edm.String' },
-    ModificationTimestamp: { type: 'Edm.DateTimeOffset' },
+    ModificationTimestamp: { type: 'Edm.DateTimeOffset' }
   },
   Member: {
     MemberKey: { type: 'Edm.String' },
     MemberEmail: { type: 'Edm.String' },
     MemberType: { type: 'Edm.String' },
-    ModificationTimestamp: { type: 'Edm.DateTimeOffset' },
+    ModificationTimestamp: { type: 'Edm.DateTimeOffset' }
   },
   OpenHouse: {
     OpenHouseKey: { type: 'Edm.String' },
     OpenHouseStartTime: { type: 'Edm.DateTimeOffset' },
-    ModificationTimestamp: { type: 'Edm.DateTimeOffset' },
-  },
+    ModificationTimestamp: { type: 'Edm.DateTimeOffset' }
+  }
 };
 
 // Explicit low floor so a 2-unique-field shape clears in this 4-resource fixture (unique idf ≈ ln 4 ≈ 1.39).
@@ -69,7 +69,7 @@ describe('buildKindMatcher (synthetic reference)', () => {
     const withoutValues = matcher.match({ fields: ['MediaCategory', 'MediaURL'] });
     expect(withValues?.resource).toBe('Media');
     expect(withValues?.signals.enumOverlap).toBeCloseTo(1, 5); // both observed values are valid MediaCategory values
-    expect((withValues?.score ?? 0)).toBeGreaterThan(withoutValues?.score ?? 0); // values add evidence
+    expect(withValues?.score ?? 0).toBeGreaterThan(withoutValues?.score ?? 0); // values add evidence
   });
 
   it('ignores enum values that are not valid for the candidate lookup', () => {

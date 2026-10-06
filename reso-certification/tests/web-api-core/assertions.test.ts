@@ -1,32 +1,31 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import type { ODataResponse } from '../../src/test-runner/types.js';
 import {
+  assertCollectionLambda,
+  assertEnumMatch,
+  assertHasResults,
+  assertODataResponse,
   assertScalarComparison,
   assertScalarCompoundOr,
   assertSortOrder,
-  assertEnumMatch,
-  assertCollectionLambda,
-  assertODataResponse,
-  assertHasResults,
-  assertStringComparison,
-  extractRecords,
   extractCount,
   extractNextLink,
+  extractRecords
 } from '../../src/web-api-core/assertions.js';
-import type { ODataResponse } from '../../src/test-runner/types.js';
 
 const makeResponse = (overrides: Partial<ODataResponse> = {}): ODataResponse => ({
   status: 200,
   headers: { 'odata-version': '4.01' },
   body: { value: [] },
   rawBody: '{"value":[]}',
-  ...overrides,
+  ...overrides
 });
 
 describe('assertScalarComparison', () => {
   const records = [
     { id: '1', price: 100, amount: 10.5 },
     { id: '2', price: 200, amount: 20.0 },
-    { id: '3', price: 300, amount: 30.5 },
+    { id: '3', price: 300, amount: 30.5 }
   ];
 
   it('passes when all records satisfy gt', () => {
@@ -57,7 +56,7 @@ describe('assertScalarComparison', () => {
   it('handles date comparison', () => {
     const dateRecords = [
       { id: '1', date: '2024-06-15' },
-      { id: '2', date: '2024-08-20' },
+      { id: '2', date: '2024-08-20' }
     ];
     const result = assertScalarComparison(dateRecords, 'date', 'gt', '2024-01-01', 'date');
     expect(result.passed).toBe(true);
@@ -124,10 +123,7 @@ describe('assertSortOrder', () => {
 });
 
 describe('assertEnumMatch', () => {
-  const records = [
-    { status: 'Active' },
-    { status: 'Active' },
-  ];
+  const records = [{ status: 'Active' }, { status: 'Active' }];
 
   it('passes for eq match', () => {
     expect(assertEnumMatch(records, 'status', 'eq', 'Active').passed).toBe(true);
@@ -147,10 +143,7 @@ describe('assertEnumMatch', () => {
 });
 
 describe('assertCollectionLambda', () => {
-  const records = [
-    { features: ['Pool', 'Garage', 'Fence'] },
-    { features: ['Pool', 'Deck'] },
-  ];
+  const records = [{ features: ['Pool', 'Garage', 'Fence'] }, { features: ['Pool', 'Deck'] }];
 
   it('passes for any() with matching value', () => {
     expect(assertCollectionLambda(records, 'features', 'any', ['Pool']).passed).toBe(true);
@@ -219,9 +212,9 @@ describe('assertODataResponse', () => {
       makeResponse({
         status: 400,
         body: { error: { code: '', message: 'OriginatingSystemName is required.' } },
-        rawBody: '{"error":{"message":"OriginatingSystemName is required."}}',
+        rawBody: '{"error":{"message":"OriginatingSystemName is required."}}'
       }),
-      200,
+      200
     );
     expect(res.passed).toBe(false);
     expect(res.message).toContain('got 400');

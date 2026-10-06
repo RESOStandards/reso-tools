@@ -4,17 +4,22 @@ import { buildStandardMap, buildStandardMapFrom } from '../src/web-api-core/stan
 
 const mockRef: DdReference = {
   fields: [
-    { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus', lookupStatus: 'Locked with Enumerations' },
+    {
+      resourceName: 'Property',
+      fieldName: 'StandardStatus',
+      type: 'org.reso.metadata.enums.StandardStatus',
+      lookupStatus: 'Locked with Enumerations'
+    },
     { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' },
     { resourceName: 'Member', fieldName: 'MemberKey', type: 'Edm.String' },
     // City: a nominal enum the DD defines with ZERO standard values (no City lookups below); lookupStatus "Open".
-    { resourceName: 'Property', fieldName: 'City', type: 'org.reso.metadata.enums.City', lookupStatus: 'Open' },
+    { resourceName: 'Property', fieldName: 'City', type: 'org.reso.metadata.enums.City', lookupStatus: 'Open' }
   ],
   lookups: [
     { lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Active' },
     { lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Pending' },
-    { lookupName: 'org.reso.metadata.enums.AccessibilityFeatures', lookupValue: 'AccessibleApproachWithRamp' },
-  ],
+    { lookupName: 'org.reso.metadata.enums.AccessibilityFeatures', lookupValue: 'AccessibleApproachWithRamp' }
+  ]
 };
 
 describe('buildStandardMapFrom — membership tests', () => {

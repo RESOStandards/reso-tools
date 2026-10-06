@@ -1,17 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import type { NavigationPropertyBinding } from '../src/db/data-access.js';
 import { applyExpandSelect, applyMongoExpandSelect } from '../src/db/expand-select.js';
 import type { ExpandBinding } from '../src/db/expand-select.js';
-import type { NavigationPropertyBinding } from '../src/db/data-access.js';
 
 // ---------------------------------------------------------------------------
 // Test helpers — minimal binding/expression factories
 // ---------------------------------------------------------------------------
 
-const makeBinding = (
-  name: string,
-  targetKeyField: string,
-  overrides?: Partial<NavigationPropertyBinding>
-): NavigationPropertyBinding => ({
+const makeBinding = (name: string, targetKeyField: string, overrides?: Partial<NavigationPropertyBinding>): NavigationPropertyBinding => ({
   name,
   targetResource: name,
   targetKeyField,
@@ -38,9 +34,7 @@ const makeExpandBinding = (
 describe('applyExpandSelect', () => {
   describe('no-op cases', () => {
     it('returns entities unchanged when no bindings have $select', () => {
-      const entities = [
-        { ListingKey: 'L1', Rooms: [{ RoomKey: 'R1', RoomType: 'Bedroom', Area: 200 }] }
-      ];
+      const entities = [{ ListingKey: 'L1', Rooms: [{ RoomKey: 'R1', RoomType: 'Bedroom', Area: 200 }] }];
       const bindings = [makeExpandBinding('Rooms', 'RoomKey')];
       const result = applyExpandSelect(entities, bindings);
       expect(result).toEqual(entities);
@@ -99,9 +93,7 @@ describe('applyExpandSelect', () => {
       const bindings = [makeExpandBinding('Rooms', 'RoomKey', { $select: 'RoomType,Area' })];
       const result = applyExpandSelect(entities, bindings);
 
-      expect(result[0].Rooms).toEqual([
-        { RoomKey: 'R1', RoomType: 'Bedroom', Area: 200 }
-      ]);
+      expect(result[0].Rooms).toEqual([{ RoomKey: 'R1', RoomType: 'Bedroom', Area: 200 }]);
     });
 
     it('always includes the target key field even if not in $select', () => {
@@ -126,9 +118,7 @@ describe('applyExpandSelect', () => {
           BuyerAgent: { MemberKey: 'M1', MemberFirstName: 'Jane', MemberLastName: 'Doe', MemberEmail: 'j@d.com' }
         }
       ];
-      const bindings = [
-        makeExpandBinding('BuyerAgent', 'MemberKey', { $select: 'MemberFirstName' }, { isCollection: false })
-      ];
+      const bindings = [makeExpandBinding('BuyerAgent', 'MemberKey', { $select: 'MemberFirstName' }, { isCollection: false })];
       const result = applyExpandSelect(entities, bindings);
 
       expect(result[0].BuyerAgent).toEqual({ MemberKey: 'M1', MemberFirstName: 'Jane' });
@@ -136,9 +126,7 @@ describe('applyExpandSelect', () => {
 
     it('leaves null to-one nav properties as null', () => {
       const entities = [{ ListingKey: 'L1', BuyerAgent: null }];
-      const bindings = [
-        makeExpandBinding('BuyerAgent', 'MemberKey', { $select: 'MemberFirstName' }, { isCollection: false })
-      ];
+      const bindings = [makeExpandBinding('BuyerAgent', 'MemberKey', { $select: 'MemberFirstName' }, { isCollection: false })];
       const result = applyExpandSelect(entities, bindings);
       expect(result[0].BuyerAgent).toBeNull();
     });
@@ -265,15 +253,13 @@ describe('applyExpandSelect', () => {
       ];
       const bindings = [
         makeExpandBinding('Rooms', 'RoomKey', { $select: 'RoomType' }),
-        makeExpandBinding('Media', 'MediaKey')  // no $select
+        makeExpandBinding('Media', 'MediaKey') // no $select
       ];
       const result = applyExpandSelect(entities, bindings);
 
       expect(result[0].Rooms).toEqual([{ RoomKey: 'R1', RoomType: 'Bedroom' }]);
       // Media untouched — all fields present
-      expect(result[0].Media).toEqual([
-        { MediaKey: 'M1', MediaURL: 'http://example.com/1.jpg', MediaType: 'Photo' }
-      ]);
+      expect(result[0].Media).toEqual([{ MediaKey: 'M1', MediaURL: 'http://example.com/1.jpg', MediaType: 'Photo' }]);
     });
   });
 
@@ -342,10 +328,7 @@ describe('applyMongoExpandSelect', () => {
         expr: { property: 'Rooms', options: { $select: 'RoomType' } as Record<string, unknown> }
       }
     ];
-    const result = applyMongoExpandSelect(
-      entities,
-      bindings as Parameters<typeof applyMongoExpandSelect>[1]
-    );
+    const result = applyMongoExpandSelect(entities, bindings as Parameters<typeof applyMongoExpandSelect>[1]);
 
     expect(result[0].Rooms).toEqual([{ RoomKey: 'R1', RoomType: 'Bedroom' }]);
   });

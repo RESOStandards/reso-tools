@@ -6,8 +6,8 @@ const config = {
   '2.0': { Property: { MLSAreaMinor: { ignoreEnumerations: true } } },
   '2.1': {
     Property: { MLSAreaMinor: { ignoreEnumerations: true } },
-    Media: { ImageSizeDescription: { ignoreEnumerations: true } },
-  },
+    Media: { ImageSizeDescription: { ignoreEnumerations: true } }
+  }
 };
 
 describe('isEnumerationIgnored', () => {

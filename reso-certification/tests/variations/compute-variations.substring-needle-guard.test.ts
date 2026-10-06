@@ -16,8 +16,8 @@
  * — nothing here is an `it.fails`.
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 const createRequire = (await import('node:module')).createRequire;
 const require = createRequire(import.meta.url);
@@ -34,14 +34,12 @@ type Suggestion = { to?: string; strat?: string };
 const suggestionsFor = async (fieldName: string, P: string): Promise<ReadonlyArray<Suggestion>> => {
   const metadataReportJson = {
     fields: [{ resourceName: 'Property', fieldName, type: 'L' }],
-    lookups: [{ lookupName: 'L', type: 'Edm.Int64', lookupValue: P }],
+    lookups: [{ lookupName: 'L', type: 'Edm.Int64', lookupValue: P }]
   };
   const { variations } = (await computeVariations({ metadataReportJson, fuzziness: FUZZINESS, version: DD_1_7 })) as {
     variations: { lookups: Array<{ suggestions: Array<{ suggestedLegacyODataValue?: string; strategy?: string }> }> };
   };
-  return (variations.lookups ?? []).flatMap((l) =>
-    (l.suggestions ?? []).map((s) => ({ to: s.suggestedLegacyODataValue, strat: s.strategy })),
-  );
+  return (variations.lookups ?? []).flatMap(l => (l.suggestions ?? []).map(s => ({ to: s.suggestedLegacyODataValue, strat: s.strategy })));
 };
 
 describe('substring arm — needle-guard (the guard tests the needle, not the haystack)', () => {
@@ -60,7 +58,7 @@ describe('substring arm — needle-guard (the guard tests the needle, not the ha
   // needle "Log" (normLen 3) is NOT > 3 → blocked; nothing else catches it either → no suggestion.
   it('haystack-vs-needle: "LogHome" does NOT match "Log" (needle normLen 3 ≤ 3 → guard blocks)', async () => {
     const s = await suggestionsFor('ConstructionMaterials', 'LogHome');
-    expect(s.find((x) => x.to === 'Log')).toBeUndefined();
+    expect(s.find(x => x.to === 'Log')).toBeUndefined();
     expect(s).toEqual([]); // and the short needle isn't rescued by any other arm
   });
 

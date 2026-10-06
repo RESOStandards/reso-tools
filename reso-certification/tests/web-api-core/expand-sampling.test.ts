@@ -4,8 +4,8 @@ import type { EntityType } from '../../src/test-runner/types.js';
 import type { ODataResponse } from '../../src/test-runner/types.js';
 import { buildScenarioQuery } from '../../src/web-api-core/queries.js';
 import { resolveTestParams } from '../../src/web-api-core/sampling.js';
-import type { StandardMap } from '../../src/web-api-core/standard-map.js';
 import type { ExpandScenario } from '../../src/web-api-core/scenarios.js';
+import type { StandardMap } from '../../src/web-api-core/standard-map.js';
 
 // The 2.1.0 $expand scenario was dormant: resolveTestParams never populated `expandField`, so buildExpandUrl
 // returned undefined and the scenario always skipped. Selection = the FIRST COLLECTION navigation property of
@@ -17,6 +17,11 @@ const noopStandardMap: StandardMap = {
   isStandardField: () => false,
   isStandardValue: () => false,
   standardValues: () => new Set<string>(),
+  // Declared `StandardMap` but omitted two of its members. Nothing noticed, because the annotation
+  // was never checked — and had expand selection ever consulted either one, the stub would have
+  // thrown on a missing function rather than returning the inert answer the comment promises.
+  standardValuesForField: () => undefined,
+  isClosedEnumField: () => false
 };
 
 // One record is enough that resolveTestParams doesn't take its no-records early return (which never reaches the
@@ -25,21 +30,19 @@ const oneRecordResponse: ODataResponse = {
   status: 200,
   headers: { 'odata-version': '4.01' },
   body: { value: [{ ListingKey: 'P1', BedroomsTotal: 3 }] },
-  rawBody: JSON.stringify({ value: [{ ListingKey: 'P1', BedroomsTotal: 3 }] }),
+  rawBody: JSON.stringify({ value: [{ ListingKey: 'P1', BedroomsTotal: 3 }] })
 };
 
 const scriptedRequester: ODataRequester = { request: async () => oneRecordResponse };
 
-const makeEntityType = (
-  navigationProperties?: EntityType['navigationProperties'],
-): EntityType => ({
+const makeEntityType = (navigationProperties?: EntityType['navigationProperties']): EntityType => ({
   name: 'Property',
   keyProperties: ['ListingKey'],
   properties: [
     { name: 'ListingKey', type: 'Edm.String' },
-    { name: 'BedroomsTotal', type: 'Edm.Int64' },
+    { name: 'BedroomsTotal', type: 'Edm.Int64' }
   ],
-  ...(navigationProperties && { navigationProperties }),
+  ...(navigationProperties && { navigationProperties })
 });
 
 const resolve = (entityType: EntityType) =>
@@ -51,7 +54,7 @@ const expandScenario: ExpandScenario = {
   name: '$expand navigation property',
   category: 'expand',
   fieldParam: 'expandField',
-  minVersion: '2.1.0',
+  minVersion: '2.1.0'
 };
 
 describe('resolveTestParams — $expand navigation selection', () => {
@@ -60,8 +63,8 @@ describe('resolveTestParams — $expand navigation selection', () => {
     const params = await resolve(
       makeEntityType([
         { name: 'ListOffice', isCollection: false, targetType: 'Office' },
-        { name: 'Media', isCollection: true, targetType: 'Media' },
-      ]),
+        { name: 'Media', isCollection: true, targetType: 'Media' }
+      ])
     );
     expect(params.expandField).toBe('Media');
   });
@@ -70,8 +73,8 @@ describe('resolveTestParams — $expand navigation selection', () => {
     const params = await resolve(
       makeEntityType([
         { name: 'Media', isCollection: true, targetType: 'Media' },
-        { name: 'Rooms', isCollection: true, targetType: 'Room' },
-      ]),
+        { name: 'Rooms', isCollection: true, targetType: 'Room' }
+      ])
     );
     expect(params.expandField).toBe('Media');
   });

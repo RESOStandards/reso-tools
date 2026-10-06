@@ -12,16 +12,14 @@
  * reverse, and get a success report for the wrong thing.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseDecisionsCsv } from '../../src/variations/csv.js';
 
 const sheet = (body: string) => `Resource Name,Field Name,Lookup Value,Action,Comment\n${body}`;
 
 describe('parseDecisionsCsv', () => {
   it('parses the identity columns plus Action and Comment', () => {
-    const { items } = parseDecisionsCsv(
-      sheet('Property,LeaseTerm,Months - 4,submit-to-ft,DD has no 4-month term\n')
-    );
+    const { items } = parseDecisionsCsv(sheet('Property,LeaseTerm,Months - 4,submit-to-ft,DD has no 4-month term\n'));
     expect(items).toEqual([
       {
         resourceName: 'Property',
@@ -40,9 +38,7 @@ describe('parseDecisionsCsv', () => {
 
   it('accepts a comment with no action, since a comment alone is worth recording', () => {
     const { items } = parseDecisionsCsv(sheet('Property,Roof,Steel,,Which steel construction?\n'));
-    expect(items).toEqual([
-      { resourceName: 'Property', fieldName: 'Roof', lookupValue: 'Steel', comment: 'Which steel construction?' }
-    ]);
+    expect(items).toEqual([{ resourceName: 'Property', fieldName: 'Roof', lookupValue: 'Steel', comment: 'Which steel construction?' }]);
   });
 
   it('rejects a row carrying neither an action nor a comment', () => {
@@ -60,9 +56,7 @@ describe('parseDecisionsCsv', () => {
   });
 
   it('reports unrecognized columns rather than ignoring them silently', () => {
-    const { recognizedColumns, skippedColumns } = parseDecisionsCsv(
-      'Resource Name,Action,Notes For Me\nProperty,ignore,whatever\n'
-    );
+    const { recognizedColumns, skippedColumns } = parseDecisionsCsv('Resource Name,Action,Notes For Me\nProperty,ignore,whatever\n');
     expect(recognizedColumns).toContain('Action');
     expect(skippedColumns).toEqual(['Notes For Me']);
   });
@@ -89,8 +83,6 @@ describe('parseDecisionsCsv', () => {
 
   it('does not accept an update sheet, whose Outcome column it does not know', () => {
     // The guard that keeps the two sheets apart: an update sheet's rows carry no Action and no Comment.
-    expect(() => parseDecisionsCsv('Resource Name,Field Name,Outcome\nProperty,MBR_Foo,Ignored\n')).toThrow(
-      /row 2 .*(action|comment)/i
-    );
+    expect(() => parseDecisionsCsv('Resource Name,Field Name,Outcome\nProperty,MBR_Foo,Ignored\n')).toThrow(/row 2 .*(action|comment)/i);
   });
 });

@@ -12,8 +12,8 @@
  * Real DD 1.7 values; synthetic inputs — no vendor reports or identifiers.
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { computeVariationsV2 } from '../../src/variations-v2/compute.js';
 
 const createRequire = (await import('node:module')).createRequire;
@@ -28,12 +28,12 @@ const suggestsField = (fieldName: string, fuzziness: number, target: string): bo
     referenceMetadata: getReferenceMetadata(VERSION),
     version: VERSION,
     fuzziness,
-    applyVersionBucketing: false,
-  }) as { variations: { fields?: Array<Record<string, unknown>> } };
+    applyVersionBucketing: false
+  }) as unknown as { variations: { fields?: Array<Record<string, unknown>> } };
   return (variations.fields ?? []).some(
-    (f) =>
+    f =>
       f.suggestedFieldName === target ||
-      ((f.suggestions as Array<Record<string, unknown>>) ?? []).some((s) => s.suggestedFieldName === target),
+      ((f.suggestions as Array<Record<string, unknown>>) ?? []).some(s => s.suggestedFieldName === target)
   );
 };
 

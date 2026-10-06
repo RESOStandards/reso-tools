@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 // The legacy variations modules are CommonJS, so require them via createRequire
 // (same pattern as tests/metadata/dd-metadata-checks.test.ts).
@@ -27,7 +27,7 @@ const getRandomNonAlphaNumericCharacter = (): string => {
   return chars[Math.floor(Math.random() * chars.length)];
 };
 
-const isEven = (n = 0): boolean => (parseInt(String(n)) ? n % 2 === 0 : false);
+const isEven = (n = 0): boolean => (Number.parseInt(String(n)) ? n % 2 === 0 : false);
 
 const intersperseNonAlphaNumericNoise = (value = ''): string => {
   let newValue = '';
@@ -188,7 +188,9 @@ describe('Variations Service reference metadata tests', () => {
         expect(variations.resourceName).toBe((testMetadataReportJson as { resourceName?: unknown }).resourceName);
 
         // the suggestions should have the resource name in them
-        expect(variations.resources[0].suggestions.some((x: { suggestedResourceName?: string }) => x?.suggestedResourceName === resourceName)).toBe(true);
+        expect(
+          variations.resources[0].suggestions.some((x: { suggestedResourceName?: string }) => x?.suggestedResourceName === resourceName)
+        ).toBe(true);
 
         processedResources.add(resourceName);
       }
@@ -223,25 +225,23 @@ describe('Variations Service reference metadata tests', () => {
     const unmatchedItems = fieldVariations.flatMap(({ resourceName, fieldName, suggestions = [] }) => {
       if (suggestions.some(({ suggestedFieldName }) => metadataReportFieldsSet.has(`${resourceName}${suggestedFieldName}`))) {
         return [];
-      } else {
-        return {
-          resourceName,
-          fieldName
-        };
       }
+      return {
+        resourceName,
+        fieldName
+      };
     });
 
     expect(unmatchedItems?.length).toBe(0);
 
     const noExactMatches = fieldVariations.flatMap(({ resourceName, fieldName, suggestions = [] }) => {
-      if (suggestions.some((x) => x?.exactMatch)) {
+      if (suggestions.some(x => x?.exactMatch)) {
         return [];
-      } else {
-        return {
-          resourceName,
-          fieldName
-        };
       }
+      return {
+        resourceName,
+        fieldName
+      };
     });
 
     expect(noExactMatches.length).toBe(0);
@@ -325,7 +325,9 @@ describe('Variations Service reference metadata tests', () => {
         expect(variations.resources.length).toBe(1);
         expect(variations.resourceName).toBe((testMetadataReportJson as { resourceName?: unknown }).resourceName);
 
-        expect(variations.resources[0].suggestions.some((x: { suggestedResourceName?: string }) => x?.suggestedResourceName === resourceName)).toBe(true);
+        expect(
+          variations.resources[0].suggestions.some((x: { suggestedResourceName?: string }) => x?.suggestedResourceName === resourceName)
+        ).toBe(true);
 
         processedResources.add(resourceName);
       }
@@ -361,25 +363,23 @@ describe('Variations Service reference metadata tests', () => {
     const unmatchedItems = fieldVariations.flatMap(({ resourceName, fieldName, suggestions = [] }) => {
       if (suggestions.some(({ suggestedFieldName }) => metadataReportFieldsSet.has(`${resourceName}${suggestedFieldName}`))) {
         return [];
-      } else {
-        return {
-          resourceName,
-          fieldName
-        };
       }
+      return {
+        resourceName,
+        fieldName
+      };
     });
 
     expect(unmatchedItems?.length).toBe(0);
 
     const noExactMatches = fieldVariations.flatMap(({ resourceName, fieldName, suggestions = [] }) => {
-      if (suggestions.some((x) => x?.exactMatch)) {
+      if (suggestions.some(x => x?.exactMatch)) {
         return [];
-      } else {
-        return {
-          resourceName,
-          fieldName
-        };
       }
+      return {
+        resourceName,
+        fieldName
+      };
     });
 
     expect(noExactMatches.length).toBe(0);
@@ -414,14 +414,13 @@ describe('Variations Service reference metadata tests', () => {
       const { fields: fieldVariations = [] } = variations;
 
       const noCloseMatches = fieldVariations.flatMap(({ resourceName, fieldName, suggestions = [] }) => {
-        if (suggestions.some((x) => x?.closeMatch)) {
+        if (suggestions.some(x => x?.closeMatch)) {
           return [];
-        } else {
-          return {
-            resourceName,
-            fieldName
-          };
         }
+        return {
+          resourceName,
+          fieldName
+        };
       });
 
       expect(noCloseMatches.length).toBe(0);
@@ -446,13 +445,13 @@ describe('Variations Service reference metadata tests', () => {
 
       const { fields: fieldVariations = [] } = variations;
 
-      const testItems = fieldVariations.filter((item) => item?.fieldName === localTestFieldName);
+      const testItems = fieldVariations.filter(item => item?.fieldName === localTestFieldName);
 
       // ensure there is exactly one match and no duplication of items
       expect(testItems?.length).toBe(1);
 
       // the suggestion should contain the standard field
-      expect(testItems[0]?.suggestions?.some((suggestion) => suggestion?.suggestedFieldName === standardTestFieldName)).toBe(true);
+      expect(testItems[0]?.suggestions?.some(suggestion => suggestion?.suggestedFieldName === standardTestFieldName)).toBe(true);
     });
 
     it('Should not suggest standard fields if already present in the metadata', async () => {
@@ -477,7 +476,7 @@ describe('Variations Service reference metadata tests', () => {
 
       const { fields: fieldVariations = [] } = variations;
 
-      const testItems = fieldVariations.filter((item) => item?.fieldName === localTestFieldName);
+      const testItems = fieldVariations.filter(item => item?.fieldName === localTestFieldName);
 
       // ensure there is exactly one match and no duplication of items
       expect(testItems?.length).toBe(0);
@@ -505,7 +504,7 @@ describe('Variations Service reference metadata tests', () => {
 
       const { fields: fieldVariations = [] } = variations;
 
-      const testItems = fieldVariations.filter((item) => item?.fieldName === localTestFieldName);
+      const testItems = fieldVariations.filter(item => item?.fieldName === localTestFieldName);
 
       // ensure there is exactly one match and no duplication of items
       expect(testItems?.length).toBe(1);
@@ -516,7 +515,7 @@ describe('Variations Service reference metadata tests', () => {
       expect(testItem.suggestions?.length > 0).toBe(true);
 
       // ensure that the existing standard field does not show up in the suggestions
-      expect(testItem.suggestions.some((suggestion) => suggestion?.suggestedFieldName === standardTestFieldName)).toBe(false);
+      expect(testItem.suggestions.some(suggestion => suggestion?.suggestedFieldName === standardTestFieldName)).toBe(false);
     });
   });
 });

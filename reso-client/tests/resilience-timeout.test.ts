@@ -16,14 +16,14 @@ describe('withTimeout', () => {
 
   it('resolves normally when the request completes in time', async () => {
     server.enqueue({ status: 200, body: { ok: true } });
-    const res = await withTimeout(1000, (signal) => fetch(`${server.url}/Property`, { signal }));
+    const res = await withTimeout(1000, signal => fetch(`${server.url}/Property`, { signal }));
     expect(res.status).toBe(200);
   });
 
   it('aborts a hung request, and the abort classifies as a retryable timeout', async () => {
     server.enqueue({ hang: true });
     try {
-      await withTimeout(30, (signal) => fetch(`${server.url}/Property`, { signal }));
+      await withTimeout(30, signal => fetch(`${server.url}/Property`, { signal }));
       expect.unreachable('the hung request should have timed out');
     } catch (err) {
       const c = classifyThrown(err);
@@ -34,7 +34,7 @@ describe('withTimeout', () => {
 
   it('does not abort a slow-but-completing request when disabled (0)', async () => {
     server.enqueue({ delayMs: 20, status: 200 });
-    const res = await withTimeout(0, (signal) => fetch(`${server.url}/Property`, { signal }));
+    const res = await withTimeout(0, signal => fetch(`${server.url}/Property`, { signal }));
     expect(res.status).toBe(200);
   });
 });

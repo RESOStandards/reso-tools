@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { allScenarios } from '../../src/web-api-core/scenarios.js';
 import { describeScenario, generateScenarioCatalog, scenarioAnchor } from '../../src/web-api-core/scenario-catalog.js';
+import { allScenarios } from '../../src/web-api-core/scenarios.js';
 
 /**
  * Locks the Scenario Catalog against the runner's scenario set. This is the anti-drift guard:

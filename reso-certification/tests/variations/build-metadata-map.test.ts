@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 /**
  * buildMetadataMap dual-key construction — the keying the variations
  * presence/suppression checks depend on.
@@ -12,8 +13,7 @@
  * A regression in this keying silently breaks every downstream form↔map
  * presence check.
  */
-import { describe, it, expect } from 'vitest';
-import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 const createRequire = (await import('node:module')).createRequire;
 const require = createRequire(import.meta.url);
@@ -28,19 +28,19 @@ describe('buildMetadataMap: dual-key construction', () => {
   it('non-string enum: legacyODataValues keyed by wire form, lookupValues by StandardName display', () => {
     const { metadataMap } = buildMetadataMap({
       fields: [{ resourceName: 'Property', fieldName: 'Appliances', type: ENUM, annotations: [] }],
-      lookups: [{ lookupName: ENUM, lookupValue: 'WaterHeater', type: 'Edm.Int64', annotations: [{ term: SN, value: 'Water Heater' }] }],
+      lookups: [{ lookupName: ENUM, lookupValue: 'WaterHeater', type: 'Edm.Int64', annotations: [{ term: SN, value: 'Water Heater' }] }]
     });
     const f = metadataMap.Property.Appliances;
-    expect(f.legacyODataValues.WaterHeater).toBeDefined();        // wire key = raw value
-    expect(f.lookupValues['Water Heater']).toBeDefined();         // display key = StandardName
-    expect(f.legacyODataValues['Water Heater']).toBeUndefined();  // not display-keyed
-    expect(f.lookupValues.WaterHeater).toBeUndefined();           // not wire-keyed
+    expect(f.legacyODataValues.WaterHeater).toBeDefined(); // wire key = raw value
+    expect(f.lookupValues['Water Heater']).toBeDefined(); // display key = StandardName
+    expect(f.legacyODataValues['Water Heater']).toBeUndefined(); // not display-keyed
+    expect(f.lookupValues.WaterHeater).toBeUndefined(); // not wire-keyed
   });
 
   it('string enum: lookupValues keyed by the raw value + standardLookupValue annotation, no legacyODataValues', () => {
     const { metadataMap } = buildMetadataMap({
       fields: [{ resourceName: 'Property', fieldName: 'StrField', type: STR_ENUM, annotations: [] }],
-      lookups: [{ lookupName: STR_ENUM, lookupValue: 'Activ', type: 'Edm.String', annotations: [{ term: SN, value: 'Active' }] }],
+      lookups: [{ lookupName: STR_ENUM, lookupValue: 'Activ', type: 'Edm.String', annotations: [{ term: SN, value: 'Active' }] }]
     });
     const f = metadataMap.Property.StrField;
     expect(f.lookupValues.Activ).toBeDefined();
@@ -51,7 +51,7 @@ describe('buildMetadataMap: dual-key construction', () => {
   it('excludes Sample…EnumValue placeholder lookups from both maps', () => {
     const { metadataMap } = buildMetadataMap({
       fields: [{ resourceName: 'Property', fieldName: 'Appliances', type: ENUM, annotations: [] }],
-      lookups: [{ lookupName: ENUM, lookupValue: 'SampleAppliancesEnumValue', type: 'Edm.Int64', annotations: [] }],
+      lookups: [{ lookupName: ENUM, lookupValue: 'SampleAppliancesEnumValue', type: 'Edm.Int64', annotations: [] }]
     });
     const f = metadataMap.Property.Appliances;
     expect(Object.keys(f.legacyODataValues ?? {})).toHaveLength(0);

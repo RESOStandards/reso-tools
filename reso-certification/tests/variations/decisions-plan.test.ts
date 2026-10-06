@@ -8,8 +8,8 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { describe, it, expect } from 'vitest';
-import { planDecisionPush, formatPlan } from '../../src/cli/decisions-command.js';
+import { describe, expect, it } from 'vitest';
+import { formatPlan, planDecisionPush } from '../../src/cli/decisions-command.js';
 import type { DecisionReport } from '../../src/variations/decisions.js';
 
 const NOW = '2026-10-05T04:30:00.000Z';
@@ -17,8 +17,7 @@ const NOW = '2026-10-05T04:30:00.000Z';
 const report = (): DecisionReport =>
   JSON.parse(readFileSync(new URL('../fixtures/variations-report-level-buckets.json', import.meta.url), 'utf-8')) as DecisionReport;
 
-const plan = (rows: ReadonlyArray<Record<string, unknown>>) =>
-  planDecisionPush({ report: report(), rows: rows as never, now: NOW });
+const plan = (rows: ReadonlyArray<Record<string, unknown>>) => planDecisionPush({ report: report(), rows: rows as never, now: NOW });
 
 describe('planning', () => {
   it('reports the report’s own size from its level buckets', () => {
@@ -53,7 +52,9 @@ describe('what the operator is shown before it goes', () => {
   it('names the derived requestedAction beside the sheet’s own word', () => {
     // `submit-to-ft` shows up in the pool and the UI as `fast-track`. An operator checking their
     // work should not have to learn that from a mismatch afterwards.
-    const text = formatPlan(plan([{ resourceName: 'Property', fieldName: 'LeaseTerm', lookupValue: 'Months - 4', action: 'submit-to-ft' }]));
+    const text = formatPlan(
+      plan([{ resourceName: 'Property', fieldName: 'LeaseTerm', lookupValue: 'Months - 4', action: 'submit-to-ft' }])
+    );
     expect(text).toContain('Property.LeaseTerm.Months - 4');
     expect(text).toContain('[lookups]');
     expect(text).toContain("requestedAction 'fast-track'");

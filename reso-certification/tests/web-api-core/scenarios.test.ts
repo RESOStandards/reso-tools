@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { allScenarios, scenariosForVersion } from '../../src/web-api-core/scenarios.js';
 
 describe('scenario definitions', () => {

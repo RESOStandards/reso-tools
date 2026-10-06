@@ -9,7 +9,7 @@
  * and assert against the recorded request log.
  */
 
-import { createServer, type Server } from 'node:http';
+import { type Server, createServer } from 'node:http';
 import type { Socket } from 'node:net';
 
 export interface MockReply {
@@ -86,12 +86,12 @@ export const startMockServer = async (): Promise<MockServer> => {
     }
   });
 
-  server.on('connection', (socket) => {
+  server.on('connection', socket => {
     sockets.add(socket);
     socket.on('close', () => sockets.delete(socket));
   });
 
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (address === null || typeof address === 'string') {
     throw new Error('mock server did not bind to a TCP port');
@@ -116,7 +116,7 @@ export const startMockServer = async (): Promise<MockServer> => {
     },
     async close() {
       for (const socket of sockets) socket.destroy();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>(resolve => server.close(() => resolve()));
     }
   };
 };

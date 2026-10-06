@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { detectEnumMode } from '../../src/web-api-core/sampling.js';
+import { describe, expect, it } from 'vitest';
 import type { EntityType } from '../../src/test-runner/types.js';
+import { detectEnumMode } from '../../src/web-api-core/sampling.js';
 
 const makeEntityType = (properties: ReadonlyArray<{ name: string; type: string; annotations?: Record<string, string> }>): EntityType => ({
   name: 'TestEntity',
@@ -8,8 +8,8 @@ const makeEntityType = (properties: ReadonlyArray<{ name: string; type: string; 
   properties: properties.map(p => ({
     name: p.name,
     type: p.type,
-    annotations: p.annotations,
-  })),
+    annotations: p.annotations
+  }))
 });
 
 describe('detectEnumMode', () => {
@@ -17,7 +17,7 @@ describe('detectEnumMode', () => {
     const entityType = makeEntityType([
       { name: 'ListingKey', type: 'Edm.String' },
       { name: 'StandardStatus', type: 'Edm.String', annotations: { 'RESO.OData.Metadata.LookupName': 'StandardStatus' } },
-      { name: 'ListPrice', type: 'Edm.Decimal' },
+      { name: 'ListPrice', type: 'Edm.Decimal' }
     ]);
     expect(detectEnumMode(entityType)).toBe('string');
   });
@@ -26,7 +26,7 @@ describe('detectEnumMode', () => {
     const entityType = makeEntityType([
       { name: 'ListingKey', type: 'Edm.String' },
       { name: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus' },
-      { name: 'Features', type: 'Collection(org.reso.metadata.enums.Features)' },
+      { name: 'Features', type: 'Collection(org.reso.metadata.enums.Features)' }
     ]);
     expect(detectEnumMode(entityType)).toBe('collections');
   });
@@ -35,7 +35,7 @@ describe('detectEnumMode', () => {
     const entityType = makeEntityType([
       { name: 'ListingKey', type: 'Edm.String' },
       { name: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus' },
-      { name: 'ListPrice', type: 'Edm.Decimal' },
+      { name: 'ListPrice', type: 'Edm.Decimal' }
     ]);
     expect(detectEnumMode(entityType)).toBe('isflags');
   });
@@ -44,7 +44,7 @@ describe('detectEnumMode', () => {
     const entityType = makeEntityType([
       { name: 'ListingKey', type: 'Edm.String' },
       { name: 'ListPrice', type: 'Edm.Decimal' },
-      { name: 'BedroomsTotal', type: 'Edm.Int32' },
+      { name: 'BedroomsTotal', type: 'Edm.Int32' }
     ]);
     expect(detectEnumMode(entityType)).toBe('string');
   });
@@ -52,7 +52,7 @@ describe('detectEnumMode', () => {
   it('string mode takes priority over enum types when both present', () => {
     const entityType = makeEntityType([
       { name: 'StandardStatus', type: 'Edm.String', annotations: { 'RESO.OData.Metadata.LookupName': 'StandardStatus' } },
-      { name: 'OtherField', type: 'org.reso.metadata.enums.SomeEnum' },
+      { name: 'OtherField', type: 'org.reso.metadata.enums.SomeEnum' }
     ]);
     expect(detectEnumMode(entityType)).toBe('string');
   });

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
+import { describe, expect, it } from 'vitest';
 import { generateReferenceArtifacts } from '../../src/metadata/reference-artifacts.js';
 
 const report: MetadataReport = {
@@ -9,14 +9,30 @@ const report: MetadataReport = {
   resources: [{ resourceName: 'Property' }],
   fields: [
     { resourceName: 'Property', fieldName: 'ListingKey', type: 'Edm.String', annotations: [] },
-    { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus', isEnumeration: true, annotations: [] },
+    {
+      resourceName: 'Property',
+      fieldName: 'StandardStatus',
+      type: 'org.reso.metadata.enums.StandardStatus',
+      isEnumeration: true,
+      annotations: []
+    }
   ],
   lookups: [
-    { lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Active', type: 'Edm.Int32', annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Active' }] },
-    { lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Pending', type: 'Edm.Int32', annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Pending Sale' }] },
+    {
+      lookupName: 'org.reso.metadata.enums.StandardStatus',
+      lookupValue: 'Active',
+      type: 'Edm.Int32',
+      annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Active' }]
+    },
+    {
+      lookupName: 'org.reso.metadata.enums.StandardStatus',
+      lookupValue: 'Pending',
+      type: 'Edm.Int32',
+      annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Pending Sale' }]
+    }
   ],
   actions: [],
-  functions: [],
+  functions: []
 };
 
 describe('generateReferenceArtifacts — enum-type representation', () => {

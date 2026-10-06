@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { stringFieldStats, classifyStringField, ENUM_MIN_SAMPLE } from '../../src/rcf/local-enum-detection.js';
+import { describe, expect, it } from 'vitest';
+import { ENUM_MIN_SAMPLE, classifyStringField, stringFieldStats } from '../../src/rcf/local-enum-detection.js';
 
 describe('stringFieldStats', () => {
   it('keeps non-blank strings and counts total vs distinct', () => {

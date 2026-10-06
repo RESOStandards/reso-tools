@@ -3,9 +3,9 @@
  * variations data in the step output and writes the report file.
  */
 
-import { describe, it, expect } from 'vitest';
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
 
 describe('Variations report output', () => {
   // The variations report filename must match what the desktop client reads
@@ -41,7 +41,7 @@ describe('Variations report output', () => {
       variations: 'variations-report.json',
       metadata: 'metadata-report.json',
       report: 'report.json',
-      reportDetailed: 'report-detailed.json',
+      reportDetailed: 'report-detailed.json'
     };
 
     // Verify the filenames match what the pipeline writes

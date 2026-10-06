@@ -60,10 +60,7 @@ interface Call {
   readonly url: string;
   readonly headers?: Readonly<Record<string, string>>;
 }
-const scripted = (
-  pages: ReadonlyArray<ODataResponse | Error>,
-  calls: Call[]
-): ODataRequester => ({
+const scripted = (pages: ReadonlyArray<ODataResponse | Error>, calls: Call[]): ODataRequester => ({
   request: async ({ url, headers }) => {
     calls.push({ url, ...(headers ? { headers } : {}) });
     const next = pages[calls.length - 1];
@@ -96,10 +93,7 @@ describe('sampling pages to the record target', () => {
   });
 
   it('stops when the server runs out of pages, and calls that the complete resource', async () => {
-    const params = await sample([
-      page(records(100, 0), { next: 'http://x/Property?$skiptoken=a' }),
-      page(records(50, 100))
-    ]);
+    const params = await sample([page(records(100, 0), { next: 'http://x/Property?$skiptoken=a' }), page(records(50, 100))]);
     expect(params.sampleRecordCount).toBe(150);
     expect(params.samplePagesFetched).toBe(2);
     expect(params.sampleStopReason).toBe('exhausted');
@@ -158,20 +152,14 @@ describe('sampling stops safely when paging cannot continue', () => {
   });
 
   it('keeps the records already in hand when a page request throws', async () => {
-    const params = await sample([
-      page(records(200), { next: 'http://x/Property?$skiptoken=a' }),
-      new Error('socket hang up')
-    ]);
+    const params = await sample([page(records(200), { next: 'http://x/Property?$skiptoken=a' }), new Error('socket hang up')]);
     expect(params.sampleRecordCount).toBe(200);
     expect(params.sampleStopReason).toBe('page-error');
     expect(params.sampleComplete).toBe(false);
   });
 
   it('keeps the records already in hand when a page answers non-200', async () => {
-    const params = await sample([
-      page(records(200), { next: 'http://x/Property?$skiptoken=a' }),
-      page([], { status: 500 })
-    ]);
+    const params = await sample([page(records(200), { next: 'http://x/Property?$skiptoken=a' }), page([], { status: 500 })]);
     expect(params.sampleRecordCount).toBe(200);
     expect(params.sampleStopReason).toBe('page-error');
   });
@@ -179,10 +167,7 @@ describe('sampling stops safely when paging cannot continue', () => {
   it('does not spin when a page carries a forward link but no records', async () => {
     const calls: Call[] = [];
     const params = await sample(
-      [
-        page(records(10), { next: 'http://x/Property?$skiptoken=a' }),
-        page([], { next: 'http://x/Property?$skiptoken=b' })
-      ],
+      [page(records(10), { next: 'http://x/Property?$skiptoken=a' }), page([], { next: 'http://x/Property?$skiptoken=b' })],
       calls
     );
     expect(calls).toHaveLength(2); // stopped rather than following the link again
@@ -197,19 +182,14 @@ describe('sampling stops safely when paging cannot continue', () => {
     // this codebase uses marker fields, not Error subclasses). A fake shape would make this test pass while the
     // guard did nothing, which is the failure mode worth avoiding in a test OF a guard.
     const deadline = Object.assign(new Error('deadline exceeded'), { resilienceKind: 'deadline-exceeded' });
-    await expect(
-      sample([page(records(10), { next: 'http://x/Property?$skiptoken=a' }), deadline])
-    ).rejects.toThrow();
+    await expect(sample([page(records(10), { next: 'http://x/Property?$skiptoken=a' }), deadline])).rejects.toThrow();
   });
 });
 
 describe('sampling request shape', () => {
   it('asks for a large page on the first request AND on every page request', async () => {
     const calls: Call[] = [];
-    await sample(
-      [page(records(400), { next: 'http://x/Property?$skiptoken=a' }), page(records(10, 400))],
-      calls
-    );
+    await sample([page(records(400), { next: 'http://x/Property?$skiptoken=a' }), page(records(10, 400))], calls);
     for (const call of calls) {
       expect(call.headers?.Prefer).toBe(`odata.maxpagesize=${SAMPLE_TOP}`);
     }
@@ -219,10 +199,7 @@ describe('sampling request shape', () => {
     // A provider behind a proxy emits an internal host in its nextLink; following it blindly would fail a
     // conformant server. Covered by rebaseNextLink, asserted here so the sampler keeps using it.
     const calls: Call[] = [];
-    await sample(
-      [page(records(400), { next: 'http://internal-host:9000/Property?$skiptoken=a' }), page(records(10, 400))],
-      calls
-    );
+    await sample([page(records(400), { next: 'http://internal-host:9000/Property?$skiptoken=a' }), page(records(10, 400))], calls);
     expect(calls[1].url).toBe('http://x/Property?$skiptoken=a');
   });
 

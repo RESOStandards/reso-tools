@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { handlers } from '../src/handlers.js';
 
 describe('handler registry', () => {
@@ -38,7 +38,7 @@ describe('handleValidate', () => {
   it('returns field count for a record', async () => {
     const result = await handlers.validate({
       record: { ListPrice: 350000, City: 'Austin', BedroomsTotal: 3 },
-      resource: 'Property',
+      resource: 'Property'
     });
     expect(result.isError).toBeFalsy();
     const data = JSON.parse(result.content[0].text);
@@ -49,23 +49,29 @@ describe('handleValidate', () => {
 
 describe('auth resolution', () => {
   it('query throws without any auth', async () => {
-    await expect(handlers.query({
-      url: 'http://localhost:9999',
-      resource: 'Property',
-    })).rejects.toThrow('Authentication required');
+    await expect(
+      handlers.query({
+        url: 'http://localhost:9999',
+        resource: 'Property'
+      })
+    ).rejects.toThrow('Authentication required');
   });
 
   it('metadata throws without any auth', async () => {
-    await expect(handlers.metadata({
-      url: 'http://localhost:9999',
-    })).rejects.toThrow('Authentication required');
+    await expect(
+      handlers.metadata({
+        url: 'http://localhost:9999'
+      })
+    ).rejects.toThrow('Authentication required');
   });
 
   it('run-compliance throws for unknown endorsement', async () => {
-    await expect(handlers['run-compliance']({
-      endorsement: 'nonexistent',
-      url: 'http://localhost:9999',
-      authToken: 'token',
-    })).rejects.toThrow('Unknown endorsement');
+    await expect(
+      handlers['run-compliance']({
+        endorsement: 'nonexistent',
+        url: 'http://localhost:9999',
+        authToken: 'token'
+      })
+    ).rejects.toThrow('Unknown endorsement');
   });
 });

@@ -1,23 +1,23 @@
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
-import { CURRENT_DD_VERSION } from '../../src/sdk/dd-versions.js';
-import { CURRENT_CORE_VERSION } from '../../src/sdk/core-versions.js';
+import { describe, expect, it } from 'vitest';
 import {
-  loadConfigFile,
-  normalizeConfigFile,
-  generateLocalUoi,
   configEntryToAddEdit,
-  configEntryToEntityEvent,
   configEntryToCore,
   configEntryToDD,
-  resolvePayloadKeys,
+  configEntryToEntityEvent,
+  generateLocalUoi,
+  loadConfigFile,
+  normalizeConfigFile,
+  resolvePayloadKeys
 } from '../../src/sdk/config.js';
+import { CURRENT_CORE_VERSION } from '../../src/sdk/core-versions.js';
+import { CURRENT_DD_VERSION } from '../../src/sdk/dd-versions.js';
 
 describe('normalizeConfigFile — accept legacy / desktop / single shapes', () => {
   it('passes the legacy { providerUoi, configs } format through', () => {
     const cf = normalizeConfigFile({
       providerUoi: 'P001',
-      configs: [{ serviceRootUri: 'https://api.example.com', recipientUoi: 'R1', providerUsi: 'S1', token: 't', version: '2.1.0' }],
+      configs: [{ serviceRootUri: 'https://api.example.com', recipientUoi: 'R1', providerUsi: 'S1', token: 't', version: '2.1.0' }]
     });
     expect(cf.providerUoi).toBe('P001');
     expect(cf.configs).toHaveLength(1);
@@ -28,12 +28,16 @@ describe('normalizeConfigFile — accept legacy / desktop / single shapes', () =
   it('normalizes the desktop { providerUoi, recipients } format with nested token auth (OSN carried through)', () => {
     const cf = normalizeConfigFile({
       providerUoi: 'P001',
-      recipients: [{
-        serviceRootUri: 'https://api.example.com', recipientUoi: 'R1', providerUsi: 'S1',
-        auth: { mode: 'token', authToken: 'abc' },
-        originatingSystemName: 'MyMLS',
-        ddOptions: { version: '2.1.0' },
-      }],
+      recipients: [
+        {
+          serviceRootUri: 'https://api.example.com',
+          recipientUoi: 'R1',
+          providerUsi: 'S1',
+          auth: { mode: 'token', authToken: 'abc' },
+          originatingSystemName: 'MyMLS',
+          ddOptions: { version: '2.1.0' }
+        }
+      ]
     });
     expect(cf.configs).toHaveLength(1);
     expect(cf.configs[0].token).toBe('abc');
@@ -44,17 +48,31 @@ describe('normalizeConfigFile — accept legacy / desktop / single shapes', () =
   it('maps nested client_credentials auth, tokenUrl → tokenUri', () => {
     const cf = normalizeConfigFile({
       providerUoi: 'P001',
-      recipients: [{
-        serviceRootUri: 'https://api.example.com', recipientUoi: 'R1', providerUsi: 'S1',
-        auth: { mode: 'client_credentials', clientId: 'id', clientSecret: 'secret', tokenUrl: 'https://auth/token', scope: 'sc' },
-      }],
+      recipients: [
+        {
+          serviceRootUri: 'https://api.example.com',
+          recipientUoi: 'R1',
+          providerUsi: 'S1',
+          auth: { mode: 'client_credentials', clientId: 'id', clientSecret: 'secret', tokenUrl: 'https://auth/token', scope: 'sc' }
+        }
+      ]
     });
-    expect(cf.configs[0].clientCredentials).toEqual({ clientId: 'id', clientSecret: 'secret', tokenUri: 'https://auth/token', scope: 'sc' });
+    expect(cf.configs[0].clientCredentials).toEqual({
+      clientId: 'id',
+      clientSecret: 'secret',
+      tokenUri: 'https://auth/token',
+      scope: 'sc'
+    });
     expect(cf.configs[0].token).toBeUndefined();
   });
 
   it('accepts a single-entry config and supplies a placeholder providerUoi', () => {
-    const cf = normalizeConfigFile({ serviceRootUri: 'https://api.example.com', recipientUoi: 'R1', providerUsi: 'S1', auth: { mode: 'token', authToken: 't' } });
+    const cf = normalizeConfigFile({
+      serviceRootUri: 'https://api.example.com',
+      recipientUoi: 'R1',
+      providerUsi: 'S1',
+      auth: { mode: 'token', authToken: 't' }
+    });
     expect(cf.providerUoi).toMatch(/^LOCAL-/);
     expect(cf.configs).toHaveLength(1);
     expect(cf.configs[0].token).toBe('t');
@@ -66,14 +84,28 @@ describe('normalizeConfigFile — accept legacy / desktop / single shapes', () =
 
   it('rejects a serviceRootUri that is not a valid absolute http(s) URL (catch-all)', () => {
     // A desktop placeholder the CLI does not resolve — the exact case that crashed mid-metadata before.
-    expect(() => normalizeConfigFile({ providerUoi: 'P001', configs: [{ serviceRootUri: 'LOCAL_SERVER', recipientUoi: 'R1', providerUsi: 'S1', token: 't' }] }))
-      .toThrow(/serviceRootUri "LOCAL_SERVER" is not a valid URL/);
+    expect(() =>
+      normalizeConfigFile({
+        providerUoi: 'P001',
+        configs: [{ serviceRootUri: 'LOCAL_SERVER', recipientUoi: 'R1', providerUsi: 'S1', token: 't' }]
+      })
+    ).toThrow(/serviceRootUri "LOCAL_SERVER" is not a valid URL/);
     // A missing scheme is caught too.
-    expect(() => normalizeConfigFile({ serviceRootUri: 'api.example.com', recipientUoi: 'R1', providerUsi: 'S1', auth: { mode: 'token', authToken: 't' } }))
-      .toThrow(/not a valid URL/);
+    expect(() =>
+      normalizeConfigFile({
+        serviceRootUri: 'api.example.com',
+        recipientUoi: 'R1',
+        providerUsi: 'S1',
+        auth: { mode: 'token', authToken: 't' }
+      })
+    ).toThrow(/not a valid URL/);
     // A real absolute URL passes.
-    expect(() => normalizeConfigFile({ providerUoi: 'P001', configs: [{ serviceRootUri: 'https://api.example.com', recipientUoi: 'R1', providerUsi: 'S1', token: 't' }] }))
-      .not.toThrow();
+    expect(() =>
+      normalizeConfigFile({
+        providerUoi: 'P001',
+        configs: [{ serviceRootUri: 'https://api.example.com', recipientUoi: 'R1', providerUsi: 'S1', token: 't' }]
+      })
+    ).not.toThrow();
   });
 });
 
@@ -113,7 +145,7 @@ describe('configEntryToAddEdit', () => {
     recipientUoi: 'R001',
     providerUsi: 'S001',
     token: 'test-token',
-    resource: 'Property',
+    resource: 'Property'
   };
 
   it('converts to AddEditConfig with bearer auth', () => {
@@ -132,8 +164,8 @@ describe('configEntryToAddEdit', () => {
       clientCredentials: {
         clientId: 'id',
         clientSecret: 'secret',
-        tokenUri: 'https://auth.example.com/token',
-      },
+        tokenUri: 'https://auth.example.com/token'
+      }
     };
 
     const config = configEntryToAddEdit(ccEntry, 'P001');
@@ -142,7 +174,7 @@ describe('configEntryToAddEdit', () => {
       mode: 'client_credentials',
       clientId: 'id',
       clientSecret: 'secret',
-      tokenUrl: 'https://auth.example.com/token',
+      tokenUrl: 'https://auth.example.com/token'
     });
   });
 
@@ -164,7 +196,7 @@ describe('configEntryToEntityEvent', () => {
     serviceRootUri: 'https://api.example.com',
     recipientUoi: 'R001',
     providerUsi: 'S001',
-    token: 'test-token',
+    token: 'test-token'
   };
 
   it('converts with default observe mode', () => {
@@ -186,12 +218,15 @@ describe('configEntryToCore', () => {
   it('converts an entry with no version to the current Core minor', () => {
     // An absent version resolves to CURRENT_CORE_VERSION (the current minor), not the 2.0.0 baseline — an
     // unknown version certifies under the strictest known profile rather than silently downgrading.
-    const config = configEntryToCore({
-      serviceRootUri: 'https://api.example.com',
-      recipientUoi: 'R001',
-      providerUsi: 'S001',
-      token: 'test-token',
-    }, 'P001');
+    const config = configEntryToCore(
+      {
+        serviceRootUri: 'https://api.example.com',
+        recipientUoi: 'R001',
+        providerUsi: 'S001',
+        token: 'test-token'
+      },
+      'P001'
+    );
 
     expect(config.endorsement).toBe('core');
     expect(config.version).toBe(CURRENT_CORE_VERSION);
@@ -201,50 +236,62 @@ describe('configEntryToCore', () => {
     // The config-mode bug: reso-certification-utils supplies the Core version as "2.1", and the old bare
     // `as CoreVersion` cast passed it straight through — so `version === '2.1.0'` gates (the $expand schema
     // validator) never fired. The entry must resolve to the exact canonical literal.
-    const config = configEntryToCore({
-      serviceRootUri: 'https://api.example.com',
-      recipientUoi: 'R001',
-      providerUsi: 'S001',
-      token: 'test-token',
-      version: '2.1',
-    }, 'P001');
+    const config = configEntryToCore(
+      {
+        serviceRootUri: 'https://api.example.com',
+        recipientUoi: 'R001',
+        providerUsi: 'S001',
+        token: 'test-token',
+        version: '2.1'
+      },
+      'P001'
+    );
 
     expect(config.version).toBe('2.1.0');
   });
 
   it('passes an already-canonical config version through unchanged', () => {
-    const config = configEntryToCore({
-      serviceRootUri: 'https://api.example.com',
-      recipientUoi: 'R001',
-      providerUsi: 'S001',
-      token: 'test-token',
-      version: '2.1.0',
-    }, 'P001');
+    const config = configEntryToCore(
+      {
+        serviceRootUri: 'https://api.example.com',
+        recipientUoi: 'R001',
+        providerUsi: 'S001',
+        token: 'test-token',
+        version: '2.1.0'
+      },
+      'P001'
+    );
 
     expect(config.version).toBe('2.1.0');
   });
 
   it('threads OriginatingSystemName/ID from the entry (reso-certification-utils format)', () => {
-    const config = configEntryToCore({
-      serviceRootUri: 'https://api.example.com',
-      recipientUoi: 'R001',
-      providerUsi: 'S001',
-      token: 'test-token',
-      originatingSystemName: 'MyMLS',
-      originatingSystemId: 'MLS-42',
-    }, 'P001');
+    const config = configEntryToCore(
+      {
+        serviceRootUri: 'https://api.example.com',
+        recipientUoi: 'R001',
+        providerUsi: 'S001',
+        token: 'test-token',
+        originatingSystemName: 'MyMLS',
+        originatingSystemId: 'MLS-42'
+      },
+      'P001'
+    );
 
     expect(config.originatingSystemName).toBe('MyMLS');
     expect(config.originatingSystemId).toBe('MLS-42');
   });
 
   it('omits OriginatingSystem fields when the entry carries none', () => {
-    const config = configEntryToCore({
-      serviceRootUri: 'https://api.example.com',
-      recipientUoi: 'R001',
-      providerUsi: 'S001',
-      token: 'test-token',
-    }, 'P001');
+    const config = configEntryToCore(
+      {
+        serviceRootUri: 'https://api.example.com',
+        recipientUoi: 'R001',
+        providerUsi: 'S001',
+        token: 'test-token'
+      },
+      'P001'
+    );
 
     expect(config.originatingSystemName).toBeUndefined();
     expect(config.originatingSystemId).toBeUndefined();
@@ -253,12 +300,15 @@ describe('configEntryToCore', () => {
 
 describe('configEntryToDD', () => {
   it('converts with default version (the current DD version)', () => {
-    const config = configEntryToDD({
-      serviceRootUri: 'https://api.example.com',
-      recipientUoi: 'R001',
-      providerUsi: 'S001',
-      token: 'test-token',
-    }, 'P001');
+    const config = configEntryToDD(
+      {
+        serviceRootUri: 'https://api.example.com',
+        recipientUoi: 'R001',
+        providerUsi: 'S001',
+        token: 'test-token'
+      },
+      'P001'
+    );
 
     expect(config.endorsement).toBe('dd');
     // An entry with no version coerces to the current DD version.
@@ -266,14 +316,17 @@ describe('configEntryToDD', () => {
   });
 
   it('threads OriginatingSystemName/ID from the entry into the DD replication config', () => {
-    const config = configEntryToDD({
-      serviceRootUri: 'https://api.example.com',
-      recipientUoi: 'R001',
-      providerUsi: 'S001',
-      token: 'test-token',
-      originatingSystemName: 'MyMLS',
-      originatingSystemId: 'MLS-42',
-    }, 'P001');
+    const config = configEntryToDD(
+      {
+        serviceRootUri: 'https://api.example.com',
+        recipientUoi: 'R001',
+        providerUsi: 'S001',
+        token: 'test-token',
+        originatingSystemName: 'MyMLS',
+        originatingSystemId: 'MLS-42'
+      },
+      'P001'
+    );
 
     expect(config.originatingSystemName).toBe('MyMLS');
     expect(config.originatingSystemId).toBe('MLS-42');
@@ -287,7 +340,7 @@ describe('resolvePayloadKeys', () => {
     const payloads = {
       createSucceeds: { ListPrice: 350000 },
       updateSucceeds: { ListPrice: 375000 },
-      updateFails: { ListPrice: -1 },
+      updateFails: { ListPrice: -1 }
     };
 
     const resolved = resolvePayloadKeys(payloads, keyField, 'KEY-123');
@@ -300,7 +353,7 @@ describe('resolvePayloadKeys', () => {
   it('injects createdKey into delete payload missing id', () => {
     const payloads = {
       createSucceeds: { ListPrice: 350000 },
-      deleteSucceeds: {},
+      deleteSucceeds: {}
     };
 
     const resolved = resolvePayloadKeys(payloads, keyField, 'KEY-456');
@@ -314,7 +367,7 @@ describe('resolvePayloadKeys', () => {
       createSucceeds: { ListPrice: 350000 },
       updateSucceeds: { ListingKey: 'EXISTING-KEY', ListPrice: 375000 },
       updateFails: { ListingKey: 'EXISTING-KEY', ListPrice: -1 },
-      deleteSucceeds: { id: 'EXISTING-DELETE-KEY' },
+      deleteSucceeds: { id: 'EXISTING-DELETE-KEY' }
     };
 
     const resolved = resolvePayloadKeys(payloads, keyField, 'SHOULD-NOT-USE');
@@ -327,7 +380,7 @@ describe('resolvePayloadKeys', () => {
 
   it('throws when update missing key and no create payload', () => {
     const payloads = {
-      updateSucceeds: { ListPrice: 375000 },
+      updateSucceeds: { ListPrice: 375000 }
     };
 
     expect(() => resolvePayloadKeys(payloads, keyField)).toThrow('Update payload missing');
@@ -337,7 +390,7 @@ describe('resolvePayloadKeys', () => {
     const payloads = {
       updateSucceeds: { ListingKey: 'HAS-KEY', ListPrice: 100 },
       updateFails: { ListingKey: 'HAS-KEY', ListPrice: -1 },
-      deleteSucceeds: {},
+      deleteSucceeds: {}
     };
 
     expect(() => resolvePayloadKeys(payloads, keyField)).toThrow('Delete payload missing');

@@ -1,8 +1,8 @@
-import { afterAll, describe, expect, it } from 'vitest';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { createRequire } from 'node:module';
+import { afterAll, describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const { writeSchemaValidationWarningsReport, writeSchemaValidationErrorReport, SCHEMA_VALIDATION_WARNINGS_FILENAME } = require(
@@ -18,13 +18,21 @@ const { writeSchemaValidationWarningsReport, writeSchemaValidationErrorReport, S
 const errorMapWith = (totalErrors: number, totalWarnings: number) => ({
   stats: { totalErrors, totalWarnings },
   errorCache: {},
-  warningsCache: totalWarnings ? { Property: { '@reso.context': { 'The "@reso.context" version does not match the run version': { fileName: 'page-1' } } } } : {},
-  payloadErrors: {},
+  warningsCache: totalWarnings
+    ? { Property: { '@reso.context': { 'The "@reso.context" version does not match the run version': { fileName: 'page-1' } } } }
+    : {},
+  payloadErrors: {}
 });
 
 const tempDirs: string[] = [];
-const tempDir = (): string => { const d = mkdtempSync(resolve(tmpdir(), 'schema-warn-')); tempDirs.push(d); return d; };
-afterAll(() => { for (const d of tempDirs) rmSync(d, { recursive: true, force: true }); });
+const tempDir = (): string => {
+  const d = mkdtempSync(resolve(tmpdir(), 'schema-warn-'));
+  tempDirs.push(d);
+  return d;
+};
+afterAll(() => {
+  for (const d of tempDirs) rmSync(d, { recursive: true, force: true });
+});
 
 describe('schema-validation warnings report (transport-path context findings on a DD run)', () => {
   it('warnings without errors → the warnings file is written beside the analytics reports, carrying the combined report', async () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createPipeline } from '../../src/sdk/pipeline.js';
 import type { PipelineStep, StepProgress, TestFunction } from '../../src/sdk/types.js';
 
@@ -20,7 +20,7 @@ describe('pipeline sub-function progress', () => {
     const step: PipelineStep = {
       name: 'multi-function-step',
       mode: 'sequential',
-      functions: [fn1, fn2],
+      functions: [fn1, fn2]
     };
 
     const pipeline = createPipeline('test', [step]);
@@ -56,7 +56,7 @@ describe('pipeline sub-function progress', () => {
     const step: PipelineStep = {
       name: 'parallel-step',
       mode: 'parallel',
-      functions: [fn1, fn2],
+      functions: [fn1, fn2]
     };
 
     const pipeline = createPipeline('test', [step]);
@@ -67,15 +67,15 @@ describe('pipeline sub-function progress', () => {
   });
 
   it('returns counts from sub-functions in step results', async () => {
-    const fn: TestFunction = async (ctx) => ({
+    const fn: TestFunction = async ctx => ({
       context: ctx,
       summary: 'fetched data',
-      counts: { totalRecordsFetched: 1000, meanResponseMs: 250, throughput: 400 },
+      counts: { totalRecordsFetched: 1000, meanResponseMs: 250, throughput: 400 }
     });
 
     const step: PipelineStep = {
       name: 'with-counts',
-      functions: [fn],
+      functions: [fn]
     };
 
     const pipeline = createPipeline('test', [step]);
@@ -84,7 +84,7 @@ describe('pipeline sub-function progress', () => {
     expect(result.steps[0].counts).toEqual({
       totalRecordsFetched: 1000,
       meanResponseMs: 250,
-      throughput: 400,
+      throughput: 400
     });
   });
 
@@ -99,7 +99,7 @@ describe('pipeline sub-function progress', () => {
 
     const step: PipelineStep = {
       name: 'outer-step',
-      functions: [fn],
+      functions: [fn]
     };
 
     const pipeline = createPipeline('test', [step]);
@@ -119,13 +119,13 @@ describe('replication progress format', () => {
       _type: 'replication-progress',
       resources: [
         { name: 'Property', records: 5000, bytes: 50_000_000 },
-        { name: 'Member', records: 2000, bytes: 15_000_000 },
+        { name: 'Member', records: 2000, bytes: 15_000_000 }
       ],
       totalRecords: 7000,
       totalBytes: 65_000_000,
       throughput: 450,
       meanResponseMs: 800,
-      anomalyCount: 1,
+      anomalyCount: 1
     };
 
     const json = JSON.stringify(data);
@@ -146,7 +146,7 @@ describe('replication progress format', () => {
       totalBytes: null,
       throughput: null,
       meanResponseMs: null,
-      anomalyCount: 0,
+      anomalyCount: 0
     };
 
     const json = JSON.stringify(data);
@@ -160,7 +160,9 @@ describe('replication progress format', () => {
 describe('Welford online algorithm', () => {
   it('computes correct mean and detects anomalies', () => {
     // Simulate the Welford's algorithm from replicate()
-    let count = 0, mean = 0, m2 = 0;
+    let count = 0;
+    let mean = 0;
+    let m2 = 0;
     const values = [100, 110, 95, 105, 500, 98, 102]; // 500 is the anomaly
 
     for (const v of values) {
@@ -189,7 +191,9 @@ describe('Welford online algorithm', () => {
   });
 
   it('handles fewer than 3 samples without anomaly detection', () => {
-    let count = 0, mean = 0, m2 = 0;
+    let count = 0;
+    let mean = 0;
+    let m2 = 0;
     const values = [100, 200];
 
     for (const v of values) {

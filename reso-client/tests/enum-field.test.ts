@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { resolveEnum } from '../src/index.js';
 import type { CsdlSchema } from '@reso-standards/reso-metadata-utils';
+import { describe, expect, it } from 'vitest';
+import { resolveEnum } from '../src/index.js';
 
 const schema: CsdlSchema = {
   namespace: 'org.reso.metadata',
@@ -15,8 +15,8 @@ const schema: CsdlSchema = {
       members: [
         { name: 'Active', value: '0' },
         { name: 'Pending', value: '1' },
-        { name: 'Closed', value: '2' },
-      ],
+        { name: 'Closed', value: '2' }
+      ]
     },
     {
       name: 'AccessibilityFeatures',
@@ -25,10 +25,10 @@ const schema: CsdlSchema = {
         { name: 'None', value: '0' },
         { name: 'A', value: '1' },
         { name: 'B', value: '2' },
-        { name: 'C', value: '4' },
-      ],
-    },
-  ],
+        { name: 'C', value: '4' }
+      ]
+    }
+  ]
 };
 
 const LOOKUP = { 'RESO.OData.Metadata.LookupName': 'StandardStatus' };

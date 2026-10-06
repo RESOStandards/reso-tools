@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { gzipSync } from 'node:zlib';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { findVariations } from '../../src/variations/find-variations.js';
 
 /** Encode a report the way the /compute handler does — gzip then base64. */
@@ -12,12 +12,15 @@ const serviceResponse = (report: unknown) => ({
   ok: true,
   status: 200,
   statusText: 'OK',
-  text: async () => gzB64(report),
+  text: async () => gzB64(report)
 });
 
 describe('findVariations — metadata source resolution', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.RESO_SERVICES_URL;
   });
 
@@ -26,9 +29,9 @@ describe('findVariations — metadata source resolution', () => {
   });
 
   it('throws when both an in-memory report and a file path are provided', async () => {
-    await expect(
-      findVariations({ metadataReportJson: { fields: [] }, pathToMetadataReportJson: '/tmp/x.json' }),
-    ).rejects.toThrow(/mutually exclusive/i);
+    await expect(findVariations({ metadataReportJson: { fields: [] }, pathToMetadataReportJson: '/tmp/x.json' })).rejects.toThrow(
+      /mutually exclusive/i
+    );
   });
 
   it('computes from an in-memory report and writes the artifact when variations exist', async () => {
@@ -37,7 +40,7 @@ describe('findVariations — metadata source resolution', () => {
       description: 'x',
       version: '2.0',
       fuzziness: 0.25,
-      variations: { fields: [{ resourceName: 'Property', suggestedFieldName: 'X' }] },
+      variations: { fields: [{ resourceName: 'Property', suggestedFieldName: 'X' }] }
     };
     const fetchMock = vi.fn().mockResolvedValue(serviceResponse(report));
     vi.stubGlobal('fetch', fetchMock);
@@ -49,7 +52,7 @@ describe('findVariations — metadata source resolution', () => {
         version: '2.0',
         fuzziness: 0.25,
         bearerToken: 'tok', // pass a token so the service client skips minting
-        outputPath: dir,
+        outputPath: dir
       });
 
       // The in-memory report went to /compute (not a file read), and the report came back.
@@ -71,7 +74,7 @@ describe('findVariations — metadata source resolution', () => {
       description: 'x',
       version: '2.0',
       fuzziness: 0.25,
-      variations: { fields: [{ resourceName: 'Property', suggestedFieldName: 'X' }] },
+      variations: { fields: [{ resourceName: 'Property', suggestedFieldName: 'X' }] }
     };
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(serviceResponse(report)));
 
@@ -82,7 +85,7 @@ describe('findVariations — metadata source resolution', () => {
         metadataReportJson: { fields: [] },
         version: '2.0',
         bearerToken: 'tok',
-        outputPath: nested,
+        outputPath: nested
       });
       const written = JSON.parse(await readFile(join(nested, 'data-dictionary-variations.json'), 'utf-8'));
       expect(written).toEqual(report);
@@ -102,7 +105,7 @@ describe('findVariations — metadata source resolution', () => {
         metadataReportJson: { fields: [] },
         version: '2.0',
         bearerToken: 'tok',
-        outputPath: dir,
+        outputPath: dir
       });
       expect(result).toEqual(report);
       await expect(readFile(join(dir, 'data-dictionary-variations.json'), 'utf-8')).rejects.toThrow();

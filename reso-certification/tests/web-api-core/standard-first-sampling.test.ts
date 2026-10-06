@@ -226,7 +226,11 @@ const DATE_EQ_SCENARIO: ScalarFilterScenario = {
 };
 
 /** A requester that rejects any query naming `brokenField` and serves `records` for everything else. */
-const rejectingRequester = (brokenField: string, records: ReadonlyArray<Record<string, unknown>>, status = 500): ODataRequester & { readonly urls: string[] } => {
+const rejectingRequester = (
+  brokenField: string,
+  records: ReadonlyArray<Record<string, unknown>>,
+  status = 500
+): ODataRequester & { readonly urls: string[] } => {
   const urls: string[] = [];
   return {
     urls,
@@ -271,11 +275,7 @@ describe('scalar filter scenarios walk the candidate ladder past a non-2xx (#315
   });
 
   it('a lone candidate that rejects the operator still fails, exactly as before the ladder', async () => {
-    const params = await sample(
-      makeEntityType([{ name: 'ListingContractDate', type: 'Edm.Date' }]),
-      DATE_RECORDS,
-      DATE_STANDARD_MAP
-    );
+    const params = await sample(makeEntityType([{ name: 'ListingContractDate', type: 'Edm.Date' }]), DATE_RECORDS, DATE_STANDARD_MAP);
     const requester = rejectingRequester('ListingContractDate', [], 400);
     const result = await runScalarFilterScenario('http://x', 'Property', DATE_EQ_SCENARIO, params, 'tok', Date.now(), requester);
     expect(result.passed).toBe(false);

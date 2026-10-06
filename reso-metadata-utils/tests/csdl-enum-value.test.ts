@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { decodeFlagsValue, extractTypeName } from '../src/index.js';
+import { describe, expect, it } from 'vitest';
 import type { CsdlEnumType } from '../src/csdl/types.js';
+import { decodeFlagsValue, extractTypeName } from '../src/index.js';
 
 /** A well-formed IsFlags enum: power-of-two member values, with a value-0 "None". */
 const flagsEnum: CsdlEnumType = {
@@ -11,8 +11,8 @@ const flagsEnum: CsdlEnumType = {
     { name: 'A', value: '1' },
     { name: 'B', value: '2' },
     { name: 'C', value: '4' },
-    { name: 'D', value: '8' },
-  ],
+    { name: 'D', value: '8' }
+  ]
 };
 
 describe('decodeFlagsValue — comma-joined name form', () => {
@@ -71,7 +71,7 @@ describe('decodeFlagsValue — integer bitmask form', () => {
     const partial: CsdlEnumType = {
       name: 'Partial',
       isFlags: true,
-      members: [{ name: 'A' }, { name: 'B', value: '2' }], // A has no @Value
+      members: [{ name: 'A' }, { name: 'B', value: '2' }] // A has no @Value
     };
     expect(decodeFlagsValue(partial, 3)).toEqual(['B']); // A cannot participate in bit math
   });
@@ -83,8 +83,8 @@ describe('decodeFlagsValue — integer bitmask form', () => {
       isFlags: true,
       members: [
         { name: 'Low', value: '1' },
-        { name: 'High', value: highBit },
-      ],
+        { name: 'High', value: highBit }
+      ]
     };
     expect(decodeFlagsValue(wide, highBit)).toEqual(['High']);
     expect(decodeFlagsValue(wide, (1n + 2n ** 60n).toString())).toEqual(['Low', 'High']);
@@ -118,8 +118,8 @@ describe('decodeFlagsValue — composite (non-power-of-two) members are excluded
       members: [
         { name: 'A', value: '1' },
         { name: 'B', value: '2' },
-        { name: 'AB', value: '3' }, // combined convenience flag — not a power of two
-      ],
+        { name: 'AB', value: '3' } // combined convenience flag — not a power of two
+      ]
     };
     expect(decodeFlagsValue(withComposite, 3)).toEqual(['A', 'B']); // not ['A','B','AB']
   });

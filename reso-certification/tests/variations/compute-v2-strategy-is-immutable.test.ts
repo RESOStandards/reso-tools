@@ -56,10 +56,10 @@ const run = (suggestionsMap: Json | undefined): ReadonlyArray<Emitted> => {
     version: DD,
     fuzziness: 0.25,
     applyVersionBucketing: false
-  }) as { variations: { fields?: Json[] } };
+  }) as unknown as { variations: { fields?: Json[] } };
 
   return (variations.fields ?? []).flatMap(f =>
-    ((f.suggestions as Json[]) ?? []).map(s => ({
+    ((f.suggestions as unknown as Json[]) ?? []).map(s => ({
       strategy: s.strategy as string | undefined,
       ddWikiUrl: s.ddWikiUrl as string | null | undefined,
       suggestedFieldName: s.suggestedFieldName as string | undefined
@@ -133,17 +133,13 @@ describe('an admin-AUTHORED mapping keeps Admin Review as its strategy', () => {
   // The legacy golden-master semantics, which must not regress: when an admin put the mapping in, `Admin
   // Review` IS the correct strategy. Note there is no open review here — this is the review's OUTPUT.
   it('reports Admin Review for a mapping the tool could not have derived', () => {
-    const authored = fieldSuggestions([
-      { suggestedResourceName: 'Property', suggestedFieldName: 'ListPrice', isAdminReview: true }
-    ]);
+    const authored = fieldSuggestions([{ suggestedResourceName: 'Property', suggestedFieldName: 'ListPrice', isAdminReview: true }]);
     const hit = run(authored).find(h => h.suggestedFieldName === 'ListPrice');
     expect(hit?.strategy).toBe('Admin Review');
   });
 
   it('reports Fast Track for a fast-tracked mapping', () => {
-    const fastTracked = fieldSuggestions([
-      { suggestedResourceName: 'Property', suggestedFieldName: 'ListPrice', isFastTrack: true }
-    ]);
+    const fastTracked = fieldSuggestions([{ suggestedResourceName: 'Property', suggestedFieldName: 'ListPrice', isFastTrack: true }]);
     const hit = run(fastTracked).find(h => h.suggestedFieldName === 'ListPrice');
     expect(hit?.strategy).toBe('Fast Track');
   });

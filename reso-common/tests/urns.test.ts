@@ -1,9 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import {
-  VARIATIONS_URN_STEM,
-  variationsCanonicalStoreUrn,
-  variationsReportUrn,
-} from '../src/variations/urns.js';
+import { describe, expect, it } from 'vitest';
+import { VARIATIONS_URN_STEM, variationsCanonicalStoreUrn, variationsReportUrn } from '../src/variations/urns.js';
 
 /**
  * These identifiers are the whole contract between the certification service, which
@@ -47,9 +43,7 @@ describe('variationsReportUrn', () => {
     });
 
     it('separates DD versions — a 2.0 report and a 2.1 report are different reports', () => {
-      expect(variationsReportUrn(ENV, '2.0', PROVIDER, USI, RECIPIENT)).not.toBe(
-        variationsReportUrn(ENV, '2.1', PROVIDER, USI, RECIPIENT)
-      );
+      expect(variationsReportUrn(ENV, '2.0', PROVIDER, USI, RECIPIENT)).not.toBe(variationsReportUrn(ENV, '2.1', PROVIDER, USI, RECIPIENT));
     });
 
     it('separates providers, systems and recipients', () => {

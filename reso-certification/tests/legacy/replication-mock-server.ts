@@ -35,7 +35,7 @@ const toInt = (v?: string): number | undefined => (v == null ? undefined : Numbe
 const applyFilter = (
   records: ReadonlyArray<Record<string, unknown>>,
   filter: string | undefined,
-  tsField: string,
+  tsField: string
 ): ReadonlyArray<Record<string, unknown>> => {
   if (!filter) return records;
   const match = filter.match(new RegExp(`${tsField}\\s+(ge|gt|le|lt)\\s+(\\S+)`));
@@ -60,7 +60,7 @@ const applyFilter = (
 const applyOrderby = (
   records: ReadonlyArray<Record<string, unknown>>,
   orderby: string | undefined,
-  tsField: string,
+  tsField: string
 ): ReadonlyArray<Record<string, unknown>> => {
   if (!orderby) return records; // insertion order — the server's default; TopAndSkip depends on it being stable
   const desc = orderby.toLowerCase().includes('desc');
@@ -88,17 +88,21 @@ export const startReplicationMockServer = async (opts: ReplicationMockOptions): 
     const base = `${req.protocol}://${req.get('host')}`;
 
     // Count probe — the iterator reads @odata.count and pages separately.
-    if (q['$count'] === 'true' && q['$top'] == null && q['$skip'] == null && q['$filter'] == null) {
+    if (q.$count === 'true' && q.$top == null && q.$skip == null && q.$filter == null) {
       res.json({ '@odata.count': opts.records.length, value: [] });
       return;
     }
 
-    const ordered = applyOrderby(applyFilter(opts.records, q['$filter'], tsField), q['$orderby'], tsField);
-    const pageSize = toInt(q['$top']) ?? parseMaxPageSize(req.get('prefer')) ?? 100;
-    const skip = toInt(q['$skip']) ?? 0;
+    const ordered = applyOrderby(applyFilter(opts.records, q.$filter, tsField), q.$orderby, tsField);
+    const pageSize = toInt(q.$top) ?? parseMaxPageSize(req.get('prefer')) ?? 100;
+    const skip = toInt(q.$skip) ?? 0;
     const page = ordered.slice(skip, skip + pageSize);
 
-    const body: Record<string, unknown> = { '@odata.context': `${base}/$metadata#${opts.resource}`, ...(opts.pageContext ? { '@reso.context': opts.pageContext } : {}), value: page };
+    const body: Record<string, unknown> = {
+      '@odata.context': `${base}/$metadata#${opts.resource}`,
+      ...(opts.pageContext ? { '@reso.context': opts.pageContext } : {}),
+      value: page
+    };
     if (skip + pageSize < ordered.length) {
       body['@odata.nextLink'] = `${base}/${opts.resource}?$skip=${skip + pageSize}`;
     }
@@ -111,7 +115,7 @@ export const startReplicationMockServer = async (opts: ReplicationMockOptions): 
       const port = typeof address === 'object' && address ? address.port : 0;
       resolve({
         url: `http://127.0.0.1:${port}`,
-        close: () => new Promise<void>(done => server.close(() => done())),
+        close: () => new Promise<void>(done => server.close(() => done()))
       });
     });
   });

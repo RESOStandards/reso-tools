@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { runMetadataStep } from '../src/cli/metadata-command.js';
 
 const readFixture = (p: string): Promise<string> => readFile(resolve(import.meta.dirname, p), 'utf-8');

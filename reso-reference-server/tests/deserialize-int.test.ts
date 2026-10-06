@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { buildInsertQuery, coerceServedInteger, deserializeRow, isServedAsInteger } from '../src/db/queries.js';
 import type { ResoField } from '../src/metadata/types.js';
 
@@ -9,7 +9,7 @@ import type { ResoField } from '../src/metadata/types.js';
 // returns a REAL for a decimal stored in such a column; Postgres returns BIGINT/NUMERIC as strings. Both must coerce.
 
 const field = (fieldName: string, type: string, scale?: number): ResoField =>
-  ({ fieldName, type, isCollection: false, ...(scale !== undefined && { scale }) } as ResoField);
+  ({ fieldName, type, isCollection: false, ...(scale !== undefined && { scale }) }) as ResoField;
 
 const fields: ReadonlyArray<ResoField> = [
   field('ImageHeight', 'Edm.Decimal', 0), // the REAL #286 shape: DD Decimal scale 0 → advertised Edm.Int64
@@ -83,8 +83,11 @@ describe('insert coercion (#286 filter consistency) — stored value matches the
   });
 
   it('buildInsertQuery stores a scale-0 Decimal as an integer in its parameter values', () => {
-    const q = buildInsertQuery('Media', { MediaKey: 'm1', ImageHeight: 98.9, ListPrice: 100000.5 },
-      [field('MediaKey', 'Edm.String'), field('ImageHeight', 'Edm.Decimal', 0), field('ListPrice', 'Edm.Decimal', 2)]);
+    const q = buildInsertQuery('Media', { MediaKey: 'm1', ImageHeight: 98.9, ListPrice: 100000.5 }, [
+      field('MediaKey', 'Edm.String'),
+      field('ImageHeight', 'Edm.Decimal', 0),
+      field('ListPrice', 'Edm.Decimal', 2)
+    ]);
     // values order follows the record's own key order (MediaKey, ImageHeight, ListPrice)
     expect(q.values).toContain(98); // ImageHeight truncated for storage
     expect(q.values).not.toContain(98.9);

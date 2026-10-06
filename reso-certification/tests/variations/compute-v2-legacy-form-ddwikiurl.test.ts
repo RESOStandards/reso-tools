@@ -9,8 +9,8 @@
  * Real DD 1.7 lookup (Property/ExteriorFeatures: GasGrill ⇄ "Gas Grill"); inputs synthetic.
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { computeVariationsV2 } from '../../src/variations-v2/compute.js';
 
 const createRequire = (await import('node:module')).createRequire;
@@ -26,9 +26,9 @@ const legacyFormSuggestions = (report: Json, suggestionsMap: Json, version = '1.
     suggestionsMap,
     version,
     fuzziness: 0.25,
-    applyVersionBucketing: false,
-  }) as { variations: { lookups?: Array<Json & { suggestions?: Json[] }> } };
-  return (variations.lookups ?? []).flatMap((l) => (l.suggestions as Json[]) ?? []);
+    applyVersionBucketing: false
+  }) as unknown as { variations: { lookups?: Array<Json & { suggestions?: Json[] }> } };
+  return (variations.lookups ?? []).flatMap(l => (l.suggestions as unknown as Json[]) ?? []);
 };
 
 describe('computeVariationsV2: legacy-form store-suggestion ddWikiUrl (#212)', () => {
@@ -36,15 +36,19 @@ describe('computeVariationsV2: legacy-form store-suggestion ddWikiUrl (#212)', (
     const suggestions = legacyFormSuggestions(
       {
         fields: [{ resourceName: 'Property', fieldName: 'ExteriorFeatures', type: 'ExteriorFeaturesLookups.ExteriorFeatures' }],
-        lookups: [{ lookupName: 'ExteriorFeaturesLookups.ExteriorFeatures', type: 'Edm.Int64', lookupValue: 'Grill' }],
+        lookups: [{ lookupName: 'ExteriorFeaturesLookups.ExteriorFeatures', type: 'Edm.Int64', lookupValue: 'Grill' }]
       },
       {
         Property: {
           ExteriorFeatures: {
-            Grill: { suggestions: [{ suggestedResourceName: 'Property', suggestedFieldName: 'ExteriorFeatures', suggestedLegacyODataValue: 'GasGrill' }] },
-          },
-        },
-      },
+            Grill: {
+              suggestions: [
+                { suggestedResourceName: 'Property', suggestedFieldName: 'ExteriorFeatures', suggestedLegacyODataValue: 'GasGrill' }
+              ]
+            }
+          }
+        }
+      }
     );
     expect(suggestions).toHaveLength(1);
     const url = suggestions[0].ddWikiUrl as string;

@@ -25,13 +25,12 @@ const entityTypeXml = (name: string, keyField: string): string =>
         <Property Name="${keyField}" Type="Edm.String" MaxLength="255" Nullable="false"/>
         <Property Name="ListPrice" Type="Edm.Int64"/>
       </EntityType>`;
-const entitySetXml = (name: string, type: string): string =>
-  `        <EntitySet Name="${name}" EntityType="${RESOURCE_NS}.${type}"/>`;
+const entitySetXml = (name: string, type: string): string => `        <EntitySet Name="${name}" EntityType="${RESOURCE_NS}.${type}"/>`;
 
 /** Build a minimal, XSD/semantically-valid EDMX from a list of entity types + entity sets. */
 const buildEdmx = (
   entityTypes: ReadonlyArray<readonly [string, string]>,
-  entitySets: ReadonlyArray<readonly [string, string]>,
+  entitySets: ReadonlyArray<readonly [string, string]>
 ): string => `<?xml version="1.0" encoding="utf-8"?>
 <edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
   <edmx:DataServices>
@@ -48,7 +47,7 @@ ${entitySets.map(([n, t]) => entitySetXml(n, t)).join('\n')}
 
 const serviceDoc = (names: ReadonlyArray<string>): unknown => ({
   '@odata.context': `${BASE}/$metadata`,
-  value: names.map(n => ({ name: n, kind: 'EntitySet', url: n })),
+  value: names.map(n => ({ name: n, kind: 'EntitySet', url: n }))
 });
 
 const SAMPLE_ROW = { ListingKey: '1', MediaKey: '1', OfficeKey: '1', MemberKey: '1', FieldKey: '1', LookupKey: '1', ListPrice: 100 };
@@ -96,7 +95,7 @@ const makeConfig = (outputDir: string, over: Partial<CoreConfig>): CoreConfig =>
   version: '2.1.0',
   server: { url: BASE, auth: { mode: 'token', authToken: 'test' } },
   options: { outputDir },
-  ...over,
+  ...over
 });
 
 const reportFor = (result: Awaited<ReturnType<typeof runCoreCompliance>>, resource: string): ResourceTestReport | undefined =>
@@ -122,9 +121,15 @@ describe('Core 2.1.0 declared-but-not-served carve-out (end-to-end)', () => {
   it('2.1.0: a non-required well-known resource absent on BOTH surfaces → Not Applicable, NO sampling request', async () => {
     // Property is served; Media has an EntityType (declared shape) but no EntitySet and is absent from the doc.
     mock = installMock({
-      edmx: buildEdmx([['Property', 'ListingKey'], ['Media', 'MediaKey']], [['Property', 'Property']]),
+      edmx: buildEdmx(
+        [
+          ['Property', 'ListingKey'],
+          ['Media', 'MediaKey']
+        ],
+        [['Property', 'Property']]
+      ),
       serviceDoc: serviceDoc(['Property']),
-      notFound: new Set(['Media']),
+      notFound: new Set(['Media'])
     });
 
     const result = await runCoreCompliance(makeConfig(outputDir, { version: '2.1.0', resources: ['Property', 'Media'] }));
@@ -144,8 +149,14 @@ describe('Core 2.1.0 declared-but-not-served carve-out (end-to-end)', () => {
 
   it('2.1.0: a REQUIRED resource absent on BOTH surfaces → one clean FAIL, NO sampling request', async () => {
     mock = installMock({
-      edmx: buildEdmx([['Property', 'ListingKey'], ['Member', 'MemberKey']], [['Member', 'Member']]),
-      serviceDoc: serviceDoc(['Member']),
+      edmx: buildEdmx(
+        [
+          ['Property', 'ListingKey'],
+          ['Member', 'MemberKey']
+        ],
+        [['Member', 'Member']]
+      ),
+      serviceDoc: serviceDoc(['Member'])
     });
 
     const result = await runCoreCompliance(makeConfig(outputDir, { version: '2.1.0', resources: ['Property'] }));
@@ -166,9 +177,15 @@ describe('Core 2.1.0 declared-but-not-served carve-out (end-to-end)', () => {
     // GET 404s, so no records come back. A REQUIRED resource with no top-level records is a GUARANTEED clean
     // failure — sampled first, real failure, never masked/NA. (A non-required resource here would be NA instead.)
     mock = installMock({
-      edmx: buildEdmx([['Property', 'ListingKey'], ['Member', 'MemberKey']], [['Property', 'Property']]),
+      edmx: buildEdmx(
+        [
+          ['Property', 'ListingKey'],
+          ['Member', 'MemberKey']
+        ],
+        [['Property', 'Property']]
+      ),
       serviceDoc: serviceDoc(['Member']),
-      notFound: new Set(['Property']),
+      notFound: new Set(['Property'])
     });
 
     const result = await runCoreCompliance(makeConfig(outputDir, { version: '2.1.0', resources: ['Property'] }));
@@ -186,9 +203,15 @@ describe('Core 2.1.0 declared-but-not-served carve-out (end-to-end)', () => {
   it('2.0.0: behavior UNCHANGED — a declared-but-not-served resource is still sampled + run (never masked)', async () => {
     // Identical topology to the NA test, but at 2.0.0 the carve-out is off: Media must be sampled as today.
     mock = installMock({
-      edmx: buildEdmx([['Property', 'ListingKey'], ['Media', 'MediaKey']], [['Property', 'Property']]),
+      edmx: buildEdmx(
+        [
+          ['Property', 'ListingKey'],
+          ['Media', 'MediaKey']
+        ],
+        [['Property', 'Property']]
+      ),
       serviceDoc: serviceDoc(['Property']),
-      notFound: new Set(['Media']),
+      notFound: new Set(['Media'])
     });
 
     const result = await runCoreCompliance(makeConfig(outputDir, { version: '2.0.0', resources: ['Property', 'Media'] }));
@@ -204,8 +227,15 @@ describe('Core 2.1.0 declared-but-not-served carve-out (end-to-end)', () => {
     // Only Office is served/declared; Property (required) and Media (well-known) are both absent on both
     // surfaces → all requested resources are masked. The provider pass must still run + record its scenarios.
     mock = installMock({
-      edmx: buildEdmx([['Property', 'ListingKey'], ['Media', 'MediaKey'], ['Office', 'OfficeKey']], [['Office', 'Office']]),
-      serviceDoc: serviceDoc(['Office']),
+      edmx: buildEdmx(
+        [
+          ['Property', 'ListingKey'],
+          ['Media', 'MediaKey'],
+          ['Office', 'OfficeKey']
+        ],
+        [['Office', 'Office']]
+      ),
+      serviceDoc: serviceDoc(['Office'])
     });
 
     const result = await runCoreCompliance(makeConfig(outputDir, { version: '2.1.0', resources: ['Property', 'Media'] }));
@@ -218,7 +248,9 @@ describe('Core 2.1.0 declared-but-not-served carve-out (end-to-end)', () => {
     expect(provider?.scenarios.every(s => s.passed)).toBe(true);
 
     // They ran ONCE — no per-resource report carries a metadata / service-document scenario.
-    const perResource = (result.context.resourceReports as ReadonlyArray<ResourceTestReport>).filter(r => r.resource !== PROVIDER_WIDE_LABEL);
+    const perResource = (result.context.resourceReports as ReadonlyArray<ResourceTestReport>).filter(
+      r => r.resource !== PROVIDER_WIDE_LABEL
+    );
     for (const r of perResource) {
       expect(r.scenarios.some(s => s.tag === 'metadata' || s.tag === 'service-document')).toBe(false);
     }

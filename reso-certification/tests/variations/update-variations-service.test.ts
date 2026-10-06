@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { updateVariationsViaService, isVariationsAuthError } from '../../src/variations/service.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { isVariationsAuthError, updateVariationsViaService } from '../../src/variations/service.js';
 
 const okResponse = (body: unknown) => ({
   ok: true,
   status: 200,
   statusText: 'OK',
   json: async () => body,
-  text: async () => JSON.stringify(body),
+  text: async () => JSON.stringify(body)
 });
 
 const items = [{ resourceName: 'Property', fieldName: 'Foo', suggestedFieldName: 'Bar' }];
@@ -15,13 +15,25 @@ describe('updateVariationsViaService', () => {
   beforeEach(() => {
     process.env.RESO_SERVICES_URL = 'https://services.example.org';
     // Keep the .env mint path deterministic (no CERT_AUTH_* → mint returns undefined).
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.CERT_AUTH_API_BASE_URL;
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.CERT_AUTH_API_USERNAME;
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.CERTIFICATION_API_KEY;
   });
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.RESO_SERVICES_URL;
   });
 
@@ -34,7 +46,7 @@ describe('updateVariationsViaService', () => {
       bearerToken: 'tok',
       adminSecret: 'sekret',
       adminReview: true,
-      overwrite: true,
+      overwrite: true
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -56,7 +68,7 @@ describe('updateVariationsViaService', () => {
       permissionDeniedReasons: {},
       overwriteRequired: 0,
       validationFailed: 0,
-      corrections: 0,
+      corrections: 0
     });
   });
 
@@ -68,9 +80,9 @@ describe('updateVariationsViaService', () => {
           updatedFields: 0,
           permissionDenied: [{ items: [1, 2, 3] }],
           validationFailed: [{ reason: 'x' }, { reason: 'y' }],
-          corrections: [{ a: 1 }],
-        }),
-      ),
+          corrections: [{ a: 1 }]
+        })
+      )
     );
     const result = await updateVariationsViaService({ items, bearerToken: 'tok' });
     expect(result.permissionDenied).toBe(3);
@@ -86,7 +98,7 @@ describe('updateVariationsViaService', () => {
     vi.stubGlobal('fetch', fetchMock);
     const many = Array.from({ length: 3 }, (_, i) => ({ resourceName: `R${i}` }));
     await expect(updateVariationsViaService({ items: many, bearerToken: 'tok', chunkSize: 2 })).rejects.toThrow(
-      /chunk 2\/2 failed.*1 of 2 chunk\(s\) already committed/,
+      /chunk 2\/2 failed.*1 of 2 chunk\(s\) already committed/
     );
   });
 
@@ -131,9 +143,7 @@ describe('updateVariationsViaService', () => {
     const fetchMock = vi.fn().mockResolvedValue(
       okResponse({
         ignoredLookups: 0,
-        overwriteRequired: [
-          { reason: 'Modification of a flagged mapping requires overwrite=true.', items: [{}, {}, {}] }
-        ]
+        overwriteRequired: [{ reason: 'Modification of a flagged mapping requires overwrite=true.', items: [{}, {}, {}] }]
       })
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -163,9 +173,9 @@ describe('updateVariationsViaService', () => {
   });
 
   it('rejects a submission flagged both admin-review and fast-track', async () => {
-    await expect(
-      updateVariationsViaService({ items, bearerToken: 'tok', adminReview: true, fastTrack: true }),
-    ).rejects.toThrow(/mutually exclusive/);
+    await expect(updateVariationsViaService({ items, bearerToken: 'tok', adminReview: true, fastTrack: true })).rejects.toThrow(
+      /mutually exclusive/
+    );
   });
 
   it('rejects an empty submission', async () => {
@@ -173,28 +183,31 @@ describe('updateVariationsViaService', () => {
   });
 
   it('throws when RESO_SERVICES_URL is unset', async () => {
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.RESO_SERVICES_URL;
     await expect(updateVariationsViaService({ items, bearerToken: 'tok' })).rejects.toThrow(/RESO_SERVICES_URL is not set/);
   });
 
   it('throws AUTH_REQUIRED with no bearer and no .env credentials', async () => {
-    const err = await updateVariationsViaService({ items, fromCli: true }).catch((e) => e);
+    const err = await updateVariationsViaService({ items, fromCli: true }).catch(e => e);
     expect(isVariationsAuthError(err)).toBe(true);
   });
 
   it('surfaces AUTH_REJECTED on a 401', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({ ok: false, status: 401, statusText: 'Unauthorized', text: async () => '', json: async () => ({}) }),
+      vi.fn().mockResolvedValue({ ok: false, status: 401, statusText: 'Unauthorized', text: async () => '', json: async () => ({}) })
     );
-    const err = await updateVariationsViaService({ items, bearerToken: 'tok' }).catch((e) => e);
+    const err = await updateVariationsViaService({ items, bearerToken: 'tok' }).catch(e => e);
     expect(isVariationsAuthError(err)).toBe(true);
   });
 
   it('throws SERVICE_ERROR with chunk info on a non-ok, non-auth response', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({ ok: false, status: 500, statusText: 'Server Error', text: async () => 'boom', json: async () => ({}) }),
+      vi.fn().mockResolvedValue({ ok: false, status: 500, statusText: 'Server Error', text: async () => 'boom', json: async () => ({}) })
     );
     await expect(updateVariationsViaService({ items, bearerToken: 'tok' })).rejects.toThrow(/chunk 1\/1 failed: 500/);
   });

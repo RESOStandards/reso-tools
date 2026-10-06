@@ -2,8 +2,8 @@
  * ETL metadata processing tests — ported from reso-certification-etl Mocha suite.
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 // ETL is CommonJS — use require
 const createRequire = (await import('node:module')).createRequire;

@@ -691,7 +691,7 @@ describe('getAllFields — EntitySet name ≠ type name (key-space alignment)', 
   it('emits the served type under its TYPE name too, so a type-qualified $ref resolves (closes the dangling-ref gap)', () => {
     const all = getAllFields(parseCsdlXml(skewedEdmx));
     expect(Object.keys(all)).toContain('Listings'); // the served EntitySet key
-    expect(Object.keys(all)).toContain('Property');  // ...and the backing type, keyed by type name
+    expect(Object.keys(all)).toContain('Property'); // ...and the backing type, keyed by type name
     expect(all.Property?.map(f => f.fieldName)).toContain('ListingKey');
   });
 

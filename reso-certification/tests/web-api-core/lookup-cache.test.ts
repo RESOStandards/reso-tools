@@ -3,18 +3,25 @@ import { createLookupCache } from '../../src/web-api-core/lookup-cache.js';
 
 // Two fields share the LookupName 'PropertyType'; 'StandardStatus' maps to its own; 'Unmapped' has no name.
 const lookupNameFor = (resource: string, field: string): string | undefined =>
-  ({
-    'Property/PropertyType': 'PropertyType',
-    'Property/PropertySubType': 'PropertyType', // shares the LookupName with PropertyType — the dedup case
-    'Property/StandardStatus': 'StandardStatus',
-  })[`${resource}/${field}`];
+  (
+    ({
+      'Property/PropertyType': 'PropertyType',
+      'Property/PropertySubType': 'PropertyType', // shares the LookupName with PropertyType — the dedup case
+      'Property/StandardStatus': 'StandardStatus'
+    }) as Record<string, string>
+  )[`${resource}/${field}`];
 
 // PropertyType rows. The last row's data value distinguishes ONLY on LegacyODataValue (the form the old
 // presence union missed): LookupValue/StandardLookupValue are 'Residential' but LegacyODataValue is 'LEGACY_ONLY'.
 const propertyTypeRows: ReadonlyArray<Record<string, unknown>> = [
-  { LookupName: 'PropertyType', LookupValue: 'ResidentialLease', StandardLookupValue: 'Residential Lease', LegacyODataValue: 'ResidentialLease' },
+  {
+    LookupName: 'PropertyType',
+    LookupValue: 'ResidentialLease',
+    StandardLookupValue: 'Residential Lease',
+    LegacyODataValue: 'ResidentialLease'
+  },
   { LookupName: 'PropertyType', LookupValue: 'CommercialSale', StandardLookupValue: 'Commercial Sale', LegacyODataValue: 'CommercialSale' },
-  { LookupName: 'PropertyType', LookupValue: 'Residential', StandardLookupValue: 'Residential', LegacyODataValue: 'LEGACY_ONLY' },
+  { LookupName: 'PropertyType', LookupValue: 'Residential', StandardLookupValue: 'Residential', LegacyODataValue: 'LEGACY_ONLY' }
 ];
 
 describe('createLookupCache', () => {
@@ -28,7 +35,7 @@ describe('createLookupCache', () => {
     expect(cache.has('Property', 'PropertyType', 'NotPresent')).toBe(false); // genuine miss
   });
 
-  it('toStandard(): any wire form resolves to that row\'s StandardLookupValue', () => {
+  it("toStandard(): any wire form resolves to that row's StandardLookupValue", () => {
     const cache = createLookupCache({ lookupNameFor });
     cache.put('PropertyType', propertyTypeRows);
 
@@ -48,7 +55,9 @@ describe('createLookupCache', () => {
     expect(cache.rowsFor('Property', 'PropertySubType')).toHaveLength(3);
 
     // put is idempotent: a second put for the same LookupName is a no-op (first fill wins).
-    cache.put('PropertyType', [{ LookupName: 'PropertyType', LookupValue: 'Replaced', StandardLookupValue: 'Replaced', LegacyODataValue: 'Replaced' }]);
+    cache.put('PropertyType', [
+      { LookupName: 'PropertyType', LookupValue: 'Replaced', StandardLookupValue: 'Replaced', LegacyODataValue: 'Replaced' }
+    ]);
     expect(cache.rowsFor('Property', 'PropertyType')).toHaveLength(3);
     expect(cache.has('Property', 'PropertyType', 'Replaced')).toBe(false);
   });

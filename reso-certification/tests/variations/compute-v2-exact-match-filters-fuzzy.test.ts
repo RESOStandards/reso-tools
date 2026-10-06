@@ -12,8 +12,8 @@
  * Real DD 1.7 values; inputs are synthetic — no vendor reports or identifiers.
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { computeVariationsV2 } from '../../src/variations-v2/compute.js';
 
 const createRequire = (await import('node:module')).createRequire;
@@ -28,35 +28,35 @@ const variationsFor = (report: Json, version = '1.7'): Json => {
     referenceMetadata: getReferenceMetadata(version),
     version,
     fuzziness: 0.25,
-    applyVersionBucketing: false,
-  }) as { variations: Json };
+    applyVersionBucketing: false
+  }) as unknown as { variations: Json };
   return variations;
 };
 
 // Flatten suggested-target values at a level, tolerant of flat vs nested `.suggestions` shapes.
 const suggested = (items: Json[] | undefined, key: string): string[] =>
-  (items ?? []).flatMap((i) => {
+  (items ?? []).flatMap(i => {
     const direct = i[key] as string | undefined;
-    const nested = ((i.suggestions as Json[]) ?? []).map((s) => s[key] as string);
+    const nested = ((i.suggestions as unknown as Json[]) ?? []).map(s => s[key] as string);
     return [direct, ...nested].filter((v): v is string => !!v);
   });
 
 describe('computeVariationsV2: an exact match filters out the element’s fuzzy suggestions', () => {
   it('resource: "property" emits only the exact "Property", not the Property* substrings', () => {
     const v = variationsFor({ fields: [{ resourceName: 'property', fieldName: 'ListPrice' }] });
-    expect(suggested(v.resources as Json[], 'suggestedResourceName')).toEqual(['Property']);
+    expect(suggested(v.resources as unknown as Json[], 'suggestedResourceName')).toEqual(['Property']);
   });
 
   it('field: "list_price" emits only the exact "ListPrice", not the substring matches', () => {
     const v = variationsFor({ fields: [{ resourceName: 'Property', fieldName: 'list_price' }] });
-    expect(suggested(v.fields as Json[], 'suggestedFieldName')).toEqual(['ListPrice']);
+    expect(suggested(v.fields as unknown as Json[], 'suggestedFieldName')).toEqual(['ListPrice']);
   });
 
   it('lookup: "active" emits only the exact "Active", not the substring "Active Under Contract"', () => {
     const v = variationsFor({
       fields: [{ resourceName: 'Property', fieldName: 'StandardStatus', type: 'StandardStatusLookups' }],
-      lookups: [{ lookupName: 'StandardStatusLookups', type: 'Edm.String', lookupValue: 'active' }],
+      lookups: [{ lookupName: 'StandardStatusLookups', type: 'Edm.String', lookupValue: 'active' }]
     });
-    expect(suggested(v.lookups as Json[], 'suggestedLookupValue')).toEqual(['Active']);
+    expect(suggested(v.lookups as unknown as Json[], 'suggestedLookupValue')).toEqual(['Active']);
   });
 });

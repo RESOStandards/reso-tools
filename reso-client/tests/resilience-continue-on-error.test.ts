@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runSettled, settle, skip, type UnitOutcome } from '../src/http/resilience/continue-on-error.js';
+import { type UnitOutcome, runSettled, settle, skip } from '../src/http/resilience/continue-on-error.js';
 import { isResilienceError, resilienceError } from '../src/http/resilience/errors.js';
 
 type Behavior = 'ok' | 'fail' | 'skip' | 'fatal';
@@ -46,7 +46,7 @@ describe('settle (generator primitive)', () => {
     }
     expect(step.value).toBe(true); // stopped early
     expect(ran).toEqual(['a', 'b']); // c never ran
-    expect(outcomes.map((o) => o.status)).toEqual(['ok', 'failed']);
+    expect(outcomes.map(o => o.status)).toEqual(['ok', 'failed']);
   });
 });
 
@@ -63,7 +63,7 @@ describe('runSettled (collector)', () => {
     const r = await runSettled(['a', 'b', 'c'], runner({ b: 'fail' }, ran), { onError: 'continue' });
     expect(ran).toEqual(['a', 'b', 'c']); // all ran
     expect(r.succeeded).toEqual(['ok:a', 'ok:c']);
-    expect(r.failed.map((f) => f.item)).toEqual(['b']);
+    expect(r.failed.map(f => f.item)).toEqual(['b']);
     expect(r.stoppedEarly).toBe(false);
   });
 
@@ -71,7 +71,7 @@ describe('runSettled (collector)', () => {
     const ran: string[] = [];
     const r = await runSettled(['a', 'b', 'c'], runner({ b: 'fail' }, ran), { onError: 'fail-fast' });
     expect(ran).toEqual(['a', 'b']); // c not run
-    expect(r.failed.map((f) => f.item)).toEqual(['b']);
+    expect(r.failed.map(f => f.item)).toEqual(['b']);
     expect(r.stoppedEarly).toBe(true);
   });
 
@@ -93,7 +93,7 @@ describe('runSettled (collector)', () => {
   it('fires onOutcome as each unit settles (checkpoint hook)', async () => {
     const seen: string[] = [];
     await runSettled(['a', 'b'], runner({ b: 'fail' }), {
-      onOutcome: (o) => seen.push(`${o.status}:${o.item}`)
+      onOutcome: o => seen.push(`${o.status}:${o.item}`)
     });
     expect(seen).toEqual(['ok:a', 'failed:b']);
   });

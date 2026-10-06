@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { isInOperatorSkippedForVersion } from '../../src/web-api-core/test-runner.js';
 import { scenariosForVersion } from '../../src/web-api-core/scenarios.js';
+import { isInOperatorSkippedForVersion } from '../../src/web-api-core/test-runner.js';
 
 // Real catalog scenarios — the `in`-operator scenario and a non-gated filter scenario.
 const scenarios = scenariosForVersion('2.1.0');
-const inOp = scenarios.find((s) => s.category === 'in-operator');
-const filter = scenarios.find((s) => s.category === 'filter');
+const inOp = scenarios.find(s => s.category === 'in-operator');
+const filter = scenarios.find(s => s.category === 'filter');
 
 describe('isInOperatorSkippedForVersion — the `in` operator 4.01 gate (fail-closed)', () => {
   it('the catalog actually has an in-operator scenario to gate', () => {

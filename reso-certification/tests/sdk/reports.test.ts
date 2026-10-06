@@ -1,17 +1,17 @@
-import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
 import {
   SOFTWARE_VERSION,
+  addEditReportGenerators,
+  coreReportGenerators,
+  createDetailedReportGenerator,
+  createGenericReportGenerator,
+  entityEventReportGenerators,
   resolveSoftwareVersion,
   serializeAddEditRemarks,
-  serializeEntityEventRemarks,
   serializeCoreRemarks,
-  createGenericReportGenerator,
-  createDetailedReportGenerator,
-  addEditReportGenerators,
-  entityEventReportGenerators,
-  coreReportGenerators,
+  serializeEntityEventRemarks
 } from '../../src/sdk/reports.js';
 import type { PipelineResult, StepResult } from '../../src/sdk/types.js';
 
@@ -21,7 +21,7 @@ const makeResult = (overrides: Partial<PipelineResult> = {}): PipelineResult => 
   steps: [],
   context: {},
   duration: 100,
-  ...overrides,
+  ...overrides
 });
 
 const makeStep = (overrides: Partial<StepResult> = {}): StepResult => ({
@@ -29,7 +29,7 @@ const makeStep = (overrides: Partial<StepResult> = {}): StepResult => ({
   endorsement: 'test',
   status: 'passed',
   duration: 50,
-  ...overrides,
+  ...overrides
 });
 
 describe('serializeAddEditRemarks', () => {
@@ -38,8 +38,8 @@ describe('serializeAddEditRemarks', () => {
       context: { resource: 'Property' },
       steps: [
         makeStep({ name: 'Fetch metadata', counts: { fields: 632 } }),
-        makeStep({ name: 'Run Add/Edit scenarios', counts: { total: 8, passed: 8, failed: 0 } }),
-      ],
+        makeStep({ name: 'Run Add/Edit scenarios', counts: { total: 8, passed: 8, failed: 0 } })
+      ]
     });
 
     const remarks = serializeAddEditRemarks(result);
@@ -54,8 +54,8 @@ describe('serializeAddEditRemarks', () => {
       status: 'failed',
       context: { resource: 'Property' },
       steps: [
-        makeStep({ name: 'Run Add/Edit scenarios', counts: { total: 8, passed: 6, failed: 2 }, errors: ['create failed', 'delete failed'] }),
-      ],
+        makeStep({ name: 'Run Add/Edit scenarios', counts: { total: 8, passed: 6, failed: 2 }, errors: ['create failed', 'delete failed'] })
+      ]
     });
 
     const remarks = serializeAddEditRemarks(result);
@@ -78,9 +78,7 @@ describe('serializeEntityEventRemarks', () => {
   it('includes mode and scenario counts', () => {
     const result = makeResult({
       context: { mode: 'full' },
-      steps: [
-        makeStep({ name: 'Run EntityEvent scenarios', counts: { total: 11, passed: 11 } }),
-      ],
+      steps: [makeStep({ name: 'Run EntityEvent scenarios', counts: { total: 11, passed: 11 } })]
     });
 
     const remarks = serializeEntityEventRemarks(result);
@@ -93,9 +91,7 @@ describe('serializeEntityEventRemarks', () => {
 describe('serializeCoreRemarks', () => {
   it('includes all count categories', () => {
     const result = makeResult({
-      steps: [
-        makeStep({ name: 'Run Core scenarios', counts: { total: 45, passed: 42, failed: 0, skipped: 3 } }),
-      ],
+      steps: [makeStep({ name: 'Run Core scenarios', counts: { total: 45, passed: 42, failed: 0, skipped: 3 } })]
     });
 
     const remarks = serializeCoreRemarks(result);
@@ -111,11 +107,16 @@ describe('serializeCoreRemarks', () => {
         makeStep({
           name: 'Run Core scenarios',
           counts: {
-            total: 10, passed: 6, failed: 0, skipped: 1,
-            optionalPassed: 1, optionalNotSupported: 1, optionalNotTested: 1,
-          },
-        }),
-      ],
+            total: 10,
+            passed: 6,
+            failed: 0,
+            skipped: 1,
+            optionalPassed: 1,
+            optionalNotSupported: 1,
+            optionalNotTested: 1
+          }
+        })
+      ]
     });
 
     const remarks = serializeCoreRemarks(result);
@@ -129,7 +130,7 @@ describe('serializeCoreRemarks', () => {
 
   it('omits the optional clause when there are no optional tests', () => {
     const result = makeResult({
-      steps: [makeStep({ name: 'Run Core scenarios', counts: { total: 5, passed: 5, failed: 0, skipped: 0 } })],
+      steps: [makeStep({ name: 'Run Core scenarios', counts: { total: 5, passed: 5, failed: 0, skipped: 0 } })]
     });
     expect(serializeCoreRemarks(result)).not.toContain('Optional:');
   });
@@ -145,10 +146,11 @@ describe('serializeCoreRemarks', () => {
       steps: [
         makeStep({ name: 'Fetch metadata', counts: { entityTypes: 14, resources: 5 } }),
         makeStep({
-          name: 'Run Core scenarios', status: 'failed',
-          counts: { total: 305, passed: 193, failed: 7, skipped: 90, optionalPassed: 6, optionalNotSupported: 0, optionalNotTested: 9 },
-        }),
-      ],
+          name: 'Run Core scenarios',
+          status: 'failed',
+          counts: { total: 305, passed: 193, failed: 7, skipped: 90, optionalPassed: 6, optionalNotSupported: 0, optionalNotTested: 9 }
+        })
+      ]
     });
 
     const remarks = serializeCoreRemarks(result);
@@ -176,14 +178,7 @@ describe('createGenericReportGenerator', () => {
     // without anyone deciding it should — it caught `outcome` being added, which is the behavior
     // wanted. Adding a key here is a deliberate act, so update this list only alongside a reason.
     // It asserts what we EMIT; it is not evidence about what the Cert API would reject.
-    expect(Object.keys(report)).toEqual([
-      'description',
-      'version',
-      'softwareVersion',
-      'generatedOn',
-      'remarks',
-      'outcome'
-    ]);
+    expect(Object.keys(report)).toEqual(['description', 'version', 'softwareVersion', 'generatedOn', 'remarks', 'outcome']);
   });
 
   it('has correct filename', () => {
@@ -197,9 +192,7 @@ describe('createDetailedReportGenerator', () => {
   it('extends generic with outcome, steps, and duration', () => {
     const generator = createDetailedReportGenerator('Web API Add/Edit', '2.0.0', () => 'remarks');
     const result = makeResult({
-      steps: [
-        makeStep({ name: 'step-1', summary: 'did stuff', counts: { x: 1 } }),
-      ],
+      steps: [makeStep({ name: 'step-1', summary: 'did stuff', counts: { x: 1 } })]
     });
 
     const report = generator.generate(result);
@@ -224,7 +217,7 @@ describe('createDetailedReportGenerator', () => {
   it('omits empty optional fields from steps', () => {
     const generator = createDetailedReportGenerator('Test', '1.0', () => '');
     const result = makeResult({
-      steps: [makeStep({ name: 'clean' })],
+      steps: [makeStep({ name: 'clean' })]
     });
 
     const report = generator.generate(result);
@@ -253,7 +246,7 @@ describe('createDetailedReportGenerator — resourceReports', () => {
                 skipped: false,
                 duration: 120,
                 requestUrl: 'http://localhost/Property?$filter=BedroomsTotal eq 3',
-                assertions: [{ message: 'Status 200', passed: true }],
+                assertions: [{ message: 'Status 200', passed: true }]
               },
               {
                 name: 'String enum collection: all()',
@@ -261,13 +254,13 @@ describe('createDetailedReportGenerator — resourceReports', () => {
                 passed: false,
                 skipped: false,
                 duration: 85,
-                assertions: [{ message: '21 records failed validation', passed: false }],
-              },
-            ],
-          },
-        ],
+                assertions: [{ message: '21 records failed validation', passed: false }]
+              }
+            ]
+          }
+        ]
       },
-      steps: [makeStep({ name: 'Run Core scenarios' })],
+      steps: [makeStep({ name: 'Run Core scenarios' })]
     });
 
     const report = generator.generate(result);
@@ -300,13 +293,13 @@ describe('createDetailedReportGenerator — resourceReports', () => {
                 passed: false,
                 skipped: false,
                 duration: 50,
-                assertions: [{ message: 'Expected 200 but got 400', passed: false }],
-              },
-            ],
-          },
-        ],
+                assertions: [{ message: 'Expected 200 but got 400', passed: false }]
+              }
+            ]
+          }
+        ]
       },
-      steps: [],
+      steps: []
     });
 
     const report = generator.generate(result);
@@ -368,11 +361,7 @@ describe('SOFTWARE_VERSION provenance', () => {
   it('every report generator from every endorsement stamps the exact SOFTWARE_VERSION', () => {
     // Guards against a future report generator that forgets provenance: a
     // silent gap where a certified result ships without its tool version.
-    const generators = [
-      ...addEditReportGenerators('2.0.0'),
-      ...entityEventReportGenerators('RCP-027'),
-      ...coreReportGenerators('2.0.0'),
-    ];
+    const generators = [...addEditReportGenerators('2.0.0'), ...entityEventReportGenerators('RCP-027'), ...coreReportGenerators('2.0.0')];
     expect(generators.length).toBeGreaterThan(0);
     for (const generator of generators) {
       const report = generator.generate(makeResult());
@@ -434,10 +423,12 @@ describe('report.json carries its own outcome', () => {
   const generic = (gens: ReadonlyArray<{ filename: string; generate: (r: PipelineResult) => Record<string, unknown> }>) =>
     gens.find(g => g.filename === 'report.json');
 
-  const SETS: ReadonlyArray<readonly [string, ReadonlyArray<{ filename: string; generate: (r: PipelineResult) => Record<string, unknown> }>]> = [
+  const SETS: ReadonlyArray<
+    readonly [string, ReadonlyArray<{ filename: string; generate: (r: PipelineResult) => Record<string, unknown> }>]
+  > = [
     ['Add/Edit', addEditReportGenerators('1.0.0')],
     ['EntityEvent', entityEventReportGenerators('1.0.0')],
-    ['Core', coreReportGenerators('2.1.0')],
+    ['Core', coreReportGenerators('2.1.0')]
   ];
 
   it.each(['passed', 'failed', 'incomplete'] as const)('states outcome %s, not only in prose', status => {
