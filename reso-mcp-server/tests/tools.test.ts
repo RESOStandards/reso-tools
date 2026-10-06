@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CREDENTIAL_ARG_NAMES, ENV_AUTH_TOKEN, ENV_CLIENT_ID, ENV_CLIENT_SECRET, ENV_TOKEN_URI } from '../src/auth-env.js';
 import { allTools, toolsForScope } from '../src/tools.js';
 
 describe('tool definitions', () => {
@@ -50,13 +51,76 @@ describe('tool definitions', () => {
     expect(toolsForScope('all')).toHaveLength(allTools.length);
   });
 
-  it('authenticate tool exists with required params', () => {
+  // Remove the empty required list and the schema forces an assistant to obtain a client secret
+  // before it can call the tool, and the only place it can obtain one is the user, in the
+  // conversation. That is the defect this change exists to close.
+  it('authenticate requires nothing, so the environment can be checked with no arguments', () => {
     const auth = allTools.find(t => t.name === 'authenticate');
     expect(auth).toBeDefined();
-    const required = auth!.inputSchema.required as string[];
-    expect(required).toContain('clientId');
-    expect(required).toContain('clientSecret');
-    expect(required).toContain('tokenUrl');
+    expect(auth!.inputSchema.required).toEqual([]);
+    const props = auth!.inputSchema.properties as Record<string, unknown>;
+    for (const name of [...CREDENTIAL_ARG_NAMES, 'scope']) expect(props[name]).toBeDefined();
+  });
+
+  // Remove this and a future tool can reintroduce the same invitation on a different schema.
+  it('no tool lists a credential in its required arguments', () => {
+    for (const tool of allTools) {
+      const required = (tool.inputSchema.required ?? []) as ReadonlyArray<string>;
+      for (const name of CREDENTIAL_ARG_NAMES) expect(required).not.toContain(name);
+    }
+  });
+
+  // The MCP SDK validates arguments with zod and forwards the validation error text to the host.
+  // A plain string rejection names the received TYPE, but an enum rejection names the received
+  // VALUE. Remove this and declaring a credential field as an enum would echo a rejected secret
+  // into the conversation through the validation error.
+  it('no credential property is declared as an enum', () => {
+    for (const tool of allTools) {
+      const props = (tool.inputSchema.properties ?? {}) as Record<string, Record<string, unknown>>;
+      for (const name of CREDENTIAL_ARG_NAMES) {
+        if (props[name]) expect(props[name].enum).toBeUndefined();
+      }
+    }
+  });
+
+  // Remove this and a description can come to name a variable the resolver does not read, which is
+  // confident-but-false guidance arriving through the tool schema instead of the documentation.
+  //
+  // This asserts the per-field CLAUSE and the ABSENCE of the other three, not bare containment.
+  // Bare containment could not fail: the shared note interpolates a channel string that already
+  // lists all four variable names, so `toContain(variable)` was satisfied for every variable
+  // regardless of which one a given description actually claimed to override — including a
+  // description naming the WRONG one, the exact failure this test exists to catch. Verified by
+  // mutation: with bare containment, stripping the override clause from all four descriptions left
+  // the whole suite passing.
+  it('every credential description names the environment variable it overrides, and no other', () => {
+    const expected: ReadonlyArray<readonly [string, string]> = [
+      ['authToken', ENV_AUTH_TOKEN],
+      ['clientId', ENV_CLIENT_ID],
+      ['clientSecret', ENV_CLIENT_SECRET],
+      ['tokenUrl', ENV_TOKEN_URI]
+    ];
+    for (const tool of allTools) {
+      const props = (tool.inputSchema.properties ?? {}) as Record<string, Record<string, unknown>>;
+      for (const [name, variable] of expected) {
+        if (!props[name]) continue;
+        const description = String(props[name].description);
+        expect(description).toContain(`overriding ${variable} for this one call`);
+        for (const [, otherVariable] of expected) {
+          if (otherVariable !== variable) expect(description).not.toContain(`overriding ${otherVariable}`);
+        }
+      }
+    }
+  });
+
+  // resolveToken builds a fresh provider on every call, so no token survives one tool call. The old
+  // description promised caching and promised to return a token; remove this and either claim can
+  // come back and teach a reader to expect a token in the result.
+  it('the authenticate description promises neither a returned token nor caching', () => {
+    const auth = allTools.find(t => t.name === 'authenticate');
+    expect(auth!.description).not.toMatch(/cached/i);
+    expect(auth!.description).not.toMatch(/returns a token/i);
+    expect(auth!.description).toContain('never returned');
   });
 
   it('query tool accepts auth via token or client credentials', () => {
