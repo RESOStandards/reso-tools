@@ -1,8 +1,8 @@
 # @reso-standards/odata-expression-parser
 
-Standalone, zero-dependency library for parsing OData 4.01 `$filter` and `$expand` expressions into typed ASTs (abstract syntax trees). Used by both [`@reso-standards/reso-client`](../reso-client/) for query validation and [`@reso-standards/reso-reference-server`](../reso-reference-server/) for SQL WHERE clause generation and multi-level navigation property expansion.
+Stand-alone, zero-dependency library for parsing OData 4.01 `$filter` and `$expand` expressions into typed ASTs (abstract syntax trees). Used by both [`@reso-standards/reso-client`](../reso-client/) for query validation and [`@reso-standards/reso-reference-server`](../reso-reference-server/) for SQL WHERE clause generation and multi-level navigation property expansion.
 
-> **[User Guide](doc/GUIDE.md)** – a task-oriented walkthrough with realistic examples.
+> **[User Guide](doc/GUIDE.md)** – a task-oriented walk-through with realistic examples.
 
 ## Install
 
@@ -162,11 +162,11 @@ const roundTripped = astToFilterString(ast);
 // → "ListPrice gt 200000 and contains(City, 'Austin')"
 ```
 
-Handles all node types: comparison, logical, not, arithmetic, function, lambda, literal, property, and collection.
+Handles all node types: comparison, logical, not, arithmetic, function, lambda, literal, property and collection.
 
 ## $expand Parser
 
-Parse `$expand` expressions into a structured tree with `parseExpand`. Supports nested (multi-level) expansion, inline query options, and `$levels`.
+Parse `$expand` expressions into a structured tree with `parseExpand`. Supports nested (multi-level) expansion, inline query options and `$levels`.
 
 ```typescript
 import { parseExpand } from '@reso-standards/odata-expression-parser';

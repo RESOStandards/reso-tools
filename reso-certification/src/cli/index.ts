@@ -161,7 +161,7 @@ addEditCmd.action(
         throw new Error('--url and --config are mutually exclusive. Use one or the other.');
       }
       if (!opts.url && !opts.config && !opts.mock) {
-        throw new Error('Provide --url, --config, or --mock.');
+        throw new Error('Provide --url, --config or --mock.');
       }
 
       const renderMode = resolveRenderMode(opts);
@@ -292,7 +292,7 @@ entityEventCmd.action(
         throw new Error('--url and --config are mutually exclusive. Use one or the other.');
       }
       if (!opts.url && !opts.config && !opts.mock) {
-        throw new Error('Provide --url, --config, or --mock.');
+        throw new Error('Provide --url, --config or --mock.');
       }
 
       // Flags apply only when given: a config entry's entityEventOptions block is the next source, then the defaults.
@@ -398,21 +398,21 @@ const coreCmd = program
   .command('core')
   .description('Web API Core 2.0.0/2.1.0 compliance testing')
   .option('--url <url>', 'Server base URL (mutually exclusive with --config)')
-  .option('--config <path>', 'Path to a config file — runs every entry (mutually exclusive with --url)')
+  .option('--config <path>', 'Path to a config file – runs every entry (mutually exclusive with --url)')
   .option('--resources <list>', 'Comma-separated resource names (default: well-known list)')
   // `--spec-version` (not `--version`, which is reserved for the program's own `-V`). Defaults to the current
   // minor, so a plain `reso-cert core --url …` certifies the latest Core without the caller passing a version.
   .option('--spec-version <version>', `Web API Core spec version: ${SUPPORTED_CORE_VERSIONS.join(' or ')}`, CURRENT_CORE_VERSION)
   .option(
     '--enum-mode <mode>',
-    "Enum mode: auto, string, collections, or isflags (default: the config entry's coreOptions.enumMode, else auto-detect)"
+    "Enum mode: auto, string, collections or isflags (default: the config entry's coreOptions.enumMode, else auto-detect)"
   )
   .option('--full-coverage', 'Fail if any data type category has no coverage across all resources')
   .option('--originating-system-name <v>', 'Scope resource queries to OriginatingSystemName eq <v> (multi-tenant providers)')
   .option('--originating-system-id <v>', 'Scope resource queries to OriginatingSystemID eq <v> (used when no name; OSN takes precedence)')
   .option(
     '--prefer-fields <list>',
-    'Comma-separated field-selection preferences, Resource.Field or bare Field (e.g. Office.FeedTypes). Re-orders ' +
+    'Comma-separated field-selection preferences, Resource.Field or bare Field (e.g., Office.FeedTypes). Reorders ' +
       'the ranked candidates; auto-selection decides everything else. Overrides coreOptions.preferFields from a config.'
   );
 
@@ -463,7 +463,7 @@ coreCmd.action(
               .filter((v: string) => v.length > 0)
           : undefined;
       if (enumModeFlag !== undefined && !['auto', 'isflags', 'collections', 'string'].includes(enumModeFlag)) {
-        throw new Error(`Invalid enum mode "${opts.enumMode}". Must be "auto", "string", "collections", or "isflags".`);
+        throw new Error(`Invalid enum mode "${opts.enumMode}". Must be "auto", "string", "collections" or "isflags".`);
       }
 
       const renderMode = resolveRenderMode(opts);
@@ -542,7 +542,7 @@ const ddCmd = program
   .command('dd')
   .description('Data Dictionary compliance testing')
   .option('--url <url>', 'Server base URL (mutually exclusive with --config)')
-  .option('--config <path>', 'Path to a config file — runs every entry (mutually exclusive with --url)')
+  .option('--config <path>', 'Path to a config file – runs every entry (mutually exclusive with --url)')
   // No Commander default here on purpose. With one, the action cannot tell `--dd-version 2.1` from
   // nothing supplied, and config mode needs that distinction to let an explicit flag win.
   .option('--dd-version <version>', `DD version (${CERTIFIABLE_DD_VERSIONS.join(' or ')}; default ${CURRENT_DD_VERSION})`)
@@ -765,7 +765,7 @@ const REVIEW_ELEMENT_TYPES: ReadonlyArray<VariationReviewElementType> = ['resour
 
 program
   .command('list-variation-reviews')
-  .description('List the variations in review (your own as a provider, the whole pool as an admin) — read-only')
+  .description('List the variations in review (your own as a provider, the whole pool as an admin) – read-only')
   .option('--status <status>', 'Filter by pool status: pending, ft-submitted or resolved')
   .option('--element-type <type>', 'Filter by element type: resource, field or lookup')
   .option('--provenance', 'Show every submission under each item instead of the summary table')
@@ -811,7 +811,7 @@ const ENDORSEMENT_REVIEW_STATUSES: ReadonlyArray<EndorsementReviewStatus> = ['no
 
 program
   .command('variations-review-status')
-  .description('Show where each of your variations submissions stands (lifecycle and review status) — read-only')
+  .description('Show where each of your variations submissions stands (lifecycle and review status) – read-only')
   .option(
     '--review-status <status>',
     "Admin: list every provider's submissions with this review status (none, in-review or resolved) instead of your own"
@@ -848,7 +848,7 @@ const metadataReportCmd = program.command('metadata-report').description('Utilit
 metadataReportCmd
   .command('adapt')
   .description(
-    'Synthesize the top-level resources[] block on a DD 2.0/2.1 metadata report so it can be loaded by tools that expect a DD 2.2-shaped report. Idempotent — DD 2.2+ reports pass through unchanged.'
+    'Synthesize the top-level resources[] block on a DD 2.0/2.1 metadata report so it can be loaded by tools that expect a DD 2.2-shaped report. Idempotent: DD 2.2+ reports pass through unchanged.'
   )
   .requiredOption('--in <path>', 'Input metadata report JSON file')
   .requiredOption('--out <path>', 'Output path for the adapted report')
@@ -911,7 +911,7 @@ schemaCmd
   .command('validate')
   .description("Validate a payload against a metadata report's JSON Schema")
   .requiredOption('-m, --metadata <file>', 'Metadata report JSON (metadata-report.json), or "-" for stdin')
-  .requiredOption('-p, --payload <file>', 'Payload JSON — an OData collection { value: [...] } or a single record, or "-" for stdin')
+  .requiredOption('-p, --payload <file>', 'Payload JSON: an OData collection { value: [...] } or a single record, or "-" for stdin')
   // `--dd-version`, not `-v, --version`: the program's own version flag wins over a subcommand's,
   // so the old spelling printed the package version and exited 0 without ever running the command.
   .option('--dd-version <version>', 'DD version for the schema context', CURRENT_DD_VERSION)
@@ -919,7 +919,7 @@ schemaCmd
     '-r, --resource <name>',
     'Resource name when the payload carries no @reso.context (a present context names the resource); default Property'
   )
-  .option('-s, --settings <file>', 'schema-validation-settings.json (else ./ then the pre-baked copy)')
+  .option('-s, --settings <file>', 'schema-validation-settings.json (else ./ then the prebaked copy)')
   .option('-a, --additional-properties', 'Allow fields not present in the metadata (default: reject them)')
   .option('--output-dir <path>', 'Directory for the report (created if missing); "-" for stdout', '.')
   .action(
@@ -947,8 +947,8 @@ schemaCmd
         const dest = await writeArtifact(opts.outputDir, 'schema-validation-report.json', report);
         process.stderr.write(
           totalErrors === 0
-            ? `PASS — 0 schema validation errors (report: ${dest})\n`
-            : `FAIL — ${totalErrors} schema validation error(s) (report: ${dest})\n`
+            ? `PASS: 0 schema validation errors (report: ${dest})\n`
+            : `FAIL: ${totalErrors} schema validation error(s) (report: ${dest})\n`
         );
         process.exitCode = totalErrors > 0 ? 1 : 0;
       } catch (err) {
@@ -984,7 +984,7 @@ schemaCmd
 
 program
   .command('metadata')
-  .description('Metadata step — validate OData CSDL/EDMX (XSD + semantic) and convert it to a RESO Format metadata report')
+  .description('Metadata step: validate OData CSDL/EDMX (XSD + semantic) and convert it to a RESO Format metadata report')
   .requiredOption('-m, --metadata <path>', 'Path to the CSDL/EDMX XML metadata file, or "-" for stdin')
   // `--dd-version`, not `-v, --version`: the program's own version flag wins over a subcommand's,
   // so the old spelling printed the package version and exited 0 without ever running the command.
@@ -1029,8 +1029,8 @@ program
   .requiredOption('-u, --url <uri>', 'OData service root URI (no resource name or query)')
   .requiredOption('-s, --strategy <strategy>', `Replication strategy: ${REPLICATION_STRATEGY_VALUES.join(' | ')}`)
   .option('-r, --resource <name>', 'Resource to replicate (single-resource mode)')
-  .option('-m, --metadata <path>', 'Metadata report JSON — replicate every resource in it (report-driven mode)')
-  .option('-x, --expansions <list>', 'Comma-separated expansions, e.g. Media,OpenHouse (single-resource mode)')
+  .option('-m, --metadata <path>', 'Metadata report JSON – replicate every resource in it (report-driven mode)')
+  .option('-x, --expansions <list>', 'Comma-separated expansions such as Media,OpenHouse (single-resource mode)')
   .option('-f, --filter <expr>', 'OData $filter expression')
   .option('-t, --top <n>', 'OData $top page size')
   .option('--orderby <expr>', 'OData $orderby expression')
@@ -1108,8 +1108,8 @@ program
           }
         });
         process.stderr.write(
-          `\nreplicate: ${result.strategy} complete — ${result.stats.totalRecordsFetched.toLocaleString()} records, ` +
-            `${result.stats.totalRequests.toLocaleString()} requests → ${result.outputDir}\n`
+          `\nreplicate: ${result.strategy} complete (${result.stats.totalRecordsFetched.toLocaleString()} records, ` +
+            `${result.stats.totalRequests.toLocaleString()} requests) → ${result.outputDir}\n`
         );
         process.exitCode = 0;
       } catch (err) {
@@ -1262,8 +1262,8 @@ program
 
 program
   .command('rcf')
-  .description('RESO Common Format — infer a DD-2.0 metadata report from RCF data and run variations')
-  .requiredOption('-i, --input <path>', 'RCF input: a .json file, a .zip, or a directory of payloads/records')
+  .description('RESO Common Format: infer a DD-2.0 metadata report from RCF data and run variations')
+  .requiredOption('-i, --input <path>', 'RCF input: a .json file, a .zip or a directory of payloads/records')
   // `--dd-version`, not `-v, --version`: the program's own version flag wins over a subcommand's,
   // so the old spelling printed the package version and exited 0 without ever running the command.
   .option('--dd-version <ver>', `DD version; the payload's @reso.context wins when present, else ${CURRENT_DD_VERSION}`)
@@ -1320,20 +1320,20 @@ program
 
         const s = result.stats;
         process.stderr.write(
-          `rcf: DD${result.version} — ${s.totalRecords.toLocaleString()} records → ${s.resources} resources, ${s.fields.toLocaleString()} fields, ${s.lookups.toLocaleString()} lookups${opts.schemaValidate ? `; ${s.schemaErrors} schema error(s)` : ''}${s.variationsTotal !== undefined ? `; ${s.variationsTotal} variation(s)` : ''} → ${dir}\n`
+          `rcf: DD${result.version} – ${s.totalRecords.toLocaleString()} records → ${s.resources} resources, ${s.fields.toLocaleString()} fields, ${s.lookups.toLocaleString()} lookups${opts.schemaValidate ? `; ${s.schemaErrors} schema error(s)` : ''}${s.variationsTotal !== undefined ? `; ${s.variationsTotal} variation(s)` : ''} → ${dir}\n`
         );
         if (result.variationsError) {
-          process.stderr.write(`rcf: variations skipped — ${result.variationsError} (reports still written)\n`);
+          process.stderr.write(`rcf: variations skipped (reports still written): ${result.variationsError}\n`);
         }
         if (s.totalRecords === 0) {
-          process.stderr.write(`rcf: no certifiable records were ingested from ${resolve(opts.input)} — nothing to certify\n`);
+          process.stderr.write(`rcf: no certifiable records were ingested from ${resolve(opts.input)} – nothing to certify\n`);
         }
         if (s.invalidContextFiles > 0) {
           process.stderr.write(
             `rcf: ${s.invalidContextFiles} file(s) carry an unreadable @reso.context (${s.invalidContextRecords} record(s) not certified)${
               opts.schemaValidate
-                ? ' — counted among the schema errors above\n'
-                : ' — run with --schema-validate to have them reported as schema errors\n'
+                ? ' – counted among the schema errors above\n'
+                : ' – run with --schema-validate to have them reported as schema errors\n'
             }`
           );
         }
@@ -1367,7 +1367,7 @@ program
 
 program
   .command('submit-variations-report')
-  .description('Submit a variations report from a DD run to the Variations Service — starts or refreshes a review')
+  .description('Submit a variations report from a DD run to the Variations Service to start or refresh a review')
   .requiredOption('-r, --report <path>', 'Path to the variations-report.json a DD run produced')
   .option('--overwrite', 'Proceed over an existing pending review (never over a lock)')
   .option('--dry-run', 'Report what would be submitted and send nothing')
@@ -1399,10 +1399,10 @@ program
       const where = `${result.providerUoi} / ${result.providerUsi} → ${result.recipientUoi}, DD ${result.version}`;
 
       if (result.dryRun) {
-        console.log('Dry run — nothing was sent.');
+        console.log('Dry run: nothing was sent.');
         console.log(`  Would submit ${result.changeCount} change(s) for ${where}.`);
-        console.log('  This is a FULL replace: it replaces the review rows currently on record for this report.');
-        console.log('  Re-run without --dry-run to submit.');
+        console.log('  Everything currently on record for this report is replaced, not merged.');
+        console.log('  Rerun without --dry-run to submit.');
         return;
       }
 
@@ -1495,9 +1495,9 @@ program
       }
 
       if (opts.dryRun) {
-        console.log('Dry run — nothing was sent.');
-        console.log('  Submitting is a FULL replace: it replaces the review rows currently on record for this report.');
-        console.log('  Re-run without --dry-run to submit.');
+        console.log('Dry run: nothing was sent.');
+        console.log('  Submitting replaces everything currently on record for this report. It does not merge.');
+        console.log('  Rerun without --dry-run to submit.');
         return;
       }
 

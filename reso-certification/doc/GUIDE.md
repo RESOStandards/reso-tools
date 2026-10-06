@@ -1,6 +1,6 @@
 # RESO Certification – User Guide
 
-A task-oriented walkthrough of the RESO Certification toolkit. This is the package that runs the same compliance tests RESO uses for official certification, against any RESO-compliant OData server, from a command line, a CI pipeline, or a programmatic SDK.
+A task-oriented walk-through of the RESO Certification toolkit. This is the package that runs the same compliance tests RESO uses for official certification, against any RESO-compliant OData server, from a command line, a CI pipeline or a programmatic SDK.
 
 If you have ever wondered whether your server actually passes RESO certification before you submit it for the official process, this is the package that answers that question on your laptop.
 
@@ -9,13 +9,13 @@ If you have ever wondered whether your server actually passes RESO certification
 Anyone who needs to know whether a RESO server passes the certification tests. Real examples:
 
 * **MLS and vendor developers** preparing for official RESO certification who want to run the same tests locally before submitting
-* **Technology providers** who need to verify their server still passes after every change to the schema, the data, or the platform
+* **Technology providers** who need to verify their server still passes after every change to the schema, the data or the platform
 * **Integrators and consultants** who need to evaluate a third-party server's compliance before recommending or building against it
 * **CI pipelines** that run the cert flows on every pull request so regressions are caught before they ship
 * **Test engineers** who want a single source of truth for "is this thing actually conformant" that does not depend on running a Java toolchain
 * **AI agents and automation tools** that need to verify a server's behavior end to end as part of a larger workflow
 
-The package covers four endorsements: **Add/Edit (RCP-010)**, **EntityEvent (RCP-027)**, **Web API Core 2.0.0 / 2.1.0**, and **Data Dictionary 2.0**. The same tests RESO runs in the official certification process, available as a CLI, an SDK, and a Docker target.
+The package covers four endorsements: **Add/Edit (RCP-010)**, **EntityEvent (RCP-027)**, **Web API Core 2.0.0 / 2.1.0** and **Data Dictionary 2.0**. The same tests RESO runs in the official certification process, available as a CLI, an SDK and a Docker target.
 
 ## Install
 
@@ -50,17 +50,17 @@ This runs the **Web API Core 2.0.0** compliance test suite against the server at
 * Reports a per-scenario pass/fail summary at the end
 * Exits with code 0 if everything passed, 1 if anything failed, 2 if there was a runtime error
 
-You go from "I have a RESO server URL" to "I know exactly which scenarios pass and fail" in one command, with no Java toolchain, no XML config to edit, and no manual test parameter wiring.
+You go from "I have a RESO server URL" to "I know exactly which scenarios pass and fail" in one command, with no Java toolchain, no XML config to edit and no manual test parameter wiring.
 
 ---
 
 ## The Four Endorsements
 
-The toolkit ships four cert flows, one per endorsement RESO certifies. They share the same CLI shape, the same auth resolution, and the same output formats – the only thing that changes is which subcommand you run and what it tests.
+The toolkit ships four cert flows, one per endorsement RESO certifies. They share the same CLI shape, the same auth resolution and the same output formats – the only thing that changes is which subcommand you run and what it tests.
 
 ### Web API Core 2.0.0 / 2.1.0
 
-The OData query surface. Validates `$filter` across every data type, `$select`, `$orderby`, `$top`, `$skip`, `$count`, enumerations, error code shapes, response metadata, and the service document. Version 2.1.0 adds `$expand`, server-driven paging, and string-based enum comparisons.
+The OData query surface. Validates `$filter` across every data type, `$select`, `$orderby`, `$top`, `$skip`, `$count`, enumerations, error code shapes, response metadata and the service document. Version 2.1.0 adds `$expand`, server-driven paging and string-based enum comparisons.
 
 ```bash
 # Default version 2.0.0
@@ -87,25 +87,25 @@ The DD flow does several things in sequence:
 
 1. **Fetches the metadata** and parses it into a structured report
 2. **Merges the Lookup Resource data** so the metadata report knows what every enumerated field can hold
-3. **Checks for variations** – fields, lookups, and enum values that look like local extensions of the standard DD
+3. **Checks for variations** – fields, lookups and enum values that look like local extensions of the standard DD
 4. **Replicates a sample of data** using one of several strategies (full, top-of-file, modification timestamp window)
 5. **Validates the replicated records** against the merged metadata
 
-The output is a per-resource report showing what passed, what failed, and where the variations are. Strict mode treats variations as failures; the default treats them as warnings so you can see what is non-standard without immediately failing.
+The output is a per-resource report showing what passed, what failed and where the variations are. Strict mode treats variations as failures; the default treats them as warnings so you can see what is nonstandard without immediately failing.
 
 ### Add/Edit (RCP-010)
 
-Create, Update, and Delete operations with both `representation` and `minimal` response modes. Eight certification scenarios covering the full RCP-010 surface – successful creates, successful updates, successful deletes, validation failures, the right response headers (`Location`, `Preference-Applied`, `OData-EntityId`), the right annotations (`@odata.context`, `@odata.id`, `@odata.editLink`, `@odata.etag`), and the right error format (`error.code`, `error.message`, `error.details[].target`).
+Create, Update and Delete operations with both `representation` and `minimal` response modes. Eight certification scenarios covering the full RCP-010 surface – successful creates, successful updates, successful deletes, validation failures, the right response headers (`Location`, `Preference-Applied`, `OData-EntityId`), the right annotations (`@odata.context`, `@odata.id`, `@odata.editLink`, `@odata.etag`) and the right error format (`error.code`, `error.message`, `error.details[].target`).
 
 ```bash
 reso-cert add-edit --url https://api.example.com --auth-token TOKEN
 ```
 
-The runner generates realistic test payloads automatically. It does not need a static fixture file. It samples your server's metadata, picks values that satisfy the type constraints, runs each scenario, and verifies the responses match the spec.
+The runner generates realistic test payloads automatically. It does not need a static fixture file. It samples your server's metadata, picks values that satisfy the type constraints, runs each scenario and verifies the responses match the spec.
 
 ### EntityEvent (RCP-027)
 
-Change tracking. Validates the `EntityEvent` resource shape, the sequence numbering, the polling-replication consumer pattern, and the way creates, updates, and deletes are surfaced in the feed. Two modes:
+Change tracking. Validates the `EntityEvent` resource shape, the sequence numbering, the polling-replication consumer pattern, and the way creates, updates and deletes are surfaced in the feed. Two modes:
 
 ```bash
 # Observe mode: read-only, validates the existing feed
@@ -115,7 +115,7 @@ reso-cert entity-event --url https://api.example.com --auth-token TOKEN --mode o
 reso-cert entity-event --url https://api.example.com --auth-token TOKEN --mode full
 ```
 
-**Observe mode** is the safe default for any server you do not own. It only reads the `EntityEvent` feed and validates that what is there conforms to the spec. Nine scenarios covering shape, sequencing, and the disambiguation logic.
+**Observe mode** is the safe default for any server you do not own. It only reads the `EntityEvent` feed and validates that what is there conforms to the spec. Nine scenarios covering shape, sequencing and the disambiguation logic.
 
 **Full mode** writes a small number of canary records to exercise the full create → observe → update → observe → delete → observe loop. Twelve scenarios. Use it when you control the server and you want to verify that writes actually produce events with the right shape.
 
@@ -158,7 +158,7 @@ node --env-file=.env $(which reso-cert) core --url https://api.example.com
 
 ## Configuration Files
 
-Flags are fine for one server. A configuration file is better once you are testing more than one recipient, more than one system, or the same server repeatedly, because it keeps the identifiers and the credentials in one place and runs each entry in sequence.
+Flags are fine for one server. A configuration file is better once you are testing more than one recipient, more than one system or the same server repeatedly, because it keeps the identifiers and the credentials in one place and runs each entry in sequence.
 
 ```bash
 reso-cert dd --config path/to/config.json
@@ -245,13 +245,13 @@ reso-cert core --url https://api.example.com --auth-token TOKEN --output-dir ./r
 
 **Verbose mode** is the right choice for CI – every step prints on its own line with no terminal control codes, so the output reads cleanly in build logs.
 
-**JSON mode** is the right choice when you are processing the cert results downstream – feeding them into a dashboard, archiving them in a results store, or comparing two runs to see what regressed. The JSON shape is stable and matches the SDK's `PipelineResult` type.
+**JSON mode** is the right choice when you are processing the cert results downstream – feeding them into a dashboard, archiving them in a results store or comparing two runs to see what regressed. The JSON shape is stable and matches the SDK's `PipelineResult` type.
 
 **`--output-dir`** writes a structured report tree to disk. Each cert run produces a per-scenario JSON file plus a top-level summary. This is the format the official certification submission expects, so a successful local run can be uploaded directly.
 
 ---
 
-## Running Cert From Code
+## Running Cert from Code
 
 The CLI is a thin wrapper around an SDK that you can call directly from your own application. The SDK is the right entry point when you are embedding cert testing inside another tool – a release pipeline, an admin UI, an MCP tool that runs cert on behalf of an agent.
 
@@ -280,7 +280,7 @@ if (result.status === 'passed') {
 }
 ```
 
-The first argument is the test configuration. The second is an optional progress callback that fires on every step transition – use it to drive a progress bar in a UI, stream lines to a log, or post status updates to a chat channel.
+The first argument is the test configuration. The second is an optional progress callback that fires on every step transition – use it to drive a progress bar in a UI, stream lines to a log or post status updates to a chat channel.
 
 ### Running Multiple Endorsements in Sequence
 
@@ -375,7 +375,7 @@ docker compose --profile compliance-core up --build \
   --exit-code-from compliance-core compliance-core
 ```
 
-Each profile spins up a clean server, seeds it with realistic data, runs the cert flow, and exits with the cert result code. This is the form most CI pipelines use because it produces a deterministic, reproducible cert result against a known dataset.
+Each profile spins up a clean server, seeds it with realistic data, runs the cert flow and exits with the cert result code. This is the form most CI pipelines use because it produces a deterministic, reproducible cert result against a known data set.
 
 ---
 
@@ -398,12 +398,12 @@ Use code `1` to gate a release, code `2` to alert someone that the test infrastr
 * **A target server to run cert against** – the **[RESO Reference Server](../reso-reference-server/)** is the most useful target during development. Spin it up locally, seed it, point cert at it, get a clean baseline. Every example in this guide runs against it cleanly.
 * **Generating test data first** – the **[RESO Data Generator](../reso-data-generator/)** is what produces the records cert runs against. If you want to seed a custom shape, start there.
 * **Calling a server from your own code** – the **[RESO Client SDK](../reso-client/)** is the OData client the cert runner uses internally. If you are integrating with a server outside the cert flow, that is the right entry point.
-* **Validating individual records** – the **[reso-validation](../reso-validation/)** library is the field-level and resource-level validator the cert runner uses for record checks. It is also a standalone library you can call directly from your own application.
+* **Validating individual records** – the **[reso-validation](../reso-validation/)** library is the field-level and resource-level validator the cert runner uses for record checks. It is also a stand-alone library you can call directly from your own application.
 * **Running cert through an AI agent** – the **[RESO MCP Server](../reso-mcp-server/)** exposes RESO tools to AI hosts and is the path toward agent-driven cert workflows. Issue **[reso-tools#104](https://github.com/RESOStandards/reso-tools/issues/104)** tracks the work to expose the cert flows themselves as first-class MCP tools, targeted for the webinar following the Spring RESO 2026 conference.
 
 ## Reference
 
-* **[Package README](../)** – full CLI flag reference, endorsement details, and SDK exports
+* **[Package README](../)** – full CLI flag reference, endorsement details and SDK exports
 * **[Source on GitHub](https://github.com/RESOStandards/reso-tools/tree/main/reso-certification)**
 * **[GitHub source](https://github.com/RESOStandards/reso-tools/tree/main/reso-certification)**
 * **[RCP-010 Add/Edit](https://github.com/RESOStandards/transport/blob/main/proposals/web-api-add-edit.md)** – the spec the Add/Edit cert flow validates

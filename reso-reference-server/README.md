@@ -1,14 +1,14 @@
 # RESO Reference OData Server
 
-A metadata-driven OData 4.01 reference server for the [RESO Data Dictionary](https://www.reso.org/data-dictionary/). Reads the RESO JSON metadata format and dynamically generates PostgreSQL tables, OData CRUD endpoints, EDMX metadata, and OpenAPI documentation.
+A metadata-driven OData 4.01 reference server for the [RESO Data Dictionary](https://www.reso.org/data-dictionary/). Reads the RESO JSON metadata format and dynamically generates PostgreSQL tables, OData CRUD endpoints, EDMX metadata and OpenAPI documentation.
 
-> **[User Guide](doc/GUIDE.md)** – a task-oriented walkthrough with realistic examples.
+> **[User Guide](doc/GUIDE.md)** – a task-oriented walk-through with realistic examples.
 
 > **Use it as a package.** Also published to npm as `@reso-standards/reso-reference-server` – import `createApp`, `startServer` and `loadConfig` to embed a RESO OData server in your own Node process (handy for test harnesses). Running the server directly from the package (`npx`, no clone or Docker) is tracked in [#238](https://github.com/RESOStandards/reso-tools/issues/238).
 
 ## Quick Start (Docker)
 
-The server supports three database backends: **PostgreSQL** (default), **MongoDB**, and **SQLite**. Each has its own Docker Compose profile.
+The server supports three database backends: **PostgreSQL** (default), **MongoDB** and **SQLite**. Each has its own Docker Compose profile.
 
 ### PostgreSQL (Default)
 
@@ -102,7 +102,7 @@ curl -X POST http://localhost:8080/Property \
   -d '{"ListPrice": 250000, "City": "Austin", "StateOrProvince": "TX", "PostalCode": "78701", "Country": "US", "BedroomsTotal": 3}'
 ```
 
-Seeding loads a committed static dataset (`seed-data/seed.json.gz`) via `POST /admin/seed`. The server inserts it through the DAL with FK links preserved: Office (17), Member (39), OUID (2), Teams (5), Property (50), plus child collections (Media, OpenHouse, Showing, Rooms, etc.) – 948 records total. The call is idempotent – it is a no-op once the server is already seeded.
+Seeding loads a committed static data set (`seed-data/seed.json.gz`) via `POST /admin/seed`. The server inserts it through the DAL with FK links preserved: Office (17), Member (39), OUID (2), Teams (5), Property (50), plus child collections (Media, OpenHouse, Showing, Rooms, etc.) – 948 records total. The call is idempotent – it is a no-op once the server is already seeded.
 
 ### Reseed (Drop Existing Data)
 
@@ -127,12 +127,12 @@ See also: the desktop certification app, distributed from [Releases](https://git
 
 The server is **metadata-driven**: it reads `server-metadata.json` (RESO Data Dictionary 2.0) at startup and dynamically:
 
-1. Creates database schema (PostgreSQL tables, MongoDB collections/indexes, or SQLite tables) for each target resource
-2. Registers OData CRUD routes with proper headers, annotations, and error format
+1. Creates database schema (PostgreSQL tables, MongoDB collections/indexes or SQLite tables) for each target resource
+2. Registers OData CRUD routes with proper headers, annotations and error format
 3. Generates EDMX XML metadata at `/$metadata`
 4. Generates OpenAPI 3.0 documentation at `/api-docs`
 
-The `DataAccessLayer` interface abstracts persistence, allowing the same OData handlers to work with PostgreSQL, MongoDB, or SQLite.
+The `DataAccessLayer` interface abstracts persistence, allowing the same OData handlers to work with PostgreSQL, MongoDB or SQLite.
 
 ## Supported Resources
 
@@ -177,7 +177,7 @@ The server implements OData 4.01 features required by the RESO Web API Add/Edit 
 | GET | `/{Resource}('{key}')` | Get a record by key (supports `$expand`) |
 | PATCH | `/{Resource}('{key}')` | Update a record |
 | DELETE | `/{Resource}('{key}')` | Delete a record |
-| POST | `/admin/seed` | Load the committed static seed dataset (idempotent) |
+| POST | `/admin/seed` | Load the committed static seed data set (idempotent) |
 | DELETE | `/admin/data-generator/reset` | Truncate all resource data (schema preserved) |
 
 ## Enumeration Modes
@@ -199,11 +199,11 @@ Both modes pass all Web API Core 2.0.0 compliance tests.
 
 ## Compliance Testing
 
-The server includes Docker-based compliance testing against RESO Certification tools and a custom Add/Edit test runner. Tests run against seeded data and validate OData protocol compliance, metadata structure, field mappings, and query behavior.
+The server includes Docker-based compliance testing against RESO Certification tools and a custom Add/Edit test runner. Tests run against seeded data and validate OData protocol compliance, metadata structure, field mappings and query behavior.
 
 ### Web API Core 2.0.0
 
-Validates OData query operations (`$filter`, `$select`, `$orderby`, `$top`, `$skip`, `$count`, `$expand`), response formats, metadata, and service document compliance. Uses the RESO [web-api-commander](https://github.com/RESOStandards/web-api-commander).
+Validates OData query operations (`$filter`, `$select`, `$orderby`, `$top`, `$skip`, `$count`, `$expand`), response formats, metadata and service document compliance. Uses the RESO [web-api-commander](https://github.com/RESOStandards/web-api-commander).
 
 **Current status: 42 passed, 0 failed, 3 skipped** (3 skipped: `has` operator tests, N/A for string enumerations)
 
@@ -228,7 +228,7 @@ The test generates RESOScript XML configs dynamically from live server data (`co
 
 ### Data Dictionary 2.0
 
-Validates metadata compliance, field mappings, and data availability against the RESO Data Dictionary 2.0 specification. Uses the RESO [reso-certification-utils](https://github.com/RESOStandards/reso-certification-utils).
+Validates metadata compliance, field mappings and data availability against the RESO Data Dictionary 2.0 specification. Uses the RESO [reso-certification-utils](https://github.com/RESOStandards/reso-certification-utils).
 
 **Current status: 1,034 passed, 570 skipped, 0 failed, 0 schema validation errors**
 
@@ -245,7 +245,7 @@ docker compose --profile sqlite --profile compliance-dd-sqlite up --build --exit
 
 ### Web API Add/Edit (RCP-010)
 
-Validates Create, Update, and Delete operations with representation and minimal response modes. Uses the custom [`@reso-standards/reso-certification`](../reso-certification/) test runner.
+Validates Create, Update and Delete operations with representation and minimal response modes. Uses the custom [`@reso-standards/reso-certification`](../reso-certification/) test runner.
 
 **Current status: 8 passed, 0 failed**
 

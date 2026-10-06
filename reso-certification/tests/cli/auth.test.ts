@@ -39,7 +39,7 @@ describe('resolveCliAuth', () => {
     });
 
     it('throws when client credentials are incomplete', () => {
-      expect(() => resolveCliAuth({ clientId: 'id', clientSecret: 'secret' })).toThrow('--client-id, --client-secret, and --token-url');
+      expect(() => resolveCliAuth({ clientId: 'id', clientSecret: 'secret' })).toThrow('--client-id, --client-secret and --token-url');
     });
 
     it('flags take priority over config auth', () => {

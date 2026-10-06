@@ -2,9 +2,9 @@
 
 MCP server that exposes RESO tools for AI agents. Query OData servers, parse metadata, validate records, run compliance tests – all through the [Model Context Protocol](https://modelcontextprotocol.io/).
 
-Works with any MCP client: Claude, Cursor, Windsurf, VS Code, or your own application.
+Works with any MCP client: Claude, Cursor, Windsurf, VS Code or your own application.
 
-> **New here?** The [User Guide](doc/GUIDE.md) is a dialogue-format walkthrough – every example is a real question to an AI assistant, the actual MCP tool call, and the live response from a seeded reference server. It covers auth, metadata exploration, querying, searching, and the full Add/Edit + EntityEvent loop including error handling.
+> **New here?** The [User Guide](doc/GUIDE.md) is a dialogue-format walk-through – every example is a real question to an AI assistant, the actual MCP tool call and the live response from a seeded reference server. It covers auth, metadata exploration, querying, searching and the full Add/Edit + EntityEvent loop including error handling.
 
 ## Install
 
@@ -80,7 +80,7 @@ authenticate({ clientId, clientSecret, tokenUrl, scope? })
 
 ### query
 
-Query a RESO OData server. Supports `$filter`, `$select`, `$orderby`, `$top`, `$skip`, `$count`, and `$expand`.
+Query a RESO OData server. Supports `$filter`, `$select`, `$orderby`, `$top`, `$skip`, `$count` and `$expand`.
 
 ```
 query({ url, resource, authToken, filter?, select?, orderby?, top?, skip?, count?, expand? })
@@ -91,7 +91,7 @@ All tools accept either `authToken` (bearer token) or `clientId` + `clientSecret
 
 ### metadata
 
-Fetch and parse OData `$metadata`. Returns entity types, fields, key properties, and type information.
+Fetch and parse OData `$metadata`. Returns entity types, fields, key properties and type information.
 
 ```
 metadata({ url, authToken, resource? })
@@ -109,7 +109,7 @@ validate({ record, resource, version? })
 
 ### parse-filter
 
-Parse an OData `$filter` expression into an AST. Useful for understanding, validating, or transforming filter expressions.
+Parse an OData `$filter` expression into an AST. Useful for understanding, validating or transforming filter expressions.
 
 ```
 parse-filter({ filter })
@@ -118,7 +118,7 @@ parse-filter({ filter })
 
 ### run-compliance
 
-Run RESO Certification compliance tests. Supports Add/Edit (RCP-010), EntityEvent (RCP-027), and Web API Core.
+Run RESO Certification compliance tests. Supports Add/Edit (RCP-010), EntityEvent (RCP-027) and Web API Core.
 
 ```
 run-compliance({ endorsement, url, authToken, resource?, version?, mode?, resources? })
@@ -127,7 +127,7 @@ run-compliance({ endorsement, url, authToken, resource?, version?, mode?, resour
 
 ### metadata-report
 
-Generate a RESO metadata compliance report. Checks entity types, fields, and annotations.
+Generate a RESO metadata compliance report. Checks entity types, fields and annotations.
 
 ```
 metadata-report({ url, authToken })
@@ -176,7 +176,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 
 ## Related
 
-- [User Guide](doc/GUIDE.md) – dialogue-format walkthrough with live examples
+- [User Guide](doc/GUIDE.md) – dialogue-format walk-through with live examples
 - [`reso-certification/`](../reso-certification/) – CLI and SDK for compliance testing
 - [`reso-client/`](../reso-client/) – OData client SDK
 - [RESO Tools MCP Server ticket](https://github.com/RESOStandards/reso-tools/issues/91)

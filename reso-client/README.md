@@ -2,7 +2,7 @@
 
 OData 4.01 client SDK for TypeScript. Provides URI building, CRUD helpers, CSDL metadata parsing and validation, query option validation, and response parsing.
 
-> **[User Guide](doc/GUIDE.md)** – a task-oriented walkthrough with realistic examples.
+> **[User Guide](doc/GUIDE.md)** – a task-oriented walk-through with realistic examples.
 
 ## Install
 
@@ -73,7 +73,7 @@ The client supports two authentication modes.
 
 #### OAuth2 Client Credentials
 
-Tokens are managed automatically – fetched on first use, refreshed proactively at 90% of TTL, and retried once on 401 responses.
+Tokens are managed automatically – fetched on first use, refreshed proactively at 90% of TTL and retried once on 401 responses.
 
 ```typescript
 const client = await createClient({
@@ -216,7 +216,7 @@ await queryEntities(client, "Property", {
 
 ### CSDL Metadata Parsing
 
-Parse and validate EDMX/CSDL XML metadata documents. The parser, validator, and `Csdl*` types
+Parse and validate EDMX/CSDL XML metadata documents. The parser, validator and `Csdl*` types
 live in [`@reso-standards/reso-metadata-utils`](../reso-metadata-utils); reso-client provides the
 metadata fetchers.
 
@@ -240,7 +240,7 @@ if (!result.valid) {
 }
 ```
 
-Parsed types include: `CsdlEntityType`, `CsdlProperty`, `CsdlNavigationProperty`, `CsdlComplexType`, `CsdlEnumType`, `CsdlEntityContainer`, `CsdlEntitySet`, `CsdlSingleton`, `CsdlAction`, `CsdlFunction`, and more.
+Parsed types include: `CsdlEntityType`, `CsdlProperty`, `CsdlNavigationProperty`, `CsdlComplexType`, `CsdlEnumType`, `CsdlEntityContainer`, `CsdlEntitySet`, `CsdlSingleton`, `CsdlAction`, `CsdlFunction` and more.
 
 ### Query Validation
 
@@ -268,7 +268,7 @@ Validates `$select` and `$orderby` field references against the entity type, `$f
 
 ### Response Parsing
 
-Extract annotations, detect errors, and handle paging.
+Extract annotations, detect errors and handle paging.
 
 ```typescript
 import {

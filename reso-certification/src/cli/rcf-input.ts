@@ -189,5 +189,5 @@ export async function* readRcfPayloads(inputPath: string): AsyncGenerator<RcfPay
   if (inputStat.isDirectory()) yield* readDirectory(inputPath);
   else if (extname(inputPath) === '.zip') yield* readZip(inputPath);
   else if (extname(inputPath) === '.json') yield* readJsonFile(inputPath);
-  else throw new Error(`Unsupported RCF input (expected a .json file, .zip, or a directory): ${inputPath}`);
+  else throw new Error(`Unsupported RCF input (expected a .json file, .zip or a directory): ${inputPath}`);
 }

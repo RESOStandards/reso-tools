@@ -1,6 +1,6 @@
 # @reso-standards/reso-metadata-utils
 
-RESO OData metadata processing utilities: CSDL parsing, validation, EDMX → metadata-report serialization, and live metadata fetching. This is the dependency-requiring side of the RESO metadata split ([reso-tools #221](https://github.com/RESOStandards/reso-tools)) – a sibling to [`@reso-standards/reso-common`](../reso-common/), which holds the zero-dependency metadata model and EDMX generation. Nothing here imports reso-common; the two are meant to be used together.
+RESO OData metadata processing utilities: CSDL parsing, validation, EDMX → metadata-report serialization and live metadata fetching. This is the dependency-requiring side of the RESO metadata split ([reso-tools #221](https://github.com/RESOStandards/reso-tools)) – a sibling to [`@reso-standards/reso-common`](../reso-common/), which holds the zero-dependency metadata model and EDMX generation. Nothing here imports reso-common; the two are meant to be used together.
 
 Its one runtime dependency is [`fast-xml-parser`](https://www.npmjs.com/package/fast-xml-parser).
 
@@ -62,7 +62,7 @@ const report = generateMetadataReport(edmxXml, '2.1');  // MetadataReport — pa
 const report2 = serializeMetadataReport(schema, '2.1'); // MetadataReport — from a parsed CsdlSchema
 ```
 
-### 4. Fetch metadata from a live server
+### 4. Fetch Metadata from a Live Server
 
 ```typescript
 import { fetchAndParseMetadata, fetchRawMetadataWithVersion } from '@reso-standards/reso-metadata-utils';
@@ -81,7 +81,7 @@ Fetch failures throw `MetadataFetchError`.
 
 ## Types
 
-The package ships full TypeScript declarations: the `Csdl*` model (`CsdlSchema`, `CsdlEntityType`, `CsdlProperty`, `CsdlEnumType`, …), the `MetadataReport*` report shapes, and `FieldInfo` / `FieldAnnotation`.
+The package ships full TypeScript declarations: the `Csdl*` model (`CsdlSchema`, `CsdlEntityType`, `CsdlProperty`, `CsdlEnumType`, …), the `MetadataReport*` report shapes and `FieldInfo` / `FieldAnnotation`.
 
 ## Development
 

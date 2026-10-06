@@ -110,7 +110,7 @@ export const runReplicate = async (opts: ReplicateOptions): Promise<ReplicateRes
   // every resource's fields, so they are report-driven-mode only.
   if (opts.jsonSchemaValidation && !opts.metadataReportPath) {
     throw new Error(
-      'Schema validation (--json-schema-validation / --strict) requires a metadata report (--metadata) — the schema is generated from it.'
+      'Schema validation (--json-schema-validation / --strict) requires a metadata report (--metadata) because the schema is generated from it.'
     );
   }
 
