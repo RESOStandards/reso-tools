@@ -73,7 +73,7 @@ const failures = validateRecord(
 
 Two kinds of rules live here:
 
-* **Per-field rules** – range checks (`min` / `max`), required-field checks and pattern-matched constraints (e.g. "every field whose name ends in `Fee` must be between 0 and 10,000")
+* **Per-field rules** – range checks (`min` / `max`), required-field checks and pattern-matched constraints (e.g., "every field whose name ends in `Fee` must be between 0 and 10,000")
 * **Cross-field rules** – constraints that span multiple fields, like "BathroomsTotalInteger must equal the sum of the individual bathroom-part fields"
 
 ```typescript
