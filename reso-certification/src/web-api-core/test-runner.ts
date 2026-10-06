@@ -40,6 +40,15 @@ export interface ScenarioResult {
   readonly name: string;
   readonly passed: boolean;
   readonly skipped: boolean;
+  /**
+   * Why this scenario was skipped, machine-readable. Present whenever `skipped` is true.
+   *
+   * The reason was always written, but only as English prose inside `assertions` — so nothing could
+   * aggregate or filter skips, and a reader had to pattern-match a sentence. On one observed run 73
+   * of 76 skips prefixed theirs "Skipped:" and 3 did not, which made those three read as ordinary
+   * passing scenarios.
+   */
+  readonly skipReason?: string;
   readonly assertions: ReadonlyArray<AssertionResult>;
   readonly duration: number;
   /** OData request latency in ms (excludes assertion/processing time). */
@@ -277,8 +286,11 @@ const paramsWithCandidate = (params: TestParams, slot: 'single' | 'multi', c: En
 const skipResult = (scenario: CoreScenario, start: number, message: string): ScenarioResult => ({
   tag: scenario.tag,
   name: scenario.name,
-  passed: true,
+  // A skip is neither a pass nor a failure. `passed: true` here read as a pass to anything looking
+  // at that field, and both tallies already guard on `!skipped`, so this cannot move a verdict.
+  passed: false,
   skipped: true,
+  skipReason: message,
   assertions: [{ passed: true, message: `Skipped: ${message}` }],
   duration: Date.now() - start
 });
@@ -289,8 +301,9 @@ const skipResult = (scenario: CoreScenario, start: number, message: string): Sce
 const deadlineSkipResult = (scenario: CoreScenario): ScenarioResult => ({
   tag: scenario.tag,
   name: scenario.name,
-  passed: true,
+  passed: false,
   skipped: true,
+  skipReason: 'Not tested — run deadline reached',
   assertions: [{ passed: true, message: 'Not tested — run deadline reached' }],
   duration: 0,
   optional: scenario.optional
@@ -367,7 +380,9 @@ export const emptyOutcome = (
       };
     default:
       return {
-        passed: true,
+        // Not a pass. These three scenarios recorded this message beside a passing HTTP assertion
+        // and nothing marking them skipped, so they read as ordinary passes on a real run.
+        passed: false,
         skipped: true,
         retryable: true,
         message: 'No records returned — filter executed but no matching data to validate'
@@ -574,7 +589,7 @@ const runOneExpandNav = async (
     const responseCheck = assertODataResponse(response, 200);
     // Gate the SKIP on the STATUS, not on assertODataResponse. $expand is OPTIONAL (RESO Core: "providers who
     // support expand"; OData Intermediate conformance does not require it), so a NON-2xx is the spec-conformant
-    // "not supported / not authorised / no data" decline (OData §9.3.1 501 Not Implemented; §11.2 unsupported
+    // "not supported / not authorized / no data" decline (OData §9.3.1 501 Not Implemented; §11.2 unsupported
     // option MUST-fail-and-SHOULD-501; §11.2.5 permissions) → SKIP and report the status, never a determinate
     // FAIL. A 200 whose OData envelope is malformed (missing/invalid OData-Version, null body) ALSO fails
     // responseCheck — but that is a served-but-broken response, which we DO fault (below).
@@ -582,8 +597,9 @@ const runOneExpandNav = async (
       return {
         tag,
         name,
-        passed: true,
+        passed: false,
         skipped: true,
+        skipReason: `$expand ${nav.name}: HTTP ${response.status} — expansion not supported / not accessible for this client (optional per RESO Core; OData §9.3.1/§11.2)`,
         assertions: [
           {
             passed: true,
@@ -640,8 +656,9 @@ const runOneExpandNav = async (
       return {
         tag,
         name,
-        passed: true,
+        passed: false,
         skipped: true,
+        skipReason: `$expand ${nav.name}: 200 received; per-item schema validation unavailable (no validator built)`,
         assertions: [
           ...assertions,
           {
@@ -763,6 +780,7 @@ const runOneExpandNav = async (
       name,
       passed: false,
       skipped: true,
+      skipReason: `$expand ${nav.name} errored — ${err instanceof Error ? err.message : String(err)}`,
       errored: true,
       assertions: [
         ...assertions,
@@ -870,6 +888,7 @@ export const executeStandardScenario = async (
           name: scenario.name,
           passed: outcome.passed,
           skipped: outcome.skipped,
+          ...(outcome.skipped ? { skipReason: outcome.message } : {}),
           assertions,
           duration: Date.now() - start,
           requestLatency,
@@ -2285,6 +2304,7 @@ export const runCoreResourceScenarios = async (
         name: scenario.name,
         passed: false,
         skipped: true,
+        skipReason: 'lookup-resource-validation failed earlier in this run',
         assertions: [{ passed: false, message: 'Skipped: lookup-resource-validation failed earlier in this run' }],
         duration: 0,
         optional: scenario.optional
@@ -2302,6 +2322,7 @@ export const runCoreResourceScenarios = async (
         name: scenario.name,
         passed: false,
         skipped: true,
+        skipReason: `'in' operator requires OData-Version 4.01 (server reports ${detectedODataVersion ?? 'no OData-Version'})`,
         assertions: [
           {
             passed: false,
