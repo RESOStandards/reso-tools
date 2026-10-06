@@ -11,15 +11,20 @@ const response = (status: number, value: unknown[] = [], nextLink?: string): ODa
   rawBody: ''
 });
 
-interface RecordedCall { readonly url: string; readonly headers?: Readonly<Record<string, string>>; }
+interface RecordedCall {
+  readonly url: string;
+  readonly headers?: Readonly<Record<string, string>>;
+}
 
 // Injected test client: returns the scripted responses in order AND records each request (url + headers),
 // so tests can assert the request SHAPE the walk builds (filter / orderby / $top / Prefer maxpagesize).
-const recordingRequester = (responses: readonly ODataResponse[]): { readonly requester: ODataRequester; readonly calls: RecordedCall[] } => {
+const recordingRequester = (
+  responses: readonly ODataResponse[]
+): { readonly requester: ODataRequester; readonly calls: RecordedCall[] } => {
   const calls: RecordedCall[] = [];
   const queue = [...responses];
   const requester: ODataRequester = {
-    request: async (req) => {
+    request: async req => {
       calls.push({ url: req.url, headers: req.headers });
       const next = queue.shift();
       if (!next) throw new Error('requester queue exhausted');
@@ -31,10 +36,17 @@ const recordingRequester = (responses: readonly ODataResponse[]): { readonly req
 
 // Params carry the sampled timestamp field + its `gt` target + distinct count — Check B (the walk) needs them.
 const params: TestParams = {
-  resource: 'Property', keyField: 'ListingKey', keyValue: '1',
-  enumMode: 'string', integerValueHigh: 0, skippedTypes: [], sampleComplete: true,
-  timestampField: 'ModificationTimestamp', datetimeValue: '2024-01-01T00:00:00Z',
-  datetimeValueMax: '2025-06-01T00:00:00Z', datetimeDistinctCount: 5
+  resource: 'Property',
+  keyField: 'ListingKey',
+  keyValue: '1',
+  enumMode: 'string',
+  integerValueHigh: 0,
+  skippedTypes: [],
+  sampleComplete: true,
+  timestampField: 'ModificationTimestamp',
+  datetimeValue: '2024-01-01T00:00:00Z',
+  datetimeValueMax: '2025-06-01T00:00:00Z',
+  datetimeDistinctCount: 5
 };
 
 const runWith = (p: TestParams, requester: ODataRequester) => runPagingScenario('http://x', 'Property', p, 'tok', 0, requester);
@@ -129,6 +141,31 @@ describe('runPagingScenario — Check B: forward gt-walk (server-driven paging)'
     expect(out.passed).toBe(true);
   });
 
+  it('an empty first page on the walk is reported as a valid single page (0 records)', async () => {
+    // The third branch of `runPagingScenario`'s verdict, exercised here for the first time. The other
+    // two — `pages > 1 && !lastHadNext` and a non-empty `pages === 1` — are covered above.
+    //
+    // It was *named* by four tests in paging.test.ts, but those imported nothing from the codebase:
+    // each hardcoded `const pages = 0 | 3` and asserted against a ternary written inside the test.
+    // A mutation settled it — inverting the normative $top=1 nextLink assertion in production left
+    // all four green while this file caught it immediately. They are replaced by this one, which
+    // calls the function.
+    //
+    // The pass is correct, and the rule is simple (Josh, 2026-10-05): an empty result is a legitimate
+    // outcome — an empty `value` array with no nextLink — and ANY resource with one page or zero
+    // pages would have no nextLink. So there is nothing for the check to fault. A `gt` filter that
+    // matches nothing is conformant, not inconclusive, which is why this branch passes rather than
+    // skipping the way `executeStandardScenario` does for an ambiguous empty via `emptyVerdict`.
+    const { requester, calls } = recordingRequester([topOneOk, response(200, [])]);
+    const out = await run(requester);
+
+    expect(calls.length).toBe(2); // $top=1, then one walk request that came back empty
+    expect(out.passed).toBe(true);
+    expect(out.assertions.some(a => a.message.includes('one page (0 records)'))).toBe(true);
+    // It must NOT claim to have walked pages it never saw.
+    expect(out.assertions.some(a => a.message.includes('pages, '))).toBe(false);
+  });
+
   it('no returning timestamp filter (distinct < 2) → walk is skipped; only the $top=1 request is made', async () => {
     const { requester, calls } = recordingRequester([topOneOk]);
     const out = await runWith({ ...params, datetimeDistinctCount: 1 }, requester);
@@ -156,7 +193,10 @@ describe('runPagingScenario — Check B: forward gt-walk (server-driven paging)'
   });
 
   it('a throttled server that keeps returning fresh nextLink pages is capped (does not hang) and passes', async () => {
-    const pages = [topOneOk, ...Array.from({ length: 40 }, (_, i) => response(200, [{ ListingKey: `k${i}` }], `http://x/Property?$skiptoken=${i}`))];
+    const pages = [
+      topOneOk,
+      ...Array.from({ length: 40 }, (_, i) => response(200, [{ ListingKey: `k${i}` }], `http://x/Property?$skiptoken=${i}`))
+    ];
     const { requester, calls } = recordingRequester(pages);
     const out = await run(requester);
     expect(out.passed).toBe(true);
