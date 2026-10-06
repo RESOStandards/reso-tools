@@ -11,11 +11,12 @@ import {
   resolveAuthToken
 } from '../test-runner/index.js';
 import { persistMetadataXml } from '../test-runner/metadata.js';
+import { everyStepPassed } from './certification.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
 import { addEditReportGenerators, prepareOutputDir, writeReports } from './reports.js';
 import { FETCH_METADATA, RUN_ADD_EDIT_SCENARIOS } from './step-names.js';
-import type { AddEditConfig, PipelineStep } from './types.js';
+import type { AddEditConfig, PipelineStep, ValidForCertification } from './types.js';
 import type { BaseTestContext } from './types.js';
 
 // ── Pipeline Context ──
@@ -302,11 +303,15 @@ const writeComplianceReports = (config: AddEditConfig): PipelineStep<AddEditCont
       ]
     };
 
+    const steps = (ctx.pipelineSteps as ReadonlyArray<import('./types.js').StepResult>) ?? [];
     const pipelineResult = {
       status: testReport.summary.failed > 0 ? ('failed' as const) : ('passed' as const),
       endorsement: 'add-edit',
-      steps: (ctx.pipelineSteps as ReadonlyArray<import('./types.js').StepResult>) ?? [],
+      steps,
       context: contextWithReports,
+      // The same pure rule the pipeline applies to its returned result, over the same step list, so
+      // the written report and the returned result cannot disagree.
+      certification: addEditValidForCertification(steps),
       duration: 0
     };
 
@@ -332,17 +337,33 @@ const inlinePayloadsNeedSampling = (payloads?: import('./types.js').InlinePayloa
 };
 
 /** Create the Add/Edit compliance test pipeline. */
+/**
+ * Add/Edit's own certification rule: every step must have passed.
+ *
+ * `sampleRecords` is omitted when the caller supplied payloads, which is a legitimate way to run
+ * the endorsement rather than a gap, so its absence is not a skip and does not reach here.
+ */
+/**
+ * Exported so the rule can be tested directly. The alternative is reaching it only through a full
+ * pipeline run against a live server, which would leave the rule itself unobserved.
+ */
+export const addEditValidForCertification: ValidForCertification = steps => everyStepPassed(steps);
+
 export const createAddEditPipeline = (config: AddEditConfig) => {
   const needsSampling = !config.payloadsDir && (!config.payloads || inlinePayloadsNeedSampling(config.payloads));
-  return createPipeline<AddEditContext>('add-edit', [
-    resolveAuth(config),
-    ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),
-    fetchAndParseMetadata(config),
-    ...(needsSampling ? [sampleRecords(config)] : []),
-    generatePayloads(config),
-    runTests(config),
-    writeComplianceReports(config)
-  ]);
+  return createPipeline<AddEditContext>(
+    'add-edit',
+    [
+      resolveAuth(config),
+      ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),
+      fetchAndParseMetadata(config),
+      ...(needsSampling ? [sampleRecords(config)] : []),
+      generatePayloads(config),
+      runTests(config),
+      writeComplianceReports(config)
+    ],
+    addEditValidForCertification
+  );
 };
 
 /** Run Add/Edit compliance tests with a single function call. */

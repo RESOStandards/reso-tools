@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
+import { everyStepPassed } from '../../src/sdk/certification.js';
 import { createPipeline } from '../../src/sdk/pipeline.js';
 import type { PipelineStep, StepProgress } from '../../src/sdk/types.js';
+
+/**
+ * These tests exercise the generic runner, not any endorsement's certification rule, so they pass
+ * the shared `everyStepPassed` rule that three of the four endorsements declare. The rule is a
+ * required parameter of createPipeline on purpose: a new endorsement must state what a certifiable
+ * run of itself looks like rather than inheriting a default.
+ */
+const pipelineOf = (endorsement: string, steps: ReadonlyArray<PipelineStep>) => createPipeline(endorsement, steps, everyStepPassed);
 
 describe('createPipeline', () => {
   const makeStep = (name: string, result: Partial<Awaited<ReturnType<NonNullable<PipelineStep['run']>>>> = {}): PipelineStep => ({
@@ -12,7 +21,7 @@ describe('createPipeline', () => {
   });
 
   it('runs steps sequentially and accumulates context', async () => {
-    const pipeline = createPipeline('test', [makeStep('step-1'), makeStep('step-2'), makeStep('step-3')]);
+    const pipeline = pipelineOf('test', [makeStep('step-1'), makeStep('step-2'), makeStep('step-3')]);
 
     const result = await pipeline.run({});
 
@@ -26,7 +35,7 @@ describe('createPipeline', () => {
   });
 
   it('records step durations', async () => {
-    const pipeline = createPipeline('test', [
+    const pipeline = pipelineOf('test', [
       makeStep('slow', {
         summary: 'did something'
       })
@@ -39,7 +48,7 @@ describe('createPipeline', () => {
   });
 
   it('stops on first failure when failFast is true', async () => {
-    const pipeline = createPipeline('test', [
+    const pipeline = pipelineOf('test', [
       makeStep('step-1'),
       makeStep('step-2', { status: 'failed', errors: ['broke'] }),
       makeStep('step-3')
@@ -66,7 +75,7 @@ describe('createPipeline', () => {
       run: async ctx => ({ context: { ...ctx, reports_written: true } })
     };
 
-    const pipeline = createPipeline('test', [
+    const pipeline = pipelineOf('test', [
       makeStep('step-1'),
       makeStep('step-2', { status: 'failed', errors: ['boom'] }),
       makeStep('step-3'),
@@ -97,7 +106,7 @@ describe('createPipeline', () => {
       }
     };
 
-    const pipeline = createPipeline('test', [makeStep('step-1', { status: 'failed' }), writeReports]);
+    const pipeline = pipelineOf('test', [makeStep('step-1', { status: 'failed' }), writeReports]);
 
     const result = await pipeline.run({}, undefined, { failFast: true });
 
@@ -121,7 +130,7 @@ describe('createPipeline', () => {
       }
     };
 
-    const pipeline = createPipeline('test', [makeStep('step-1'), writeReports]);
+    const pipeline = pipelineOf('test', [makeStep('step-1'), writeReports]);
     const result = await pipeline.run({});
 
     expect(result.status).toBe('passed');
@@ -152,7 +161,7 @@ describe('createPipeline', () => {
       }
     };
 
-    const result = await createPipeline('test', [makeStep('step-1'), throwingStep, writeReports]).run({});
+    const result = await pipelineOf('test', [makeStep('step-1'), throwingStep, writeReports]).run({});
 
     expect(seen).toHaveLength(1);
     expect(seen[0]).toContainEqual(['validate', 'failed']);
@@ -180,7 +189,7 @@ describe('createPipeline', () => {
       }
     };
 
-    await createPipeline('test', [makeStep('step-1'), makeStep('step-2'), throwingStep, writeReports]).run({
+    await pipelineOf('test', [makeStep('step-1'), makeStep('step-2'), throwingStep, writeReports]).run({
       seeded: 'value'
     });
 
@@ -206,7 +215,7 @@ describe('createPipeline', () => {
       }
     };
 
-    await createPipeline('test', [makeStep('step-1'), makeStep('step-2', { status: 'failed' }), makeStep('step-3'), writeReports]).run({});
+    await pipelineOf('test', [makeStep('step-1'), makeStep('step-2', { status: 'failed' }), makeStep('step-3'), writeReports]).run({});
 
     expect(seen).toHaveLength(1);
     expect(seen[0]).toEqual([
@@ -229,7 +238,7 @@ describe('createPipeline', () => {
         return { context: ctx };
       }
     };
-    await createPipeline('test', [makeStep('step-1', { status: 'failed' }), makeStep('step-2'), writeReports]).run({});
+    await pipelineOf('test', [makeStep('step-1', { status: 'failed' }), makeStep('step-2'), writeReports]).run({});
     expect(seenNames).not.toContain('write-reports');
     expect(seenNames).toEqual(['step-1', 'step-2']);
   });
@@ -239,7 +248,7 @@ describe('createPipeline', () => {
     // pipeline already appends skipped steps after the loop. A seed that leaked into stepResults would
     // double-add them.
     const writeReports: PipelineStep = { name: 'write-reports', alwaysRun: true, run: async ctx => ({ context: ctx }) };
-    const result = await createPipeline('test', [
+    const result = await pipelineOf('test', [
       makeStep('step-1'),
       makeStep('step-2', { status: 'failed' }),
       makeStep('step-3'),
@@ -267,7 +276,7 @@ describe('createPipeline', () => {
         return { context: ctx };
       }
     };
-    await createPipeline('test', [makeStep('step-1'), makeStep('step-2'), writeReports]).run({});
+    await pipelineOf('test', [makeStep('step-1'), makeStep('step-2'), writeReports]).run({});
     expect(seen[0]).toEqual([
       ['step-1', 'passed'],
       ['step-2', 'passed']
@@ -275,7 +284,7 @@ describe('createPipeline', () => {
   });
 
   it('continues after failure when failFast is false', async () => {
-    const pipeline = createPipeline('test', [makeStep('step-1'), makeStep('step-2', { status: 'failed' }), makeStep('step-3')]);
+    const pipeline = pipelineOf('test', [makeStep('step-1'), makeStep('step-2', { status: 'failed' }), makeStep('step-3')]);
 
     const result = await pipeline.run({}, undefined, { failFast: false });
 
@@ -293,7 +302,7 @@ describe('createPipeline', () => {
       }
     };
 
-    const pipeline = createPipeline('test', [makeStep('step-1'), throwingStep, makeStep('step-3')]);
+    const pipeline = pipelineOf('test', [makeStep('step-1'), throwingStep, makeStep('step-3')]);
 
     const result = await pipeline.run({});
 
@@ -307,7 +316,7 @@ describe('createPipeline', () => {
     const progressEvents: StepProgress[] = [];
     const onProgress = (p: StepProgress) => progressEvents.push(p);
 
-    const pipeline = createPipeline('test', [makeStep('step-1', { summary: 'done' }), makeStep('step-2')]);
+    const pipeline = pipelineOf('test', [makeStep('step-1', { summary: 'done' }), makeStep('step-2')]);
 
     await pipeline.run({}, onProgress);
 
@@ -330,7 +339,7 @@ describe('createPipeline', () => {
       })
     };
 
-    const pipeline = createPipeline('test', [step]);
+    const pipeline = pipelineOf('test', [step]);
     const result = await pipeline.run({});
 
     expect(result.steps[0].summary).toBe('14 resources processed');
@@ -350,14 +359,14 @@ describe('createPipeline', () => {
       }
     };
 
-    const pipeline = createPipeline('test', [makeStep('first'), checkContext]);
+    const pipeline = pipelineOf('test', [makeStep('first'), checkContext]);
 
     const result = await pipeline.run({});
     expect(result.context.priorStepCount).toBe(1);
   });
 
   it('defaults failFast to true', async () => {
-    const pipeline = createPipeline('test', [makeStep('step-1', { status: 'failed' }), makeStep('step-2')]);
+    const pipeline = pipelineOf('test', [makeStep('step-1', { status: 'failed' }), makeStep('step-2')]);
 
     const result = await pipeline.run({});
 
@@ -365,7 +374,7 @@ describe('createPipeline', () => {
   });
 
   it('handles empty pipeline', async () => {
-    const pipeline = createPipeline('test', []);
+    const pipeline = pipelineOf('test', []);
     const result = await pipeline.run({});
 
     expect(result.status).toBe('passed');

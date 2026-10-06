@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { collectFailures, collectOptionalUnsupported, humanizeDuration, runHeaderSummary } from '../../src/cli/render.js';
+import { describe, expect, it, vi } from 'vitest';
+import { collectFailures, collectOptionalUnsupported, humanizeDuration, printRunSummary, runHeaderSummary } from '../../src/cli/render.js';
 import type { PipelineResult } from '../../src/sdk/types.js';
 
 describe('humanizeDuration', () => {
@@ -136,5 +136,61 @@ describe('runHeaderSummary', () => {
       ]
     } as unknown as PipelineResult;
     expect(runHeaderSummary(result)).toBe('1 passed, 1 failed');
+  });
+});
+
+describe('runHeaderSummary — the step-tally fallback', () => {
+  const ddResult = (variationsStatus: string): PipelineResult =>
+    ({
+      status: 'passed',
+      duration: 0,
+      steps: [
+        { name: 'Resolve authentication', status: 'passed' },
+        { name: 'Generate metadata report', status: 'passed' },
+        { name: 'Check variations', status: variationsStatus },
+        { name: 'Write reports', status: 'passed' }
+      ]
+    }) as unknown as PipelineResult;
+
+  /**
+   * The Data Dictionary has no scenario-running step, so it takes the step-tally branch. That branch
+   * counted only passed and failed, which meant a run with a skipped step printed "3 passed,
+   * 0 failed" — a terminal and a continuous-integration log that said nothing about the step which
+   * never ran.
+   */
+  it('counts skipped steps, so a skipped step is visible in the header', () => {
+    expect(runHeaderSummary(ddResult('skipped'))).toBe('3 passed, 0 failed, 1 skipped');
+  });
+
+  it('says nothing about skips when there are none, leaving an ordinary run unchanged', () => {
+    expect(runHeaderSummary(ddResult('passed'))).toBe('4 passed, 0 failed');
+  });
+});
+
+describe('printRunSummary — certification', () => {
+  const resultWith = (certification: PipelineResult['certification']): PipelineResult =>
+    ({ status: 'passed', endorsement: 'dd', duration: 0, steps: [], context: {}, certification }) as unknown as PipelineResult;
+
+  const captured = (result: PipelineResult): string => {
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(' '));
+    });
+    printRunSummary(result, 'default' as never);
+    spy.mockRestore();
+    return lines.join('\n');
+  };
+
+  // The case the whole mechanism exists for: the run PASSED, so nothing else in this summary would
+  // say a word about it.
+  it('reports ineligibility on a passing run, with the reason', () => {
+    const out = captured(resultWith({ valid: false, reasons: ['Check variations: skipped — requested with --skip-variations'] }));
+
+    expect(out).toContain('Not eligible for certification (1)');
+    expect(out).toContain('Check variations: skipped');
+  });
+
+  it('says nothing when the run is eligible', () => {
+    expect(captured(resultWith({ valid: true }))).not.toContain('Not eligible');
   });
 });

@@ -6,7 +6,8 @@ import type {
   ProgressCallback,
   StepOutput,
   StepResult,
-  TestFunction
+  TestFunction,
+  ValidForCertification
 } from './types.js';
 
 /** No-op progress callback for callers that don't need progress updates. */
@@ -123,8 +124,20 @@ const executeStepFunctions = async <TContext extends PipelineContext>(
   };
 };
 
-/** Create a pipeline from an ordered list of steps and execute it. */
-export const createPipeline = <TContext extends PipelineContext>(endorsement: string, steps: ReadonlyArray<PipelineStep<TContext>>) => ({
+/**
+ * Create a pipeline from an ordered list of steps and execute it.
+ *
+ * `validForCertification` is a required positional parameter rather than an option, so that a new
+ * endorsement cannot be added without stating what a certifiable run of it looks like. Made
+ * optional, the absent case would have to mean something, and the only available meanings are
+ * "certifiable" — certifiable by omission — or "not certifiable", which would silently refuse every
+ * run of a correctly-written endorsement. Neither is a good default, so there is no default.
+ */
+export const createPipeline = <TContext extends PipelineContext>(
+  endorsement: string,
+  steps: ReadonlyArray<PipelineStep<TContext>>,
+  validForCertification: ValidForCertification
+) => ({
   /** Run all steps in sequence, accumulating context and emitting progress. */
   run: async (
     initialContext: TContext,
@@ -344,7 +357,11 @@ export const createPipeline = <TContext extends PipelineContext>(endorsement: st
       endorsement,
       steps: orderedStepResults,
       context,
-      duration: Date.now() - startTime
+      duration: Date.now() - startTime,
+      // Computed from the ordered, complete step list — the same record a reader of the report
+      // sees, including the steps the loop above marked `skipped` because they never ran. Asking
+      // the endorsement here, once, is what keeps eligibility from being re-derived per consumer.
+      certification: validForCertification(orderedStepResults)
     };
   }
 });

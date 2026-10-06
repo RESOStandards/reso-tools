@@ -4,11 +4,12 @@ import { runAllEntityEventScenarios } from '../entity-event/test-runner.js';
 import type { EntityEventConfig as EERunnerConfig } from '../entity-event/types.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, persistMetadataXml } from '../test-runner/metadata.js';
+import { CERTIFIABLE, allOf, everyStepPassed, notCertifiable } from './certification.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
 import { entityEventReportGenerators, prepareOutputDir, writeReports } from './reports.js';
 import { FETCH_METADATA, RUN_ENTITY_EVENT_SCENARIOS } from './step-names.js';
-import type { BaseTestContext, EntityEventConfig, PipelineStep } from './types.js';
+import type { BaseTestContext, EntityEventConfig, PipelineStep, ValidForCertification } from './types.js';
 import type { StepResult } from './types.js';
 
 // ── Pipeline Context ──
@@ -189,7 +190,7 @@ const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> =
 });
 
 /** Write generic and detailed compliance reports. */
-const writeComplianceReports = (_config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
+const writeComplianceReports = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
   name: 'Write reports',
   run: async (ctx, onProgress) => {
     // outputPath is prepped by runEntityEventCompliance before the
@@ -211,11 +212,15 @@ const writeComplianceReports = (_config: EntityEventConfig): PipelineStep<Entity
       ]
     };
 
+    const steps = (ctx.pipelineSteps as ReadonlyArray<StepResult>) ?? [];
     const pipelineResult = {
       status: testReport.summary.failed > 0 ? ('failed' as const) : ('passed' as const),
       endorsement: 'entity-event',
-      steps: (ctx.pipelineSteps as ReadonlyArray<StepResult>) ?? [],
+      steps,
       context: contextWithReports,
+      // The same pure rule the pipeline applies to its returned result, over the same step list, so
+      // the written report and the returned result cannot disagree.
+      certification: entityEventValidForCertification(config)(steps),
       duration: 0
     };
 
@@ -230,16 +235,46 @@ const writeComplianceReports = (_config: EntityEventConfig): PipelineStep<Entity
 
 // ── Pipeline Assembly ──
 
+/**
+ * EntityEvent's own certification rule: every step passed, AND the run was not observe-only.
+ *
+ * The mode check is the part a step list cannot supply. In observe mode `generatePayloads` is
+ * OMITTED from the pipeline rather than skipped, so it produces no StepResult and `everyStepPassed`
+ * sees a complete, all-passing run. An observe-only run exercises no writes at all, so certifying
+ * it would certify nothing.
+ *
+ * This is the case that ruled out expressing the rule as a per-endorsement "are skips allowed"
+ * flag: the answer for EntityEvent is yes, and that answer would have made an observe-only run
+ * eligible.
+ */
+/**
+ * Exported so the rule can be tested directly. The alternative is reaching it only through a full
+ * pipeline run against a live server, which would leave the rule itself unobserved.
+ */
+export const entityEventValidForCertification =
+  (config: EntityEventConfig): ValidForCertification =>
+  steps =>
+    allOf(
+      config.mode === 'observe'
+        ? notCertifiable(['observe mode — the run exercised no writes, so there is nothing to certify'])
+        : CERTIFIABLE,
+      everyStepPassed(steps)
+    );
+
 /** Create the EntityEvent compliance test pipeline. */
 export const createEntityEventPipeline = (config: EntityEventConfig) =>
-  createPipeline<EntityEventContext>('entity-event', [
-    resolveAuth(config),
-    ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),
-    fetchAndParseMetadata(config),
-    ...(config.mode === 'full' ? [generatePayloads(config)] : []),
-    runTests(config),
-    writeComplianceReports(config)
-  ]);
+  createPipeline<EntityEventContext>(
+    'entity-event',
+    [
+      resolveAuth(config),
+      ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),
+      fetchAndParseMetadata(config),
+      ...(config.mode === 'full' ? [generatePayloads(config)] : []),
+      runTests(config),
+      writeComplianceReports(config)
+    ],
+    entityEventValidForCertification(config)
+  );
 
 /** Run EntityEvent compliance tests with a single function call. */
 export const runEntityEventCompliance = async (
