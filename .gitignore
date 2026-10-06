@@ -34,6 +34,11 @@ schema-validation-report.json
 # cover that too. Run output carries provider metadata and endpoints — never committed.
 /out/
 reso-certification/out/
+# Running the compliance jobs the way CI does collects each container's reports here, via the
+# Collect results step in compliance.yml. Only some of the filenames it writes matched the
+# patterns above, so the directory left a half-ignored mess in the tree. These are reference-server
+# reports rather than provider data, but they are generated either way.
+reso-reference-server/compliance/results/
 reso-variations.json
 upi-validation-report.json
 *.resoscript

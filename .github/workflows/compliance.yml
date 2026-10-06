@@ -18,10 +18,20 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22' # the engines floor (>=22); verifies the minimum supported runtime
+          cache: npm
+
+      # The committed lockfile is authored with npm 11, which the root package.json
+      # declares as engines.npm. Node 22 ships npm 10, whose stricter `npm ci` rejects that
+      # lockfile, so this pin is what lets the install below run at all. build.yml carries
+      # the same step for the same reason.
+      - name: Pin npm 11 (matches the committed lockfile)
+        run: npm install -g npm@11
 
       - name: Install dependencies
-        run: npm install
+        # npm ci rather than npm install, so a lockfile that has drifted out of sync fails
+        # the run instead of being quietly rewritten.
+        run: npm ci
 
       - name: Run Biome lint
         run: npm run lint
@@ -34,21 +44,42 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22' # the engines floor (>=22); verifies the minimum supported runtime
+          cache: npm
 
-      - name: Install all package dependencies
+      # The committed lockfile is authored with npm 11, which the root package.json
+      # declares as engines.npm. Node 22 ships npm 10, whose stricter `npm ci` rejects that
+      # lockfile, so this pin is what lets the install below run at all. build.yml carries
+      # the same step for the same reason.
+      - name: Pin npm 11 (matches the committed lockfile)
+        run: npm install -g npm@11
+
+      - name: Install dependencies
         run: |
-          npm install
-          for dir in reso-validation odata-expression-parser reso-client reso-reference-server; do
-            (cd "$dir" && npm install)
-          done
-          git clone --depth 1 --branch v3.0.0 https://github.com/RESOStandards/reso-certification-utils.git /tmp/cert-utils
-          cd /tmp/cert-utils && npm pkg delete scripts.prepare && cd -
-          cd reso-certification && npm install /tmp/cert-utils && cd ..
-          cd reso-certification/xsd-validator && npm install && cd ../..
-          cd reso-mcp-server && npm install && cd ..
+          # ONE install, at the workspace root.
+          #
+          # This step used to run `npm install` again inside individual members. A
+          # per-package install inside a workspace member creates a nested node_modules
+          # that SHADOWS the workspace symlink, so @reso-standards/* resolved to the last
+          # PUBLISHED version rather than to this repository. That is not a style point:
+          # it is why a commit that adds an export and a commit that consumes it could
+          # never both be green until a publish happened in between, and it is the whole
+          # of the TS2305 on parseReplicationProgress and summarizeReplicationProgress —
+          # reso-common has them, published reso-common did not, and the nested copy won.
+          #
+          # It also cloned reso-certification-utils v3.0.0 from GitHub and installed it
+          # into reso-certification. Nothing imports that package and no manifest declares
+          # it; the only references left are comments recording where tests were ported
+          # from. So the clone bought nothing and paid for it by creating the nested
+          # node_modules above.
+          #
+          # npm ci rather than npm install, so a lockfile that has drifted out of sync
+          # fails the run instead of being quietly rewritten.
+          npm ci
+          # Not a workspace member, so it installs on its own.
+          (cd reso-certification/xsd-validator && npm install)
 
-      - name: Build shared libraries
+      - name: Build all packages
         run: |
           # Topological order. A package can only build after every @reso-standards
           # package it imports, because tsc resolves those through the dist the
@@ -63,15 +94,17 @@ jobs:
           # unresolved module. It passed locally only because a developer's dist
           # already existed from an earlier build.
           #
-          # Subshells rather than `cd X && npx tsc && cd ..`: a failing tsc
-          # short-circuits before the trailing cd, so every later line ran from the
-          # wrong directory and reported a missing path instead of the real failure.
-          # That is what hid the cause above.
-          for dir in reso-metadata-utils reso-common reso-validation odata-expression-parser reso-client reso-reference-server; do
-            (cd "$dir" && npx tsc)
-          done
-          (cd reso-certification && npx tsc && rm -rf dist/legacy dist/etl && cp -r src/legacy dist/legacy && cp -r src/etl dist/etl)
-          (cd reso-mcp-server && npx tsc)
+          # Ordered explicitly rather than through `npm run build --workspaces`, which
+          # would depend on the order of the workspaces array staying topological. This is
+          # the same order, written the same way, as the three Dockerfiles.
+          npm run build -w @reso-standards/reso-metadata-utils
+          npm run build -w @reso-standards/reso-common
+          npm run build -w @reso-standards/reso-validation
+          npm run build -w @reso-standards/odata-expression-parser
+          npm run build -w @reso-standards/reso-client
+          npm run build -w @reso-standards/reso-certification
+          npm run build -w @reso-standards/reso-reference-server
+          npm run build -w @reso-standards/reso-mcp-server
 
       - name: Run all tests
         run: npm test
