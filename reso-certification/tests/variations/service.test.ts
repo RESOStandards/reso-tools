@@ -4,16 +4,16 @@
  * client-aware coded auth errors, and the loud-failure cases.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { gzipSync } from 'node:zlib';
 import { randomBytes } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeVariationsViaService, isVariationsAuthError } from '../../src/variations/index.js';
 
 const report = {
   description: 'Data Dictionary Variations Report',
   version: '2.1',
   fuzziness: 0.25,
-  variations: { fields: [] },
+  variations: { fields: [] }
 };
 
 const gzipB64 = (o: unknown): string => gzipSync(JSON.stringify(o)).toString('base64');
@@ -44,12 +44,12 @@ describe('computeVariationsViaService — auth paths', () => {
     const result = await computeVariationsViaService({
       metadataReportJson: { fields: [], lookups: [] },
       version: '2.1',
-      bearerToken: 'sess-123',
+      bearerToken: 'sess-123'
     });
 
     expect(result.variations).toEqual({ fields: [] });
     expect(mockFetch()).toHaveBeenCalledTimes(1);
-    const [url, opts] = mockFetch().mock.calls[0] as FetchCall;
+    const [url, opts] = mockFetch().mock.calls[0] as unknown as FetchCall;
     expect(url).toContain('/v2/certification/variations/compute');
     expect(opts.headers.Authorization).toBe('Bearer sess-123');
   });
@@ -62,13 +62,13 @@ describe('computeVariationsViaService — auth paths', () => {
     mockFetch().mockImplementation(async (url: string) =>
       url.includes('auth.example.org')
         ? { ok: true, status: 200, json: async () => ({ token: 'minted-tok' }) }
-        : { ok: true, status: 200, text: async () => gzipB64(report) },
+        : { ok: true, status: 200, text: async () => gzipB64(report) }
     );
 
     const result = await computeVariationsViaService({ metadataReportJson: { fields: [], lookups: [] }, version: '2.1', fromCli: true });
 
     expect(result.version).toBe('2.1');
-    const computeCall = (mockFetch().mock.calls as ReadonlyArray<FetchCall>).find(([u]) => u.includes('/compute'));
+    const computeCall = (mockFetch().mock.calls as unknown as ReadonlyArray<FetchCall>).find(([u]) => u.includes('/compute'));
     expect(computeCall?.[1].headers.Authorization).toBe('Bearer minted-tok');
   });
 });
@@ -102,6 +102,9 @@ describe('computeVariationsViaService — coded auth errors', () => {
 
 describe('computeVariationsViaService — service failures', () => {
   it('throws SERVICE_ERROR when RESO_SERVICES_URL is unset', async () => {
+    // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+    // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
     delete process.env.RESO_SERVICES_URL;
     const err = await computeVariationsViaService({ metadataReportJson: {}, version: '2.1', bearerToken: 't' }).catch(e => e);
     expect(codeOf(err)).toBe('SERVICE_ERROR');
@@ -121,7 +124,7 @@ describe('computeVariationsViaService — service failures', () => {
     const err = await computeVariationsViaService({
       metadataReportJson: { fields: [], _pad: oversized },
       version: '2.1',
-      bearerToken: 't',
+      bearerToken: 't'
     }).catch(e => e);
     expect(codeOf(err)).toBe('SERVICE_ERROR');
     expect((err as Error).message).toMatch(/too large/i);

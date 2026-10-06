@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { generateEdmx, type ResoMetadata } from '../src/index.js';
+import { describe, expect, it } from 'vitest';
+import { type ResoMetadata, generateEdmx } from '../src/index.js';
 
 /**
  * A minimal two-field Property resource: one Edm primitive (the key) and one enum field
@@ -12,13 +12,24 @@ const metadata: ResoMetadata = {
   resources: [{ resourceName: 'Property', wikiPageURL: '', payloads: [] }],
   fields: [
     { resourceName: 'Property', fieldName: 'ListingKey', type: 'Edm.String', annotations: [] },
-    { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus', isEnumeration: true, annotations: [] },
+    {
+      resourceName: 'Property',
+      fieldName: 'StandardStatus',
+      type: 'org.reso.metadata.enums.StandardStatus',
+      isEnumeration: true,
+      annotations: []
+    }
   ],
   lookups: [
     // Active has no StandardName (self-closing member); Pending has one (wrapped member).
     { lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Active', type: 'Edm.Int32', annotations: [] },
-    { lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Pending', type: 'Edm.Int32', annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Pending Sale' }] },
-  ],
+    {
+      lookupName: 'org.reso.metadata.enums.StandardStatus',
+      lookupValue: 'Pending',
+      type: 'Edm.Int32',
+      annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Pending Sale' }]
+    }
+  ]
 };
 
 describe('generateEdmx — enum-type representation', () => {

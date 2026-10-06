@@ -11,8 +11,8 @@
  * Synthetic inputs — no vendor reports or identifiers.
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 const createRequire = (await import('node:module')).createRequire;
 const require = createRequire(import.meta.url);
@@ -26,7 +26,7 @@ const STR_ENUM = 'Cotality.DataStandard.RESO.DD.Enums.String.Single.SomeEnum';
 const lookupEntries = (type: string, enumName: string): Array<{ isStringEnumeration?: boolean }> => {
   const { metadataMap } = buildMetadataMap({
     fields: [{ resourceName: 'Property', fieldName: 'F', type: enumName, annotations: [] }],
-    lookups: [{ lookupName: enumName, lookupValue: 'Activ', type, annotations: [{ term: SN, value: 'Active' }] }],
+    lookups: [{ lookupName: enumName, lookupValue: 'Activ', type, annotations: [{ term: SN, value: 'Active' }] }]
   });
   return Object.values(metadataMap.Property.F.lookupValues ?? {}) as Array<{ isStringEnumeration?: boolean }>;
 };

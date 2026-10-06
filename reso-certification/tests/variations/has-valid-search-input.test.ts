@@ -15,8 +15,8 @@
  * from reso-certification-utils v3.0.0.
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 const createRequire = (await import('node:module')).createRequire;
 const require = createRequire(import.meta.url);

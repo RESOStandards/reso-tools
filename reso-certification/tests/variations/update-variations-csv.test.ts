@@ -1,15 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseVariationsCsv } from '../../src/variations/csv.js';
 
 describe('parseVariationsCsv', () => {
   it('parses a basic suggestion CSV into items', () => {
-    const csv = [
-      'Resource Name,Field Name,Suggested Resource Name,Suggested Field Name',
-      'Property,ListPriceX,Property,ListPrice',
-    ].join('\n');
+    const csv = ['Resource Name,Field Name,Suggested Resource Name,Suggested Field Name', 'Property,ListPriceX,Property,ListPrice'].join(
+      '\n'
+    );
     const { items, recognizedColumns, skippedColumns } = parseVariationsCsv(csv);
     expect(items).toEqual([
-      { resourceName: 'Property', fieldName: 'ListPriceX', suggestedResourceName: 'Property', suggestedFieldName: 'ListPrice' },
+      { resourceName: 'Property', fieldName: 'ListPriceX', suggestedResourceName: 'Property', suggestedFieldName: 'ListPrice' }
     ]);
     expect(recognizedColumns).toEqual(['Resource Name', 'Field Name', 'Suggested Resource Name', 'Suggested Field Name']);
     expect(skippedColumns).toEqual([]);
@@ -43,32 +42,30 @@ describe('parseVariationsCsv', () => {
 
   it('throws, with the row number, when a row is missing a Resource Name', () => {
     expect(() => parseVariationsCsv('Resource Name,Suggested Resource Name\nProperty,Office\n,Bar')).toThrow(
-      /row 3 is missing a Resource Name/,
+      /row 3 is missing a Resource Name/
     );
   });
 
   it('throws on an unterminated quoted field', () => {
     expect(() => parseVariationsCsv('Resource Name,Suggested Resource Name\nProperty,"Office\nOffice,Bar')).toThrow(
-      /unterminated quoted field/,
+      /unterminated quoted field/
     );
   });
 
   it('throws when a row has more columns than the header', () => {
     expect(() => parseVariationsCsv('Resource Name,Suggested Resource Name\nProperty,A,B')).toThrow(
-      /row 2 has 3 columns but the header has 2/,
+      /row 2 has 3 columns but the header has 2/
     );
   });
 
   it('throws on a bare-identity row with no suggestion or outcome', () => {
-    expect(() => parseVariationsCsv('Resource Name,Field Name\nProperty,Foo')).toThrow(
-      /row 2 has neither a suggestion .* nor an Outcome/,
-    );
+    expect(() => parseVariationsCsv('Resource Name,Field Name\nProperty,Foo')).toThrow(/row 2 has neither a suggestion .* nor an Outcome/);
   });
 
   it('skips fully blank rows and keeps accurate row numbers', () => {
     const { items } = parseVariationsCsv('Resource Name,Suggested Resource Name\nProperty,X\n\nOffice,Y');
     expect(items).toHaveLength(2);
-    expect(items.map((i) => i.resourceName)).toEqual(['Property', 'Office']);
+    expect(items.map(i => i.resourceName)).toEqual(['Property', 'Office']);
   });
 
   it('handles CRLF line endings', () => {

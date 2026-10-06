@@ -11,17 +11,18 @@ import type { TestParams } from '../../src/web-api-core/sampling.js';
  */
 
 // The metadata scenario fetches outside the requester seam; mock it, as the container test does.
-vi.mock('../../src/test-runner/metadata.js', async (importOriginal) => {
+vi.mock('../../src/test-runner/metadata.js', async importOriginal => {
   const actual = await importOriginal<typeof import('../../src/test-runner/metadata.js')>();
   return {
     ...actual,
-    fetchMetadataWithVersion: vi.fn(async () => ({ xml: '<edmx:Edmx></edmx:Edmx>', odataVersion: '4.01' })),
+    fetchMetadataWithVersion: vi.fn(async () => ({ xml: '<edmx:Edmx></edmx:Edmx>', odataVersion: '4.01' }))
   };
 });
 
 import { runCoreResourceScenarios } from '../../src/web-api-core/test-runner.js';
 
-const WARNING = "Property does not declare it for 'ModificationTimestamp' — grounded the timestamp scenarios on 'OriginalEntryTimestamp' instead.";
+const WARNING =
+  "Property does not declare it for 'ModificationTimestamp' — grounded the timestamp scenarios on 'OriginalEntryTimestamp' instead.";
 
 // A resource certified on a substitute timestamp field: `timestampField` is populated so the datetime scenarios run,
 // and `timestampWarning` is the note sampling produced.
@@ -38,7 +39,7 @@ const paramsWith = (timestampWarning?: string): TestParams => ({
   datetimeDistinctCount: 2,
   skippedTypes: [],
   sampleComplete: true,
-  ...(timestampWarning !== undefined && { timestampWarning }),
+  ...(timestampWarning !== undefined && { timestampWarning })
 });
 
 const okRequester = (): ODataRequester => ({
@@ -46,8 +47,8 @@ const okRequester = (): ODataRequester => ({
     status: 200,
     headers: { 'odata-version': '4.01' },
     body: { value: [{ ListingKey: '1', OriginalEntryTimestamp: '2026-01-01T00:00:00Z' }], '@odata.count': 1 },
-    rawBody: '',
-  }),
+    rawBody: ''
+  })
 });
 
 const run = (timestampWarning?: string) =>

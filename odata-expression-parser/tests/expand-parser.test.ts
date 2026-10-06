@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { parseExpand, ExpandParseError } from '../src/index.js';
+import { describe, expect, it } from 'vitest';
+import { ExpandParseError, parseExpand } from '../src/index.js';
 
 describe('parseExpand', () => {
   describe('single-level expansions', () => {
@@ -13,7 +13,7 @@ describe('parseExpand', () => {
       expect(result).toEqual([
         { property: 'Media', options: {} },
         { property: 'Rooms', options: {} },
-        { property: 'OpenHouse', options: {} },
+        { property: 'OpenHouse', options: {} }
       ]);
     });
 
@@ -21,7 +21,7 @@ describe('parseExpand', () => {
       const result = parseExpand('  Media , Rooms  ');
       expect(result).toEqual([
         { property: 'Media', options: {} },
-        { property: 'Rooms', options: {} },
+        { property: 'Rooms', options: {} }
       ]);
     });
 
@@ -34,51 +34,37 @@ describe('parseExpand', () => {
   describe('inline query options', () => {
     it('parses $select option', () => {
       const result = parseExpand('Media($select=MediaURL,MediaKey)');
-      expect(result).toEqual([
-        { property: 'Media', options: { $select: 'MediaURL,MediaKey' } },
-      ]);
+      expect(result).toEqual([{ property: 'Media', options: { $select: 'MediaURL,MediaKey' } }]);
     });
 
     it('parses $filter option', () => {
       const result = parseExpand("Media($filter=MediaType eq 'Photo')");
-      expect(result).toEqual([
-        { property: 'Media', options: { $filter: "MediaType eq 'Photo'" } },
-      ]);
+      expect(result).toEqual([{ property: 'Media', options: { $filter: "MediaType eq 'Photo'" } }]);
     });
 
     it('parses $orderby option', () => {
       const result = parseExpand('Media($orderby=Order asc)');
-      expect(result).toEqual([
-        { property: 'Media', options: { $orderby: 'Order asc' } },
-      ]);
+      expect(result).toEqual([{ property: 'Media', options: { $orderby: 'Order asc' } }]);
     });
 
     it('parses $top option', () => {
       const result = parseExpand('Media($top=5)');
-      expect(result).toEqual([
-        { property: 'Media', options: { $top: 5 } },
-      ]);
+      expect(result).toEqual([{ property: 'Media', options: { $top: 5 } }]);
     });
 
     it('parses $skip option', () => {
       const result = parseExpand('Media($skip=10)');
-      expect(result).toEqual([
-        { property: 'Media', options: { $skip: 10 } },
-      ]);
+      expect(result).toEqual([{ property: 'Media', options: { $skip: 10 } }]);
     });
 
     it('parses $count option', () => {
       const result = parseExpand('Media($count=true)');
-      expect(result).toEqual([
-        { property: 'Media', options: { $count: true } },
-      ]);
+      expect(result).toEqual([{ property: 'Media', options: { $count: true } }]);
     });
 
     it('parses multiple semicolon-separated options', () => {
       const result = parseExpand('Media($select=MediaURL;$top=5;$orderby=Order)');
-      expect(result).toEqual([
-        { property: 'Media', options: { $select: 'MediaURL', $top: 5, $orderby: 'Order' } },
-      ]);
+      expect(result).toEqual([{ property: 'Media', options: { $select: 'MediaURL', $top: 5, $orderby: 'Order' } }]);
     });
 
     it('parses mixed properties with and without options', () => {
@@ -86,7 +72,7 @@ describe('parseExpand', () => {
       expect(result).toEqual([
         { property: 'Media', options: { $select: 'MediaURL' } },
         { property: 'Rooms', options: {} },
-        { property: 'OpenHouse', options: { $top: 3 } },
+        { property: 'OpenHouse', options: { $top: 3 } }
       ]);
     });
   });
@@ -94,16 +80,12 @@ describe('parseExpand', () => {
   describe('$levels support', () => {
     it('parses $levels with a number', () => {
       const result = parseExpand('Rooms($levels=2)');
-      expect(result).toEqual([
-        { property: 'Rooms', options: { $levels: 2 } },
-      ]);
+      expect(result).toEqual([{ property: 'Rooms', options: { $levels: 2 } }]);
     });
 
     it('parses $levels=max', () => {
       const result = parseExpand('Rooms($levels=max)');
-      expect(result).toEqual([
-        { property: 'Rooms', options: { $levels: 'max' } },
-      ]);
+      expect(result).toEqual([{ property: 'Rooms', options: { $levels: 'max' } }]);
     });
 
     it('rejects invalid $levels value', () => {
@@ -120,9 +102,9 @@ describe('parseExpand', () => {
         {
           property: 'Rooms',
           options: {
-            $expand: [{ property: 'Media', options: {} }],
-          },
-        },
+            $expand: [{ property: 'Media', options: {} }]
+          }
+        }
       ]);
     });
 
@@ -132,11 +114,9 @@ describe('parseExpand', () => {
         {
           property: 'Rooms',
           options: {
-            $expand: [
-              { property: 'Media', options: { $select: 'MediaURL', $top: 3 } },
-            ],
-          },
-        },
+            $expand: [{ property: 'Media', options: { $select: 'MediaURL', $top: 3 } }]
+          }
+        }
       ]);
     });
 
@@ -150,12 +130,12 @@ describe('parseExpand', () => {
               {
                 property: 'Rooms',
                 options: {
-                  $expand: [{ property: 'Media', options: {} }],
-                },
-              },
-            ],
-          },
-        },
+                  $expand: [{ property: 'Media', options: {} }]
+                }
+              }
+            ]
+          }
+        }
       ]);
     });
 
@@ -167,9 +147,9 @@ describe('parseExpand', () => {
           options: {
             $select: 'RoomType',
             $expand: [{ property: 'Media', options: { $top: 1 } }],
-            $top: 10,
-          },
-        },
+            $top: 10
+          }
+        }
       ]);
     });
 
@@ -181,17 +161,15 @@ describe('parseExpand', () => {
           options: {
             $expand: [
               { property: 'Media', options: {} },
-              { property: 'Listing', options: {} },
-            ],
-          },
-        },
+              { property: 'Listing', options: {} }
+            ]
+          }
+        }
       ]);
     });
 
     it('parses complex multi-level expression', () => {
-      const result = parseExpand(
-        'Media($select=MediaURL),Rooms($select=RoomType;$expand=Media($top=1),Tags)'
-      );
+      const result = parseExpand('Media($select=MediaURL),Rooms($select=RoomType;$expand=Media($top=1),Tags)');
       expect(result).toEqual([
         { property: 'Media', options: { $select: 'MediaURL' } },
         {
@@ -200,10 +178,10 @@ describe('parseExpand', () => {
             $select: 'RoomType',
             $expand: [
               { property: 'Media', options: { $top: 1 } },
-              { property: 'Tags', options: {} },
-            ],
-          },
-        },
+              { property: 'Tags', options: {} }
+            ]
+          }
+        }
       ]);
     });
   });

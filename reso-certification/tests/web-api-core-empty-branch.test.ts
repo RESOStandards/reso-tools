@@ -1,18 +1,36 @@
 import { describe, expect, it } from 'vitest';
-import { complementOp, emptyContextFor, emptyOutcome, rebaseNextLink } from '../src/web-api-core/test-runner.js';
 import type { TestParams } from '../src/web-api-core/sampling.js';
 import type { ComparisonOp, CoreScenario } from '../src/web-api-core/scenarios.js';
+import { complementOp, emptyContextFor, emptyOutcome, rebaseNextLink } from '../src/web-api-core/test-runner.js';
 
 // Piece 3 — the two pure pieces of the runner's 200-empty branch. Together with the emptyVerdict matrix they
 // fully specify what a 200-with-no-rows means, without needing to mock the network.
 
 const params = (extra: Partial<TestParams> = {}): TestParams =>
-  ({ resource: 'Property', keyField: 'ListingKey', keyValue: '1', enumMode: 'string', integerValueHigh: 0, sampleComplete: true, skippedTypes: [], ...extra }) as TestParams;
+  ({
+    resource: 'Property',
+    keyField: 'ListingKey',
+    keyValue: '1',
+    enumMode: 'string',
+    integerValueHigh: 0,
+    sampleComplete: true,
+    skippedTypes: [],
+    ...extra
+  }) as TestParams;
 
 const filter = (dataType: string): CoreScenario =>
   ({ tag: 't', name: 'n', category: 'filter', dataType, op: 'ne', fieldParam: 'f', valueParam: 'v', minVersion: '2.0.0' }) as CoreScenario;
 const enumS = (slot: 'single' | 'multi'): CoreScenario =>
-  ({ tag: 't', name: 'n', category: 'enum', enumType: slot, op: 'ne', fieldParam: slot === 'multi' ? 'multiLookupField' : 'singleLookupField', valueParam: 'v', minVersion: '2.0.0' }) as CoreScenario;
+  ({
+    tag: 't',
+    name: 'n',
+    category: 'enum',
+    enumType: slot,
+    op: 'ne',
+    fieldParam: slot === 'multi' ? 'multiLookupField' : 'singleLookupField',
+    valueParam: 'v',
+    minVersion: '2.0.0'
+  }) as CoreScenario;
 const structural = (): CoreScenario =>
   ({ tag: 't', name: 'n', category: 'structural', assertion: 'metadata', minVersion: '2.0.0' }) as CoreScenario;
 
@@ -51,7 +69,7 @@ describe('emptyOutcome — verdict → result flags', () => {
   });
 
   it('skip stays retryable so the next candidate field is tried', () => {
-    expect(emptyOutcome('skip')).toMatchObject({ passed: true, skipped: true, retryable: true });
+    expect(emptyOutcome('skip')).toMatchObject({ passed: false, skipped: true, retryable: true });
   });
 });
 
@@ -63,7 +81,7 @@ describe('complementOp — the assertion op for a negated filter', () => {
       ['ge', 'lt'],
       ['lt', 'ge'],
       ['eq', 'ne'],
-      ['ne', 'eq'],
+      ['ne', 'eq']
     ];
     for (const [op, negated] of pairs) expect(complementOp(op)).toBe(negated);
   });
@@ -90,7 +108,7 @@ describe('rebaseNextLink — follow a proxy/wrong-host @odata.nextLink safely', 
 
   it('swaps an entirely different host/proxy origin (and clears its port) for the one we queried', () => {
     expect(rebaseNextLink('http://internal-proxy:9000/Property?$skip=2', 'https://api.example.com/Property')).toBe(
-      'https://api.example.com/Property?$skip=2',
+      'https://api.example.com/Property?$skip=2'
     );
   });
 
@@ -107,9 +125,18 @@ describe('rebaseNextLink — follow a proxy/wrong-host @odata.nextLink safely', 
 // `lt/le now()` over an all-future field. The pass message must say which, or the report attributes one to the other.
 describe('emptyOutcome — the pass message names the operator that actually proved it', () => {
   const nowScenario = (op: string) =>
-    ({ tag: 't', name: 'n', category: 'filter', dataType: 'datetime', op, fieldParam: 'timestampField', valueParam: 'now', minVersion: '2.0.0' }) as never;
+    ({
+      tag: 't',
+      name: 'n',
+      category: 'filter',
+      dataType: 'datetime',
+      op,
+      fieldParam: 'timestampField',
+      valueParam: 'now',
+      minVersion: '2.0.0'
+    }) as never;
 
-  it("describes an all-future lt/le now() pass, not a ne pass", () => {
+  it('describes an all-future lt/le now() pass, not a ne pass', () => {
     for (const op of ['lt', 'le']) {
       const m = emptyOutcome('pass', nowScenario(op)).message;
       expect(m).toContain(`'${op} now()'`);
@@ -119,13 +146,22 @@ describe('emptyOutcome — the pass message names the operator that actually pro
   });
 
   it('still describes the ne pass for a sampled-value scenario, and with no scenario at all', () => {
-    const sampled = ({ tag: 't', name: 'n', category: 'filter', dataType: 'integer', op: 'ne', fieldParam: 'integerField', valueParam: 'integerValueLow', minVersion: '2.0.0' }) as never;
+    const sampled = {
+      tag: 't',
+      name: 'n',
+      category: 'filter',
+      dataType: 'integer',
+      op: 'ne',
+      fieldParam: 'integerField',
+      valueParam: 'integerValueLow',
+      minVersion: '2.0.0'
+    } as never;
     expect(emptyOutcome('pass', sampled).message).toContain('ne over a single-valued field');
     expect(emptyOutcome('pass').message).toContain('ne over a single-valued field');
   });
 
   it('leaves the fail and skip messages untouched by the scenario', () => {
     expect(emptyOutcome('fail', nowScenario('lt')).message).toContain('Guaranteed-match filter');
-    expect(emptyOutcome('skip', nowScenario('lt'))).toMatchObject({ passed: true, skipped: true });
+    expect(emptyOutcome('skip', nowScenario('lt'))).toMatchObject({ passed: false, skipped: true });
   });
 });

@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { readRcfPayloads, type RcfPayload } from '../../src/cli/rcf-input.js';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+import { type RcfPayload, readRcfPayloads } from '../../src/cli/rcf-input.js';
 
 const fixtures = resolve(dirname(fileURLToPath(import.meta.url)), '../fixtures/rcf');
 

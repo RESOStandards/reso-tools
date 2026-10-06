@@ -10,8 +10,8 @@
  * Ported from cert-utils `test/variations.js`. Oracle: legacy `computeVariations`.
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 const createRequire = (await import('node:module')).createRequire;
 const require = createRequire(import.meta.url);
@@ -31,28 +31,40 @@ describe('computeVariations: DD 2.x StandardLookupValue remap (Lookup Resource)'
           lookupName: 'ArchitecturalStyle',
           lookupValue: 'Ranch/1 Story',
           type: 'Edm.String',
-          annotations: [{ term: SN, value: 'Ranch' }],
-        },
-      ],
+          annotations: [{ term: SN, value: 'Ranch' }]
+        }
+      ]
     };
     const suggestionsMap = {
       Property: {
         ArchitecturalStyle: {
           'Ranch/1 Story': {
             suggestions: [
-              { suggestedResourceName: 'Property', suggestedFieldName: 'ArchitecturalStyle', suggestedLookupValue: 'Ranch', isFastTrack: true },
-              { suggestedResourceName: 'Property', suggestedFieldName: 'ArchitecturalStyle', suggestedLookupValue: 'Raised Ranch', isFastTrack: true },
-            ],
-          },
-        },
-      },
+              {
+                suggestedResourceName: 'Property',
+                suggestedFieldName: 'ArchitecturalStyle',
+                suggestedLookupValue: 'Ranch',
+                isFastTrack: true
+              },
+              {
+                suggestedResourceName: 'Property',
+                suggestedFieldName: 'ArchitecturalStyle',
+                suggestedLookupValue: 'Raised Ranch',
+                isFastTrack: true
+              }
+            ]
+          }
+        }
+      }
     };
 
-    const { variations: { resources = [], fields = [], lookups = [] } } = await computeVariations({
+    const {
+      variations: { resources = [], fields = [], lookups = [] }
+    } = await computeVariations({
       metadataReportJson,
       fuzziness: FUZZINESS,
       version: DD_1_7,
-      suggestionsMap,
+      suggestionsMap
     });
 
     expect(resources).toHaveLength(0);

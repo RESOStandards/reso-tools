@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { inferType, analyzeNumber, isValidIsoDate, isValidIsoDateTimeOffset } from '../../src/rcf/infer-type.js';
+import { describe, expect, it } from 'vitest';
+import { analyzeNumber, inferType, isValidIsoDate, isValidIsoDateTimeOffset } from '../../src/rcf/infer-type.js';
 
 describe('analyzeNumber — integer width by range', () => {
   const cases: ReadonlyArray<readonly [number, string]> = [
@@ -12,7 +12,7 @@ describe('analyzeNumber — integer width by range', () => {
     [-2147483648, 'Edm.Int32'],
     [2147483648, 'Edm.Int64'],
     [-2147483649, 'Edm.Int64'],
-    [5_000_000_000, 'Edm.Int64'],
+    [5_000_000_000, 'Edm.Int64']
   ];
   it.each(cases)('%d → %s', (n, expected) => {
     expect(analyzeNumber(n)).toEqual({ type: expected });
@@ -41,7 +41,7 @@ describe('isValidIsoDate', () => {
     '2023-1-5', // not zero-padded
     '2023/01/15', // wrong separators
     '2023-01-15T00:00:00Z', // a datetime, not a date
-    'Residential', // plain string
+    'Residential' // plain string
   ])('rejects %s', s => {
     expect(isValidIsoDate(s)).toBe(false);
   });
@@ -52,7 +52,7 @@ describe('isValidIsoDateTimeOffset', () => {
     'accepts %s',
     s => {
       expect(isValidIsoDateTimeOffset(s)).toBe(true);
-    },
+    }
   );
   it.each([
     '2023-01-15T10:30:00', // no offset
@@ -60,7 +60,7 @@ describe('isValidIsoDateTimeOffset', () => {
     '2023-13-15T10:30:00Z', // invalid month → NaN
     '2023-02-30T10:30:00Z', // impossible calendar date — Date.parse silently rolls Feb 30 over
     '2023-04-31T10:30:00Z', // April has 30 days
-    'not-a-date',
+    'not-a-date'
   ])('rejects %s', s => {
     expect(isValidIsoDateTimeOffset(s)).toBe(false);
   });
@@ -74,8 +74,7 @@ describe('inferType — scalars', () => {
   it('integer → Edm.Int16', () => expect(inferType(42)).toEqual({ type: 'Edm.Int16' }));
   it('decimal → Edm.Decimal', () => expect(inferType(1.25)).toEqual({ type: 'Edm.Decimal', scale: 2, precision: 3 }));
   it('ISO date string → Edm.Date', () => expect(inferType('2023-01-15')).toEqual({ type: 'Edm.Date' }));
-  it('ISO datetime string → Edm.DateTimeOffset', () =>
-    expect(inferType('2023-01-15T10:30:00Z')).toEqual({ type: 'Edm.DateTimeOffset' }));
+  it('ISO datetime string → Edm.DateTimeOffset', () => expect(inferType('2023-01-15T10:30:00Z')).toEqual({ type: 'Edm.DateTimeOffset' }));
   it('plain string → Edm.String', () => expect(inferType('Residential')).toEqual({ type: 'Edm.String' }));
   it('null → nullable null sentinel', () => expect(inferType(null)).toEqual({ type: 'null', nullable: true }));
   it('nested object → expansion candidate', () => expect(inferType({ a: 1 })).toEqual({ type: 'object', isExpansion: true }));
@@ -86,14 +85,14 @@ describe('inferType — collections', () => {
     expect(inferType([1, 2])).toEqual({
       isCollection: true,
       types: [{ type: 'Edm.Int16' }, { type: 'Edm.Int16' }],
-      isExpansion: false,
+      isExpansion: false
     });
   });
   it('array of objects → isCollection + isExpansion', () => {
     expect(inferType([{ a: 1 }])).toEqual({
       isCollection: true,
       types: [{ type: 'object', isExpansion: true }],
-      isExpansion: true,
+      isExpansion: true
     });
   });
   it('empty array → isCollection, no element types, non-expansion', () => {

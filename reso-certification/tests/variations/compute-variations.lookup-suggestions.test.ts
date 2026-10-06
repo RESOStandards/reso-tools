@@ -12,8 +12,8 @@
  * bug or a drift between cert-utils and the reso-tools legacy copy.
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 const createRequire = (await import('node:module')).createRequire;
 const require = createRequire(import.meta.url);
@@ -30,11 +30,11 @@ const SUGGESTION = {
     StandardStatus: {
       'Active UC': {
         suggestions: [
-          { suggestedResourceName: 'Property', suggestedFieldName: 'StandardStatus', suggestedLookupValue: 'Active Under Contract' },
-        ],
-      },
-    },
-  },
+          { suggestedResourceName: 'Property', suggestedFieldName: 'StandardStatus', suggestedLookupValue: 'Active Under Contract' }
+        ]
+      }
+    }
+  }
 };
 
 const reportWith = (annotations?: ReadonlyArray<{ term: string; value: string }>) => ({
@@ -44,9 +44,9 @@ const reportWith = (annotations?: ReadonlyArray<{ term: string; value: string }>
       lookupName: 'StandardStatusLookups',
       type: 'Edm.String',
       lookupValue: 'Active UC',
-      ...(annotations ? { annotations } : {}),
-    },
-  ],
+      ...(annotations ? { annotations } : {})
+    }
+  ]
 });
 
 const run = (metadataReportJson: unknown) =>
@@ -54,7 +54,9 @@ const run = (metadataReportJson: unknown) =>
 
 describe('computeVariations: lookup-value suggestion + annotation suppression', () => {
   it('flags the lookup-value suggestion when the value is present and not yet canonical', async () => {
-    const { variations: { resources = [], fields = [], lookups = [] } } = await run(reportWith());
+    const {
+      variations: { resources = [], fields = [], lookups = [] }
+    } = await run(reportWith());
     expect(resources).toHaveLength(0);
     expect(fields).toHaveLength(0);
     expect(lookups).toHaveLength(1);
@@ -74,12 +76,16 @@ describe('computeVariations: lookup-value suggestion + annotation suppression', 
   });
 
   it('suppresses when the provider declares the canonical via a valid StandardName annotation', async () => {
-    const { variations: { lookups = [] } } = await run(reportWith([{ term: SN, value: 'Active Under Contract' }]));
+    const {
+      variations: { lookups = [] }
+    } = await run(reportWith([{ term: SN, value: 'Active Under Contract' }]));
     expect(lookups).toHaveLength(0);
   });
 
   it('still flags when the StandardName annotation is a typo (invalid mapping)', async () => {
-    const { variations: { lookups = [] } } = await run(reportWith([{ term: SN, value: 'Active Under Contrct' }]));
+    const {
+      variations: { lookups = [] }
+    } = await run(reportWith([{ term: SN, value: 'Active Under Contrct' }]));
     expect(lookups).toHaveLength(1);
     expect(lookups[0].lookupValue).toBe('Active UC');
   });

@@ -9,8 +9,8 @@
  * Oracle: legacy `computeVariations` (src/legacy).
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 const createRequire = (await import('node:module')).createRequire;
 const require = createRequire(import.meta.url);
@@ -25,20 +25,33 @@ const FT: Flag = { isFastTrack: true };
 const ADMIN: Flag = { isAdminReview: true };
 
 // Resource-level: local "Offices" → canonical "Office".
-const officesReport = { fields: [{ resourceName: 'Offices', fieldName: 'ModificationTimestamp', type: 'Edm.DateTimeOffset' }], lookups: [] };
+const officesReport = {
+  fields: [{ resourceName: 'Offices', fieldName: 'ModificationTimestamp', type: 'Edm.DateTimeOffset' }],
+  lookups: []
+};
 const officesSugg = (flag: Flag) => ({ Offices: { suggestions: [{ suggestedResourceName: 'Office', ...flag }] } });
 
 // Field-level: local "ListPrices" → canonical "ListPrice".
 const listPricesReport = { fields: [{ resourceName: 'Property', fieldName: 'ListPrices', type: 'Edm.Decimal' }], lookups: [] };
-const listPricesSugg = (flag: Flag) => ({ Property: { ListPrices: { suggestions: [{ suggestedResourceName: 'Property', suggestedFieldName: 'ListPrice', ...flag }] } } });
+const listPricesSugg = (flag: Flag) => ({
+  Property: { ListPrices: { suggestions: [{ suggestedResourceName: 'Property', suggestedFieldName: 'ListPrice', ...flag }] } }
+});
 
 // Lookup-level: local "Ranch/1 Story" → canonical "Ranch".
 const archReport = {
   fields: [{ resourceName: 'Property', fieldName: 'ArchitecturalStyle', type: 'ArchitecturalStyles' }],
-  lookups: [{ lookupName: 'ArchitecturalStyles', lookupValue: 'Ranch/1 Story', type: 'Edm.String' }],
+  lookups: [{ lookupName: 'ArchitecturalStyles', lookupValue: 'Ranch/1 Story', type: 'Edm.String' }]
 };
 const archSugg = (flag: Flag) => ({
-  Property: { ArchitecturalStyle: { 'Ranch/1 Story': { suggestions: [{ suggestedResourceName: 'Property', suggestedFieldName: 'ArchitecturalStyle', suggestedLookupValue: 'Ranch', ...flag }] } } },
+  Property: {
+    ArchitecturalStyle: {
+      'Ranch/1 Story': {
+        suggestions: [
+          { suggestedResourceName: 'Property', suggestedFieldName: 'ArchitecturalStyle', suggestedLookupValue: 'Ranch', ...flag }
+        ]
+      }
+    }
+  }
 });
 
 const cases = [
@@ -47,7 +60,7 @@ const cases = [
   { name: 'Fast Track lookup', report: archReport, sugg: archSugg(FT), col: 'lookups', strategy: MATCHING_STRATEGIES.FAST_TRACK },
   { name: 'Admin resource', report: officesReport, sugg: officesSugg(ADMIN), col: 'resources', strategy: MATCHING_STRATEGIES.ADMIN_REVIEW },
   { name: 'Admin field', report: listPricesReport, sugg: listPricesSugg(ADMIN), col: 'fields', strategy: MATCHING_STRATEGIES.ADMIN_REVIEW },
-  { name: 'Admin lookup', report: archReport, sugg: archSugg(ADMIN), col: 'lookups', strategy: MATCHING_STRATEGIES.ADMIN_REVIEW },
+  { name: 'Admin lookup', report: archReport, sugg: archSugg(ADMIN), col: 'lookups', strategy: MATCHING_STRATEGIES.ADMIN_REVIEW }
 ];
 
 describe('computeVariations: FT/Admin strategy labels', () => {
@@ -56,7 +69,7 @@ describe('computeVariations: FT/Admin strategy labels', () => {
       metadataReportJson: report,
       fuzziness: FUZZINESS,
       version: DD_1_7,
-      suggestionsMap: sugg,
+      suggestionsMap: sugg
     })) as { variations: Record<string, Array<{ suggestions: Array<{ strategy: string }> }>> };
 
     for (const c of ['resources', 'fields', 'lookups']) {

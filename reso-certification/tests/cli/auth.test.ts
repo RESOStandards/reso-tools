@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { resolveCliAuth, loadDotEnv } from '../../src/cli/auth.js';
-import type { CliAuthFlags } from '../../src/cli/auth.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import { loadDotEnv, resolveCliAuth } from '../../src/cli/auth.js';
 
 describe('resolveCliAuth', () => {
   const originalEnv = { ...process.env };
@@ -25,26 +24,22 @@ describe('resolveCliAuth', () => {
       const result = resolveCliAuth({
         clientId: 'id',
         clientSecret: 'secret',
-        tokenUrl: 'https://auth.example.com/token',
+        tokenUrl: 'https://auth.example.com/token'
       });
       expect(result).toEqual({
         mode: 'client_credentials',
         clientId: 'id',
         clientSecret: 'secret',
-        tokenUrl: 'https://auth.example.com/token',
+        tokenUrl: 'https://auth.example.com/token'
       });
     });
 
     it('throws when --auth-token and --client-id are both provided', () => {
-      expect(() =>
-        resolveCliAuth({ authToken: 'token', clientId: 'id' }),
-      ).toThrow('Cannot use --auth-token together with');
+      expect(() => resolveCliAuth({ authToken: 'token', clientId: 'id' })).toThrow('Cannot use --auth-token together with');
     });
 
     it('throws when client credentials are incomplete', () => {
-      expect(() =>
-        resolveCliAuth({ clientId: 'id', clientSecret: 'secret' }),
-      ).toThrow('--client-id, --client-secret, and --token-url');
+      expect(() => resolveCliAuth({ clientId: 'id', clientSecret: 'secret' })).toThrow('--client-id, --client-secret, and --token-url');
     });
 
     it('flags take priority over config auth', () => {
@@ -72,7 +67,7 @@ describe('resolveCliAuth', () => {
         mode: 'client_credentials' as const,
         clientId: 'cfg-id',
         clientSecret: 'cfg-secret',
-        tokenUrl: 'https://cfg.example.com/token',
+        tokenUrl: 'https://cfg.example.com/token'
       };
       const result = resolveCliAuth({}, configAuth);
       expect(result).toEqual(configAuth);
@@ -102,15 +97,27 @@ describe('resolveCliAuth', () => {
         mode: 'client_credentials',
         clientId: 'env-id',
         clientSecret: 'env-secret',
-        tokenUrl: 'https://env.example.com/token',
+        tokenUrl: 'https://env.example.com/token'
       });
     });
 
     it('throws clear error when nothing configured', () => {
       // Ensure no RESO_ env vars are set
+      // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+      // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+      // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
       delete process.env.RESO_AUTH_TOKEN;
+      // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+      // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+      // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
       delete process.env.RESO_CLIENT_ID;
+      // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+      // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+      // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
       delete process.env.RESO_CLIENT_SECRET;
+      // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+      // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+      // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
       delete process.env.RESO_TOKEN_URI;
 
       expect(() => resolveCliAuth({})).toThrow('No authentication configured');
@@ -131,13 +138,16 @@ describe('loadDotEnv', () => {
   });
 
   it('does not throw when .env file does not exist', () => {
-    expect(() => loadDotEnv('/nonexistent/path')).not.toThrow();
+    // An array, not a bare string. `loadDotEnv` takes ReadonlyArray<string> and does
+    // `for (const dir of paths)` — handed a string that iterates its CHARACTERS, so this
+    // previously exercised 17 single-character directories rather than one missing path.
+    expect(() => loadDotEnv(['/nonexistent/path'])).not.toThrow();
   });
 
   it('does not overwrite existing env vars', () => {
     process.env.RESO_AUTH_TOKEN = 'existing-value';
     // Even if a .env file had RESO_AUTH_TOKEN, it should not overwrite
-    loadDotEnv('/nonexistent/path');
+    loadDotEnv(['/nonexistent/path']);
     expect(process.env.RESO_AUTH_TOKEN).toBe('existing-value');
   });
 });

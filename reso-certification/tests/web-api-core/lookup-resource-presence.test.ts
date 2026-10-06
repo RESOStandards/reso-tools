@@ -12,7 +12,7 @@ const makeCache = (rows: ReadonlyArray<Record<string, unknown>>, lookupName: str
 // A row whose data value distinguishes ONLY on LegacyODataValue — the form the old presence union missed.
 const rows: ReadonlyArray<Record<string, unknown>> = [
   { LookupName: 'PropertyType', LookupValue: 'CommercialSale', StandardLookupValue: 'Commercial Sale', LegacyODataValue: 'CommercialSale' },
-  { LookupName: 'PropertyType', LookupValue: 'Residential', StandardLookupValue: 'Residential', LegacyODataValue: 'LEGACY_ONLY' },
+  { LookupName: 'PropertyType', LookupValue: 'Residential', StandardLookupValue: 'Residential', LegacyODataValue: 'LEGACY_ONLY' }
 ];
 
 const never = (): boolean => false;

@@ -11,8 +11,8 @@
  * Real DD 1.7 values (Property.ExteriorFeatures, target "Balcony").
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { computeVariationsV2 } from '../../src/variations-v2/compute.js';
 
 const createRequire = (await import('node:module')).createRequire;
@@ -28,20 +28,20 @@ const VERSION = '1.7';
 const suggestsLegacyOData = (P: string, target: string): boolean => {
   const metadataReportJson = {
     fields: [{ resourceName: 'Property', fieldName: 'ExteriorFeatures', type: 'EF' }],
-    lookups: [{ lookupName: 'EF', type: 'Edm.Int64', lookupValue: P }],
+    lookups: [{ lookupName: 'EF', type: 'Edm.Int64', lookupValue: P }]
   };
   const { variations } = computeVariationsV2({
     metadataReportJson,
     referenceMetadata: getReferenceMetadata(VERSION),
     version: VERSION,
     fuzziness: FUZZINESS,
-    applyVersionBucketing: false,
-  }) as { variations: { lookups?: Array<Record<string, unknown>> } };
+    applyVersionBucketing: false
+  }) as unknown as { variations: { lookups?: Array<Record<string, unknown>> } };
   const lookups = variations.lookups ?? [];
   return lookups.some(
-    (l) =>
+    l =>
       l.suggestedLegacyODataValue === target ||
-      ((l.suggestions as Array<Record<string, unknown>>) ?? []).some((s) => s.suggestedLegacyODataValue === target),
+      ((l.suggestions as Array<Record<string, unknown>>) ?? []).some(s => s.suggestedLegacyODataValue === target)
   );
 };
 

@@ -7,20 +7,20 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import type { EntityType, ParsedEntitySet } from '../../src/test-runner/types.js';
 import {
   declaredPresence,
   parseServiceDocument,
   resolveNoRecordsOutcome,
   resolveServingDecision,
-  servedPresence,
+  servedPresence
 } from '../../src/web-api-core/serving.js';
-import type { EntityType, ParsedEntitySet } from '../../src/test-runner/types.js';
 
 const entityType = (name: string): EntityType => ({ name, keyProperties: [`${name}Key`], properties: [] });
 
 const goodDoc = (names: ReadonlyArray<string>): Record<string, unknown> => ({
   '@odata.context': 'https://api.example.com/odata/$metadata',
-  value: names.map(n => ({ name: n, kind: 'EntitySet', url: n })),
+  value: names.map(n => ({ name: n, kind: 'EntitySet', url: n }))
 });
 
 // ── parseServiceDocument ──
@@ -51,12 +51,14 @@ describe('parseServiceDocument', () => {
     expect(parseServiceDocument({ '@odata.context': 'https://x/$metadata', value: [] })).toBeUndefined();
   });
 
-  it('rejects a paged doc carrying @odata.nextLink → undefined (incomplete, can\'t prove absence)', () => {
-    expect(parseServiceDocument({
-      '@odata.context': 'https://x/$metadata',
-      value: [{ name: 'Property' }],
-      '@odata.nextLink': 'https://x/$metadata/next',
-    })).toBeUndefined();
+  it("rejects a paged doc carrying @odata.nextLink → undefined (incomplete, can't prove absence)", () => {
+    expect(
+      parseServiceDocument({
+        '@odata.context': 'https://x/$metadata',
+        value: [{ name: 'Property' }],
+        '@odata.nextLink': 'https://x/$metadata/next'
+      })
+    ).toBeUndefined();
   });
 
   it('rejects a non-empty value[] with no usable names → undefined (malformed, not an empty served set)', () => {
@@ -79,17 +81,17 @@ describe('servedPresence (Surface 1 — service document)', () => {
 describe('declaredPresence (Surface 2 — EntityContainer, resolved through EntityType)', () => {
   const sets: ReadonlyArray<ParsedEntitySet> = [
     { name: 'Properties', entityType: 'Property' }, // set name ≠ type name — membership is by TYPE
-    { name: 'Member', entityType: 'Member' },
+    { name: 'Member', entityType: 'Member' }
   ];
   it('undefined / empty entitySets ⇒ indeterminate', () => {
     expect(declaredPresence(undefined, entityType('Property'))).toBe('indeterminate');
     expect(declaredPresence([], entityType('Property'))).toBe('indeterminate');
   });
-  it('present when a declared set exposes the resource\'s EntityType (NOT by set name)', () => {
+  it("present when a declared set exposes the resource's EntityType (NOT by set name)", () => {
     expect(declaredPresence(sets, entityType('Property'))).toBe('present');
     expect(declaredPresence(sets, entityType('Member'))).toBe('present');
   });
-  it('absent when no declared set exposes the resource\'s EntityType', () => {
+  it("absent when no declared set exposes the resource's EntityType", () => {
     expect(declaredPresence(sets, entityType('Media'))).toBe('absent');
   });
 });
@@ -104,7 +106,7 @@ describe('resolveServingDecision', () => {
     resource: string,
     version: '2.0.0' | '2.1.0',
     servedEntitySets: ReadonlySet<string> | undefined,
-    declaredEntitySets: ReadonlyArray<ParsedEntitySet> | undefined,
+    declaredEntitySets: ReadonlyArray<ParsedEntitySet> | undefined
   ) => resolveServingDecision({ resource, entityType: entityType(resource), version, servedEntitySets, declaredEntitySets });
 
   it('2.0.0 ALWAYS runs — the carve-out is 2.1.0+ only (even both-absent)', () => {

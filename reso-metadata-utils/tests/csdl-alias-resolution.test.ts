@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseCsdlXml } from '../src/csdl/parser.js';
 import { validateCsdl } from '../src/csdl/validator.js';
 
@@ -15,7 +15,13 @@ const NS = 'org.reso.metadata';
 const ALIAS = 'WEBAPI';
 
 /** A provider metadata document with the binding's correctness and the type spellings as knobs. */
-const edmx = (opts: { setType: string; navType: string; bindingCorrect?: boolean; setTypo?: boolean; withOperations?: boolean }): string => {
+const edmx = (opts: {
+  setType: string;
+  navType: string;
+  bindingCorrect?: boolean;
+  setTypo?: boolean;
+  withOperations?: boolean;
+}): string => {
   const media = opts.bindingCorrect === false ? `Collection(${opts.navType}.Property)` : `Collection(${opts.navType}.Media)`;
   const propertySet = opts.setTypo ? `${opts.setType}.Propertyy` : `${opts.setType}.Property`;
   const operations = opts.withOperations
@@ -54,16 +60,24 @@ describe('CSDL Alias resolution — parser canonicalizes every qualified-name at
   const aliased = () => parseCsdlXml(edmx({ setType: ALIAS, navType: ALIAS, withOperations: true }));
   it.each([
     ['Singleton/@Type', (s: ReturnType<typeof parseCsdlXml>) => s.entityContainer?.singletons[0]?.type, `${NS}.Member`],
-    ['Function Parameter/@Type (Collection)', (s: ReturnType<typeof parseCsdlXml>) => s.functions[0]?.parameters[0]?.type, `Collection(${NS}.Property)`],
-    ['Function ReturnType/@Type (Collection)', (s: ReturnType<typeof parseCsdlXml>) => s.functions[0]?.returnType?.type, `Collection(${NS}.Property)`],
+    [
+      'Function Parameter/@Type (Collection)',
+      (s: ReturnType<typeof parseCsdlXml>) => s.functions[0]?.parameters[0]?.type,
+      `Collection(${NS}.Property)`
+    ],
+    [
+      'Function ReturnType/@Type (Collection)',
+      (s: ReturnType<typeof parseCsdlXml>) => s.functions[0]?.returnType?.type,
+      `Collection(${NS}.Property)`
+    ],
     ['Action Parameter/@Type', (s: ReturnType<typeof parseCsdlXml>) => s.actions[0]?.parameters[0]?.type, `${NS}.Media`],
     ['FunctionImport/@Function', (s: ReturnType<typeof parseCsdlXml>) => s.entityContainer?.functionImports[0]?.function, `${NS}.Nearby`],
-    ['ActionImport/@Action', (s: ReturnType<typeof parseCsdlXml>) => s.entityContainer?.actionImports[0]?.action, `${NS}.Touch`],
+    ['ActionImport/@Action', (s: ReturnType<typeof parseCsdlXml>) => s.entityContainer?.actionImports[0]?.action, `${NS}.Touch`]
   ])('%s spelled with the alias parses as the namespace form', (_label, read, expected) => {
     expect(read(aliased())).toBe(expected);
   });
 
-  it('maps each alias to ITS OWN schema namespace, not the first schema\'s (two aliased schemas)', () => {
+  it("maps each alias to ITS OWN schema namespace, not the first schema's (two aliased schemas)", () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx"><edmx:DataServices>
 <Schema Namespace="${NS}" Alias="${ALIAS}" xmlns="http://docs.oasis-open.org/odata/ns/edm">
@@ -100,17 +114,20 @@ describe('CSDL Alias resolution — the validator sees one spelling', () => {
     ['namespace set / namespace nav', NS, NS],
     ['alias set / alias nav', ALIAS, ALIAS],
     ['alias set / namespace nav', ALIAS, NS],
-    ['namespace set / alias nav', NS, ALIAS],
+    ['namespace set / alias nav', NS, ALIAS]
   ];
 
   it.each(spellings)('%s — a correct document validates with zero errors', (_label, setType, navType) => {
     expect(messages(edmx({ setType, navType, withOperations: true }))).toEqual([]);
   });
 
-  it.each(spellings)('%s — a navigation bound to a set of the wrong type is reported, with the namespace spelling in the message', (_label, setType, navType) => {
-    const errors = messages(edmx({ setType, navType, bindingCorrect: false }));
-    expect(errors).toEqual([`Navigation property type '${NS}.Property' does not match binding target entity type '${NS}.Media'`]);
-  });
+  it.each(spellings)(
+    '%s — a navigation bound to a set of the wrong type is reported, with the namespace spelling in the message',
+    (_label, setType, navType) => {
+      const errors = messages(edmx({ setType, navType, bindingCorrect: false }));
+      expect(errors).toEqual([`Navigation property type '${NS}.Property' does not match binding target entity type '${NS}.Media'`]);
+    }
+  );
 
   it.each(spellings)('%s — an entity set whose type does not exist is reported as unknown', (_label, setType, navType) => {
     const errors = messages(edmx({ setType, navType, setTypo: true }));
@@ -118,7 +135,7 @@ describe('CSDL Alias resolution — the validator sees one spelling', () => {
   });
 });
 
-describe('CSDL Alias resolution — malformed input is the validator\'s job, not a parse crash', () => {
+describe("CSDL Alias resolution — malformed input is the validator's job, not a parse crash", () => {
   it('an EntitySet without an EntityType attribute still parses (entityType undefined), as before', () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx"><edmx:DataServices>
@@ -145,16 +162,19 @@ describe('CSDL Alias resolution — §3.4 MUSTs: an invalid alias is never used 
     expect(schema.entityContainer?.entitySets.map(e => e.entityType)).toEqual(['X.Property']);
   });
 
-  it('an alias equal to another schema\'s namespace never rewrites that namespace\'s own spelling', () => {
+  it("an alias equal to another schema's namespace never rewrites that namespace's own spelling", () => {
     const schema = parseCsdlXml(doc(schemaWith('org.a', undefined, 'org.a.Property') + schemaWith('org.b', 'org.a', 'org.b.Property')));
     expect(schema.entityContainer?.entitySets.map(e => e.entityType)).toEqual(['org.a.Property']);
     expect(validateCsdl(schema).errors.map(e => e.message)).toEqual([]);
   });
 
-  it.each(['Edm', 'odata', 'System', 'Transient'])('the reserved alias %s is ignored (a reference through it is left as written)', (reserved) => {
-    const schema = parseCsdlXml(doc(schemaWith('org.x', reserved, `${reserved}.Property`)));
-    expect(schema.entityContainer?.entitySets[0]?.entityType).toBe(`${reserved}.Property`);
-    const primitive = parseCsdlXml(doc(schemaWith('org.x', 'Edm', 'org.x.Property')));
-    expect(primitive.entityTypes[0]?.properties[0]?.type).toBe('Edm.String');
-  });
+  it.each(['Edm', 'odata', 'System', 'Transient'])(
+    'the reserved alias %s is ignored (a reference through it is left as written)',
+    reserved => {
+      const schema = parseCsdlXml(doc(schemaWith('org.x', reserved, `${reserved}.Property`)));
+      expect(schema.entityContainer?.entitySets[0]?.entityType).toBe(`${reserved}.Property`);
+      const primitive = parseCsdlXml(doc(schemaWith('org.x', 'Edm', 'org.x.Property')));
+      expect(primitive.entityTypes[0]?.properties[0]?.type).toBe('Edm.String');
+    }
+  );
 });

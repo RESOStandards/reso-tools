@@ -1,15 +1,19 @@
-import { describe, it, expect } from 'vitest';
+import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
+import { describe, expect, it } from 'vitest';
 import {
   fetchLookupResource,
   mergeWithLookupResource,
   serializeLookupResourceDump,
   synthesizeLookupResourceRecords
 } from '../../src/metadata/lookup-resource.js';
-import type { ODataRequester } from '../../src/test-runner/index.js';
-import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import type { RawLookupRecord } from '../../src/metadata/lookup-resource.js';
+import type { ODataRequester } from '../../src/test-runner/index.js';
 
 const baseReport: MetadataReport = {
+  // `actions` and `functions` are required on MetadataReport. The fixture omitted both, which only
+  // went unnoticed because this file was never typechecked.
+  actions: [],
+  functions: [],
   description: 'RESO Data Dictionary Metadata Report',
   version: '2.0',
   generatedOn: '2026-04-06T00:00:00.000Z',
@@ -19,16 +23,14 @@ const baseReport: MetadataReport = {
       resourceName: 'Property',
       fieldName: 'ListingKey',
       type: 'Edm.String',
-      annotations: [],
+      annotations: []
     },
     {
       resourceName: 'Property',
       fieldName: 'StandardStatus',
       type: 'Edm.String',
       isEnumeration: true,
-      annotations: [
-        { term: 'RESO.OData.Metadata.LookupName', value: 'StandardStatus' },
-      ],
+      annotations: [{ term: 'RESO.OData.Metadata.LookupName', value: 'StandardStatus' }]
     },
     {
       resourceName: 'Property',
@@ -36,12 +38,10 @@ const baseReport: MetadataReport = {
       type: 'Edm.String',
       isCollection: true,
       isEnumeration: true,
-      annotations: [
-        { term: 'RESO.OData.Metadata.LookupName', value: 'InteriorFeatures' },
-      ],
-    },
+      annotations: [{ term: 'RESO.OData.Metadata.LookupName', value: 'InteriorFeatures' }]
+    }
   ],
-  lookups: [],
+  lookups: []
 };
 
 const lookupRecords: ReadonlyArray<RawLookupRecord> = [
@@ -51,7 +51,7 @@ const lookupRecords: ReadonlyArray<RawLookupRecord> = [
     StandardLookupValue: 'Active',
     LegacyODataValue: 'Active',
     ModificationTimestamp: '2021-07-09T01:14:09Z',
-    LookupKey: '103-456188-2106739-8419115',
+    LookupKey: '103-456188-2106739-8419115'
   },
   {
     LookupName: 'StandardStatus',
@@ -59,7 +59,7 @@ const lookupRecords: ReadonlyArray<RawLookupRecord> = [
     StandardLookupValue: 'Pending',
     LegacyODataValue: null,
     ModificationTimestamp: '2021-07-09T01:14:09Z',
-    LookupKey: '103-456188-2106739-8419116',
+    LookupKey: '103-456188-2106739-8419116'
   },
   {
     LookupName: 'InteriorFeatures',
@@ -67,8 +67,8 @@ const lookupRecords: ReadonlyArray<RawLookupRecord> = [
     StandardLookupValue: 'Garden Bath',
     LegacyODataValue: 'GardenBath',
     ModificationTimestamp: '2021-07-09T01:14:09Z',
-    LookupKey: '103-456188-2106739-8419117',
-  },
+    LookupKey: '103-456188-2106739-8419117'
+  }
 ];
 
 describe('mergeWithLookupResource', () => {
@@ -129,7 +129,7 @@ describe('mergeWithLookupResource', () => {
   it('preserves existing lookups from base report', () => {
     const baseWithLookups: MetadataReport = {
       ...baseReport,
-      lookups: [{ lookupName: 'ExistingLookup', lookupValue: 'Value1', type: 'Edm.Int32' }],
+      lookups: [{ lookupName: 'ExistingLookup', lookupValue: 'Value1', type: 'Edm.Int32' }]
     };
     const result = mergeWithLookupResource(baseWithLookups, lookupRecords);
     expect(result.lookups).toHaveLength(4); // 1 existing + 3 new
@@ -139,14 +139,25 @@ describe('mergeWithLookupResource', () => {
 
 describe('synthesizeLookupResourceRecords', () => {
   const enumField = (fieldName: string, lookupName: string) => ({
-    resourceName: 'Property', fieldName, type: `org.reso.metadata.enums.${lookupName}`, isEnumeration: true, annotations: [],
+    resourceName: 'Property',
+    fieldName,
+    type: `org.reso.metadata.enums.${lookupName}`,
+    isEnumeration: true,
+    annotations: []
   });
 
   it('synthesizes records from standard lookup values (short LookupName + StandardLookupValue)', () => {
     const report: MetadataReport = {
       ...baseReport,
       fields: [enumField('StandardStatus', 'StandardStatus')],
-      lookups: [{ lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'ActiveUnderContract', type: 'Edm.Int32', annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Active Under Contract' }] }],
+      lookups: [
+        {
+          lookupName: 'org.reso.metadata.enums.StandardStatus',
+          lookupValue: 'ActiveUnderContract',
+          type: 'Edm.Int32',
+          annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Active Under Contract' }]
+        }
+      ]
     };
     const records = synthesizeLookupResourceRecords(report);
     const auc = records.find(r => r.LookupValue === 'ActiveUnderContract');
@@ -169,7 +180,7 @@ describe('synthesizeLookupResourceRecords', () => {
     const report: MetadataReport = {
       ...baseReport,
       fields: [enumField('StandardStatus', 'StandardStatus')],
-      lookups: [{ lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Active', type: 'Edm.Int32', annotations: [] }],
+      lookups: [{ lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Active', type: 'Edm.Int32', annotations: [] }]
     };
     expect(synthesizeLookupResourceRecords(report).every(r => !String(r.LookupValue).startsWith('Sample'))).toBe(true);
   });
@@ -191,7 +202,7 @@ describe('serializeLookupResourceDump', () => {
   // argument a compile error rather than a silently wrong label; that type signature is the real control,
   // since no runtime test can observe a caller that does not exist in the test. These cases guard the
   // field mapping against a reintroduced default by asserting a version that is NOT the old one.
-  it.each(['2.0', '2.1'])('stamps the version it is handed rather than a default — %s', (version) => {
+  it.each(['2.0', '2.1'])('stamps the version it is handed rather than a default — %s', version => {
     expect(serializeLookupResourceDump(lookupRecords, version).version).toBe(version);
   });
 });
@@ -268,9 +279,9 @@ describe('fetchLookupResource', () => {
   });
 
   it('throws with the failing request attached on a non-200', async () => {
-    await expect(
-      fetchLookupResource(ROOT, 'token', undefined, undefined, failing(500))
-    ).rejects.toMatchObject({ requestDetails: { status: 500, method: 'GET' } });
+    await expect(fetchLookupResource(ROOT, 'token', undefined, undefined, failing(500))).rejects.toMatchObject({
+      requestDetails: { status: 500, method: 'GET' }
+    });
   });
 
   it('returns an empty array for a provider that serves the resource with no rows', async () => {
@@ -298,9 +309,7 @@ describe('fetchLookupResource — a server whose cursor does not move', () => {
       }
     };
 
-    await expect(fetchLookupResource(ROOT2, 'token', undefined, undefined, ignoresSkip)).rejects.toThrow(
-      /not honoring \$skip/i
-    );
+    await expect(fetchLookupResource(ROOT2, 'token', undefined, undefined, ignoresSkip)).rejects.toThrow(/not honoring \$skip/i);
   }, 5000);
 
   it('does not trip on a server that merely repeats a boundary record', async () => {

@@ -1,6 +1,6 @@
+import type { CsdlSchema } from '@reso-standards/reso-metadata-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { createLookupResolver } from '../src/lookup/resolver.js';
-import type { CsdlSchema } from '@reso-standards/reso-metadata-utils';
 
 /** Minimal schema with CSDL enum types and a Lookup entity set. */
 const schemaWithLookupResource: CsdlSchema = {
@@ -66,9 +66,7 @@ const schemaWithoutLookupResource: CsdlSchema = {
   entityTypes: schemaWithLookupResource.entityTypes.filter(et => et.name !== 'Lookup'),
   entityContainer: {
     name: 'Default',
-    entitySets: [
-      { name: 'Property', entityType: 'org.reso.metadata.Property' }
-    ],
+    entitySets: [{ name: 'Property', entityType: 'org.reso.metadata.Property' }],
     singletons: [],
     actionImports: [],
     functionImports: []
@@ -79,9 +77,10 @@ const schemaWithoutLookupResource: CsdlSchema = {
 const mockFetchLookup = (lookupName: string, values: ReadonlyArray<string>) =>
   vi.fn().mockResolvedValue({
     ok: true,
-    json: () => Promise.resolve({
-      value: values.map(v => ({ LookupName: lookupName, LookupValue: v }))
-    })
+    json: () =>
+      Promise.resolve({
+        value: values.map(v => ({ LookupName: lookupName, LookupValue: v }))
+      })
   });
 
 describe('createLookupResolver', () => {

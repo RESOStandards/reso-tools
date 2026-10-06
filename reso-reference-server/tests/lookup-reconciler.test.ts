@@ -1,15 +1,15 @@
-import { resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import { describe, expect, it } from 'vitest';
 import Database from 'better-sqlite3';
-import { loadMetadata, getFieldsForResource, getKeyFieldForResource } from '../src/metadata/loader.js';
-import { TARGET_RESOURCES } from '../src/metadata/types.js';
-import { generateSqliteSchema } from '../src/db/sqlite-schema-generator.js';
+import { describe, expect, it } from 'vitest';
+import type { CollectionQueryOptions, CollectionResult, DataAccessLayer, ResourceContext } from '../src/db/data-access.js';
 import { createSqliteDal } from '../src/db/sqlite-dal.js';
-import { applySeedData } from '../src/seed-data.js';
+import { generateSqliteSchema } from '../src/db/sqlite-schema-generator.js';
+import { getFieldsForResource, getKeyFieldForResource, loadMetadata } from '../src/metadata/loader.js';
 import { reconcileLookups } from '../src/metadata/lookup-reconciler.js';
-import type { DataAccessLayer, ResourceContext, CollectionQueryOptions, CollectionResult } from '../src/db/data-access.js';
+import { TARGET_RESOURCES } from '../src/metadata/types.js';
+import { applySeedData } from '../src/seed-data.js';
 
 const metadataPath = resolve(import.meta.dirname, '../server-metadata.json');
 
@@ -24,8 +24,12 @@ describe('applySeedData reconciles lookups (City fix regression guard)', () => {
     const metadata = await loadMetadata(metadataPath);
     const db = new Database(':memory:'); // bare handle: FKs off by default, so seed insert order is irrelevant
     const resourceSpecs = [...TARGET_RESOURCES, 'Lookup']
-      .map((resource) => ({ resourceName: resource, keyField: getKeyFieldForResource(resource), fields: getFieldsForResource(metadata, resource) }))
-      .filter((spec) => spec.fields.length > 0);
+      .map(resource => ({
+        resourceName: resource,
+        keyField: getKeyFieldForResource(resource),
+        fields: getFieldsForResource(metadata, resource)
+      }))
+      .filter(spec => spec.fields.length > 0);
     for (const statement of generateSqliteSchema(resourceSpecs)) db.exec(statement);
     const dal = createSqliteDal(db);
 
@@ -33,19 +37,24 @@ describe('applySeedData reconciles lookups (City fix regression guard)', () => {
 
     // Expected City set = distinct City values in the committed seed (computed, not hardcoded, so it stays
     // green if the seed evolves — but goes from 39 to 0 and FAILS if reconcileLookups is ever un-wired).
-    const seed = JSON.parse(
-      gunzipSync(readFileSync(resolve(import.meta.dirname, '../seed-data/seed.json.gz'))).toString(),
-    ) as { readonly Property?: ReadonlyArray<Record<string, unknown>> };
-    const expectedCities = new Set((seed.Property ?? []).map((p) => p.City).filter(Boolean));
+    const seed = JSON.parse(gunzipSync(readFileSync(resolve(import.meta.dirname, '../seed-data/seed.json.gz'))).toString()) as {
+      readonly Property?: ReadonlyArray<Record<string, unknown>>;
+    };
+    const expectedCities = new Set((seed.Property ?? []).map(p => p.City).filter(Boolean));
 
-    const ctx: ResourceContext = { resource: 'Lookup', keyField: 'LookupKey', fields: getFieldsForResource(metadata, 'Lookup'), navigationBindings: [] };
+    const ctx: ResourceContext = {
+      resource: 'Lookup',
+      keyField: 'LookupKey',
+      fields: getFieldsForResource(metadata, 'Lookup'),
+      navigationBindings: []
+    };
     const result = await dal.queryCollection(ctx, { $filter: "LookupName eq 'City'", $top: 10000 });
-    const served = new Set(result.value.map((r) => r.LookupValue));
+    const served = new Set(result.value.map(r => r.LookupValue));
 
     expect(expectedCities.size).toBeGreaterThan(0);
     expect(served).toEqual(expectedCities);
     expect([...served]).toContain('Cleveland');
-    expect(result.value.every((r) => r.LookupName === 'City' && typeof r.LookupKey === 'string' && r.LookupKey.length > 0)).toBe(true);
+    expect(result.value.every(r => r.LookupName === 'City' && typeof r.LookupKey === 'string' && r.LookupKey.length > 0)).toBe(true);
   });
 });
 
@@ -59,8 +68,8 @@ describe('reconcileLookups (open-enum backfill mechanism)', () => {
       },
       queryCollection: async (_ctx: ResourceContext, options?: CollectionQueryOptions): Promise<CollectionResult> => {
         const name = /LookupName eq '([^']+)'/.exec(options?.$filter ?? '')?.[1];
-        return { value: store.filter((r) => r.LookupName === name) };
-      },
+        return { value: store.filter(r => r.LookupName === name) };
+      }
     } as unknown as DataAccessLayer; // partial mock — reconcileLookups only calls insert + queryCollection
     return { dal, store };
   };
@@ -70,8 +79,13 @@ describe('reconcileLookups (open-enum backfill mechanism)', () => {
     const { dal, store } = fakeDal();
     // City is a scalar open-enum; BuildingFeatures is a Collection open-enum (exercises the array path).
     const inserted = await reconcileLookups(dal, metadata, 'Property', [{ City: 'Cleveland', BuildingFeatures: ['Fireplace', 'Deck'] }]);
-    expect(store.some((r) => r.LookupName === 'City' && r.LookupValue === 'Cleveland')).toBe(true);
-    expect(store.filter((r) => r.LookupName === 'BuildingFeatures').map((r) => r.LookupValue).sort()).toEqual(['Deck', 'Fireplace']);
+    expect(store.some(r => r.LookupName === 'City' && r.LookupValue === 'Cleveland')).toBe(true);
+    expect(
+      store
+        .filter(r => r.LookupName === 'BuildingFeatures')
+        .map(r => r.LookupValue)
+        .sort()
+    ).toEqual(['Deck', 'Fireplace']);
     expect(inserted).toBe(3);
   });
 
@@ -81,6 +95,11 @@ describe('reconcileLookups (open-enum backfill mechanism)', () => {
     store.push({ LookupName: 'City', LookupValue: 'Cleveland' });
     const inserted = await reconcileLookups(dal, metadata, 'Property', [{ City: 'Cleveland' }, { City: 'Hartford' }]);
     expect(inserted).toBe(1);
-    expect(store.filter((r) => r.LookupName === 'City').map((r) => r.LookupValue).sort()).toEqual(['Cleveland', 'Hartford']);
+    expect(
+      store
+        .filter(r => r.LookupName === 'City')
+        .map(r => r.LookupValue)
+        .sort()
+    ).toEqual(['Cleveland', 'Hartford']);
   });
 });

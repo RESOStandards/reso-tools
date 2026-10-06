@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { type BreakerState, type CircuitBreaker, createCircuitBreaker } from '../src/http/resilience/circuit-breaker.js';
 import { isResilienceError } from '../src/http/resilience/errors.js';
 import type { Governor } from '../src/http/resilience/rate-governor.js';
-import { resilientSend, type SendDeps } from '../src/http/resilience/resilient-send.js';
+import { type SendDeps, resilientSend } from '../src/http/resilience/resilient-send.js';
 import type { ResilienceSession } from '../src/http/resilience/session.js';
 import type { ODataResponse } from '../src/types.js';
 
@@ -40,9 +40,7 @@ const spyBreaker = (canProceed = true): { breaker: CircuitBreaker; events: strin
 
 type Scripted = { response: ODataResponse } | { throw: unknown };
 
-const scriptedSend = (
-  outcomes: readonly Scripted[]
-): { send: (signal: AbortSignal) => Promise<ODataResponse>; calls: () => number } => {
+const scriptedSend = (outcomes: readonly Scripted[]): { send: (signal: AbortSignal) => Promise<ODataResponse>; calls: () => number } => {
   const queue = [...outcomes];
   const state = { calls: 0 };
   return {
@@ -90,7 +88,14 @@ const sessionWith = (
 // Deps with a fixed clock reading, for exercising the run deadline deterministically.
 const fakeDepsAt = (nowValue: number): SendDeps & { waits: number[] } => {
   const waits: number[] = [];
-  return { sleep: async (ms: number) => { waits.push(ms); }, random: () => 0, now: () => nowValue, waits };
+  return {
+    sleep: async (ms: number) => {
+      waits.push(ms);
+    },
+    random: () => 0,
+    now: () => nowValue,
+    waits
+  };
 };
 
 const networkError = (code: string): Error => Object.assign(new Error('boom'), { code });
@@ -238,9 +243,7 @@ describe('resilientSend with a retryableStatuses allowlist (retry only when the 
   it('retries a 429 (listed)', async () => {
     const s = scriptedSend([{ response: res(429, { 'retry-after': '1' }) }, { response: res(200) }]);
     const deps = fakeDeps();
-    const out = await resilientSend(
-      s.send, 'GET', 'k', sessionWith(spyGovernor().governor, spyBreaker().breaker, allowlist), deps
-    );
+    const out = await resilientSend(s.send, 'GET', 'k', sessionWith(spyGovernor().governor, spyBreaker().breaker, allowlist), deps);
     expect(out.status).toBe(200);
     expect(s.calls()).toBe(2);
   });
@@ -248,9 +251,7 @@ describe('resilientSend with a retryableStatuses allowlist (retry only when the 
   it('retries a 503 (listed)', async () => {
     const s = scriptedSend([{ response: res(503, { 'retry-after': '1' }) }, { response: res(200) }]);
     const deps = fakeDeps();
-    const out = await resilientSend(
-      s.send, 'GET', 'k', sessionWith(spyGovernor().governor, spyBreaker().breaker, allowlist), deps
-    );
+    const out = await resilientSend(s.send, 'GET', 'k', sessionWith(spyGovernor().governor, spyBreaker().breaker, allowlist), deps);
     expect(out.status).toBe(200);
     expect(s.calls()).toBe(2);
   });
@@ -258,9 +259,7 @@ describe('resilientSend with a retryableStatuses allowlist (retry only when the 
   it('does NOT retry a 500 (not listed) — returns it on the first attempt', async () => {
     const s = scriptedSend([{ response: res(500) }]);
     const deps = fakeDeps();
-    const out = await resilientSend(
-      s.send, 'GET', 'k', sessionWith(spyGovernor().governor, spyBreaker().breaker, allowlist), deps
-    );
+    const out = await resilientSend(s.send, 'GET', 'k', sessionWith(spyGovernor().governor, spyBreaker().breaker, allowlist), deps);
     expect(out.status).toBe(500);
     expect(s.calls()).toBe(1); // no retry
     expect(deps.waits).toEqual([]);
@@ -269,9 +268,7 @@ describe('resilientSend with a retryableStatuses allowlist (retry only when the 
   it('does NOT retry a network drop (no status can be in the allowlist) — throws exhausted on the first attempt', async () => {
     const s = scriptedSend([{ throw: networkError('ECONNRESET') }]);
     try {
-      await resilientSend(
-        s.send, 'GET', 'k', sessionWith(spyGovernor().governor, spyBreaker().breaker, allowlist), fakeDeps()
-      );
+      await resilientSend(s.send, 'GET', 'k', sessionWith(spyGovernor().governor, spyBreaker().breaker, allowlist), fakeDeps());
       expect.unreachable('an unlisted network drop should not retry');
     } catch (err) {
       expect(isResilienceError(err) && err.resilienceKind === 'exhausted').toBe(true);
@@ -281,9 +278,7 @@ describe('resilientSend with a retryableStatuses allowlist (retry only when the 
 
   it('without an allowlist, a 500 still retries (default behavior preserved)', async () => {
     const s = scriptedSend([{ response: res(500) }, { response: res(200) }]);
-    const out = await resilientSend(
-      s.send, 'GET', 'k', sessionWith(spyGovernor().governor, spyBreaker().breaker), fakeDeps()
-    );
+    const out = await resilientSend(s.send, 'GET', 'k', sessionWith(spyGovernor().governor, spyBreaker().breaker), fakeDeps());
     expect(out.status).toBe(200);
     expect(s.calls()).toBe(2); // retried
   });
@@ -328,9 +323,7 @@ describe('resilientSend total run deadline (totalTimeoutMs)', () => {
 
   it('has no deadline when totalTimeoutMs is unset (default) — a far-future clock still proceeds', async () => {
     const s = scriptedSend([{ response: res(200) }]);
-    const out = await resilientSend(
-      s.send, 'GET', 'k', sessionWith(spyGovernor().governor, spyBreaker().breaker), fakeDepsAt(9_999_999)
-    );
+    const out = await resilientSend(s.send, 'GET', 'k', sessionWith(spyGovernor().governor, spyBreaker().breaker), fakeDepsAt(9_999_999));
     expect(out.status).toBe(200);
   });
 });

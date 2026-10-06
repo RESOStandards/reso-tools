@@ -8,8 +8,8 @@
  * array (DD 2.2 shape), the legacy comma-string, or the annotation (pre-2.2 refs).
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 // ETL is CommonJS — use require
 const createRequire = (await import('node:module')).createRequire;
@@ -59,9 +59,7 @@ describe('normalizePayloads', () => {
 describe('getStandardMetadata — IDX classification against real refs', () => {
   it('DD 2.0: ListPrice carries the IDX payload', () => {
     const { fields } = getStandardMetadata('2.0');
-    const listPrice = fields.find(
-      (f: Record<string, unknown>) => f.resourceName === 'Property' && f.fieldName === 'ListPrice'
-    );
+    const listPrice = fields.find((f: Record<string, unknown>) => f.resourceName === 'Property' && f.fieldName === 'ListPrice');
     expect(listPrice).toBeDefined();
     expect(listPrice.payloads).toContain('IDX');
   });

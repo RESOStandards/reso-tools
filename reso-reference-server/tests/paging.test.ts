@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
 import type { Request, Response } from 'express';
+import { describe, expect, it, vi } from 'vitest';
+import type { DataAccessLayer, ResourceContext } from '../src/db/data-access.js';
 import { collectionHandler } from '../src/odata/handlers.js';
 import type { HandlerContext } from '../src/odata/handlers.js';
-import type { DataAccessLayer, ResourceContext } from '../src/db/data-access.js';
 
 // ---------------------------------------------------------------------------
 // Test helpers

@@ -10,8 +10,8 @@
  * Synthetic inputs — no vendor reports or identifiers.
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { computeVariationsV2 } from '../../src/variations-v2/compute.js';
 
 const createRequire = (await import('node:module')).createRequire;
@@ -27,12 +27,12 @@ const suggestedResources = (report: Json, suggestionsMap: Json, version = '1.7')
     suggestionsMap,
     version,
     fuzziness: 0.25,
-    applyVersionBucketing: false,
-  }) as { variations: { resources?: Json[] } };
-  return (variations.resources ?? []).flatMap((r) =>
-    [r.suggestedResourceName as string, ...((r.suggestions as Json[]) ?? []).map((s) => s.suggestedResourceName as string)].filter(
-      (v): v is string => !!v,
-    ),
+    applyVersionBucketing: false
+  }) as unknown as { variations: { resources?: Json[] } };
+  return (variations.resources ?? []).flatMap(r =>
+    [r.suggestedResourceName as string, ...((r.suggestions as unknown as Json[]) ?? []).map(s => s.suggestedResourceName as string)].filter(
+      (v): v is string => !!v
+    )
   );
 };
 
@@ -40,7 +40,7 @@ describe('computeVariationsV2: store-suggestion emit is whole-set gated', () => 
   it('emits the survivor when the suggested target is absent from the provider metadata', () => {
     const suggested = suggestedResources(
       { fields: [{ resourceName: 'Propertyy', fieldName: 'ListPrice' }] },
-      { Propertyy: { suggestions: [{ suggestedResourceName: 'Property' }] } },
+      { Propertyy: { suggestions: [{ suggestedResourceName: 'Property' }] } }
     );
     expect(suggested).toContain('Property');
   });
@@ -50,10 +50,10 @@ describe('computeVariationsV2: store-suggestion emit is whole-set gated', () => 
       {
         fields: [
           { resourceName: 'Propertyy', fieldName: 'ListPrice' },
-          { resourceName: 'Property', fieldName: 'ListPrice' },
-        ],
+          { resourceName: 'Property', fieldName: 'ListPrice' }
+        ]
       },
-      { Propertyy: { suggestions: [{ suggestedResourceName: 'Property' }] } },
+      { Propertyy: { suggestions: [{ suggestedResourceName: 'Property' }] } }
     );
     expect(suggested).not.toContain('Property');
   });

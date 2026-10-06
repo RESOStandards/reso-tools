@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  NO_FIELD_PREFERENCES,
   applyFieldPreferences,
   matchedPreferences,
-  NO_FIELD_PREFERENCES,
   parseFieldPreferences,
   preferenceFor,
   summarizeFieldPreferences
@@ -22,10 +22,7 @@ const discriminates = (c: Cand): boolean => c.distinct >= 2;
 
 describe('parseFieldPreferences', () => {
   it('reads a comma-separated string and an array the same way', () => {
-    expect(parseFieldPreferences('Office.FeedTypes, SyndicateTo').entries.map(e => e.spec)).toEqual([
-      'Office.FeedTypes',
-      'SyndicateTo'
-    ]);
+    expect(parseFieldPreferences('Office.FeedTypes, SyndicateTo').entries.map(e => e.spec)).toEqual(['Office.FeedTypes', 'SyndicateTo']);
     expect(parseFieldPreferences(['Office.FeedTypes', 'SyndicateTo']).entries.map(e => e.spec)).toEqual([
       'Office.FeedTypes',
       'SyndicateTo'
@@ -89,13 +86,7 @@ describe('applyFieldPreferences', () => {
   it('never adds or removes a candidate — a preference only re-orders', () => {
     const ranked = cands('SyndicateTo', 'FeedTypes');
     // NotAField does not exist on the resource; Member.FeedTypes is scoped elsewhere.
-    const out = applyFieldPreferences(
-      ranked,
-      parseFieldPreferences(['NotAField', 'Member.FeedTypes']),
-      'Office',
-      fieldOf,
-      discriminates
-    );
+    const out = applyFieldPreferences(ranked, parseFieldPreferences(['NotAField', 'Member.FeedTypes']), 'Office', fieldOf, discriminates);
     expect(out.map(fieldOf)).toEqual(['SyndicateTo', 'FeedTypes']);
     expect(out).toHaveLength(ranked.length);
   });

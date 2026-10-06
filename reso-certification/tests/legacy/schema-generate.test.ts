@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 
@@ -14,7 +14,7 @@ const {
   fieldsWithMaxLength,
   nonNullableField,
   nullableCollectionFields,
-  simpleNonEnumFields,
+  simpleNonEnumFields
 } = require(resolve(import.meta.dirname, './fixtures/metadata-samples.cjs'));
 
 const {
@@ -25,7 +25,7 @@ const {
   nullableCollectionFieldsSchema,
   schemaWithImplicitNullable,
   schemaWithMaxLength,
-  simpleNonEnumSchema,
+  simpleNonEnumSchema
 } = require(resolve(import.meta.dirname, './fixtures/schema-samples.cjs'));
 
 describe('Schema generation tests', () => {

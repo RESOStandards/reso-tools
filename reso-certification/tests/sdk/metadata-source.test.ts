@@ -1,14 +1,14 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readFile } from 'node:fs/promises';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the $metadata fetcher so the test is offline + deterministic (no reso-client
 // HTTP path). metadata-source.ts only depends on fetchMetadataWithVersion from here.
 vi.mock('../../src/test-runner/metadata.js', () => ({
-  fetchMetadataWithVersion: vi.fn(),
+  fetchMetadataWithVersion: vi.fn()
 }));
 
-import { fetchMetadataWithVersion } from '../../src/test-runner/metadata.js';
 import { fetchMetadataReportFromServer } from '../../src/sdk/metadata-source.js';
+import { fetchMetadataWithVersion } from '../../src/test-runner/metadata.js';
 
 describe('fetchMetadataReportFromServer', () => {
   afterEach(() => {
@@ -24,7 +24,7 @@ describe('fetchMetadataReportFromServer', () => {
     const report = await fetchMetadataReportFromServer({
       url: 'https://server.example.org',
       bearerToken: 'tok',
-      version: '2.0',
+      version: '2.0'
     });
 
     // The endpoint + bearer are passed straight through to the fetcher.
@@ -37,8 +37,8 @@ describe('fetchMetadataReportFromServer', () => {
   it('propagates a fetch failure rather than swallowing it', async () => {
     vi.mocked(fetchMetadataWithVersion).mockRejectedValue(new Error('HTTP 401 Unauthorized'));
 
-    await expect(
-      fetchMetadataReportFromServer({ url: 'https://server.example.org', bearerToken: 'bad', version: '2.0' }),
-    ).rejects.toThrow('401');
+    await expect(fetchMetadataReportFromServer({ url: 'https://server.example.org', bearerToken: 'bad', version: '2.0' })).rejects.toThrow(
+      '401'
+    );
   });
 });

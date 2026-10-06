@@ -10,12 +10,12 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  type ReplicationProgressData,
   buildAnomalyDetail,
   humanizeBytes,
   humanizeMs,
   parseReplicationProgress,
-  summarizeReplicationProgress,
-  type ReplicationProgressData,
+  summarizeReplicationProgress
 } from '../src/progress/replication.js';
 
 const payload = (over: Partial<ReplicationProgressData> = {}): ReplicationProgressData => ({
@@ -26,7 +26,7 @@ const payload = (over: Partial<ReplicationProgressData> = {}): ReplicationProgre
   throughput: 1250.4,
   meanResponseMs: 2100,
   anomalyCount: 4,
-  ...over,
+  ...over
 });
 
 describe('parseReplicationProgress sits in front of every progress message', () => {
@@ -62,9 +62,7 @@ describe('summarizeReplicationProgress spends one line', () => {
 
   it('omits what is absent instead of padding it', () => {
     // An early update has a count but no throughput yet. Placeholders would be noise.
-    const summary = summarizeReplicationProgress(
-      payload({ totalBytes: null, throughput: null, meanResponseMs: null, anomalyCount: 0 }),
-    );
+    const summary = summarizeReplicationProgress(payload({ totalBytes: null, throughput: null, meanResponseMs: null, anomalyCount: 0 }));
     expect(summary).toBe('17,000 records');
   });
 
@@ -75,7 +73,7 @@ describe('summarizeReplicationProgress spends one line', () => {
 
   it('returns empty when nothing is quantified, so a caller can leave the display alone', () => {
     const summary = summarizeReplicationProgress(
-      payload({ totalRecords: 0, totalBytes: null, throughput: null, meanResponseMs: null, anomalyCount: 0 }),
+      payload({ totalRecords: 0, totalBytes: null, throughput: null, meanResponseMs: null, anomalyCount: 0 })
     );
     expect(summary).toBe('');
   });
@@ -105,7 +103,7 @@ describe('buildAnomalyDetail', () => {
   it('orders resources by anomaly count, descending', () => {
     const detail = buildAnomalyDetail([
       { name: 'Member', records: 1, bytes: 1, meanMs: 800, anomalyCount: 2, maxAnomalyMs: 3400, maxAnomalyDelta: 2600 },
-      { name: 'Property', records: 1, bytes: 1, meanMs: 2100, anomalyCount: 4, maxAnomalyMs: 8200, maxAnomalyDelta: 6100 },
+      { name: 'Property', records: 1, bytes: 1, meanMs: 2100, anomalyCount: 4, maxAnomalyMs: 8200, maxAnomalyDelta: 6100 }
     ]);
     const lines = detail.split('\n');
     expect(lines[0]).toContain('slower than');
@@ -116,7 +114,7 @@ describe('buildAnomalyDetail', () => {
   it('skips resources with no anomalies', () => {
     const detail = buildAnomalyDetail([
       { name: 'Clean', records: 1, bytes: 1, anomalyCount: 0 },
-      { name: 'Noisy', records: 1, bytes: 1, meanMs: 500, anomalyCount: 1, maxAnomalyMs: 2000, maxAnomalyDelta: 1500 },
+      { name: 'Noisy', records: 1, bytes: 1, meanMs: 500, anomalyCount: 1, maxAnomalyMs: 2000, maxAnomalyDelta: 1500 }
     ]);
     expect(detail).not.toContain('Clean');
     expect(detail).toContain('Noisy (mean 500ms): 1 anomaly, max 2.0s (+1.5s)');

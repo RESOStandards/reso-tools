@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { synthesizeResourcesFromFields } from '../../src/metadata/synthesize-resources.js';
 import type { MetadataReport, MetadataReportField } from '@reso-standards/reso-metadata-utils';
+import { describe, expect, it } from 'vitest';
+import { synthesizeResourcesFromFields } from '../../src/metadata/synthesize-resources.js';
 
 // Tiny field-shape factory so each test can build readable fixtures
 // without restating the full MetadataReportField structure every time.
@@ -8,7 +8,7 @@ const field = (resourceName: string, fieldName: string): MetadataReportField => 
   resourceName,
   fieldName,
   type: 'Edm.String',
-  annotations: [],
+  annotations: []
 });
 
 const baseReport = (overrides: Partial<MetadataReport> = {}): MetadataReport => ({
@@ -18,7 +18,10 @@ const baseReport = (overrides: Partial<MetadataReport> = {}): MetadataReport => 
   resources: [],
   fields: [],
   lookups: [],
-  ...overrides,
+  // Required on MetadataReport, and defaulted BEFORE the spread so a caller can still override.
+  actions: [],
+  functions: [],
+  ...overrides
 });
 
 describe('synthesizeResourcesFromFields', () => {
@@ -29,17 +32,13 @@ describe('synthesizeResourcesFromFields', () => {
           field('Property', 'ListingKey'),
           field('Property', 'ListPrice'),
           field('Member', 'MemberKey'),
-          field('Office', 'OfficeKey'),
-        ],
+          field('Office', 'OfficeKey')
+        ]
       });
 
       const result = synthesizeResourcesFromFields(report);
 
-      expect(result.resources).toEqual([
-        { resourceName: 'Member' },
-        { resourceName: 'Office' },
-        { resourceName: 'Property' },
-      ]);
+      expect(result.resources).toEqual([{ resourceName: 'Member' }, { resourceName: 'Office' }, { resourceName: 'Property' }]);
     });
 
     it('produces a stable, alphabetically sorted resource list', () => {
@@ -50,18 +49,13 @@ describe('synthesizeResourcesFromFields', () => {
           field('OpenHouse', 'OpenHouseKey'),
           field('Property', 'ListingKey'),
           field('Media', 'MediaKey'),
-          field('Member', 'MemberKey'),
-        ],
+          field('Member', 'MemberKey')
+        ]
       });
 
       const result = synthesizeResourcesFromFields(report);
 
-      expect(result.resources.map(r => r.resourceName)).toEqual([
-        'Media',
-        'Member',
-        'OpenHouse',
-        'Property',
-      ]);
+      expect(result.resources.map(r => r.resourceName)).toEqual(['Media', 'Member', 'OpenHouse', 'Property']);
     });
 
     it('deduplicates repeated resource names', () => {
@@ -70,17 +64,14 @@ describe('synthesizeResourcesFromFields', () => {
           field('Property', 'ListingKey'),
           field('Property', 'ListPrice'),
           field('Property', 'BedroomsTotal'),
-          field('Member', 'MemberKey'),
-        ],
+          field('Member', 'MemberKey')
+        ]
       });
 
       const result = synthesizeResourcesFromFields(report);
 
       expect(result.resources).toHaveLength(2);
-      expect(result.resources).toEqual([
-        { resourceName: 'Member' },
-        { resourceName: 'Property' },
-      ]);
+      expect(result.resources).toEqual([{ resourceName: 'Member' }, { resourceName: 'Property' }]);
     });
 
     it('triggers synthesis when resources is undefined (older report shape)', () => {
@@ -92,7 +83,7 @@ describe('synthesizeResourcesFromFields', () => {
         version: '2.0',
         generatedOn: '2026-04-08T00:00:00.000Z',
         fields: [field('Property', 'ListingKey')],
-        lookups: [],
+        lookups: []
       } as unknown as MetadataReport;
 
       const result = synthesizeResourcesFromFields(report);
@@ -104,19 +95,12 @@ describe('synthesizeResourcesFromFields', () => {
       // Defensive: a malformed field with an empty resourceName should
       // not produce a `{ resourceName: '' }` entry in the output.
       const report = baseReport({
-        fields: [
-          field('Property', 'ListingKey'),
-          { ...field('', 'Junk'), resourceName: '' },
-          field('Member', 'MemberKey'),
-        ],
+        fields: [field('Property', 'ListingKey'), { ...field('', 'Junk'), resourceName: '' }, field('Member', 'MemberKey')]
       });
 
       const result = synthesizeResourcesFromFields(report);
 
-      expect(result.resources).toEqual([
-        { resourceName: 'Member' },
-        { resourceName: 'Property' },
-      ]);
+      expect(result.resources).toEqual([{ resourceName: 'Member' }, { resourceName: 'Property' }]);
     });
 
     it('preserves all other top-level fields on the report', () => {
@@ -129,9 +113,9 @@ describe('synthesizeResourcesFromFields', () => {
           {
             lookupName: 'org.reso.metadata.enums.StandardStatus',
             lookupValue: 'Active',
-            type: 'Edm.Int32',
-          },
-        ],
+            type: 'Edm.Int32'
+          }
+        ]
       });
 
       const result = synthesizeResourcesFromFields(report);
@@ -148,7 +132,7 @@ describe('synthesizeResourcesFromFields', () => {
     it('returns the input unchanged when resources is already populated', () => {
       const report = baseReport({
         resources: [{ resourceName: 'Property' }, { resourceName: 'Member' }],
-        fields: [field('Property', 'ListingKey')],
+        fields: [field('Property', 'ListingKey')]
       });
 
       const result = synthesizeResourcesFromFields(report);
@@ -170,10 +154,10 @@ describe('synthesizeResourcesFromFields', () => {
             description: 'A real estate property listing',
             // Hypothetical DD 2.2 fields we want to make sure pass through
             complexTypes: ['Address', 'Geocoordinates'],
-            primaryKey: 'ListingKey',
-          },
+            primaryKey: 'ListingKey'
+          }
         ],
-        fields: [field('Property', 'ListingKey')],
+        fields: [field('Property', 'ListingKey')]
       });
 
       const result = synthesizeResourcesFromFields(report);
@@ -183,7 +167,7 @@ describe('synthesizeResourcesFromFields', () => {
         wikiPageURL: 'https://dd.reso.org/DD2.0/Property',
         description: 'A real estate property listing',
         complexTypes: ['Address', 'Geocoordinates'],
-        primaryKey: 'ListingKey',
+        primaryKey: 'ListingKey'
       });
     });
 
@@ -193,11 +177,7 @@ describe('synthesizeResourcesFromFields', () => {
       // missing entirely.
       const report = baseReport({
         resources: [{ resourceName: 'Property' }],
-        fields: [
-          field('Property', 'ListingKey'),
-          field('Member', 'MemberKey'),
-          field('Office', 'OfficeKey'),
-        ],
+        fields: [field('Property', 'ListingKey'), field('Member', 'MemberKey'), field('Office', 'OfficeKey')]
       });
 
       const result = synthesizeResourcesFromFields(report);

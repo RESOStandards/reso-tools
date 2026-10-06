@@ -9,7 +9,7 @@ const page = (keys: readonly string[]): ODataResponse => ({
   status: 200,
   headers: { 'odata-version': '4.01' },
   body: { value: keys.map(k => ({ ListingKey: k })) },
-  rawBody: '',
+  rawBody: ''
 });
 
 // Injected client — returns the scripted responses in order (page 1, then the $skip=5 page).
@@ -20,7 +20,7 @@ const queuedRequester = (responses: readonly ODataResponse[]): ODataRequester =>
       const next = queue.shift();
       if (!next) throw new Error('requester queue exhausted');
       return next;
-    },
+    }
   };
 };
 
@@ -31,7 +31,7 @@ const params: TestParams = {
   enumMode: 'string',
   integerValueHigh: 0,
   skippedTypes: [],
-  sampleComplete: true,
+  sampleComplete: true
 };
 const query = { url: 'http://x/Property?$top=5&$select=ListingKey', selectFields: ['ListingKey'] };
 

@@ -1,7 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { buildLookupUrl, buildScenarioQuery, originatingSystemFilterClause } from '../../src/web-api-core/queries.js';
 import type { TestParams } from '../../src/web-api-core/sampling.js';
-import type { CoreScenario, FilterScenario, OrderByScenario, ErrorScenario, StructuralScenario, PagingScenario } from '../../src/web-api-core/scenarios.js';
+import type {
+  CoreScenario,
+  ErrorScenario,
+  FilterScenario,
+  OrderByScenario,
+  PagingScenario,
+  StructuralScenario
+} from '../../src/web-api-core/scenarios.js';
 
 const baseParams: TestParams = {
   resource: 'Property',
@@ -24,12 +31,19 @@ const baseParams: TestParams = {
   multiLookupValue1: 'Pool',
   multiLookupValue2: 'Garage',
   sampleComplete: true,
-  skippedTypes: [],
+  enumMode: 'string',
+  skippedTypes: []
 };
 
 describe('buildScenarioQuery', () => {
   it('builds metadata URL', () => {
-    const scenario: StructuralScenario = { tag: 'metadata-validation', name: 'Metadata', category: 'structural', assertion: 'metadata', minVersion: '2.0.0' };
+    const scenario: StructuralScenario = {
+      tag: 'metadata-validation',
+      name: 'Metadata',
+      category: 'structural',
+      assertion: 'metadata',
+      minVersion: '2.0.0'
+    };
     const result = buildScenarioQuery('http://localhost:8080', 'Property', scenario, baseParams);
     expect(result?.url).toBe('http://localhost:8080/$metadata');
   });
@@ -37,18 +51,39 @@ describe('buildScenarioQuery', () => {
   // paging is dispatched in runScenario (it builds its own $top=2 / $top=1 URLs), so buildScenarioQuery
   // intentionally returns undefined for it — locks the removal of the old dead paging case.
   it('returns undefined for a paging scenario (paging builds its own URLs)', () => {
-    const scenario: PagingScenario = { tag: 'server-driven-paging', name: 'Server-driven paging (nextLink)', category: 'paging', assertion: 'nextLink', minVersion: '2.1.0' };
+    const scenario: PagingScenario = {
+      tag: 'server-driven-paging',
+      name: 'Server-driven paging (nextLink)',
+      category: 'paging',
+      assertion: 'nextLink',
+      minVersion: '2.1.0'
+    };
     expect(buildScenarioQuery('http://localhost:8080', 'Property', scenario, baseParams)).toBeUndefined();
   });
 
   it('builds fetch-by-key URL', () => {
-    const scenario: StructuralScenario = { tag: 'fetch-by-key', name: 'Fetch', category: 'structural', assertion: 'fetch-by-key', minVersion: '2.0.0' };
+    const scenario: StructuralScenario = {
+      tag: 'fetch-by-key',
+      name: 'Fetch',
+      category: 'structural',
+      assertion: 'fetch-by-key',
+      minVersion: '2.0.0'
+    };
     const result = buildScenarioQuery('http://localhost:8080', 'Property', scenario, baseParams);
     expect(result?.url).toContain("Property('ABC123')");
   });
 
   it('builds integer filter URL', () => {
-    const scenario: FilterScenario = { tag: 'filter-int-gt', name: 'Int gt', category: 'filter', dataType: 'integer', op: 'gt', fieldParam: 'integerField', valueParam: 'integerValueLow', minVersion: '2.0.0' };
+    const scenario: FilterScenario = {
+      tag: 'filter-int-gt',
+      name: 'Int gt',
+      category: 'filter',
+      dataType: 'integer',
+      op: 'gt',
+      fieldParam: 'integerField',
+      valueParam: 'integerValueLow',
+      minVersion: '2.0.0'
+    };
     const result = buildScenarioQuery('http://localhost:8080', 'Property', scenario, baseParams);
     expect(result?.url).toContain('$filter=');
     expect(result?.url).toContain('ListPrice');
@@ -56,7 +91,17 @@ describe('buildScenarioQuery', () => {
   });
 
   it('builds compound filter URL', () => {
-    const scenario: FilterScenario = { tag: 'filter-int-and', name: 'Int and', category: 'filter', dataType: 'integer', op: 'gt', fieldParam: 'integerField', valueParam: 'integerValueLow', compound: { op2: 'lt', valueParam2: 'integerValueHigh', logical: 'and' }, minVersion: '2.0.0' };
+    const scenario: FilterScenario = {
+      tag: 'filter-int-and',
+      name: 'Int and',
+      category: 'filter',
+      dataType: 'integer',
+      op: 'gt',
+      fieldParam: 'integerField',
+      valueParam: 'integerValueLow',
+      compound: { op2: 'lt', valueParam2: 'integerValueHigh', logical: 'and' },
+      minVersion: '2.0.0'
+    };
     const result = buildScenarioQuery('http://localhost:8080', 'Property', scenario, baseParams);
     expect(result?.url).toContain('and');
   });
@@ -64,13 +109,30 @@ describe('buildScenarioQuery', () => {
   it('builds the not() filter as not(field <op> <sentinel>) — the -1 sentinel returns every non-negative record', () => {
     // `not(ListPrice le -1)` = ListPrice > -1 = all records (prices are non-negative) → guaranteed non-empty,
     // so an empty result is a determinate operator defect. The builder must honor scenario.op (le), not eq.
-    const scenario: FilterScenario = { tag: 'filter-int-not', name: 'Int not()', category: 'filter', dataType: 'integer', op: 'le', fieldParam: 'integerField', valueParam: 'integerNotSentinel', negated: true, minVersion: '2.0.0' };
+    const scenario: FilterScenario = {
+      tag: 'filter-int-not',
+      name: 'Int not()',
+      category: 'filter',
+      dataType: 'integer',
+      op: 'le',
+      fieldParam: 'integerField',
+      valueParam: 'integerNotSentinel',
+      negated: true,
+      minVersion: '2.0.0'
+    };
     const result = buildScenarioQuery('http://localhost:8080', 'Property', scenario, baseParams);
     expect(result && decodeURIComponent(result.url)).toContain('not(ListPrice le -1)');
   });
 
   it('builds orderby URL', () => {
-    const scenario: OrderByScenario = { tag: 'orderby-timestamp-asc', name: 'Orderby', category: 'orderby', fieldParam: 'timestampField', direction: 'asc', minVersion: '2.0.0' };
+    const scenario: OrderByScenario = {
+      tag: 'orderby-timestamp-asc',
+      name: 'Orderby',
+      category: 'orderby',
+      fieldParam: 'timestampField',
+      direction: 'asc',
+      minVersion: '2.0.0'
+    };
     const result = buildScenarioQuery('http://localhost:8080', 'Property', scenario, baseParams);
     expect(result?.url).toContain('$orderby=ModificationTimestamp asc');
   });
@@ -89,13 +151,31 @@ describe('buildScenarioQuery', () => {
 
   it('returns undefined when required param is missing', () => {
     const paramsNoInt: TestParams = { ...baseParams, integerField: undefined };
-    const scenario: FilterScenario = { tag: 'filter-int-gt', name: 'Int gt', category: 'filter', dataType: 'integer', op: 'gt', fieldParam: 'integerField', valueParam: 'integerValueLow', minVersion: '2.0.0' };
+    const scenario: FilterScenario = {
+      tag: 'filter-int-gt',
+      name: 'Int gt',
+      category: 'filter',
+      dataType: 'integer',
+      op: 'gt',
+      fieldParam: 'integerField',
+      valueParam: 'integerValueLow',
+      minVersion: '2.0.0'
+    };
     const result = buildScenarioQuery('http://localhost:8080', 'Property', scenario, paramsNoInt);
     expect(result).toBeUndefined();
   });
 
   it('includes select fields in query', () => {
-    const scenario: FilterScenario = { tag: 'filter-int-eq', name: 'Int eq', category: 'filter', dataType: 'integer', op: 'eq', fieldParam: 'integerField', valueParam: 'integerValueLow', minVersion: '2.0.0' };
+    const scenario: FilterScenario = {
+      tag: 'filter-int-eq',
+      name: 'Int eq',
+      category: 'filter',
+      dataType: 'integer',
+      op: 'eq',
+      fieldParam: 'integerField',
+      valueParam: 'integerValueLow',
+      minVersion: '2.0.0'
+    };
     const result = buildScenarioQuery('http://localhost:8080', 'Property', scenario, baseParams);
     expect(result?.selectFields).toContain('ListingKey');
     expect(result?.selectFields).toContain('ListPrice');
@@ -119,14 +199,23 @@ describe('buildScenarioQuery', () => {
 });
 
 describe('buildScenarioQuery — OriginatingSystem (OSN/OSID) scoping', () => {
-  const filterScenario: FilterScenario = { tag: 'filter-int-gt', name: 'Int gt', category: 'filter', dataType: 'integer', op: 'gt', fieldParam: 'integerField', valueParam: 'integerValueLow', minVersion: '2.0.0' };
+  const filterScenario: FilterScenario = {
+    tag: 'filter-int-gt',
+    name: 'Int gt',
+    category: 'filter',
+    dataType: 'integer',
+    op: 'gt',
+    fieldParam: 'integerField',
+    valueParam: 'integerValueLow',
+    minVersion: '2.0.0'
+  };
   const osnParams: TestParams = { ...baseParams, originatingSystemName: 'MyMLS' };
   const query = (scenario: CoreScenario, params: TestParams): string =>
     decodeURIComponent(buildScenarioQuery('http://localhost:8080', 'Property', scenario, params)?.url ?? '');
 
   it('ANDs OriginatingSystemName into a resource-data filter query (original predicate preserved)', () => {
     const decoded = query(filterScenario, osnParams);
-    expect(decoded).toContain('(ListPrice gt 200000) and OriginatingSystemName eq \'MyMLS\'');
+    expect(decoded).toContain("(ListPrice gt 200000) and OriginatingSystemName eq 'MyMLS'");
   });
 
   it('is inert when no OriginatingSystem is configured (zero behavior change)', () => {
@@ -136,28 +225,43 @@ describe('buildScenarioQuery — OriginatingSystem (OSN/OSID) scoping', () => {
   });
 
   it('uses OriginatingSystemID when only OSID is set; OSN takes precedence when both are set', () => {
-    expect(query(filterScenario, { ...baseParams, originatingSystemId: 'MLS-42' })).toContain('OriginatingSystemID eq \'MLS-42\'');
+    expect(query(filterScenario, { ...baseParams, originatingSystemId: 'MLS-42' })).toContain("OriginatingSystemID eq 'MLS-42'");
     const both = query(filterScenario, { ...baseParams, originatingSystemName: 'MyMLS', originatingSystemId: 'MLS-42' });
-    expect(both).toContain('OriginatingSystemName eq \'MyMLS\'');
+    expect(both).toContain("OriginatingSystemName eq 'MyMLS'");
     expect(both).not.toContain('OriginatingSystemID');
   });
 
   it('does NOT scope a non-resource-data category (fetch-by-key / structural, /Lookup, error)', () => {
-    const fetch: StructuralScenario = { tag: 'fetch-by-key', name: 'Fetch', category: 'structural', assertion: 'fetch-by-key', minVersion: '2.0.0' };
+    const fetch: StructuralScenario = {
+      tag: 'fetch-by-key',
+      name: 'Fetch',
+      category: 'structural',
+      assertion: 'fetch-by-key',
+      minVersion: '2.0.0'
+    };
     const err: ErrorScenario = { tag: 'response-code-404', name: '404', category: 'error', expectedStatus: 404, minVersion: '2.0.0' };
     expect(query(fetch, osnParams)).not.toContain('OriginatingSystem');
     expect(query(err, osnParams)).not.toContain('OriginatingSystem');
   });
 
   it('adds a $filter when the scoped query has none (orderby without a filter)', () => {
-    const scenario: OrderByScenario = { tag: 'orderby-timestamp-asc', name: 'Orderby', category: 'orderby', fieldParam: 'timestampField', direction: 'asc', minVersion: '2.0.0' };
+    const scenario: OrderByScenario = {
+      tag: 'orderby-timestamp-asc',
+      name: 'Orderby',
+      category: 'orderby',
+      fieldParam: 'timestampField',
+      direction: 'asc',
+      minVersion: '2.0.0'
+    };
     const decoded = query(scenario, osnParams);
     expect(decoded).toContain('$orderby=ModificationTimestamp asc');
-    expect(decoded).toContain('$filter=OriginatingSystemName eq \'MyMLS\'');
+    expect(decoded).toContain("$filter=OriginatingSystemName eq 'MyMLS'");
   });
 
   it('escapes single quotes in the OriginatingSystem value (OData string literal)', () => {
-    expect(query(filterScenario, { ...baseParams, originatingSystemName: 'O\'Brien MLS' })).toContain('OriginatingSystemName eq \'O\'\'Brien MLS\'');
+    expect(query(filterScenario, { ...baseParams, originatingSystemName: "O'Brien MLS" })).toContain(
+      "OriginatingSystemName eq 'O''Brien MLS'"
+    );
   });
 });
 

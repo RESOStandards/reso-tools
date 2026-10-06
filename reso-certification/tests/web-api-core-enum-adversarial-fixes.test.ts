@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
 import { decodeFlagsValue } from '@reso-standards/reso-metadata-utils';
 import type { CsdlEnumType } from '@reso-standards/reso-metadata-utils';
+import { describe, expect, it } from 'vitest';
 import { assertCollectionLambda, assertEnumMatch } from '../src/web-api-core/assertions.js';
 import { buildScenarioQuery } from '../src/web-api-core/queries.js';
 import type { TestParams } from '../src/web-api-core/sampling.js';
@@ -44,11 +44,10 @@ describe('#11 — flags bitmask response decoded before matching', () => {
     members: [
       { name: 'None', value: '0' },
       { name: 'Active', value: '1' },
-      { name: 'Pending', value: '2' },
-    ],
+      { name: 'Pending', value: '2' }
+    ]
   };
-  const decode = (raw: unknown) =>
-    decodeFlagsValue(enumType, typeof raw === 'string' || typeof raw === 'number' ? raw : undefined);
+  const decode = (raw: unknown) => decodeFlagsValue(enumType, typeof raw === 'string' || typeof raw === 'number' ? raw : undefined);
 
   it('an integer-bitmask response matches only after decoding', () => {
     // Bitmask 3 = Active(1) | Pending(2). Naive String(3) → ['3'] → no match (the pre-fix false-fail).
@@ -78,7 +77,7 @@ describe('#7 — OData single-quote escaping in query builders', () => {
       op: 'eq',
       fieldParam: 'singleLookupField',
       valueParam: 'singleLookupValue',
-      minVersion: '2.0.0',
+      minVersion: '2.0.0'
     } as CoreScenario;
     const params = {
       resource: 'Property',
@@ -88,7 +87,7 @@ describe('#7 — OData single-quote escaping in query builders', () => {
       singleLookupField: 'AttributionContact',
       singleLookupValue: "O'Brien",
       integerValueHigh: 0,
-      skippedTypes: [],
+      skippedTypes: []
     } as unknown as TestParams;
     const q = buildScenarioQuery('http://x', 'Property', scenario, params);
     expect(q && decodeURIComponent(q.url)).toContain("AttributionContact eq 'O''Brien'");

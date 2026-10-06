@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { parseCsdlXml } from '../src/csdl/parser.js';
 import type { CsdlSchema } from '../src/csdl/types.js';
 import { validateCsdl } from '../src/csdl/validator.js';
-import { parseCsdlXml } from '../src/csdl/parser.js';
 
 const validSchema: CsdlSchema = {
   namespace: 'org.reso.metadata',
@@ -328,9 +328,7 @@ describe('validateCsdl', () => {
           {
             name: 'Property',
             entityType: 'org.reso.metadata.Property',
-            navigationPropertyBindings: [
-              { path: 'NonExistentNav', target: 'Property' }
-            ]
+            navigationPropertyBindings: [{ path: 'NonExistentNav', target: 'Property' }]
           }
         ],
         singletons: [],
@@ -364,9 +362,7 @@ describe('validateCsdl', () => {
           {
             name: 'Property',
             entityType: 'org.reso.metadata.Property',
-            navigationPropertyBindings: [
-              { path: 'Photos', target: 'Media' }
-            ]
+            navigationPropertyBindings: [{ path: 'Photos', target: 'Media' }]
           }
         ],
         singletons: [],
@@ -404,9 +400,7 @@ describe('validateCsdl', () => {
           {
             name: 'Property',
             entityType: 'org.reso.metadata.Property',
-            navigationPropertyBindings: [
-              { path: 'Photos', target: 'Media' }
-            ]
+            navigationPropertyBindings: [{ path: 'Photos', target: 'Media' }]
           },
           { name: 'Media', entityType: 'org.reso.metadata.Media' }
         ],
@@ -452,9 +446,7 @@ describe('validateCsdl', () => {
           {
             name: 'Property',
             entityType: 'org.reso.metadata.Property',
-            navigationPropertyBindings: [
-              { path: 'Photos', target: 'Office' }
-            ]
+            navigationPropertyBindings: [{ path: 'Photos', target: 'Office' }]
           },
           { name: 'Media', entityType: 'org.reso.metadata.Media' },
           { name: 'Office', entityType: 'org.reso.metadata.Office' }
@@ -485,9 +477,7 @@ describe('validateCsdl', () => {
               type: 'org.reso.metadata.Member',
               isCollection: false,
               entityTypeName: 'Member',
-              referentialConstraints: [
-                { property: 'NonExistentFK', referencedProperty: 'MemberKey' }
-              ]
+              referentialConstraints: [{ property: 'NonExistentFK', referencedProperty: 'MemberKey' }]
             }
           ]
         },
@@ -521,9 +511,7 @@ describe('validateCsdl', () => {
               type: 'org.reso.metadata.Member',
               isCollection: false,
               entityTypeName: 'Member',
-              referentialConstraints: [
-                { property: 'ListAgentKey', referencedProperty: 'BadProperty' }
-              ]
+              referentialConstraints: [{ property: 'ListAgentKey', referencedProperty: 'BadProperty' }]
             }
           ]
         },
@@ -557,9 +545,7 @@ describe('validateCsdl', () => {
               type: 'org.reso.metadata.Member',
               isCollection: false,
               entityTypeName: 'Member',
-              referentialConstraints: [
-                { property: 'ListAgentKey', referencedProperty: 'MemberKey' }
-              ]
+              referentialConstraints: [{ property: 'ListAgentKey', referencedProperty: 'MemberKey' }]
             }
           ]
         },
@@ -622,7 +608,9 @@ describe('validateCsdl', () => {
           name: 'Property',
           key: ['ListingKey'],
           properties: [{ name: 'ListingKey', type: 'Edm.String' }],
-          navigationProperties: [{ name: 'Photos', type: 'Collection(org.reso.metadata.Media)', isCollection: true, entityTypeName: 'Media' }]
+          navigationProperties: [
+            { name: 'Photos', type: 'Collection(org.reso.metadata.Media)', isCollection: true, entityTypeName: 'Media' }
+          ]
         },
         { name: 'Media', key: ['MediaKey'], properties: [{ name: 'MediaKey', type: 'Edm.String' }], navigationProperties: [] }
       ]
@@ -635,7 +623,13 @@ describe('validateCsdl', () => {
     const schema: CsdlSchema = {
       ...validSchema,
       entityTypes: [
-        { name: 'Derived', key: ['Id'], properties: [{ name: 'Id', type: 'Edm.String' }], navigationProperties: [], baseType: 'org.reso.metadata.NoBase' }
+        {
+          name: 'Derived',
+          key: ['Id'],
+          properties: [{ name: 'Id', type: 'Edm.String' }],
+          navigationProperties: [],
+          baseType: 'org.reso.metadata.NoBase'
+        }
       ]
     };
     const result = validateCsdl(schema);
@@ -647,7 +641,13 @@ describe('validateCsdl', () => {
     const schema: CsdlSchema = {
       ...validSchema,
       entityTypes: [
-        { name: 'Derived', key: ['Id'], properties: [{ name: 'Id', type: 'Edm.String' }], navigationProperties: [], baseType: 'com.other.ns.Base' }
+        {
+          name: 'Derived',
+          key: ['Id'],
+          properties: [{ name: 'Id', type: 'Edm.String' }],
+          navigationProperties: [],
+          baseType: 'com.other.ns.Base'
+        }
       ]
     };
     const result = validateCsdl(schema);
@@ -690,7 +690,14 @@ describe('validateCsdl', () => {
       }
     ],
     enumTypes: [
-      { name: 'StandardStatus', namespace: ENUMS_NS, members: [{ name: 'Active', value: '0' }, { name: 'Pending', value: '1' }] }
+      {
+        name: 'StandardStatus',
+        namespace: ENUMS_NS,
+        members: [
+          { name: 'Active', value: '0' },
+          { name: 'Pending', value: '1' }
+        ]
+      }
     ]
   });
 

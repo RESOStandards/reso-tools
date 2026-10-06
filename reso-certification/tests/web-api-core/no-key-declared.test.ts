@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { noKeyDeclaredReport } from '../../src/sdk/core.js';
 import type { ODataRequester } from '../../src/test-runner/requester.js';
 import type { EntityType } from '../../src/test-runner/types.js';
 import { NO_KEY_DECLARED, resolveTestParams } from '../../src/web-api-core/sampling.js';
-import { noKeyDeclaredReport } from '../../src/sdk/core.js';
 import type { StandardMap } from '../../src/web-api-core/standard-map.js';
 
 /**
@@ -22,7 +22,7 @@ const standardMap: StandardMap = {
   isStandardValue: () => false,
   standardValues: () => new Set<string>(),
   standardValuesForField: () => undefined,
-  isClosedEnumField: () => false,
+  isClosedEnumField: () => false
 };
 
 const entityType = (keyProperties: ReadonlyArray<string>): EntityType => ({
@@ -30,8 +30,8 @@ const entityType = (keyProperties: ReadonlyArray<string>): EntityType => ({
   keyProperties,
   properties: [
     { name: 'MemberKey', type: 'Edm.String' },
-    { name: 'MemberFirstName', type: 'Edm.String' },
-  ],
+    { name: 'MemberFirstName', type: 'Edm.String' }
+  ]
 });
 
 // Records a server would return, plus a count of how many requests were actually issued.
@@ -46,17 +46,17 @@ const countingRequester = (): { requester: ODataRequester; calls: string[] } => 
           status: 200,
           headers: { 'odata-version': '4.01' },
           body: { value: [{ MemberKey: 'M1', MemberFirstName: 'Ada' }] },
-          rawBody: '',
+          rawBody: ''
         };
-      },
-    },
+      }
+    }
   };
 };
 
 const resolve = (keyProperties: ReadonlyArray<string>, rec = countingRequester()) =>
   resolveTestParams('http://x', 'Member', entityType(keyProperties), 'tok', [], standardMap, undefined, rec.requester).then(p => ({
     params: p,
-    calls: rec.calls,
+    calls: rec.calls
   }));
 
 describe('the key is read from the CSDL, never substituted (#315)', () => {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ODataRequester } from '../../src/test-runner/requester.js';
 import type { ODataResponse } from '../../src/test-runner/types.js';
-import type { FilterScenario } from '../../src/web-api-core/scenarios.js';
 import type { TestParams } from '../../src/web-api-core/sampling.js';
+import type { FilterScenario } from '../../src/web-api-core/scenarios.js';
 import { executeStandardScenario } from '../../src/web-api-core/test-runner.js';
 
 // A conformant 2xx needs the OData-Version header, or assertODataResponse rejects it.
@@ -39,12 +39,11 @@ const params: TestParams = {
   sampleComplete: true
 };
 
-const run = (requester: ODataRequester) =>
-  executeStandardScenario('http://x', 'Property', scenario, params, 'tok', 0, requester);
+const run = (requester: ODataRequester) => executeStandardScenario('http://x', 'Property', scenario, params, 'tok', 0, requester);
 
 // Characterization: locks executeStandardScenario's four outcomes. These assertions are the
 // same ones that were green under vi.mock before the refactor — now the runner takes its client
-// by injection, and behaviour is identical. That equality IS the proof the refactor is safe.
+// by injection, and behavior is identical. That equality IS the proof the refactor is safe.
 describe('executeStandardScenario (characterization — injected test client)', () => {
   it('200 with matching data → accepted + passed', async () => {
     const out = await run(scriptedRequester(response(200, [{ ListingKey: '1', BedroomsTotal: 3 }])));

@@ -1,13 +1,13 @@
-import { describe, it, expect, vi, afterAll } from 'vitest';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { processRcfStream, runRcf, resolveRcfExitCode, type RcfResult } from '../../src/cli/rcf-command.js';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterAll, describe, expect, it, vi } from 'vitest';
+import { type RcfResult, processRcfStream, resolveRcfExitCode, runRcf } from '../../src/cli/rcf-command.js';
 import type { RcfPayload } from '../../src/cli/rcf-input.js';
 import type { DdSchemaValidator } from '../../src/cli/schema-command.js';
-import { computeVariationsViaService } from '../../src/variations/index.js';
 import { serviceError } from '../../src/sdk/common.js';
+import { computeVariationsViaService } from '../../src/variations/index.js';
 
 // Mock only computeVariationsViaService; the real isVariationsAuthError still runs, so the
 // degrade-vs-rethrow branch is exercised against genuine coded service errors.
@@ -28,8 +28,8 @@ describe('processRcfStream', () => {
     const result = await processRcfStream(
       stream([
         { source: 'a', resource: 'Property', version: '2.0', records: [{ ListingKey: '1', City: 'X' }, { ListingKey: '2' }] },
-        { source: 'b', resource: 'Property', records: [{ ListingKey: '3', City: 'Y' }] },
-      ]),
+        { source: 'b', resource: 'Property', records: [{ ListingKey: '3', City: 'Y' }] }
+      ])
     );
     expect(result.version).toBe('2.0'); // first payload that carried one
     expect(result.totalRecords).toBe(3);
@@ -50,7 +50,7 @@ describe('processRcfStream', () => {
   it('strict: throws a schemaFailure on the first payload with errors (fast-fail)', async () => {
     const validator: DdSchemaValidator = { validate: () => ({}), combine: () => ({ totalErrors: 3, report: {} }) };
     await expect(
-      processRcfStream(stream([{ source: 'bad', resource: 'Property', version: '2.0', records: [{}] }]), { validator, strict: true }),
+      processRcfStream(stream([{ source: 'bad', resource: 'Property', version: '2.0', records: [{}] }]), { validator, strict: true })
     ).rejects.toMatchObject({ schemaFailure: true });
   });
 
@@ -66,7 +66,7 @@ describe('runRcf (offline)', () => {
     const result = await runRcf({
       input: resolve(fixtures, 'single-payload.json'),
       generatedOn: '2026-01-01T00:00:00.000Z',
-      runVariations: false,
+      runVariations: false
     });
     expect(result.version).toBe('2.0'); // peeked from @reso.context
     expect(result.variations).toBeUndefined();
@@ -84,7 +84,7 @@ describe('runRcf (offline)', () => {
       version: '2.0',
       schemaValidate: true,
       generatedOn: '2026-01-01T00:00:00.000Z',
-      runVariations: false,
+      runVariations: false
     });
     expect(result.version).toBe('2.0'); // caller-supplied fallback stuck
     expect(result.stats.totalRecords).toBe(2);
@@ -100,7 +100,7 @@ describe('runRcf (offline)', () => {
       version: '2.0',
       schemaValidate: true,
       generatedOn: '2026-01-01T00:00:00.000Z',
-      runVariations: false,
+      runVariations: false
     });
     expect(result.stats.schemaErrors).toBeGreaterThanOrEqual(1);
     expect(JSON.stringify(result.schemaReport ?? result)).toMatch(/@reso\.context/);
@@ -112,7 +112,7 @@ describe('runRcf (offline)', () => {
       version: '2.0',
       schemaValidate: true,
       generatedOn: '2026-01-01T00:00:00.000Z',
-      runVariations: false,
+      runVariations: false
     });
     expect(JSON.stringify(result.schemaReport ?? result)).not.toMatch(/@reso\.context" (value|version|resource)|MUST carry/);
   });
@@ -126,7 +126,7 @@ describe('runRcf (offline)', () => {
       version: '2.0',
       schemaValidate: true,
       generatedOn: '2026-01-01T00:00:00.000Z',
-      runVariations: false,
+      runVariations: false
     });
     expect(result.stats.schemaErrors).toBeGreaterThanOrEqual(1);
     expect(JSON.stringify(result.schemaReport)).toMatch(/@reso\.context/);
@@ -134,7 +134,9 @@ describe('runRcf (offline)', () => {
   });
 
   const tempDirs: string[] = [];
-  afterAll(() => { for (const d of tempDirs) rmSync(d, { recursive: true, force: true }); });
+  afterAll(() => {
+    for (const d of tempDirs) rmSync(d, { recursive: true, force: true });
+  });
   const tempDirWith = (files: Record<string, unknown>): string => {
     const dir = mkdtempSync(resolve(tmpdir(), 'rcf-review-'));
     tempDirs.push(dir);
@@ -145,7 +147,13 @@ describe('runRcf (offline)', () => {
 
   it('a 1.7 context under --version 2.0 is a VERSION MISMATCH error (the declared run version is authoritative, never the context compared with itself)', async () => {
     const dir = tempDirWith({ 'a.json': { '@reso.context': 'urn:reso:metadata:1.7:resource:property', value: [goodRecord] } });
-    const result = await runRcf({ input: dir, version: '2.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    const result = await runRcf({
+      input: dir,
+      version: '2.0',
+      schemaValidate: true,
+      generatedOn: '2026-01-01T00:00:00.000Z',
+      runVariations: false
+    });
     expect(result.stats.schemaErrors).toBeGreaterThanOrEqual(1);
     expect(JSON.stringify(result.schemaReport)).toMatch(/version does not match/);
     expect(resolveRcfExitCode(result)).toBe(1);
@@ -153,12 +161,20 @@ describe('runRcf (offline)', () => {
 
   it('a context naming a Data Dictionary version with no reference (3.0) fails loud with the version named, never a null dereference', async () => {
     const dir = tempDirWith({ 'a.json': { '@reso.context': 'urn:reso:metadata:3.0:resource:property', value: [goodRecord] } });
-    await expect(runRcf({ input: dir, schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false })).rejects.toThrow(/Unsupported Data Dictionary version "3\.0"/);
+    await expect(
+      runRcf({ input: dir, schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false })
+    ).rejects.toThrow(/Unsupported Data Dictionary version "3\.0"/);
   });
 
   it('--version 2.0.0 (the Core form) is accepted as 2.0 on the rcf path', async () => {
     const dir = tempDirWith({ 'a.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:property', value: [goodRecord] } });
-    const result = await runRcf({ input: dir, version: '2.0.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    const result = await runRcf({
+      input: dir,
+      version: '2.0.0',
+      schemaValidate: true,
+      generatedOn: '2026-01-01T00:00:00.000Z',
+      runVariations: false
+    });
     expect(result.version).toBe('2.0');
     expect(result.stats.schemaErrors).toBe(0);
   });
@@ -175,7 +191,7 @@ describe('runRcf (offline)', () => {
 
     const mixed = tempDirWith({
       'good.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:property', value: [goodRecord] },
-      'bad.json': { '@reso.context': 'urn:reso:metadata:2.0', value: [goodRecord, goodRecord] },
+      'bad.json': { '@reso.context': 'urn:reso:metadata:2.0', value: [goodRecord, goodRecord] }
     });
     const r2 = await runRcf({ input: mixed, version: '2.0', generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
     expect(r2.stats.totalRecords).toBe(1); // only the certifiable records; the two invalid-context ones are their own stat
@@ -187,11 +203,26 @@ describe('runRcf (offline)', () => {
 
   it('a well-formed context naming a resource the DD does not define: exit 1 with the "not defined" error under --schema-validate, a schema failure under --strict', async () => {
     const dir = tempDirWith({ 'p.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:propery', value: [goodRecord] } });
-    const result = await runRcf({ input: dir, version: '2.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    const result = await runRcf({
+      input: dir,
+      version: '2.0',
+      schemaValidate: true,
+      generatedOn: '2026-01-01T00:00:00.000Z',
+      runVariations: false
+    });
     expect(result.stats.schemaErrors).toBe(1);
     expect(JSON.stringify(result.schemaReport)).toMatch(/propery.*is not defined in the schema/i);
     expect(resolveRcfExitCode(result)).toBe(1);
-    await expect(runRcf({ input: dir, version: '2.0', schemaValidate: true, strict: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false })).rejects.toMatchObject({ schemaFailure: true });
+    await expect(
+      runRcf({
+        input: dir,
+        version: '2.0',
+        schemaValidate: true,
+        strict: true,
+        generatedOn: '2026-01-01T00:00:00.000Z',
+        runVariations: false
+      })
+    ).rejects.toMatchObject({ schemaFailure: true });
   });
 
   // RCF is taken as-is (Josh, 2026-09-21): the Data Dictionary allows extension, and an RCF submission carries no
@@ -202,27 +233,56 @@ describe('runRcf (offline)', () => {
     const dir = tempDirWith({
       'p.json': {
         '@reso.context': 'urn:reso:metadata:2.0:resource:property',
-        value: [{ ListingKey: 'P1', MyLocalField: 'x', StandardStatus: 'NotAStandardStatus' }],
-      },
+        value: [{ ListingKey: 'P1', MyLocalField: 'x', StandardStatus: 'NotAStandardStatus' }]
+      }
     });
-    const asIs = await runRcf({ input: dir, version: '2.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    const asIs = await runRcf({
+      input: dir,
+      version: '2.0',
+      schemaValidate: true,
+      generatedOn: '2026-01-01T00:00:00.000Z',
+      runVariations: false
+    });
     expect(asIs.stats.schemaErrors).toBe(0); // before: 2 (MUST be advertised: the field, and the enumeration value)
     expect((asIs.schemaReport as { totalWarnings: number }).totalWarnings).toBe(0); // accepted, not warned about
     expect(resolveRcfExitCode(asIs)).toBe(0);
     // `-a` is kept for existing invocations and changes nothing either way
-    const withFlag = await runRcf({ input: dir, version: '2.0', schemaValidate: true, additionalProperties: false, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    const withFlag = await runRcf({
+      input: dir,
+      version: '2.0',
+      schemaValidate: true,
+      additionalProperties: false,
+      generatedOn: '2026-01-01T00:00:00.000Z',
+      runVariations: false
+    });
     expect(withFlag.stats.schemaErrors).toBe(0);
 
-    const wrongType = tempDirWith({ 'p.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:property', value: [{ ListingKey: 'P1', ListPrice: 'not-a-number' }] } });
-    const typed = await runRcf({ input: wrongType, version: '2.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    const wrongType = tempDirWith({
+      'p.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:property', value: [{ ListingKey: 'P1', ListPrice: 'not-a-number' }] }
+    });
+    const typed = await runRcf({
+      input: wrongType,
+      version: '2.0',
+      schemaValidate: true,
+      generatedOn: '2026-01-01T00:00:00.000Z',
+      runVariations: false
+    });
     expect(typed.stats.schemaErrors).toBe(1);
     expect(JSON.stringify(typed.schemaReport)).toMatch(/MUST be number/);
   });
 
   it('RCF: a DD decimal value over its precision is a WARNING, not an error (length, precision and scale are advisory on RCF)', async () => {
     // Property.BathroomsFull is Edm.Decimal precision 3, scale 0 in DD 2.0: the schema caps it at 999
-    const dir = tempDirWith({ 'p.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:property', value: [{ ListingKey: 'P1', BathroomsFull: 12345 }] } });
-    const result = await runRcf({ input: dir, version: '2.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    const dir = tempDirWith({
+      'p.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:property', value: [{ ListingKey: 'P1', BathroomsFull: 12345 }] }
+    });
+    const result = await runRcf({
+      input: dir,
+      version: '2.0',
+      schemaValidate: true,
+      generatedOn: '2026-01-01T00:00:00.000Z',
+      runVariations: false
+    });
     expect(result.stats.schemaErrors).toBe(0); // before: 1 (a MUST via the schema's maximum)
     const report = result.schemaReport as { totalWarnings: number; warnings: Record<string, unknown> };
     expect(report.totalWarnings).toBe(1);
@@ -234,10 +294,20 @@ describe('runRcf (offline)', () => {
     // inference missed the reference map (every field local, no lookups) for 27 of the 41 DD 2.0 resources
     const openHouse = { OpenHouseKey: 'OH1', ListingKey: 'P1', OpenHouseDate: '2026-01-01', OpenHouseType: 'Public' };
     const dir = tempDirWith({ 'oh.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:openhouse', value: [openHouse] } });
-    const result = await runRcf({ input: dir, version: '2.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    const result = await runRcf({
+      input: dir,
+      version: '2.0',
+      schemaValidate: true,
+      generatedOn: '2026-01-01T00:00:00.000Z',
+      runVariations: false
+    });
     expect(result.stats.schemaErrors).toBe(0);
     expect(resolveRcfExitCode(result)).toBe(0);
-    const report = result.metadataReport as { resources: ReadonlyArray<{ resourceName: string }>; fields: ReadonlyArray<{ resourceName: string; fieldName: string; type: string }>; lookups: ReadonlyArray<{ lookupName: string }> };
+    const report = result.metadataReport as {
+      resources: ReadonlyArray<{ resourceName: string }>;
+      fields: ReadonlyArray<{ resourceName: string; fieldName: string; type: string }>;
+      lookups: ReadonlyArray<{ lookupName: string }>;
+    };
     expect(report.resources.map(r => r.resourceName)).toEqual(['OpenHouse']);
     const type = report.fields.find(f => f.resourceName === 'OpenHouse' && f.fieldName === 'OpenHouseType')?.type;
     expect(type).not.toBe('Edm.String'); // the DD enumeration, resolved through the reference map
@@ -251,7 +321,7 @@ describe('runRcf (offline)', () => {
     // clean 2.1 file got a spurious version mismatch
     const dir = tempDirWith({
       'a-bad.json': { '@reso.context': 'urn:reso:metadata:2.1', value: [goodRecord] },
-      'b-good.json': { '@reso.context': 'urn:reso:metadata:2.1:resource:property', value: [goodRecord] },
+      'b-good.json': { '@reso.context': 'urn:reso:metadata:2.1:resource:property', value: [goodRecord] }
     });
     const result = await runRcf({ input: dir, schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
     expect(result.version).toBe('2.1');
@@ -261,14 +331,22 @@ describe('runRcf (offline)', () => {
   it('a file whose @reso.context is present but unparseable is INGESTED and reported malformed, not silently dropped from a mixed directory', async () => {
     const dir = tempDirWith({
       'good.json': { '@reso.context': 'urn:reso:metadata:2.0:resource:property', value: [goodRecord] },
-      'bad.json': { '@reso.context': 'urn:reso:metadata:2.0', value: [goodRecord, goodRecord] },
+      'bad.json': { '@reso.context': 'urn:reso:metadata:2.0', value: [goodRecord, goodRecord] }
     });
-    const result = await runRcf({ input: dir, version: '2.0', schemaValidate: true, generatedOn: '2026-01-01T00:00:00.000Z', runVariations: false });
+    const result = await runRcf({
+      input: dir,
+      version: '2.0',
+      schemaValidate: true,
+      generatedOn: '2026-01-01T00:00:00.000Z',
+      runVariations: false
+    });
     expect(result.stats.totalRecords).toBe(1); // the certifiable records; before: bad.json was dropped as "not an RCF payload" and the run certified on good.json alone
     expect(result.stats.invalidContextRecords).toBe(2);
     expect(result.stats.schemaErrors).toBe(1); // exactly one counted error for the one bad file (round 2b: it was two, the second keyed under "")
     expect(JSON.stringify(result.schemaReport)).toMatch(/MUST be urn:reso:metadata/); // the MALFORMED message, not merely REQUIRED
-    const resourceKeys = Object.values((result.schemaReport as { errors: Record<string, { resources: Record<string, unknown> }> }).errors).flatMap(e => Object.keys(e.resources));
+    const resourceKeys = Object.values(
+      (result.schemaReport as { errors: Record<string, { resources: Record<string, unknown> }> }).errors
+    ).flatMap(e => Object.keys(e.resources));
     expect(resourceKeys).not.toContain(''); // the finding is keyed under a named resource, never ""
     expect(resourceKeys).toEqual(['_INVALID_']);
     expect(resolveRcfExitCode(result)).toBe(1);
@@ -282,7 +360,7 @@ describe('runRcf (offline)', () => {
       version: '2.0',
       schemaValidate: true,
       generatedOn: '2026-01-01T00:00:00.000Z',
-      runVariations: false,
+      runVariations: false
     });
     expect(result.stats.schemaErrors).toBeGreaterThan(0);
     expect(resolveRcfExitCode(result)).toBe(1);
@@ -295,7 +373,7 @@ describe('runRcf (offline)', () => {
       input: resolve(fixtures, 'single-payload.json'),
       generatedOn: '2026-01-01T00:00:00.000Z',
       runVariations: true,
-      bearerToken: 'test-token',
+      bearerToken: 'test-token'
     });
     expect(result.variations).toBeUndefined();
     expect(result.variationsError).toMatch(/limit ~6 MB/);
@@ -310,8 +388,8 @@ describe('runRcf (offline)', () => {
         input: resolve(fixtures, 'single-payload.json'),
         generatedOn: '2026-01-01T00:00:00.000Z',
         runVariations: true,
-        bearerToken: 'test-token',
-      }),
+        bearerToken: 'test-token'
+      })
     ).rejects.toThrow(/invalid client credentials/);
   });
 });
@@ -325,14 +403,11 @@ describe('resolveRcfExitCode', () => {
     schemaErrors: 0,
     invalidContextFiles: 0,
     invalidContextRecords: 0,
-    ...over,
+    ...over
   });
-  const result = (
-    over: Partial<RcfResult['stats']>,
-    variationsError?: string,
-  ): Pick<RcfResult, 'stats' | 'variationsError'> => ({
+  const result = (over: Partial<RcfResult['stats']>, variationsError?: string): Pick<RcfResult, 'stats' | 'variationsError'> => ({
     stats: stats(over),
-    ...(variationsError ? { variationsError } : {}),
+    ...(variationsError ? { variationsError } : {})
   });
 
   it('exits 2 when zero records were ingested — an empty/unreadable submission must not read as a clean pass', () => {

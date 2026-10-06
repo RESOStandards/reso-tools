@@ -1,12 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { mergeWithLookupResource } from '../../src/metadata/lookup-resource.js';
 
 const require = createRequire(import.meta.url);
-const { generateJsonSchema, validate, combineErrors } = require(
-  resolve(import.meta.dirname, '../../src/legacy/lib/schema/index.js')
-);
+const { generateJsonSchema, validate, combineErrors } = require(resolve(import.meta.dirname, '../../src/legacy/lib/schema/index.js'));
 
 // End-to-end coverage for a dependency the adversarial pass surfaced: the fail-closed / advertised-membership
 // guarantee relies on the /Lookup MERGE having rewritten a STRING-representation enum field's type from
@@ -45,21 +43,32 @@ const baseReport = (): MergeReport =>
 
 const raw = (values: ReadonlyArray<string>): RawLookup[] =>
   values.map(
-    (v) =>
-      ({ LookupKey: `k-${v}`, LookupName: 'StandardStatus', LookupValue: v, ModificationTimestamp: '2026-01-01T00:00:00Z' }) as unknown as RawLookup
+    v =>
+      ({
+        LookupKey: `k-${v}`,
+        LookupName: 'StandardStatus',
+        LookupValue: v,
+        ModificationTimestamp: '2026-01-01T00:00:00Z'
+      }) as unknown as RawLookup
   );
 
 const errorsE2E = async (advertised: ReadonlyArray<string>, record: Record<string, unknown>): Promise<number> => {
   const merged = mergeWithLookupResource(baseReport(), raw(advertised));
   const schema = await generateJsonSchema({ metadataReportJson: merged, additionalProperties: false });
-  const errorMap = validate({ jsonSchema: schema, jsonPayload: { value: [record] }, resourceName: 'Property', version: '2.0', errorMap: {} });
+  const errorMap = validate({
+    jsonSchema: schema,
+    jsonPayload: { value: [record] },
+    resourceName: 'Property',
+    version: '2.0',
+    errorMap: {}
+  });
   return combineErrors(errorMap).totalErrors as number;
 };
 
 describe('schema fail-closed — through the REAL /Lookup merge (type-rewrite dependency)', () => {
   it('the merge rewrites a string-rep enum field type to its LookupName (the load-bearing rewrite)', () => {
     const merged = mergeWithLookupResource(baseReport(), raw([]));
-    const ss = merged.fields.find((f) => f.fieldName === 'StandardStatus');
+    const ss = merged.fields.find(f => f.fieldName === 'StandardStatus');
     // NOT 'Edm.String' — if this regresses, the field never reaches isLookupField and the hole reopens.
     expect(ss?.type).toBe('StandardStatus');
   });

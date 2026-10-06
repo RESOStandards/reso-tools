@@ -1,8 +1,8 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtemp, rm, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runReplicate, REPLICATION_STRATEGY_VALUES } from '../../src/cli/replicate-command.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import { REPLICATION_STRATEGY_VALUES, runReplicate } from '../../src/cli/replicate-command.js';
 import { startReplicationMockServer } from './replication-mock-server.js';
 
 const RESOURCE = 'Property';
@@ -13,7 +13,7 @@ const distinctRecords = [
   { ListingKey: 'P2', ModificationTimestamp: '2024-02-01T00:00:00.000Z' },
   { ListingKey: 'P3', ModificationTimestamp: '2024-03-01T00:00:00.000Z' },
   { ListingKey: 'P4', ModificationTimestamp: '2024-04-01T00:00:00.000Z' },
-  { ListingKey: 'P5', ModificationTimestamp: '2024-05-01T00:00:00.000Z' },
+  { ListingKey: 'P5', ModificationTimestamp: '2024-05-01T00:00:00.000Z' }
 ];
 
 /** Collect the ListingKeys across every saved page — the proof each strategy fetched all rows and terminated. */
@@ -39,10 +39,7 @@ afterEach(async () => {
 // Returns the distinct ListingKeys the run actually pulled and saved — the ground truth for full traversal +
 // termination. (We assert on WHICH records, not the run's record-count stat: that stat comes from the legacy
 // engine's 500ms-throttled onProgress, which never fires on a sub-500ms test run — see replicate-command.ts.)
-const replicateAgainst = async (
-  records: ReadonlyArray<Record<string, unknown>>,
-  strategy: string,
-): Promise<ReadonlyArray<string>> => {
+const replicateAgainst = async (records: ReadonlyArray<Record<string, unknown>>, strategy: string): Promise<ReadonlyArray<string>> => {
   const server = await startReplicationMockServer({ resource: RESOURCE, records });
   cleanups.push(server.close);
   const outputPath = await mkdtemp(join(tmpdir(), 'replicate-'));
@@ -58,7 +55,7 @@ const replicateAgainst = async (
     outputPath,
     shouldSaveResults: true, // raw pages are what savedKeys reads back
     shouldGenerateReports: false, // single-resource mode has no metadata to score against
-    secondsDelayBetweenRequests: 0, // no inter-request sleep in tests
+    secondsDelayBetweenRequests: 0 // no inter-request sleep in tests
   });
 
   return savedKeys(outputPath, RESOURCE);
@@ -80,7 +77,7 @@ describe('runReplicate — timestamp strategies across a boundary-straddling col
     { ListingKey: 'C2', ModificationTimestamp: '2024-02-01T00:00:00.000Z' },
     { ListingKey: 'C3', ModificationTimestamp: '2024-03-01T00:00:00.000Z' },
     { ListingKey: 'C4', ModificationTimestamp: '2024-03-01T00:00:00.000Z' }, // shares C3's timestamp
-    { ListingKey: 'C5', ModificationTimestamp: '2024-04-01T00:00:00.000Z' },
+    { ListingKey: 'C5', ModificationTimestamp: '2024-04-01T00:00:00.000Z' }
   ];
 
   it.each(['TimestampAsc', 'TimestampDesc'])('%s reaches every record across the collision', async strategy => {
@@ -98,11 +95,11 @@ describe('runReplicate — --strict propagates a schema-validation failure (no f
     resources: [{ resourceName: RESOURCE }],
     fields: [
       { resourceName: RESOURCE, fieldName: 'ListingKey', type: 'Edm.String', annotations: [] },
-      { resourceName: RESOURCE, fieldName: 'ModificationTimestamp', type: 'Edm.DateTimeOffset', annotations: [] },
+      { resourceName: RESOURCE, fieldName: 'ModificationTimestamp', type: 'Edm.DateTimeOffset', annotations: [] }
     ],
     lookups: [],
     actions: [],
-    functions: [],
+    functions: []
   };
   // additionalProperties:false in the generated schema → an unknown field is a validation error.
   const violatingRecord = { ListingKey: 'X1', ModificationTimestamp: '2024-01-01T00:00:00.000Z', BogusExtraField: 'nope' };
@@ -125,8 +122,8 @@ describe('runReplicate — --strict propagates a schema-validation failure (no f
         version: '2.0',
         jsonSchemaValidation: true,
         strictMode: true,
-        secondsDelayBetweenRequests: 0,
-      }),
+        secondsDelayBetweenRequests: 0
+      })
     ).rejects.toThrow(/[Ss]chema validation/);
   });
 
@@ -150,7 +147,7 @@ describe('runReplicate — --strict propagates a schema-validation failure (no f
       outputPath,
       version: '2.0',
       jsonSchemaValidation: true,
-      secondsDelayBetweenRequests: 0,
+      secondsDelayBetweenRequests: 0
     });
     const written = await readdir(outputPath); // the reports are written at outputPath itself
     expect(written).toContain('data-availability-report.json');
@@ -161,7 +158,11 @@ describe('runReplicate — --strict propagates a schema-validation failure (no f
   it('a run whose only findings are warnings writes the warnings file beside the analytics reports (the call site, end to end)', async () => {
     // a well-formed page context naming another resource: a warning on the transport path, no error
     const record = { ListingKey: 'W1', ModificationTimestamp: '2024-01-01T00:00:00.000Z' };
-    const server = await startReplicationMockServer({ resource: RESOURCE, records: [record], pageContext: 'urn:reso:metadata:2.0:resource:member' });
+    const server = await startReplicationMockServer({
+      resource: RESOURCE,
+      records: [record],
+      pageContext: 'urn:reso:metadata:2.0:resource:member'
+    });
     cleanups.push(server.close);
     const outputPath = await mkdtemp(join(tmpdir(), 'replicate-warn-'));
     cleanups.push(() => rm(outputPath, { recursive: true, force: true }));
@@ -176,7 +177,7 @@ describe('runReplicate — --strict propagates a schema-validation failure (no f
       outputPath,
       version: '2.0',
       jsonSchemaValidation: true,
-      secondsDelayBetweenRequests: 0,
+      secondsDelayBetweenRequests: 0
     });
     const dir = outputPath; // the reports are written at outputPath itself
     const written = await readdir(dir);
@@ -194,11 +195,8 @@ describe('runReplicate — --strict propagates a schema-validation failure (no f
     const report21 = {
       ...minimalReport,
       version: '2.1',
-      fields: [
-        ...minimalReport.fields,
-        { resourceName: RESOURCE, fieldName: 'MLSAreaMajor', type: CITY, annotations: [] },
-      ],
-      lookups: [{ lookupName: CITY, lookupValue: 'SampleCity', type: 'Edm.Int32', annotations: [] }],
+      fields: [...minimalReport.fields, { resourceName: RESOURCE, fieldName: 'MLSAreaMajor', type: CITY, annotations: [] }],
+      lookups: [{ lookupName: CITY, lookupValue: 'SampleCity', type: 'Edm.Int32', annotations: [] }]
     };
     const record = { ListingKey: 'E1', ModificationTimestamp: '2024-01-01T00:00:00.000Z', MLSAreaMajor: 'NotAnAdvertisedValue' };
     const server = await startReplicationMockServer({ resource: RESOURCE, records: [record] });
@@ -216,7 +214,7 @@ describe('runReplicate — --strict propagates a schema-validation failure (no f
       outputPath,
       version: '2.1.0',
       jsonSchemaValidation: true,
-      secondsDelayBetweenRequests: 0,
+      secondsDelayBetweenRequests: 0
     });
     const written = await readdir(outputPath);
     expect(written).not.toContain('data-availability-schema-validation-errors.json'); // before: the 2.1 exemption was missed under "2.1.0" → error
@@ -231,8 +229,8 @@ describe('runReplicate — --strict propagates a schema-validation failure (no f
         bearerToken: 'test-token',
         resourceName: RESOURCE, // single-resource, no metadata
         outputPath: '.',
-        jsonSchemaValidation: true,
-      }),
+        jsonSchemaValidation: true
+      })
     ).rejects.toThrow(/requires a metadata report/);
   });
 });

@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const { runUpiTests } = require(resolve(import.meta.dirname, '../../src/legacy/lib/certification/upi/index.js'));
@@ -8,8 +8,8 @@ const { parseUpi, validateCountrySubdivision, buildCountrySubdivisionCaches } = 
   resolve(import.meta.dirname, '../../src/legacy/lib/upi/index.js')
 );
 
-const KNOWN_GOOD_UPI = 'urn:reso:upi:2.0:US:48201:12345 parcel number',
-  KNOWN_GOOD_UPI_WITH_SUBCOMPONENT = `${KNOWN_GOOD_UPI}:sub:test parcel subcomponent`;
+const KNOWN_GOOD_UPI = 'urn:reso:upi:2.0:US:48201:12345 parcel number';
+const KNOWN_GOOD_UPI_WITH_SUBCOMPONENT = `${KNOWN_GOOD_UPI}:sub:test parcel subcomponent`;
 
 describe('UPI Parsing Tests', () => {
   it('Should have required properties with a known-good UPI', async () => {

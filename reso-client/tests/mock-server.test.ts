@@ -18,7 +18,7 @@ describe('mock server harness', () => {
     const b = await (await fetch(`${server.url}/Member`)).json();
     expect(a).toEqual({ value: [1] });
     expect(b).toEqual({ value: [2] });
-    expect(server.requests.map((r) => r.url)).toEqual(['/Property', '/Member']);
+    expect(server.requests.map(r => r.url)).toEqual(['/Property', '/Member']);
   });
 
   it('serves a scripted 429 with a Retry-After header', async () => {
@@ -59,7 +59,7 @@ describe('mock server harness', () => {
   });
 
   it('falls back to a handler when the queue is empty', async () => {
-    server.setHandler((req) => (req.url === '/Media' ? { status: 404 } : { status: 200 }));
+    server.setHandler(req => (req.url === '/Media' ? { status: 404 } : { status: 200 }));
     expect((await fetch(`${server.url}/Media`)).status).toBe(404);
     expect((await fetch(`${server.url}/Property`)).status).toBe(200);
   });

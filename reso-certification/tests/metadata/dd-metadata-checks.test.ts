@@ -1,12 +1,20 @@
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import type { MetadataReport, MetadataReportLookup } from '@reso-standards/reso-metadata-utils';
+import { describe, expect, it } from 'vitest';
 import {
-  checkDisallowedSynonyms, checkClosedEnumValues, checkStandardLookupValuePresent, checkFieldTypes, checkExpansionStructure, checkSuggestedMaxConstraints,
-  checkLookupResourceFields, checkLookupNameAnnotations, runDdMetadataChecks, LOOKUP_MANDATORY_FIELDS,
+  LOOKUP_MANDATORY_FIELDS,
+  checkClosedEnumValues,
+  checkDisallowedSynonyms,
+  checkExpansionStructure,
+  checkFieldTypes,
+  checkLookupNameAnnotations,
+  checkLookupResourceFields,
+  checkStandardLookupValuePresent,
+  checkSuggestedMaxConstraints,
+  runDdMetadataChecks
 } from '../../src/metadata/dd-metadata-checks.js';
 import type { DdReference } from '../../src/metadata/dd-metadata-checks.js';
 import { generateReferenceArtifacts } from '../../src/metadata/reference-artifacts.js';
-import type { MetadataReport, MetadataReportLookup } from '@reso-standards/reso-metadata-utils';
 
 const createRequire = (await import('node:module')).createRequire;
 const require = createRequire(import.meta.url);
@@ -15,65 +23,100 @@ const { getReferenceMetadata } = require(resolve(import.meta.dirname, '../../src
 const SN = 'RESO.OData.Metadata.StandardName';
 
 const emptyReport = (fields: ReadonlyArray<{ resourceName: string; fieldName: string }>): MetadataReport => ({
-  description: 'test', version: '2.1', generatedOn: '2026-06-21T00:00:00.000Z',
-  resources: [], fields: fields.map((f) => ({ ...f, type: 'Edm.String', annotations: [] })), lookups: [], actions: [], functions: [],
+  description: 'test',
+  version: '2.1',
+  generatedOn: '2026-06-21T00:00:00.000Z',
+  resources: [],
+  fields: fields.map(f => ({ ...f, type: 'Edm.String', annotations: [] })),
+  lookups: [],
+  actions: [],
+  functions: []
 });
 
 const makeReport = (
-  fields: ReadonlyArray<{ resourceName: string; fieldName: string; type: string; isCollection?: boolean; isFlags?: boolean; isEnumeration?: boolean; isExpansion?: boolean; maxLength?: number; precision?: number; scale?: number; annotations?: ReadonlyArray<{ term: string; value: string }> }>,
-  lookups: ReadonlyArray<MetadataReportLookup>,
+  fields: ReadonlyArray<{
+    resourceName: string;
+    fieldName: string;
+    type: string;
+    isCollection?: boolean;
+    isFlags?: boolean;
+    isEnumeration?: boolean;
+    isExpansion?: boolean;
+    maxLength?: number;
+    precision?: number;
+    scale?: number;
+    annotations?: ReadonlyArray<{ term: string; value: string }>;
+  }>,
+  lookups: ReadonlyArray<MetadataReportLookup>
 ): MetadataReport => ({
-  description: 'test', version: '2.1', generatedOn: '2026-06-21T00:00:00.000Z',
-  resources: [], fields: fields.map((f) => ({ ...f, annotations: f.annotations ?? [] })), lookups, actions: [], functions: [],
+  description: 'test',
+  version: '2.1',
+  generatedOn: '2026-06-21T00:00:00.000Z',
+  resources: [],
+  fields: fields.map(f => ({ ...f, annotations: f.annotations ?? [] })),
+  lookups,
+  actions: [],
+  functions: []
 });
 
 describe('checkDisallowedSynonyms', () => {
   // The Commander's StandardStatus scenario: NormalizedListingStatus / RetsStatus must NOT exist.
   const reference: DdReference = {
     fields: [
-      { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus', synonyms: 'NormalizedListingStatus, RetsStatus' },
-      { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' },
+      {
+        resourceName: 'Property',
+        fieldName: 'StandardStatus',
+        type: 'org.reso.metadata.enums.StandardStatus',
+        synonyms: 'NormalizedListingStatus, RetsStatus'
+      },
+      { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' }
     ],
-    lookups: [],
+    lookups: []
   };
 
   it('flags a provider field that uses a disallowed synonym', () => {
-    const findings = checkDisallowedSynonyms(emptyReport([
-      { resourceName: 'Property', fieldName: 'ListPrice' },
-      { resourceName: 'Property', fieldName: 'NormalizedListingStatus' },
-    ]), reference);
+    const findings = checkDisallowedSynonyms(
+      emptyReport([
+        { resourceName: 'Property', fieldName: 'ListPrice' },
+        { resourceName: 'Property', fieldName: 'NormalizedListingStatus' }
+      ]),
+      reference
+    );
     expect(findings).toHaveLength(1);
     expect(findings[0]).toMatchObject({ check: 'disallowed-synonym', resourceName: 'Property', fieldName: 'NormalizedListingStatus' });
     expect(findings[0].message).toContain('StandardStatus');
   });
 
   it('passes a provider that uses only standard field names', () => {
-    expect(checkDisallowedSynonyms(emptyReport([
-      { resourceName: 'Property', fieldName: 'StandardStatus' },
-      { resourceName: 'Property', fieldName: 'ListPrice' },
-    ]), reference)).toEqual([]);
+    expect(
+      checkDisallowedSynonyms(
+        emptyReport([
+          { resourceName: 'Property', fieldName: 'StandardStatus' },
+          { resourceName: 'Property', fieldName: 'ListPrice' }
+        ]),
+        reference
+      )
+    ).toEqual([]);
   });
 
   it('is resource-scoped: the synonym name in a DIFFERENT resource is not flagged', () => {
-    expect(checkDisallowedSynonyms(emptyReport([
-      { resourceName: 'Member', fieldName: 'NormalizedListingStatus' },
-    ]), reference)).toEqual([]);
+    expect(checkDisallowedSynonyms(emptyReport([{ resourceName: 'Member', fieldName: 'NormalizedListingStatus' }]), reference)).toEqual([]);
   });
 
   it('does not flag a synonym that is itself a standard field (collision guard)', () => {
     const refWithCollision: DdReference = {
       fields: [
         { resourceName: 'Property', fieldName: 'A', type: 'Edm.String', synonyms: 'B' },
-        { resourceName: 'Property', fieldName: 'B', type: 'Edm.String' }, // B is also a standard field
+        { resourceName: 'Property', fieldName: 'B', type: 'Edm.String' } // B is also a standard field
       ],
-      lookups: [],
+      lookups: []
     };
     expect(checkDisallowedSynonyms(emptyReport([{ resourceName: 'Property', fieldName: 'B' }]), refWithCollision)).toEqual([]);
   });
 
   // Self-test invariant: the DD reference, checked against itself, MUST be clean — the standard
   // never uses its own synonyms as field names. (Verified across dd-1.7/2.0/2.1.)
-  it.each(['2.0', '2.1'])('DD %s reference passes the disallowed-synonym gate clean', (version) => {
+  it.each(['2.0', '2.1'])('DD %s reference passes the disallowed-synonym gate clean', version => {
     const ref = getReferenceMetadata(version) as MetadataReport & DdReference;
     expect(checkDisallowedSynonyms(ref, ref)).toEqual([]);
   });
@@ -85,52 +128,79 @@ describe('checkClosedEnumValues', () => {
   const reference: DdReference = {
     fields: [
       { resourceName: 'Property', fieldName: 'StandardStatus', type: SS, lookupStatus: 'Locked with Enumerations' },
-      { resourceName: 'Property', fieldName: 'OpenField', type: OPEN, lookupStatus: 'Open with Enumerations' },
+      { resourceName: 'Property', fieldName: 'OpenField', type: OPEN, lookupStatus: 'Open with Enumerations' }
     ],
     lookups: [
       { lookupName: SS, lookupValue: 'Active', annotations: [{ term: SN, value: 'Active' }] },
       { lookupName: SS, lookupValue: 'ActiveUnderContract', annotations: [{ term: SN, value: 'Active Under Contract' }] },
-      { lookupName: OPEN, lookupValue: 'A', annotations: [{ term: SN, value: 'A' }] },
-    ],
+      { lookupName: OPEN, lookupValue: 'A', annotations: [{ term: SN, value: 'A' }] }
+    ]
   };
 
   it('flags a value outside a closed enumeration', () => {
-    const findings = checkClosedEnumValues(makeReport(
-      [{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS }],
-      [
-        { lookupName: SS, lookupValue: 'Active', type: 'Edm.Int32', annotations: [{ term: SN, value: 'Active' }] },
-        { lookupName: SS, lookupValue: 'Foreclosure', type: 'Edm.Int32', annotations: [{ term: SN, value: 'Foreclosure' }] }, // LOCAL
-      ]), reference);
+    const findings = checkClosedEnumValues(
+      makeReport(
+        [{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS }],
+        [
+          { lookupName: SS, lookupValue: 'Active', type: 'Edm.Int32', annotations: [{ term: SN, value: 'Active' }] },
+          { lookupName: SS, lookupValue: 'Foreclosure', type: 'Edm.Int32', annotations: [{ term: SN, value: 'Foreclosure' }] } // LOCAL
+        ]
+      ),
+      reference
+    );
     expect(findings).toHaveLength(1);
     expect(findings[0]).toMatchObject({ check: 'closed-enum-value', resourceName: 'Property', fieldName: 'StandardStatus' });
     expect(findings[0].message).toContain('Foreclosure');
   });
 
   it('passes when all closed-enum values are standard', () => {
-    expect(checkClosedEnumValues(makeReport(
-      [{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS }],
-      [
-        { lookupName: SS, lookupValue: 'Active', type: 'Edm.Int32', annotations: [{ term: SN, value: 'Active' }] },
-        { lookupName: SS, lookupValue: 'ActiveUnderContract', type: 'Edm.Int32', annotations: [{ term: SN, value: 'Active Under Contract' }] },
-      ]), reference)).toEqual([]);
+    expect(
+      checkClosedEnumValues(
+        makeReport(
+          [{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS }],
+          [
+            { lookupName: SS, lookupValue: 'Active', type: 'Edm.Int32', annotations: [{ term: SN, value: 'Active' }] },
+            {
+              lookupName: SS,
+              lookupValue: 'ActiveUnderContract',
+              type: 'Edm.Int32',
+              annotations: [{ term: SN, value: 'Active Under Contract' }]
+            }
+          ]
+        ),
+        reference
+      )
+    ).toEqual([]);
   });
 
   it('permits a value that matches by StandardName even if the machine value differs', () => {
-    expect(checkClosedEnumValues(makeReport(
-      [{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS }],
-      // machine 'AUC' is non-standard, but its StandardName is the standard display form → allowed.
-      [{ lookupName: SS, lookupValue: 'AUC', type: 'Edm.Int32', annotations: [{ term: SN, value: 'Active Under Contract' }] }]), reference)).toEqual([]);
+    expect(
+      checkClosedEnumValues(
+        makeReport(
+          [{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS }],
+          // machine 'AUC' is non-standard, but its StandardName is the standard display form → allowed.
+          [{ lookupName: SS, lookupValue: 'AUC', type: 'Edm.Int32', annotations: [{ term: SN, value: 'Active Under Contract' }] }]
+        ),
+        reference
+      )
+    ).toEqual([]);
   });
 
   it('does NOT check open enumerations (local values there are mapping variations)', () => {
-    expect(checkClosedEnumValues(makeReport(
-      [{ resourceName: 'Property', fieldName: 'OpenField', type: OPEN }],
-      [{ lookupName: OPEN, lookupValue: 'SomethingLocal', type: 'Edm.Int32', annotations: [] }]), reference)).toEqual([]);
+    expect(
+      checkClosedEnumValues(
+        makeReport(
+          [{ resourceName: 'Property', fieldName: 'OpenField', type: OPEN }],
+          [{ lookupName: OPEN, lookupValue: 'SomethingLocal', type: 'Edm.Int32', annotations: [] }]
+        ),
+        reference
+      )
+    ).toEqual([]);
   });
 
   // Self-test invariant: the DD reference's closed enums contain exactly the standard values, so the
   // reference checked against itself MUST be clean.
-  it.each(['2.0', '2.1'])('DD %s reference passes the closed-enum gate clean', (version) => {
+  it.each(['2.0', '2.1'])('DD %s reference passes the closed-enum gate clean', version => {
     const ref = getReferenceMetadata(version) as MetadataReport & DdReference;
     expect(checkClosedEnumValues(ref, ref)).toEqual([]);
   });
@@ -144,54 +214,98 @@ describe('checkFieldTypes', () => {
       { resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String' },
       { resourceName: 'Property', fieldName: 'BedroomsTotal', type: 'Edm.Int64' },
       { resourceName: 'Property', fieldName: 'StandardStatus', type: SS, isEnumeration: true, isCollection: false },
-      { resourceName: 'Property', fieldName: 'Appliances', type: 'org.reso.metadata.enums.Appliances', isEnumeration: true, isCollection: true },
+      {
+        resourceName: 'Property',
+        fieldName: 'Appliances',
+        type: 'org.reso.metadata.enums.Appliances',
+        isEnumeration: true,
+        isCollection: true
+      }
     ],
-    lookups: [],
+    lookups: []
   };
   const enumLookup = (name: string): MetadataReportLookup => ({ lookupName: name, lookupValue: 'X', type: 'Edm.Int32', annotations: [] });
 
   it('passes a primitive that maps to the DD type', () => {
-    expect(checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String' }], []), reference)).toEqual([]);
+    expect(
+      checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String' }], []), reference)
+    ).toEqual([]);
   });
 
   it('flags a primitive with the wrong EDM type', () => {
-    const findings = checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'BedroomsTotal', type: 'Edm.String' }], []), reference);
+    const findings = checkFieldTypes(
+      makeReport([{ resourceName: 'Property', fieldName: 'BedroomsTotal', type: 'Edm.String' }], []),
+      reference
+    );
     expect(findings).toHaveLength(1);
     expect(findings[0]).toMatchObject({ check: 'field-type', fieldName: 'BedroomsTotal' });
     expect(findings[0].message).toContain('Integer');
   });
 
   it('accepts a single enumeration as Edm.String + Lookup Resource', () => {
-    expect(checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'StandardStatus', type: 'Edm.String', isEnumeration: true }], []), reference)).toEqual([]);
+    expect(
+      checkFieldTypes(
+        makeReport([{ resourceName: 'Property', fieldName: 'StandardStatus', type: 'Edm.String', isEnumeration: true }], []),
+        reference
+      )
+    ).toEqual([]);
   });
 
   it('accepts a single enumeration as an EnumType FQDN with an Int underlying type', () => {
-    expect(checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS, isEnumeration: true }], [enumLookup(SS)]), reference)).toEqual([]);
+    expect(
+      checkFieldTypes(
+        makeReport([{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS, isEnumeration: true }], [enumLookup(SS)]),
+        reference
+      )
+    ).toEqual([]);
   });
 
   it('flags a single enumeration declared as a collection', () => {
-    const findings = checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS, isEnumeration: true, isCollection: true }], [enumLookup(SS)]), reference);
+    const findings = checkFieldTypes(
+      makeReport(
+        [{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS, isEnumeration: true, isCollection: true }],
+        [enumLookup(SS)]
+      ),
+      reference
+    );
     expect(findings[0].message).toContain('cannot be collections');
   });
 
   it('flags a single enumeration EnumType with IsFlags=true', () => {
-    const findings = checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS, isEnumeration: true, isFlags: true }], [enumLookup(SS)]), reference);
+    const findings = checkFieldTypes(
+      makeReport(
+        [{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS, isEnumeration: true, isFlags: true }],
+        [enumLookup(SS)]
+      ),
+      reference
+    );
     expect(findings[0].message).toContain('IsFlags');
   });
 
   it('accepts a multiple enumeration as Collection(Edm.String)', () => {
-    expect(checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'Appliances', type: 'Collection(Edm.String)', isEnumeration: true, isCollection: true }], []), reference)).toEqual([]);
+    expect(
+      checkFieldTypes(
+        makeReport(
+          [{ resourceName: 'Property', fieldName: 'Appliances', type: 'Collection(Edm.String)', isEnumeration: true, isCollection: true }],
+          []
+        ),
+        reference
+      )
+    ).toEqual([]);
   });
 
   it('flags a multiple enumeration declared as a non-collection Edm.String', () => {
-    const findings = checkFieldTypes(makeReport([{ resourceName: 'Property', fieldName: 'Appliances', type: 'Edm.String', isEnumeration: true, isCollection: false }], []), reference);
+    const findings = checkFieldTypes(
+      makeReport([{ resourceName: 'Property', fieldName: 'Appliances', type: 'Edm.String', isEnumeration: true, isCollection: false }], []),
+      reference
+    );
     expect(findings[0].message).toContain('Collection(Edm.String)');
   });
 
   // Self-test invariant: the GENERATED reference's field types satisfy their declared DD types. The
   // raw dd-json types numerics as Edm.Decimal; generateReferenceArtifacts emits Edm.Int64 for the
   // scale-0 ones (matching the Commander), which is what the gate actually checks.
-  it.each(['2.0', '2.1'])('DD %s generated reference passes the field-type gate clean', (version) => {
+  it.each(['2.0', '2.1'])('DD %s generated reference passes the field-type gate clean', version => {
     const ref = getReferenceMetadata(version) as MetadataReport & DdReference;
     const { metadataReport } = generateReferenceArtifacts(ref, ref.resources as unknown as string[], 'string', version);
     expect(checkFieldTypes(metadataReport, ref)).toEqual([]);
@@ -205,17 +319,22 @@ describe('checkExpansionStructure', () => {
   const reference: DdReference = {
     fields: [
       { resourceName: 'Property', fieldName: 'Media', type: 'Collection(org.reso.metadata.Media)', isExpansion: true },
-      { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' },
+      { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' }
     ],
-    lookups: [],
+    lookups: []
   };
 
   it('flags a standard expansion modeled as a non-expansion (e.g. an OData Complex Type)', () => {
-    const findings = checkExpansionStructure(makeReport(
-      [
-        { resourceName: 'Property', fieldName: 'Media', type: 'Collection(Property.MediaType)', isExpansion: false },
-        { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' },
-      ], []), reference);
+    const findings = checkExpansionStructure(
+      makeReport(
+        [
+          { resourceName: 'Property', fieldName: 'Media', type: 'Collection(Property.MediaType)', isExpansion: false },
+          { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' }
+        ],
+        []
+      ),
+      reference
+    );
     expect(findings).toHaveLength(1);
     expect(findings[0]).toMatchObject({ check: 'expansion-structure', severity: 'error', resourceName: 'Property', fieldName: 'Media' });
     expect(findings[0].message).toContain('NavigationProperty');
@@ -223,27 +342,34 @@ describe('checkExpansionStructure', () => {
   });
 
   it('flags an expansion declared as a plain field (no isExpansion flag at all)', () => {
-    const findings = checkExpansionStructure(makeReport(
-      [{ resourceName: 'Property', fieldName: 'Media', type: 'Edm.String' }], []), reference);
+    const findings = checkExpansionStructure(
+      makeReport([{ resourceName: 'Property', fieldName: 'Media', type: 'Edm.String' }], []),
+      reference
+    );
     expect(findings).toHaveLength(1);
     expect(findings[0]).toMatchObject({ check: 'expansion-structure', fieldName: 'Media' });
   });
 
   it('passes when the provider declares the expansion as a NavigationProperty', () => {
-    expect(checkExpansionStructure(makeReport(
-      [{ resourceName: 'Property', fieldName: 'Media', type: 'Collection(org.reso.metadata.Media)', isExpansion: true }], []), reference)).toEqual([]);
+    expect(
+      checkExpansionStructure(
+        makeReport([{ resourceName: 'Property', fieldName: 'Media', type: 'Collection(org.reso.metadata.Media)', isExpansion: true }], []),
+        reference
+      )
+    ).toEqual([]);
   });
 
   it('does not fire when the provider omits the standard expansion (field-existence / mapping concern, not a type violation)', () => {
-    expect(checkExpansionStructure(makeReport(
-      [{ resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' }], []), reference)).toEqual([]);
+    expect(
+      checkExpansionStructure(makeReport([{ resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' }], []), reference)
+    ).toEqual([]);
   });
 
   // Self-test: the DD reference declares standard expansions (146 in dd-2.1) and every one is a
   // NavigationProperty, so the gate is clean against the reference itself — and non-vacuously so.
-  it.each(['2.0', '2.1'])('DD %s reference declares expansions and passes the gate clean', (version) => {
+  it.each(['2.0', '2.1'])('DD %s reference declares expansions and passes the gate clean', version => {
     const ref = getReferenceMetadata(version) as MetadataReport & DdReference;
-    expect(ref.fields.some((f) => f.isExpansion === true)).toBe(true);
+    expect(ref.fields.some(f => f.isExpansion === true)).toBe(true);
     expect(checkExpansionStructure(ref, ref)).toEqual([]);
   });
 });
@@ -252,34 +378,48 @@ describe('checkSuggestedMaxConstraints (SHOULD warnings)', () => {
   const reference: DdReference = {
     fields: [
       { resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String', maxLength: 4000 },
-      { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal', precision: 14, scale: 2 },
+      { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal', precision: 14, scale: 2 }
     ],
-    lookups: [],
+    lookups: []
   };
 
   it('warns (warning severity, not error) when a Suggested Max attribute differs', () => {
-    const findings = checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String', maxLength: 2000 }], []), reference);
+    const findings = checkSuggestedMaxConstraints(
+      makeReport([{ resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String', maxLength: 2000 }], []),
+      reference
+    );
     expect(findings).toHaveLength(1);
     expect(findings[0]).toMatchObject({ check: 'suggested-max', severity: 'warning', fieldName: 'PublicRemarks' });
     expect(findings[0].message).toContain('Suggested Max Length of 4000 but was 2000');
   });
 
   it('emits a warning per differing attribute (precision and scale)', () => {
-    const findings = checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal', precision: 10, scale: 4 }], []), reference);
+    const findings = checkSuggestedMaxConstraints(
+      makeReport([{ resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal', precision: 10, scale: 4 }], []),
+      reference
+    );
     expect(findings).toHaveLength(2);
-    const joined = findings.map((f) => f.message).join(' ');
+    const joined = findings.map(f => f.message).join(' ');
     expect(joined).toContain('Precision');
     expect(joined).toContain('Scale');
   });
 
   it('is silent when the attributes match the suggested maxima', () => {
-    expect(checkSuggestedMaxConstraints(makeReport([
-      { resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String', maxLength: 4000 },
-      { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal', precision: 14, scale: 2 },
-    ], []), reference)).toEqual([]);
+    expect(
+      checkSuggestedMaxConstraints(
+        makeReport(
+          [
+            { resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String', maxLength: 4000 },
+            { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal', precision: 14, scale: 2 }
+          ],
+          []
+        ),
+        reference
+      )
+    ).toEqual([]);
   });
 
-  it.each(['2.0', '2.1'])('DD %s reference is silent under suggested-max (provider == reference)', (version) => {
+  it.each(['2.0', '2.1'])('DD %s reference is silent under suggested-max (provider == reference)', version => {
     const ref = getReferenceMetadata(version) as MetadataReport & DdReference;
     expect(checkSuggestedMaxConstraints(ref, ref)).toEqual([]);
   });
@@ -302,19 +442,21 @@ describe('checkSuggestedMaxConstraints — only facets the SERVED type can carry
     // The DD type says Decimal; the provider type says Int16. Keying off the DD type would warn 3×.
     const reference: DdReference = {
       fields: [{ resourceName: 'Property', fieldName: 'BathroomsFull', type: 'Edm.Decimal', maxLength: 3, precision: 3, scale: 0 }],
-      lookups: [],
+      lookups: []
     };
     const report = makeReport([{ resourceName: 'Property', fieldName: 'BathroomsFull', type: 'Edm.Int16' }], []);
     expect(checkSuggestedMaxConstraints(report, reference)).toEqual([]);
   });
 
-  it.each(['Edm.Int16', 'Edm.Int32', 'Edm.Int64'])('is silent for %s, any width the provider picks', (type) => {
+  it.each(['Edm.Int16', 'Edm.Int32', 'Edm.Int64'])('is silent for %s, any width the provider picks', type => {
     // Any int wide enough for the DD's digit count is acceptable, and none of them take a facet.
     const reference: DdReference = {
       fields: [{ resourceName: 'Property', fieldName: 'BathroomsFull', type: 'Edm.Decimal', maxLength: 3, precision: 3, scale: 0 }],
-      lookups: [],
+      lookups: []
     };
-    expect(checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Property', fieldName: 'BathroomsFull', type }], []), reference)).toEqual([]);
+    expect(
+      checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Property', fieldName: 'BathroomsFull', type }], []), reference)
+    ).toEqual([]);
   });
 
   it('drops Length on an Edm.Decimal while keeping Precision and Scale', () => {
@@ -322,10 +464,15 @@ describe('checkSuggestedMaxConstraints — only facets the SERVED type can carry
     // defines none for Decimal. The DD's maxLength of 14 is its misnamed column for the digit width,
     // which the served Precision already satisfies.
     const reference: DdReference = {
-      fields: [{ resourceName: 'Property', fieldName: 'BelowGradeUnfinishedArea', type: 'Edm.Decimal', maxLength: 14, precision: 14, scale: 2 }],
-      lookups: [],
+      fields: [
+        { resourceName: 'Property', fieldName: 'BelowGradeUnfinishedArea', type: 'Edm.Decimal', maxLength: 14, precision: 14, scale: 2 }
+      ],
+      lookups: []
     };
-    const report = makeReport([{ resourceName: 'Property', fieldName: 'BelowGradeUnfinishedArea', type: 'Edm.Decimal', precision: 14, scale: 2 }], []);
+    const report = makeReport(
+      [{ resourceName: 'Property', fieldName: 'BelowGradeUnfinishedArea', type: 'Edm.Decimal', precision: 14, scale: 2 }],
+      []
+    );
     expect(checkSuggestedMaxConstraints(report, reference)).toEqual([]);
   });
 
@@ -333,9 +480,12 @@ describe('checkSuggestedMaxConstraints — only facets the SERVED type can carry
     // Property.Latitude on the same run: DD 12, served 10. Signal that must survive the gate.
     const reference: DdReference = {
       fields: [{ resourceName: 'Property', fieldName: 'Latitude', type: 'Edm.Decimal', maxLength: 12, precision: 12, scale: 8 }],
-      lookups: [],
+      lookups: []
     };
-    const findings = checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Property', fieldName: 'Latitude', type: 'Edm.Decimal', precision: 10, scale: 8 }], []), reference);
+    const findings = checkSuggestedMaxConstraints(
+      makeReport([{ resourceName: 'Property', fieldName: 'Latitude', type: 'Edm.Decimal', precision: 10, scale: 8 }], []),
+      reference
+    );
     expect(findings).toHaveLength(1);
     expect(findings[0]).toMatchObject({ check: 'suggested-max', severity: 'warning', fieldName: 'Latitude' });
     expect(findings[0].message).toContain('Suggested Max Precision of 12 but was 10');
@@ -344,19 +494,24 @@ describe('checkSuggestedMaxConstraints — only facets the SERVED type can carry
   it('still warns when an Edm.String leaves MaxLength unset, because String DOES take it', () => {
     const reference: DdReference = {
       fields: [{ resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String', maxLength: 4000 }],
-      lookups: [],
+      lookups: []
     };
-    const findings = checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String' }], []), reference);
+    const findings = checkSuggestedMaxConstraints(
+      makeReport([{ resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String' }], []),
+      reference
+    );
     expect(findings).toHaveLength(1);
     expect(findings[0].message).toContain('Suggested Max Length of 4000 but was not set');
   });
 
-  it.each(['Edm.Binary', 'Edm.Stream'])('treats %s as taking MaxLength, like String', (type) => {
+  it.each(['Edm.Binary', 'Edm.Stream'])('treats %s as taking MaxLength, like String', type => {
     const reference: DdReference = {
       fields: [{ resourceName: 'Media', fieldName: 'Thumbnail', type: 'Edm.String', maxLength: 100 }],
-      lookups: [],
+      lookups: []
     };
-    expect(checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Media', fieldName: 'Thumbnail', type }], []), reference)).toHaveLength(1);
+    expect(checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Media', fieldName: 'Thumbnail', type }], []), reference)).toHaveLength(
+      1
+    );
   });
 
   it('is silent on a named enum type, qualified or bare', () => {
@@ -365,25 +520,30 @@ describe('checkSuggestedMaxConstraints — only facets the SERVED type can carry
     const reference: DdReference = {
       fields: [
         { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus', maxLength: 50 },
-        { resourceName: 'Property', fieldName: 'LotSizeUnits', type: 'org.reso.metadata.enums.LinearUnits', maxLength: 25 },
+        { resourceName: 'Property', fieldName: 'LotSizeUnits', type: 'org.reso.metadata.enums.LinearUnits', maxLength: 25 }
       ],
-      lookups: [],
+      lookups: []
     };
-    const report = makeReport([
-      { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus' },
-      { resourceName: 'Property', fieldName: 'LotSizeUnits', type: 'LinearUnits' },
-    ], []);
+    const report = makeReport(
+      [
+        { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus' },
+        { resourceName: 'Property', fieldName: 'LotSizeUnits', type: 'LinearUnits' }
+      ],
+      []
+    );
     expect(checkSuggestedMaxConstraints(report, reference)).toEqual([]);
   });
 
   it('drops Length and Scale on a temporal type but keeps Precision, which CSDL does define there', () => {
     const reference: DdReference = {
-      fields: [{ resourceName: 'Property', fieldName: 'ModificationTimestamp', type: 'Edm.DateTimeOffset', maxLength: 27, precision: 3, scale: 0 }],
-      lookups: [],
+      fields: [
+        { resourceName: 'Property', fieldName: 'ModificationTimestamp', type: 'Edm.DateTimeOffset', maxLength: 27, precision: 3, scale: 0 }
+      ],
+      lookups: []
     };
     const findings = checkSuggestedMaxConstraints(
       makeReport([{ resourceName: 'Property', fieldName: 'ModificationTimestamp', type: 'Edm.DateTimeOffset', precision: 6 }], []),
-      reference,
+      reference
     );
     expect(findings).toHaveLength(1);
     expect(findings[0].message).toContain('Suggested Max Precision of 3 but was 6');
@@ -392,9 +552,11 @@ describe('checkSuggestedMaxConstraints — only facets the SERVED type can carry
   it('is silent on Edm.Date, which takes none of the three', () => {
     const reference: DdReference = {
       fields: [{ resourceName: 'Property', fieldName: 'CloseDate', type: 'Edm.Date', maxLength: 10, precision: 0, scale: 0 }],
-      lookups: [],
+      lookups: []
     };
-    expect(checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Property', fieldName: 'CloseDate', type: 'Edm.Date' }], []), reference)).toEqual([]);
+    expect(
+      checkSuggestedMaxConstraints(makeReport([{ resourceName: 'Property', fieldName: 'CloseDate', type: 'Edm.Date' }], []), reference)
+    ).toEqual([]);
   });
 
   it('never raises an error, so no facet decision can gate certification', () => {
@@ -403,49 +565,67 @@ describe('checkSuggestedMaxConstraints — only facets the SERVED type can carry
       fields: [
         { resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String', maxLength: 4000 },
         { resourceName: 'Property', fieldName: 'Latitude', type: 'Edm.Decimal', maxLength: 12, precision: 12, scale: 8 },
-        { resourceName: 'Property', fieldName: 'BathroomsFull', type: 'Edm.Decimal', maxLength: 3, precision: 3, scale: 0 },
+        { resourceName: 'Property', fieldName: 'BathroomsFull', type: 'Edm.Decimal', maxLength: 3, precision: 3, scale: 0 }
       ],
-      lookups: [],
+      lookups: []
     };
-    const report = makeReport([
-      { resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String', maxLength: 2000 },
-      { resourceName: 'Property', fieldName: 'Latitude', type: 'Edm.Decimal', precision: 10, scale: 8 },
-      { resourceName: 'Property', fieldName: 'BathroomsFull', type: 'Edm.Int16' },
-    ], []);
+    const report = makeReport(
+      [
+        { resourceName: 'Property', fieldName: 'PublicRemarks', type: 'Edm.String', maxLength: 2000 },
+        { resourceName: 'Property', fieldName: 'Latitude', type: 'Edm.Decimal', precision: 10, scale: 8 },
+        { resourceName: 'Property', fieldName: 'BathroomsFull', type: 'Edm.Int16' }
+      ],
+      []
+    );
     const findings = checkSuggestedMaxConstraints(report, reference);
     expect(findings).toHaveLength(2);
-    expect(findings.every((f) => f.severity === 'warning')).toBe(true);
+    expect(findings.every(f => f.severity === 'warning')).toBe(true);
   });
 });
-
 
 describe('Lookup Resource checks', () => {
   const LN = 'RESO.OData.Metadata.LookupName';
   const reference: DdReference = {
-    fields: [{ resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus', isEnumeration: true }],
-    lookups: [],
+    fields: [
+      { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus', isEnumeration: true }
+    ],
+    lookups: []
   };
 
   describe('checkLookupResourceFields', () => {
     it('skips when there is no Lookup resource (EnumType representation)', () => {
-      expect(checkLookupResourceFields(makeReport([{ resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' }], []), reference)).toEqual([]);
+      expect(
+        checkLookupResourceFields(makeReport([{ resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' }], []), reference)
+      ).toEqual([]);
     });
 
     it('passes when the Lookup resource declares all mandatory fields', () => {
-      const fields = ['LookupKey', 'LookupName', 'LookupValue', 'ModificationTimestamp'].map((fieldName) => ({ resourceName: 'Lookup', fieldName, type: 'Edm.String' }));
+      const fields = ['LookupKey', 'LookupName', 'LookupValue', 'ModificationTimestamp'].map(fieldName => ({
+        resourceName: 'Lookup',
+        fieldName,
+        type: 'Edm.String'
+      }));
       expect(checkLookupResourceFields(makeReport(fields, []), reference)).toEqual([]);
     });
 
     it('flags a missing mandatory Lookup field', () => {
-      const fields = ['LookupKey', 'LookupName', 'LookupValue'].map((fieldName) => ({ resourceName: 'Lookup', fieldName, type: 'Edm.String' })); // no ModificationTimestamp
+      const fields = ['LookupKey', 'LookupName', 'LookupValue'].map(fieldName => ({
+        resourceName: 'Lookup',
+        fieldName,
+        type: 'Edm.String'
+      })); // no ModificationTimestamp
       const findings = checkLookupResourceFields(makeReport(fields, []), reference);
       expect(findings).toHaveLength(1);
       expect(findings[0]).toMatchObject({ check: 'lookup-resource-fields', fieldName: 'ModificationTimestamp', severity: 'error' });
     });
 
     // F.3 — each mandatory field independently (order-independent; not keyed to ModificationTimestamp)
-    it.each([...LOOKUP_MANDATORY_FIELDS])('flags a missing %s', (missing) => {
-      const fields = LOOKUP_MANDATORY_FIELDS.filter((f) => f !== missing).map((fieldName) => ({ resourceName: 'Lookup', fieldName, type: 'Edm.String' }));
+    it.each([...LOOKUP_MANDATORY_FIELDS])('flags a missing %s', missing => {
+      const fields = LOOKUP_MANDATORY_FIELDS.filter(f => f !== missing).map(fieldName => ({
+        resourceName: 'Lookup',
+        fieldName,
+        type: 'Edm.String'
+      }));
       const findings = checkLookupResourceFields(makeReport(fields, []), reference);
       expect(findings).toHaveLength(1);
       expect(findings[0]).toMatchObject({ check: 'lookup-resource-fields', resourceName: 'Lookup', fieldName: missing, severity: 'error' });
@@ -453,19 +633,22 @@ describe('Lookup Resource checks', () => {
 
     // F.4 — multiple missing → one finding per missing field
     it('emits one finding per missing mandatory field', () => {
-      const fields = ['LookupName', 'LookupValue'].map((fieldName) => ({ resourceName: 'Lookup', fieldName, type: 'Edm.String' })); // LookupKey + ModificationTimestamp absent
+      const fields = ['LookupName', 'LookupValue'].map(fieldName => ({ resourceName: 'Lookup', fieldName, type: 'Edm.String' })); // LookupKey + ModificationTimestamp absent
       const findings = checkLookupResourceFields(makeReport(fields, []), reference);
       expect(findings).toHaveLength(2);
-      expect(new Set(findings.map((f) => f.fieldName))).toEqual(new Set(['LookupKey', 'ModificationTimestamp']));
-      expect(findings.every((f) => f.check === 'lookup-resource-fields' && f.severity === 'error')).toBe(true);
+      expect(new Set(findings.map(f => f.fieldName))).toEqual(new Set(['LookupKey', 'ModificationTimestamp']));
+      expect(findings.every(f => f.check === 'lookup-resource-fields' && f.severity === 'error')).toBe(true);
     });
 
     // F.5 — the declaration gate must NOT require the optional StandardLookupValue / LegacyODataValue columns
     // (declaration vs value: SLV's conditional presence is the separate checkStandardLookupValuePresent rule).
     it('does not require the optional StandardLookupValue / LegacyODataValue columns', () => {
-      const mandatory = LOOKUP_MANDATORY_FIELDS.map((fieldName) => ({ resourceName: 'Lookup', fieldName, type: 'Edm.String' }));
+      const mandatory = LOOKUP_MANDATORY_FIELDS.map(fieldName => ({ resourceName: 'Lookup', fieldName, type: 'Edm.String' }));
       expect(checkLookupResourceFields(makeReport(mandatory, []), reference)).toEqual([]);
-      const withOptionals = [...mandatory, ...['StandardLookupValue', 'LegacyODataValue'].map((fieldName) => ({ resourceName: 'Lookup', fieldName, type: 'Edm.String' }))];
+      const withOptionals = [
+        ...mandatory,
+        ...['StandardLookupValue', 'LegacyODataValue'].map(fieldName => ({ resourceName: 'Lookup', fieldName, type: 'Edm.String' }))
+      ];
       expect(checkLookupResourceFields(makeReport(withOptionals, []), reference)).toEqual([]);
     });
 
@@ -477,18 +660,32 @@ describe('Lookup Resource checks', () => {
 
   describe('checkLookupNameAnnotations', () => {
     it('flags a string-enum field missing the LookupName annotation', () => {
-      const findings = checkLookupNameAnnotations(makeReport([{ resourceName: 'Property', fieldName: 'StandardStatus', type: 'Edm.String', isEnumeration: true }], []), reference);
+      const findings = checkLookupNameAnnotations(
+        makeReport([{ resourceName: 'Property', fieldName: 'StandardStatus', type: 'Edm.String', isEnumeration: true }], []),
+        reference
+      );
       expect(findings).toHaveLength(1);
       expect(findings[0]).toMatchObject({ check: 'lookup-name-annotation', fieldName: 'StandardStatus', severity: 'error' });
     });
 
     it('passes a string-enum field that carries the annotation', () => {
-      const field = { resourceName: 'Property', fieldName: 'StandardStatus', type: 'Edm.String', isEnumeration: true, annotations: [{ term: LN, value: 'StandardStatus' }] };
+      const field = {
+        resourceName: 'Property',
+        fieldName: 'StandardStatus',
+        type: 'Edm.String',
+        isEnumeration: true,
+        annotations: [{ term: LN, value: 'StandardStatus' }]
+      };
       expect(checkLookupNameAnnotations(makeReport([field], []), reference)).toEqual([]);
     });
 
     it('exempts the EnumType representation (nominal type needs no annotation)', () => {
-      const field = { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus', isEnumeration: true };
+      const field = {
+        resourceName: 'Property',
+        fieldName: 'StandardStatus',
+        type: 'org.reso.metadata.enums.StandardStatus',
+        isEnumeration: true
+      };
       expect(checkLookupNameAnnotations(makeReport([field], []), reference)).toEqual([]);
     });
   });
@@ -499,13 +696,28 @@ describe('Lookup Resource checks', () => {
     // the annotation at the metadata phase; value presence is deferred to the schema-validation phase (and
     // only when the field has data). The removed checkLookupNameIntegrity false-failed exactly this case.
     const ref: DdReference = {
-      fields: [{ resourceName: 'Property', fieldName: 'BuildingFeatures', type: 'Collection(org.reso.metadata.enums.BuildingFeatures)', isEnumeration: true, isCollection: true }],
-      lookups: [],
+      fields: [
+        {
+          resourceName: 'Property',
+          fieldName: 'BuildingFeatures',
+          type: 'Collection(org.reso.metadata.enums.BuildingFeatures)',
+          isEnumeration: true,
+          isCollection: true
+        }
+      ],
+      lookups: []
     };
-    const field = { resourceName: 'Property', fieldName: 'BuildingFeatures', type: 'Collection(Edm.String)', isEnumeration: true, isCollection: true, annotations: [{ term: LN, value: 'BuildingFeatures' }] };
+    const field = {
+      resourceName: 'Property',
+      fieldName: 'BuildingFeatures',
+      type: 'Collection(Edm.String)',
+      isEnumeration: true,
+      isCollection: true,
+      annotations: [{ term: LN, value: 'BuildingFeatures' }]
+    };
     const findings = runDdMetadataChecks(makeReport([field], []), ref); // /Lookup has no BuildingFeatures rows
-    expect(findings.some((f) => f.message.includes('not present in the Lookup Resource'))).toBe(false);
-    expect(findings.some((f) => f.check === 'lookup-name-annotation')).toBe(false); // annotation present → no RCP-032 flag
+    expect(findings.some(f => f.message.includes('not present in the Lookup Resource'))).toBe(false);
+    expect(findings.some(f => f.check === 'lookup-name-annotation')).toBe(false); // annotation present → no RCP-032 flag
   });
 
   // Self-test: the generated string-rep reference is internally consistent — its Lookup resource has
@@ -525,7 +737,7 @@ describe('runDdMetadataChecks', () => {
   it('aggregates findings (currently the disallowed-synonym check)', () => {
     const reference: DdReference = {
       fields: [{ resourceName: 'Property', fieldName: 'StandardStatus', type: 'x', synonyms: 'RetsStatus' }],
-      lookups: [],
+      lookups: []
     };
     expect(runDdMetadataChecks(emptyReport([{ resourceName: 'Property', fieldName: 'RetsStatus' }]), reference)).toHaveLength(1);
   });
@@ -533,13 +745,13 @@ describe('runDdMetadataChecks', () => {
   it('aggregates the expansion-structure check (Media modeled as a non-expansion)', () => {
     const reference: DdReference = {
       fields: [{ resourceName: 'Property', fieldName: 'Media', type: 'Collection(org.reso.metadata.Media)', isExpansion: true }],
-      lookups: [],
+      lookups: []
     };
     const findings = runDdMetadataChecks(
       makeReport([{ resourceName: 'Property', fieldName: 'Media', type: 'Collection(Property.MediaType)', isExpansion: false }], []),
-      reference,
+      reference
     );
-    expect(findings.some((f) => f.check === 'expansion-structure' && f.fieldName === 'Media')).toBe(true);
+    expect(findings.some(f => f.check === 'expansion-structure' && f.fieldName === 'Media')).toBe(true);
   });
 });
 
@@ -553,77 +765,108 @@ describe('checkStandardLookupValuePresent', () => {
     fields: [
       { resourceName: 'Property', fieldName: 'StandardStatus', type: SS, isEnumeration: true, lookupStatus: 'Locked with Enumerations' },
       { resourceName: 'Property', fieldName: 'OtherEnum', type: OTHER, isEnumeration: true, lookupStatus: 'Open with Enumerations' },
-      { resourceName: 'Property', fieldName: 'City', type: CITY, isEnumeration: true, lookupStatus: 'Open' }, // purely-open: no ref lookups → empty catalog
+      { resourceName: 'Property', fieldName: 'City', type: CITY, isEnumeration: true, lookupStatus: 'Open' } // purely-open: no ref lookups → empty catalog
     ],
     lookups: [
       // 'Active': StandardName == LegacyODataValue == 'Active' (the overlap case → one Set member)
-      { lookupName: SS, lookupValue: 'Active', annotations: [{ term: SN, value: 'Active' }, { term: LODV, value: 'Active' }] },
+      {
+        lookupName: SS,
+        lookupValue: 'Active',
+        annotations: [
+          { term: SN, value: 'Active' },
+          { term: LODV, value: 'Active' }
+        ]
+      },
       // display "Active Under Contract", legacy machine "ActiveUnderContract"
-      { lookupName: SS, lookupValue: 'ActiveUnderContract', annotations: [{ term: SN, value: 'Active Under Contract' }, { term: LODV, value: 'ActiveUnderContract' }] },
+      {
+        lookupName: SS,
+        lookupValue: 'ActiveUnderContract',
+        annotations: [
+          { term: SN, value: 'Active Under Contract' },
+          { term: LODV, value: 'ActiveUnderContract' }
+        ]
+      },
       // OtherEnum has a DISTINCT standard value (for the cross-enum no-fallback test)
-      { lookupName: OTHER, lookupValue: 'Foo', annotations: [{ term: SN, value: 'Foo' }] },
-    ],
+      { lookupName: OTHER, lookupValue: 'Foo', annotations: [{ term: SN, value: 'Foo' }] }
+    ]
   };
 
   // A provider string-enum field: its field-type is rewritten to the (short) LookupName in the merged report;
   // its Lookup rows are typed Edm.String.
-  const strField = (fieldName: string, lookupName: string) => ({ resourceName: 'Property', fieldName, type: lookupName, isEnumeration: true });
-  const strRow = (lookupName: string, lookupValue: string, annotations: ReadonlyArray<{ term: string; value: string }> = []): MetadataReportLookup => ({ lookupName, lookupValue, type: 'Edm.String', annotations });
+  const strField = (fieldName: string, lookupName: string) => ({
+    resourceName: 'Property',
+    fieldName,
+    type: lookupName,
+    isEnumeration: true
+  });
+  const strRow = (
+    lookupName: string,
+    lookupValue: string,
+    annotations: ReadonlyArray<{ term: string; value: string }> = []
+  ): MetadataReportLookup => ({ lookupName, lookupValue, type: 'Edm.String', annotations });
 
   it('lsv.L.1 — flags a standard value served with no StandardLookupValue (default severity warning)', () => {
     const findings = checkStandardLookupValuePresent(
       makeReport([strField('StandardStatus', 'StandardStatus')], [strRow('StandardStatus', 'Active')]),
-      reference,
+      reference
     );
     expect(findings.length).toBe(1);
-    expect(findings[0]).toMatchObject({ check: 'standard-lookup-value', severity: 'warning', resourceName: 'Property', fieldName: 'StandardStatus' });
+    expect(findings[0]).toMatchObject({
+      check: 'standard-lookup-value',
+      severity: 'warning',
+      resourceName: 'Property',
+      fieldName: 'StandardStatus'
+    });
   });
 
   it('lsv.L.2 — passes a standard value that declares its StandardLookupValue', () => {
-    expect(checkStandardLookupValuePresent(
-      makeReport([strField('StandardStatus', 'StandardStatus')], [strRow('StandardStatus', 'Active', [{ term: SN, value: 'Active' }])]),
-      reference,
-    )).toEqual([]);
+    expect(
+      checkStandardLookupValuePresent(
+        makeReport([strField('StandardStatus', 'StandardStatus')], [strRow('StandardStatus', 'Active', [{ term: SN, value: 'Active' }])]),
+        reference
+      )
+    ).toEqual([]);
   });
 
   it('lsv.F.1 — never fires on a purely-open enum (empty DD catalog, e.g. City)', () => {
-    expect(checkStandardLookupValuePresent(
-      makeReport([strField('City', 'City')], [strRow('City', 'Springfield')]),
-      reference,
-    )).toEqual([]);
+    expect(checkStandardLookupValuePresent(makeReport([strField('City', 'City')], [strRow('City', 'Springfield')]), reference)).toEqual([]);
   });
 
   it('lsv.E.1 — passes a purely-local value (not in the field catalog); SLV optional', () => {
-    expect(checkStandardLookupValuePresent(
-      makeReport([strField('StandardStatus', 'StandardStatus')], [strRow('StandardStatus', 'MyLocalStatus')]),
-      reference,
-    )).toEqual([]);
+    expect(
+      checkStandardLookupValuePresent(
+        makeReport([strField('StandardStatus', 'StandardStatus')], [strRow('StandardStatus', 'MyLocalStatus')]),
+        reference
+      )
+    ).toEqual([]);
   });
 
   it('lsv.R.1 — exempts the Edm.EnumType representation (no StandardLookupValue column)', () => {
     const findings = checkStandardLookupValuePresent(
       makeReport(
         [{ resourceName: 'Property', fieldName: 'StandardStatus', type: SS, isEnumeration: true }],
-        [{ lookupName: SS, lookupValue: 'Active', type: 'Edm.Int32', annotations: [] }],
+        [{ lookupName: SS, lookupValue: 'Active', type: 'Edm.Int32', annotations: [] }]
       ),
-      reference,
+      reference
     );
     expect(findings).toEqual([]);
   });
 
   it('lsv.L.3 — no any-enum fallback: a value standard for a DIFFERENT enum is not standard here', () => {
     // 'Active' is standard for StandardStatus but NOT for OtherEnum (catalog {Foo}).
-    expect(checkStandardLookupValuePresent(
-      makeReport([strField('OtherEnum', 'OtherEnum')], [strRow('OtherEnum', 'Active')]),
-      reference,
-    )).toEqual([]);
+    expect(
+      checkStandardLookupValuePresent(makeReport([strField('OtherEnum', 'OtherEnum')], [strRow('OtherEnum', 'Active')]), reference)
+    ).toEqual([]);
   });
 
   it('matches on the LegacyODataValue form: a value standard via its LODV, no SLV, flags', () => {
     // Provider serves a local display 'AUC' whose LegacyODataValue is the standard machine form; no SLV declared.
     const findings = checkStandardLookupValuePresent(
-      makeReport([strField('StandardStatus', 'StandardStatus')], [strRow('StandardStatus', 'AUC', [{ term: LODV, value: 'ActiveUnderContract' }])]),
-      reference,
+      makeReport(
+        [strField('StandardStatus', 'StandardStatus')],
+        [strRow('StandardStatus', 'AUC', [{ term: LODV, value: 'ActiveUnderContract' }])]
+      ),
+      reference
     );
     expect(findings.length).toBe(1);
     expect(findings[0]).toMatchObject({ check: 'standard-lookup-value', fieldName: 'StandardStatus' });
@@ -633,14 +876,18 @@ describe('checkStandardLookupValuePresent', () => {
     const findings = checkStandardLookupValuePresent(
       makeReport([strField('StandardStatus', 'StandardStatus')], [strRow('StandardStatus', 'Active')]),
       reference,
-      'error',
+      'error'
     );
     expect(findings[0]?.severity).toBe('error');
   });
 
   it('runDdMetadataChecks includes it as a warning by default (non-gating); error when configured', () => {
     const report = makeReport([strField('StandardStatus', 'StandardStatus')], [strRow('StandardStatus', 'Active')]);
-    expect(runDdMetadataChecks(report, reference).some((f) => f.check === 'standard-lookup-value' && f.severity === 'warning')).toBe(true);
-    expect(runDdMetadataChecks(report, reference, { standardLookupValueSeverity: 'error' }).some((f) => f.check === 'standard-lookup-value' && f.severity === 'error')).toBe(true);
+    expect(runDdMetadataChecks(report, reference).some(f => f.check === 'standard-lookup-value' && f.severity === 'warning')).toBe(true);
+    expect(
+      runDdMetadataChecks(report, reference, { standardLookupValueSeverity: 'error' }).some(
+        f => f.check === 'standard-lookup-value' && f.severity === 'error'
+      )
+    ).toBe(true);
   });
 });

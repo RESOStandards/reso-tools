@@ -8,14 +8,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import {
-  summarizeScenarios,
-  optionalOutcome,
-  type ScenarioResult,
-} from '../../src/web-api-core/test-runner.js';
-import { allScenarios } from '../../src/web-api-core/scenarios.js';
 import { buildScenarioQuery } from '../../src/web-api-core/queries.js';
 import type { TestParams } from '../../src/web-api-core/sampling.js';
+import { allScenarios } from '../../src/web-api-core/scenarios.js';
+import { type ScenarioResult, optionalOutcome, summarizeScenarios } from '../../src/web-api-core/test-runner.js';
 
 const r = (over: Partial<ScenarioResult>): ScenarioResult => ({
   tag: 't',
@@ -24,7 +20,7 @@ const r = (over: Partial<ScenarioResult>): ScenarioResult => ({
   skipped: false,
   assertions: [],
   duration: 0,
-  ...over,
+  ...over
 });
 
 // ── outcome-semantics: the three optional labels ──
@@ -57,19 +53,13 @@ describe('summarizeScenarios — verdict surface', () => {
     expect(s.optional.notSupported).toBe(1);
   });
   it('required pass + optional fail → verdict-relevant failed is 0', () => {
-    const s = summarizeScenarios([
-      r({ passed: true }),
-      r({ passed: false, optional: true }),
-    ]);
+    const s = summarizeScenarios([r({ passed: true }), r({ passed: false, optional: true })]);
     expect(s.failed).toBe(0);
     expect(s.passed).toBe(1);
     expect(s.optional.notSupported).toBe(1);
   });
   it('required fail + optional pass → failed is 1', () => {
-    const s = summarizeScenarios([
-      r({ passed: false }),
-      r({ passed: true, optional: true }),
-    ]);
+    const s = summarizeScenarios([r({ passed: false }), r({ passed: true, optional: true })]);
     expect(s.failed).toBe(1);
     expect(s.optional.passed).toBe(1);
   });
@@ -77,7 +67,7 @@ describe('summarizeScenarios — verdict surface', () => {
     const s = summarizeScenarios([
       r({ passed: true, optional: true }),
       r({ passed: false, skipped: false, optional: true }),
-      r({ skipped: true, optional: true }),
+      r({ skipped: true, optional: true })
     ]);
     expect(s.optional).toEqual({ passed: 1, notSupported: 1, notTested: 1 });
     expect(s.passed).toBe(0);
@@ -87,7 +77,7 @@ describe('summarizeScenarios — verdict surface', () => {
   it('total counts every result; required skipped is not a failure', () => {
     const s = summarizeScenarios([
       r({ passed: false, skipped: true }), // required, skipped
-      r({ passed: false, optional: true }), // optional, failed
+      r({ passed: false, optional: true }) // optional, failed
     ]);
     expect(s.total).toBe(2);
     expect(s.failed).toBe(0);
@@ -97,7 +87,7 @@ describe('summarizeScenarios — verdict surface', () => {
 
 // ── classification-matches-spec: which scenarios are optional ──
 describe('classification: string functions optional, Core required', () => {
-  const byTag = (tag: string) => allScenarios.find((s) => s.tag === tag);
+  const byTag = (tag: string) => allScenarios.find(s => s.tag === tag);
 
   it('contains / startswith / endswith are optional', () => {
     for (const tag of ['filter-string-contains', 'filter-string-startswith', 'filter-string-endswith']) {
@@ -156,14 +146,15 @@ describe('query builder: string-function scenarios produce the right $filter', (
     stringField: 'City',
     stringValue: 'Dallas',
     sampleComplete: true,
-    skippedTypes: [],
+    enumMode: 'string',
+    skippedTypes: []
   };
-  const byTag = (tag: string) => allScenarios.find((s) => s.tag === tag)!;
+  const byTag = (tag: string) => allScenarios.find(s => s.tag === tag)!;
 
   it.each([
     ['filter-string-contains', "contains(City,'Dallas')"],
     ['filter-string-startswith', "startswith(City,'Dallas')"],
-    ['filter-string-endswith', "endswith(City,'Dallas')"],
+    ['filter-string-endswith', "endswith(City,'Dallas')"]
   ])('%s → %s', (tag, expectedFilter) => {
     const q = buildScenarioQuery('http://x', 'Property', byTag(tag), params);
     expect(q).toBeDefined();

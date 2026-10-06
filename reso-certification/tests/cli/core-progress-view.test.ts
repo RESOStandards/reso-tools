@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createCoreProgressView } from '../../src/cli/render.js';
 import type { CoreProgressDetail } from '../../src/sdk/types.js';
 
@@ -73,7 +73,10 @@ describe('createCoreProgressView', () => {
     v.apply(d({ event: 'init', resources: ['Property', 'Media'] }));
     v.apply(d({ resource: 'Property', phase: 'done', outcome: 'failed', counts: { passed: 65, failed: 3, skipped: 4 } }));
     v.apply(d({ resource: 'Media', phase: 'done', outcome: 'failed', counts: { passed: 8, failed: 1, skipped: 2 } }));
-    const lines = v.render().split('\n').filter(l => l.includes('/')); // the two tally rows
+    const lines = v
+      .render()
+      .split('\n')
+      .filter(l => l.includes('/')); // the two tally rows
     // The '/' in each tally sits at the same column — grid alignment (Property total 72 vs Media total 11 both
     // right-padded to width 2, and passed 65 vs 8 right-padded to width 2).
     expect(lines).toHaveLength(2);

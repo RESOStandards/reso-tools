@@ -4,7 +4,7 @@ import type { TestParams } from '../../src/web-api-core/sampling.js';
 
 // The metadata scenario fetches through a separate path (fetchMetadataWithVersion), not the
 // requester seam, so mock it — this test is about the requester threading, not the metadata path.
-vi.mock('../../src/test-runner/metadata.js', async (importOriginal) => {
+vi.mock('../../src/test-runner/metadata.js', async importOriginal => {
   const actual = await importOriginal<typeof import('../../src/test-runner/metadata.js')>();
   return {
     ...actual,
@@ -34,7 +34,7 @@ const recordingRequester = (): { requester: ODataRequester; urls: string[] } => 
   const urls: string[] = [];
   return {
     requester: {
-      request: async (options) => {
+      request: async options => {
         urls.push(options.url);
         return {
           status: 200,

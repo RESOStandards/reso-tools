@@ -1,17 +1,17 @@
-import { describe, it, expect } from 'vitest';
-import { buildOutputPath } from '../../src/sdk/reports.js';
+import { describe, expect, it } from 'vitest';
 import {
   configEntryToAddEdit,
   configEntryToCore,
   configEntryToDD,
   configEntryToEntityEvent,
-  normalizeConfigFile,
+  normalizeConfigFile
 } from '../../src/sdk/config.js';
+import { buildOutputPath } from '../../src/sdk/reports.js';
 import type { BaseComplianceConfig } from '../../src/sdk/types.js';
 
 const makeConfig = (overrides: Partial<BaseComplianceConfig> = {}): BaseComplianceConfig => ({
   server: { url: 'http://localhost:8080', auth: { mode: 'token', authToken: 'test' } },
-  ...overrides,
+  ...overrides
 });
 
 describe('buildOutputPath', () => {
@@ -19,7 +19,7 @@ describe('buildOutputPath', () => {
     const config = makeConfig({
       providerUoi: 'T00000012',
       providerUsi: '50055',
-      recipientUoi: 'M00000570',
+      recipientUoi: 'M00000570'
     });
 
     const path = buildOutputPath('web-api-core', '2.1.0', config);
@@ -46,7 +46,7 @@ describe('buildOutputPath', () => {
       providerUoi: 'P1',
       providerUsi: 'S1',
       recipientUoi: 'R1',
-      options: { outputDir: '/custom/output' },
+      options: { outputDir: '/custom/output' }
     });
 
     const path = buildOutputPath('web-api-add-edit', '2.0.0', config);
@@ -61,7 +61,7 @@ describe('buildOutputPath', () => {
     const config = makeConfig({
       providerUoi: 'PROV',
       providerUsi: 'USI',
-      recipientUoi: 'RECIP',
+      recipientUoi: 'RECIP'
     });
 
     const path = buildOutputPath('data-dictionary', '2.0', config);
@@ -73,7 +73,7 @@ describe('buildOutputPath', () => {
     const config = makeConfig({
       providerUoi: 'PROV',
       providerUsi: 'USI',
-      recipientUoi: 'RECIP',
+      recipientUoi: 'RECIP'
     });
 
     const path = buildOutputPath('entity-event', 'RCP-027', config);
@@ -105,9 +105,9 @@ const V1_CONFIG = {
       serviceRootUri: 'https://api.example.org/odata',
       recipientUoi: 'M00000570',
       providerUsi: '50055',
-      token: 'test-token',
-    },
-  ],
+      token: 'test-token'
+    }
+  ]
 };
 
 describe('config mapper to buildOutputPath (the seam)', () => {
@@ -115,7 +115,7 @@ describe('config mapper to buildOutputPath (the seam)', () => {
     ['dd', configEntryToDD, 'data-dictionary', '2.1'],
     ['core', configEntryToCore, 'web-api-core', '2.1.0'],
     ['add-edit', configEntryToAddEdit, 'web-api-add-edit', '2.0.0'],
-    ['entity-event', configEntryToEntityEvent, 'entity-event', '1.0.0'],
+    ['entity-event', configEntryToEntityEvent, 'entity-event', '1.0.0']
   ] as const;
 
   for (const [label, mapper, slug, version] of mappers) {
@@ -139,7 +139,7 @@ describe('config mapper to buildOutputPath (the seam)', () => {
     // would collapse the path segment. Only a non-empty value is set on the config, so
     // a genuinely absent one stays absent and the intended fallback fires.
     const file = normalizeConfigFile({
-      configs: [{ serviceRootUri: 'https://api.example.org/odata', token: 't' }],
+      configs: [{ serviceRootUri: 'https://api.example.org/odata', token: 't' }]
     } as unknown as Record<string, unknown>);
     const config = configEntryToDD(file.configs[0] as never, file.providerUoi) as BaseComplianceConfig;
 
@@ -159,7 +159,7 @@ describe('config mapper to buildOutputPath (the seam)', () => {
     // regression would reappear -- a mapper that starts setting '' would silently drop a segment.
     const file = normalizeConfigFile({
       providerUoi: 'T00000012',
-      configs: [{ serviceRootUri: 'https://api.example.org/odata', recipientUoi: '', providerUsi: '   ', token: 't' }],
+      configs: [{ serviceRootUri: 'https://api.example.org/odata', recipientUoi: '', providerUsi: '   ', token: 't' }]
     } as unknown as Record<string, unknown>);
     const config = configEntryToDD(file.configs[0] as never, file.providerUoi) as BaseComplianceConfig;
 

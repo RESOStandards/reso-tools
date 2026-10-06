@@ -331,17 +331,23 @@ const makeTestMetadata = (): ResoMetadata => ({
   fields: [
     { resourceName: 'Property', fieldName: 'ListingKey', type: 'Edm.String', annotations: [] },
     { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal', annotations: [] },
-    { resourceName: 'EntityEvent', fieldName: 'EntityEventSequence', type: 'Edm.Int64', annotations: [] },
+    { resourceName: 'EntityEvent', fieldName: 'EntityEventSequence', type: 'Edm.Int64', annotations: [] }
   ],
-  lookups: [],
+  lookups: []
 });
 
 const makeMockResponse = (): Response & { body: unknown; statusCode: number } => {
   const res = {
     body: undefined as unknown,
     statusCode: 200,
-    status(code: number) { res.statusCode = code; return res; },
-    json(data: unknown) { res.body = data; return res; },
+    status(code: number) {
+      res.statusCode = code;
+      return res;
+    },
+    json(data: unknown) {
+      res.body = data;
+      return res;
+    }
   } as unknown as Response & { body: unknown; statusCode: number };
   return res;
 };
@@ -358,7 +364,7 @@ describe('createDataResetHandler', () => {
       truncateResource: async (ctx: ResourceContext): Promise<number> => {
         truncatedResources.push(ctx.resource);
         return 10;
-      },
+      }
     };
 
     const readOnlyResources = new Set(['EntityEvent']);
@@ -379,7 +385,7 @@ describe('createDataResetHandler', () => {
       readByKey: async (): Promise<SingleResult> => undefined,
       insert: async (_ctx: ResourceContext, record: Readonly<Record<string, unknown>>): Promise<EntityRecord> => record,
       update: async (): Promise<SingleResult> => undefined,
-      deleteByKey: async (): Promise<boolean> => false,
+      deleteByKey: async (): Promise<boolean> => false
     };
 
     const handler = createDataResetHandler(makeTestMetadata(), dal);

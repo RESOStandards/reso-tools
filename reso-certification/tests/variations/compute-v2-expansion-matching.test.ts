@@ -11,8 +11,8 @@
  * Real DD 2.1 expansions (Property/Media); provider inputs are synthetic — no vendor reports.
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { computeVariationsV2 } from '../../src/variations-v2/compute.js';
 
 const createRequire = (await import('node:module')).createRequire;
@@ -29,23 +29,23 @@ const variationsFor = (report: Json, version = '2.1'): Json => {
     referenceMetadata: getReferenceMetadata(version),
     version,
     fuzziness: 0.25,
-    applyVersionBucketing: false,
-  }) as { variations: Json };
+    applyVersionBucketing: false
+  }) as unknown as { variations: Json };
   return variations;
 };
 
 // Suggested expansion targets, tolerant of flat vs nested `.suggestions` shapes.
 const suggestedExpansions = (variations: Json): string[] =>
-  ((variations.expansions as Json[]) ?? []).flatMap((i) => {
+  ((variations.expansions as unknown as Json[]) ?? []).flatMap(i => {
     const direct = i.suggestedFieldName as string | undefined;
-    const nested = ((i.suggestions as Json[]) ?? []).map((s) => s.suggestedFieldName as string);
+    const nested = ((i.suggestions as unknown as Json[]) ?? []).map(s => s.suggestedFieldName as string);
     return [direct, ...nested].filter((v): v is string => !!v);
   });
 
 describe('computeVariationsV2: expansion matching (like-with-like; the gate owns exact)', () => {
   it('flags a provider expansion with a near-miss name against the standard expansion', () => {
     const v = variationsFor({
-      fields: [{ resourceName: 'Property', fieldName: 'Medias', type: MEDIA_TYPE, isExpansion: true }],
+      fields: [{ resourceName: 'Property', fieldName: 'Medias', type: MEDIA_TYPE, isExpansion: true }]
     });
     expect(suggestedExpansions(v)).toContain('Media');
   });
@@ -54,23 +54,23 @@ describe('computeVariationsV2: expansion matching (like-with-like; the gate owns
     const v = variationsFor({
       fields: [
         { resourceName: 'Property', fieldName: 'Medias', type: MEDIA_TYPE, isExpansion: true },
-        { resourceName: 'Property', fieldName: 'Media', type: MEDIA_TYPE, isExpansion: true },
-      ],
+        { resourceName: 'Property', fieldName: 'Media', type: MEDIA_TYPE, isExpansion: true }
+      ]
     });
     expect(suggestedExpansions(v)).not.toContain('Media');
   });
 
   it('does not match a plain field against the standard expansions (like-with-like)', () => {
     const v = variationsFor({
-      fields: [{ resourceName: 'Property', fieldName: 'Medias' }], // a plain field, not an expansion
+      fields: [{ resourceName: 'Property', fieldName: 'Medias' }] // a plain field, not an expansion
     });
     expect(suggestedExpansions(v)).not.toContain('Media');
   });
 
   it('does not emit an expansion variation for an exact-name expansion mistyped as a non-expansion (the gate owns that)', () => {
     const v = variationsFor({
-      fields: [{ resourceName: 'Property', fieldName: 'Media', type: 'Collection(Property.MediaType)' }],
+      fields: [{ resourceName: 'Property', fieldName: 'Media', type: 'Collection(Property.MediaType)' }]
     });
-    expect(v.expansions as Json[]).toEqual([]);
+    expect(v.expansions as unknown as Json[]).toEqual([]);
   });
 });

@@ -1,15 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { coreVerdict } from '../../src/sdk/core.js';
 import type { ODataRequester } from '../../src/test-runner/requester.js';
 import type { ODataResponse } from '../../src/test-runner/types.js';
-import type { ExpandScenario } from '../../src/web-api-core/scenarios.js';
 import type { TestParams } from '../../src/web-api-core/sampling.js';
-import {
-  executeStandardScenario,
-  expandRrkWarnings,
-  summarizeScenarios,
-  type ScenarioResult,
-} from '../../src/web-api-core/test-runner.js';
-import { coreVerdict } from '../../src/sdk/core.js';
+import type { ExpandScenario } from '../../src/web-api-core/scenarios.js';
+import { type ScenarioResult, executeStandardScenario, expandRrkWarnings, summarizeScenarios } from '../../src/web-api-core/test-runner.js';
 
 // The WG rule (transport#22 / RCP-039): an expanded child's ResourceRecordKey should equal the primary key of
 // the parent record it was expanded into (e.g. an expanded Media's ResourceRecordKey == the parent Property's
@@ -20,7 +15,7 @@ const expandScenario: ExpandScenario = {
   name: '$expand navigation property',
   category: 'expand',
   fieldParam: 'expandField',
-  minVersion: '2.1.0',
+  minVersion: '2.1.0'
 };
 
 // Parent = Property (ListingKey), expanded nav property = Media.
@@ -32,7 +27,7 @@ const params: TestParams = {
   expandField: 'Media',
   integerValueHigh: 0,
   skippedTypes: [],
-  sampleComplete: true,
+  sampleComplete: true
 };
 
 // One parent Property whose expanded Media collection is exactly `children`.
@@ -82,7 +77,7 @@ describe('expandRrkWarnings (unit — the RRK expanded-item rule)', () => {
       { MediaKey: 'M1', ResourceRecordKey: 'P1' }, // match
       { MediaKey: 'M2', ResourceRecordKey: 'OFFENDER' }, // mismatch
       { MediaKey: 'M3' }, // no RRK — out of scope
-      { MediaKey: 'M4', ResourceRecordKey: 'P1' }, // match
+      { MediaKey: 'M4', ResourceRecordKey: 'P1' } // match
     ];
     const warnings = expandRrkWarnings([parent(children)], expandScenario, params);
     expect(warnings).toHaveLength(1);
@@ -97,7 +92,7 @@ describe('expandRrkWarnings (unit — the RRK expanded-item rule)', () => {
       enumMode: 'string',
       integerValueHigh: 0,
       skippedTypes: [],
-      sampleComplete: true,
+      sampleComplete: true
     };
     expect(expandRrkWarnings([parent([{ ResourceRecordKey: 'WRONG' }])], expandScenario, noExpand)).toEqual([]);
   });
@@ -109,7 +104,7 @@ const response = (children: unknown): ODataResponse => ({
   status: 200,
   headers: { 'odata-version': '4.01' },
   body: { value: [parent(children)] },
-  rawBody: JSON.stringify({ value: [parent(children)] }),
+  rawBody: JSON.stringify({ value: [parent(children)] })
 });
 
 const scriptedRequester = (res: ODataResponse): ODataRequester => ({ request: async () => res });

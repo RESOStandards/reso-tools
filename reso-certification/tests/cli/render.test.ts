@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { humanizeDuration, collectFailures, collectOptionalUnsupported, runHeaderSummary } from '../../src/cli/render.js';
+import { collectFailures, collectOptionalUnsupported, humanizeDuration, runHeaderSummary } from '../../src/cli/render.js';
 import type { PipelineResult } from '../../src/sdk/types.js';
 
 describe('humanizeDuration', () => {
@@ -15,7 +15,10 @@ describe('humanizeDuration', () => {
 describe('collectFailures', () => {
   it('extracts failed scenarios + assertion messages from resource reports', () => {
     const result = {
-      status: 'failed', endorsement: 'core', duration: 0, steps: [],
+      status: 'failed',
+      endorsement: 'core',
+      duration: 0,
+      steps: [],
       context: {
         resourceReports: [
           {
@@ -23,11 +26,11 @@ describe('collectFailures', () => {
             scenarios: [
               { name: 'fetch-by-key', passed: false, assertions: [{ passed: false, description: 'Expected HTTP 200, got 404' }] },
               { name: 'top', passed: true, assertions: [] },
-              { name: 'skipped-one', passed: false, skipped: true, assertions: [] },
-            ],
-          },
-        ],
-      },
+              { name: 'skipped-one', passed: false, skipped: true, assertions: [] }
+            ]
+          }
+        ]
+      }
     } as unknown as PipelineResult;
 
     const f = collectFailures(result);
@@ -38,9 +41,11 @@ describe('collectFailures', () => {
 
   it('falls back to step-level errors when there are no resource reports', () => {
     const result = {
-      status: 'failed', endorsement: 'dd', duration: 0,
+      status: 'failed',
+      endorsement: 'dd',
+      duration: 0,
       steps: [{ name: 'Service check', status: 'failed', duration: 0, errors: ['OData service did not respond'] }],
-      context: {},
+      context: {}
     } as unknown as PipelineResult;
 
     expect(collectFailures(result)).toEqual(['Service check: OData service did not respond']);
@@ -48,18 +53,26 @@ describe('collectFailures', () => {
 
   it('excludes optional-test failures from the required failure list', () => {
     const result = {
-      status: 'failed', endorsement: 'core', duration: 0, steps: [],
+      status: 'failed',
+      endorsement: 'core',
+      duration: 0,
+      steps: [],
       context: {
         resourceReports: [
           {
             resource: 'Property',
             scenarios: [
               { name: 'fetch-by-key', passed: false, assertions: [{ passed: false, description: 'Expected HTTP 200, got 404' }] },
-              { name: 'String: contains()', passed: false, optional: true, assertions: [{ passed: false, description: 'Expected HTTP 200, got 400' }] },
-            ],
-          },
-        ],
-      },
+              {
+                name: 'String: contains()',
+                passed: false,
+                optional: true,
+                assertions: [{ passed: false, description: 'Expected HTTP 200, got 400' }]
+              }
+            ]
+          }
+        ]
+      }
     } as unknown as PipelineResult;
 
     const required = collectFailures(result);
@@ -72,7 +85,10 @@ describe('collectFailures', () => {
 describe('collectOptionalUnsupported', () => {
   it('collects only optional-test failures, into their own list', () => {
     const result = {
-      status: 'failed', endorsement: 'core', duration: 0, steps: [],
+      status: 'failed',
+      endorsement: 'core',
+      duration: 0,
+      steps: [],
       context: {
         resourceReports: [
           {
@@ -81,11 +97,11 @@ describe('collectOptionalUnsupported', () => {
               { name: 'fetch-by-key', passed: false, assertions: [{ passed: false, description: 'got 404' }] },
               { name: 'String: contains()', passed: false, optional: true, assertions: [{ passed: false, description: 'got 400' }] },
               { name: 'String: startswith()', passed: false, optional: true, assertions: [{ passed: false, description: 'got 400' }] },
-              { name: 'String: endswith()', passed: true, optional: true, assertions: [] },
-            ],
-          },
-        ],
-      },
+              { name: 'String: endswith()', passed: true, optional: true, assertions: [] }
+            ]
+          }
+        ]
+      }
     } as unknown as PipelineResult;
 
     const optional = collectOptionalUnsupported(result);
@@ -99,23 +115,25 @@ describe('collectOptionalUnsupported', () => {
 describe('runHeaderSummary', () => {
   it('shows the scenario tally (passed/failed/skipped) from the scenario step, not the pipeline-step count', () => {
     const result = {
-      status: 'passed', duration: 0,
+      status: 'passed',
+      duration: 0,
       steps: [
         { name: 'Resolve authentication', status: 'passed' },
         { name: 'Run Core scenarios', status: 'passed', counts: { passed: 247, failed: 0, skipped: 84 } },
-        { name: 'Write reports', status: 'passed' },
-      ],
+        { name: 'Write reports', status: 'passed' }
+      ]
     } as unknown as PipelineResult;
     expect(runHeaderSummary(result)).toBe('247 passed, 0 failed, 84 skipped');
   });
 
   it('falls back to the pipeline-step tally when the run failed before scenarios ran', () => {
     const result = {
-      status: 'failed', duration: 0,
+      status: 'failed',
+      duration: 0,
       steps: [
         { name: 'Resolve authentication', status: 'passed' },
-        { name: 'Service check', status: 'failed' },
-      ],
+        { name: 'Service check', status: 'failed' }
+      ]
     } as unknown as PipelineResult;
     expect(runHeaderSummary(result)).toBe('1 passed, 1 failed');
   });

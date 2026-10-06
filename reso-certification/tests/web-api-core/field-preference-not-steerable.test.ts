@@ -53,18 +53,9 @@ const sampleResponse: ODataResponse = {
 const requester: ODataRequester = { request: async () => sampleResponse };
 
 const resolve = (preferFields: ReadonlyArray<string>) =>
-  resolveTestParams(
-    'http://x',
-    'Property',
-    entityType,
-    'tok',
-    [],
-    noopStandardMap,
-    undefined,
-    requester,
-    undefined,
-    { entries: preferFields.map(spec => ({ field: spec.includes('.') ? spec.split('.')[1] : spec, spec })) }
-  );
+  resolveTestParams('http://x', 'Property', entityType, 'tok', [], noopStandardMap, undefined, requester, undefined, {
+    entries: preferFields.map(spec => ({ field: spec.includes('.') ? spec.split('.')[1] : spec, spec }))
+  });
 
 describe('timestamp selection is not steerable', () => {
   it('does not report a datetime preference as applied', async () => {

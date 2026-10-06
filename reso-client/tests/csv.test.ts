@@ -4,15 +4,8 @@
  * variations-CSV schema-specific path.
  */
 
-import { describe, it, expect } from 'vitest';
-import {
-  escapeCsvField,
-  rowsToCsv,
-  csvToRows,
-  variationsToCsv,
-  csvToVariations,
-  type VariationCsvRow,
-} from '../src/index.js';
+import { describe, expect, it } from 'vitest';
+import { type VariationCsvRow, csvToRows, csvToVariations, escapeCsvField, rowsToCsv, variationsToCsv } from '../src/index.js';
 
 describe('escapeCsvField', () => {
   it('returns plain strings unchanged', () => {
@@ -45,7 +38,10 @@ describe('escapeCsvField', () => {
 describe('rowsToCsv ↔ csvToRows round-trip', () => {
   it('round-trips a simple row set', () => {
     const headers = ['a', 'b', 'c'];
-    const rows = [['1', '2', '3'], ['x', 'y', 'z']];
+    const rows = [
+      ['1', '2', '3'],
+      ['x', 'y', 'z']
+    ];
     const csv = rowsToCsv(headers, rows);
     const parsed = csvToRows(csv);
     expect(parsed).toEqual([headers, ...rows]);
@@ -61,7 +57,10 @@ describe('rowsToCsv ↔ csvToRows round-trip', () => {
 
   it('treats undefined / null cells as empty', () => {
     const headers = ['a', 'b'];
-    const rows = [[undefined, 'x'], [null, 'y']];
+    const rows = [
+      [undefined, 'x'],
+      [null, 'y']
+    ];
     const csv = rowsToCsv(headers, rows);
     expect(csv).toBe('a,b\n,x\n,y');
   });
@@ -71,17 +70,27 @@ describe('rowsToCsv ↔ csvToRows round-trip', () => {
   });
 
   it('parses CRLF-delimited input', () => {
-    expect(csvToRows('a,b\r\n1,2\r\n3,4')).toEqual([['a','b'],['1','2'],['3','4']]);
+    expect(csvToRows('a,b\r\n1,2\r\n3,4')).toEqual([
+      ['a', 'b'],
+      ['1', '2'],
+      ['3', '4']
+    ]);
   });
 });
 
 describe('csvToRows edge cases', () => {
   it('ignores a trailing newline', () => {
-    expect(csvToRows('a,b\n1,2\n')).toEqual([['a','b'],['1','2']]);
+    expect(csvToRows('a,b\n1,2\n')).toEqual([
+      ['a', 'b'],
+      ['1', '2']
+    ]);
   });
 
   it('preserves empty trailing fields', () => {
-    expect(csvToRows('a,b,c\n1,,')).toEqual([['a','b','c'],['1','','']]);
+    expect(csvToRows('a,b,c\n1,,')).toEqual([
+      ['a', 'b', 'c'],
+      ['1', '', '']
+    ]);
   });
 });
 
@@ -100,14 +109,14 @@ describe('variationsToCsv ↔ csvToVariations round-trip', () => {
       suggestedRelatedFieldName: undefined,
       suggestedRelatedLookupValue: undefined,
       outcome: 'Fast Track',
-      comments: 'fuzzy match: "MlgCanView" within 25 % of length to "View"',
+      comments: 'fuzzy match: "MlgCanView" within 25 % of length to "View"'
     },
     {
       resourceName: 'Property',
       fieldName: 'StandardStatus',
       lookupValue: 'Active, Pending', // comma in value
-      outcome: 'Ignore',
-    },
+      outcome: 'Ignore'
+    }
   ];
 
   it('serializes and re-parses to the same set', () => {
@@ -125,7 +134,8 @@ describe('variationsToCsv ↔ csvToVariations round-trip', () => {
   });
 
   it('parses 10-column legacy CSV (no Comments column) without error', () => {
-    const legacyCsv = 'Resource Name,Field Name,Lookup Value,Suggested Resource Name,Suggested Field Name,Suggested Lookup Value,Suggested Related Resource Name,Suggested Related Field Name,Suggested Related Lookup Value,Outcome\nProperty,StandardStatus,,,,Active,,,,Fast Track';
+    const legacyCsv =
+      'Resource Name,Field Name,Lookup Value,Suggested Resource Name,Suggested Field Name,Suggested Lookup Value,Suggested Related Resource Name,Suggested Related Field Name,Suggested Related Lookup Value,Outcome\nProperty,StandardStatus,,,,Active,,,,Fast Track';
     const result = csvToVariations(legacyCsv);
     expect(result.errors).toEqual([]);
     expect(result.rows.length).toBe(1);
@@ -147,8 +157,8 @@ describe('variationsToCsv ↔ csvToVariations round-trip', () => {
         suggestedStandardLookupValue: 'Close Of Escrow',
         suggestedLegacyODataValue: 'CloseOfEscrow',
         outcome: 'RESO',
-        comments: "input already matches canonical LegacyODataValue='CloseOfEscrow'",
-      },
+        comments: "input already matches canonical LegacyODataValue='CloseOfEscrow'"
+      }
     ];
     const csv = variationsToCsv(rows);
     const result = csvToVariations(csv);

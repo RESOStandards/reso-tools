@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  SUPPORTED_CORE_VERSIONS,
   CURRENT_CORE_VERSION,
-  isCoreVersion,
+  SUPPORTED_CORE_VERSIONS,
   coerceCoreVersion,
   coreVersionGte,
   isCore21OrLater,
+  isCoreVersion
 } from '../../src/sdk/core-versions.js';
 import { scenariosForVersion } from '../../src/web-api-core/scenarios.js';
 

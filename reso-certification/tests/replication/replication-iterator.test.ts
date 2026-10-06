@@ -17,11 +17,7 @@ import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import {
-  DEFAULT_PAGE_SIZE,
-  REPLICATION_STRATEGIES,
-  replicationIterator
-} from '../../src/replication/replication-iterator.js';
+import { DEFAULT_PAGE_SIZE, REPLICATION_STRATEGIES, replicationIterator } from '../../src/replication/replication-iterator.js';
 import type { ODataRequester } from '../../src/test-runner/index.js';
 
 const ROOT = 'https://example.com/odata';
@@ -100,8 +96,7 @@ const walk = async (
   return { records, counts };
 };
 
-const skips = (urls: ReadonlyArray<string>): Array<string | null> =>
-  urls.map(u => new URL(u).searchParams.get('$skip'));
+const skips = (urls: ReadonlyArray<string>): Array<string | null> => urls.map(u => new URL(u).searchParams.get('$skip'));
 
 describe('replicationIterator — TopAndSkip', () => {
   it('walks the complete set against a server that caps its page below $top', async () => {

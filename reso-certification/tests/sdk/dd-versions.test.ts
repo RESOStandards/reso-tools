@@ -3,23 +3,21 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  SUPPORTED_DD_VERSIONS,
-  DEPRECATED_DD_VERSIONS,
   CERTIFIABLE_DD_VERSIONS,
   CURRENT_DD_VERSION,
-  normalizeDDVersion,
-  isDDVersion,
+  DEPRECATED_DD_VERSIONS,
+  SUPPORTED_DD_VERSIONS,
   isCertifiableDDVersion,
+  isDDVersion,
   isSupportedDDVersion,
+  normalizeDDVersion
 } from '../../src/sdk/dd-versions.js';
 
 // The versions we ship reference metadata for, read straight off reso-common's reference-metadata
 // directory (the single source; resolved through its `reference-metadata/*` subpath export).
-const referenceDir = dirname(
-  createRequire(import.meta.url).resolve('@reso-standards/reso-common/reference-metadata/dd-2.1.json'),
-);
+const referenceDir = dirname(createRequire(import.meta.url).resolve('@reso-standards/reso-common/reference-metadata/dd-2.1.json'));
 const versionsOnDisk = readdirSync(referenceDir)
-  .map((f) => /^dd-(.+)\.json$/.exec(f)?.[1])
+  .map(f => /^dd-(.+)\.json$/.exec(f)?.[1])
   .filter((v): v is string => v != null)
   .sort();
 
@@ -33,9 +31,7 @@ describe('SUPPORTED_DD_VERSIONS is the single source of truth', () => {
 
 describe('derived sets stay consistent', () => {
   it('certifiable = supported minus deprecated', () => {
-    const expected = SUPPORTED_DD_VERSIONS.filter(
-      (v) => !(DEPRECATED_DD_VERSIONS as ReadonlyArray<string>).includes(v),
-    );
+    const expected = SUPPORTED_DD_VERSIONS.filter(v => !(DEPRECATED_DD_VERSIONS as ReadonlyArray<string>).includes(v));
     expect([...CERTIFIABLE_DD_VERSIONS].sort()).toEqual([...expected].sort());
   });
 
@@ -57,7 +53,7 @@ describe('normalizeDDVersion strips patch to MAJOR.MINOR', () => {
     ['2.1.0', '2.1'],
     ['2.1', '2.1'],
     ['1.7.3', '1.7'],
-    ['2.0.0', '2.0'],
+    ['2.0.0', '2.0']
   ])('%s -> %s', (input, expected) => {
     expect(normalizeDDVersion(input)).toBe(expected);
   });
@@ -88,7 +84,9 @@ describe('the legacy @reso.context checker knows the same versions', () => {
     // The checker accepts a context version with no run version declared only when it names a Data Dictionary
     // version this engine ships a reference for; the two lists are kept in different modules (CJS legacy vs the
     // SDK) so this guard is what keeps them one list.
-    const { KNOWN_DD_VERSIONS } = createRequire(import.meta.url)(resolve(import.meta.dirname, '../../src/legacy/lib/schema/reso-context.js'));
+    const { KNOWN_DD_VERSIONS } = createRequire(import.meta.url)(
+      resolve(import.meta.dirname, '../../src/legacy/lib/schema/reso-context.js')
+    );
     expect([...KNOWN_DD_VERSIONS].sort()).toEqual([...SUPPORTED_DD_VERSIONS].sort());
   });
 });

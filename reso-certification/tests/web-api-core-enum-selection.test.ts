@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import type { CsdlEnumType } from '@reso-standards/reso-metadata-utils';
+import { describe, expect, it } from 'vitest';
 import type { DdReference } from '../src/metadata/dd-metadata-checks.js';
 import type { EntityProperty } from '../src/test-runner/types.js';
 import { isMultiRep, isSingleRep, selectEnumCandidates } from '../src/web-api-core/enum-selection.js';
@@ -12,8 +12,8 @@ const enumTypes: ReadonlyArray<CsdlEnumType> = [
     members: [
       { name: 'Active', value: '0' },
       { name: 'Pending', value: '1' },
-      { name: 'Closed', value: '2' },
-    ],
+      { name: 'Closed', value: '2' }
+    ]
   },
   {
     name: 'AccessibilityFeatures',
@@ -21,15 +21,15 @@ const enumTypes: ReadonlyArray<CsdlEnumType> = [
     members: [
       { name: 'None', value: '0' },
       { name: 'AccessibleApproachWithRamp', value: '1' },
-      { name: 'AccessibleBedroom', value: '2' },
-    ],
-  },
+      { name: 'AccessibleBedroom', value: '2' }
+    ]
+  }
 ];
 
 const prop = (name: string, type: string, annotations?: Record<string, string>): EntityProperty => ({
   name,
   type,
-  ...(annotations && { annotations }),
+  ...(annotations && { annotations })
 });
 
 const properties: ReadonlyArray<EntityProperty> = [
@@ -37,7 +37,7 @@ const properties: ReadonlyArray<EntityProperty> = [
   prop('MyLocalStatus', 'org.reso.metadata.enums.StandardStatus'), // SINGLE_ENUM, LOCAL field (not in DD)
   prop('AccessibilityFeatures', 'org.reso.metadata.enums.AccessibilityFeatures'), // FLAGS_ENUM, standard
   prop('Appliances', 'Collection(Edm.String)', { 'RESO.OData.Metadata.LookupName': 'Appliances' }), // COLLECTION_STRING
-  prop('ListPrice', 'Edm.Decimal'), // not an enum at all
+  prop('ListPrice', 'Edm.Decimal') // not an enum at all
 ];
 
 const records: ReadonlyArray<Record<string, unknown>> = [
@@ -46,15 +46,15 @@ const records: ReadonlyArray<Record<string, unknown>> = [
     MyLocalStatus: 'Active',
     AccessibilityFeatures: 'AccessibleApproachWithRamp,AccessibleBedroom', // comma form
     Appliances: ['Dishwasher', 'Dryer'],
-    ListPrice: 100,
+    ListPrice: 100
   },
   {
     StandardStatus: 'Pending',
     MyLocalStatus: 'Closed',
     AccessibilityFeatures: 3, // integer bitmask (1 | 2) — must decode to the two members
     Appliances: ['Dishwasher'],
-    ListPrice: 200,
-  },
+    ListPrice: 200
+  }
 ];
 
 const ddRef: DdReference = {
@@ -62,7 +62,7 @@ const ddRef: DdReference = {
     { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus' },
     { resourceName: 'Property', fieldName: 'AccessibilityFeatures', type: 'org.reso.metadata.enums.AccessibilityFeatures' },
     { resourceName: 'Property', fieldName: 'Appliances', type: 'Collection(Edm.String)' },
-    { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' },
+    { resourceName: 'Property', fieldName: 'ListPrice', type: 'Edm.Decimal' }
     // MyLocalStatus intentionally absent → local
   ],
   lookups: [
@@ -72,8 +72,8 @@ const ddRef: DdReference = {
     { lookupName: 'AccessibilityFeatures', lookupValue: 'AccessibleApproachWithRamp' },
     { lookupName: 'AccessibilityFeatures', lookupValue: 'AccessibleBedroom' },
     { lookupName: 'Appliances', lookupValue: 'Dishwasher' },
-    { lookupName: 'Appliances', lookupValue: 'Dryer' },
-  ],
+    { lookupName: 'Appliances', lookupValue: 'Dryer' }
+  ]
 };
 
 const standardMap = buildStandardMapFrom(ddRef);
@@ -84,7 +84,7 @@ describe('selectEnumCandidates — single-valued group', () => {
   const candidates = select(isSingleRep);
 
   it('picks the standard SINGLE_ENUM field first, local after', () => {
-    expect(candidates.map((c) => c.field)).toEqual(['StandardStatus', 'MyLocalStatus']);
+    expect(candidates.map(c => c.field)).toEqual(['StandardStatus', 'MyLocalStatus']);
     expect(candidates[0].representation).toBe('SINGLE_ENUM');
     expect(candidates[0].isStandard).toBe(true);
     expect(candidates[1].isStandard).toBe(false);
@@ -96,8 +96,8 @@ describe('selectEnumCandidates — single-valued group', () => {
   });
 
   it('excludes non-enum and multi-valued fields', () => {
-    expect(candidates.some((c) => c.field === 'ListPrice')).toBe(false);
-    expect(candidates.some((c) => c.field === 'AccessibilityFeatures')).toBe(false);
+    expect(candidates.some(c => c.field === 'ListPrice')).toBe(false);
+    expect(candidates.some(c => c.field === 'AccessibilityFeatures')).toBe(false);
   });
 });
 
@@ -105,13 +105,13 @@ describe('selectEnumCandidates — multi-valued group', () => {
   const candidates = select(isMultiRep);
 
   it('includes the flags and collection fields, tagged by real representation', () => {
-    const byField = new Map(candidates.map((c) => [c.field, c]));
+    const byField = new Map(candidates.map(c => [c.field, c]));
     expect(byField.get('AccessibilityFeatures')?.representation).toBe('FLAGS_ENUM');
     expect(byField.get('Appliances')?.representation).toBe('COLLECTION_STRING');
   });
 
   it('decodes an integer bitmask into member names (representation-aware sampling)', () => {
-    const flags = candidates.find((c) => c.field === 'AccessibilityFeatures');
+    const flags = candidates.find(c => c.field === 'AccessibilityFeatures');
     // Record 2 sends the bitmask 3 (1|2); it must decode to the two members, not "3".
     expect(flags?.values).toContain('AccessibleApproachWithRamp');
     expect(flags?.values).toContain('AccessibleBedroom');
@@ -119,19 +119,19 @@ describe('selectEnumCandidates — multi-valued group', () => {
   });
 
   it('carries the LookupName for a string-collection field', () => {
-    expect(candidates.find((c) => c.field === 'Appliances')?.lookupName).toBe('Appliances');
+    expect(candidates.find(c => c.field === 'Appliances')?.lookupName).toBe('Appliances');
   });
 
   it('captures the SMALLEST record collection as subsetSampleValues (a guaranteed all() subset)', () => {
     // Appliances: record 1 = [Dishwasher, Dryer] (2), record 2 = [Dishwasher] (1). Smallest is record 2's — so an
     // all() built over exactly {Dishwasher} is guaranteed to return record 2 (its collection ⊆ the set).
-    expect(candidates.find((c) => c.field === 'Appliances')?.subsetSampleValues).toEqual(['Dishwasher']);
+    expect(candidates.find(c => c.field === 'Appliances')?.subsetSampleValues).toEqual(['Dishwasher']);
   });
 
   it('subsetSampleValues decodes a flags record too (both bits of one record, co-present)', () => {
     // AccessibilityFeatures: both records carry two members (comma form and bitmask 3); the smallest (2) decodes
     // to the co-present pair — the guaranteed `has A and has B` seed.
-    const flags = candidates.find((c) => c.field === 'AccessibilityFeatures')?.subsetSampleValues;
+    const flags = candidates.find(c => c.field === 'AccessibilityFeatures')?.subsetSampleValues;
     expect(flags).toEqual(expect.arrayContaining(['AccessibleApproachWithRamp', 'AccessibleBedroom']));
     expect(flags).toHaveLength(2);
   });
@@ -151,7 +151,7 @@ describe('R2-2 — Lookup Resource sample is local-first, filter values standard
     const strRecords = [{ MlsStatus: 'Active' }, { MlsStatus: 'CustomLocalStatus' }];
     const strDd: DdReference = {
       fields: [{ resourceName: 'Property', fieldName: 'MlsStatus', type: 'Edm.String' }],
-      lookups: [{ lookupName: 'MlsStatus', lookupValue: 'Active' }], // 'CustomLocalStatus' intentionally absent from the DD
+      lookups: [{ lookupName: 'MlsStatus', lookupValue: 'Active' }] // 'CustomLocalStatus' intentionally absent from the DD
     };
     const strMap = buildStandardMapFrom(strDd);
     const [c] = selectEnumCandidates(strProps, strRecords, [], strMap, 'Property', isSingleRep);
@@ -170,7 +170,7 @@ describe('drift resistance — frequency ordering, distinct count, fill rate', (
     { StandardStatus: 'Active' },
     { StandardStatus: 'Active' },
     { StandardStatus: 'Active' },
-    {}, // field absent → does not count toward fill
+    {} // field absent → does not count toward fill
   ];
   const [c] = selectEnumCandidates(freqProps, freqRecords, enumTypes, standardMap, 'Property', isSingleRep);
 
@@ -192,28 +192,28 @@ describe('drift resistance — frequency ordering, distinct count, fill rate', (
     // Two standard fields of the same tier; the one populated in more records must sort first.
     const rankProps = [
       prop('SparseStatus', 'org.reso.metadata.enums.StandardStatus'),
-      prop('FullStatus', 'org.reso.metadata.enums.StandardStatus'),
+      prop('FullStatus', 'org.reso.metadata.enums.StandardStatus')
     ];
     const rankRecords = [
       { SparseStatus: 'Active', FullStatus: 'Active' },
-      { FullStatus: 'Pending' }, // SparseStatus absent here → lower fill
+      { FullStatus: 'Pending' } // SparseStatus absent here → lower fill
     ];
     const rankDd: DdReference = {
       fields: [
         { resourceName: 'Property', fieldName: 'SparseStatus', type: 'org.reso.metadata.enums.StandardStatus' },
-        { resourceName: 'Property', fieldName: 'FullStatus', type: 'org.reso.metadata.enums.StandardStatus' },
+        { resourceName: 'Property', fieldName: 'FullStatus', type: 'org.reso.metadata.enums.StandardStatus' }
       ],
-      lookups: ddRef.lookups,
+      lookups: ddRef.lookups
     };
     const ranked = selectEnumCandidates(rankProps, rankRecords, enumTypes, buildStandardMapFrom(rankDd), 'Property', isSingleRep);
-    expect(ranked.map((x) => x.field)).toEqual(['FullStatus', 'SparseStatus']);
+    expect(ranked.map(x => x.field)).toEqual(['FullStatus', 'SparseStatus']);
   });
 });
 
 describe('rep predicates', () => {
   it('partition the five representations correctly', () => {
-    expect(['SINGLE_ENUM', 'SINGLE_STRING'].every(isSingleRep)).toBe(true);
-    expect(['FLAGS_ENUM', 'COLLECTION_ENUM', 'COLLECTION_STRING'].every(isMultiRep)).toBe(true);
+    expect((['SINGLE_ENUM', 'SINGLE_STRING'] as const).every(isSingleRep)).toBe(true);
+    expect((['FLAGS_ENUM', 'COLLECTION_ENUM', 'COLLECTION_STRING'] as const).every(isMultiRep)).toBe(true);
     expect(isSingleRep('FLAGS_ENUM')).toBe(false);
     expect(isMultiRep('SINGLE_ENUM')).toBe(false);
   });

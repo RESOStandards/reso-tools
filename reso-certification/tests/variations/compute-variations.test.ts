@@ -5,8 +5,8 @@
  * Uses the monorepo's ETL reference metadata (src/etl/reference-metadata/).
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 // Legacy CJS — use require
 const createRequire = (await import('node:module')).createRequire;
@@ -30,7 +30,7 @@ describe('computeVariations: basic structure', () => {
     const result = await computeVariations({
       metadataReportJson: {},
       fuzziness: TEST_FUZZINESS,
-      version: DD_1_7,
+      version: DD_1_7
     });
 
     expect(result.description).toBeTruthy();
@@ -55,7 +55,7 @@ describe('computeVariations: reference metadata self-check', () => {
     const result = await computeVariations({
       metadataReportJson,
       fuzziness: TEST_FUZZINESS,
-      version: DD_1_7,
+      version: DD_1_7
     });
 
     expect(result.variations.resources).toEqual([]);
@@ -68,7 +68,7 @@ describe('computeVariations: reference metadata self-check', () => {
     const result = await computeVariations({
       metadataReportJson,
       fuzziness: TEST_FUZZINESS,
-      version: DD_2_0,
+      version: DD_2_0
     });
 
     expect(result.variations.resources).toEqual([]);
@@ -81,7 +81,7 @@ describe('computeVariations: reference metadata self-check', () => {
     const result = await computeVariations({
       metadataReportJson,
       fuzziness: TEST_FUZZINESS,
-      version: DD_2_1,
+      version: DD_2_1
     });
 
     expect(result.variations.resources).toEqual([]);
@@ -94,7 +94,7 @@ describe('computeVariations: reference metadata self-check', () => {
     const result = await computeVariations({
       metadataReportJson,
       fuzziness: 1.0,
-      version: DD_1_7,
+      version: DD_1_7
     });
 
     expect(result.fuzziness).toBe(1.0);
@@ -110,31 +110,29 @@ describe('computeVariations: substring matching', () => {
   it('should detect a lowercase resource name variation', async () => {
     const result = await computeVariations({
       metadataReportJson: {
-        fields: [{ resourceName: 'property', fieldName: 'ListPrice' }],
+        fields: [{ resourceName: 'property', fieldName: 'ListPrice' }]
       },
       fuzziness: TEST_FUZZINESS,
-      version: DD_1_7,
+      version: DD_1_7
     });
 
     expect(result.variations.resources.length).toBe(1);
-    expect(result.variations.resources[0].suggestions.some(
-      (s: Record<string, unknown>) => s.suggestedResourceName === 'Property'
-    )).toBe(true);
+    expect(result.variations.resources[0].suggestions.some((s: Record<string, unknown>) => s.suggestedResourceName === 'Property')).toBe(
+      true
+    );
   });
 
   it('should detect a field name variation with noise characters', async () => {
     const result = await computeVariations({
       metadataReportJson: {
-        fields: [{ resourceName: 'Property', fieldName: 'list_price' }],
+        fields: [{ resourceName: 'Property', fieldName: 'list_price' }]
       },
       fuzziness: TEST_FUZZINESS,
-      version: DD_1_7,
+      version: DD_1_7
     });
 
     expect(result.variations.fields.length).toBeGreaterThan(0);
-    expect(result.variations.fields[0].suggestions.some(
-      (s: Record<string, unknown>) => s.suggestedFieldName === 'ListPrice'
-    )).toBe(true);
+    expect(result.variations.fields[0].suggestions.some((s: Record<string, unknown>) => s.suggestedFieldName === 'ListPrice')).toBe(true);
   });
 });
 
@@ -144,19 +142,17 @@ describe('computeVariations: edit distance matching', () => {
   it('should detect a close field name misspelling', async () => {
     const result = await computeVariations({
       metadataReportJson: {
-        fields: [{ resourceName: 'Property', fieldName: 'ListPrce' }],
+        fields: [{ resourceName: 'Property', fieldName: 'ListPrce' }]
       },
       fuzziness: TEST_FUZZINESS,
-      version: DD_1_7,
+      version: DD_1_7
     });
 
-    const fieldSuggestions = result.variations.fields.filter(
-      (f: Record<string, unknown>) => f.fieldName === 'ListPrce'
-    );
+    const fieldSuggestions = result.variations.fields.filter((f: Record<string, unknown>) => f.fieldName === 'ListPrce');
     expect(fieldSuggestions.length).toBeGreaterThan(0);
-    expect(fieldSuggestions[0].suggestions.some(
-      (s: Record<string, unknown>) => s.strategy === MATCHING_STRATEGIES.EDIT_DISTANCE
-    )).toBe(true);
+    expect(fieldSuggestions[0].suggestions.some((s: Record<string, unknown>) => s.strategy === MATCHING_STRATEGIES.EDIT_DISTANCE)).toBe(
+      true
+    );
   });
 });
 
@@ -167,54 +163,54 @@ describe('computeVariations: suggestions map', () => {
     const suggestionsMap = {
       Property: {
         CustomField123: {
-          suggestions: [{
-            suggestedResourceName: 'Property',
-            suggestedFieldName: 'ListPrice',
-            isFastTrack: true,
-          }],
-        },
-      },
+          suggestions: [
+            {
+              suggestedResourceName: 'Property',
+              suggestedFieldName: 'ListPrice',
+              isFastTrack: true
+            }
+          ]
+        }
+      }
     };
 
     const result = await computeVariations({
       metadataReportJson: {
-        fields: [{ resourceName: 'Property', fieldName: 'CustomField123' }],
+        fields: [{ resourceName: 'Property', fieldName: 'CustomField123' }]
       },
       fuzziness: TEST_FUZZINESS,
       version: DD_1_7,
-      suggestionsMap,
+      suggestionsMap
     });
 
-    const field = result.variations.fields.find(
-      (f: Record<string, unknown>) => f.fieldName === 'CustomField123'
-    );
+    const field = result.variations.fields.find((f: Record<string, unknown>) => f.fieldName === 'CustomField123');
     expect(field).toBeDefined();
-    expect(field.suggestions.some(
-      (s: Record<string, unknown>) => s.suggestedFieldName === 'ListPrice' && s.strategy === MATCHING_STRATEGIES.FAST_TRACK
-    )).toBe(true);
+    expect(
+      field.suggestions.some(
+        (s: Record<string, unknown>) => s.suggestedFieldName === 'ListPrice' && s.strategy === MATCHING_STRATEGIES.FAST_TRACK
+      )
+    ).toBe(true);
   });
 
   it('should suppress variations when item is ignored in suggestions map', async () => {
     const suggestionsMap = {
       Property: {
         CustomField123: {
-          ignored: true,
-        },
-      },
+          ignored: true
+        }
+      }
     };
 
     const result = await computeVariations({
       metadataReportJson: {
-        fields: [{ resourceName: 'Property', fieldName: 'CustomField123' }],
+        fields: [{ resourceName: 'Property', fieldName: 'CustomField123' }]
       },
       fuzziness: TEST_FUZZINESS,
       version: DD_1_7,
-      suggestionsMap,
+      suggestionsMap
     });
 
-    const field = result.variations.fields.find(
-      (f: Record<string, unknown>) => f.fieldName === 'CustomField123'
-    );
+    const field = result.variations.fields.find((f: Record<string, unknown>) => f.fieldName === 'CustomField123');
     // Ignored fields should not appear in variations
     expect(field).toBeUndefined();
   });

@@ -10,17 +10,43 @@ import { lookupResourceValueReport } from '../../src/web-api-core/test-runner.js
 // AccessibilityFeatures owns a value in NO test field, proving the classification joins per-FIELD.
 const ref: DdReference = {
   fields: [
-    { resourceName: 'Property', fieldName: 'StandardStatus', type: 'org.reso.metadata.enums.StandardStatus', lookupStatus: 'Locked with Enumerations' },
-    { resourceName: 'OpenHouse', fieldName: 'OpenHouseStatus', type: 'org.reso.metadata.enums.OpenHouseStatus', lookupStatus: 'Open with Enumerations' },
-    { resourceName: 'Property', fieldName: 'City', type: 'org.reso.metadata.enums.City', lookupStatus: 'Open' },
+    {
+      resourceName: 'Property',
+      fieldName: 'StandardStatus',
+      type: 'org.reso.metadata.enums.StandardStatus',
+      lookupStatus: 'Locked with Enumerations'
+    },
+    {
+      resourceName: 'OpenHouse',
+      fieldName: 'OpenHouseStatus',
+      type: 'org.reso.metadata.enums.OpenHouseStatus',
+      lookupStatus: 'Open with Enumerations'
+    },
+    { resourceName: 'Property', fieldName: 'City', type: 'org.reso.metadata.enums.City', lookupStatus: 'Open' }
   ],
   lookups: [
-    { lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Active', annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Active' }] },
-    { lookupName: 'org.reso.metadata.enums.StandardStatus', lookupValue: 'Pending', annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Pending' }] },
-    { lookupName: 'org.reso.metadata.enums.OpenHouseStatus', lookupValue: 'Active', annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Active' }] },
-    { lookupName: 'org.reso.metadata.enums.OpenHouseStatus', lookupValue: 'Ended', annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Ended' }] },
-    { lookupName: 'org.reso.metadata.enums.AccessibilityFeatures', lookupValue: 'AccessibleApproachWithRamp' },
-  ],
+    {
+      lookupName: 'org.reso.metadata.enums.StandardStatus',
+      lookupValue: 'Active',
+      annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Active' }]
+    },
+    {
+      lookupName: 'org.reso.metadata.enums.StandardStatus',
+      lookupValue: 'Pending',
+      annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Pending' }]
+    },
+    {
+      lookupName: 'org.reso.metadata.enums.OpenHouseStatus',
+      lookupValue: 'Active',
+      annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Active' }]
+    },
+    {
+      lookupName: 'org.reso.metadata.enums.OpenHouseStatus',
+      lookupValue: 'Ended',
+      annotations: [{ term: 'RESO.OData.Metadata.StandardName', value: 'Ended' }]
+    },
+    { lookupName: 'org.reso.metadata.enums.AccessibilityFeatures', lookupValue: 'AccessibleApproachWithRamp' }
+  ]
 };
 const standardMap = buildStandardMapFrom(ref);
 const never = (): boolean => false;
@@ -29,13 +55,27 @@ const row = (slv: string): Record<string, unknown> => ({ StandardLookupValue: sl
 
 describe('lookupResourceValueReport — report-only classification, NEVER gates', () => {
   it('all DD-standard values → PASS, reports them as standard', () => {
-    const res = lookupResourceValueReport([row('Active'), row('Pending')], 'Property', 'StandardStatus', 'StandardStatus', standardMap, never);
+    const res = lookupResourceValueReport(
+      [row('Active'), row('Pending')],
+      'Property',
+      'StandardStatus',
+      'StandardStatus',
+      standardMap,
+      never
+    );
     expect(res.passed).toBe(true);
     expect(res.message).toContain('all 2 value(s) are DD-standard');
   });
 
-  it('OPEN enum + a local value → PASS, classified local, no closed-enum warning (OpenHouseStatus \'Deleted\' regression)', () => {
-    const res = lookupResourceValueReport([row('Active'), row('Deleted')], 'OpenHouse', 'OpenHouseStatus', 'OpenHouseStatus', standardMap, never);
+  it("OPEN enum + a local value → PASS, classified local, no closed-enum warning (OpenHouseStatus 'Deleted' regression)", () => {
+    const res = lookupResourceValueReport(
+      [row('Active'), row('Deleted')],
+      'OpenHouse',
+      'OpenHouseStatus',
+      'OpenHouseStatus',
+      standardMap,
+      never
+    );
     expect(res.passed).toBe(true); // a local value on an open enum is a permitted extension — never a failure
     expect(res.message).toContain("'Deleted'");
     expect(res.message).toContain('local value');
@@ -45,7 +85,14 @@ describe('lookupResourceValueReport — report-only classification, NEVER gates'
   });
 
   it('CLOSED enum + a local value → PASS (report only) but WARNS it would not pass DD', () => {
-    const res = lookupResourceValueReport([row('Active'), row('CompletelyMadeUp')], 'Property', 'StandardStatus', 'StandardStatus', standardMap, never);
+    const res = lookupResourceValueReport(
+      [row('Active'), row('CompletelyMadeUp')],
+      'Property',
+      'StandardStatus',
+      'StandardStatus',
+      standardMap,
+      never
+    );
     expect(res.passed).toBe(true); // Core NEVER fails — even extending a closed enum is caught in DD, not Core
     expect(res.message).toContain("'CompletelyMadeUp'");
     expect(res.message).toContain('closed enumeration');
@@ -53,7 +100,14 @@ describe('lookupResourceValueReport — report-only classification, NEVER gates'
   });
 
   it('NEVER fails Core — a closed enum full of bogus values still passes (report only)', () => {
-    const res = lookupResourceValueReport([row('Nope'), row('AlsoNope')], 'Property', 'StandardStatus', 'StandardStatus', standardMap, never);
+    const res = lookupResourceValueReport(
+      [row('Nope'), row('AlsoNope')],
+      'Property',
+      'StandardStatus',
+      'StandardStatus',
+      standardMap,
+      never
+    );
     expect(res.passed).toBe(true);
   });
 
@@ -83,14 +137,28 @@ describe('lookupResourceValueReport — report-only classification, NEVER gates'
   });
 
   it('no StandardLookupValue rows → PASS, nothing to classify', () => {
-    const res = lookupResourceValueReport([{ LookupName: 'StandardStatus' }], 'Property', 'StandardStatus', 'StandardStatus', standardMap, never);
+    const res = lookupResourceValueReport(
+      [{ LookupName: 'StandardStatus' }],
+      'Property',
+      'StandardStatus',
+      'StandardStatus',
+      standardMap,
+      never
+    );
     expect(res.passed).toBe(true);
     expect(res.message).toContain('no StandardLookupValue values to classify');
   });
 
   it('classification joins on the FIELD enum — a value standard in ANOTHER enum is local here', () => {
     // AccessibleApproachWithRamp is a real DD value, but not for OpenHouseStatus → local under the per-field set.
-    const res = lookupResourceValueReport([row('AccessibleApproachWithRamp')], 'OpenHouse', 'OpenHouseStatus', 'OpenHouseStatus', standardMap, never);
+    const res = lookupResourceValueReport(
+      [row('AccessibleApproachWithRamp')],
+      'OpenHouse',
+      'OpenHouseStatus',
+      'OpenHouseStatus',
+      standardMap,
+      never
+    );
     expect(res.passed).toBe(true);
     expect(res.message).toContain("'AccessibleApproachWithRamp'");
     expect(res.message).toContain('local value');

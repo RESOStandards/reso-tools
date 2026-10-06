@@ -14,8 +14,8 @@
  * the test proves the ignore is the cause, not that the variation never fires.
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 // Legacy CJS — use require
 const createRequire = (await import('node:module')).createRequire;

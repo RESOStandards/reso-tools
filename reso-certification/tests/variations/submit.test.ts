@@ -29,8 +29,8 @@ const REPORT = {
   recipientUoi: 'M00000100',
   changes: [
     { resourceName: 'Property', fieldName: 'Sprinklers' },
-    { resourceName: 'Property', fieldName: 'Fencing' },
-  ],
+    { resourceName: 'Property', fieldName: 'Fencing' }
+  ]
 };
 
 const ok = (body: unknown, status = 200) =>
@@ -49,7 +49,10 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  process.env.RESO_SERVICES_URL = undefined;
+  // `process.env.X = undefined` coerces to the STRING "undefined" and leaves the key present,
+  // so every "throws when unset" assertion silently stops throwing. Only `delete` unsets.
+  // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
+  delete process.env.RESO_SERVICES_URL;
 });
 
 const submit = (over: Record<string, unknown> = {}) =>
@@ -113,7 +116,7 @@ describe('a submission is a full replace, declared explicitly', () => {
 describe('a lock refusal is actionable, not a generic failure', () => {
   const lockedBody = {
     message: 'locked',
-    lock: { displayName: 'Anna Reviewer', email: 'anna@example.org', expiresAt: '2026-10-04T14:30:00.000Z', heldByProviderUoi: 'T00000076' },
+    lock: { displayName: 'Anna Reviewer', email: 'anna@example.org', expiresAt: '2026-10-04T14:30:00.000Z', heldByProviderUoi: 'T00000076' }
   };
 
   it('throws LOCKED rather than SERVICE_ERROR', async () => {
@@ -180,9 +183,9 @@ describe('a dry run touches nothing', () => {
 describe('a report that is not a variations report is caught before anything is sent', () => {
   it('names the missing coordinates rather than failing at the service', async () => {
     // The likeliest mistake is pointing this at metadata-report.json, which carries none of them.
-    await expect(
-      submitVariationsReportViaService({ report: { version: '2.1' }, bearerToken: 'tok', fromCli: true }),
-    ).rejects.toThrow(/providerUoi, providerUsi, recipientUoi/);
+    await expect(submitVariationsReportViaService({ report: { version: '2.1' }, bearerToken: 'tok', fromCli: true })).rejects.toThrow(
+      /providerUoi, providerUsi, recipientUoi/
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

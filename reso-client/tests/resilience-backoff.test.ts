@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { type BackoffConfig, backoffMs, shouldRetry } from '../src/http/resilience/backoff.js';
 import type { FailureClassification } from '../src/http/resilience/errors.js';
 
-const cls = (
-  over: Partial<FailureClassification> & Pick<FailureClassification, 'kind' | 'retryable'>
-): FailureClassification => ({ fatal: false, message: 'x', ...over });
+const cls = (over: Partial<FailureClassification> & Pick<FailureClassification, 'kind' | 'retryable'>): FailureClassification => ({
+  fatal: false,
+  message: 'x',
+  ...over
+});
 
 describe('backoffMs', () => {
   const cfg: BackoffConfig = { baseMs: 100, maxMs: 1000, maxRetries: 5 };

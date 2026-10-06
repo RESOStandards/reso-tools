@@ -6,18 +6,18 @@
  * matcher is deleted wholesale (cert-utils archives it).
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
 import {
-  DEFAULT_FUZZINESS,
-  MIN_MATCHING_LENGTH,
   CLOSE_MATCH_DISTANCE,
+  DEFAULT_FUZZINESS,
   MATCHING_STRATEGIES,
-  normalizeDataElementName,
+  MIN_MATCHING_LENGTH,
   classifySuggestionStrategy,
   getDDWikiUrl,
-  prepareResults,
+  normalizeDataElementName,
+  prepareResults
 } from '@reso-standards/reso-common';
+import { describe, expect, it } from 'vitest';
 
 const createRequire = (await import('node:module')).createRequire;
 const require = createRequire(import.meta.url);
@@ -48,7 +48,13 @@ describe('matching helpers parity — reso-common === legacy', () => {
     same({ version: '2.1', resourceName: 'Property' });
     same({ version: '2.1', resourceName: 'Property', fieldName: 'ListPrice' });
     same({ version: '1.7', resourceName: 'Property', fieldName: 'ExteriorFeatures', lookupValue: 'Public Sewer' });
-    same({ version: '1.7', standardMetadataMap: smm, resourceName: 'Property', fieldName: 'ExteriorFeatures', legacyODataValue: 'GasGrill' });
+    same({
+      version: '1.7',
+      standardMetadataMap: smm,
+      resourceName: 'Property',
+      fieldName: 'ExteriorFeatures',
+      legacyODataValue: 'GasGrill'
+    });
   });
 
   it('prepareResults groups + dedupes identically', () => {
@@ -56,15 +62,17 @@ describe('matching helpers parity — reso-common === legacy', () => {
       resources: [{ resourceName: 'Prop', suggestedResourceName: 'Property', strategy: 'Substring' }],
       fields: [
         { resourceName: 'Property', fieldName: 'ListPrce', suggestedFieldName: 'ListPrice', strategy: 'Edit Distance' },
-        { resourceName: 'Property', fieldName: 'ListPrce', suggestedFieldName: 'ListPrices', strategy: 'Edit Distance' },
+        { resourceName: 'Property', fieldName: 'ListPrce', suggestedFieldName: 'ListPrices', strategy: 'Edit Distance' }
       ],
-      lookupValues: [{ resourceName: 'Property', fieldName: 'StandardStatus', lookupValue: 'Active UC', suggestedLookupValue: 'Active Under Contract' }],
+      lookupValues: [
+        { resourceName: 'Property', fieldName: 'StandardStatus', lookupValue: 'Active UC', suggestedLookupValue: 'Active Under Contract' }
+      ],
       legacyODataValues: [
         { resourceName: 'Property', fieldName: 'ExteriorFeatures', legacyODataValue: 'Grill', suggestedLegacyODataValue: 'GasGrill' },
-        { resourceName: 'Property', fieldName: 'ExteriorFeatures', legacyODataValue: 'Grill', suggestedLegacyODataValue: 'GasGrill' },
+        { resourceName: 'Property', fieldName: 'ExteriorFeatures', legacyODataValue: 'Grill', suggestedLegacyODataValue: 'GasGrill' }
       ],
       expansions: [{ resourceName: 'Property', fieldName: 'Media' }],
-      complexTypes: [],
+      complexTypes: []
     };
     expect(prepareResults(input)).toEqual(legacy.prepareResults(input));
   });

@@ -6,7 +6,7 @@ import type { TestParams } from '../../src/web-api-core/sampling.js';
 // The metadata scenario fetches through a separate path (fetchMetadataWithVersion), not the
 // requester seam. Mock it to succeed so this test isolates the deadline behavior on the
 // requester-driven scenarios.
-vi.mock('../../src/test-runner/metadata.js', async (importOriginal) => {
+vi.mock('../../src/test-runner/metadata.js', async importOriginal => {
   const actual = await importOriginal<typeof import('../../src/test-runner/metadata.js')>();
   return {
     ...actual,
@@ -34,14 +34,13 @@ const params: TestParams = {
 const DEADLINE_MSG = 'Not tested — run deadline reached';
 
 /** Build the deadline-exceeded error the resilient client throws once the run budget is spent. */
-const deadlineError = (): Error =>
-  Object.assign(new Error('Total run timeout exceeded'), { resilienceKind: 'deadline-exceeded' as const });
+const deadlineError = (): Error => Object.assign(new Error('Total run timeout exceeded'), { resilienceKind: 'deadline-exceeded' as const });
 
 /** A requester that serves `okCount` requests, then throws deadline-exceeded on every call after. */
 const deadlineAfter = (okCount: number): ODataRequester => {
   const calls: string[] = []; // closure-local counter (const binding, mutated via push)
   return {
-    request: async (options) => {
+    request: async options => {
       calls.push(options.url);
       if (calls.length > okCount) throw deadlineError();
       return {
@@ -84,7 +83,7 @@ describe('runCoreResourceScenarios — graceful stop on the run deadline', () =>
     expect(deadlineScenarios.length).toBeGreaterThan(0);
     for (const s of deadlineScenarios) {
       expect(s.skipped).toBe(true);
-      expect(s.passed).toBe(true); // a skip never counts as a failure
+      expect(s.passed).toBe(false); // skipped is skipped — not also a pass; `!skipped` in both tallies is what keeps it off the failure count
     }
 
     // THE CORE GUARANTEE, stated non-vacuously against a swallow-as-failed regression: a deadline can

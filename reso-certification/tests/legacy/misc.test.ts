@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const { pascalCase } = require(resolve(import.meta.dirname, '../../src/legacy/lib/misc/index.js'));
