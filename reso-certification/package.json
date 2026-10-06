@@ -1,13 +1,13 @@
 {
   "name": "@reso-standards/reso-certification",
-  "version": "0.10.7",
+  "version": "0.10.8",
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/RESOStandards/reso-tools.git",
     "directory": "reso-certification"
   },
-  "description": "RESO certification testing toolkit – Add/Edit (RCP-010), Web API Core, Data Dictionary",
+  "description": "RESO certification testing toolkit \u2013 Add/Edit (RCP-010), Web API Core, Data Dictionary",
   "type": "module",
   "engines": {
     "node": ">=22.0.0"

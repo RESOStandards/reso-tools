@@ -38,6 +38,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.os }}
+          # The artifact is a hand-off between jobs in this same run, so it needs to live
+          # minutes. Unset, it defaulted to ninety days and these are full Electron
+          # builds per platform, which is where the storage bill actually came from.
+          retention-days: 1
           path: |
             reso-desktop-client/dist/*.dmg
             reso-desktop-client/dist/*.zip

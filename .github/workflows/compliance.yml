@@ -146,6 +146,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: compliance-results-postgres
+          # Compliance results are a debugging aid, not a hand-off. A week is enough to
+          # investigate a failed run; ninety days is just storage.
+          retention-days: 7
           path: reso-reference-server/compliance/results/
 
   compliance-mongodb:
@@ -201,6 +204,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: compliance-results-mongodb
+          # Compliance results are a debugging aid, not a hand-off. A week is enough to
+          # investigate a failed run; ninety days is just storage.
+          retention-days: 7
           path: reso-reference-server/compliance/results/
 
   compliance-sqlite:
@@ -256,4 +262,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: compliance-results-sqlite
+          # Compliance results are a debugging aid, not a hand-off. A week is enough to
+          # investigate a failed run; ninety days is just storage.
+          retention-days: 7
           path: reso-reference-server/compliance/results/
