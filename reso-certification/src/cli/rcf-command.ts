@@ -297,7 +297,7 @@ export const runRcf = async (opts: {
   // Variations runs LAST and must never discard the already-computed reports. A payload-too-large
   // or a service outage degrades to "no variations" with the reason surfaced, so metadata-report.json
   // and data-availability-report.json still land. Auth misconfig is the one hard-fail — the run can't
-  // do what was asked, so rethrow and let the caller report it (and hint --no-variations).
+  // do what was asked, so rethrow and let the caller report it (and hint --skip-variations).
   const attemptVariations = async (): Promise<{ readonly variations?: VariationsServiceReport; readonly variationsError?: string }> => {
     if (opts.runVariations === false) return {};
     try {

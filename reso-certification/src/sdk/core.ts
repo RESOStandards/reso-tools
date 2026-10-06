@@ -26,13 +26,14 @@ import {
   runProviderScenarios,
   summarizeScenarios
 } from '../web-api-core/test-runner.js';
+import { everyStepPassed } from './certification.js';
 import { coerceCoreVersion, isCore21OrLater } from './core-versions.js';
 import { createExpandSchemaValidator, isEnumerationIgnored, loadValidationConfig } from './expand-schema.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
 import { coreReportGenerators, prepareOutputDir, writeReports } from './reports.js';
 import { FETCH_METADATA, RUN_CORE_SCENARIOS } from './step-names.js';
-import type { BaseTestContext, CoreConfig, PipelineStep, StepResult } from './types.js';
+import type { BaseTestContext, CoreConfig, PipelineStep, StepResult, ValidForCertification } from './types.js';
 
 // ── Pipeline Context ──
 
@@ -763,11 +764,15 @@ const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> =
     const priorStepFailed = priorSteps.some(s => s.status === 'failed');
     const testingAborted = (ctx.resources?.length ?? 0) > 0 && resourceReports.length === 0;
 
+    const steps = (ctx.pipelineSteps as ReadonlyArray<StepResult>) ?? [];
     const pipelineResult = {
       status: reportVerdict({ priorStepFailed, testingAborted, totalFailed, coverageFailed, deadlineReached }),
       endorsement: 'core',
-      steps: (ctx.pipelineSteps as ReadonlyArray<StepResult>) ?? [],
+      steps,
       context: ctx,
+      // The same pure rule the pipeline applies to its returned result, over the same step list, so
+      // the written report and the returned result cannot disagree.
+      certification: coreValidForCertification(steps),
       duration: 0
     };
 
@@ -782,15 +787,37 @@ const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> =
 
 // ── Pipeline Assembly ──
 
+/**
+ * Web API Core's own certification rule: every step must have passed.
+ *
+ * Core needs nothing beyond that, because `coreVerdict` already folds the conditions a step list
+ * cannot see — a failed required scenario, a failed coverage gate, a deadline-truncated run — into
+ * the scenarios step's own status, and it is deliberately shared by the step and the report writer
+ * so the two can never diverge. A failed coverage gate therefore arrives here as a failed step.
+ *
+ * Core's large skip counts are SCENARIO-level and live in the step's `counts`; the step itself
+ * passes. They are not step-level skips and never reach this predicate, so a run reporting
+ * "219 passed, 0 failed, 112 skipped" is certifiable, which is correct.
+ */
+/**
+ * Exported so the rule can be tested directly. The alternative is reaching it only through a full
+ * pipeline run against a live server, which would leave the rule itself unobserved.
+ */
+export const coreValidForCertification: ValidForCertification = steps => everyStepPassed(steps);
+
 /** Create the Web API Core compliance test pipeline. */
 export const createCorePipeline = (config: CoreConfig) => {
-  return createPipeline<CoreContext>('core', [
-    resolveAuth(config),
-    ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),
-    fetchAndParseMetadata(config),
-    sampleAndTest(config),
-    writeComplianceReports(config)
-  ]);
+  return createPipeline<CoreContext>(
+    'core',
+    [
+      resolveAuth(config),
+      ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),
+      fetchAndParseMetadata(config),
+      sampleAndTest(config),
+      writeComplianceReports(config)
+    ],
+    coreValidForCertification
+  );
 };
 
 /** Run Web API Core compliance tests with a single function call. */

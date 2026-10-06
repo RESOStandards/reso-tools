@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { everyStepPassed } from '../../src/sdk/certification.js';
 import { createPipeline } from '../../src/sdk/pipeline.js';
 import type { PipelineStep, StepProgress, TestFunction } from '../../src/sdk/types.js';
+
+/**
+ * These tests exercise the generic runner, not any endorsement's certification rule, so they pass
+ * the shared `everyStepPassed` rule that three of the four endorsements declare. The rule is a
+ * required parameter of createPipeline on purpose: a new endorsement must state what a certifiable
+ * run of itself looks like rather than inheriting a default.
+ */
+const pipelineOf = (endorsement: string, steps: ReadonlyArray<PipelineStep>) => createPipeline(endorsement, steps, everyStepPassed);
 
 describe('pipeline sub-function progress', () => {
   it('threads onProgress to sequential sub-functions', async () => {
@@ -23,7 +32,7 @@ describe('pipeline sub-function progress', () => {
       functions: [fn1, fn2]
     };
 
-    const pipeline = createPipeline('test', [step]);
+    const pipeline = pipelineOf('test', [step]);
     await pipeline.run({}, onProgress);
 
     // Should have sub-step events from both functions
@@ -59,7 +68,7 @@ describe('pipeline sub-function progress', () => {
       functions: [fn1, fn2]
     };
 
-    const pipeline = createPipeline('test', [step]);
+    const pipeline = pipelineOf('test', [step]);
     await pipeline.run({}, onProgress);
 
     const subEvents = events.filter(e => e.step === 'sub:parallel');
@@ -78,7 +87,7 @@ describe('pipeline sub-function progress', () => {
       functions: [fn]
     };
 
-    const pipeline = createPipeline('test', [step]);
+    const pipeline = pipelineOf('test', [step]);
     const result = await pipeline.run({});
 
     expect(result.steps[0].counts).toEqual({
@@ -102,7 +111,7 @@ describe('pipeline sub-function progress', () => {
       functions: [fn]
     };
 
-    const pipeline = createPipeline('test', [step]);
+    const pipeline = pipelineOf('test', [step]);
     await pipeline.run({}, onProgress);
 
     // Step-level "running" should come before the sub-step event

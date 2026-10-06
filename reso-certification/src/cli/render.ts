@@ -16,7 +16,7 @@ import {
 } from 'listr2';
 import { runComplianceTests } from '../sdk/index.js';
 import { RUN_ADD_EDIT_SCENARIOS, RUN_CORE_SCENARIOS, RUN_ENTITY_EVENT_SCENARIOS } from '../sdk/step-names.js';
-import type { ComplianceConfig, CoreProgressDetail, CoreResourcePhase, PipelineResult, StepProgress } from '../sdk/types.js';
+import type { ComplianceConfig, CoreProgressDetail, CoreResourcePhase, PipelineResult, StepProgress, StepStatus } from '../sdk/types.js';
 
 /** Rendering mode derived from CLI flags. */
 export type RenderMode = 'default' | 'verbose' | 'silent';
@@ -403,8 +403,14 @@ export const collectWarnings = (result: PipelineResult): ReadonlyArray<string> =
   );
 };
 
-/** After the live render, print the reports location and — on a non-passing run — a concise failure summary. */
-const printRunSummary = (result: PipelineResult, renderMode: RenderMode): void => {
+/**
+ * After the live render, print the reports location and — on a non-passing run — a concise failure
+ * summary, plus the certification verdict when the run is not eligible.
+ *
+ * Exported so what it prints can be asserted. The not-eligible section is the kind of line that is
+ * easy to lose in a later refactor precisely because the run around it passed.
+ */
+export const printRunSummary = (result: PipelineResult, renderMode: RenderMode): void => {
   if (renderMode === 'silent') return;
   const outputPath = (result.context as Record<string, unknown>).outputPath;
   if (typeof outputPath === 'string') console.log(`Reports → ${outputPath}`);
@@ -421,6 +427,14 @@ const printRunSummary = (result: PipelineResult, renderMode: RenderMode): void =
   if (optionalUnsupported.length > 0) {
     console.log(`Optional — not supported (${optionalUnsupported.length}):`);
     for (const f of optionalUnsupported) console.log(`  · ${f}`);
+  }
+  // Eligibility for certification is a different question from the verdict, so it gets its own
+  // section rather than being folded into failures: a run can pass everything it ran and still not
+  // be certifiable because a required step never ran. Printed on passing runs too — that is the
+  // whole case it exists for, and the terminal is where an operator actually looks.
+  if (!result.certification.valid) {
+    console.log(`Not eligible for certification (${result.certification.reasons.length}):`);
+    for (const reason of result.certification.reasons) console.log(`  ⊘ ${reason}`);
   }
   // Non-gating warnings — surfaced on EVERY run (they never move the verdict or exit code), so observe-then-flip
   // checks (single-enum ne) and future Fast Track / DD 3.0 suggestions are visible without failing anyone.
@@ -439,9 +453,16 @@ export const runHeaderSummary = (result: PipelineResult): string => {
   const c = result.steps.find(s => SCENARIO_STEP_NAMES.includes(s.name))?.counts as
     | { passed?: number; failed?: number; skipped?: number }
     | undefined;
-  return c
-    ? `${c.passed ?? 0} passed, ${c.failed ?? 0} failed, ${c.skipped ?? 0} skipped`
-    : `${result.steps.filter(s => s.status === 'passed').length} passed, ${result.steps.filter(s => s.status === 'failed').length} failed`;
+  if (c) return `${c.passed ?? 0} passed, ${c.failed ?? 0} failed, ${c.skipped ?? 0} skipped`;
+
+  // The step tally counts skipped steps too. It used to report only passed and failed, which is the
+  // branch the Data Dictionary takes because it has no scenario-running step — so a DD run whose
+  // variations check was skipped printed "6 passed, 0 failed" and gave a reader of the terminal, or
+  // of a continuous-integration log, no hint that a step had not run at all. Shown only when there
+  // is one, so an ordinary run's header is unchanged.
+  const tally = (status: StepStatus): number => result.steps.filter(s => s.status === status).length;
+  const skipped = tally('skipped');
+  return `${tally('passed')} passed, ${tally('failed')} failed${skipped > 0 ? `, ${skipped} skipped` : ''}`;
 };
 
 /** Run a single pipeline with listr2 progress rendering. */

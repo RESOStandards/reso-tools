@@ -548,6 +548,7 @@ const ddCmd = program
   .option('--dd-version <version>', `DD version (${CERTIFIABLE_DD_VERSIONS.join(' or ')}; default ${CURRENT_DD_VERSION})`)
   .option('--limit <n>', "Max records to replicate per resource (default: the config entry's ddOptions.limit, else 100000)")
   .option('--strict', 'Strict mode: fail on variations and enforce JSON schema validation')
+  .option('--skip-variations', 'Do not check variations. The step is reported as skipped and the run is NOT eligible for certification')
   .option('--batch-expand', 'Batch all expansions per resource into a single $expand request')
   .option('--originating-system-name <v>', 'Append OriginatingSystemName eq <v> to every replication query (multi-tenant providers)')
   .option(
@@ -565,6 +566,7 @@ ddCmd.action(
     ddVersion?: string;
     limit: string;
     strict?: boolean;
+    skipVariations?: boolean;
     batchExpand?: boolean;
     originatingSystemName?: string;
     originatingSystemId?: string;
@@ -623,6 +625,9 @@ ddCmd.action(
             server: { ...baseConfig.server, auth },
             limit: opts.limit !== undefined ? Number(opts.limit) : (baseConfig.limit ?? 100000),
             ...(opts.strict ? { strictMode: true } : {}),
+            // Only set when the flag was passed, so an untouched run never carries the field and
+            // the default (run the check) stands.
+            ...(opts.skipVariations ? { runVariations: false } : {}),
             ...(opts.batchExpand ? { batchExpand: true } : {}),
             ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
             ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
@@ -649,6 +654,7 @@ ddCmd.action(
           version: ddVersion,
           limit: opts.limit !== undefined ? Number(opts.limit) : 100000,
           strictMode: opts.strict,
+          ...(opts.skipVariations ? { runVariations: false } : {}),
           batchExpand: opts.batchExpand,
           ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
           ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
@@ -1272,7 +1278,7 @@ program
     'Accepted for compatibility: extension is always allowed on RCF (local fields and values), so this flag has no effect here'
   )
   .option('--strict', 'Fail fast on the first schema-validation error (with --schema-validate)')
-  .option('--no-variations', 'Skip the variations service call (infer + reports only)')
+  .option('--skip-variations', 'Skip the variations service call (infer + reports only)')
   .action(
     async (opts: {
       input: string;
@@ -1282,7 +1288,7 @@ program
       schemaValidate?: boolean;
       additionalProperties?: boolean;
       strict?: boolean;
-      variations: boolean;
+      skipVariations?: boolean;
     }) => {
       try {
         const fuzziness = Number.parseFloat(opts.fuzziness);
@@ -1290,7 +1296,7 @@ program
           throw new Error(`--fuzziness must be a number in [0, 1], got '${opts.fuzziness}'`);
         }
         // The /compute token for the variations service (from .env; the service mints its own if absent).
-        const bearerToken = opts.variations ? await mintOAuth2ClientCredentialsToken() : undefined;
+        const bearerToken = opts.skipVariations ? undefined : await mintOAuth2ClientCredentialsToken();
 
         const result = await runRcf({
           input: resolve(opts.input),
@@ -1300,7 +1306,7 @@ program
           strict: opts.strict,
           schemaValidate: opts.schemaValidate,
           generatedOn: new Date().toISOString(),
-          runVariations: opts.variations,
+          runVariations: !opts.skipVariations,
           ...(bearerToken ? { bearerToken } : {})
         });
 

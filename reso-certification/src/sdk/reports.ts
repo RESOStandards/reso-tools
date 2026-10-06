@@ -267,6 +267,19 @@ export const createDetailedReportGenerator = (
       ...(fieldPreferences && fieldPreferences.requested.length > 0 ? { fieldPreferences } : {}),
       remarks: serializeRemarks(result),
       outcome: result.status,
+      /**
+       * Whether the run is eligible for certification, with the reasons when it is not.
+       *
+       * Distinct from `outcome`: that says what happened while the run executed, this says whether
+       * what happened is enough to certify. A run can pass every step it ran and still not be
+       * certifiable because a required step never ran.
+       *
+       * Carried on the DETAILED report only. `report.json`'s key set is pinned by a test as the
+       * Cert API compatible shape, and widening a contract with the backend's ingestion path is not
+       * something to do on the assumption that unknown keys are tolerated. This file is also where
+       * the `steps` array lives, so the skipped step and the reason for ineligibility sit together.
+       */
+      certification: result.certification,
       endorsement: result.endorsement,
       duration: result.duration,
       steps: result.steps.map(({ name, status, duration, summary, params, counts, artifacts, errors }) => ({

@@ -18,11 +18,12 @@ import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadataWithVersion, persistMetadataXml } from '../test-runner/metadata.js';
 import { computeVariationsViaService } from '../variations/index.js';
+import { everyStepPassed } from './certification.js';
 import type { DDVersion } from './dd-versions.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
 import { createDetailedReportGenerator, createGenericReportGenerator, prepareOutputDir, writeReports } from './reports.js';
-import type { BaseTestContext, DDConfig, PipelineStep, StepResult, TestFunction } from './types.js';
+import type { BaseTestContext, DDConfig, PipelineStep, StepResult, TestFunction, ValidForCertification } from './types.js';
 import type { PipelineResult } from './types.js';
 
 // ── Cert-utils imports (local copy for modification) ──
@@ -300,9 +301,32 @@ const validateDdMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
   }
 });
 
-const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
+/**
+ * Exported so the skip path can be tested without a Variations Service. The two behaviors worth
+ * pinning are opposites: an explicit --skip-variations must skip, and an absent RESO_SERVICES_URL
+ * must still throw.
+ */
+export const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Check variations',
   run: async (ctx, _onProgress) => {
+    // An operator asked for this step not to run. It is reported as `skipped` and the step stays in
+    // the pipeline, rather than being omitted the way DD 1.7 omits it, because an omitted step
+    // produces no StepResult and so is absent from report-detailed.json entirely. A reader could not
+    // then tell that variations went unchecked. Present-and-skipped is what makes the run visibly
+    // ineligible under the DD certification rule, which requires every step to have passed.
+    //
+    // Never inferred from a missing RESO_SERVICES_URL. That absence still throws, exactly as before:
+    // treating it as a skip would mean a misconfigured machine quietly stopped checking variations
+    // and reported a run that looked complete.
+    if (config.runVariations === false) {
+      return {
+        context: ctx,
+        status: 'skipped',
+        summary:
+          'Variations not checked — requested with --skip-variations. A run that did not check variations is not eligible for certification.'
+      };
+    }
+
     if (Number.parseFloat(ctx.version) < 2.0) {
       return { context: ctx, status: 'skipped', summary: 'Variations are only checked for DD 2.0 and higher' };
     }
@@ -591,6 +615,20 @@ const deriveStatus = (steps: ReadonlyArray<StepResult>): 'passed' | 'failed' | '
   steps.some(s => s.status === 'failed') ? 'failed' : steps.some(s => s.status === 'incomplete') ? 'incomplete' : 'passed';
 
 /**
+ * The Data Dictionary's own certification rule: every step must have passed.
+ *
+ * Nothing in a DD run is optional. The two steps that can be absent are absent by omission rather
+ * than skipped — `Service check` under an SDK-only `skipHealthCheck`, and `Check variations` below
+ * DD 2.0, which RESO does not certify — so neither reaches this predicate.
+ *
+ * What this does catch is the reverse case, and it is not hypothetical. `getReferenceMetadata`
+ * returns null rather than throwing when its JSON cannot be loaded, which makes `Validate DD
+ * metadata` return `skipped`; since `deriveStatus` does not consider `skipped`, such a run was
+ * reported `passed` having validated no metadata at all.
+ */
+export const ddValidForCertification: ValidForCertification = steps => everyStepPassed(steps);
+
+/**
  * Exported so the report's verdict can be tested against the steps it reports on. `createPipeline`
  * returns only `{ run }`, so a test cannot otherwise reach this step, and the verdict is decided
  * here rather than in the generators.
@@ -612,6 +650,10 @@ export const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext
       endorsement: 'dd',
       steps,
       context: ctx,
+      // The finalizer computes this itself rather than reading the pipeline's, because it runs
+      // inside the pipeline and the returned result does not exist yet. It is the same pure
+      // function over the same step list, so the report and the returned result cannot disagree.
+      certification: ddValidForCertification(steps),
       // Summed from the recorded steps for the same reason the status is derived: the pipeline's own
       // wall clock is not available to a finalizer. DD steps run in sequence, so the sum tracks wall
       // clock closely, short by the between-step overhead and by this step's own time, which is not
@@ -631,15 +673,19 @@ export const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext
 
 /** Create the DD compliance test pipeline. */
 export const createDDPipeline = (config: DDConfig) =>
-  createPipeline<DDContext>('dd', [
-    resolveAuth(config),
-    ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),
-    generateMetadata(config),
-    validateDdMetadata(config),
-    ...(config.version !== '1.7' ? [runVariations(config)] : []),
-    replicateAndValidate(config),
-    writeComplianceReports(config)
-  ]);
+  createPipeline<DDContext>(
+    'dd',
+    [
+      resolveAuth(config),
+      ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),
+      generateMetadata(config),
+      validateDdMetadata(config),
+      ...(config.version !== '1.7' ? [runVariations(config)] : []),
+      replicateAndValidate(config),
+      writeComplianceReports(config)
+    ],
+    ddValidForCertification
+  );
 
 /** Run DD compliance tests with a single function call. */
 export const runDDCompliance = async (config: DDConfig, onProgress?: (progress: import('./types.js').StepProgress) => void) => {

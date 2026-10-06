@@ -184,6 +184,35 @@ export interface StepResult {
   }>;
 }
 
+/**
+ * Whether a finished run is eligible for certification.
+ *
+ * Separate from `status`, which records what happened while the run executed. The two answer
+ * different questions, and a run can pass everything it ran while still not being certifiable
+ * because something required never ran at all.
+ *
+ * The reasons travel with the verdict rather than being left to the reader to reconstruct, so a
+ * report can never say "not certifiable" without saying what is missing.
+ */
+export type CertificationValidity = { readonly valid: true } | { readonly valid: false; readonly reasons: ReadonlyArray<string> };
+
+/**
+ * An endorsement's own answer to whether a finished run can be endorsed.
+ *
+ * Each endorsement owns its rule, because only it knows what a complete run of itself looks like.
+ * The Data Dictionary requires every step to have passed; EntityEvent's observe mode is a
+ * legitimate run that nonetheless certifies nothing, because it exercises no writes.
+ *
+ * A central table of per-endorsement rules was the first shape tried here, and it got EntityEvent
+ * wrong: expressed as "does this endorsement allow skips", an observe-only run came out certifiable
+ * because the answer for EntityEvent is yes. The rule belongs with the endorsement that knows what
+ * it means, not in a table that belongs to none of them.
+ *
+ * Config is closed over when an endorsement builds its predicate, the same way its steps are, so
+ * the signature needs only the step list.
+ */
+export type ValidForCertification = (steps: ReadonlyArray<StepResult>) => CertificationValidity;
+
 /** Result of a completed pipeline execution. */
 export interface PipelineResult<TContext extends PipelineContext = PipelineContext> {
   readonly status: 'passed' | 'failed' | 'incomplete';
@@ -191,6 +220,12 @@ export interface PipelineResult<TContext extends PipelineContext = PipelineConte
   readonly steps: ReadonlyArray<StepResult>;
   readonly context: TContext;
   readonly duration: number;
+  /**
+   * Whether this run is eligible for certification. Required, not optional: an optional field
+   * would make a run certifiable by omission, which is the one failure direction that matters
+   * here. See {@link ValidForCertification}.
+   */
+  readonly certification: CertificationValidity;
 }
 
 // ── Compliance Config ──
@@ -245,6 +280,19 @@ export interface DDConfig extends BaseComplianceConfig {
   readonly version: DDVersion;
   readonly limit?: number;
   readonly strictMode?: boolean;
+  /**
+   * Run the variations check (default: true). Set false by the CLI's `--skip-variations`, which
+   * `dd` and `rcf` both carry under that name.
+   *
+   * The field stays positive while the flag is negative on purpose: a double-negative config field
+   * (`skipVariations: false`) is harder to read at every use site than one positive default.
+   *
+   * The step is then reported `skipped` rather than omitted, which makes the run ineligible for
+   * certification under the DD rule. That is the intended consequence: a run that did not check
+   * variations should not be mistakable for a complete one. Used by continuous integration, which
+   * has no Variations Service to reach.
+   */
+  readonly runVariations?: boolean;
   /** Batch all expansions for a resource into a single $expand request (default: false). */
   readonly batchExpand?: boolean;
   /** Delay between replication requests in seconds (default: 1). Set to 0 for local testing. */

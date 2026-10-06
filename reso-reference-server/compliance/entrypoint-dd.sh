@@ -41,11 +41,20 @@ fi
 # absolute /app/... path, which broke when the images moved to building the whole
 # workspace and the package stopped being the filesystem root of the image. A
 # relative path survives the next relocation too.
+# --skip-variations because continuous integration has no Variations Service to reach, and no
+# credentials with which to reach one. The client's own behavior is covered by its unit tests; the
+# end-to-end leg against a real service belongs where the service and its credentials live, which is
+# not a public repository.
+#
+# The step is reported as skipped rather than omitted, so the run is recorded as NOT eligible for
+# certification and the report says which step is missing. A continuous-integration run was never a
+# certification, and now it cannot be mistaken for one.
 exec node dist/cli/index.js dd \
   --url "$SERVER_URL" \
   --auth-token "$AUTH_TOKEN" \
   --dd-version "$DD_VERSION" \
   --strict \
+  --skip-variations \
   --verbose \
   --output-dir /tmp/compliance-results \
   $LIMIT_FLAG
