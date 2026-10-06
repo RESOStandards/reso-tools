@@ -5,6 +5,17 @@
  * reso-certification, or odata-expression-parser.
  */
 
+import {
+  CLIENT_CREDENTIAL_ARG_NAMES,
+  ENV_AUTH_TOKEN,
+  ENV_BASE_URL,
+  ENV_CLIENT_CREDENTIAL_NAMES,
+  ENV_CLIENT_ID,
+  ENV_CLIENT_SECRET,
+  ENV_SCOPE,
+  ENV_TOKEN_URI
+} from './auth-env.js';
+
 /** Tool scope for filtering. */
 export type ToolScope = 'all' | 'cert';
 
@@ -32,32 +43,55 @@ export interface ToolDef {
 
 // ── Auth Tools ──
 
+const ENV_CHANNEL = `${ENV_AUTH_TOKEN}, or ${ENV_CLIENT_CREDENTIAL_NAMES.join(' + ')}`;
+
+/**
+ * Appended to every credential property. Two jobs, and the second is why the wording is specific
+ * about which server the environment serves.
+ *
+ * It steers an assistant away from asking a user to paste a secret into the conversation, because
+ * the environment is the right place for one. But it must not steer an assistant into omitting a
+ * credential for a server the environment is NOT configured for: the environment credential is
+ * bound to {@link ENV_BASE_URL} and refused for any other host, so omitting it elsewhere produces a
+ * refusal rather than a request. Saying "omit it when the environment is configured" without naming
+ * the bound server would therefore be advice that fails.
+ */
+const PREFER_ENV_NOTE = `Optional. Omit it for the server named by ${ENV_BASE_URL}, whose credentials the MCP server process already holds in its environment (${ENV_CHANNEL}); the environment is the right place for a secret and a tool argument is visible in the conversation. The environment credential is sent ONLY to ${ENV_BASE_URL} and is refused for any other host, so to reach a different server pass its own credentials as arguments. Do not ask the user to paste a secret into the conversation.`;
+
+const CLIENT_CREDENTIAL_SET_NOTE = `${CLIENT_CREDENTIAL_ARG_NAMES.join(', ')} travel together or not at all. A partial set is refused, never completed from the environment.`;
+
+/** Shared auth properties for tool schemas. Either authToken, or the client-credentials set, or neither to use the environment. */
+const authProperties = {
+  authToken: { type: 'string', description: `Bearer token, overriding ${ENV_AUTH_TOKEN} for this one call. ${PREFER_ENV_NOTE}` },
+  clientId: {
+    type: 'string',
+    description: `OAuth2 client ID, overriding ${ENV_CLIENT_ID} for this one call. ${CLIENT_CREDENTIAL_SET_NOTE} ${PREFER_ENV_NOTE}`
+  },
+  clientSecret: {
+    type: 'string',
+    description: `OAuth2 client secret, overriding ${ENV_CLIENT_SECRET} for this one call. ${CLIENT_CREDENTIAL_SET_NOTE} ${PREFER_ENV_NOTE}`
+  },
+  tokenUrl: {
+    type: 'string',
+    description: `OAuth2 token endpoint URL, overriding ${ENV_TOKEN_URI} for this one call. ${CLIENT_CREDENTIAL_SET_NOTE} ${PREFER_ENV_NOTE}`
+  }
+};
+
 export const authenticateTool: ToolDef = {
   name: 'authenticate',
-  description:
-    'Obtain a bearer token using OAuth2 Client Credentials. Returns a token that can be used with all other tools. Tokens are cached and refreshed automatically.',
+  description: `Check that the server can authenticate. With client credentials it requests a token from the token endpoint and discards it. The token is never returned, and no authenticate step is needed before the other tools, because each of them obtains its own token from the same credentials on every call. Called with no arguments it checks ${ENV_CHANNEL} from the MCP server process environment, which is how a user confirms the setup works without putting a credential in the conversation.`,
   scope: 'all',
   inputSchema: {
     type: 'object',
     properties: {
-      clientId: { type: 'string', description: 'OAuth2 client ID' },
-      clientSecret: { type: 'string', description: 'OAuth2 client secret' },
-      tokenUrl: { type: 'string', description: 'OAuth2 token endpoint URL' },
-      scope: { type: 'string', description: 'OAuth2 scope (optional)' }
+      ...authProperties,
+      scope: { type: 'string', description: `OAuth2 scope, overriding ${ENV_SCOPE} for this one call. Optional.` }
     },
-    required: ['clientId', 'clientSecret', 'tokenUrl']
+    required: []
   }
 };
 
 // ── Query Tools ──
-
-/** Shared auth properties for tool schemas. Either authToken or clientId+clientSecret+tokenUrl. */
-const authProperties = {
-  authToken: { type: 'string', description: 'Bearer token for authentication' },
-  clientId: { type: 'string', description: 'OAuth2 client ID (alternative to authToken)' },
-  clientSecret: { type: 'string', description: 'OAuth2 client secret' },
-  tokenUrl: { type: 'string', description: 'OAuth2 token endpoint URL' }
-};
 
 export const queryTool: ToolDef = {
   name: 'query',

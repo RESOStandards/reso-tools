@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ENV_AUTH_TOKEN, ENV_CLIENT_ID, ENV_CLIENT_SECRET, ENV_SCOPE, ENV_TOKEN_URI } from '../src/auth-env.js';
 import { handlers } from '../src/handlers.js';
 
 describe('handler registry', () => {
@@ -48,6 +49,17 @@ describe('handleValidate', () => {
 });
 
 describe('auth resolution', () => {
+  // The environment is a credential channel now, so these refusal tests have to state their own
+  // environment. Without this the suite would pass or fail depending on the developer's shell, and
+  // a shell exporting RESO_AUTH_TOKEN would turn a refusal into a live request.
+  beforeEach(() => {
+    for (const name of [ENV_AUTH_TOKEN, ENV_CLIENT_ID, ENV_CLIENT_SECRET, ENV_TOKEN_URI, ENV_SCOPE]) vi.stubEnv(name, undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('query throws without any auth', async () => {
     await expect(
       handlers.query({

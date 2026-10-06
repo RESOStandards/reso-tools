@@ -10,9 +10,20 @@ import {
   parseMetadataXml,
   runComplianceTests
 } from '@reso-standards/reso-certification';
-import type { ComplianceConfig } from '@reso-standards/reso-certification';
+import type { AuthConfig, ComplianceConfig } from '@reso-standards/reso-certification';
 import { resolveToken } from '@reso-standards/reso-client';
 import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
+import {
+  CLIENT_CREDENTIAL_ARG_NAMES,
+  CREDENTIAL_ARG_NAMES,
+  ENV_AUTH_TOKEN,
+  ENV_BASE_URL,
+  ENV_CLIENT_CREDENTIAL_NAMES,
+  ENV_CLIENT_ID,
+  ENV_CLIENT_SECRET,
+  ENV_SCOPE,
+  ENV_TOKEN_URI
+} from './auth-env.js';
 
 /** Auth args common to most tools. */
 interface AuthArgs {
@@ -20,32 +31,201 @@ interface AuthArgs {
   readonly clientId?: string;
   readonly clientSecret?: string;
   readonly tokenUrl?: string;
+  /**
+   * The data server this call targets, read from the same `url` argument the handlers already
+   * destructure, so no call site had to change to supply it.
+   *
+   * It is here because the resolver needs it: an environment credential may only be sent to the host
+   * {@link ENV_BASE_URL} names, and that check is impossible without knowing where the call is going.
+   * Absent for `authenticate`, which contacts only the token endpoint carried by the credential
+   * itself and no data server.
+   */
+  readonly url?: string;
 }
 
-/** Resolve a bearer token from auth args. Supports both token and Client Credentials. */
-const resolveAuthToken = async (args: AuthArgs): Promise<string> => {
-  if (args.authToken) return args.authToken;
+/**
+ * The environment as the resolver reads it. Always passed in and never read inside the resolver, so
+ * a test can hand in a literal and watch the resolution decision directly.
+ */
+export type AuthEnv = Readonly<Record<string, string | undefined>>;
 
-  if (args.clientId && args.clientSecret && args.tokenUrl) {
-    return resolveToken({
-      mode: 'client_credentials',
-      clientId: args.clientId,
-      clientSecret: args.clientSecret,
-      tokenUrl: args.tokenUrl
-    });
+/** Which channel supplied the credentials. The `authenticate` tool reports this. The values never are. */
+export type AuthSource = 'arguments' | 'environment';
+
+/** A resolved credential set together with the channel it came from. */
+export interface ResolvedAuth {
+  readonly auth: AuthConfig;
+  readonly source: AuthSource;
+  /**
+   * The base URL an environment credential is bound to, present only when `source` is
+   * `environment`. An argument credential has no binding: the caller chose the credential and the
+   * host together, so there is nothing to constrain.
+   */
+  readonly boundTo?: string;
+}
+
+const AUTH_MODE_TOKEN = 'token' as const;
+const AUTH_MODE_CLIENT_CREDENTIALS = 'client_credentials' as const;
+const SOURCE_ARGUMENTS = 'arguments' as const;
+const SOURCE_ENVIRONMENT = 'environment' as const;
+
+const AUTH_REQUIRED_MESSAGE = `Authentication required. Set ${ENV_BASE_URL} together with ${ENV_AUTH_TOKEN}, or with ${ENV_CLIENT_CREDENTIAL_NAMES.join(' + ')}, in the environment the MCP server process runs in. ${ENV_BASE_URL} is required alongside the credential: it names the one server the credential may be sent to. Passing ${CREDENTIAL_ARG_NAMES.join(', ')} as tool arguments works too and overrides the environment for that one call, but a tool argument is visible in the conversation, so the environment is the right place for a secret.`;
+
+/** Present means a non-empty string. This is the truthiness these handlers have always applied. */
+const isPresent = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
+
+/** The names, never the values, of the entries that are absent. */
+const absentNames = (entries: ReadonlyArray<readonly [string, unknown]>): ReadonlyArray<string> =>
+  entries.filter(([, value]) => !isPresent(value)).map(([name]) => name);
+
+/**
+ * Credentials from the call's own arguments.
+ *
+ * Returns undefined only when the call carries no credential argument at all, which is the single
+ * case in which the environment is consulted. An incomplete client-credentials set is refused here
+ * rather than completed from the environment: completing it would post one server's secret to
+ * another server's token endpoint.
+ */
+const authFromArgs = (args: AuthArgs): ResolvedAuth | undefined => {
+  if (isPresent(args.authToken)) {
+    return { auth: { mode: AUTH_MODE_TOKEN, authToken: args.authToken }, source: SOURCE_ARGUMENTS };
   }
 
-  throw new Error('Authentication required. Provide authToken or clientId + clientSecret + tokenUrl.');
+  const { clientId, clientSecret, tokenUrl } = args;
+  if (isPresent(clientId) && isPresent(clientSecret) && isPresent(tokenUrl)) {
+    return { auth: { mode: AUTH_MODE_CLIENT_CREDENTIALS, clientId, clientSecret, tokenUrl }, source: SOURCE_ARGUMENTS };
+  }
+
+  const absent = absentNames([
+    ['clientId', clientId],
+    ['clientSecret', clientSecret],
+    ['tokenUrl', tokenUrl]
+  ]);
+  if (absent.length === CLIENT_CREDENTIAL_ARG_NAMES.length) return undefined;
+
+  throw new Error(
+    `Incomplete client credentials in the tool arguments: ${absent.join(', ')} missing. Pass all of ${CLIENT_CREDENTIAL_ARG_NAMES.join(', ')} together. A partial set is never completed from the environment, because that would send one server credential to a different server.`
+  );
 };
 
-/** Build an AuthConfig for the certification SDK. */
-const buildAuthConfig = (args: AuthArgs) => {
-  if (args.authToken) return { mode: 'token' as const, authToken: args.authToken };
-  if (args.clientId && args.clientSecret && args.tokenUrl) {
-    return { mode: 'client_credentials' as const, clientId: args.clientId, clientSecret: args.clientSecret, tokenUrl: args.tokenUrl };
+/**
+ * Credentials from the MCP server process environment.
+ *
+ * Client credentials win over a bearer token when all three are set, which is the order reso-client
+ * declares for the same variables (reso-client/src/env.ts:54, :69), so one environment means the
+ * same thing to the reso-cert CLI and to this server. An incomplete set is refused rather than
+ * falling through to the bearer token, which is stricter than reso-client: a half-configured set is
+ * more likely a typo than an intention, and falling through would answer it with an unrelated
+ * credential that happened to be set.
+ */
+const authFromEnv = (env: AuthEnv): ResolvedAuth | undefined => {
+  const clientId = env[ENV_CLIENT_ID];
+  const clientSecret = env[ENV_CLIENT_SECRET];
+  const tokenUrl = env[ENV_TOKEN_URI];
+
+  /**
+   * An environment credential without a bound destination is refused. Fail closed: the alternative
+   * is an ambient secret that any call's `url` can collect, which is a worse failure than refusing
+   * to start. Called at each point a credential is found rather than once up front, so an
+   * environment with no credential at all still returns undefined and falls through to the ordinary
+   * "authentication required" refusal.
+   */
+  const bound = (resolved: Omit<ResolvedAuth, 'boundTo'>): ResolvedAuth => {
+    const baseUrl = env[ENV_BASE_URL];
+    if (!isPresent(baseUrl)) {
+      throw new Error(
+        `${ENV_BASE_URL} is not set, so the credential in the MCP server environment has no server it is allowed to be sent to and was not used. ` +
+          `Set ${ENV_BASE_URL} to the data server those credentials belong to. An unbound environment credential would be sent to whatever host a tool call names, which is why it is refused instead.`
+      );
+    }
+    return { ...resolved, boundTo: baseUrl };
+  };
+
+  if (isPresent(clientId) && isPresent(clientSecret) && isPresent(tokenUrl)) {
+    const scope = env[ENV_SCOPE];
+    const auth = { mode: AUTH_MODE_CLIENT_CREDENTIALS, clientId, clientSecret, tokenUrl };
+    return bound({ auth: isPresent(scope) ? { ...auth, scope } : auth, source: SOURCE_ENVIRONMENT });
   }
-  throw new Error('Authentication required.');
+
+  const absent = absentNames([
+    [ENV_CLIENT_ID, clientId],
+    [ENV_CLIENT_SECRET, clientSecret],
+    [ENV_TOKEN_URI, tokenUrl]
+  ]);
+  if (absent.length < ENV_CLIENT_CREDENTIAL_NAMES.length) {
+    throw new Error(
+      `Incomplete client credentials in the MCP server environment: ${absent.join(', ')} not set. Set all of ` +
+        `${ENV_CLIENT_CREDENTIAL_NAMES.join(', ')}, or unset all of them to use ${ENV_AUTH_TOKEN}.`
+    );
+  }
+
+  const authToken = env[ENV_AUTH_TOKEN];
+  if (isPresent(authToken)) {
+    return bound({ auth: { mode: AUTH_MODE_TOKEN, authToken }, source: SOURCE_ENVIRONMENT });
+  }
+
+  return undefined;
 };
+
+/**
+ * Same origin means same protocol, host and port. Protocol is included deliberately: http against
+ * https for one host is a downgrade, and a credential set for the secure origin should not travel
+ * over the insecure one. A value that does not parse returns false, so a malformed target refuses
+ * rather than being waved through.
+ */
+const sameOrigin = (a: string, b: string): boolean => {
+  try {
+    return new URL(a).origin === new URL(b).origin;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Enforce the binding on an environment credential.
+ *
+ * `targetUrl` absent means no data server is being contacted. Only `authenticate` is in that
+ * position: it exchanges credentials at the token endpoint carried by the credential itself, and
+ * returns no token, so there is no destination to constrain and nothing to disclose. Every tool that
+ * reaches a data server passes its `url` through, so this is not a hole a new tool falls into
+ * silently; a tool with a target has a target to check.
+ */
+const withinBinding = (resolved: ResolvedAuth, targetUrl: string | undefined): ResolvedAuth => {
+  if (targetUrl === undefined) return resolved;
+  if (!isPresent(resolved.boundTo)) {
+    throw new Error(`An environment credential reached a call for ${targetUrl} without a bound server. Refusing.`);
+  }
+  if (sameOrigin(targetUrl, resolved.boundTo)) return resolved;
+
+  throw new Error(
+    `The credential in the MCP server environment is bound to ${resolved.boundTo} (${ENV_BASE_URL}) and this call targets ${targetUrl}, so it was not used. Pass ${CREDENTIAL_ARG_NAMES.join(', ')} as arguments to reach a different server, or change ${ENV_BASE_URL}. The environment credential is never sent to a host it was not set for.`
+  );
+};
+
+/**
+ * Resolve the credential set for one call. Pure: the call's arguments and the environment record are
+ * the only inputs, and the chosen channel comes back as `source`, so a test asserts the decision
+ * itself instead of inferring it from a side effect.
+ *
+ * Arguments win as a set. When the call carries any credential argument the environment is not read
+ * at all, so no field is ever taken from one channel and combined with the other. Every message this
+ * throws names argument names and variable names, never a value.
+ */
+export const resolveAuth = (args: AuthArgs, env: AuthEnv): ResolvedAuth => {
+  const fromArgs = authFromArgs(args);
+  if (fromArgs) return fromArgs;
+
+  const fromEnv = authFromEnv(env);
+  if (fromEnv) return withinBinding(fromEnv, args.url);
+
+  throw new Error(AUTH_REQUIRED_MESSAGE);
+};
+
+/** Resolve a bearer token for one call: the call's arguments first, then the server environment. */
+const resolveAuthToken = async (args: AuthArgs): Promise<string> => resolveToken(resolveAuth(args, process.env).auth);
+
+/** Build an AuthConfig for the certification SDK: the call's arguments first, then the server environment. */
+const buildAuthConfig = (args: AuthArgs): AuthConfig => resolveAuth(args, process.env).auth;
 
 /** Tool handler result — matches MCP SDK's CallToolResult shape. */
 interface HandlerResult {
@@ -65,23 +245,58 @@ const errorResult = (message: string): HandlerResult => ({
 
 // ── Authenticate ──
 
+const AUTHENTICATE_EXCHANGED_MESSAGE =
+  'The token endpoint issued a token for these credentials. The token was discarded and is not returned. ' +
+  'Nothing was checked against a data server. Every other tool obtains its own token from the same credentials on each call, ' +
+  'so no authenticate step is needed before them.';
+
+const AUTHENTICATE_TOKEN_MODE_MESSAGE =
+  'A bearer token is configured, so there was no token exchange to make and nothing was checked. ' +
+  'The other tools send the token as it is. Call metadata or query to find out whether a server accepts it.';
+
+/**
+ * The token endpoint reduced to origin and path, so a result can say which endpoint answered. Query
+ * string and fragment are dropped, because a configured URL can carry a secret in them and this
+ * tool's result text becomes conversation history. Returns undefined when the value does not parse,
+ * so an unparsed string is never echoed back.
+ */
+const tokenEndpointLabel = (tokenUrl: string): string | undefined => {
+  try {
+    const parsed = new URL(tokenUrl);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Check that the server can authenticate, without returning a token.
+ *
+ * Credentials resolve exactly as they do for every other tool, so this reports the configuration the
+ * other tools will actually use. Called with no arguments it checks the server environment, which is
+ * the point of the tool: a user confirms the setup works without putting a credential in the
+ * conversation. The result reports the mode, the channel and the endpoint, and no credential.
+ */
 export const handleAuthenticate = async (args: Record<string, unknown>): Promise<HandlerResult> => {
-  const { clientId, clientSecret, tokenUrl, scope } = args as {
-    clientId: string;
-    clientSecret: string;
-    tokenUrl: string;
-    scope?: string;
-  };
+  const { scope } = args as { scope?: string };
+  const { auth, source } = resolveAuth(args as AuthArgs, process.env);
 
-  const token = await resolveToken({
-    mode: 'client_credentials',
-    clientId,
-    clientSecret,
-    tokenUrl,
-    ...(scope ? { scope } : {})
+  if (auth.mode === AUTH_MODE_TOKEN) {
+    return textResult({ mode: auth.mode, source, message: AUTHENTICATE_TOKEN_MODE_MESSAGE });
+  }
+
+  // An explicit scope argument overrides RESO_SCOPE. Scope is not a credential and cannot change
+  // which endpoint a secret reaches, so it is the one field allowed to cross between the channels.
+  await resolveToken(isPresent(scope) ? { ...auth, scope } : auth);
+
+  const endpoint = tokenEndpointLabel(auth.tokenUrl);
+
+  return textResult({
+    mode: auth.mode,
+    source,
+    ...(endpoint ? { tokenEndpoint: endpoint } : {}),
+    message: AUTHENTICATE_EXCHANGED_MESSAGE
   });
-
-  return textResult({ token, message: 'Token obtained. Use this token as authToken in subsequent tool calls.' });
 };
 
 // ── Query ──
