@@ -12,7 +12,7 @@ reso-cert core --url https://api.example.com --auth-token TOKEN
 reso-cert core --url https://api.example.com --auth-token TOKEN --resources Property,Member
 
 # Version 2.1.0
-reso-cert core --url https://api.example.com --auth-token TOKEN --version 2.1.0
+reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2.1.0
 
 # Require full data type coverage
 reso-cert core --url https://api.example.com --auth-token TOKEN --full-coverage

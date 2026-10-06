@@ -67,7 +67,7 @@ The OData query surface. Validates `$filter` across every data type, `$select`, 
 reso-cert core --url https://api.example.com --auth-token TOKEN
 
 # Version 2.1.0
-reso-cert core --url https://api.example.com --auth-token TOKEN --core-version 2.1.0
+reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2.1.0
 ```
 
 The cert runner samples live records to find good test parameters automatically – it does not need a static config of "use ListPrice = 250000 for the integer test." It looks at what is actually in the server, picks values that exercise each operator and data type, and runs the scenarios against them.
@@ -276,7 +276,10 @@ const result = await runComplianceTests(
 if (result.status === 'passed') {
   console.log('All scenarios passed');
 } else {
-  console.log(`${result.failedCount} of ${result.totalCount} scenarios failed`);
+  // Scenario tallies live on the scenario-running step, not on the result itself.
+  const scenarios = result.steps.find((s) => s.name === 'Run Core scenarios');
+  const { passed = 0, failed = 0 } = scenarios?.counts ?? {};
+  console.log(`${failed} of ${passed + failed} scenarios failed`);
 }
 ```
 

@@ -23,7 +23,7 @@ npm install @reso-standards/reso-common
 ```ts
 import { generateEdmx, buildMetadataMap, getFieldsForResource } from '@reso-standards/reso-common';
 
-const edmx = generateEdmx(metadataReport);
+const edmx = generateEdmx(metadataReport, ['Property']);
 const { metadataMap } = buildMetadataMap(metadataReport);
 const propertyFields = getFieldsForResource(metadataReport, 'Property');
 ```
