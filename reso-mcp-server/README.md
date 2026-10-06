@@ -87,7 +87,9 @@ query({ url, resource, authToken, filter?, select?, orderby?, top?, skip?, count
 → { value: [...records] }
 ```
 
-All tools accept either `authToken` (bearer token) or `clientId` + `clientSecret` + `tokenUrl` (OAuth2 Client Credentials).
+All tools accept either `authToken` (bearer token) or `clientId` + `clientSecret` + `tokenUrl` (OAuth2 Client Credentials), or no credential argument at all when the server environment carries one.
+
+For a local server, holding the credential in the environment is preferable to passing it per call: an `authToken` sent as an argument travels inside the tool call and lands in the agent's conversation history. Set `RESO_AUTH_TOKEN`, or `RESO_CLIENT_ID` with `RESO_CLIENT_SECRET` and `RESO_TOKEN_URI`, together with `RESO_BASE_URL`, which is required and binds the credential to the one server it may be sent to. See [Authentication](doc/GUIDE.md#65-authentication-bearer-token-vs-client-credentials) in the User Guide for the precedence rules and what a mismatch does.
 
 ### metadata
 

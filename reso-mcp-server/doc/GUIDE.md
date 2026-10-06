@@ -1536,6 +1536,34 @@ Some RESO servers support OAuth2 Client Credentials. The cloud MCP server handle
 
 The server returns a bearer token. Use that token as `authToken` in subsequent calls. You can also skip the `authenticate` step and pass `clientId`, `clientSecret` and `tokenUrl` directly on any tool call – the cloud server will obtain the token automatically before making the request.
 
+**Server environment** – for the local server, set the credential once in the environment that runs `reso-mcp` and leave it out of every tool call. Prefer this. An `authToken` passed as an argument travels inside the tool call, so it lands in the agent's conversation history and in any transcript of it. A credential held in the server environment never appears in a message.
+
+| Variable | Purpose |
+|---|---|
+| `RESO_AUTH_TOKEN` | Bearer token for the provider API |
+| `RESO_CLIENT_ID`, `RESO_CLIENT_SECRET`, `RESO_TOKEN_URI` | OAuth2 client credentials, read only as a complete set |
+| `RESO_SCOPE` | Optional OAuth2 scope |
+| `RESO_BASE_URL` | **Required** whenever any of the above is set. The one data server an environment credential may be sent to |
+
+```bash
+# Bearer token, bound to one server
+export RESO_BASE_URL=https://api.example.com
+export RESO_AUTH_TOKEN=your-bearer-token
+
+# OAuth2 client credentials, same binding
+export RESO_BASE_URL=https://api.example.com
+export RESO_CLIENT_ID=your-client-id
+export RESO_CLIENT_SECRET=your-client-secret
+export RESO_TOKEN_URI=https://auth.example.com/oauth2/token
+```
+
+These are the same names `reso-client` and the `reso-cert` CLI read, so one shell configuration serves all three. The `RESO_` prefix is load-bearing: the unprefixed `CLIENT_ID` and `CLIENT_SECRET` that `reso-cert` also reads are credentials for RESO's own services rather than for a data provider's API, and this server never reads an unprefixed variable.
+
+**Why `RESO_BASE_URL` is required rather than optional.** An environment credential is ambient, because no caller chose it for the call being made, and `url` is a free-form argument the model fills in. Without a bound destination the credential would be sent to whatever host a call happens to name. Bound, it goes only where the operator who set it said it belongs. A call targeting a different origin is refused with a message naming both origins, and an environment credential set without `RESO_BASE_URL` is refused outright rather than defaulted to anything.
+
+**Arguments win as a set.** When a call carries any of `authToken`, `clientId`, `clientSecret` or `tokenUrl`, the environment is not read at all, so no field is ever taken from one channel and combined with the other. Pass arguments to reach a server other than the bound one. No error this server produces contains a credential value; every message names argument names and variable names only.
+
+
 ### 6.6 Cloud vs. Local
 
 | | Cloud (`services.reso.org/mcp`) | Local (`reso-mcp`) |
