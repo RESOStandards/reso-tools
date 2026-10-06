@@ -23,7 +23,7 @@ const suffix = (context?: string): string => (context ? ` ${context}` : '');
  */
 export const addAuthOptions = (cmd: Command, context?: string): Command =>
   cmd
-    .option('--auth-token <token>', `Pre-fetched bearer token${suffix(context)}`)
+    .option('--auth-token <token>', `Prefetched bearer token${suffix(context)}`)
     .option('--client-id <id>', `OAuth2 client ID${suffix(context)} (with --client-secret and --token-url)`)
     .option('--client-secret <secret>', `OAuth2 client secret${suffix(context)}`)
     .option('--token-url <url>', `OAuth2 token endpoint URL${suffix(context)}`);

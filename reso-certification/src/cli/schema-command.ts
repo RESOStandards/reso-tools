@@ -43,7 +43,7 @@ const isSchemaModule = (m: unknown): m is SchemaModule =>
 const loadSchemaModule = (): SchemaModule => {
   const raw: unknown = requireLegacy(resolve(dirname(fileURLToPath(import.meta.url)), '../legacy/lib/schema/index.js'));
   if (!isSchemaModule(raw)) {
-    throw new Error('Failed to load the schema module — expected generateJsonSchema / validate / combineErrors exports.');
+    throw new Error('Failed to load the schema module: expected generateJsonSchema / validate / combineErrors exports.');
   }
   return raw;
 };

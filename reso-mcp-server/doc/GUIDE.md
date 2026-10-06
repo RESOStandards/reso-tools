@@ -1,6 +1,6 @@
 # RESO MCP Server – User Guide
 
-A walkthrough of using the RESO MCP server through an AI assistant. Each section is a real conversation: the user asks a question, the assistant calls the appropriate MCP tool, and the answer comes back grounded in live data from the **[reso-reference-server](../../reso-reference-server/)** seeded with the bundled fixtures.
+A walk-through of using the RESO MCP server through an AI assistant. Each section is a real conversation: the user asks a question, the assistant calls the appropriate MCP tool, and the answer comes back grounded in live data from the **[reso-reference-server](../../reso-reference-server/)** seeded with the bundled fixtures.
 
 The format is intentional – this is what working with a RESO OData server *should* feel like once you have an MCP-aware assistant in the loop. The boxed JSON tool calls are collapsed by default so the dialogue stays readable; click them open when you want to see the exact arguments.
 
@@ -540,7 +540,7 @@ Section 2 used `$filter` for the simplest possible cases – equality and a sing
 
 - **Geospatial functions** (`geo.distance`, `geo.intersects`) – for radius and polygon search. RESO defines them in the spec, but support varies by server. Worth checking your `$metadata` capabilities annotations before relying on them.
 - **`$count=true`** – returns `@odata.count` alongside the page so you know the total result-set size, not just the current page. The MCP `query` tool exposes it as the `count` boolean parameter.
-- **`$expand`** – pulls related records inline (e.g. `$expand=Media`). The MCP `query` tool exposes it as the `expand` parameter. Whether it works depends on the server's navigation properties, which is server-specific.
+- **`$expand`** – pulls related records inline (e.g., `$expand=Media`). The MCP `query` tool exposes it as the `expand` parameter. Whether it works depends on the server's navigation properties, which is server-specific.
 
 These are best learned the same way Sections 3.1–3.5 demonstrated: form a question, send it, and read the AST or the response. The MCP server does not care which OData feature you reach for – it just forwards the call.
 
@@ -548,7 +548,7 @@ These are best learned the same way Sections 3.1–3.5 demonstrated: form a ques
 
 ## Section 4 – Add/Edit
 
-Reading data is half the story. The other half is making changes – creating listings, updating fields, deleting records – and the MCP server's `create`, `update`, and `delete` tools make that possible through natural conversation. This section walks through CRUD operations against a RESO server: what happens when things work, what happens when they do not and how an AI assistant can turn structured errors into actionable guidance.
+Reading data is half the story. The other half is making changes – creating listings, updating fields, deleting records – and the MCP server's `create`, `update` and `delete` tools make that possible through natural conversation. This section walks through CRUD operations against a RESO server: what happens when things work, what happens when they do not and how an AI assistant can turn structured errors into actionable guidance.
 
 ### 4.1 Creating a Listing
 
@@ -1156,7 +1156,7 @@ Reading data is half the story. Tracking *other people's* changes – and knowin
 >
 > HTTP **204 No Content** – the OData convention for a successful DELETE. There is no body, just the status code. The record is gone from `Property` and a new EntityEvent row has been appended.
 
-### 5.8 Wearing the Consumer's Hat – Verifying a Delete From the Feed
+### 5.8 Wearing the Consumer's Hat – Verifying a Delete from the Feed
 
 Sections 4.4–4.7 were about *making* writes. Now let us flip the perspective: you are a polling replication client, you have just pulled a new batch of EntityEvent rows and you need to figure out what each one means. The cleanest way to teach this is to do a clean add → observe → delete → re-observe cycle on a fresh record.
 
@@ -1352,7 +1352,7 @@ Sections 4.4–4.7 were about *making* writes. Now let us flip the perspective: 
 >
 > Every consumer in the RESO ecosystem is, at heart, some variation on that loop. The forthcoming optional `EventTypes` extension will let servers advertise the change type up front so consumers can skip the disambiguation fetch when they care, but the loop above works against every compliant server today.
 
-### 5.9 Summarizing Recent Changes From the Feed
+### 5.9 Summarizing Recent Changes from the Feed
 
 > **User:** Show me everything that is happened in my feed today, oldest first, and summarize.
 >
@@ -1405,7 +1405,7 @@ Sections 4.4–4.7 were about *making* writes. Now let us flip the perspective: 
 
 ### 5.10 Error Handling in the Context of EntityEvent
 
-The Add/Edit error patterns from §4.4 apply here too – structured 400s for validation failures, 404s for missing records, and silent acceptance of bad data. The key difference in the EntityEvent context: **failed writes do not produce events.** Only successful mutations (HTTP 2xx) append a row to EntityEvent. A 400 or 404 is invisible to the feed, which means a polling consumer never needs to reason about server-side validation failures – it only sees the changes that actually landed.
+The Add/Edit error patterns from §4.4 apply here too – structured 400s for validation failures, 404s for missing records and silent acceptance of bad data. The key difference in the EntityEvent context: **failed writes do not produce events.** Only successful mutations (HTTP 2xx) append a row to EntityEvent. A 400 or 404 is invisible to the feed, which means a polling consumer never needs to reason about server-side validation failures – it only sees the changes that actually landed.
 
 ### 5.11 What Is Next for EntityEvent
 
@@ -1534,7 +1534,7 @@ Some RESO servers support OAuth2 Client Credentials. The cloud MCP server handle
 }
 ```
 
-The server returns a bearer token. Use that token as `authToken` in subsequent calls. You can also skip the `authenticate` step and pass `clientId`, `clientSecret`, and `tokenUrl` directly on any tool call – the cloud server will obtain the token automatically before making the request.
+The server returns a bearer token. Use that token as `authToken` in subsequent calls. You can also skip the `authenticate` step and pass `clientId`, `clientSecret` and `tokenUrl` directly on any tool call – the cloud server will obtain the token automatically before making the request.
 
 ### 6.6 Cloud vs. Local
 
@@ -1542,7 +1542,7 @@ The server returns a bearer token. Use that token as `authToken` in subsequent c
 |---|---|---|
 | **Setup** | Just an API key | Install Node.js, clone repo |
 | **Tools** | Core tools (query, metadata, CRUD) | All tools including certification |
-| **Latency** | Network round-trip through AWS | Direct on your machine |
+| **Latency** | Network round trip through AWS | Direct on your machine |
 | **Use case** | Quick demos, remote agents, conference | Development, cert testing, offline |
 
 Both use the same tool interfaces and return the same response shapes. An agent built against the cloud server will work identically with the local server and vice versa.

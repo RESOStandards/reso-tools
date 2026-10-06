@@ -72,7 +72,7 @@ export const formatEndorsementStatusTable = (
   if (rows.length === 0) {
     if (reviewStatus) return `No submissions with review status '${reviewStatus}'.`;
     const whose = providerUoi ? `for provider UOI ${providerUoi}` : 'under your own organization';
-    return `No submissions ${whose}. Submissions you made on behalf of a provider belong to that provider — run with --review-status in-review to see the review queue.`;
+    return `No submissions ${whose}. Submissions you made on behalf of a provider belong to that provider. Run with --review-status in-review to see the review queue.`;
   }
   const lines = rows.map(r => [
     cell(r.providerUoi),

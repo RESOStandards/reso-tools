@@ -1,6 +1,6 @@
 # RESO Reference Server – User Guide
 
-A task-oriented walkthrough of the RESO Reference Server. This is the package that gives you a complete, certified RESO-compliant OData server you can run on your laptop, in CI, or in a container, against the database backend of your choice, with realistic test data ready to query in seconds.
+A task-oriented walk-through of the RESO Reference Server. This is the package that gives you a complete, certified RESO-compliant OData server you can run on your laptop, in CI or in a container, against the database backend of your choice, with realistic test data ready to query in seconds.
 
 If you have ever needed a real RESO server to develop against and did not want to ask an MLS for credentials, this is the server that ends that pattern.
 
@@ -13,14 +13,14 @@ Anyone who needs a working RESO Web API on demand. Real examples:
 * **Test engineers** who need a clean RESO server to run tests against in CI
 * **AI agents** that need a target to exercise read and write operations against without touching production data
 * **RESO members and certification candidates** preparing for compliance testing who want to run the same cert tools locally that the official process uses
-* **Demo and training environments** where the audience needs to see real-looking listings, agents, offices, and media records on screen
+* **Demo and training environments** where the audience needs to see real-looking listings, agents, offices and media records on screen
 * **Anyone evaluating a RESO-related tool** who needs a server to point it at without setting up a database from scratch
 
 The reference server is intentionally a *complete* server – not a mock, not a stub, not a partial implementation. It speaks OData 4.01, it passes RESO Web API Core compliance tests, it passes Data Dictionary compliance tests, and it passes Add/Edit (RCP-010) compliance tests. What you build against it is what you build against any compliant production server.
 
 ## Install
 
-The reference server runs as a Docker stack, or you can install and run it directly with Node.js. Docker is the recommended path for almost everything because it bundles the database, the API, and the web UI into one command.
+The reference server runs as a Docker stack, or you can install and run it directly with Node.js. Docker is the recommended path for almost everything because it bundles the database, the API and the web UI into one command.
 
 ```bash
 git clone https://github.com/RESOStandards/reso-tools.git
@@ -47,13 +47,13 @@ Three services come up:
 * **Web UI** at `http://localhost:5173` – the React browser for exploring the data interactively
 * **PostgreSQL database** at `localhost:5432` – the persistence layer (the default backend)
 
-### Seed It With Test Data
+### Seed It with Test Data
 
 ```bash
 docker compose --profile seed up seed
 ```
 
-This runs the data generator with full dependency resolution: it creates Office records, Member records, OUID records, Teams, and Properties, then back-fills the foreign keys, then creates child collections (Media, OpenHouse, Showing, PropertyRooms). About 892 records total in a single run, all wired correctly. Detailed walk-through of what the generator does and why is in the **[RESO Data Generator guide](../reso-data-generator/)**.
+This runs the data generator with full dependency resolution: it creates Office records, Member records, OUID records, Teams and Properties, then backfills the foreign keys, then creates child collections (Media, OpenHouse, Showing, PropertyRooms). About 892 records total in a single run, all wired correctly. Detailed walk-through of what the generator does and why is in the **[RESO Data Generator guide](../reso-data-generator/)**.
 
 ### Verify It Is Working
 
@@ -82,7 +82,7 @@ The reference server supports three database backends, each with its own Docker 
 
 ### PostgreSQL (Default)
 
-The default backend, and the closest match for most production RESO servers in the field. Use it for development against anything Postgres-shaped, for cert testing, and as the default unless you have a specific reason to pick something else.
+The default backend, and the closest match for most production RESO servers in the field. Use it for development against anything Postgres-shaped, for cert testing and as the default unless you have a specific reason to pick something else.
 
 ```bash
 docker compose up -d
@@ -91,7 +91,7 @@ docker compose --profile seed up seed
 
 ### MongoDB
 
-Use it when you are building against a document-oriented backend, when you want to exercise the cert flows against a non-relational store, or when you are validating that an integration works the same way against both shapes.
+Use it when you are building against a document-oriented backend, when you want to exercise the cert flows against a nonrelational store or when you are validating that an integration works the same way against both shapes.
 
 ```bash
 docker compose --profile mongodb up -d mongodb server-mongo ui-mongo
@@ -100,7 +100,7 @@ docker compose --profile seed-mongo up seed-mongo
 
 ### SQLite
 
-The lightest backend. No external database container, no separate process – the SQLite file lives in a Docker volume. Use it when you want a fast, ephemeral, low-footprint server for unit tests, CI runs, or local development on a constrained machine.
+The lightest backend. No external database container, no separate process – the SQLite file lives in a Docker volume. Use it when you want a fast, ephemeral, low-footprint server for unit tests, CI runs or local development on a constrained machine.
 
 ```bash
 docker compose --profile sqlite up -d server-sqlite ui-sqlite
@@ -161,7 +161,7 @@ curl -H 'Accept: application/json' \
 
 OData key syntax with single quotes around the key value. Compound keys (for resources with multi-field primary keys) use comma-separated key fragments inside the parentheses.
 
-### Creating, Updating, and Deleting Records
+### Creating, Updating and Deleting Records
 
 ```bash
 # Create a new Property
@@ -204,7 +204,7 @@ curl http://localhost:8080/api-docs
 open http://localhost:8080/api-docs
 ```
 
-Both are generated dynamically from the loaded `server-metadata.json` at boot. Any change to the metadata file produces a new schema, new tables, new endpoints, and new docs automatically – there is no separate "regenerate the API" step.
+Both are generated dynamically from the loaded `server-metadata.json` at boot. Any change to the metadata file produces a new schema, new tables, new endpoints and new docs automatically – there is no separate "regenerate the API" step.
 
 ---
 
@@ -220,9 +220,9 @@ Set the `METADATA_PATH` environment variable to the absolute path of the file yo
 METADATA_PATH=/path/to/your-metadata.json node dist/index.js
 ```
 
-Or, in Docker, mount the file into the container and set `METADATA_PATH` in the compose configuration. The server reads the file at boot, generates schema for every resource it declares, and is ready to query.
+Or, in Docker, mount the file into the container and set `METADATA_PATH` in the compose configuration. The server reads the file at boot, generates schema for every resource it declares and is ready to query.
 
-### Working With Real Cert Metadata Reports
+### Working with Real Cert Metadata Reports
 
 If you have a metadata report from a RESO certification run – the kind that comes out of `reso-cert dd` – the reference server can load it directly, with one preprocessing step. DD 2.0 and 2.1 cert reports do not include the top-level `resources[]` block (that concept arrives in DD 2.2), so the **[RESO Certification](../reso-certification/)** package ships an adapter that synthesizes it from the field declarations:
 
@@ -239,7 +239,7 @@ Then point the server at the adapted file:
 METADATA_PATH=path/to/adapted-report.json node dist/index.js
 ```
 
-The server loads the cert report, registers routes for every resource declared in it, and serves the schema exactly as the certified provider exposed it. This is the cleanest way to develop or test against a server shaped like a specific real-world deployment without needing access to that deployment.
+The server loads the cert report, registers routes for every resource declared in it and serves the schema exactly as the certified provider exposed it. This is the cleanest way to develop or test against a server shaped like a specific real-world deployment without needing access to that deployment.
 
 The adapter is idempotent – running it on a report that already has a `resources[]` block (DD 2.2 or later) returns the file unchanged.
 
@@ -247,7 +247,7 @@ The adapter is idempotent – running it on a report that already has a `resourc
 
 ## Authentication
 
-The server ships with a **mock OAuth2 endpoint** at `/oauth/token` that accepts any client credentials and returns a bearer token. This is intentional – the reference server is meant for development and testing, not production, and the auth mechanism exists so consumers can exercise the OAuth2 round-trip end to end without needing a real identity provider.
+The server ships with a **mock OAuth2 endpoint** at `/oauth/token` that accepts any client credentials and returns a bearer token. This is intentional – the reference server is meant for development and testing, not production, and the auth mechanism exists so consumers can exercise the OAuth2 round trip end to end without needing a real identity provider.
 
 ### Bearer Token
 
@@ -275,7 +275,7 @@ The server returns a token immediately. The **[RESO Client SDK](../reso-client/)
 
 ## Switching Enumeration Modes
 
-RESO Data Dictionary fields that take enumerated values (like `StandardStatus`, `PropertyType`, and the rest) can be exposed in two different ways at the OData layer. The reference server supports both via the `ENUM_MODE` environment variable.
+RESO Data Dictionary fields that take enumerated values (like `StandardStatus`, `PropertyType` and the rest) can be exposed in two different ways at the OData layer. The reference server supports both via the `ENUM_MODE` environment variable.
 
 ### `string` Mode (Default)
 
@@ -303,7 +303,7 @@ Both modes pass the Web API Core 2.0.0 compliance tests. Pick whichever your cli
 
 ## EntityEvent Mode
 
-The reference server supports the full **EntityEvent** change-tracking flow defined in RCP-027. EntityEvent is the RESO-defined way to surface a change feed for incremental replication: every create, update, and delete on a resource produces a row on the `EntityEvent` resource with a monotonic sequence number, and consumers poll the feed to discover changes.
+The reference server supports the full **EntityEvent** change-tracking flow defined in RCP-027. EntityEvent is the RESO-defined way to surface a change feed for incremental replication: every create, update and delete on a resource produces a row on the `EntityEvent` resource with a monotonic sequence number, and consumers poll the feed to discover changes.
 
 ### Enabling EntityEvent
 
@@ -313,7 +313,7 @@ Set the `ENTITY_EVENT` environment variable to `true` when starting the server:
 ENTITY_EVENT=true docker compose up -d --build
 ```
 
-The server registers the `EntityEvent` resource, starts producing change events on every write, and exposes the feed for querying:
+The server registers the `EntityEvent` resource, starts producing change events on every write and exposes the feed for querying:
 
 ```bash
 # Get every event since sequence 0
@@ -346,7 +346,7 @@ The current status of the reference server against this flow is **42 passed, 0 f
 
 ### Data Dictionary 2.0
 
-Validates metadata compliance, field mappings, and data availability against the RESO DD 2.0 specification. Walks every resource, checks every declared field, samples the data for type correctness, and validates the lookup tables.
+Validates metadata compliance, field mappings and data availability against the RESO DD 2.0 specification. Walks every resource, checks every declared field, samples the data for type correctness and validates the lookup tables.
 
 ```bash
 docker compose --profile compliance-dd up --build --exit-code-from compliance-dd
@@ -356,7 +356,7 @@ Current status: **1,034 passed, 570 skipped, 0 failed, 0 schema validation error
 
 ### Add/Edit (RCP-010)
 
-Validates Create, Update, and Delete operations with both `representation` and `minimal` response modes. Exercises every supported endorsement scenario and checks the response headers, annotations, and error format.
+Validates Create, Update and Delete operations with both `representation` and `minimal` response modes. Exercises every supported endorsement scenario and checks the response headers, annotations and error format.
 
 ```bash
 docker compose --profile compliance-addedit up --build --exit-code-from compliance-addedit
@@ -372,9 +372,9 @@ All three cert flows run against any of the three database backends. The MongoDB
 
 * **Filling the server with data** – the **[RESO Data Generator](../reso-data-generator/)** is the package that produced the seed data above, and it can produce more on demand. If you need 500 Properties or 5,000, that is the right entry point.
 * **Querying the server interactively** – the **[RESO Desktop Client](../reso-desktop-client/)** and the **[RESO Web Client](../reso-web-client/)** are both built around the **[RESO Client SDK](../reso-client/)** and connect to any RESO server, including this one.
-* **Validating records** – the **[reso-validation](../reso-validation/)** library runs on every Add/Edit write against the reference server. It is also a standalone library you can use in your own application to check records before sending them.
+* **Validating records** – the **[reso-validation](../reso-validation/)** library runs on every Add/Edit write against the reference server. It is also a stand-alone library you can use in your own application to check records before sending them.
 * **Running the cert tools as code** – the **[RESO Certification](../reso-certification/)** package gives you a CLI and an SDK for running every cert flow programmatically, not just through Docker. Useful for CI pipelines and for embedding cert testing inside other tools.
-* **Connecting an AI agent** – the **[RESO MCP Server](../reso-mcp-server/)** exposes this exact server through the Model Context Protocol so any MCP-aware AI host (Claude Code, Claude Desktop, Cursor, others) can read, query, and write through a real RESO server. The MCP guide walks through the full Add/Edit and EntityEvent flows against this reference server with verbatim tool calls.
+* **Connecting an AI agent** – the **[RESO MCP Server](../reso-mcp-server/)** exposes this exact server through the Model Context Protocol so any MCP-aware AI host (Claude Code, Claude Desktop, Cursor, others) can read, query and write through a real RESO server. The MCP guide walks through the full Add/Edit and EntityEvent flows against this reference server with verbatim tool calls.
 
 ## Reference
 
