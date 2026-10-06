@@ -184,7 +184,7 @@ describe('printRunSummary — certification', () => {
   // The case the whole mechanism exists for: the run PASSED, so nothing else in this summary would
   // say a word about it.
   it('reports ineligibility on a passing run, with the reason', () => {
-    const out = captured(resultWith({ valid: false, reasons: ['Check variations: skipped — requested with --skip-variations'] }));
+    const out = captured(resultWith({ valid: false, reasons: ['Check variations: skipped – requested with --skip-variations'] }));
 
     expect(out).toContain('Not eligible for certification (1)');
     expect(out).toContain('Check variations: skipped');

@@ -144,7 +144,7 @@ The certification verdict, from a run with `--skip-variations`:
 "certification": {
   "valid": false,
   "reasons": [
-    "Check variations: skipped — Variations not checked, requested with --skip-variations. A run that did not check variations is not eligible for certification."
+    "Check variations: skipped – Variations not checked, requested with --skip-variations. A run that did not check variations is not eligible for certification."
   ]
 }
 ```
