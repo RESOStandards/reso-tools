@@ -1,4 +1,4 @@
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 
 WORKDIR /app
 
@@ -7,6 +7,15 @@ WORKDIR /app
 # them (including reso-certification, which ships its own xsd/validation assets).
 # No sibling COPY-into-/deps, no file: rewrites, no source builds needed.
 COPY reso-mcp-server/package.json ./
+# node:22-alpine ships npm 10.9.9, whose dependency resolver crashes on this
+# tree with "Cannot read properties of null (reading 'edgesOut')". Bisected to
+# vitest 4.x: every other dependency installs clean, vitest alone reproduces it,
+# and npm 11 installs the whole manifest. Development runs npm 11 locally, which
+# is why this passed on every machine and failed only in the image.
+#
+# Pinned to the major rather than @latest so a future npm cannot change the build
+# underneath us.
+RUN npm install -g npm@11
 RUN npm install
 
 COPY reso-mcp-server/tsconfig.json ./
@@ -15,7 +24,7 @@ RUN npm run build
 RUN npm prune --omit=dev
 
 # --- Runtime ---
-FROM node:22-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 COPY --from=build /app/dist ./dist

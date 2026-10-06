@@ -1,10 +1,19 @@
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 
 WORKDIR /app
 
 # Install dependencies. All @reso-standards/* deps resolve from the npm registry
 # as caret ranges — no sibling COPY-into-/deps, no file: rewrites, no source builds.
 COPY reso-certification/package.json ./
+# node:22-alpine ships npm 10.9.9, whose dependency resolver crashes on this
+# tree with "Cannot read properties of null (reading 'edgesOut')". Bisected to
+# vitest 4.x: every other dependency installs clean, vitest alone reproduces it,
+# and npm 11 installs the whole manifest. Development runs npm 11 locally, which
+# is why this passed on every machine and failed only in the image.
+#
+# Pinned to the major rather than @latest so a future npm cannot change the build
+# underneath us.
+RUN npm install -g npm@11
 RUN npm install
 
 COPY reso-certification/tsconfig.json ./
@@ -23,7 +32,7 @@ COPY reso-certification/sample-payloads/ ./sample-payloads/
 COPY reso-certification/sample-metadata.xml ./
 
 # --- Runtime stage ---
-FROM node:22-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
