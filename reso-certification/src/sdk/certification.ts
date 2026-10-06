@@ -41,7 +41,7 @@ export const everyStepPassed = (steps: ReadonlyArray<StepResult>): Certification
   const notPassed = steps.filter(step => step.status !== 'passed');
   return notPassed.length === 0
     ? CERTIFIABLE
-    : notCertifiable(notPassed.map(step => `${step.name}: ${step.status}${step.summary ? ` — ${step.summary}` : ''}`));
+    : notCertifiable(notPassed.map(step => `${step.name}: ${step.status}${step.summary ? ` – ${step.summary}` : ''}`));
 };
 
 /**
