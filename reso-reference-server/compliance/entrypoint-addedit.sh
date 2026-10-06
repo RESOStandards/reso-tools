@@ -33,7 +33,11 @@ echo "Seed complete."
 echo ""
 
 # --- 2. Run compliance pipeline ---
-exec node /app/dist/cli/index.js add-edit \
+# Invoked relative to the image's WORKDIR, which is the package root. It was an
+# absolute /app/... path, which broke when the images moved to building the whole
+# workspace and the package stopped being the filesystem root of the image. A
+# relative path survives the next relocation too.
+exec node dist/cli/index.js add-edit \
   --url "$SERVER_URL" \
   --resource "$RESOURCE" \
   --auth-token "$AUTH_TOKEN" \
