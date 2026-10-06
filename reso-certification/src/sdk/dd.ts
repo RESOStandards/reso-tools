@@ -323,7 +323,7 @@ export const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
         context: ctx,
         status: 'skipped',
         summary:
-          'Variations not checked — requested with --skip-variations. A run that did not check variations is not eligible for certification.'
+          'Variations not checked, requested with --skip-variations. A run that did not check variations is not eligible for certification.'
       };
     }
 

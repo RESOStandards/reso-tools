@@ -56,6 +56,7 @@ import { runMetadataStep } from './metadata-command.js';
 import { resolveRcfExitCode, runRcf } from './rcf-command.js';
 import { resolveRenderMode, runConfigEntries, runWithProgress } from './render.js';
 import { REPLICATION_STRATEGY_VALUES, runReplicate } from './replicate-command.js';
+import { formatResultJson } from './result-json.js';
 import { generateSchemaFromReport, loadSettings, validateSchemaPayload } from './schema-command.js';
 import { addAuthOptions, addOutputOptions } from './shared-options.js';
 import {
@@ -96,10 +97,6 @@ const loadDefaultMetadata = async (): Promise<string> => {
   const defaultPath = resolve(import.meta.dirname, '../../sample-metadata.xml');
   return readFile(defaultPath, 'utf-8');
 };
-
-/** Format pipeline results as JSON. */
-const formatResultJson = (results: ReadonlyArray<PipelineResult>): string =>
-  JSON.stringify(results.length === 1 ? results[0] : results, null, 2);
 
 /** Determine exit code from pipeline results. A run cut short by its total-timeout budget
  *  is `incomplete` — not a clean pass, so it exits non-zero (like a failure) rather than

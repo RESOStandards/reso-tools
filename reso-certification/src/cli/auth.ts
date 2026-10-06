@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { parseEnv } from 'node:util';
 import { authConfigFromEnv } from '@reso-standards/reso-client';
 import type { AuthConfig } from '../test-runner/types.js';
+import { registerSecret } from './secrets.js';
 
 /** CLI option flags related to authentication. */
 export interface CliAuthFlags {
@@ -83,6 +84,9 @@ export const mintOAuth2ClientCredentialsToken = async (): Promise<string | undef
       console.error('OAuth2 token mint succeeded but response had no access_token.');
       return undefined;
     }
+    // Registered where it comes into existence. This value was never typed by anyone, so
+    // registering the flags alone would miss it.
+    registerSecret(parsed.access_token);
     return parsed.access_token;
   } catch (err) {
     console.error('OAuth2 token mint threw:', err instanceof Error ? err.message : String(err));
@@ -128,17 +132,31 @@ const buildAuthFromFlags = (flags: CliAuthFlags): AuthConfig | null => {
  *
  * Call loadDotEnv() before this to merge .env values into process.env.
  */
+/**
+ * Register whatever secrets a resolved AuthConfig carries, so they are masked wherever they later
+ * surface in output.
+ *
+ * Done here rather than at each source because this function IS the chokepoint for all three — the
+ * flags, the config entry and the environment. A registration per source would have to be kept in
+ * step with the chain; this one cannot drift from it.
+ */
+const registerAuthSecrets = (auth: AuthConfig): AuthConfig => {
+  if (auth.mode === 'token') registerSecret(auth.authToken);
+  else registerSecret(auth.clientSecret);
+  return auth;
+};
+
 export const resolveCliAuth = (flags: CliAuthFlags, configAuth?: AuthConfig): AuthConfig => {
   // Level 1: CLI flags
   const fromFlags = buildAuthFromFlags(flags);
-  if (fromFlags) return fromFlags;
+  if (fromFlags) return registerAuthSecrets(fromFlags);
 
   // Level 2: Config entry auth
-  if (configAuth) return configAuth;
+  if (configAuth) return registerAuthSecrets(configAuth);
 
   // Level 3: Env vars (includes .env if loadDotEnv was called)
   try {
-    return authConfigFromEnv() as AuthConfig;
+    return registerAuthSecrets(authConfigFromEnv() as AuthConfig);
   } catch {
     throw new Error(
       'No authentication configured. Provide one of:\n' +
