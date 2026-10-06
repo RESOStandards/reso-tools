@@ -158,17 +158,14 @@ The GitHub repo merges PRs with **Rebase and merge** — the trunk stays linear,
 4. **Update RELEASES.md**: Add all changes under the version heading. This is the canonical changelog – memory and READMEs reference it, not the other way around.
 5. **Update READMEs**: Test counts, new features, CLI examples, package table in root README. Cross-check against RELEASES.md.
 6. **Update test badge**: `![Tests](https://img.shields.io/badge/tests-XXXX%20passed-brightgreen)` in root README
-6. **Desktop client** (source now in `reso-tools-private`; the app is built there and its binaries published to this public repo's Releases — the exact build/publish wiring is the distribution follow-up):
-   - Update `version` in `reso-desktop-client/package.json` (the About dialog reads it via `app.getVersion()` automatically – do not hardcode)
-   - Pick a release name and update the `RELEASE_NAME` constant in `reso-desktop-client/src/main.ts` (search for the comment block above `setAboutPanelOptions`)
-   - Rebuild web client: `cd reso-web-client && npm run build`
-7. **Create PR**: `gh pr create --base main --head vX.Y --title "vX.Y – Release Name"`
-8. **Create draft release**: `gh release create vX.Y --draft --target vX.Y --title "vX.Y – Release Name"`
+7. **Desktop client** – nothing to do in this repo. The Electron shell, the browser UI, the CORS proxy and the test-data generator all live in `reso-tools-private`, which consumes these packages from npm. Bump its version, pick its `RELEASE_NAME` and build it there, then attach its binaries to this repo's Release.
+8. **Create PR**: `gh pr create --base main --head vX.Y --title "vX.Y – Release Name"`
+9. **Create draft release**: `gh release create vX.Y --draft --target vX.Y --title "vX.Y – Release Name"`
    - Include: highlights, what changed, download instructions, migration guide link
    - Desktop download instructions for unsigned binaries (macOS xattr, Windows SmartScreen, Linux chmod)
-9. **Merge PR**: After review, merge to main
-10. **Tag**: The release workflow triggers on tag push, builds desktop binaries, and attaches them
-11. **Publish release**: Remove draft status after binaries are attached
+10. **Merge PR**: After review, merge to main
+11. **Tag**: Pushing a `v*` tag runs `release.yml`, which creates the Release as a draft when none exists and leaves an existing one untouched, assets included. It builds nothing – no binary is produced in this repo.
+12. **Publish release**: Remove draft status once `reso-tools-private` has attached the desktop binaries.
 
 ### File Naming
 - `schema-validation-settings.json` – committee-approved, NEVER modify

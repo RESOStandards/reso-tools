@@ -1,4 +1,19 @@
-name: Build & Release
+name: Release
+
+# What a `v*` tag means in THIS repo, after the v1.0.0 split.
+#
+# The Electron desktop shell, the browser UI, the CORS proxy and the test-data generator all
+# moved to the private reso-tools-private repo. Nothing in this repo builds a binary, so this
+# workflow no longer tries to. It used to run `cd reso-desktop-client && npx electron-builder`
+# on a three-OS matrix; that directory has had zero tracked files since the split, so every
+# job failed at that step from v1.0.0-beta.14 onward and `Create Release` was skipped behind
+# `needs: build`.
+#
+# The npm packages do not release from here either — each publishes from its own
+# `<package>-v<version>` tag via Trusted Publishing (see the publish-*.yml workflows).
+#
+# So the one thing a `v*` tag still needs is a GitHub Release to exist, which gives
+# reso-tools-private a target to attach its desktop binaries to.
 
 on:
   push:
@@ -6,76 +21,32 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Configure git for CI
-        run: |
-          git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://github.com/".insteadOf "git@github.com:"
-
-      - name: Bootstrap all packages
-        run: npm run bootstrap:force
-        shell: bash
-
-      - name: Package Electron app
-        run: cd reso-desktop-client && npx electron-builder --publish never
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: desktop-${{ matrix.os }}
-          # The artifact is a hand-off between jobs in this same run, so it needs to live
-          # minutes. Unset, it defaulted to ninety days and these are full Electron
-          # builds per platform, which is where the storage bill actually came from.
-          retention-days: 1
-          path: |
-            reso-desktop-client/dist/*.dmg
-            reso-desktop-client/dist/*.zip
-            reso-desktop-client/dist/*.AppImage
-            reso-desktop-client/dist/*.deb
-            reso-desktop-client/dist/*.exe
-          if-no-files-found: ignore
-
   release:
     name: Create Release
-    needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: Upload assets to GitHub release
+      - name: Create the release, or leave an existing one alone
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
+          set -euo pipefail
           tag="${GITHUB_REF#refs/tags/}"
-          # If the release already exists (typical: published manually as a draft),
-          # upload the binaries to it. Otherwise create it from scratch.
-          if gh release view "$tag" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            gh release upload "$tag" artifacts/* --repo "${{ github.repository }}" --clobber
-          else
-            gh release create "$tag" artifacts/* \
-              --repo "${{ github.repository }}" \
-              --title "$tag" \
-              --generate-notes
+
+          # Publishing a draft by hand is the documented path, and reso-tools-private attaches
+          # binaries to whatever release is already there. So an existing release is never
+          # modified — not its notes, not its draft state, and above all not its assets.
+          if gh release view "$tag" --repo "$REPO" >/dev/null 2>&1; then
+            echo "Release $tag already exists. Leaving it untouched, assets included."
+            exit 0
           fi
+
+          echo "No release for $tag yet. Creating one as a draft."
+          gh release create "$tag" \
+            --repo "$REPO" \
+            --title "$tag" \
+            --draft \
+            --generate-notes
