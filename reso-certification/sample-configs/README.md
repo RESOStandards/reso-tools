@@ -1,6 +1,16 @@
 # Sample Configurations
 
-Ready-to-edit configuration files for each endorsement. Download one, replace the identifiers and the service root, and run.
+Configuration files for each endorsement, ready to copy and fill in.
+
+> **A filled-in config holds a live bearer token.** Copy a sample to a `*.local.json` name before
+> editing it – for example `cp dd-config.json dd-config.local.json` – and edit the copy. That name is
+> gitignored, so a credential cannot be committed by accident. The samples themselves are tracked
+> files in this repository, so editing one in place puts your token one `git add` away from being
+> published.
+>
+> The `token` value shipped in each sample is `admin-token`, which is the reference server's own
+> documented token and is public. It works against a local reference server as-is. Replace it, along
+> with the identifiers and the service root, for a run against any real system.
 
 | Sample | Endorsement | Download |
 |---|---|---|

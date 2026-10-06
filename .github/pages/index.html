@@ -75,7 +75,6 @@ title: RESO Tools
   <div class="arch-arrow">&darr;</div>
   <div class="arch-row">
     <div class="arch-box arch-box-orange">reso-certification</div>
-    <div class="arch-box arch-box-orange">reso-data-generator</div>
     <div class="arch-box arch-box-orange">reso-mcp-server</div>
   </div>
 </div>
@@ -90,6 +89,32 @@ title: RESO Tools
     <div class="card-header">
       <h3>Core Libraries</h3>
       <span class="badge badge-green">Stable</span>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso-standards/reso-common</div>
+        <div class="package-desc">The shared RESO metadata model and projections: the ResoMetadata shape, pure helpers and the EDMX generator. Runs in a browser or in Node.</div>
+        <div class="package-meta">
+          <span>41 tests</span>
+          <span>&middot;</span>
+          <span>Zero dependencies</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/reso-common' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso-standards/reso-metadata-utils</div>
+        <div class="package-desc">OData metadata processing: CSDL parsing, XSD and semantic validation, EDMX to metadata-report serialization, and live metadata fetching.</div>
+        <div class="package-meta">
+          <span>156 tests</span>
+          <span>&middot;</span>
+          <span>CSDL + EDMX</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/reso-metadata-utils' | relative_url }}" class="view-link">View &rarr;</a>
     </div>
 
     <div class="package-item">
@@ -143,19 +168,6 @@ title: RESO Tools
     <div class="card-header">
       <h3>Developer Tools</h3>
       <span class="badge badge-blue">Tools</span>
-    </div>
-
-    <div class="package-item">
-      <div>
-        <div class="package-name">@reso-standards/reso-data-generator</div>
-        <div class="package-desc">Generate realistic sample real estate data for testing. Creates properties, agents, offices, media, and more that conform to the RESO Data Dictionary. Use the CLI or import as a library.</div>
-        <div class="package-meta">
-          <span>104 tests</span>
-          <span>&middot;</span>
-          <span>CLI + Library</span>
-        </div>
-      </div>
-      <a href="{{ '/packages/reso-data-generator' | relative_url }}" class="view-link">View &rarr;</a>
     </div>
 
     <div class="package-item">
@@ -224,11 +236,11 @@ title: RESO Tools
   </div>
 </div>
 
-<!-- Desktop & Web Client -->
+<!-- Desktop Client -->
 <div id="clients" class="section-group section-tools">
   <div class="section-title">
     <svg viewBox="0 0 24 24"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-    Desktop &amp; Web Client
+    Desktop Client
   </div>
   <div class="card">
     <div class="card-header">
@@ -238,7 +250,7 @@ title: RESO Tools
 
     <div class="package-item">
       <div>
-        <div class="package-name">@reso-standards/reso-desktop-client</div>
+        <div class="package-name">RESO Desktop Client</div>
         <div class="package-desc">Electron desktop application for browsing any RESO-compliant OData server. Includes OAuth2 Client Credentials and Bearer Token authentication, metadata caching, and an optional built-in reference server for local test data. No Docker required.</div>
         <div class="package-meta">
           <span>SQLite</span>
@@ -248,35 +260,7 @@ title: RESO Tools
           <span>macOS / Windows / Linux</span>
         </div>
       </div>
-      <a href="{{ '/packages/reso-desktop-client' | relative_url }}" class="view-link">View &rarr;</a>
-    </div>
-
-    <div class="package-item">
-      <div>
-        <div class="package-name">@reso-standards/reso-web-client</div>
-        <div class="package-desc">React-based OData browser UI with server connection manager, analytics-driven search fields, advanced search with field groups, metadata explorer, and CRUD operations. Connects to any OData server via the CORS proxy.</div>
-        <div class="package-meta">
-          <span>72 tests</span>
-          <span>&middot;</span>
-          <span>React 19 + Vite 6</span>
-        </div>
-      </div>
-      <a href="{{ '/packages/reso-web-client' | relative_url }}" class="view-link">View &rarr;</a>
-    </div>
-
-    <div class="package-item">
-      <div>
-        <div class="package-name">@reso-standards/reso-web-api-proxy</div>
-        <div class="package-desc">Lightweight CORS proxy and static file server for deploying the web client without the reference server. Enables browser-based OData clients to connect to servers that don&rsquo;t set CORS headers.</div>
-        <div class="package-meta">
-          <span>Express middleware</span>
-          <span>&middot;</span>
-          <span>CLI</span>
-          <span>&middot;</span>
-          <span>Docker</span>
-        </div>
-      </div>
-      <a href="{{ '/packages/reso-web-api-proxy' | relative_url }}" class="view-link">View &rarr;</a>
+      <a href="https://github.com/RESOStandards/reso-tools/releases/latest" class="view-link">Download &rarr;</a>
     </div>
   </div>
 </div>

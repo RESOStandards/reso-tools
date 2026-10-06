@@ -66,6 +66,8 @@ jobs:
           # the copy in .github/pages/_packages/.
 
           packages=(
+            "reso-common:@reso-standards/reso-common:Shared RESO metadata model"
+            "reso-metadata-utils:@reso-standards/reso-metadata-utils:OData metadata processing"
             "reso-validation:@reso-standards/reso-validation:Isomorphic validation library"
             "odata-expression-parser:@reso-standards/odata-expression-parser:OData filter parser"
             "reso-client:@reso-standards/reso-client:RESO Client SDK"
@@ -244,6 +246,8 @@ jobs:
           # work because tools.reso.org already has /packages/<name>/.
 
           packages=(
+            "reso-common:@reso-standards/reso-common"
+            "reso-metadata-utils:@reso-standards/reso-metadata-utils"
             "reso-validation:@reso-standards/reso-validation"
             "odata-expression-parser:@reso-standards/odata-expression-parser"
             "reso-client:@reso-standards/reso-client"
