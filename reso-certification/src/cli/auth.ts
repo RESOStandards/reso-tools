@@ -109,7 +109,7 @@ const buildAuthFromFlags = (flags: CliAuthFlags): AuthConfig | null => {
   }
 
   if (!flags.clientId || !flags.clientSecret || !flags.tokenUrl) {
-    throw new Error('OAuth2 Client Credentials requires all three: --client-id, --client-secret, and --token-url.');
+    throw new Error('OAuth2 Client Credentials requires all three: --client-id, --client-secret and --token-url.');
   }
 
   return {

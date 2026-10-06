@@ -1,14 +1,14 @@
 # RESO Certification
 
-Compliance testing toolkit for RESO OData servers. Run certification tests from the command line, integrate them into your CI pipeline, or call the SDK directly from your application.
+Compliance testing toolkit for RESO OData servers. Run certification tests from the command line, integrate them into your CI pipeline or call the SDK directly from your application.
 
 - **Three endorsements** ready to use: Add/Edit, EntityEvent, Web API Core
 - **No Java required** – pure TypeScript, built on [`reso-client`](../reso-client/) for OData and [`reso-validation`](../reso-validation/) for field validation
 - **Auto-configuring** – samples live server data to build test parameters, auto-detects enum mode from metadata
-- **SDK-first** – the CLI, Desktop Client, and MCP server all call the same SDK functions with progress callbacks
-- **Flexible auth** – bearer tokens, OAuth2 Client Credentials, `.env` files, or environment variables
+- **SDK-first** – the CLI, Desktop Client and MCP server all call the same SDK functions with progress callbacks
+- **Flexible auth** – bearer tokens, OAuth2 Client Credentials, `.env` files or environment variables
 
-> **[User Guide](doc/GUIDE.md)** – a task-oriented walkthrough with realistic examples.
+> **[User Guide](doc/GUIDE.md)** – a task-oriented walk-through with realistic examples.
 
 ## Install
 
@@ -37,7 +37,7 @@ reso-cert entity-event --url https://api.example.com --auth-token TOKEN
 reso-cert core --url https://api.example.com --auth-token TOKEN
 ```
 
-> **[Full CLI reference](src/cli/README.md)** — every command and option, including the per-step utilities (`metadata`, `schema`, `replicate`, `find-variations`) and the `update-variations` admin command.
+> **[Full CLI reference](src/cli/README.md)** – every command and option, including the per-step utilities (`metadata`, `schema`, `replicate`, `find-variations`) and the `update-variations` admin command.
 
 ## Authentication
 
@@ -52,7 +52,7 @@ Auth is resolved automatically from the first available source:
 
 ### Add/Edit (RCP-010)
 
-Validates CRUD operations: create, update, and delete with representation/minimal preferences and error handling. 8 certification scenarios.
+Validates CRUD operations: create, update and delete with representation/minimal preferences and error handling. 8 certification scenarios.
 
 ```bash
 reso-cert add-edit --url https://api.example.com --auth-token TOKEN
@@ -72,7 +72,7 @@ reso-cert entity-event --url https://api.example.com --auth-token TOKEN --mode o
 
 ### Web API Core 2.0.0 / 2.1.0
 
-Validates OData query capabilities: $filter across all data types, $select, $orderby, $top, $skip, $count, enumerations, error codes. v2.1.0 adds $expand, server-driven paging, and string-based enum comparisons.
+Validates OData query capabilities: $filter across all data types, $select, $orderby, $top, $skip, $count, enumerations, error codes. v2.1.0 adds $expand, server-driven paging and string-based enum comparisons.
 
 ```bash
 reso-cert core --url https://api.example.com --auth-token TOKEN
@@ -82,7 +82,7 @@ reso-cert core --url https://api.example.com --auth-token TOKEN
 
 ### Data Dictionary 2.0
 
-Validates server metadata and data availability against the RESO Data Dictionary. Fetches metadata, merges Lookup Resource data, checks for variations, and replicates data using multiple strategies.
+Validates server metadata and data availability against the RESO Data Dictionary. Fetches metadata, merges Lookup Resource data, checks for variations and replicates data using multiple strategies.
 
 ```bash
 reso-cert dd --url https://api.example.com --auth-token TOKEN

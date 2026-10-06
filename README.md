@@ -12,7 +12,7 @@ Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compl
 |---------|-------------|-------|
 | [`reso-common/`](reso-common/) | Universal (browser + Node) RESO metadata model and projections – the shared `ResoMetadata` shape, pure helpers and EDMX generator (zero runtime dependencies) | 16 |
 | [`reso-metadata-utils/`](reso-metadata-utils/) | RESO OData metadata processing – CSDL parse + validate (CSDL/XSD), EDMX → metadata-report serialization, live metadata fetching (the deps-requiring side of the metadata split) | 108 |
-| [`reso-client/`](reso-client/) | OData 4.01 client SDK -- URI builder, CRUD helpers, CSDL metadata parsing, OAuth2 Client Credentials | 211 |
+| [`reso-client/`](reso-client/) | OData 4.01 client SDK – URI builder, CRUD helpers, CSDL metadata parsing, OAuth2 Client Credentials | 211 |
 | [`odata-expression-parser/`](odata-expression-parser/) | Zero-dependency `$filter` and `$expand` expression parser | 180 |
 | [`reso-validation/`](reso-validation/) | Isomorphic field and business-rule validation for RESO Data Dictionary records | 98 |
 | [`reso-reference-server/`](reso-reference-server/) | Metadata-driven OData reference server (PostgreSQL, MongoDB, SQLite) | 265 |

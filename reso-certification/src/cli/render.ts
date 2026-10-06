@@ -60,7 +60,7 @@ export const humanizeDuration = (ms: number): string => {
 const formatStep = (progress: StepProgress): string => {
   const icon = statusIcon(progress.status);
   const duration = progress.duration ? ` (${humanizeDuration(progress.duration)})` : '';
-  const message = progress.message ? ` \u2014 ${progress.message}` : '';
+  const message = progress.message ? ` \u2013 ${progress.message}` : '';
   return `${icon} ${progress.step}${message}${duration}`;
 };
 
@@ -249,9 +249,9 @@ const coreProgressRenderer = (view: ReturnType<typeof createCoreProgressView>): 
     if (d.event === 'phase' && d.resource && d.phase === 'done') {
       const c = d.counts;
       const tally = c
-        ? ` \u2014 ${c.passed}/${c.passed + c.failed + c.skipped}${c.failed ? `, ${c.failed} failed` : ''}`
+        ? ` \u2013 ${c.passed}/${c.passed + c.failed + c.skipped}${c.failed ? `, ${c.failed} failed` : ''}`
         : d.note
-          ? ` \u2014 ${d.note}`
+          ? ` \u2013 ${d.note}`
           : '';
       return `\u25cb ${d.resource}${tally}`;
     }
@@ -425,7 +425,7 @@ export const printRunSummary = (result: PipelineResult, renderMode: RenderMode):
   // never read as real Core failures. Shown on passing runs too — they're informational, not part of the verdict.
   const optionalUnsupported = collectOptionalUnsupported(result);
   if (optionalUnsupported.length > 0) {
-    console.log(`Optional — not supported (${optionalUnsupported.length}):`);
+    console.log(`Optional – not supported (${optionalUnsupported.length}):`);
     for (const f of optionalUnsupported) console.log(`  · ${f}`);
   }
   // Eligibility for certification is a different question from the verdict, so it gets its own
@@ -440,7 +440,7 @@ export const printRunSummary = (result: PipelineResult, renderMode: RenderMode):
   // checks (single-enum ne) and future Fast Track / DD 3.0 suggestions are visible without failing anyone.
   const warnings = collectWarnings(result);
   if (warnings.length > 0) {
-    console.log(`Warnings — non-gating (${warnings.length}):`);
+    console.log(`Non-gating warnings (${warnings.length}):`);
     for (const w of warnings) console.log(`  ⚠ ${w}`);
   }
 };
@@ -477,7 +477,7 @@ export const runWithProgress = async (config: ComplianceConfig, label: string, r
           const view = createCoreProgressView();
           pipelineResult = await runComplianceTests(config, handleProgress(task, label, renderMode, view));
 
-          task.title = `${label} \u2014 ${runHeaderSummary(pipelineResult)} (${humanizeDuration(pipelineResult.duration)})`;
+          task.title = `${label} \u2013 ${runHeaderSummary(pipelineResult)} (${humanizeDuration(pipelineResult.duration)})`;
           // Reflect the verdict in the PARENT task glyph: a non-passing run throws so listr2 marks it \u2717
           // (a green \u2713 over failed resources was misleading). listr2's own glyph is the single status indicator.
           if (pipelineResult.status !== 'passed') throw new Error('non-passing run');
@@ -517,7 +517,7 @@ export const runConfigEntries = async (
 
         results.push(result);
 
-        task.title = `${label} \u2014 ${runHeaderSummary(result)} (${humanizeDuration(result.duration)})`;
+        task.title = `${label} \u2013 ${runHeaderSummary(result)} (${humanizeDuration(result.duration)})`;
         if (result.status !== 'passed') throw new Error('non-passing run'); // parent glyph \u2192 \u2717 (see runWithProgress)
       },
       rendererOptions: { persistentOutput: true }

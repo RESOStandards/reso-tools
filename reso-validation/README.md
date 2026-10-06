@@ -1,8 +1,8 @@
 # @reso-standards/validation
 
-Isomorphic TypeScript validation library for RESO Data Dictionary records. Validates field types, lengths, and ranges against metadata, plus resource-specific business rules with cross-field constraints. Zero external dependencies.
+Isomorphic TypeScript validation library for RESO Data Dictionary records. Validates field types, lengths and ranges against metadata, plus resource-specific business rules with cross-field constraints. Zero external dependencies.
 
-> **[User Guide](doc/GUIDE.md)** – a task-oriented walkthrough with realistic examples.
+> **[User Guide](doc/GUIDE.md)** – a task-oriented walk-through with realistic examples.
 
 ## Install
 
@@ -49,7 +49,7 @@ Validates a record payload against RESO field metadata. Checks:
 - **Enum fields** – must be string or number
 - **Business rules** – delegates to `validateBusinessRules()` for range/relationship checks
 
-Null, undefined, and empty string values are silently skipped unless the field is required. Fields starting with `@` (OData annotations) are ignored.
+Null, undefined and empty string values are silently skipped unless the field is required. Fields starting with `@` (OData annotations) are ignored.
 
 ### `validateBusinessRules(resourceName, body): ValidationFailure[]`
 
@@ -60,7 +60,7 @@ Validates resource-specific constraints:
 - Price fields (> 0 to $1B): ListPrice, OriginalListPrice, PreviousListPrice, ClosePrice, ListPriceLow
 - Room counts (0 to 100): BedroomsTotal, BathroomsFull, BathroomsHalf, etc.
 - Expense/fee/amount fields ($0 to $10K): matched via `fieldPattern` regex `/(?:Expense|Amount|Fee\d?)$/`
-- Latitude and Longitude are exempt from the non-negative rule (negative coordinates are valid)
+- Latitude and Longitude are exempt from the nonnegative rule (negative coordinates are valid)
 - Cross-field: `BathroomsTotalInteger = sum(BathroomsFull + BathroomsHalf + ...)`
 
 **Member:** Required MemberCity, MemberStateOrProvince, MemberPostalCode, MemberCountry
