@@ -52,7 +52,7 @@
  */
 
 /** The stem every certification variations lock identifier shares. Exported so a
- *  consumer can recognise one without re-deriving the prefix. */
+ *  consumer can recognize one without re-deriving the prefix. */
 export const VARIATIONS_URN_STEM = 'urn:reso:certification:variations';
 
 /**
