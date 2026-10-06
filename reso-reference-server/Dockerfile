@@ -7,11 +7,20 @@
 # The @reso-standards/* dependencies (reso-common, odata-expression-parser,
 # reso-validation) resolve from the npm registry via npm install.
 
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 
 # Install dependencies (resolved from the npm registry)
 COPY reso-reference-server/package.json reso-reference-server/package-lock.json* ./
+# node:22-alpine ships npm 10.9.9, whose dependency resolver crashes on this
+# tree with "Cannot read properties of null (reading 'edgesOut')". Bisected to
+# vitest 4.x: every other dependency installs clean, vitest alone reproduces it,
+# and npm 11 installs the whole manifest. Development runs npm 11 locally, which
+# is why this passed on every machine and failed only in the image.
+#
+# Pinned to the major rather than @latest so a future npm cannot change the build
+# underneath us.
+RUN npm install -g npm@11
 RUN npm install
 
 # Build the server
@@ -22,7 +31,7 @@ RUN npm run build
 RUN cp src/ui-config.json src/field-groups.json dist/
 
 # Runtime stage
-FROM node:22-alpine
+FROM node:24-alpine
 WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
