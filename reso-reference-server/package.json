@@ -1,7 +1,7 @@
 {
   "name": "@reso-standards/reso-reference-server",
-  "version": "0.8.2",
-  "description": "RESO Reference OData Server – metadata-driven CRUD server for RESO Data Dictionary resources",
+  "version": "0.8.3",
+  "description": "RESO Reference OData Server \u2013 metadata-driven CRUD server for RESO Data Dictionary resources",
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",

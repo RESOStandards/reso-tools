@@ -1,12 +1,12 @@
 {
   "name": "@reso-standards/reso-client",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/RESOStandards/reso-tools.git",
     "directory": "reso-client"
   },
-  "description": "RESO Client SDK for TypeScript — OData 4.01 URI builder, CRUD helpers, CSDL metadata validation, and query parsing.",
+  "description": "RESO Client SDK for TypeScript \u2014 OData 4.01 URI builder, CRUD helpers, CSDL metadata validation, and query parsing.",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "main": "./dist/index.js",

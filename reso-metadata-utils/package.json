@@ -1,12 +1,12 @@
 {
   "name": "@reso-standards/reso-metadata-utils",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/RESOStandards/reso-tools.git",
     "directory": "reso-metadata-utils"
   },
-  "description": "RESO OData metadata processing utilities — CSDL parse, validate (CSDL/XSD), serialize (EDMX → report), and metadata fetching. The deps-requiring side of the RESO metadata split; sibling to reso-common's zero-dep model.",
+  "description": "RESO OData metadata processing utilities \u2014 CSDL parse, validate (CSDL/XSD), serialize (EDMX \u2192 report), and metadata fetching. The deps-requiring side of the RESO metadata split; sibling to reso-common's zero-dep model.",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "main": "./dist/index.js",
