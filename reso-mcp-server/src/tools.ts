@@ -175,7 +175,14 @@ export const updateTool: ToolDef = {
       resource: { type: 'string', description: 'Resource name (e.g., Property)' },
       key: { type: 'string', description: 'Key value of the record to update (e.g., the ListingKey)' },
       ...authProperties,
-      record: { type: 'object', description: 'Field/value pairs to PATCH onto the record' }
+      record: { type: 'object', description: 'Field/value pairs to PATCH onto the record' },
+      ifMatch: {
+        type: 'string',
+        description:
+          "The record's @odata.etag as you last read it, so the change is refused rather than applied " +
+          'if someone else edited the record in between. Omit only when overwriting whatever is there is ' +
+          "intended. Use '*' to match any version."
+      }
     },
     required: ['url', 'resource', 'key', 'record']
   }
@@ -198,7 +205,14 @@ export const deleteTool: ToolDef = {
       url: { type: 'string', description: 'OData service root URL' },
       resource: { type: 'string', description: 'Resource name (e.g., Property)' },
       key: { type: 'string', description: 'Key value of the record to delete' },
-      ...authProperties
+      ...authProperties,
+      ifMatch: {
+        type: 'string',
+        description:
+          "The record's @odata.etag as you last read it, so the change is refused rather than applied " +
+          'if someone else edited the record in between. Omit only when overwriting whatever is there is ' +
+          "intended. Use '*' to match any version."
+      }
     },
     required: ['url', 'resource', 'key']
   }

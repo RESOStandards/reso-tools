@@ -2,16 +2,10 @@
  * MCP tool handlers — implement each tool by calling SDK functions.
  */
 
-import {
-  buildResourceUrl,
-  fetchMetadata,
-  getEntityType,
-  odataRequest,
-  parseMetadataXml,
-  runComplianceTests
-} from '@reso-standards/reso-certification';
+import { fetchMetadata, getEntityType, parseMetadataXml, runComplianceTests } from '@reso-standards/reso-certification';
 import type { AuthConfig, ComplianceConfig } from '@reso-standards/reso-certification';
-import { resolveToken } from '@reso-standards/reso-client';
+import { createClient, createEntity, deleteEntity, queryEntities, resolveToken, updateEntity } from '@reso-standards/reso-client';
+import type { ODataClient } from '@reso-standards/reso-client';
 import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import {
   CLIENT_CREDENTIAL_ARG_NAMES,
@@ -389,7 +383,6 @@ export const handleAuthenticate = async (args: Record<string, unknown>): Promise
 // ── Query ──
 
 export const handleQuery = async (args: Record<string, unknown>): Promise<HandlerResult> => {
-  const authToken = await resolveAuthToken(args as AuthArgs);
   const { url, resource, filter, select, orderby, top, skip, count, expand } = args as {
     url: string;
     resource: string;
@@ -402,19 +395,20 @@ export const handleQuery = async (args: Record<string, unknown>): Promise<Handle
     expand?: string;
   };
 
-  const params = new URLSearchParams();
-  if (filter) params.set('$filter', filter);
-  if (select) params.set('$select', select);
-  if (orderby) params.set('$orderby', orderby);
-  if (top != null) params.set('$top', String(top));
-  if (skip != null) params.set('$skip', String(skip));
-  if (count) params.set('$count', 'true');
-  if (expand) params.set('$expand', expand);
+  const client = await clientFor(url, args as AuthArgs);
 
-  const queryString = params.toString();
-  const requestUrl = `${buildResourceUrl(url, resource)}${queryString ? `?${queryString}` : ''}`;
-
-  const response = await odataRequest({ method: 'GET', url: requestUrl, authToken });
+  // The SDK owns the query-option encoding. Hand-assembling these into a query string is the one
+  // place this adapter used to reimplement something the client already does, and it did it less
+  // carefully: the builder escapes what belongs escaped and omits what was not asked for.
+  const response = await queryEntities(client, resource, {
+    ...(filter ? { $filter: filter } : {}),
+    ...(select ? { $select: select } : {}),
+    ...(orderby ? { $orderby: orderby } : {}),
+    ...(top != null ? { $top: top } : {}),
+    ...(skip != null ? { $skip: skip } : {}),
+    ...(count ? { $count: true } : {}),
+    ...(expand ? { $expand: expand } : {})
+  });
 
   if (response.status !== 200) {
     return errorResult(`Server returned HTTP ${response.status}: ${response.rawBody}`);
@@ -429,20 +423,38 @@ export const handleQuery = async (args: Record<string, unknown>): Promise<Handle
 
 // ── Write helpers ──
 
+/**
+ * An SDK client bound to one server, with the credential already resolved.
+ *
+ * `resolveAuthToken` runs first and stays the single enforcement point for the environment
+ * credential's origin binding, so no client exists until that check has passed. Building one any
+ * other way would route around it.
+ *
+ * A client per call, because the credential can differ per call. That is what the certification
+ * runner's own helper did, so this is the same cost at a higher layer.
+ */
+const clientFor = async (url: string, args: AuthArgs): Promise<ODataClient> => {
+  const authToken = await resolveAuthToken(args);
+
+  return createClient({
+    baseUrl: url.replace(/\/$/, ''),
+    auth: { mode: 'token', authToken }
+  });
+};
+
 const writeOk = (status: number): boolean => status >= 200 && status < 300;
 
 // ── Create ──
 
 export const handleCreate = async (args: Record<string, unknown>): Promise<HandlerResult> => {
-  const authToken = await resolveAuthToken(args as AuthArgs);
   const { url, resource, record } = args as {
     url: string;
     resource: string;
     record: Record<string, unknown>;
   };
 
-  const requestUrl = buildResourceUrl(url, resource);
-  const response = await odataRequest({ method: 'POST', url: requestUrl, body: record, authToken });
+  const client = await clientFor(url, args as AuthArgs);
+  const response = await createEntity(client, resource, record);
 
   if (!writeOk(response.status)) {
     return errorResult(`Server returned HTTP ${response.status}: ${response.rawBody}`);
@@ -454,16 +466,20 @@ export const handleCreate = async (args: Record<string, unknown>): Promise<Handl
 // ── Update ──
 
 export const handleUpdate = async (args: Record<string, unknown>): Promise<HandlerResult> => {
-  const authToken = await resolveAuthToken(args as AuthArgs);
-  const { url, resource, key, record } = args as {
+  const { url, resource, key, record, ifMatch } = args as {
     url: string;
     resource: string;
     key: string;
     record: Record<string, unknown>;
+    ifMatch?: string;
   };
 
-  const requestUrl = buildResourceUrl(url, resource, key);
-  const response = await odataRequest({ method: 'PATCH', url: requestUrl, body: record, authToken });
+  const client = await clientFor(url, args as AuthArgs);
+
+  // ifMatch is the reason this goes through the SDK's write helper rather than a raw PATCH. Passing
+  // the ETag from the record as read turns a blind overwrite into a conditional one, so an edit made
+  // by someone else in between is refused instead of silently lost.
+  const response = await updateEntity(client, resource, key, record, isPresent(ifMatch) ? { ifMatch } : undefined);
 
   if (!writeOk(response.status)) {
     return errorResult(`Server returned HTTP ${response.status}: ${response.rawBody}`);
@@ -475,11 +491,15 @@ export const handleUpdate = async (args: Record<string, unknown>): Promise<Handl
 // ── Delete ──
 
 export const handleDelete = async (args: Record<string, unknown>): Promise<HandlerResult> => {
-  const authToken = await resolveAuthToken(args as AuthArgs);
-  const { url, resource, key } = args as { url: string; resource: string; key: string };
+  const { url, resource, key, ifMatch } = args as {
+    url: string;
+    resource: string;
+    key: string;
+    ifMatch?: string;
+  };
 
-  const requestUrl = buildResourceUrl(url, resource, key);
-  const response = await odataRequest({ method: 'DELETE', url: requestUrl, authToken });
+  const client = await clientFor(url, args as AuthArgs);
+  const response = await deleteEntity(client, resource, key, isPresent(ifMatch) ? { ifMatch } : undefined);
 
   if (!writeOk(response.status)) {
     return errorResult(`Server returned HTTP ${response.status}: ${response.rawBody}`);
