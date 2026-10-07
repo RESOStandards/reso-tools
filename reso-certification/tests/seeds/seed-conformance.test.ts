@@ -19,6 +19,18 @@ const require = createRequire(import.meta.url);
 const { generateJsonSchema, validate, combineErrors } = require(resolve(import.meta.dirname, '../../src/legacy/lib/schema/index.js'));
 const { getReferenceMetadata } = require(resolve(import.meta.dirname, '../../src/etl/index.cjs'));
 
+/**
+ * Each of these generates the full DD 2.0 JSON schema and validates every resource in a gunzipped
+ * seed, so they cost real time: measured locally at 1.3s, 1.2s and 0.5s. Vitest's 5s default left
+ * under 4x headroom on the slowest, which is not enough on a loaded runner — the suite puts 96s of
+ * test time through the same CPUs in parallel, and this test timed out in CI on a commit that
+ * touched only markdown.
+ *
+ * 30s is roughly 23x the measured cost. Long enough that contention cannot trip it, short enough
+ * that a genuine hang still fails rather than hanging the job.
+ */
+const SEED_TEST_TIMEOUT_MS = 30_000;
+
 const INTEGER_RULE = 'MUST be integer or null but found decimal';
 const load = (name: string): Record<string, ReadonlyArray<Record<string, unknown>>> =>
   JSON.parse(gunzipSync(readFileSync(resolve(import.meta.dirname, `../fixtures/seeds/${name}.json.gz`))).toString('utf8'));
@@ -49,62 +61,74 @@ const scale0Fields = (): ReadonlySet<string> =>
   );
 
 describe('reference-server seed datasets — known-bad and known-good', () => {
-  it('known-bad reproduces the nine scale-0 integer violations, with these exact counts', async () => {
-    expect(await integerFindings(load('known-bad-scale-0-decimals'))).toEqual({
-      Property: {
-        MobileLength: 28,
-        MobileWidth: 23,
-        NumberOfSeparateGasMeters: 32,
-        NumberOfSeparateWaterMeters: 27,
-        NumberOfSeparateElectricMeters: 34
-      },
-      Media: { ImageHeight: 136, ImageWidth: 151 },
-      PropertyGreenVerification: { GreenVerificationMetric: 29 },
-      PropertyPowerProduction: { PowerProductionAnnual: 22 }
-    });
-  });
-
-  it('known-good has no integer-rule finding on any resource, and no scale-0 Decimal field holds a fractional value', async () => {
-    const seed = load('known-good');
-    expect(await integerFindings(seed)).toEqual({});
-    const scale0 = scale0Fields();
-    const fractional = Object.entries(seed).flatMap(([res, records]) =>
-      records.flatMap(r =>
-        Object.entries(r)
-          .filter(([k, v]) => scale0.has(`${res}.${k}`) && typeof v === 'number' && !Number.isInteger(v))
-          .map(([k]) => `${res}.${k}`)
-      )
-    );
-    expect(fractional).toEqual([]);
-  });
-
-  it('the repair changed only the nine fields: every other value, every key and every record count is identical', () => {
-    const bad = load('known-bad-scale-0-decimals');
-    const good = load('known-good');
-    const repaired = new Set([
-      'Property.MobileLength',
-      'Property.MobileWidth',
-      'Property.NumberOfSeparateGasMeters',
-      'Property.NumberOfSeparateWaterMeters',
-      'Property.NumberOfSeparateElectricMeters',
-      'Media.ImageHeight',
-      'Media.ImageWidth',
-      'PropertyGreenVerification.GreenVerificationMetric',
-      'PropertyPowerProduction.PowerProductionAnnual'
-    ]);
-    expect(Object.keys(good).sort()).toEqual(Object.keys(bad).sort());
-    for (const [res, records] of Object.entries(bad)) {
-      expect(good[res].length).toBe(records.length);
-      records.forEach((rec, i) => {
-        const other = good[res][i];
-        expect(Object.keys(other).sort()).toEqual(Object.keys(rec).sort());
-        for (const [k, v] of Object.entries(rec)) {
-          if (repaired.has(`${res}.${k}`)) {
-            if (typeof v === 'number' && !Number.isInteger(v)) expect(Number.isInteger(other[k])).toBe(true);
-            else expect(other[k]).toEqual(v);
-          } else expect(other[k]).toEqual(v);
-        }
+  it(
+    'known-bad reproduces the nine scale-0 integer violations, with these exact counts',
+    async () => {
+      expect(await integerFindings(load('known-bad-scale-0-decimals'))).toEqual({
+        Property: {
+          MobileLength: 28,
+          MobileWidth: 23,
+          NumberOfSeparateGasMeters: 32,
+          NumberOfSeparateWaterMeters: 27,
+          NumberOfSeparateElectricMeters: 34
+        },
+        Media: { ImageHeight: 136, ImageWidth: 151 },
+        PropertyGreenVerification: { GreenVerificationMetric: 29 },
+        PropertyPowerProduction: { PowerProductionAnnual: 22 }
       });
-    }
-  });
+    },
+    SEED_TEST_TIMEOUT_MS
+  );
+
+  it(
+    'known-good has no integer-rule finding on any resource, and no scale-0 Decimal field holds a fractional value',
+    async () => {
+      const seed = load('known-good');
+      expect(await integerFindings(seed)).toEqual({});
+      const scale0 = scale0Fields();
+      const fractional = Object.entries(seed).flatMap(([res, records]) =>
+        records.flatMap(r =>
+          Object.entries(r)
+            .filter(([k, v]) => scale0.has(`${res}.${k}`) && typeof v === 'number' && !Number.isInteger(v))
+            .map(([k]) => `${res}.${k}`)
+        )
+      );
+      expect(fractional).toEqual([]);
+    },
+    SEED_TEST_TIMEOUT_MS
+  );
+
+  it(
+    'the repair changed only the nine fields: every other value, every key and every record count is identical',
+    () => {
+      const bad = load('known-bad-scale-0-decimals');
+      const good = load('known-good');
+      const repaired = new Set([
+        'Property.MobileLength',
+        'Property.MobileWidth',
+        'Property.NumberOfSeparateGasMeters',
+        'Property.NumberOfSeparateWaterMeters',
+        'Property.NumberOfSeparateElectricMeters',
+        'Media.ImageHeight',
+        'Media.ImageWidth',
+        'PropertyGreenVerification.GreenVerificationMetric',
+        'PropertyPowerProduction.PowerProductionAnnual'
+      ]);
+      expect(Object.keys(good).sort()).toEqual(Object.keys(bad).sort());
+      for (const [res, records] of Object.entries(bad)) {
+        expect(good[res].length).toBe(records.length);
+        records.forEach((rec, i) => {
+          const other = good[res][i];
+          expect(Object.keys(other).sort()).toEqual(Object.keys(rec).sort());
+          for (const [k, v] of Object.entries(rec)) {
+            if (repaired.has(`${res}.${k}`)) {
+              if (typeof v === 'number' && !Number.isInteger(v)) expect(Number.isInteger(other[k])).toBe(true);
+              else expect(other[k]).toEqual(v);
+            } else expect(other[k]).toEqual(v);
+          }
+        });
+      }
+    },
+    SEED_TEST_TIMEOUT_MS
+  );
 });
