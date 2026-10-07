@@ -71,32 +71,61 @@ docker run -i reso-mcp-server
 
 ### authenticate
 
-Obtain a bearer token using OAuth2 Client Credentials. Returns a token for use with all other tools.
+Check that the configured credentials work. Takes no arguments: it reads the server environment, and
+for client credentials it performs the token exchange and then **discards the token**. Nothing is
+returned to the caller and nothing is checked against a data server.
 
 ```
-authenticate({ clientId, clientSecret, tokenUrl, scope? })
-→ { token: "..." }
+authenticate()
+→ { mode, channel, tokenEndpoint }
 ```
+
+It is a diagnostic rather than a prerequisite. Every other tool obtains its own token from the same
+credentials on each call, so there is no need to call this first.
 
 ### query
 
 Query a RESO OData server. Supports `$filter`, `$select`, `$orderby`, `$top`, `$skip`, `$count` and `$expand`.
 
 ```
-query({ url, resource, authToken, filter?, select?, orderby?, top?, skip?, count?, expand? })
+query({ url, resource, filter?, select?, orderby?, top?, skip?, count?, expand? })
 → { value: [...records] }
 ```
 
-All tools accept either `authToken` (bearer token) or `clientId` + `clientSecret` + `tokenUrl` (OAuth2 Client Credentials), or no credential argument at all when the server environment carries one.
+**No tool takes a credential.** The server reads one from its own environment, so nothing sensitive travels inside a tool call. That is the point: an argument passed to a tool becomes part of the agent's conversation history and of any transcript of it, while a credential held by the server never appears in a message.
 
-For a local server, holding the credential in the environment is preferable to passing it per call: an `authToken` sent as an argument travels inside the tool call and lands in the agent's conversation history. Set `RESO_AUTH_TOKEN`, or `RESO_CLIENT_ID` with `RESO_CLIENT_SECRET` and `RESO_TOKEN_URI`, together with `RESO_BASE_URL`, which is required and binds the credential to the one server it may be sent to. See [Authentication](doc/GUIDE.md#65-authentication-bearer-token-vs-client-credentials) in the User Guide for the precedence rules and what a mismatch does.
+Put it in a `.env` beside the server and point Node at the file:
+
+```jsonc
+{
+  "mcpServers": {
+    "reso": {
+      "command": "node",
+      "args": ["--env-file=/absolute/path/to/reso-tools/reso-mcp-server/.env",
+               "/absolute/path/to/reso-tools/reso-mcp-server/dist/index.js"]
+    }
+  }
+}
+```
+
+```bash
+# .env - gitignored, never committed
+RESO_BASE_URL=https://api.example.com
+RESO_AUTH_TOKEN=...
+# or, for OAuth2 client credentials instead of a bearer token:
+# RESO_CLIENT_ID=...
+# RESO_CLIENT_SECRET=...
+# RESO_TOKEN_URI=https://auth.example.com/oauth2/token
+```
+
+`RESO_BASE_URL` is **required** and is not a convenience. It names the one server the credential may be sent to, and a call targeting any other origin is refused. See [Authentication](doc/GUIDE.md#65-authentication) in the User Guide for why, and for what a mismatch reports.
 
 ### metadata
 
 Fetch and parse OData `$metadata`. Returns entity types, fields, key properties and type information.
 
 ```
-metadata({ url, authToken, resource? })
+metadata({ url, resource? })
 → { namespace, entityTypes: [...] }
 ```
 
@@ -123,7 +152,7 @@ parse-filter({ filter })
 Run RESO Certification compliance tests. Supports Add/Edit (RCP-010), EntityEvent (RCP-027) and Web API Core.
 
 ```
-run-compliance({ endorsement, url, authToken, resource?, version?, mode?, resources? })
+run-compliance({ endorsement, url, resource?, version?, mode?, resources? })
 → { status: "passed", steps: [...], duration: 450 }
 ```
 
@@ -132,7 +161,7 @@ run-compliance({ endorsement, url, authToken, resource?, version?, mode?, resour
 Generate a RESO metadata compliance report. Checks entity types, fields and annotations.
 
 ```
-metadata-report({ url, authToken })
+metadata-report({ url })
 → { serverUrl, entityTypes: 14, resources: [...] }
 ```
 
@@ -147,12 +176,25 @@ The `--scope` flag limits which tools are available:
 
 ## Authentication
 
-Tools accept authentication in two ways:
+The server reads its credential from its own environment. Two modes, and a complete set of client
+credentials wins over a bearer token:
 
-1. **Bearer token**: Pass `authToken` directly
-2. **Client Credentials**: Pass `clientId`, `clientSecret`, `tokenUrl` – the tool exchanges them for a token automatically
+| Mode | Variables |
+|---|---|
+| Bearer token | `RESO_AUTH_TOKEN` |
+| OAuth2 client credentials | `RESO_CLIENT_ID`, `RESO_CLIENT_SECRET`, `RESO_TOKEN_URI`, optional `RESO_SCOPE` |
 
-Or use the `authenticate` tool first to get a token, then pass it to subsequent calls.
+`RESO_BASE_URL` is required alongside either, and binds the credential to one server. See
+[Install](#install) for the `--env-file` wiring and [Authentication](doc/GUIDE.md#65-authentication)
+in the User Guide for the full rules.
+
+Two behaviors worth knowing before you debug something:
+
+- **A partial set is refused, never completed.** Supplying a client id and a token URI without a
+  secret fails by name instead of quietly falling back to a bearer token or borrowing the missing
+  field from somewhere else.
+- **An environment credential is never sent to an unbound host.** A call targeting an origin other
+  than `RESO_BASE_URL` is refused, and the refusal names both origins and no value.
 
 ## Development
 
@@ -172,8 +214,16 @@ npm run dev    # Watch mode
 cd ../reso-reference-server && docker compose up -d
 
 # Test the MCP server
+# The reference server's mock IdP accepts any client id and secret.
+cat > .env <<'ENV'
+RESO_BASE_URL=http://localhost:8080
+RESO_CLIENT_ID=test
+RESO_CLIENT_SECRET=test
+RESO_TOKEN_URI=http://localhost:8080/oauth/token
+ENV
+
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"query","arguments":{"url":"http://localhost:8080","resource":"Property","authToken":"admin-token","top":3}}}' | node dist/index.js
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"query","arguments":{"url":"http://localhost:8080","resource":"Property","top":3}}}' | node --env-file=.env dist/index.js
 ```
 
 ## Related

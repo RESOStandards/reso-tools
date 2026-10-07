@@ -43,37 +43,51 @@ Because the MCP server runs inside a container, use `http://host.docker.internal
 
 > **User:** I want to start exploring my RESO server through you. How do I authenticate?
 >
-> **Assistant:** The MCP server supports two auth methods. **Bearer token** is the simplest – if you already have a token from your IdP, just pass it as `authToken` on every call. **Client Credentials** is the full OAuth2 round-trip: you give me a `clientId`, `clientSecret`, and `tokenUrl`, and I fetch a fresh token before each request. Use that one if your server issues short-lived tokens or if you want to exercise the full handshake. Which would you like?
+> **Assistant:** You do not hand me anything, and that is deliberate. I never see your credential. The MCP server reads one from its own environment and attaches it to the requests it makes on your behalf. Nothing sensitive travels inside a tool call, which matters because anything in a tool call becomes part of this conversation and of any transcript of it.
 >
-> **User:** Let us use Client Credentials – it will exercise both code paths.
+> **User:** So where does the credential live?
 >
-> **Assistant:** Great. What credentials should I use?
+> **Assistant:** In a `.env` file beside the server, which you point the container at in your MCP client config:
+>
+> ```jsonc
+> {
+>   "mcpServers": {
+>     "reso": {
+>       "command": "docker",
+>       "args": ["run", "-i", "--rm", "--add-host=host.docker.internal:host-gateway",
+>                "--env-file", "/absolute/path/to/reso-mcp-server/.env",
+>                "reso-mcp-server"]
+>     }
+>   }
+> }
+> ```
+>
+> Running the server directly with Node instead of in a container, the equivalent is `node --env-file=.env dist/index.js`.
 >
 > **User:** It is the reference server, so anything works – its mock OAuth endpoint hands out tokens for any client id and secret. Let us use `test` / `test`.
 >
-> **Assistant:** Perfect. From here on I will use these as your auth context for every call:
+> **Assistant:** Then this is your `.env`. It is gitignored, so it will not be committed:
 >
-> ```jsonc
-> {
->   "url":          "http://host.docker.internal:8080/",
->   "clientId":     "test",
->   "clientSecret": "test",
->   "tokenUrl":     "http://host.docker.internal:8080/oauth/token"
-> }
+> ```bash
+> RESO_BASE_URL=http://host.docker.internal:8080
+> RESO_CLIENT_ID=test
+> RESO_CLIENT_SECRET=test
+> RESO_TOKEN_URI=http://host.docker.internal:8080/oauth/token
 > ```
 >
-> If you ever want to switch to bearer-token auth instead, just hand me a token and I will use this shape:
+> For a bearer token instead, `RESO_AUTH_TOKEN` replaces those three. A complete client-credentials set wins when both are present, and a *partial* set is refused by name rather than quietly falling back to the token.
 >
-> ```jsonc
-> {
->   "url": "http://host.docker.internal:8080/",
->   "authToken": "mock-access-token-abc123"
-> }
-> ```
+> **User:** What is `RESO_BASE_URL` for? I am already passing `url` on each call.
 >
-> > **Tip:** if you ever see `Error: fetch failed`, the `url` or `tokenUrl` is not reachable from inside the MCP container. Double-check the port and that you are using `host.docker.internal` (not `localhost`).
+> **Assistant:** It is required, and it is the part worth understanding. The credential in my environment is ambient – no caller chose it for the call being made – and `url` is an argument I fill in. Without a bound destination, that credential would be sent to whatever host a call happened to name. `RESO_BASE_URL` says which single server it belongs to, and a call targeting any other origin is refused before any request goes out. The refusal names both origins and never a value.
+>
+> **User:** Good. Let us get started.
+>
+> **Assistant:** Restart your MCP client so it picks up the new configuration, and we are ready.
+>
+> > **Tip:** if you ever see `Error: fetch failed`, the `url` or `RESO_TOKEN_URI` is not reachable from inside the MCP container. Double-check the port and that you are using `host.docker.internal` rather than `localhost`.
 
-For the rest of the guide, assume the Client Credentials shape above is implicitly attached to every tool call. The collapsed tool-call blocks omit the auth fields to keep the dialogue scannable.
+Every tool call for the rest of this guide carries **no credentials at all**. That is not an omission for readability – it is what the calls actually look like, because the server holds the credential and the agent never has it.
 
 ---
 
@@ -1493,50 +1507,24 @@ To query a RESO server through the cloud MCP, your AI agent sends:
       "resource": "Property",
       "top": 5,
       "select": "ListingKey,ListPrice,City,StandardStatus",
-      "filter": "ListPrice ge 200000 and StandardStatus eq 'Active'",
-      "authToken": "Bearer your-server-token"
+      "filter": "ListPrice ge 200000 and StandardStatus eq 'Active'"
     }
   }
 }
 ```
 
-The cloud server makes the OData request on your behalf and returns the results. Your agent never needs to know OData syntax, it just calls the tool.
+Note what is **not** in that call: any credential. The server makes the OData request on your behalf using credentials it already holds, so your agent never needs to know OData syntax and never handles a secret.
 
-### 6.5 Authentication: Bearer Token vs. Client Credentials
+### 6.5 Authentication
 
-Some RESO servers support OAuth2 Client Credentials. The cloud MCP server handles both patterns:
+**No tool takes a credential.** Both the local and the hosted server hold one themselves and attach
+it to the requests they make. The reason is not ceremony: an argument passed to a tool travels inside
+the tool call, so it becomes part of the agent's conversation history and of any transcript, log or
+replay of it. A credential the server holds never appears in a message at all.
 
-**Bearer token** – if you already have a token, pass it directly as `authToken` in any tool call:
+How you supply it differs by deployment.
 
-```json
-"arguments": {
-  "url": "https://api.example.com/odata",
-  "resource": "Property",
-  "authToken": "your-bearer-token"
-}
-```
-
-**Client Credentials** – if the server requires OAuth2, use the `authenticate` tool first to obtain a token:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "tools/call",
-  "params": {
-    "name": "authenticate",
-    "arguments": {
-      "clientId": "your-client-id",
-      "clientSecret": "your-client-secret",
-      "tokenUrl": "https://auth.example.com/oauth2/token"
-    }
-  }
-}
-```
-
-The server returns a bearer token. Use that token as `authToken` in subsequent calls. You can also skip the `authenticate` step and pass `clientId`, `clientSecret` and `tokenUrl` directly on any tool call – the cloud server will obtain the token automatically before making the request.
-
-**Server environment** – for the local server, set the credential once in the environment that runs `reso-mcp` and leave it out of every tool call. Prefer this. An `authToken` passed as an argument travels inside the tool call, so it lands in the agent's conversation history and in any transcript of it. A credential held in the server environment never appears in a message.
+#### Running the server yourself
 
 | Variable | Purpose |
 |---|---|
@@ -1557,12 +1545,32 @@ export RESO_CLIENT_SECRET=your-client-secret
 export RESO_TOKEN_URI=https://auth.example.com/oauth2/token
 ```
 
+In practice you put those in a gitignored `.env` beside the server and point at it, rather than
+exporting them into a shell the MCP client does not inherit. `--env-file` for Node,
+`--env-file` for `docker run`, exactly as shown in Section 0.
+
 These are the same names `reso-client` and the `reso-cert` CLI read, so one shell configuration serves all three. The `RESO_` prefix is load-bearing: the unprefixed `CLIENT_ID` and `CLIENT_SECRET` that `reso-cert` also reads are credentials for RESO's own services rather than for a data provider's API, and this server never reads an unprefixed variable.
 
 **Why `RESO_BASE_URL` is required rather than optional.** An environment credential is ambient, because no caller chose it for the call being made, and `url` is a free-form argument the model fills in. Without a bound destination the credential would be sent to whatever host a call happens to name. Bound, it goes only where the operator who set it said it belongs. A call targeting a different origin is refused with a message naming both origins, and an environment credential set without `RESO_BASE_URL` is refused outright rather than defaulted to anything.
 
-**Arguments win as a set.** When a call carries any of `authToken`, `clientId`, `clientSecret` or `tokenUrl`, the environment is not read at all, so no field is ever taken from one channel and combined with the other. Pass arguments to reach a server other than the bound one. No error this server produces contains a credential value; every message names argument names and variable names only.
+**Precedence, stated for completeness.** The tool schemas do still accept credential arguments, and
+when a call carries any of them the environment is not read at all, so no field is ever taken from
+one channel and combined with the other. No documented flow uses that path and none of this guide
+demonstrates it, because a credential in an argument is precisely what the environment design avoids.
+It exists for a multi-tenant host that has no single environment to read.
 
+**A partial set is refused, never completed.** A client id and a token URI without a secret fails by
+name rather than quietly falling back to a bearer token or borrowing the missing field from the other
+channel. And no error this server produces contains a credential value: every message names argument
+names and variable names only.
+
+#### Running on RESO's hosted server
+
+You supply one thing: the API key from §6.1, in the transport header shown in §6.2. That identifies
+you. Credentials for the provider servers you are entitled to reach are provisioned as part of your
+access rather than passed per call, so tool calls against the hosted server carry no credentials
+either. To arrange access, or to ask what is provisioned for your organization, contact
+**dev@reso.org**.
 
 ### 6.6 Cloud vs. Local
 
