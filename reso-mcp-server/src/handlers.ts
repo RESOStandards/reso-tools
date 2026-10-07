@@ -243,6 +243,93 @@ const errorResult = (message: string): HandlerResult => ({
   isError: true
 });
 
+/**
+ * A result with a note attached as its own content block, so the payload the server returned is
+ * handed back byte for byte and the note never becomes a key inside it.
+ */
+const resultWithNote = (data: unknown, note: string): HandlerResult => ({
+  content: [
+    { type: 'text', text: JSON.stringify(data, null, 2) },
+    { type: 'text', text: note }
+  ]
+});
+
+/**
+ * What to tell the model when a filtered query matches nothing.
+ *
+ * "No listings found" is the obvious reply and the least useful one. The criteria are conjoined, so
+ * which of them emptied the set is recoverable by re-counting with each one removed, and that is
+ * usually the answer the user actually wanted: a literal "3 bedrooms" excludes a five-bedroom house.
+ *
+ * It instructs a re-query rather than an estimate. A breakdown inferred from what is already in hand
+ * would be a guess, and a confident one, because an empty result carries no rows to reason from.
+ */
+const NO_MATCH_GUIDANCE =
+  'No records matched this filter. Do not stop at reporting zero. Tell the user no exact matches ' +
+  'were found, then offer them the breakdown: re-run this query once per criterion with that ' +
+  'criterion removed, each with count=true and top=0, and report how many records each relaxation ' +
+  'would return, naming the one that eliminated the matches. Then ask whether they want to widen ' +
+  'or change their criteria. Take every number from an actual query and never estimate one. ' +
+  'Speak in the terms the user used, such as bedrooms, price, acreage and city. Do not mention ' +
+  'field names, filters, parsers or query syntax unless they ask how it works. Assume someone who ' +
+  'knows real estate and data but not necessarily more than that.';
+
+/** True for an OData payload whose `value` is present and empty. */
+const isEmptyResult = (body: unknown): boolean =>
+  typeof body === 'object' &&
+  body !== null &&
+  Array.isArray((body as { value?: unknown }).value) &&
+  (body as { value: ReadonlyArray<unknown> }).value.length === 0;
+
+/** Consecutive misses that re-earn the offer after it has already been made once. */
+const GUIDANCE_STREAK_THRESHOLD = 3;
+
+/**
+ * Decides whether an empty result should carry the guidance.
+ *
+ * Said once it is useful and said every time it is nagging, so two gates govern it. The first empty
+ * filtered query of a session earns the offer. After that it takes a run of
+ * GUIDANCE_STREAK_THRESHOLD consecutive misses, because someone striking out repeatedly is in a
+ * different situation from someone whose one speculative search came back empty.
+ *
+ * Every offer resets the run, so the cadence is miss 1, then miss 4, then miss 7, rather than
+ * firing on each miss once the threshold is passed. Any query that returns rows resets it too: a
+ * run means consecutive, not cumulative.
+ *
+ * Session scope is process scope here, since the stdio transport runs one server process per client
+ * session, so state that lives as long as this module lives exactly as long as the session. Both
+ * mutable values are sealed inside the closure and never leave it, which is the one place the coding
+ * standards allow local mutable state.
+ */
+export const createGuidanceGate = (threshold: number): ((missed: boolean) => boolean) => {
+  let offered = false;
+  let run = 0;
+
+  return (missed: boolean): boolean => {
+    if (!missed) {
+      run = 0;
+      return false;
+    }
+
+    run += 1;
+
+    if (!offered) {
+      offered = true;
+      run = 0;
+      return true;
+    }
+
+    if (run >= threshold) {
+      run = 0;
+      return true;
+    }
+
+    return false;
+  };
+};
+
+const offerNoMatchGuidance = createGuidanceGate(GUIDANCE_STREAK_THRESHOLD);
+
 // ── Authenticate ──
 
 const AUTHENTICATE_EXCHANGED_MESSAGE =
@@ -333,7 +420,11 @@ export const handleQuery = async (args: Record<string, unknown>): Promise<Handle
     return errorResult(`Server returned HTTP ${response.status}: ${response.rawBody}`);
   }
 
-  return textResult(response.body);
+  // Consulted on every successful query, not only the empty ones, because a query that returns rows
+  // is what breaks a run of misses.
+  const missed = Boolean(filter) && isEmptyResult(response.body);
+
+  return offerNoMatchGuidance(missed) ? resultWithNote(response.body, NO_MATCH_GUIDANCE) : textResult(response.body);
 };
 
 // ── Write helpers ──
