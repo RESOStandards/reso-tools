@@ -89,7 +89,9 @@ Because the MCP server runs inside a container, use `http://host.docker.internal
 >
 > > **Tip:** if you ever see `Error: fetch failed`, the `url` or `RESO_TOKEN_URI` is not reachable from inside the MCP container. Double-check the port and that you are using `host.docker.internal` rather than `localhost`.
 
-Every tool call for the rest of this guide carries **no credentials at all**. That is not an omission for readability – it is what the calls actually look like, because the server holds the credential and the agent never has it.
+Every tool call for the rest of this guide carries **no credentials at all**, and that is what the calls really look like: the server holds the credential and the agent never has it.
+
+The blocks do elide one thing for readability. Every data tool requires a `url` naming the server to query, and the blocks leave it out because it is the same value throughout. Add `"url": "http://host.docker.internal:8080"` to any call you copy.
 
 ---
 
@@ -122,8 +124,8 @@ Every tool call for the rest of this guide carries **no credentials at all**. Th
 > | OUID | OrganizationUniqueIdKey | 43 |
 > | Teams | TeamKey | 40 |
 > | Media | MediaKey | 39 |
-> | OpenHouse | OpenHouseKey | 34 |
 > | Showing | ShowingKey | 34 |
+> | OpenHouse | OpenHouseKey | 27 |
 > | PropertyRooms | RoomKey | 18 |
 > | TeamMembers | TeamMemberKey | 18 |
 > | PropertyUnitTypes | UnitTypeKey | 16 |
@@ -1483,7 +1485,7 @@ The cloud server exposes the core RESO tools:
 
 | Tool | Description |
 |------|-------------|
-| `authenticate` | Obtain a bearer token via OAuth2 Client Credentials |
+| `authenticate` | Check that the configured credentials work. The token is exchanged and discarded, never returned |
 | `query` | Query any RESO OData resource with $filter, $select, $orderby, $top, $skip, $expand |
 | `metadata` | Fetch and parse OData CSDL metadata from any RESO server |
 | `create` | Create a new record (POST) |
@@ -1519,10 +1521,15 @@ Note what is **not** in that call: any credential. The server makes the OData re
 
 ### 6.5 Authentication
 
-**No tool takes a credential.** Both the local and the hosted server hold one themselves and attach
-it to the requests they make. The reason is not ceremony: an argument passed to a tool travels inside
-the tool call, so it becomes part of the agent's conversation history and of any transcript, log or
-replay of it. A credential the server holds never appears in a message at all.
+**No tool requires a credential, and nothing in this guide passes one.** Both the local and the hosted
+server hold one themselves and attach it to the requests they make. The reason is not ceremony: an
+argument passed to a tool travels inside the tool call, so it becomes part of the agent's conversation
+history and of any transcript, log or replay of it. A credential the server holds never appears in a
+message at all.
+
+Eight of the ten tools do still accept four optional credential properties, and the precedence is set
+out at the end of this section. They exist for a multi-tenant host with no single environment to read,
+and no flow in this guide uses them.
 
 How you supply it differs by deployment.
 
