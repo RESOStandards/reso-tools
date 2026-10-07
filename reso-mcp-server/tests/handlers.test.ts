@@ -4,7 +4,7 @@ import { handlers } from '../src/handlers.js';
 
 describe('handler registry', () => {
   it('has a handler for every tool', () => {
-    const expected = ['authenticate', 'query', 'metadata', 'validate', 'parse-filter', 'run-compliance', 'metadata-report'];
+    const expected = ['authorize', 'query', 'metadata', 'validate', 'parse-filter', 'run-compliance', 'metadata-report'];
     for (const name of expected) {
       expect(handlers[name]).toBeDefined();
       expect(typeof handlers[name]).toBe('function');
@@ -66,7 +66,7 @@ describe('auth resolution', () => {
         url: 'http://localhost:9999',
         resource: 'Property'
       })
-    ).rejects.toThrow('Authentication required');
+    ).rejects.toThrow('Authorization required');
   });
 
   it('metadata throws without any auth', async () => {
@@ -74,7 +74,7 @@ describe('auth resolution', () => {
       handlers.metadata({
         url: 'http://localhost:9999'
       })
-    ).rejects.toThrow('Authentication required');
+    ).rejects.toThrow('Authorization required');
   });
 
   it('run-compliance throws for unknown endorsement', async () => {

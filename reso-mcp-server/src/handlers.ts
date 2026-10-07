@@ -31,7 +31,7 @@ interface AuthArgs {
    *
    * It is here because the resolver needs it: an environment credential may only be sent to the host
    * {@link ENV_BASE_URL} names, and that check is impossible without knowing where the call is going.
-   * Absent for `authenticate`, which contacts only the token endpoint carried by the credential
+   * Absent for `authorize`, which contacts only the token endpoint carried by the credential
    * itself and no data server.
    */
   readonly url?: string;
@@ -43,7 +43,7 @@ interface AuthArgs {
  */
 export type AuthEnv = Readonly<Record<string, string | undefined>>;
 
-/** Which channel supplied the credentials. The `authenticate` tool reports this. The values never are. */
+/** Which channel supplied the credentials. The `authorize` tool reports this. The values never are. */
 export type AuthSource = 'arguments' | 'environment';
 
 /** A resolved credential set together with the channel it came from. */
@@ -63,7 +63,7 @@ const AUTH_MODE_CLIENT_CREDENTIALS = 'client_credentials' as const;
 const SOURCE_ARGUMENTS = 'arguments' as const;
 const SOURCE_ENVIRONMENT = 'environment' as const;
 
-const AUTH_REQUIRED_MESSAGE = `Authentication required. Set ${ENV_BASE_URL} together with ${ENV_AUTH_TOKEN}, or with ${ENV_CLIENT_CREDENTIAL_NAMES.join(' + ')}, in the environment the MCP server process runs in. ${ENV_BASE_URL} is required alongside the credential: it names the one server the credential may be sent to. Passing ${CREDENTIAL_ARG_NAMES.join(', ')} as tool arguments works too and overrides the environment for that one call, but a tool argument is visible in the conversation, so the environment is the right place for a secret.`;
+const AUTH_REQUIRED_MESSAGE = `Authorization required. Set ${ENV_BASE_URL} together with ${ENV_AUTH_TOKEN}, or with ${ENV_CLIENT_CREDENTIAL_NAMES.join(' + ')}, in the environment the MCP server process runs in. ${ENV_BASE_URL} is required alongside the credential: it names the one server the credential may be sent to. Passing ${CREDENTIAL_ARG_NAMES.join(', ')} as tool arguments works too and overrides the environment for that one call, but a tool argument is visible in the conversation, so the environment is the right place for a secret.`;
 
 /** Present means a non-empty string. This is the truthiness these handlers have always applied. */
 const isPresent = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
@@ -178,7 +178,7 @@ const sameOrigin = (a: string, b: string): boolean => {
 /**
  * Enforce the binding on an environment credential.
  *
- * `targetUrl` absent means no data server is being contacted. Only `authenticate` is in that
+ * `targetUrl` absent means no data server is being contacted. Only `authorize` is in that
  * position: it exchanges credentials at the token endpoint carried by the credential itself, and
  * returns no token, so there is no destination to constrain and nothing to disclose. Every tool that
  * reaches a data server passes its `url` through, so this is not a hole a new tool falls into
@@ -324,14 +324,14 @@ export const createGuidanceGate = (threshold: number): ((missed: boolean) => boo
 
 const offerNoMatchGuidance = createGuidanceGate(GUIDANCE_STREAK_THRESHOLD);
 
-// ── Authenticate ──
+// ── Authorize ──
 
-const AUTHENTICATE_EXCHANGED_MESSAGE =
+const AUTHORIZE_EXCHANGED_MESSAGE =
   'The token endpoint issued a token for these credentials. The token was discarded and is not returned. ' +
   'Nothing was checked against a data server. Every other tool obtains its own token from the same credentials on each call, ' +
-  'so no authenticate step is needed before them.';
+  'so no authorize step is needed before them.';
 
-const AUTHENTICATE_TOKEN_MODE_MESSAGE =
+const AUTHORIZE_TOKEN_MODE_MESSAGE =
   'A bearer token is configured, so there was no token exchange to make and nothing was checked. ' +
   'The other tools send the token as it is. Call metadata or query to find out whether a server accepts it.';
 
@@ -351,19 +351,19 @@ const tokenEndpointLabel = (tokenUrl: string): string | undefined => {
 };
 
 /**
- * Check that the server can authenticate, without returning a token.
+ * Check that the server can authorize, without returning a token.
  *
  * Credentials resolve exactly as they do for every other tool, so this reports the configuration the
  * other tools will actually use. Called with no arguments it checks the server environment, which is
  * the point of the tool: a user confirms the setup works without putting a credential in the
  * conversation. The result reports the mode, the channel and the endpoint, and no credential.
  */
-export const handleAuthenticate = async (args: Record<string, unknown>): Promise<HandlerResult> => {
+export const handleAuthorize = async (args: Record<string, unknown>): Promise<HandlerResult> => {
   const { scope } = args as { scope?: string };
   const { auth, source } = resolveAuth(args as AuthArgs, process.env);
 
   if (auth.mode === AUTH_MODE_TOKEN) {
-    return textResult({ mode: auth.mode, source, message: AUTHENTICATE_TOKEN_MODE_MESSAGE });
+    return textResult({ mode: auth.mode, source, message: AUTHORIZE_TOKEN_MODE_MESSAGE });
   }
 
   // An explicit scope argument overrides RESO_SCOPE. Scope is not a credential and cannot change
@@ -376,7 +376,7 @@ export const handleAuthenticate = async (args: Record<string, unknown>): Promise
     mode: auth.mode,
     source,
     ...(endpoint ? { tokenEndpoint: endpoint } : {}),
-    message: AUTHENTICATE_EXCHANGED_MESSAGE
+    message: AUTHORIZE_EXCHANGED_MESSAGE
   });
 };
 
@@ -628,7 +628,7 @@ export const handleMetadataReport = async (args: Record<string, unknown>): Promi
 // ── Handler Map ──
 
 export const handlers: Readonly<Record<string, (args: Record<string, unknown>) => Promise<HandlerResult>>> = {
-  authenticate: handleAuthenticate,
+  authorize: handleAuthorize,
   query: handleQuery,
   metadata: handleMetadata,
   create: handleCreate,
