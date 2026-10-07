@@ -190,7 +190,7 @@ describe('resolveAuth: the environment channel', () => {
   });
 
   // Remove the RESO_SCOPE read and a provider that requires a scope cannot be reached from the
-  // environment at all, because scope is an argument on authenticate only and on no other tool.
+  // environment at all, because scope is an argument on authorize only and on no other tool.
   it('applies RESO_SCOPE to environment client credentials, and omits scope when it is unset', () => {
     const withScope = resolveAuth({}, { ...ENV_TRIPLE, [ENV_SCOPE]: 'api' });
     expect(withScope.auth).toMatchObject({ scope: 'api' });
@@ -228,7 +228,7 @@ describe('resolveAuth: refusal when nothing is configured', () => {
       expect.unreachable('an unconfigured call must be refused');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      expect(message).toContain('Authentication required');
+      expect(message).toContain('Authorization required');
       for (const name of [ENV_AUTH_TOKEN, ...ENV_CLIENT_CREDENTIAL_NAMES]) expect(message).toContain(name);
       for (const name of CREDENTIAL_ARG_NAMES) expect(message).toContain(name);
     }
@@ -238,13 +238,13 @@ describe('resolveAuth: refusal when nothing is configured', () => {
   // credential for RESO's own services rather than a provider API, would authenticate a provider call.
   it('never reads an unprefixed or unrelated variable', () => {
     const lookalikes = { CLIENT_ID: 'x', CLIENT_SECRET: 'y', TOKEN_URI: 'z', AUTH_TOKEN: 'w', ADMIN_TOKEN: 'v', RESO_TOKEN_URL: 'u' };
-    expect(() => resolveAuth({}, lookalikes)).toThrow(/Authentication required/);
+    expect(() => resolveAuth({}, lookalikes)).toThrow(/Authorization required/);
   });
 
   // Remove the non-empty check and an empty string reads as a configured credential, so a blank
   // placeholder in a .env file authenticates with nothing.
   it('treats an empty string as absent in both channels', () => {
-    expect(() => resolveAuth({}, { [ENV_AUTH_TOKEN]: '' })).toThrow(/Authentication required/);
+    expect(() => resolveAuth({}, { [ENV_AUTH_TOKEN]: '' })).toThrow(/Authorization required/);
     expect(resolveAuth({ authToken: '' }, ENV_TOKEN_SET).source).toBe('environment');
   });
 
@@ -252,7 +252,7 @@ describe('resolveAuth: refusal when nothing is configured', () => {
   // because every assertion would then depend on the process the test happens to run in.
   it('reads only the environment it is given, never the process environment', () => {
     vi.stubEnv(ENV_AUTH_TOKEN, 'process-token');
-    expect(() => resolveAuth({}, {})).toThrow(/Authentication required/);
+    expect(() => resolveAuth({}, {})).toThrow(/Authorization required/);
   });
 });
 
@@ -341,18 +341,18 @@ describe('handlers consult the process environment: the second reader', () => {
   });
 
   it('refuses run-compliance when neither channel is configured', async () => {
-    await expect(handlers['run-compliance']({ endorsement: 'core', url: DATA_SERVER })).rejects.toThrow(/Authentication required/);
+    await expect(handlers['run-compliance']({ endorsement: 'core', url: DATA_SERVER })).rejects.toThrow(/Authorization required/);
   });
 });
 
-describe('authenticate does not return a token', () => {
+describe('authorize does not return a token', () => {
   // The defect itself. Remove the discard and the minted bearer token is written into conversation
   // history, where it is readable by anything that can read the transcript.
   it('reports mode, channel and endpoint, and never the minted token or the client secret', async () => {
     setAuthEnv(ENV_TRIPLE);
     recordRequests();
 
-    const result = await handlers.authenticate({});
+    const result = await handlers.authorize({});
     const text = resultText(result);
 
     expect(result.isError).toBeFalsy();
@@ -372,7 +372,7 @@ describe('authenticate does not return a token', () => {
     setAuthEnv(ENV_TRIPLE);
     const calls = recordRequests();
 
-    const reported = JSON.parse(resultText(await handlers.authenticate(ARG_TRIPLE)));
+    const reported = JSON.parse(resultText(await handlers.authorize(ARG_TRIPLE)));
 
     expect(reported.source).toBe('arguments');
     expect(calls).toHaveLength(1);
@@ -386,7 +386,7 @@ describe('authenticate does not return a token', () => {
     setAuthEnv(ENV_TRIPLE);
     const calls = recordRequests();
 
-    const result = await handlers.authenticate({});
+    const result = await handlers.authorize({});
 
     expect(result.isError).toBeFalsy();
     expect(calls).toHaveLength(1);
@@ -399,7 +399,7 @@ describe('authenticate does not return a token', () => {
     setAuthEnv(ENV_TOKEN_SET);
     const calls = recordRequests();
 
-    const text = resultText(await handlers.authenticate({}));
+    const text = resultText(await handlers.authorize({}));
     const reported = JSON.parse(text);
 
     expect(calls).toHaveLength(0);
@@ -410,7 +410,7 @@ describe('authenticate does not return a token', () => {
   });
 
   it('refuses when neither channel is configured', async () => {
-    await expect(handlers.authenticate({})).rejects.toThrow(/Authentication required/);
+    await expect(handlers.authorize({})).rejects.toThrow(/Authorization required/);
   });
 
   // Remove the scope overlay and a provider that requires a scope cannot be checked at all from
@@ -419,8 +419,8 @@ describe('authenticate does not return a token', () => {
     setAuthEnv({ ...ENV_TRIPLE, [ENV_SCOPE]: 'env-scope' });
     const calls = recordRequests();
 
-    await handlers.authenticate({ scope: 'arg-scope' });
-    await handlers.authenticate({});
+    await handlers.authorize({ scope: 'arg-scope' });
+    await handlers.authorize({});
 
     expect(new URLSearchParams(calls[0].body).get('scope')).toBe('arg-scope');
     expect(new URLSearchParams(calls[1].body).get('scope')).toBe('env-scope');
@@ -432,7 +432,7 @@ describe('authenticate does not return a token', () => {
     setAuthEnv({ ...ENV_TRIPLE, [ENV_TOKEN_URI]: `${ENV_TOKEN_ENDPOINT}?client_secret=${ENV_SECRET}` });
     recordRequests();
 
-    const text = resultText(await handlers.authenticate({}));
+    const text = resultText(await handlers.authorize({}));
 
     expect(JSON.parse(text).tokenEndpoint).toBe(ENV_TOKEN_ENDPOINT);
     expect(text).not.toContain(ENV_SECRET);
@@ -445,7 +445,7 @@ describe('authenticate does not return a token', () => {
     recordRequests(401);
 
     try {
-      await handlers.authenticate({});
+      await handlers.authorize({});
       expect.unreachable('a 401 from the token endpoint must reject');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -550,9 +550,9 @@ describe('the environment credential is bound to one server', () => {
     expect(resolved.boundTo).toBeUndefined();
   });
 
-  // authenticate contacts only the token endpoint carried by the credential itself and returns no
+  // authorize contacts only the token endpoint carried by the credential itself and returns no
   // token, so it has no data server to constrain.
-  it('allows a call with no target url, which is authenticate', () => {
+  it('allows a call with no target url, which is authorize', () => {
     expect(resolveAuth({}, ENV_TRIPLE).source).toBe('environment');
   });
 });

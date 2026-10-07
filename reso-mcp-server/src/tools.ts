@@ -77,9 +77,9 @@ const authProperties = {
   }
 };
 
-export const authenticateTool: ToolDef = {
-  name: 'authenticate',
-  description: `Check that the server can authenticate. With client credentials it requests a token from the token endpoint and discards it. The token is never returned, and no authenticate step is needed before the other tools, because each of them obtains its own token from the same credentials on every call. Called with no arguments it checks ${ENV_CHANNEL} from the MCP server process environment, which is how a user confirms the setup works without putting a credential in the conversation.`,
+export const authorizeTool: ToolDef = {
+  name: 'authorize',
+  description: `Check that the server can authorize. With client credentials it requests a token from the token endpoint and discards it. The token is never returned, and no authorize step is needed before the other tools, because each of them obtains its own token from the same credentials on every call. Called with no arguments it checks ${ENV_CHANNEL} from the MCP server process environment, which is how a user confirms the setup works without putting a credential in the conversation.`,
   scope: 'all',
   inputSchema: {
     type: 'object',
@@ -299,7 +299,7 @@ export const metadataReportTool: ToolDef = {
 // ── All Tools ──
 
 export const allTools: ReadonlyArray<ToolDef> = [
-  authenticateTool,
+  authorizeTool,
   queryTool,
   metadataTool,
   createTool,

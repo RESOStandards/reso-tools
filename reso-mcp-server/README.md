@@ -80,15 +80,15 @@ call refuses with the authentication message above.
 
 ## Tools
 
-### authenticate
+### authorize
 
 Check that the configured credentials work. Takes no arguments: it reads the server environment, and
 for client credentials it performs the token exchange and then **discards the token**. Nothing is
 returned to the caller and nothing is checked against a data server.
 
 ```
-authenticate()
-→ { mode, source, tokenEndpoint?, message }
+authorize()
+→ { mode, channel, tokenEndpoint }
 ```
 
 It is a diagnostic rather than a prerequisite. Every other tool obtains its own token from the same

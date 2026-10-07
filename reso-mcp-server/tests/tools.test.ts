@@ -54,8 +54,8 @@ describe('tool definitions', () => {
   // Remove the empty required list and the schema forces an assistant to obtain a client secret
   // before it can call the tool, and the only place it can obtain one is the user, in the
   // conversation. That is the defect this change exists to close.
-  it('authenticate requires nothing, so the environment can be checked with no arguments', () => {
-    const auth = allTools.find(t => t.name === 'authenticate');
+  it('authorize requires nothing, so the environment can be checked with no arguments', () => {
+    const auth = allTools.find(t => t.name === 'authorize');
     expect(auth).toBeDefined();
     expect(auth!.inputSchema.required).toEqual([]);
     const props = auth!.inputSchema.properties as Record<string, unknown>;
@@ -116,8 +116,8 @@ describe('tool definitions', () => {
   // resolveToken builds a fresh provider on every call, so no token survives one tool call. The old
   // description promised caching and promised to return a token; remove this and either claim can
   // come back and teach a reader to expect a token in the result.
-  it('the authenticate description promises neither a returned token nor caching', () => {
-    const auth = allTools.find(t => t.name === 'authenticate');
+  it('the authorize description promises neither a returned token nor caching', () => {
+    const auth = allTools.find(t => t.name === 'authorize');
     expect(auth!.description).not.toMatch(/cached/i);
     expect(auth!.description).not.toMatch(/returns a token/i);
     expect(auth!.description).toContain('never returned');
