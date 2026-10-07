@@ -4,7 +4,7 @@ MCP server that exposes RESO tools for AI agents. Query OData servers, parse met
 
 Works with any MCP client: Claude, Cursor, Windsurf, VS Code or your own application.
 
-> **New here?** The [User Guide](doc/GUIDE.md) is a dialogue-format walk-through – every example is a real question to an AI assistant, the actual MCP tool call and the live response from a seeded reference server. It covers auth, metadata exploration, querying, searching and the full Add/Edit + EntityEvent loop including error handling.
+> **New here?** The [User Guide](doc/GUIDE.md) is a dialogue-format walk-through – every example is a real question to an AI assistant, a real MCP tool call and the live response from a seeded reference server. The tool-call blocks elide the `url` argument, which every data tool requires, to keep the dialogue readable. It covers auth, metadata exploration, querying, searching and the full Add/Edit + EntityEvent loop including error handling.
 
 ## Install
 
@@ -12,10 +12,14 @@ This package is **deliberately not published to npm**. It is a reference adapter
 
 ```bash
 git clone https://github.com/RESOStandards/reso-tools.git
-cd reso-tools/reso-mcp-server
-npm install      # preinstall hook builds sibling deps automatically
-npm run build
+cd reso-tools
+npm install      # the whole workspace
+npm run build    # every package in dependency order
 ```
+
+Build from the repo root rather than from this directory. Each package resolves its siblings through
+the `dist` their `package.json` points at, and a workspace symlink alone does not create that `dist`,
+so a sibling has to be built before anything that imports it.
 
 The built binary lives at `reso-tools/reso-mcp-server/dist/index.js`. Note its absolute path – you will point your MCP client at it below.
 
@@ -63,9 +67,16 @@ The server uses stdio transport, so the configuration is the same `command` + `a
 ### Docker
 
 ```bash
-docker build -t reso-mcp-server .
-docker run -i reso-mcp-server
+# From the repo root. The Dockerfile copies the root lockfile and every sibling it needs,
+# so the build context has to be the repo rather than this directory.
+docker build -t reso-mcp-server -f reso-mcp-server/Dockerfile .
+
+docker run -i --rm --env-file ./reso-mcp-server/.env \
+  --add-host=host.docker.internal:host-gateway reso-mcp-server
 ```
+
+The `--env-file` is not optional. The image sets no credential defaults, so without it every data
+call refuses with the authentication message above.
 
 ## Tools
 
@@ -77,7 +88,7 @@ returned to the caller and nothing is checked against a data server.
 
 ```
 authenticate()
-→ { mode, channel, tokenEndpoint }
+→ { mode, source, tokenEndpoint?, message }
 ```
 
 It is a diagnostic rather than a prerequisite. Every other tool obtains its own token from the same
@@ -92,7 +103,15 @@ query({ url, resource, filter?, select?, orderby?, top?, skip?, count?, expand? 
 → { value: [...records] }
 ```
 
-**No tool takes a credential.** The server reads one from its own environment, so nothing sensitive travels inside a tool call. That is the point: an argument passed to a tool becomes part of the agent's conversation history and of any transcript of it, while a credential held by the server never appears in a message.
+**No tool requires a credential, and nothing in this documentation passes one.** The server reads one
+from its own environment instead, so nothing sensitive travels inside a tool call. That matters because
+an argument passed to a tool becomes part of the agent's conversation history and of every transcript
+of it, while a credential the server holds never appears in a message.
+
+Eight of the ten tools do still *accept* four optional credential properties, for a multi-tenant host
+that has no single environment to read. Each one is documented in the schema as optional, with the
+reason to omit it, and the schema tells a model not to ask anyone to paste a secret into the
+conversation. No flow here uses them.
 
 Put it in a `.env` beside the server and point Node at the file:
 
@@ -131,11 +150,13 @@ metadata({ url, resource? })
 
 ### validate
 
-Validate a record against RESO Data Dictionary field rules.
+**Currently a stub.** It counts the fields it was given and returns a message saying so. It does not
+compare anything against the Data Dictionary, and it never returns failures, so an empty result does
+not mean a record is valid. Wiring it to `@reso-standards/reso-validation` is a follow-up.
 
 ```
-validate({ record, resource, version? })
-→ { failures: [...] }
+validate({ record, resource })
+→ { resource, fieldsProvided, message }
 ```
 
 ### parse-filter
@@ -161,8 +182,8 @@ run-compliance({ endorsement, url, resource?, version?, mode?, resources? })
 Generate a RESO metadata compliance report. Checks entity types, fields and annotations.
 
 ```
-metadata-report({ url })
-→ { serverUrl, entityTypes: 14, resources: [...] }
+metadata-report({ url, version? })
+→ { description, version, generatedOn, resources, fields, lookups, actions, functions }
 ```
 
 ## Scope

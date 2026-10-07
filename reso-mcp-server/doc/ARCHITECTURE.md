@@ -9,24 +9,34 @@ The [User Guide](GUIDE.md) covers using the server. This covers how it is built.
 
 ## The Measurement
 
-| | Source lines |
+Counted as every `.ts`, `.js`, `.cjs` and `.mjs` file under each package's `src/`, excluding test
+files. The basis matters: counting TypeScript alone gives a different total, because
+`reso-certification` carries a substantial JavaScript `src/legacy` and `src/etl`.
+
+| Package | Source lines |
 |---|---|
-| `reso-common` | 1,150 |
-| `reso-metadata-utils` | 1,979 |
-| `odata-expression-parser` | 1,356 |
 | `reso-validation` | 435 |
+| `reso-common` | 1,150 |
+| `odata-expression-parser` | 1,356 |
+| `reso-metadata-utils` | 1,979 |
 | `reso-client` | 3,032 |
-| `reso-certification` | 31,197 |
-| **shared SDK total** | **39,149** |
-| `reso-reference-server` | 5,992 – 15% of the SDK beneath it |
-| `reso-mcp-server` | **1,002 – 2%** |
+| `reso-certification` | 33,266 |
+| **shared SDK total** | **41,218** |
+| `reso-mcp-server` | **1,002** |
 
-A full OData 4.01 server with three database backends is 15% of the work. An MCP adapter is 2%.
-Between 85 and 98 percent of the engineering is in the shared SDK, and the servers are the thin part.
+**This adapter is 1,002 lines over the 41,218 it draws on, about 2.4%.** Its dependency closure
+really is all six packages: `reso-certification` pulls `reso-client`, `reso-common`,
+`reso-metadata-utils` and `reso-validation`, and `reso-client` pulls `odata-expression-parser`.
 
-That is the point worth taking away: **a good server over this standard needs a good SDK and little
-else.** There is no proprietary layer here, and there is nothing clever being withheld. The whole of
-it is on this page.
+A measurement only means something against the SDK a thing actually uses, which is worth saying
+because the obvious comparison does not hold. `reso-reference-server` is 5,992 lines, but it declares
+and imports only three packages, totalling 2,941 lines, so it is **two lines of server for every line
+of SDK** rather than a thin layer over all of it. Counting it against the full 41,218 would credit it
+with `reso-certification`'s 33,266 lines, which it never touches.
+
+So the claim this document supports is the narrow one: **a protocol adapter over a good SDK is almost
+all SDK.** A full OData server is not, and nothing here shows otherwise. There is still no proprietary
+layer and nothing clever withheld, and the whole of this one is on this page.
 
 ## The Boundary
 
@@ -43,7 +53,7 @@ Four files, and each one has exactly one job.
 protocol layer does not know what a listing is. That separation is why the same shape works for any
 domain with a decent SDK.
 
-The entire borrowed surface is **ten symbols for ten tools**:
+The borrowed surface is **eleven symbols for ten tools**, ten of them imported statically:
 
 ```ts
 import {
@@ -55,7 +65,8 @@ import { resolveToken } from '@reso-standards/reso-client';
 import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 ```
 
-Roughly one SDK function per tool. Nothing else is imported, and nothing is reimplemented.
+Plus `parseFilter`, loaded dynamically inside `handleParseFilter`. Roughly one SDK function per tool,
+and nothing is reimplemented.
 
 ## One Tool, End to End
 
@@ -73,8 +84,11 @@ export const queryTool: ToolDef = {
 };
 ```
 
-Worth noting what the schema does **not** contain: any credential property that a caller is expected
-to fill. The server reads its credential from its environment.
+The snippet elides four optional credential properties that the real schema spreads in, which eight
+of the ten tools carry. Each is documented there as optional, with the reason to omit it, and no flow
+in this documentation fills one. They exist for a multi-tenant host with no single environment to
+read. What matters for reading the handler below is that **nothing requires** a caller to supply a
+credential.
 
 **The handler**, `handlers.ts`. Resolve a credential, marshal arguments into OData query options,
 hand the request to the SDK, return the body.
@@ -87,7 +101,7 @@ export const handleQuery = async (args) => {
   const params = new URLSearchParams();
   if (filter) params.set('$filter', filter);             // the whole "translation" layer
   if (select) params.set('$select', select);
-  // ... six more of the same
+  // ... five more of the same
 
   const requestUrl = `${buildResourceUrl(url, resource)}?${params}`;   // SDK
   const response = await odataRequest({ method: 'GET', url: requestUrl, authToken });  // SDK
@@ -98,17 +112,18 @@ export const handleQuery = async (args) => {
 };
 ```
 
-That is the entire tool. Around twenty-five lines, and the only domain logic is deciding that
-`filter` becomes `$filter`.
+That is the entire tool. Thirty-four lines, a quarter of them just the argument type, and the only
+domain logic is deciding that `filter` becomes `$filter`.
 
 **What the SDK did that you do not see here:** built a conformant resource URL, resolved a bearer
-token from whichever credential mode is configured and cached it until expiry, issued the request
+token from whichever credential mode is configured, issued the request
 with correct OData headers, parsed the response, and surfaced a typed error for a non-2xx. Every one
 of those is somewhere a hand-rolled client gets OData subtly wrong.
 
-The proportions hold across the file. `handlers.ts` is 530 lines, the first handler starts at line
-280, and the ten handlers share the remaining 250. **More than half the file is credential
-resolution**, which is the one part that is genuinely this package's own work.
+The proportions hold across the file. `handlers.ts` is 530 lines and the first handler starts at line
+280, so **the ten handlers share only the last 250 lines and everything above them is setup** -
+imports, result helpers, and credential resolution, which is the bulk of it and the one part that is
+genuinely this package's own work.
 
 ## The Part Worth Copying
 
