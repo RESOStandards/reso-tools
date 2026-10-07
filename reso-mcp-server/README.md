@@ -4,7 +4,7 @@ MCP server that exposes RESO tools for AI agents. Query OData servers, parse met
 
 Works with any MCP client: Claude, Cursor, Windsurf, VS Code or your own application.
 
-> **New here?** The [User Guide](doc/GUIDE.md) is a dialogue-format walk-through – every example is a real question to an AI assistant, a real MCP tool call and the live response from a seeded reference server. The tool-call blocks elide the `url` argument, which every data tool requires, to keep the dialogue readable. It covers auth, metadata exploration, querying, searching and the full Add/Edit + EntityEvent loop including error handling.
+> **New here?** The [User Guide](doc/GUIDE.md) walks through using the server from an AI assistant: setting up credentials, searching listings and the data attached to them, adding and editing records, and keeping another system in sync. Every number in it came from a real query against a seeded reference server, and each exchange carries the tool call and response in a collapsible block. The tool-call blocks elide the `url` argument, which every data tool requires, to keep the dialogue readable.
 
 ## Install
 
@@ -137,7 +137,7 @@ RESO_AUTH_TOKEN=...
 # RESO_TOKEN_URI=https://auth.example.com/oauth2/token
 ```
 
-`RESO_BASE_URL` is **required** and is not a convenience. It names the one server the credential may be sent to, and a call targeting any other origin is refused. See [Authentication](doc/GUIDE.md#65-authentication) in the User Guide for why, and for what a mismatch reports.
+`RESO_BASE_URL` is **required** and is not a convenience. It names the one server the credential may be sent to, and a call targeting any other origin is refused. See [Architecture](doc/ARCHITECTURE.md) for why, and for what a mismatch reports.
 
 ### metadata
 
@@ -206,7 +206,7 @@ credentials wins over a bearer token:
 | OAuth2 client credentials | `RESO_CLIENT_ID`, `RESO_CLIENT_SECRET`, `RESO_TOKEN_URI`, optional `RESO_SCOPE` |
 
 `RESO_BASE_URL` is required alongside either, and binds the credential to one server. See
-[Install](#install) for the `--env-file` wiring and [Authentication](doc/GUIDE.md#65-authentication)
+[Install](#install) for the `--env-file` wiring and [Architecture](doc/ARCHITECTURE.md)
 in the User Guide for the full rules.
 
 Two behaviors worth knowing before you debug something:
