@@ -8,7 +8,7 @@ Works with any MCP client: Claude, Cursor, Windsurf, VS Code or your own applica
 
 ## Install
 
-This package is not on npm yet. Build from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+This package is **deliberately not published to npm**. It is a reference adapter meant to be read and cloned rather than installed as a dependency. See [Architecture](doc/ARCHITECTURE.md) for what it demonstrates. Build it from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo:
 
 ```bash
 git clone https://github.com/RESOStandards/reso-tools.git
@@ -229,6 +229,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 ## Related
 
 - [User Guide](doc/GUIDE.md) – dialogue-format walk-through with live examples
+- [Architecture](doc/ARCHITECTURE.md) – how this server works, where the SDK boundary is, and why it is only 1,002 lines. Read this before building your own.
 - [`reso-certification/`](../reso-certification/) – CLI and SDK for compliance testing
 - [`reso-client/`](../reso-client/) – OData client SDK
 - [RESO Tools MCP Server ticket](https://github.com/RESOStandards/reso-tools/issues/91)
