@@ -2,6 +2,56 @@
 
 ---
 
+## reso-common 0.4.1 · reso-certification 0.10.8 – 2026-10-06
+
+**The `reso-cert` CLI has not been runnable from npm since 0.10.2.** Five consecutive releases
+shipped it non-executable. This release fixes that, and it is the reason to upgrade.
+
+Publish `reso-common` first. `reso-certification` calls `parseReplicationProgress` and
+`summarizeReplicationProgress` at runtime, and those arrive in 0.4.1. Installing 0.10.8 against
+`reso-common` 0.4.0 resolves a package whose progress renderer calls two functions that are not
+there.
+
+### The executable bit
+
+`tsc` emits files in `dist/` as 0644. `prepublishOnly` runs the build, `npm pack` preserves whatever
+mode is on disk, and nothing downstream restores it, because npm does not chmod bin targets on
+install. So every tarball from 0.10.2 onward carried `package/dist/cli/index.js` as `-rw-r--r--`, and
+`reso-cert` answered `Permission denied`.
+
+It misdirected as well as failed. `npx` treats a non-executable local bin as unusable and falls
+through to the registry copy, which had the same defect, so the error named a path inside the npx
+cache and pointed away from both the cause and the local build the user meant to run.
+
+The build now sets the bit, and a test in each package asserts it by reading the path out of the
+`bin` field, so renaming an entry point cannot leave the test passing against a file nobody ships.
+
+### Plain http on loopback
+
+`ensureHttps` normalizes `TOKEN_URI` and `RESO_SERVICES_URL`, upgrading a plain `http` address to
+`https` because a credential travels on both. It was doing that on loopback too, which is wrong: the
+only way to satisfy it is to generate and trust a local certificate to run a service on your own
+machine, and the rewrite was silent, so the failure arrived later as a connection error naming
+neither the rewrite nor the variable.
+
+`localhost`, the whole 127.0.0.0/8 block and `[::1]` now keep plain http. They are matched by exact
+equality on the parsed hostname, so a lookalike such as a host ending in `localhost` is still
+upgraded. `host.docker.internal` is deliberately not exempt, because it resolves off the container
+and Docker can reach a loopback address directly. Everything else still upgrades, and an empty
+value, an unparseable address and a non-http scheme are all still refused.
+
+**Worth knowing if you rely on the old behavior:** an http address that is *not* loopback is still
+rewritten to https silently rather than refused. That is deliberate, since no operator means to send
+a credential unencrypted, but it does mean a non-loopback http endpoint will fail to connect rather
+than report a scheme problem.
+
+### Packaging
+
+Two tarballs carried files nobody needs. `reso-certification` shipped seven test fixtures inside
+`dist/etl/test`, swept in because the build copies `src/etl` wholesale. `reso-mcp-server` declared no
+`files` field, the only package that did not, so its tarball carried its own source, its four test
+files and its `tsconfig.json`.
+
 ## reso-common 0.4.0 – shared lock identifiers for certification variations – 2026-09-29
 
 Additive. Two builders and a stem constant, no behaviour change to anything existing.
