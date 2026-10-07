@@ -81,13 +81,43 @@ export const mintProviderToken = async (): Promise<string | undefined> => {
  *
  * So a missing scheme becomes `https`, and an explicit `http` is UPGRADED rather than refused.
  * Upgrading is the right call: refusing would fail a run over something nobody can have intended,
- * since no operator means to send credentials unencrypted. There is no loopback exemption, because
- * these addresses name RESO services and never a local one -- a local reference server is a
- * PROVIDER address, which travels on `--url` and is validated separately.
+ * since no operator means to send credentials unencrypted.
+ *
+ * Loopback is exempt, and an earlier revision of this comment argued it should not be. That
+ * argument held that these variables name RESO services and so never name a local address, a local
+ * reference server being a PROVIDER address that travels on `--url`. The gap is that a RESO service
+ * can itself be run locally -- a Variations Service on a workstation, or a stand-in token endpoint
+ * for development -- and on loopback the upgrade is both pointless and harmful. Pointless because
+ * the traffic never leaves the machine, so there is nothing to intercept. Harmful because the only
+ * way to satisfy it is to generate and trust a local certificate, which no one is going to do, and
+ * because the rewrite is silent: the address changes and the failure arrives later as a connection
+ * error naming neither the rewrite nor the variable.
  *
  * Any other scheme is a misconfiguration rather than a downgrade, so it is refused and named.
  * A trailing slash is dropped, since every caller appends a rooted path.
  */
+/**
+ * Hosts where a plain `http` address is left as it is.
+ *
+ * Matched by exact equality on `URL.hostname`, never by substring or suffix. `localhost.evil.com`
+ * and `127.0.0.1.evil.com` parse as hostnames of their own and must still be upgraded, which a
+ * suffix test would get wrong. `hostname` is already lowercased by `URL`, so no case folding is
+ * needed here.
+ *
+ * Hardcoded rather than configurable, deliberately. A list of destinations a credential may reach
+ * unencrypted is not a list an environment variable should be able to extend.
+ *
+ * `host.docker.internal` is NOT on it. It resolves off the container, and Docker can reach a
+ * loopback address directly, so the exemption stays with addresses that are loopback by definition.
+ */
+const CLEARTEXT_HOSTS: ReadonlySet<string> = new Set(['localhost', '[::1]']);
+
+/** The whole 127.0.0.0/8 block, not only 127.0.0.1. */
+const LOOPBACK_IPV4 = /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+
+/** True when an address is loopback, so a credential on it never leaves the machine. */
+const isLoopbackHost = (hostname: string): boolean => CLEARTEXT_HOSTS.has(hostname) || LOOPBACK_IPV4.test(hostname);
+
 export const ensureHttps = (raw: string, variableName = 'URL'): string => {
   const value = raw.trim();
   if (!value) throw serviceError('SERVICE_ERROR', `${variableName} is empty.`);
@@ -112,7 +142,9 @@ export const ensureHttps = (raw: string, variableName = 'URL'): string => {
       `${variableName} ${JSON.stringify(raw)} uses the ${parsed.protocol.replace(':', '')} scheme; an https address is required.`
     );
   }
-  parsed.protocol = 'https:';
+  if (!isLoopbackHost(parsed.hostname)) {
+    parsed.protocol = 'https:';
+  }
 
   return parsed.toString().replace(/\/+$/, '');
 };
