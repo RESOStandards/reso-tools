@@ -429,7 +429,7 @@ export const handleValidate = async (args: Record<string, unknown>): Promise<Han
   return textResult({
     resource,
     fieldsProvided: fieldCount,
-    message: `Record has ${fieldCount} fields. Full DD validation requires server metadata — use the metadata tool first to fetch field definitions.`
+    message: `Record has ${fieldCount} fields. Full DD validation requires server metadata, so call the metadata tool first to fetch field definitions.`
   });
 };
 

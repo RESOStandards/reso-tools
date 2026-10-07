@@ -35,6 +35,8 @@ The MCP server runs in Docker and is wired into your client via `.mcp.json` at t
 }
 ```
 
+> **Building rather than using?** [Architecture](ARCHITECTURE.md) traces one tool from its schema to the SDK call, shows the credential design worth copying, and explains why the whole adapter is 1,002 lines over a 39,000-line SDK.
+
 Because the MCP server runs inside a container, use `http://host.docker.internal:<port>/` to reach services on the host. The reference server's default URL is `http://host.docker.internal:8080/`.
 
 ---
