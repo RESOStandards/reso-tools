@@ -52,6 +52,28 @@ Two tarballs carried files nobody needs. `reso-certification` shipped seven test
 `files` field, the only package that did not, so its tarball carried its own source, its four test
 files and its `tsconfig.json`.
 
+### Refreshed Data Dictionary reference metadata
+
+`reso-common` carries the DD reference metadata that the certification pipeline validates against,
+and the copy it has been publishing is wrong. Every version published so far ships a DD 2.1 with
+`FeedTypes` on the EntityEvent Resource.
+
+`FeedTypes` annotates a data element with the feed types it is available in: BBO, IDX, PDAP and VOW.
+EntityEvent is the change-notification envelope rather than a data resource, so the annotation does
+not describe anything a consumer can act on. A client does not subscribe to EntityEvent per feed
+type.
+
+Corrected upstream in the authoritative sheet, since these files are a pure projection of it and
+hand-editing them is not a repair. DD 2.1 goes from 2,140 fields to 2,139 and `FeedTypes` from 41
+resources to 40. `Property` and the Field Resource keep it, which is where it belongs. The 1.7 and
+2.0 files are unchanged apart from their generation stamp, because `FeedTypes` is a DD 2.1 element
+and those sheets carry no `FeedTypes` rows at all.
+
+Two consumers do not pick this up from a `reso-common` publish and need their own step. The
+certification backend's DD reference Lambda layer holds an independent copy, so server-side batch
+validation keeps answering from the old data until that layer is republished. The desktop client
+packages these files from the published `reso-common`, so it needs this release and then a rebuild.
+
 ## reso-common 0.4.0 – shared lock identifiers for certification variations – 2026-09-29
 
 Additive. Two builders and a stem constant, no behaviour change to anything existing.
