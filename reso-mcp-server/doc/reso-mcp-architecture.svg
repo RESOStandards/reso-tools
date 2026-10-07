@@ -31,7 +31,7 @@
   </defs>
 
   <!-- Background -->
-  <rect width="900" height="620" rx="12" fill="#f8fafc"/>
+  <rect width="900" height="675" rx="12" fill="#f8fafc"/>
 
   <!-- Title -->
   <text x="450" y="40" text-anchor="middle" font-size="20" font-weight="700" fill="#0f172a">RESO MCP Server Architecture</text>
