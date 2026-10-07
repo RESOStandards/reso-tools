@@ -5,7 +5,15 @@ The RESO MCP server wraps the same client SDK used for certification. As a resul
 AI agents can read and write RESO data without managing credentials or being allowed to make their own HTTP requests. It leverages 
 existing Web API authorization (OAuth 2.0), which has been proven in production.
 
-> **Data Access Is Based on a User's Credentials**: if a user is authorized to read 100 IDX fields through the RESO Web API, their AI can only see those data elements, and can only access the data using standard authorization, queries, and API capabilities. What it can do with with that data once it's accessed depends on the data licensing agreement between the end user and data provider. It's up to end users to follow those terms. 
+<div align="center">
+  <a href="reso-mcp-architecture.svg" target="_blank">
+    <img src="reso-mcp-architecture.svg" alt="RESO MCP Server architecture: an AI agent calls MCP tools, the MCP server uses RESO's certified OData client to reach the provider API, and the agent never touches the API or a credential directly" style="max-width: 720px; width: 100%;" />
+  </a>
+  <br/>
+  <sub>Click to expand full size</sub>
+</div>
+
+> **Data Access Is Based on a User's Credentials**: if a user is authorized to read 100 IDX fields through the RESO Web API, their AI can only see those data elements, and can only access the data using standard authorization, queries, and API capabilities. What it can do with that data once it's accessed depends on the data licensing agreement between the end user and data provider. It's up to end users to follow those terms. 
 
 The [User Guide](GUIDE.md) covers using the server. This covers how it is built.
 
