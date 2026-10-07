@@ -15,6 +15,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { handlers } from './handlers.js';
+import { SERVER_INSTRUCTIONS } from './instructions.js';
 import { type ToolScope, toolsForScope } from './tools.js';
 
 /** Parse CLI args for --scope flag. */
@@ -69,10 +70,13 @@ const jsonSchemaToZodShape = (schema: Record<string, unknown>): Record<string, z
 const scope = parseScope();
 const tools = toolsForScope(scope);
 
-const server = new McpServer({
-  name: 'reso-mcp-server',
-  version: '0.8.0'
-});
+const server = new McpServer(
+  {
+    name: 'reso-mcp-server',
+    version: '0.8.0'
+  },
+  { instructions: SERVER_INSTRUCTIONS }
+);
 
 // Register each tool with its Zod schema
 for (const tool of tools) {
