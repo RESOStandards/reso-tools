@@ -12,6 +12,63 @@ Publish `reso-common` first. `reso-certification` calls `parseReplicationProgres
 `reso-common` 0.4.0 resolves a package whose progress renderer calls two functions that are not
 there.
 
+These publish as prerelease versions for the beta.15 desktop round – `0.10.8-beta.1` and the
+matching `-beta.1` on the packages below – so the version string itself discloses that the vendor
+replay for this engine delta has not yet run. Consumers on a caret range stay on the current stable
+until it does.
+
+### A skipped scenario was reported as passed
+
+A scenario that could not run was recorded with `passed: true`, so a report could not distinguish a
+check that succeeded from one that never executed. Skipped scenarios now carry `passed: false` and a
+`skipReason` naming why, and both tallies guard on the skipped flag.
+
+This is the most important line in the release. A report produced before this change may show a pass
+for a check that did not run.
+
+### A run could pass having verified nothing
+
+`deriveStatus` ignored `skipped` entirely, so a Data Dictionary run whose reference metadata failed
+to load reported an outcome of `passed` having validated no metadata at all. `getReferenceMetadata`
+returns null rather than throwing when its JSON cannot be read, which makes the validation step
+return skipped, and nothing downstream objected.
+
+Every endorsement now states its own rule as `validForCertification`, a required positional
+parameter of `createPipeline`. Required rather than optional, because an optional rule would have to
+mean something when absent, and the only available meanings are certifiable by omission or refusing
+every run of a correctly written endorsement.
+
+### report.json states its own verdict
+
+`report.json` carried five keys and no verdict field, so the run's outcome existed only inside the
+English remarks sentence and a consumer had to pattern-match prose to learn whether a run passed.
+That is how the outcome defect above went unnoticed in this file: `report-detailed.json` at least
+carried a contradictory steps array that a careful reader could catch it on, while `report.json`
+offered nothing to catch it with.
+
+### The bearer token reached stdout
+
+`--output json` was a bare serialization of the pipeline result. The result carries the accumulated
+context, the context carries the bearer token every step uses after authentication resolves, so the
+live credential went to standard output – in the output the guide recommends archiving. Measured
+with a sentinel, it came back at `context.authToken`.
+
+Two layers now cover it, because each catches what the other cannot. The credential is dropped from
+the serialized context, which removes the path we knew about. And a value-keyed mask catches it
+wherever else it surfaces, because a denylist of field names only ever protects the fields someone
+remembered, and this leak happened precisely because nobody enumerated what the context held.
+
+### Two silent wrong answers in the Lookup replication walk
+
+A 200 response whose `value` is present but is not an array was read as an empty page, which ended
+the walk and reported that the resource exists and has no rows. That is now refused. An absent or
+null `value` is still treated as an empty page, deliberately, so this cannot newly fail a provider
+that answers an empty collection that way.
+
+And a server that ignores `$skip` serves the same rows at every cursor position. Those pages are
+never empty, so the walk's only termination condition never fired. The walk now stops when the
+cursor does not move.
+
 ### The executable bit
 
 `tsc` emits files in `dist/` as 0644. `prepublishOnly` runs the build, `npm pack` preserves whatever
