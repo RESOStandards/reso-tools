@@ -5,57 +5,61 @@ const { sleep } = require('../../../common');
 // const _jobs = [];
 
 /*
+  The four job-state shapes. Identifiers, timestamps, report ids and the error trace below are
+  SYNTHETIC. Do not paste real certification records here: this file ships in the published npm
+  package and the repository is public, so a real record publishes a named provider's result.
+
   // scheduled
   {
-    "certificationRequestId": "qa-T00000095-1727974929697",
-    "recipientConfigId": "M00000057-50038",
+    "certificationRequestId": "qa-T00000012-1700000000000",
+    "recipientConfigId": "M00000123-50000",
     "endorsementName": "data-dictionary",
     "endorsementVersion": "1.7",
     "environmentName": "qa",
-    "startedAtTimestamp": "2024-10-03T17:02:09.697Z",
+    "startedAtTimestamp": "2026-01-01T00:00:00.000Z",
     "status": "scheduled",
-    "statusTimestamp": "2024-10-03T17:02:09.697Z"
+    "statusTimestamp": "2026-01-01T00:00:00.000Z"
   }
 
   // passed
   {
-    "certificationRequestId": "qa-T00000044-1706609082545",
-    "recipientConfigId": "M00000172-50002",
+    "certificationRequestId": "qa-T00000012-1700000000000",
+    "recipientConfigId": "M00000123-50000",
     "endorsementName": "data-dictionary",
     "endorsementVersion": "1.7",
     "environmentName": "qa",
-    "reportId": "ks2mVY0BmZ47qXugY3F7",
-    "startedAtTimestamp": "2024-01-30T10:04:42.545Z",
+    "reportId": "EXAMPLE_REPORT_ID_0001",
+    "startedAtTimestamp": "2026-01-01T00:00:00.000Z",
     "status": "passed",
-    "statusTimestamp": "2024-01-30T10:05:23.406Z"
+    "statusTimestamp": "2026-01-01T00:01:00.000Z"
   }
 
   // failed
   {
-    "certificationRequestId": "qa-T00000141-1711478354430",
-    "recipientConfigId": "T00000012-50030",
+    "certificationRequestId": "qa-T00000012-1700000000000",
+    "recipientConfigId": "M00000123-50000",
     "endorsementName": "data-dictionary",
     "endorsementVersion": "1.7",
     "environmentName": "qa",
-    "reportId": "VQ4PfI4BMSgypO6msO7Y",
-    "startedAtTimestamp": "2024-03-26T18:39:14.430Z",
+    "reportId": "EXAMPLE_REPORT_ID_0002",
+    "startedAtTimestamp": "2026-01-01T00:00:00.000Z",
     "status": "failed",
-    "failedStep": "variations check",
-    "statusTimestamp": "2024-03-26T18:39:47.188Z"
+    "failedStep": "<the step that failed>",
+    "statusTimestamp": "2026-01-01T00:01:00.000Z"
   }
 
   // error
   {
-    "certificationRequestId": "qa-T00000095-1727974929697",
-    "recipientConfigId": "M00000094-50038",
+    "certificationRequestId": "qa-T00000012-1700000000000",
+    "recipientConfigId": "M00000123-50000",
     "endorsementName": "data-dictionary",
     "endorsementVersion": "1.7",
     "environmentName": "qa",
-    "error": "{\"Error\":\"SyntaxError\",\"Cause\":\"{\\\"errorType\\\":\\\"SyntaxError\\\",\\\"errorMessage\\\":\\\"Unexpected token o in JSON at position 1\\\",\\\"trace\\\":[\\\"SyntaxError: Unexpected token o in JSON at position 1\\\",\\\"    at JSON.parse (<anonymous>)\\\",\\\"    at Runtime.exports.handler (/var/task/index.js:127:52)\\\"]}\"}",
+    "error": "{\\"Error\\":\\"<ErrorName>\\",\\"Cause\\":\\"{\\\\\\"errorType\\\\\\":\\\\\\"<ErrorName>\\\\\\",\\\\\\"errorMessage\\\\\\":\\\\\\"<message>\\\\\\",\\\\\\"trace\\\\\\":[\\\\\\"<stack frames>\\\\\\"]}\\"}",
     "reportId": "error",
-    "startedAtTimestamp": "2024-10-03T17:02:09.697Z",
+    "startedAtTimestamp": "2026-01-01T00:00:00.000Z",
     "status": "error",
-    "statusTimestamp": "2024-10-03T17:02:28.213Z"
+    "statusTimestamp": "2026-01-01T00:00:20.000Z"
   }
 */
 
