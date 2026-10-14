@@ -1,0 +1,13 @@
+{
+  "providerUoi": "TEST-RESO-SERVER",
+  "configs": [
+    {
+      "description": "Bearer Token",
+      "serviceRootUri": "SERVER_URL_PLACEHOLDER",
+      "recipientUoi": "TEST-RESO-SERVER",
+      "providerUsi": "TEST-RESO-SERVER",
+      "token": "admin-token"
+    }
+  ]
+}
+

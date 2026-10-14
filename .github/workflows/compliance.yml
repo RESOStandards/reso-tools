@@ -1,0 +1,301 @@
+name: CI & Compliance
+
+on:
+  # The base branch, not the head. `main` alone meant this never fired for pull requests into the
+  # effective mainline, so the one workflow that runs the endorsements was silently absent from
+  # every release-candidate review — and a workflow nobody notices not running looks like one that
+  # passed.
+  pull_request:
+    branches: [main, v1.0.0-pre]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22' # the engines floor (>=22); verifies the minimum supported runtime
+          cache: npm
+
+      # The committed lockfile is authored with npm 11, which the root package.json
+      # declares as engines.npm. Node 22 ships npm 10, whose stricter `npm ci` rejects that
+      # lockfile, so this pin is what lets the install below run at all. build.yml carries
+      # the same step for the same reason.
+      - name: Pin npm 11 (matches the committed lockfile)
+        run: npm install -g npm@11
+
+      - name: Install dependencies
+        # npm ci rather than npm install, so a lockfile that has drifted out of sync fails
+        # the run instead of being quietly rewritten.
+        run: npm ci
+
+      - name: Run Biome lint
+        run: npm run lint
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22' # the engines floor (>=22); verifies the minimum supported runtime
+          cache: npm
+
+      # The committed lockfile is authored with npm 11, which the root package.json
+      # declares as engines.npm. Node 22 ships npm 10, whose stricter `npm ci` rejects that
+      # lockfile, so this pin is what lets the install below run at all. build.yml carries
+      # the same step for the same reason.
+      - name: Pin npm 11 (matches the committed lockfile)
+        run: npm install -g npm@11
+
+      - name: Install dependencies
+        run: |
+          # ONE install, at the workspace root.
+          #
+          # This step used to run `npm install` again inside individual members. A
+          # per-package install inside a workspace member creates a nested node_modules
+          # that SHADOWS the workspace symlink, so @reso-standards/* resolved to the last
+          # PUBLISHED version rather than to this repository. That is not a style point:
+          # it is why a commit that adds an export and a commit that consumes it could
+          # never both be green until a publish happened in between, and it is the whole
+          # of the TS2305 on parseReplicationProgress and summarizeReplicationProgress —
+          # reso-common has them, published reso-common did not, and the nested copy won.
+          #
+          # It also cloned reso-certification-utils v3.0.0 from GitHub and installed it
+          # into reso-certification. Nothing imports that package and no manifest declares
+          # it; the only references left are comments recording where tests were ported
+          # from. So the clone bought nothing and paid for it by creating the nested
+          # node_modules above.
+          #
+          # npm ci rather than npm install, so a lockfile that has drifted out of sync
+          # fails the run instead of being quietly rewritten.
+          npm ci
+          # Not a workspace member, so it installs on its own.
+          (cd reso-certification/xsd-validator && npm install)
+
+      - name: Build all packages
+        run: |
+          # Topological order. A package can only build after every @reso-standards
+          # package it imports, because tsc resolves those through the dist the
+          # dependency's package.json points at, and the workspace symlink does not
+          # create that dist.
+          #
+          # reso-metadata-utils and reso-common were missing from this list entirely.
+          # They have no internal dependencies, so nothing else built them, and
+          # reso-client imports reso-metadata-utils: the result was TS2307 "Cannot
+          # find module '@reso-standards/reso-metadata-utils'" on five reso-client
+          # files, and every later implicit-any error cascaded from that one
+          # unresolved module. It passed locally only because a developer's dist
+          # already existed from an earlier build.
+          #
+          # Ordered explicitly rather than through `npm run build --workspaces`, which
+          # would depend on the order of the workspaces array staying topological. This is
+          # the same order, written the same way, as the three Dockerfiles.
+          npm run build -w @reso-standards/reso-metadata-utils
+          npm run build -w @reso-standards/reso-common
+          npm run build -w @reso-standards/reso-validation
+          npm run build -w @reso-standards/odata-expression-parser
+          npm run build -w @reso-standards/reso-client
+          npm run build -w @reso-standards/reso-certification
+          npm run build -w @reso-standards/reso-reference-server
+          npm run build -w @reso-standards/reso-mcp-server
+
+      - name: Run all tests
+        run: npm test
+
+  compliance-postgres:
+    name: Compliance (PostgreSQL)
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start (PostgreSQL)
+        working-directory: reso-reference-server
+        run: docker compose up -d --build --wait db server
+
+      - name: Data Dictionary 2.0 compliance
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-dd up --build --exit-code-from compliance-dd compliance-dd
+
+      - name: Web API Core 2.0.0 compliance
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-core up --build --exit-code-from compliance-core compliance-core
+
+      - name: Add/Edit RCP-010 compliance
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-addedit up --build --exit-code-from compliance-addedit db-addedit server-addedit compliance-addedit
+
+      - name: EntityEvent RCP-027 compliance
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-entity-event up --build --exit-code-from compliance-entity-event db-entity-event server-entity-event compliance-entity-event
+
+      - name: MCP server smoke test
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-mcp up --build --exit-code-from compliance-mcp compliance-mcp
+
+      - name: Collect results
+        if: always()
+        working-directory: reso-reference-server
+        run: |
+          # Three things were wrong here and each hid the next.
+          #
+          # The paths were `/reso-certification-utils/results` and `/commander/build/certification`,
+          # which belong to the previous generation of tooling and do not exist in these containers.
+          # Every entrypoint writes to /tmp/compliance-results. With both copies suppressed by
+          # `2>/dev/null || true`, the step collected nothing for ANY endorsement and still passed,
+          # so the uploaded artifact was empty and no CI run was ever citable as evidence.
+          #
+          # The loop also covered only DD and Core, while the job runs Add/Edit and EntityEvent too.
+          # And a flat target lets two endorsements emitting the same filename overwrite each other.
+          #
+          # So: the real path, every endorsement the job ran, one directory each, and a per-container
+          # file count printed. A copy may legitimately fail for an endorsement that crashed before
+          # writing, which is why one empty container is tolerated — but all of them empty means the
+          # paths are wrong again, and that fails the step instead of passing quietly.
+          collected=0
+          for c in compliance-dd compliance-core compliance-addedit compliance-entity-event; do
+            mkdir -p "compliance/results/${c}"
+            docker cp "reso-reference-server-${c}-1:/tmp/compliance-results/." "compliance/results/${c}/" 2>/dev/null || true
+            n=$(find "compliance/results/${c}" -type f | wc -l | tr -d ' ')
+            echo "${c}: ${n} file(s)"
+            collected=$((collected + n))
+          done
+          echo "total files collected: ${collected}"
+          if [ "$collected" -eq 0 ]; then
+            echo "::error::Collected 0 files from every compliance container. The copy path is wrong, so this run has produced no evidence."
+            exit 1
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-results-postgres
+          # Compliance results are a debugging aid, not a hand-off. A week is enough to
+          # investigate a failed run; ninety days is just storage.
+          retention-days: 7
+          path: reso-reference-server/compliance/results/
+
+  compliance-mongodb:
+    name: Compliance (MongoDB)
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start (MongoDB)
+        working-directory: reso-reference-server
+        run: docker compose --profile mongodb up -d --build --wait mongodb server-mongo
+
+      - name: Data Dictionary 2.0 compliance (MongoDB)
+        working-directory: reso-reference-server
+        run: docker compose --profile mongodb --profile compliance-dd-mongo up --build --exit-code-from compliance-dd-mongo compliance-dd-mongo
+
+      - name: Web API Core 2.0.0 compliance (MongoDB)
+        working-directory: reso-reference-server
+        run: docker compose --profile mongodb --profile compliance-core-mongo up --build --exit-code-from compliance-core-mongo compliance-core-mongo
+
+      - name: Add/Edit RCP-010 compliance (MongoDB)
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-addedit-mongo up --build --exit-code-from compliance-addedit-mongo mongodb-addedit server-addedit-mongo compliance-addedit-mongo
+
+      - name: EntityEvent RCP-027 compliance (MongoDB)
+        working-directory: reso-reference-server
+        run: docker compose --profile mongodb --profile compliance-entity-event-mongo up --build --exit-code-from compliance-entity-event-mongo mongodb-entity-event server-entity-event-mongo compliance-entity-event-mongo
+
+      - name: Collect results
+        if: always()
+        working-directory: reso-reference-server
+        run: |
+          # Same three defects as the PostgreSQL job, and the same fix. The MongoDB services share
+          # the very same entrypoints, so they write to /tmp/compliance-results as well.
+          collected=0
+          for c in compliance-dd-mongo compliance-core-mongo compliance-addedit-mongo compliance-entity-event-mongo; do
+            mkdir -p "compliance/results/${c}"
+            docker cp "reso-reference-server-${c}-1:/tmp/compliance-results/." "compliance/results/${c}/" 2>/dev/null || true
+            n=$(find "compliance/results/${c}" -type f | wc -l | tr -d ' ')
+            echo "${c}: ${n} file(s)"
+            collected=$((collected + n))
+          done
+          echo "total files collected: ${collected}"
+          if [ "$collected" -eq 0 ]; then
+            echo "::error::Collected 0 files from every compliance container. The copy path is wrong, so this run has produced no evidence."
+            exit 1
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-results-mongodb
+          # Compliance results are a debugging aid, not a hand-off. A week is enough to
+          # investigate a failed run; ninety days is just storage.
+          retention-days: 7
+          path: reso-reference-server/compliance/results/
+
+  compliance-sqlite:
+    name: Compliance (SQLite)
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start (SQLite)
+        working-directory: reso-reference-server
+        run: docker compose --profile sqlite up -d --build --wait server-sqlite
+
+      - name: Data Dictionary 2.0 compliance (SQLite)
+        working-directory: reso-reference-server
+        run: docker compose --profile sqlite --profile compliance-dd-sqlite up --build --exit-code-from compliance-dd-sqlite compliance-dd-sqlite
+
+      - name: Web API Core 2.0.0 compliance (SQLite)
+        working-directory: reso-reference-server
+        run: docker compose --profile sqlite --profile compliance-core-sqlite up --build --exit-code-from compliance-core-sqlite compliance-core-sqlite
+
+      - name: Add/Edit RCP-010 compliance (SQLite)
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-addedit-sqlite up --build --exit-code-from compliance-addedit-sqlite server-addedit-sqlite compliance-addedit-sqlite
+
+      - name: EntityEvent RCP-027 compliance (SQLite)
+        working-directory: reso-reference-server
+        run: docker compose --profile compliance-entity-event-sqlite up --build --exit-code-from compliance-entity-event-sqlite server-entity-event-sqlite compliance-entity-event-sqlite
+
+      - name: Collect results
+        if: always()
+        working-directory: reso-reference-server
+        run: |
+          # Same three defects as the other two jobs, and the same fix. This job also runs four
+          # endorsements and collected two.
+          collected=0
+          for c in compliance-dd-sqlite compliance-core-sqlite compliance-addedit-sqlite compliance-entity-event-sqlite; do
+            mkdir -p "compliance/results/${c}"
+            docker cp "reso-reference-server-${c}-1:/tmp/compliance-results/." "compliance/results/${c}/" 2>/dev/null || true
+            n=$(find "compliance/results/${c}" -type f | wc -l | tr -d ' ')
+            echo "${c}: ${n} file(s)"
+            collected=$((collected + n))
+          done
+          echo "total files collected: ${collected}"
+          if [ "$collected" -eq 0 ]; then
+            echo "::error::Collected 0 files from every compliance container. The copy path is wrong, so this run has produced no evidence."
+            exit 1
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-results-sqlite
+          # Compliance results are a debugging aid, not a hand-off. A week is enough to
+          # investigate a failed run; ninety days is just storage.
+          retention-days: 7
+          path: reso-reference-server/compliance/results/

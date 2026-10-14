@@ -1,0 +1,52 @@
+name: Release
+
+# What a `v*` tag means in THIS repo, after the v1.0.0 split.
+#
+# The Electron desktop shell, the browser UI, the CORS proxy and the test-data generator all
+# moved to the private reso-tools-private repo. Nothing in this repo builds a binary, so this
+# workflow no longer tries to. It used to run `cd reso-desktop-client && npx electron-builder`
+# on a three-OS matrix; that directory has had zero tracked files since the split, so every
+# job failed at that step from v1.0.0-beta.14 onward and `Create Release` was skipped behind
+# `needs: build`.
+#
+# The npm packages do not release from here either — each publishes from its own
+# `<package>-v<version>` tag via Trusted Publishing (see the publish-*.yml workflows).
+#
+# So the one thing a `v*` tag still needs is a GitHub Release to exist, which gives
+# reso-tools-private a target to attach its desktop binaries to.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  release:
+    name: Create Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create the release, or leave an existing one alone
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF#refs/tags/}"
+
+          # Publishing a draft by hand is the documented path, and reso-tools-private attaches
+          # binaries to whatever release is already there. So an existing release is never
+          # modified — not its notes, not its draft state, and above all not its assets.
+          if gh release view "$tag" --repo "$REPO" >/dev/null 2>&1; then
+            echo "Release $tag already exists. Leaving it untouched, assets included."
+            exit 0
+          fi
+
+          echo "No release for $tag yet. Creating one as a draft."
+          gh release create "$tag" \
+            --repo "$REPO" \
+            --title "$tag" \
+            --draft \
+            --generate-notes

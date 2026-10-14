@@ -1,0 +1,7 @@
+{
+  "@reso.context": "urn:reso:metadata:2.0:resource:NotADdResource",
+  "value": [
+    { "SomeKey": "u1", "SomeField": "alpha" },
+    { "SomeKey": "u2", "SomeField": "beta" }
+  ]
+}

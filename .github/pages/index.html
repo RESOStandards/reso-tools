@@ -1,0 +1,372 @@
+---
+layout: default
+title: RESO Tools
+---
+
+<div class="hero">
+  <h1>RESO Tools</h1>
+  <p>Open-source testing, client SDK, and reference implementation tools for the RESO Web API specification.</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="number">10</div>
+      <div class="label">Packages</div>
+    </div>
+    <div class="hero-stat">
+      <div class="number">1,096</div>
+      <div class="label">Tests</div>
+    </div>
+    <div class="hero-stat">
+      <div class="number">4</div>
+      <div class="label">Compliance Suites</div>
+    </div>
+  </div>
+</div>
+
+<!-- 1. What is this? -->
+<div class="intro-blurb">
+  <strong>RESO</strong> (Real Estate Standards Organization) defines how real estate data is exchanged
+  between MLSs, brokerages, and technology providers. These open-source tools help developers
+  build, test, and certify RESO-compliant servers and applications &ndash; so listing data
+  flows reliably across the industry.
+</div>
+
+<!-- 2. Who is this for? -->
+<div class="audience-grid">
+  <a href="#ref-server" class="audience-card">
+    <div class="audience-icon audience-icon-navy">
+      <svg viewBox="0 0 24 24"><path d="M20 13H4a2 2 0 00-2 2v4a2 2 0 002 4h16a2 2 0 002-2v-4a2 2 0 00-2-2zm0-10H4a2 2 0 00-2 2v4a2 2 0 002 2h16a2 2 0 002-2V5a2 2 0 00-2-2zm-2 5H6V6h12v2z"/></svg>
+    </div>
+    <h3>MLS &amp; Vendor Developers</h3>
+    <p>Building a RESO-compliant server? Use the reference implementation as a starting point and run compliance tests locally.</p>
+  </a>
+  <a href="#libraries" class="audience-card">
+    <div class="audience-icon audience-icon-blue">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <h3>App Developers</h3>
+    <p>Consuming RESO APIs? Use the client SDK to query listings, validate responses, and parse OData filters.</p>
+  </a>
+  <a href="#tools" class="audience-card">
+    <div class="audience-icon audience-icon-green">
+      <svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    </div>
+    <h3>RESO Certification</h3>
+    <p>Preparing for certification? Run the same compliance tests used in production against your server.</p>
+  </a>
+</div>
+
+<!-- 7. Architecture diagram -->
+<div class="arch-diagram">
+  <div class="arch-label">How the packages fit together</div>
+  <div class="arch-row">
+    <div class="arch-box arch-box-outline">Your Application</div>
+  </div>
+  <div class="arch-arrow">&darr;</div>
+  <div class="arch-row">
+    <div class="arch-box arch-box-blue">reso-client</div>
+    <div class="arch-box arch-box-green">reso-validation</div>
+    <div class="arch-box arch-box-green">odata-expression-parser</div>
+  </div>
+  <div class="arch-arrow">&darr;</div>
+  <div class="arch-row">
+    <div class="arch-box arch-box-navy">Reference Server</div>
+    <div class="arch-box arch-box-outline">Your RESO Server</div>
+  </div>
+  <div class="arch-arrow">&darr;</div>
+  <div class="arch-row">
+    <div class="arch-box arch-box-orange">reso-certification</div>
+    <div class="arch-box arch-box-orange">reso-mcp-server</div>
+  </div>
+</div>
+
+<!-- Libraries -->
+<div id="libraries" class="section-group section-libraries">
+  <div class="section-title">
+    <svg viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+    Libraries
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <h3>Core Libraries</h3>
+      <span class="badge badge-green">Stable</span>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso-standards/reso-common</div>
+        <div class="package-desc">The shared RESO metadata model and projections: the ResoMetadata shape, pure helpers and the EDMX generator. Runs in a browser or in Node.</div>
+        <div class="package-meta">
+          <span>41 tests</span>
+          <span>&middot;</span>
+          <span>Zero dependencies</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/reso-common' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso-standards/reso-metadata-utils</div>
+        <div class="package-desc">OData metadata processing: CSDL parsing, XSD and semantic validation, EDMX to metadata-report serialization, and live metadata fetching.</div>
+        <div class="package-meta">
+          <span>156 tests</span>
+          <span>&middot;</span>
+          <span>CSDL + EDMX</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/reso-metadata-utils' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso-standards/reso-validation</div>
+        <div class="package-desc">Validate real estate data against RESO metadata rules. Works in any JS runtime &ndash; Node.js, browsers, or edge functions. Use it to check field types, enumerations, and required fields before sending or accepting data.</div>
+        <div class="package-meta">
+          <span>98 tests</span>
+          <span>&middot;</span>
+          <span>Zero dependencies</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/reso-validation' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso-standards/odata-expression-parser</div>
+        <div class="package-desc">Parse OData <code>$filter</code> expressions like <code>ListPrice ge 200000 and City eq 'Austin'</code> into a structured syntax tree. Useful for building query UIs, validating filters, or translating queries between systems.</div>
+        <div class="package-meta">
+          <span>180 tests</span>
+          <span>&middot;</span>
+          <span>Zero dependencies</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/odata-expression-parser' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso-standards/reso-client</div>
+        <div class="package-desc">Query RESO servers from TypeScript or JavaScript. Build OData URLs, fetch listings, parse metadata, and validate responses &ndash; without hand-crafting HTTP requests or dealing with protocol details.</div>
+        <div class="package-meta">
+          <span>118 tests</span>
+          <span>&middot;</span>
+          <span>OAuth2 Client Credentials</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/reso-client' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+  </div>
+</div>
+
+<!-- Tools -->
+<div id="tools" class="section-group section-tools">
+  <div class="section-title">
+    <svg viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066z"/><circle cx="12" cy="12" r="3"/></svg>
+    Tools
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <h3>Developer Tools</h3>
+      <span class="badge badge-blue">Tools</span>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso-standards/reso-certification</div>
+        <div class="package-desc">Run the same compliance tests used in RESO certification. Covers Web API Core, Data Dictionary, Add/Edit (RCP-010), and EntityEvent (RCP-027) endorsements. Test your server before submitting for certification.</div>
+        <div class="package-meta">
+          <span>250 tests</span>
+          <span>&middot;</span>
+          <span>4 Compliance Suites</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/reso-certification' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">reso-mcp-server</div>
+        <div class="package-desc">MCP server that exposes RESO tools for AI agents. Query OData servers, parse metadata, validate records, and run compliance tests &ndash; all through the Model Context Protocol.</div>
+        <div class="package-meta">
+          <span>10 Tools</span>
+          <span>&middot;</span>
+          <span>75 tests</span>
+          <span>&middot;</span>
+          <span>Reference implementation, not on npm</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/reso-mcp-server' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+  </div>
+</div>
+
+<!-- Reference Server -->
+<div id="ref-server" class="section-group section-server">
+  <div class="section-title">
+    <svg viewBox="0 0 24 24"><path d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/></svg>
+    Reference Implementation
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <h3>RESO Reference Server</h3>
+      <span class="badge badge-orange">OData 4.01</span>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">@reso-standards/reso-reference-server</div>
+        <div class="package-desc">
+          A fully working RESO Web API server you can run locally with Docker.
+          Point it at the RESO Data Dictionary metadata and it automatically creates database tables,
+          REST endpoints, Swagger documentation, and a React UI for browsing data.
+          Use it as a reference for building your own server, or as a test target for compliance tools.
+        </div>
+        <div class="package-meta">
+          <span>254 tests</span>
+          <span>&middot;</span>
+          <span>PostgreSQL</span>
+          <span>&middot;</span>
+          <span>MongoDB</span>
+          <span>&middot;</span>
+          <span>SQLite</span>
+          <span>&middot;</span>
+          <span>Docker</span>
+        </div>
+      </div>
+      <a href="{{ '/packages/reso-reference-server' | relative_url }}" class="view-link">View &rarr;</a>
+    </div>
+  </div>
+</div>
+
+<!-- Desktop Client -->
+<div id="clients" class="section-group section-tools">
+  <div class="section-title">
+    <svg viewBox="0 0 24 24"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+    Desktop Client
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <h3>RESO Desktop Client</h3>
+      <span class="badge badge-blue">Preview</span>
+    </div>
+
+    <div class="package-item">
+      <div>
+        <div class="package-name">RESO Desktop Client</div>
+        <div class="package-desc">Electron desktop application for browsing any RESO-compliant OData server. Includes OAuth2 Client Credentials and Bearer Token authentication, metadata caching, and an optional built-in reference server for local test data. No Docker required.</div>
+        <div class="package-meta">
+          <span>SQLite</span>
+          <span>&middot;</span>
+          <span>Electron</span>
+          <span>&middot;</span>
+          <span>macOS / Windows / Linux</span>
+        </div>
+      </div>
+      <a href="https://github.com/RESOStandards/reso-tools/releases/latest" class="view-link">Download &rarr;</a>
+    </div>
+  </div>
+</div>
+
+<!-- Getting Started -->
+<div class="section-group section-quickstart">
+  <div class="section-title">
+    <svg viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+    Getting Started
+  </div>
+  <div class="card">
+    <div class="card-body content">
+      <h3 style="margin-top: 0">Prerequisites</h3>
+      <div class="prereq-list">
+        <div class="prereq-item">
+          <div class="prereq-check"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
+          <span><a href="https://git-scm.com/downloads">Git</a></span>
+        </div>
+        <div class="prereq-item">
+          <div class="prereq-check"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
+          <span><a href="https://docs.docker.com/get-docker/">Docker Desktop</a></span>
+        </div>
+        <div class="prereq-item">
+          <div class="prereq-check"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
+          <span><a href="https://nodejs.org/">Node.js 22+</a> (for libraries &amp; CLI)</span>
+        </div>
+      </div>
+
+      <h3>Run the Reference Server</h3>
+      <p>This starts a RESO Web API server with PostgreSQL, seeds it with sample listings, and gives you a Swagger UI and React frontend to explore.</p>
+<pre><code>git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools/reso-reference-server
+docker compose up -d                      # Start server + PostgreSQL
+docker compose --profile seed up          # Seed with test data
+
+# Once running, you'll have:
+#   http://localhost:8080/health       - Health check
+#   http://localhost:8080/$metadata    - OData EDMX metadata
+#   http://localhost:8080/api-docs     - Swagger API explorer
+#   http://localhost:5173              - React UI</code></pre>
+
+      <h3>Run Compliance Tests</h3>
+      <p>Verify your server passes RESO certification requirements. This example runs the Add/Edit endorsement tests against the local reference server.</p>
+<pre><code>cd reso-certification
+npx reso-cert add-edit \
+  --url http://localhost:8080 \
+  --auth-token admin-token</code></pre>
+    </div>
+  </div>
+</div>
+
+<!-- Learn More -->
+<div class="section-group section-learn">
+  <div class="section-title">
+    <svg viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+    Learn More
+  </div>
+  <div class="card">
+    <div class="learn-grid">
+      <a href="{{ '/guides/' | relative_url }}" class="learn-item">
+        <div class="learn-icon learn-icon-blue">
+          <svg viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        </div>
+        <div class="learn-text">
+          <h4>User Guides</h4>
+          <p>Task-oriented walkthroughs for every package in the RESO Tools monorepo</p>
+        </div>
+      </a>
+      <a href="https://ddwiki.reso.org" class="learn-item">
+        <div class="learn-icon learn-icon-navy">
+          <svg viewBox="0 0 24 24"><path d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3zm5 1h6m-6 3h6m-6 3h4"/></svg>
+        </div>
+        <div class="learn-text">
+          <h4>RESO Data Dictionary Wiki</h4>
+          <p>Browse all standard fields, resources, and enumerations</p>
+        </div>
+      </a>
+      <a href="https://docs.oasis-open.org/odata/odata/v4.01/odata-v4.01-part1-protocol.html" class="learn-item">
+        <div class="learn-icon learn-icon-blue">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <div class="learn-text">
+          <h4>OData 4.01 Specification</h4>
+          <p>The OASIS standard query protocol that powers RESO Web API</p>
+        </div>
+      </a>
+      <a href="https://transport.reso.org" class="learn-item">
+        <div class="learn-icon learn-icon-orange">
+          <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
+        </div>
+        <div class="learn-text">
+          <h4>RESO Transport Specifications</h4>
+          <p>Official RESO transport specifications and endorsements</p>
+        </div>
+      </a>
+      <a href="https://certification.reso.org" class="learn-item">
+        <div class="learn-icon learn-icon-green">
+          <svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        </div>
+        <div class="learn-text">
+          <h4>RESO Certification Portal</h4>
+          <p>View certification results and analytics</p>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,345 @@
+{
+  "description": "Web API Core",
+  "version": "2.0.0",
+  "generatedOn": "2026-04-14T19:00:00.000Z",
+  "remarks": "54 scenarios tested across Property resource. 54 passed, 0 failed, 0 skipped.",
+  "outcome": "passed",
+  "endorsement": "web-api-core",
+  "duration": 12400,
+  "steps": [
+    {
+      "name": "Health check",
+      "status": "passed",
+      "duration": 65,
+      "summary": "Server is ready at http://localhost:8080"
+    },
+    {
+      "name": "Resolve authentication",
+      "status": "passed",
+      "duration": 110,
+      "summary": "Auth credentials present"
+    },
+    {
+      "name": "Fetch metadata",
+      "status": "passed",
+      "duration": 280,
+      "summary": "3 resources, 632 fields, 1,847 lookups",
+      "counts": {
+        "resources": 3,
+        "fields": 632,
+        "lookups": 1847
+      }
+    },
+    {
+      "name": "Run Core scenarios",
+      "status": "passed",
+      "duration": 11900,
+      "summary": "54 passed, 0 failed, 0 skipped (54 scenarios)",
+      "counts": {
+        "total": 54,
+        "passed": 54,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "Write compliance reports",
+      "status": "passed",
+      "duration": 45,
+      "summary": "Reports written to .reso-cert/web-api-core-2.0.0/"
+    }
+  ],
+  "resourceReports": [
+    {
+      "resource": "Property",
+      "summary": {
+        "total": 54,
+        "passed": 54,
+        "failed": 0,
+        "skipped": 0
+      },
+      "scenarios": [
+        {
+          "name": "Service document is valid",
+          "tag": "service-document-valid",
+          "passed": true,
+          "skipped": false,
+          "duration": 80,
+          "requestUrl": "http://localhost:8080/",
+          "assertions": [
+            {
+              "passed": true,
+              "message": "Response status is 200"
+            },
+            {
+              "passed": true,
+              "message": "Response contains @odata.context"
+            },
+            {
+              "passed": true,
+              "message": "Service document lists Property resource"
+            }
+          ]
+        },
+        {
+          "name": "Metadata is valid",
+          "tag": "metadata-valid",
+          "passed": true,
+          "skipped": false,
+          "duration": 120,
+          "requestUrl": "http://localhost:8080/$metadata",
+          "assertions": [
+            {
+              "passed": true,
+              "message": "Response status is 200"
+            },
+            {
+              "passed": true,
+              "message": "Content-Type is application/xml"
+            },
+            {
+              "passed": true,
+              "message": "CSDL is well-formed XML"
+            },
+            {
+              "passed": true,
+              "message": "EntityType Property is defined"
+            }
+          ]
+        },
+        {
+          "name": "Filter: eq integer",
+          "tag": "filter-eq-integer",
+          "passed": true,
+          "skipped": false,
+          "duration": 145,
+          "requestLatency": 85,
+          "requestUrl": "http://localhost:8080/Property?$filter=BedroomsTotal eq 3",
+          "assertions": [
+            {
+              "passed": true,
+              "message": "Response status is 200"
+            },
+            {
+              "passed": true,
+              "message": "All 21 records satisfy BedroomsTotal eq 3"
+            }
+          ]
+        },
+        {
+          "name": "Filter: eq string",
+          "tag": "filter-eq-string",
+          "passed": true,
+          "skipped": false,
+          "duration": 130,
+          "requestLatency": 75,
+          "requestUrl": "http://localhost:8080/Property?$filter=City eq 'Fargo'",
+          "assertions": [
+            {
+              "passed": true,
+              "message": "Response status is 200"
+            },
+            {
+              "passed": true,
+              "message": "All 8 records satisfy City eq 'Fargo'"
+            }
+          ]
+        },
+        {
+          "name": "Filter: ge decimal",
+          "tag": "filter-ge-decimal",
+          "passed": true,
+          "skipped": false,
+          "duration": 110,
+          "requestLatency": 68,
+          "requestUrl": "http://localhost:8080/Property?$filter=ListPrice ge 500000",
+          "assertions": [
+            {
+              "passed": true,
+              "message": "Response status is 200"
+            },
+            {
+              "passed": true,
+              "message": "All 15 records satisfy ListPrice ge 500000"
+            }
+          ]
+        },
+        {
+          "name": "Filter: contains string",
+          "tag": "filter-contains-string",
+          "passed": true,
+          "skipped": false,
+          "duration": 95,
+          "requestLatency": 60,
+          "requestUrl": "http://localhost:8080/Property?$filter=contains(City,'argo')",
+          "assertions": [
+            {
+              "passed": true,
+              "message": "Response status is 200"
+            },
+            {
+              "passed": true,
+              "message": "All 8 records satisfy contains(City,'argo')"
+            }
+          ]
+        },
+        {
+          "name": "Filter: single-value enum eq",
+          "tag": "filter-single-enum-eq",
+          "passed": true,
+          "skipped": false,
+          "duration": 105,
+          "requestLatency": 62,
+          "requestUrl": "http://localhost:8080/Property?$filter=StandardStatus eq 'Active'",
+          "assertions": [
+            {
+              "passed": true,
+              "message": "Response status is 200"
+            },
+            {
+              "passed": true,
+              "message": "All 42 records satisfy StandardStatus eq 'Active'"
+            }
+          ]
+        },
+        {
+          "name": "Filter: multi-value enum any()",
+          "tag": "filter-multi-enum-any",
+          "passed": true,
+          "skipped": false,
+          "duration": 125,
+          "requestLatency": 72,
+          "requestUrl": "http://localhost:8080/Property?$filter=Appliances/any(a: a eq 'Dishwasher')",
+          "assertions": [
+            {
+              "passed": true,
+              "message": "Response status is 200"
+            },
+            {
+              "passed": true,
+              "message": "All 30 records contain 'Dishwasher' in Appliances"
+            }
+          ]
+        },
+        {
+          "name": "Orderby ascending",
+          "tag": "orderby-asc",
+          "passed": true,
+          "skipped": false,
+          "duration": 90,
+          "requestLatency": 55,
+          "requestUrl": "http://localhost:8080/Property?$orderby=ListPrice asc",
+          "assertions": [
+            {
+              "passed": true,
+              "message": "Response status is 200"
+            },
+            {
+              "passed": true,
+              "message": "Results are ordered by ListPrice ascending"
+            }
+          ]
+        },
+        {
+          "name": "Select fields",
+          "tag": "select-fields",
+          "passed": true,
+          "skipped": false,
+          "duration": 85,
+          "requestLatency": 50,
+          "requestUrl": "http://localhost:8080/Property?$select=ListingKey,ListPrice,City",
+          "assertions": [
+            {
+              "passed": true,
+              "message": "Response status is 200"
+            },
+            {
+              "passed": true,
+              "message": "Response contains only selected fields plus @odata keys"
+            }
+          ]
+        },
+        {
+          "name": "Top",
+          "tag": "top",
+          "passed": true,
+          "skipped": false,
+          "duration": 75,
+          "requestLatency": 45,
+          "requestUrl": "http://localhost:8080/Property?$top=5",
+          "assertions": [
+            {
+              "passed": true,
+              "message": "Response status is 200"
+            },
+            {
+              "passed": true,
+              "message": "Response contains at most 5 records"
+            }
+          ]
+        },
+        {
+          "name": "Skip",
+          "tag": "skip",
+          "passed": true,
+          "skipped": false,
+          "duration": 80,
+          "requestLatency": 48,
+          "requestUrl": "http://localhost:8080/Property?$skip=10&$top=5",
+          "assertions": [
+            {
+              "passed": true,
+              "message": "Response status is 200"
+            },
+            {
+              "passed": true,
+              "message": "Response skipped first 10 records"
+            }
+          ]
+        },
+        {
+          "name": "Count",
+          "tag": "count",
+          "passed": true,
+          "skipped": false,
+          "duration": 70,
+          "requestLatency": 42,
+          "requestUrl": "http://localhost:8080/Property?$count=true",
+          "assertions": [
+            {
+              "passed": true,
+              "message": "Response status is 200"
+            },
+            {
+              "passed": true,
+              "message": "@odata.count is present and is a non-negative integer"
+            }
+          ]
+        },
+        {
+          "name": "Server-driven paging",
+          "tag": "server-driven-paging",
+          "passed": true,
+          "skipped": false,
+          "duration": 350,
+          "requestLatency": 120,
+          "requestUrl": "http://localhost:8080/Property",
+          "assertions": [
+            {
+              "passed": true,
+              "message": "Response status is 200"
+            },
+            {
+              "passed": true,
+              "message": "Server provides @odata.nextLink or complete result set"
+            },
+            {
+              "passed": true,
+              "message": "Following nextLink returns additional records"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@reso-standards/xsd-validator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "XSD validator using libxml2-wasm. Pure WASM — no native binaries, works in Node.js and Electron.",
+  "main": "index.js",
+  "dependencies": {
+    "libxml2-wasm": "^0.7.1"
+  }
+}

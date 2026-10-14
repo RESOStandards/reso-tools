@@ -1,0 +1,660 @@
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL backend (default)
+  # Usage: docker compose up -d
+  # ---------------------------------------------------------------------------
+  server:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      DB_BACKEND: postgres
+      DATABASE_URL: postgresql://reso:reso@db:5432/reso_reference
+      METADATA_PATH: ./server-metadata.json
+      # BASE_URL: http://server:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
+      ENUM_MODE: string
+      ENTITY_EVENT: ${ENTITY_EVENT:-false}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: reso
+      POSTGRES_PASSWORD: reso
+      POSTGRES_DB: reso_reference
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reso -d reso_reference"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Optional: seed PostgreSQL with realistic test data
+  # Usage: docker compose --profile seed up
+  seed:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/Dockerfile
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for server at http://server:8080..."
+        until wget -qO- http://server:8080/health > /dev/null 2>&1; do sleep 2; done
+        echo "Server ready. Loading static seed data..."
+
+        wget -qO- --post-data='{}' \
+          --header='Content-Type: application/json' --header='Authorization: Bearer admin-token' \
+          http://server:8080/admin/seed || true
+
+        echo "Seed complete."
+    depends_on:
+      server:
+        condition: service_healthy
+    profiles:
+      - seed
+
+  # ---------------------------------------------------------------------------
+  # MongoDB backend (alternative)
+  # Usage: docker compose --profile mongodb up -d
+  # Seed:  docker compose --profile mongodb --profile seed-mongo up
+  # ---------------------------------------------------------------------------
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - mongodb
+
+  server-mongo:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      DB_BACKEND: mongodb
+      MONGODB_URL: mongodb://mongodb:27017/reso_reference
+      METADATA_PATH: ./server-metadata.json
+      # BASE_URL: http://server-mongo:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
+      ENUM_MODE: string
+      ENTITY_EVENT: ${ENTITY_EVENT:-false}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    profiles:
+      - mongodb
+
+  seed-mongo:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/Dockerfile
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for server at http://server-mongo:8080..."
+        until wget -qO- http://server-mongo:8080/health > /dev/null 2>&1; do sleep 2; done
+        echo "Server ready. Loading static seed data..."
+
+        wget -qO- --post-data='{}' \
+          --header='Content-Type: application/json' --header='Authorization: Bearer admin-token' \
+          http://server-mongo:8080/admin/seed || true
+
+        echo "Seed complete."
+    depends_on:
+      server-mongo:
+        condition: service_healthy
+    profiles:
+      - seed-mongo
+
+  # ---------------------------------------------------------------------------
+  # SQLite backend (lightweight, no external database)
+  # Usage: docker compose --profile sqlite up -d server-sqlite
+  # Seed:  docker compose --profile sqlite --profile seed-sqlite up
+  # ---------------------------------------------------------------------------
+  server-sqlite:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      DB_BACKEND: sqlite
+      SQLITE_DB_PATH: /data/reso_reference.db
+      METADATA_PATH: ./server-metadata.json
+      # BASE_URL: http://server-sqlite:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
+      ENUM_MODE: string
+      ENTITY_EVENT: ${ENTITY_EVENT:-false}
+    volumes:
+      - sqlitedata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    profiles:
+      - sqlite
+
+  seed-sqlite:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/Dockerfile
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for server at http://server-sqlite:8080..."
+        until wget -qO- http://server-sqlite:8080/health > /dev/null 2>&1; do sleep 2; done
+        echo "Server ready. Loading static seed data..."
+
+        wget -qO- --post-data='{}' \
+          --header='Content-Type: application/json' --header='Authorization: Bearer admin-token' \
+          http://server-sqlite:8080/admin/seed || true
+
+        echo "Seed complete."
+    depends_on:
+      server-sqlite:
+        condition: service_healthy
+    profiles:
+      - seed-sqlite
+
+  # ---------------------------------------------------------------------------
+  # Compliance: Data Dictionary 2.0 (PostgreSQL)
+  # Usage: docker compose --profile compliance-dd up --build --exit-code-from compliance-dd
+  # ---------------------------------------------------------------------------
+  compliance-dd:
+    build:
+      context: ..
+      dockerfile: reso-certification/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-dd.sh"]
+    environment:
+      SERVER_URL: http://server:8080
+      AUTH_TOKEN: admin-token
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server:
+        condition: service_healthy
+    profiles:
+      - compliance
+      - compliance-dd
+
+  # ---------------------------------------------------------------------------
+  # Compliance: Web API Core 2.0.0 (PostgreSQL)
+  # Usage: docker compose --profile compliance-core up --build --exit-code-from compliance-core
+  # ---------------------------------------------------------------------------
+  compliance-core:
+    build:
+      context: ..
+      dockerfile: reso-certification/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-core.sh"]
+    environment:
+      SERVER_URL: http://server:8080
+      AUTH_TOKEN: admin-token
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server:
+        condition: service_healthy
+    profiles:
+      - compliance
+      - compliance-core
+
+  # ---------------------------------------------------------------------------
+  # Compliance: Data Dictionary 2.0 (MongoDB)
+  # Usage: docker compose --profile compliance-dd-mongo up --build --exit-code-from compliance-dd-mongo
+  # ---------------------------------------------------------------------------
+  compliance-dd-mongo:
+    build:
+      context: ..
+      dockerfile: reso-certification/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-dd.sh"]
+    environment:
+      SERVER_URL: http://server-mongo:8080
+      AUTH_TOKEN: admin-token
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server-mongo:
+        condition: service_healthy
+    profiles:
+      - compliance-mongo
+      - compliance-dd-mongo
+
+  # ---------------------------------------------------------------------------
+  # Compliance: Web API Core 2.0.0 (MongoDB)
+  # Usage: docker compose --profile compliance-core-mongo up --build --exit-code-from compliance-core-mongo
+  # ---------------------------------------------------------------------------
+  compliance-core-mongo:
+    build:
+      context: ..
+      dockerfile: reso-certification/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-core.sh"]
+    environment:
+      SERVER_URL: http://server-mongo:8080
+      AUTH_TOKEN: admin-token
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server-mongo:
+        condition: service_healthy
+    profiles:
+      - compliance-mongo
+      - compliance-core-mongo
+
+  # ---------------------------------------------------------------------------
+  # Compliance: Data Dictionary 2.0 (SQLite)
+  # Usage: docker compose --profile sqlite --profile compliance-dd-sqlite up --build --exit-code-from compliance-dd-sqlite
+  # ---------------------------------------------------------------------------
+  compliance-dd-sqlite:
+    build:
+      context: ..
+      dockerfile: reso-certification/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-dd.sh"]
+    environment:
+      SERVER_URL: http://server-sqlite:8080
+      AUTH_TOKEN: admin-token
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server-sqlite:
+        condition: service_healthy
+    profiles:
+      - compliance-sqlite
+      - compliance-dd-sqlite
+
+  # ---------------------------------------------------------------------------
+  # Compliance: Web API Core 2.0.0 (SQLite)
+  # Usage: docker compose --profile sqlite --profile compliance-core-sqlite up --build --exit-code-from compliance-core-sqlite
+  # ---------------------------------------------------------------------------
+  compliance-core-sqlite:
+    build:
+      context: ..
+      dockerfile: reso-certification/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-core.sh"]
+    environment:
+      SERVER_URL: http://server-sqlite:8080
+      AUTH_TOKEN: admin-token
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server-sqlite:
+        condition: service_healthy
+    profiles:
+      - compliance-sqlite
+      - compliance-core-sqlite
+
+  # ---------------------------------------------------------------------------
+  # Compliance: EntityEvent RCP-027 (PostgreSQL)
+  # Usage: docker compose --profile compliance-entity-event up --build --exit-code-from compliance-entity-event
+  # ---------------------------------------------------------------------------
+  db-entity-event:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: reso
+      POSTGRES_PASSWORD: reso
+      POSTGRES_DB: reso_entity_event
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reso -d reso_entity_event"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - compliance-entity-event
+
+  server-entity-event:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/Dockerfile
+    environment:
+      PORT: 8080
+      DB_BACKEND: postgres
+      DATABASE_URL: postgresql://reso:reso@db-entity-event:5432/reso_entity_event
+      METADATA_PATH: ./server-metadata.json
+      # BASE_URL: http://server-entity-event:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
+      ENUM_MODE: string
+      ENTITY_EVENT: "true"
+    depends_on:
+      db-entity-event:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    profiles:
+      - compliance-entity-event
+
+  compliance-entity-event:
+    build:
+      context: ..
+      dockerfile: reso-certification/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-entity-event.sh"]
+    environment:
+      SERVER_URL: http://server-entity-event:8080
+      AUTH_TOKEN: admin-token
+      MODE: full
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server-entity-event:
+        condition: service_healthy
+    profiles:
+      - compliance-entity-event
+
+  # ---------------------------------------------------------------------------
+  # Compliance: EntityEvent RCP-027 (MongoDB)
+  # Usage: docker compose --profile compliance-entity-event-mongo up --build --exit-code-from compliance-entity-event-mongo
+  # ---------------------------------------------------------------------------
+  mongodb-entity-event:
+    image: mongo:7
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - compliance-entity-event-mongo
+
+  server-entity-event-mongo:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/Dockerfile
+    environment:
+      PORT: 8080
+      DB_BACKEND: mongodb
+      MONGODB_URL: mongodb://mongodb-entity-event:27017/reso_entity_event
+      METADATA_PATH: ./server-metadata.json
+      # BASE_URL: http://server-entity-event-mongo:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
+      ENUM_MODE: string
+      ENTITY_EVENT: "true"
+    depends_on:
+      mongodb-entity-event:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    profiles:
+      - compliance-entity-event-mongo
+
+  compliance-entity-event-mongo:
+    build:
+      context: ..
+      dockerfile: reso-certification/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-entity-event.sh"]
+    environment:
+      SERVER_URL: http://server-entity-event-mongo:8080
+      AUTH_TOKEN: admin-token
+      MODE: full
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server-entity-event-mongo:
+        condition: service_healthy
+    profiles:
+      - compliance-entity-event-mongo
+
+  # ---------------------------------------------------------------------------
+  # Compliance: EntityEvent RCP-027 (SQLite)
+  # Usage: docker compose --profile compliance-entity-event-sqlite up --build --exit-code-from compliance-entity-event-sqlite
+  # ---------------------------------------------------------------------------
+  server-entity-event-sqlite:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/Dockerfile
+    environment:
+      PORT: 8080
+      DB_BACKEND: sqlite
+      SQLITE_DB_PATH: /data/reso_entity_event.db
+      METADATA_PATH: ./server-metadata.json
+      # BASE_URL: http://server-entity-event-sqlite:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
+      ENUM_MODE: string
+      ENTITY_EVENT: "true"
+    volumes:
+      - sqlitedata-entity-event:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    profiles:
+      - compliance-entity-event-sqlite
+
+  compliance-entity-event-sqlite:
+    build:
+      context: ..
+      dockerfile: reso-certification/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-entity-event.sh"]
+    environment:
+      SERVER_URL: http://server-entity-event-sqlite:8080
+      AUTH_TOKEN: admin-token
+      MODE: full
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server-entity-event-sqlite:
+        condition: service_healthy
+    profiles:
+      - compliance-entity-event-sqlite
+
+  # ---------------------------------------------------------------------------
+  # Compliance: Add/Edit RCP-010 (ephemeral PostgreSQL)
+  # Usage: docker compose --profile compliance-addedit up --build --exit-code-from compliance-addedit
+  # ---------------------------------------------------------------------------
+  db-addedit:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: reso
+      POSTGRES_PASSWORD: reso
+      POSTGRES_DB: reso_addedit
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reso -d reso_addedit"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - compliance-addedit
+
+  server-addedit:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/Dockerfile
+    environment:
+      PORT: 8080
+      DB_BACKEND: postgres
+      DATABASE_URL: postgresql://reso:reso@db-addedit:5432/reso_addedit
+      METADATA_PATH: ./server-metadata.json
+      # BASE_URL: http://server-addedit:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
+      ENUM_MODE: string
+    depends_on:
+      db-addedit:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    profiles:
+      - compliance-addedit
+
+  compliance-addedit:
+    build:
+      context: ..
+      dockerfile: reso-certification/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-addedit.sh"]
+    environment:
+      SERVER_URL: http://server-addedit:8080
+      AUTH_TOKEN: admin-token
+      RESOURCE: Property
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server-addedit:
+        condition: service_healthy
+    profiles:
+      - compliance-addedit
+
+  # ---------------------------------------------------------------------------
+  # Compliance: Add/Edit RCP-010 (ephemeral MongoDB)
+  # Usage: docker compose --profile compliance-addedit-mongo up --build --exit-code-from compliance-addedit-mongo
+  # ---------------------------------------------------------------------------
+  mongodb-addedit:
+    image: mongo:7
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - compliance-addedit-mongo
+
+  server-addedit-mongo:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/Dockerfile
+    environment:
+      PORT: 8080
+      DB_BACKEND: mongodb
+      MONGODB_URL: mongodb://mongodb-addedit:27017/reso_addedit
+      METADATA_PATH: ./server-metadata.json
+      # BASE_URL: http://server-addedit-mongo:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
+      ENUM_MODE: string
+    depends_on:
+      mongodb-addedit:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    profiles:
+      - compliance-addedit-mongo
+
+  compliance-addedit-mongo:
+    build:
+      context: ..
+      dockerfile: reso-certification/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-addedit.sh"]
+    environment:
+      SERVER_URL: http://server-addedit-mongo:8080
+      AUTH_TOKEN: admin-token
+      RESOURCE: Property
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server-addedit-mongo:
+        condition: service_healthy
+    profiles:
+      - compliance-addedit-mongo
+
+  # ---------------------------------------------------------------------------
+  # Compliance: Add/Edit RCP-010 (ephemeral SQLite)
+  # Usage: docker compose --profile compliance-addedit-sqlite up --build --exit-code-from compliance-addedit-sqlite
+  # ---------------------------------------------------------------------------
+  server-addedit-sqlite:
+    build:
+      context: ..
+      dockerfile: reso-reference-server/Dockerfile
+    environment:
+      PORT: 8080
+      DB_BACKEND: sqlite
+      SQLITE_DB_PATH: /data/reso_addedit.db
+      METADATA_PATH: ./server-metadata.json
+      # BASE_URL: http://server-addedit-sqlite:8080  # unset -> server derives base from request Host (see reso-reference-server base-url.ts); set only to pin a public URL a proxy/CDN hides
+      ENUM_MODE: string
+    volumes:
+      - sqlitedata-addedit:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    profiles:
+      - compliance-addedit-sqlite
+
+  compliance-addedit-sqlite:
+    build:
+      context: ..
+      dockerfile: reso-certification/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-addedit.sh"]
+    environment:
+      SERVER_URL: http://server-addedit-sqlite:8080
+      AUTH_TOKEN: admin-token
+      RESOURCE: Property
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server-addedit-sqlite:
+        condition: service_healthy
+    profiles:
+      - compliance-addedit-sqlite
+
+  # ---------------------------------------------------------------------------
+  # MCP server smoke test
+  # Verifies the reso-mcp-server Docker image starts and successfully calls
+  # tools (initialize, tools/list, metadata, query, parse-filter) against
+  # the reference server.
+  # Usage: docker compose --profile compliance-mcp up --build --exit-code-from compliance-mcp
+  # ---------------------------------------------------------------------------
+  compliance-mcp:
+    build:
+      context: ..
+      dockerfile: reso-mcp-server/Dockerfile
+    entrypoint: ["/bin/sh", "/config/entrypoint-mcp-smoke.sh"]
+    environment:
+      SERVER_URL: http://server:8080
+      AUTH_TOKEN: admin-token
+    volumes:
+      - ./compliance:/config:ro
+    depends_on:
+      server:
+        condition: service_healthy
+    profiles:
+      - compliance
+      - compliance-mcp
+
+volumes:
+  pgdata:
+  mongodata:
+  sqlitedata:
+  sqlitedata-addedit:
+  sqlitedata-entity-event:

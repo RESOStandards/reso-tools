@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "rootDir": "." },
+  "include": ["src/**/*", "tests/**/*"],
+  "comment": "tests/legacy exercises the vendored untyped JS in src/legacy, which carries no declarations — property access on an inferred shape and implicitly-any destructured params are expected there, not defects. src/legacy is likewise outside Biome's scope.",
+  "exclude": ["node_modules", "dist", "tests/legacy"]
+}

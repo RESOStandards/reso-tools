@@ -1,0 +1,294 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { runAllEntityEventScenarios } from '../entity-event/test-runner.js';
+import type { EntityEventConfig as EERunnerConfig } from '../entity-event/types.js';
+import { resolveAuthToken } from '../test-runner/auth.js';
+import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, persistMetadataXml } from '../test-runner/metadata.js';
+import { CERTIFIABLE, allOf, everyStepPassed, notCertifiable } from './certification.js';
+import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
+import { createPipeline } from './pipeline.js';
+import { entityEventReportGenerators, prepareOutputDir, writeReports } from './reports.js';
+import { FETCH_METADATA, RUN_ENTITY_EVENT_SCENARIOS } from './step-names.js';
+import type { BaseTestContext, EntityEventConfig, PipelineStep, ValidForCertification } from './types.js';
+import type { StepResult } from './types.js';
+
+// ── Pipeline Context ──
+
+interface EntityEventContext extends BaseTestContext {
+  readonly mode: 'observe' | 'full';
+  readonly writableResource: string;
+  readonly payloadsDir?: string;
+  readonly testReport?: unknown;
+  readonly [key: string]: unknown;
+}
+
+// ── Pipeline Steps ──
+
+/** OData service check — fetches the service document to confirm the server is reachable and speaks OData. */
+const serviceCheck: PipelineStep<EntityEventContext> = {
+  name: 'Service check',
+  run: async (ctx, onProgress) => {
+    const url = ctx.serverUrl;
+    // Identifying User-Agent + explicit Accept so servers behind WAFs
+    // do not reject based on undici's default User-Agent of 'node'.
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'User-Agent': 'RESO-Cert/0.11'
+    };
+    if (ctx.authToken) headers.Authorization = `Bearer ${ctx.authToken}`;
+    const maxAttempts = 10;
+    let lastStatus: number | undefined;
+    let lastBody: string | undefined;
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const response = await fetch(url, { headers });
+        if (response.ok) {
+          return { context: ctx, summary: 'OData service is ready', requestDetails: [{ method: 'GET', url }] };
+        }
+        lastStatus = response.status;
+        try {
+          lastBody = (await response.text()).slice(0, 500);
+        } catch {
+          /* ignore body read errors */
+        }
+      } catch (err) {
+        lastBody = err instanceof Error ? err.message : String(err);
+      }
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      onProgress({ step: 'Service check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
+    }
+    const errorDetail = lastStatus
+      ? `HTTP ${lastStatus}${lastBody ? ` — ${lastBody}` : ''}`
+      : `No response after ${maxAttempts} attempts${lastBody ? ` (last error: ${lastBody})` : ''}`;
+    return {
+      context: ctx,
+      status: 'failed',
+      errors: [`OData service did not respond: ${errorDetail}`],
+      requestDetails: [{ method: 'GET', url, error: errorDetail }]
+    };
+  }
+};
+
+/** Resolve the auth token from the config. */
+const resolveAuth = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
+  name: 'Resolve authentication',
+  run: async ctx => {
+    const authToken = await resolveAuthToken(config.server.auth);
+    return { context: { ...ctx, authToken }, summary: 'Auth credentials present' };
+  }
+});
+
+/** Fetch and parse OData $metadata to verify EntityEvent exists. */
+const fetchAndParseMetadata = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
+  name: FETCH_METADATA,
+  run: async (ctx, onProgress) => {
+    onProgress({ step: FETCH_METADATA, status: 'running', message: 'Fetching $metadata...' });
+    const metadataXml = config.payloadsDir
+      ? await loadMetadataFromFile(config.payloadsDir)
+      : await fetchMetadata(ctx.serverUrl, ctx.authToken!);
+
+    // Persist raw EDMX next to the report files (CLI + UI download).
+    await persistMetadataXml(ctx.outputPath, metadataXml);
+
+    const metadata = parseMetadataXml(metadataXml);
+
+    // XSD + semantic validation
+    const validation = await validateMetadata(metadataXml);
+    const validationErrors = collectValidationErrors(validation);
+
+    const entityEventType = metadata.entityTypes.find(et => et.name === 'EntityEvent');
+    const eeMsg = entityEventType
+      ? `EntityEvent found with ${entityEventType.properties.length} fields`
+      : 'EntityEvent not found (will be caught by test scenarios)';
+
+    return {
+      context: { ...ctx, metadataXml },
+      summary: `Metadata parsed: ${eeMsg}. ${formatValidationSummary(validation)}`,
+      counts: { entityTypes: metadata.entityTypes.length },
+      ...(validationErrors.length > 0 ? { errors: validationErrors } : {}),
+      ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {})
+    };
+  }
+});
+
+/** Generate payload files for full mode canary writes. */
+const generatePayloads = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
+  name: 'Generate payloads',
+  run: async ctx => {
+    if (config.payloadsDir) {
+      return {
+        context: { ...ctx, payloadsDir: config.payloadsDir },
+        summary: `Using existing payloads from ${config.payloadsDir}`
+      };
+    }
+
+    if (ctx.mode !== 'full') {
+      return { context: ctx, status: 'skipped', summary: 'Observe mode — no payloads needed' };
+    }
+
+    const outputDir = config.options?.outputDir
+      ? join(config.options.outputDir, 'entity-event-payloads')
+      : join(process.cwd(), '.reso-cert', 'entity-event-payloads');
+
+    await mkdir(outputDir, { recursive: true });
+
+    const payload = {
+      ListPrice: 275000.0,
+      BedroomsTotal: 3,
+      BathroomsTotalInteger: 2,
+      City: 'EntityEvent Test City',
+      StateOrProvince: 'TX',
+      PostalCode: '78701',
+      Country: 'US'
+    };
+
+    await writeFile(join(outputDir, 'create-succeeds.json'), JSON.stringify(payload, null, 2));
+
+    return {
+      context: { ...ctx, payloadsDir: outputDir },
+      summary: 'Generated canary write payload',
+      artifacts: [{ label: 'Payloads', path: outputDir }]
+    };
+  }
+});
+
+/** Run all EntityEvent compliance scenarios. */
+const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
+  name: RUN_ENTITY_EVENT_SCENARIOS,
+  run: async (ctx, onProgress) => {
+    const runnerConfig: EERunnerConfig = {
+      serverUrl: ctx.serverUrl,
+      auth: config.server.auth,
+      mode: ctx.mode,
+      writableResource: ctx.writableResource,
+      payloadsDir: ctx.payloadsDir,
+      maxEvents: config.maxEvents ?? 1000,
+      batchSize: config.batchSize ?? 100,
+      pollIntervalMs: config.pollInterval ?? 5000,
+      pollTimeoutMs: config.pollTimeout ?? 30000,
+      strict: false
+    };
+
+    const testReport = await runAllEntityEventScenarios(runnerConfig, message => {
+      onProgress({ step: RUN_ENTITY_EVENT_SCENARIOS, status: 'running', message });
+    });
+    const { passed, failed } = testReport.summary;
+    const status = failed > 0 ? ('failed' as const) : ('passed' as const);
+
+    return {
+      context: { ...ctx, testReport },
+      status,
+      summary: `${passed} passed, ${failed} failed (${testReport.scenarios.length} scenarios, ${testReport.mode} mode). ${testReport.dataValidation.eventsValidated} events validated`,
+      counts: {
+        total: testReport.scenarios.length,
+        passed,
+        failed,
+        eventsValidated: testReport.dataValidation.eventsValidated
+      }
+    };
+  }
+});
+
+/** Write generic and detailed compliance reports. */
+const writeComplianceReports = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
+  name: 'Write reports',
+  run: async (ctx, onProgress) => {
+    // outputPath is prepped by runEntityEventCompliance before the
+    // pipeline starts (prepareOutputDir).
+    const generators = entityEventReportGenerators('1.0.0');
+
+    const testReport = ctx.testReport as {
+      scenarios: ReadonlyArray<unknown>;
+      summary: { total: number; passed: number; failed: number; skipped?: number };
+    };
+    const contextWithReports = {
+      ...ctx,
+      resourceReports: [
+        {
+          resource: 'EntityEvent',
+          summary: testReport.summary,
+          scenarios: testReport.scenarios
+        }
+      ]
+    };
+
+    const steps = (ctx.pipelineSteps as ReadonlyArray<StepResult>) ?? [];
+    const pipelineResult = {
+      status: testReport.summary.failed > 0 ? ('failed' as const) : ('passed' as const),
+      endorsement: 'entity-event',
+      steps,
+      context: contextWithReports,
+      // The same pure rule the pipeline applies to its returned result, over the same step list, so
+      // the written report and the returned result cannot disagree.
+      certification: entityEventValidForCertification(config)(steps),
+      duration: 0
+    };
+
+    const written = await writeReports(pipelineResult, generators, ctx.outputPath, onProgress);
+
+    return {
+      context: { ...ctx, reports: written },
+      summary: `${written.length} reports written`
+    };
+  }
+});
+
+// ── Pipeline Assembly ──
+
+/**
+ * EntityEvent's own certification rule: every step passed, AND the run was not observe-only.
+ *
+ * The mode check is the part a step list cannot supply. In observe mode `generatePayloads` is
+ * OMITTED from the pipeline rather than skipped, so it produces no StepResult and `everyStepPassed`
+ * sees a complete, all-passing run. An observe-only run exercises no writes at all, so certifying
+ * it would certify nothing.
+ *
+ * This is the case that ruled out expressing the rule as a per-endorsement "are skips allowed"
+ * flag: the answer for EntityEvent is yes, and that answer would have made an observe-only run
+ * eligible.
+ */
+/**
+ * Exported so the rule can be tested directly. The alternative is reaching it only through a full
+ * pipeline run against a live server, which would leave the rule itself unobserved.
+ */
+export const entityEventValidForCertification =
+  (config: EntityEventConfig): ValidForCertification =>
+  steps =>
+    allOf(
+      config.mode === 'observe'
+        ? notCertifiable(['observe mode — the run exercised no writes, so there is nothing to certify'])
+        : CERTIFIABLE,
+      everyStepPassed(steps)
+    );
+
+/** Create the EntityEvent compliance test pipeline. */
+export const createEntityEventPipeline = (config: EntityEventConfig) =>
+  createPipeline<EntityEventContext>(
+    'entity-event',
+    [
+      resolveAuth(config),
+      ...(config.options?.skipHealthCheck ? [] : [serviceCheck]),
+      fetchAndParseMetadata(config),
+      ...(config.mode === 'full' ? [generatePayloads(config)] : []),
+      runTests(config),
+      writeComplianceReports(config)
+    ],
+    entityEventValidForCertification(config)
+  );
+
+/** Run EntityEvent compliance tests with a single function call. */
+export const runEntityEventCompliance = async (
+  config: EntityEventConfig,
+  onProgress?: (progress: import('./types.js').StepProgress) => void
+) => {
+  const pipeline = createEntityEventPipeline(config);
+  const outputPath = await prepareOutputDir('entity-event', '1.0.0', config);
+  const initialContext: EntityEventContext = {
+    serverUrl: config.server.url,
+    mode: config.mode ?? 'observe',
+    writableResource: config.writableResource ?? 'Property',
+    outputPath
+  };
+
+  return pipeline.run(initialContext, onProgress, { failFast: config.options?.failFast ?? false });
+};

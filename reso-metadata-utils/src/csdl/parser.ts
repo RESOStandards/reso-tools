@@ -1,0 +1,773 @@
+/**
+ * CSDL/EDMX XML parser — converts OData metadata XML into structured types.
+ *
+ * Moved from certification/add-edit/src/lib/metadata.ts and enhanced with
+ * enum type, entity container, and NavigationProperty extraction. Uses
+ * fast-xml-parser with the same options for compatibility with existing
+ * RESO tooling.
+ *
+ * @see https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html
+ */
+
+import { XMLParser } from 'fast-xml-parser';
+import type {
+  CsdlAction,
+  CsdlActionImport,
+  CsdlComplexType,
+  CsdlEntityContainer,
+  CsdlEntitySet,
+  CsdlEntityType,
+  CsdlEnumMember,
+  CsdlEnumType,
+  CsdlFunction,
+  CsdlFunctionImport,
+  CsdlNavigationProperty,
+  CsdlNavigationPropertyBinding,
+  CsdlParameter,
+  CsdlProperty,
+  CsdlReferentialConstraint,
+  CsdlResourceInfo,
+  CsdlReturnType,
+  CsdlSchema,
+  CsdlSingleton,
+  FieldAnnotation,
+  FieldInfo
+} from './types.js';
+
+/**
+ * Parser options for fast-xml-parser.
+ * `isArray` forces certain elements to always be arrays even when only
+ * one child exists, preventing inconsistent shapes.
+ */
+const xmlParserOptions = {
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+  // Decode XML entities (&amp; -> &, &lt; -> <, ...) so annotation/text values with XML-special
+  // characters (e.g. a StandardName of "Flex R&D") parse faithfully. With this off, an escaped
+  // value parses back as its literal entity form ("Flex R&amp;D"), corrupting any such value.
+  processEntities: true,
+  isArray: (name: string) =>
+    [
+      'EntityType',
+      'EnumType',
+      'ComplexType',
+      'Member',
+      'Property',
+      'NavigationProperty',
+      'PropertyRef',
+      'Annotation',
+      'EntitySet',
+      'NavigationPropertyBinding',
+      'Action',
+      'Function',
+      'Parameter',
+      'Singleton',
+      'ActionImport',
+      'FunctionImport',
+      'ReferentialConstraint'
+    ].includes(name)
+};
+
+/**
+ * Check if a type string is a Collection wrapper: Collection(Namespace.TypeName)
+ */
+const isCollectionType = (type: string): boolean => type.startsWith('Collection(') && type.endsWith(')');
+
+/**
+ * Unwrap Collection(X) → X
+ */
+const unwrapCollectionType = (type: string): string => type.slice('Collection('.length, -1);
+
+/**
+ * Extract the unqualified type name from a potentially namespace-qualified
+ * and/or Collection-wrapped type string.
+ * e.g. "Collection(org.reso.metadata.Media)" → "Media"
+ * e.g. "org.reso.metadata.Property" → "Property"
+ */
+export const extractTypeName = (type: string): string => {
+  const unwrapped = isCollectionType(type) ? unwrapCollectionType(type) : type;
+  const dotIndex = unwrapped.lastIndexOf('.');
+  return dotIndex >= 0 ? unwrapped.slice(dotIndex + 1) : unwrapped;
+};
+
+/**
+ * Resolve a CSDL schema Alias prefix in a qualified type reference to its namespace. CSDL lets a
+ * schema declare `Alias="X"` and lets qualified names use the alias or the namespace
+ * interchangeably (e.g. `WEBAPI.Office` == `reso.web.api.Office`). Canonicalizing to the namespace
+ * form lets downstream FQDN comparisons (enum detection, expansion) match regardless of which
+ * spelling a provider used. No-op for Edm primitives, unqualified names, and any prefix that is
+ * not a declared alias. Handles Collection(...) wrappers. Applied to every qualified-name attribute the parser
+ * reads as a TYPE or operation reference — property, navigation, base, parameter and return types; entity-set and
+ * singleton types; action and function import references — so the validator's namespace-keyed maps see one
+ * spelling (reso-tools #300). Not applied to: Annotation/@Term and Annotations/@Target (vocabulary paths, never
+ * resolved here), NavigationPropertyBinding/@Path and @Target, and import @EntitySet (paths, not types). The alias
+ * map is built from the document's own <Schema> elements only; aliases declared by edmx:Reference/edmx:Include
+ * are not read (no reference schemas are parsed) — a type reference through an Include alias stays as written.
+ */
+/** Alias values CSDL XML 4.01 §3.4 forbids — never treated as an alias. */
+const RESERVED_ALIASES: ReadonlySet<string> = new Set(['Edm', 'odata', 'System', 'Transient']);
+
+const canonicalizeType = (type: string, aliasMap: Readonly<Record<string, string>>): string => {
+  // A missing attribute (malformed CSDL) passes through untouched, exactly as it did before canonicalization
+  // reached every qualified-name attribute — the validator, not the parser, reports it.
+  if (typeof type !== 'string') return type;
+  const inner = isCollectionType(type) ? unwrapCollectionType(type) : type;
+  const dot = inner.lastIndexOf('.');
+  if (dot < 0) return type;
+  const namespace = aliasMap[inner.slice(0, dot)];
+  if (!namespace) return type;
+  const canonical = `${namespace}.${inner.slice(dot + 1)}`;
+  return isCollectionType(type) ? `Collection(${canonical})` : canonical;
+};
+
+/**
+ * CSDL constant-expression names (per the OData CSDL XSD GInlineExpressions / GExpression).
+ * A vocabulary annotation's value may be written EITHER as an inline attribute
+ * (`<Annotation Term="..." String="..."/>`) OR as a child element
+ * (`<Annotation Term="..."><String>...</String></Annotation>`) — same names either way, and
+ * identical between OData 4.0 and 4.01. RESO's terms (StandardName, LookupName, DDWikiUrl,
+ * Description) are all String constants.
+ */
+const CONSTANT_EXPRESSION_NAMES = [
+  'String',
+  'Bool',
+  'Int',
+  'Decimal',
+  'Float',
+  'Date',
+  'DateTimeOffset',
+  'Duration',
+  'Guid',
+  'TimeOfDay',
+  'EnumMember',
+  'Binary'
+] as const;
+
+/** Extracts an annotation's constant value from either the inline-attribute or child-element form. */
+const annotationConstantValue = (ann: Record<string, unknown>): string | undefined => {
+  for (const name of CONSTANT_EXPRESSION_NAMES) {
+    const attr = ann[`@_${name}`];
+    if (attr !== undefined && attr !== null) return String(attr);
+    const child = ann[name];
+    if (child !== undefined && child !== null) {
+      // fast-xml-parser yields a primitive for <String>text</String>, or an object carrying
+      // '#text' when the element itself has attributes.
+      return typeof child === 'object' ? String((child as Record<string, unknown>)['#text'] ?? '') : String(child);
+    }
+  }
+  return undefined;
+};
+
+/**
+ * Parses vocabulary Annotations on a CSDL element into a term→value map, handling both the
+ * inline-attribute and wrapped child-element constant forms. Dynamic expressions
+ * (Record/Collection/Path) are skipped — RESO terms are all constants.
+ */
+const parseAnnotations = (raw: Record<string, unknown>): Record<string, string> => {
+  const result: Record<string, string> = {};
+  const rawAnnotations = (raw.Annotation as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
+  for (const ann of rawAnnotations) {
+    const term = ann['@_Term'] as string | undefined;
+    if (!term) continue;
+    const value = annotationConstantValue(ann);
+    if (value !== undefined) result[term] = value;
+  }
+  return result;
+};
+
+const parseProperties = (
+  rawProperties: ReadonlyArray<Record<string, unknown>>,
+  aliasMap: Readonly<Record<string, string>>
+): ReadonlyArray<CsdlProperty> =>
+  rawProperties.map(rawProp => {
+    const annotations = parseAnnotations(rawProp);
+
+    return {
+      name: rawProp['@_Name'] as string,
+      type: canonicalizeType(rawProp['@_Type'] as string, aliasMap),
+      ...(rawProp['@_Nullable'] !== undefined && {
+        nullable: rawProp['@_Nullable'] === 'true'
+      }),
+      ...(rawProp['@_MaxLength'] !== undefined && {
+        maxLength: Number(rawProp['@_MaxLength'])
+      }),
+      ...(rawProp['@_Precision'] !== undefined && {
+        precision: Number(rawProp['@_Precision'])
+      }),
+      ...(rawProp['@_Scale'] !== undefined && {
+        scale: Number(rawProp['@_Scale'])
+      }),
+      ...(Object.keys(annotations).length > 0 && { annotations })
+    };
+  });
+
+/**
+ * Parse ReferentialConstraint child elements from a NavigationProperty.
+ */
+const parseReferentialConstraints = (rawConstraints: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<CsdlReferentialConstraint> =>
+  rawConstraints.map(rc => ({
+    property: rc['@_Property'] as string,
+    referencedProperty: rc['@_ReferencedProperty'] as string
+  }));
+
+/**
+ * Parse NavigationProperty elements from an entity type or complex type.
+ *
+ * NavigationProperty defines relationships between entity types. The type
+ * attribute may be a simple qualified name (single entity) or wrapped in
+ * Collection() for to-many relationships.
+ *
+ * @see https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_NavigationProperty
+ */
+const parseNavigationProperties = (
+  rawNavProps: ReadonlyArray<Record<string, unknown>>,
+  aliasMap: Readonly<Record<string, string>>
+): ReadonlyArray<CsdlNavigationProperty> =>
+  rawNavProps.map(rawNav => {
+    const name = rawNav['@_Name'] as string;
+    const type = canonicalizeType(rawNav['@_Type'] as string, aliasMap);
+    const collection = isCollectionType(type);
+    const entityTypeName = extractTypeName(type);
+
+    const rawConstraints = (rawNav.ReferentialConstraint as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
+
+    return {
+      name,
+      type,
+      isCollection: collection,
+      entityTypeName,
+      ...(rawNav['@_Nullable'] !== undefined && {
+        nullable: rawNav['@_Nullable'] === 'true'
+      }),
+      ...(rawNav['@_Partner'] !== undefined && {
+        partner: rawNav['@_Partner'] as string
+      }),
+      ...(rawNav['@_ContainsTarget'] !== undefined && {
+        containsTarget: rawNav['@_ContainsTarget'] === 'true'
+      }),
+      ...(rawConstraints.length > 0 && {
+        referentialConstraints: parseReferentialConstraints(rawConstraints)
+      })
+    };
+  });
+
+const parseEntityTypes = (
+  rawEntityTypes: ReadonlyArray<Record<string, unknown>>,
+  aliasMap: Readonly<Record<string, string>>
+): ReadonlyArray<CsdlEntityType> =>
+  rawEntityTypes.map(rawEntity => {
+    const name = rawEntity['@_Name'] as string;
+
+    const keyRefs = ((rawEntity.Key as Record<string, unknown>)?.PropertyRef as ReadonlyArray<Record<string, string>> | undefined) ?? [];
+    const key = keyRefs.map(ref => ref['@_Name']);
+
+    const rawProperties = (rawEntity.Property as ReadonlyArray<Record<string, unknown>>) ?? [];
+    const rawNavProperties = (rawEntity.NavigationProperty as ReadonlyArray<Record<string, unknown>>) ?? [];
+    // The declaring schema's namespace (injected at flatMap time) — forms this type's FQDN.
+    const namespace = rawEntity.__schemaNamespace as string | undefined;
+
+    return {
+      name,
+      ...(namespace !== undefined && { namespace }),
+      key,
+      properties: parseProperties(rawProperties, aliasMap),
+      navigationProperties: parseNavigationProperties(rawNavProperties, aliasMap),
+      ...(rawEntity['@_BaseType'] !== undefined && {
+        baseType: canonicalizeType(rawEntity['@_BaseType'] as string, aliasMap)
+      }),
+      ...(rawEntity['@_Abstract'] !== undefined && {
+        abstract: rawEntity['@_Abstract'] === 'true'
+      }),
+      ...(rawEntity['@_OpenType'] !== undefined && {
+        openType: rawEntity['@_OpenType'] === 'true'
+      }),
+      ...(rawEntity['@_HasStream'] !== undefined && {
+        hasStream: rawEntity['@_HasStream'] === 'true'
+      })
+    };
+  });
+
+const parseComplexTypes = (
+  rawComplexTypes: ReadonlyArray<Record<string, unknown>>,
+  aliasMap: Readonly<Record<string, string>>
+): ReadonlyArray<CsdlComplexType> =>
+  rawComplexTypes.map(rawComplex => {
+    const name = rawComplex['@_Name'] as string;
+
+    const rawProperties = (rawComplex.Property as ReadonlyArray<Record<string, unknown>>) ?? [];
+    const rawNavProperties = (rawComplex.NavigationProperty as ReadonlyArray<Record<string, unknown>>) ?? [];
+    // The declaring schema's namespace (injected at flatMap time) — forms this type's FQDN.
+    const namespace = rawComplex.__schemaNamespace as string | undefined;
+
+    return {
+      name,
+      ...(namespace !== undefined && { namespace }),
+      properties: parseProperties(rawProperties, aliasMap),
+      navigationProperties: parseNavigationProperties(rawNavProperties, aliasMap),
+      ...(rawComplex['@_BaseType'] !== undefined && {
+        baseType: canonicalizeType(rawComplex['@_BaseType'] as string, aliasMap)
+      }),
+      ...(rawComplex['@_Abstract'] !== undefined && {
+        abstract: rawComplex['@_Abstract'] === 'true'
+      }),
+      ...(rawComplex['@_OpenType'] !== undefined && {
+        openType: rawComplex['@_OpenType'] === 'true'
+      })
+    };
+  });
+
+const parseEnumTypes = (rawEnumTypes: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<CsdlEnumType> =>
+  rawEnumTypes.map(rawEnum => {
+    const name = rawEnum['@_Name'] as string;
+    const rawMembers = (rawEnum.Member as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
+    const members: ReadonlyArray<CsdlEnumMember> = rawMembers.map(m => {
+      const annotations = parseAnnotations(m);
+      return {
+        name: m['@_Name'] as string,
+        ...(m['@_Value'] !== undefined && { value: m['@_Value'] as string }),
+        ...(Object.keys(annotations).length > 0 && { annotations })
+      };
+    });
+    // namespace is injected onto each raw enum at flatMap time — enum types and entity types
+    // can live in separate namespaced schemas, and the enum's own namespace forms its FQDN.
+    const namespace = rawEnum.__schemaNamespace as string | undefined;
+    return {
+      name,
+      members,
+      ...(namespace !== undefined && { namespace }),
+      ...(rawEnum['@_UnderlyingType'] !== undefined && {
+        underlyingType: rawEnum['@_UnderlyingType'] as string
+      }),
+      ...(rawEnum['@_IsFlags'] !== undefined && {
+        isFlags: rawEnum['@_IsFlags'] === 'true'
+      })
+    };
+  });
+
+/**
+ * Parse NavigationPropertyBinding elements from an EntitySet or Singleton.
+ */
+const parseNavigationPropertyBindings = (
+  rawBindings: ReadonlyArray<Record<string, unknown>>
+): ReadonlyArray<CsdlNavigationPropertyBinding> =>
+  rawBindings.map(b => ({
+    path: b['@_Path'] as string,
+    target: b['@_Target'] as string
+  }));
+
+/**
+ * Parse Parameter elements from an Action or Function.
+ */
+const parseParameters = (
+  rawParams: ReadonlyArray<Record<string, unknown>>,
+  aliasMap: Readonly<Record<string, string>>
+): ReadonlyArray<CsdlParameter> =>
+  rawParams.map(p => ({
+    name: p['@_Name'] as string,
+    type: canonicalizeType(p['@_Type'] as string, aliasMap),
+    ...(p['@_Nullable'] !== undefined && {
+      nullable: p['@_Nullable'] === 'true'
+    })
+  }));
+
+/**
+ * Parse a ReturnType element from an Action or Function.
+ */
+const parseReturnType = (
+  rawReturn: Record<string, unknown> | undefined,
+  aliasMap: Readonly<Record<string, string>>
+): CsdlReturnType | undefined => {
+  if (!rawReturn) return undefined;
+  return {
+    type: canonicalizeType(rawReturn['@_Type'] as string, aliasMap),
+    ...(rawReturn['@_Nullable'] !== undefined && {
+      nullable: rawReturn['@_Nullable'] === 'true'
+    })
+  };
+};
+
+const parseActions = (
+  rawActions: ReadonlyArray<Record<string, unknown>>,
+  aliasMap: Readonly<Record<string, string>>
+): ReadonlyArray<CsdlAction> =>
+  rawActions.map(rawAction => {
+    const rawParams = (rawAction.Parameter as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
+    const rawReturn = rawAction.ReturnType as Record<string, unknown> | undefined;
+
+    return {
+      name: rawAction['@_Name'] as string,
+      ...(rawAction['@_IsBound'] !== undefined && {
+        isBound: rawAction['@_IsBound'] === 'true'
+      }),
+      ...(rawAction['@_EntitySetPath'] !== undefined && {
+        entitySetPath: rawAction['@_EntitySetPath'] as string
+      }),
+      parameters: parseParameters(rawParams, aliasMap),
+      ...(rawReturn !== undefined && {
+        returnType: parseReturnType(rawReturn, aliasMap) as CsdlReturnType
+      })
+    };
+  });
+
+const parseFunctions = (
+  rawFunctions: ReadonlyArray<Record<string, unknown>>,
+  aliasMap: Readonly<Record<string, string>>
+): ReadonlyArray<CsdlFunction> =>
+  rawFunctions.map(rawFunc => {
+    const rawParams = (rawFunc.Parameter as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
+    const rawReturn = rawFunc.ReturnType as Record<string, unknown> | undefined;
+
+    return {
+      name: rawFunc['@_Name'] as string,
+      ...(rawFunc['@_IsBound'] !== undefined && {
+        isBound: rawFunc['@_IsBound'] === 'true'
+      }),
+      ...(rawFunc['@_IsComposable'] !== undefined && {
+        isComposable: rawFunc['@_IsComposable'] === 'true'
+      }),
+      ...(rawFunc['@_EntitySetPath'] !== undefined && {
+        entitySetPath: rawFunc['@_EntitySetPath'] as string
+      }),
+      parameters: parseParameters(rawParams, aliasMap),
+      returnType: parseReturnType(rawReturn, aliasMap) as CsdlReturnType
+    };
+  });
+
+const parseEntityContainer = (
+  rawContainer: Record<string, unknown> | undefined,
+  aliasMap: Readonly<Record<string, string>>
+): CsdlEntityContainer | undefined => {
+  if (!rawContainer) return undefined;
+
+  const name = (rawContainer['@_Name'] as string) ?? 'Default';
+
+  // Entity sets
+  const rawEntitySets = (rawContainer.EntitySet as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
+  const entitySets: ReadonlyArray<CsdlEntitySet> = rawEntitySets.map(es => {
+    const rawBindings = (es.NavigationPropertyBinding as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
+    return {
+      name: es['@_Name'] as string,
+      entityType: canonicalizeType(es['@_EntityType'] as string, aliasMap),
+      ...(rawBindings.length > 0 && {
+        navigationPropertyBindings: parseNavigationPropertyBindings(rawBindings)
+      })
+    };
+  });
+
+  // Singletons
+  const rawSingletons = (rawContainer.Singleton as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
+  const singletons: ReadonlyArray<CsdlSingleton> = rawSingletons.map(s => {
+    const rawBindings = (s.NavigationPropertyBinding as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
+    return {
+      name: s['@_Name'] as string,
+      type: canonicalizeType(s['@_Type'] as string, aliasMap),
+      ...(rawBindings.length > 0 && {
+        navigationPropertyBindings: parseNavigationPropertyBindings(rawBindings)
+      })
+    };
+  });
+
+  // Action imports
+  const rawActionImports = (rawContainer.ActionImport as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
+  const actionImports: ReadonlyArray<CsdlActionImport> = rawActionImports.map(ai => ({
+    name: ai['@_Name'] as string,
+    action: canonicalizeType(ai['@_Action'] as string, aliasMap),
+    ...(ai['@_EntitySet'] !== undefined && {
+      entitySet: ai['@_EntitySet'] as string
+    })
+  }));
+
+  // Function imports
+  const rawFunctionImports = (rawContainer.FunctionImport as ReadonlyArray<Record<string, unknown>> | undefined) ?? [];
+  const functionImports: ReadonlyArray<CsdlFunctionImport> = rawFunctionImports.map(fi => ({
+    name: fi['@_Name'] as string,
+    function: canonicalizeType(fi['@_Function'] as string, aliasMap),
+    ...(fi['@_EntitySet'] !== undefined && {
+      entitySet: fi['@_EntitySet'] as string
+    })
+  }));
+
+  return { name, entitySets, singletons, actionImports, functionImports };
+};
+
+/**
+ * Parse an OData EDMX/CSDL XML string into a structured CsdlSchema.
+ *
+ * Expects the standard EDMX 4.0 format:
+ * `edmx:Edmx > edmx:DataServices > Schema > EntityType | EnumType | ComplexType | Action | Function | EntityContainer`
+ *
+ * @throws {Error} if the Schema element cannot be found
+ */
+export const parseCsdlXml = (xml: string): CsdlSchema => {
+  const parser = new XMLParser(xmlParserOptions);
+  const parsed = parser.parse(xml);
+
+  const rawSchema = parsed?.['edmx:Edmx']?.['edmx:DataServices']?.Schema ?? parsed?.['edmx:Edmx']?.['edmx:DataServices']?.schema;
+
+  if (!rawSchema) {
+    throw new Error('Could not find Schema element in metadata XML');
+  }
+
+  // Handle both single Schema element and multiple Schema elements (common in external servers
+  // that split entity types and enum types into separate namespaced schemas).
+  const schemas: ReadonlyArray<Record<string, unknown>> = Array.isArray(rawSchema) ? rawSchema : [rawSchema];
+
+  // Use the namespace from the first schema that has entity types, or fall back to the first schema
+  const namespace: string = ((schemas.find(s => s.EntityType) ?? schemas[0])['@_Namespace'] as string) ?? '';
+
+  // CSDL allows a schema Alias as a shorthand for its Namespace; qualified type references may use
+  // the alias or the namespace interchangeably. Map alias -> namespace so canonicalizeType can
+  // normalize every qualified type reference before downstream FQDN matching.
+  // CSDL XML 4.01 §3.4 MUSTs: an alias is unique within the document, differs from every schema namespace,
+  // and is none of Edm / odata / System / Transient. An alias that breaks one of them is NOT mapped — mapping a
+  // duplicate would pick one schema arbitrarily, and mapping an alias that equals a namespace would rewrite the
+  // NAMESPACE spelling of another schema's type. References through an unmapped alias stay as written
+  // (reporting the violation itself is the validator's job — see reso-tools #300 follow-ups).
+  const declaredNamespaceSet = new Set(schemas.map(s => s['@_Namespace']).filter((n): n is string => typeof n === 'string'));
+  const aliasCounts = schemas.reduce<Record<string, number>>((acc, s) => {
+    const alias = s['@_Alias'];
+    if (typeof alias === 'string') acc[alias] = (acc[alias] ?? 0) + 1;
+    return acc;
+  }, {});
+  const aliasMap: Readonly<Record<string, string>> = Object.fromEntries(
+    schemas
+      .filter(s => typeof s['@_Alias'] === 'string' && typeof s['@_Namespace'] === 'string')
+      .filter(s => aliasCounts[s['@_Alias'] as string] === 1)
+      .filter(s => !declaredNamespaceSet.has(s['@_Alias'] as string))
+      .filter(s => !RESERVED_ALIASES.has(s['@_Alias'] as string))
+      .map(s => [s['@_Alias'] as string, s['@_Namespace'] as string])
+  );
+
+  // Merge elements from all schemas. Each type carries the namespace of the schema it was declared in
+  // (multi-schema EDMX splits types across namespaces — e.g. entities in org.reso.metadata, enums in
+  // org.reso.metadata.enums); the injected __schemaNamespace forms each type's FQDN downstream.
+  const rawEntityTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s =>
+    ((s.EntityType as ReadonlyArray<Record<string, unknown>>) ?? []).map(e => ({ ...e, __schemaNamespace: s['@_Namespace'] }))
+  );
+  const rawEnumTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s =>
+    ((s.EnumType as ReadonlyArray<Record<string, unknown>>) ?? []).map(e => ({ ...e, __schemaNamespace: s['@_Namespace'] }))
+  );
+  const rawComplexTypes: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(s =>
+    ((s.ComplexType as ReadonlyArray<Record<string, unknown>>) ?? []).map(e => ({ ...e, __schemaNamespace: s['@_Namespace'] }))
+  );
+  const rawActions: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(
+    s => (s.Action as ReadonlyArray<Record<string, unknown>>) ?? []
+  );
+  const rawFunctions: ReadonlyArray<Record<string, unknown>> = schemas.flatMap(
+    s => (s.Function as ReadonlyArray<Record<string, unknown>>) ?? []
+  );
+  // EntityContainer is typically in one schema — find it
+  const rawContainer = schemas.reduce<Record<string, unknown> | undefined>(
+    (found, s) => found ?? (s.EntityContainer as Record<string, unknown> | undefined),
+    undefined
+  );
+
+  return {
+    namespace,
+    entityTypes: parseEntityTypes(rawEntityTypes, aliasMap),
+    enumTypes: parseEnumTypes(rawEnumTypes),
+    complexTypes: parseComplexTypes(rawComplexTypes, aliasMap),
+    actions: parseActions(rawActions, aliasMap),
+    functions: parseFunctions(rawFunctions, aliasMap),
+    entityContainer: parseEntityContainer(rawContainer, aliasMap)
+  };
+};
+
+/**
+ * Discover all resources (entity sets) from a parsed schema, resolving
+ * key fields and navigation properties from their entity type definitions.
+ *
+ * @throws {Error} if the schema has no EntityContainer
+ */
+export const discoverResources = (schema: CsdlSchema): ReadonlyArray<CsdlResourceInfo> => {
+  if (!schema.entityContainer) {
+    throw new Error('No EntityContainer found in metadata');
+  }
+
+  const entityTypeMap = new Map(schema.entityTypes.map(et => [et.name, et]));
+
+  /** Resolve key field by walking up the inheritance chain. */
+  const resolveKeyField = (et: CsdlEntityType | undefined, fallback: string): string => {
+    let current = et;
+    while (current) {
+      if (current.key.length > 0) return current.key[0];
+      if (!current.baseType) break;
+      current = entityTypeMap.get(extractTypeName(current.baseType));
+    }
+    return fallback;
+  };
+
+  /**
+   * Find a human-friendly alternate key (e.g. ListingId, MemberId) distinct from the primary key.
+   * Prefers a field matching the key field pattern (e.g. ListingKey → ListingId) or the
+   * entity set / type name + "Id", then falls back to the first Edm.String *Id field.
+   */
+  const resolveAlternateKey = (
+    et: CsdlEntityType | undefined,
+    keyField: string,
+    entitySetName: string,
+    typeName: string
+  ): string | undefined => {
+    if (!et) return undefined;
+    const idProps = et.properties.filter(p => p.name !== keyField && p.name.endsWith('Id') && p.type === 'Edm.String');
+    if (idProps.length === 0) return undefined;
+
+    // Derive the stem from the key field (e.g. "ListingKey" → "Listing", "MemberKey" → "Member")
+    const keyStem = keyField.endsWith('Key') ? keyField.slice(0, -3) : undefined;
+    const preferredNames = [
+      keyStem ? `${keyStem}Id` : undefined, // ListingKey → ListingId
+      `${entitySetName}Id`, // Property → PropertyId
+      `${typeName}Id` // Property → PropertyId (type name)
+    ].filter((n): n is string => n !== undefined);
+
+    const preferred = preferredNames.reduce<string | undefined>(
+      (found, name) => found ?? idProps.find(p => p.name === name)?.name,
+      undefined
+    );
+    return preferred;
+  };
+
+  return schema.entityContainer.entitySets.map(es => {
+    const typeName = extractTypeName(es.entityType);
+    const et = entityTypeMap.get(typeName);
+    const keyField = resolveKeyField(et, `${typeName}Key`);
+    const alternateKeyField = resolveAlternateKey(et, keyField, es.name, typeName);
+    const navigationProperties = et?.navigationProperties.map(np => np.name) ?? [];
+    return {
+      name: es.name,
+      entityType: es.entityType,
+      keyField,
+      ...(alternateKeyField ? { alternateKeyField } : {}),
+      navigationProperties
+    };
+  });
+};
+
+/** Find an entity type by name. */
+export const getEntityType = (schema: CsdlSchema, name: string): CsdlEntityType | undefined =>
+  schema.entityTypes.find(et => et.name === name);
+
+/** Find an enum type by name. */
+export const getEnumType = (schema: CsdlSchema, name: string): CsdlEnumType | undefined => schema.enumTypes.find(et => et.name === name);
+
+/** Find a complex type by name. */
+export const getComplexType = (schema: CsdlSchema, name: string): CsdlComplexType | undefined =>
+  schema.complexTypes.find(ct => ct.name === name);
+
+/** The RESO annotation term that indicates a field uses the Lookup Resource. */
+const LOOKUP_NAME_TERM = 'RESO.OData.Metadata.LookupName';
+
+/** Check if a CSDL type is an Edm primitive. */
+const isEdmPrimitive = (type: string): boolean => {
+  const unwrapped = isCollectionType(type) ? unwrapCollectionType(type) : type;
+  return unwrapped.startsWith('Edm.');
+};
+
+/** Convert CSDL annotations record to FieldAnnotation array. */
+const toAnnotations = (annotations?: Readonly<Record<string, string>>): ReadonlyArray<FieldAnnotation> =>
+  annotations ? Object.entries(annotations).map(([term, value]) => ({ term, value })) : [];
+
+/** Convert a single CSDL property to a FieldInfo. */
+const propertyToFieldInfo = (resourceName: string, prop: CsdlProperty, namespace: string, keyFields: ReadonlySet<string>): FieldInfo => {
+  const rawType = isCollectionType(prop.type) ? unwrapCollectionType(prop.type) : prop.type;
+  const lookupName = prop.annotations?.[LOOKUP_NAME_TERM];
+  const isCsdlEnum = !isEdmPrimitive(prop.type) && !prop.type.startsWith('Collection(Edm.');
+
+  const typeName = isCsdlEnum
+    ? rawType.startsWith(`${namespace}.`)
+      ? rawType.slice(namespace.length + 1)
+      : rawType
+    : (lookupName ?? undefined);
+
+  return {
+    resourceName,
+    fieldName: prop.name,
+    type: prop.type,
+    typeName,
+    nullable: prop.nullable,
+    isCollection: isCollectionType(prop.type),
+    maxLength: prop.maxLength,
+    scale: prop.scale,
+    precision: prop.precision,
+    annotations: toAnnotations(prop.annotations),
+    lookupName: lookupName ?? undefined,
+    ...(keyFields.has(prop.name) ? { isPrimaryKey: true } : {})
+  };
+};
+
+/**
+ * Extract field metadata for all properties and navigation properties
+ * of a CSDL entity type.
+ */
+export const getFieldsForEntityType = (schema: CsdlSchema, entityType: CsdlEntityType, resourceName: string): ReadonlyArray<FieldInfo> => {
+  const keyFields = new Set(entityType.key);
+  const fields = entityType.properties.map(p => propertyToFieldInfo(resourceName, p, schema.namespace, keyFields));
+
+  const navFields: ReadonlyArray<FieldInfo> = entityType.navigationProperties.map(nav => ({
+    resourceName,
+    fieldName: nav.name,
+    type: nav.type,
+    typeName: nav.entityTypeName,
+    nullable: nav.nullable,
+    isCollection: nav.isCollection,
+    isExpansion: true,
+    annotations: []
+  }));
+
+  return [...fields, ...navFields];
+};
+
+/**
+ * Extract field metadata for a resource (entity set) by name.
+ * Returns all properties and navigation properties as FieldInfo.
+ *
+ * @throws {Error} if the schema has no EntityContainer or the resource is not found
+ */
+export const getFieldsForResource = (schema: CsdlSchema, resourceName: string): ReadonlyArray<FieldInfo> => {
+  if (!schema.entityContainer) throw new Error('No EntityContainer found in metadata');
+
+  const entitySet = schema.entityContainer.entitySets.find(es => es.name === resourceName);
+  if (!entitySet) throw new Error(`Resource "${resourceName}" not found in metadata`);
+
+  const typeName = extractTypeName(entitySet.entityType);
+  const entityType = schema.entityTypes.find(et => et.name === typeName);
+  if (!entityType) throw new Error(`Entity type "${typeName}" not found in metadata`);
+
+  return getFieldsForEntityType(schema, entityType, resourceName);
+};
+
+/**
+ * Extract field metadata for all resources in a schema.
+ *
+ * Served resources (backed by an EntitySet) are keyed by their EntitySet name. Declared EntityTypes with NO
+ * EntitySet — e.g. a containment-navigation (`ContainsTarget="true"`) target such as a contained Media
+ * collection — are legal OData entities and valid `$expand` targets, so their fields are emitted too, keyed by
+ * type name (which is how a qualified `Collection(Ns.Type)` reference resolves downstream). Without them, JSON
+ * schema generation emits a `$ref` to a definition that was never built. A type already surfaced by an
+ * EntitySet is not repeated.
+ */
+export const getAllFields = (schema: CsdlSchema): Readonly<Record<string, ReadonlyArray<FieldInfo>>> => {
+  if (!schema.entityContainer) return {};
+
+  const entityTypeMap = new Map(schema.entityTypes.map(et => [et.name, et]));
+
+  // Served resources: one entry per EntitySet, keyed by the EntitySet name (the queryable resource name).
+  const servedEntries = schema.entityContainer.entitySets.map(es => {
+    const entityType = entityTypeMap.get(extractTypeName(es.entityType));
+    return [es.name, entityType ? getFieldsForEntityType(schema, entityType, es.name) : []] as const;
+  });
+
+  // Every declared EntityType ALSO keyed by its TYPE name, so a type-qualified reference — `Collection(Ns.Type)`
+  // on a nav, which downstream JSON-Schema generation resolves as `#/definitions/{TypeName}` — always finds a
+  // definition. This covers both containment-nav targets that have no EntitySet AND served types whose EntitySet
+  // name differs from the type name (either would otherwise dangle). Dedup against the served ENTRY KEYS
+  // (EntitySet names), NOT against type names: keying entries by type name while deduping by type name is what
+  // let a contained type silently clobber an unrelated served resource. For conformant RESO metadata (EntitySet
+  // name == type name) a served type is already keyed under that name, so it is simply skipped here — a no-op.
+  const servedKeys = new Set(servedEntries.map(([key]) => key));
+  const typeEntries = schema.entityTypes
+    .filter(et => !servedKeys.has(et.name))
+    .map(et => [et.name, getFieldsForEntityType(schema, et, et.name)] as const);
+
+  return Object.fromEntries([...servedEntries, ...typeEntries]);
+};

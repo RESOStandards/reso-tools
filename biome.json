@@ -1,0 +1,86 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.0/schema.json",
+  "files": {
+    "include": [
+      "odata-expression-parser/src/**/*.ts",
+      "odata-expression-parser/src/**/*.tsx",
+      "odata-expression-parser/src/**/*.js",
+      "reso-certification/src/**/*.ts",
+      "reso-certification/src/**/*.tsx",
+      "reso-certification/src/**/*.js",
+      "reso-client/src/**/*.ts",
+      "reso-client/src/**/*.tsx",
+      "reso-client/src/**/*.js",
+      "reso-common/src/**/*.ts",
+      "reso-common/src/**/*.tsx",
+      "reso-common/src/**/*.js",
+      "reso-mcp-server/src/**/*.ts",
+      "reso-mcp-server/src/**/*.tsx",
+      "reso-mcp-server/src/**/*.js",
+      "reso-metadata-utils/src/**/*.ts",
+      "reso-metadata-utils/src/**/*.tsx",
+      "reso-metadata-utils/src/**/*.js",
+      "reso-reference-server/src/**/*.ts",
+      "reso-reference-server/src/**/*.tsx",
+      "reso-reference-server/src/**/*.js",
+      "reso-validation/src/**/*.ts",
+      "reso-validation/src/**/*.tsx",
+      "reso-validation/src/**/*.js",
+      "odata-expression-parser/tests/**/*.ts",
+      "odata-expression-parser/tests/**/*.tsx",
+      "odata-expression-parser/tests/**/*.js",
+      "reso-certification/tests/**/*.ts",
+      "reso-certification/tests/**/*.tsx",
+      "reso-certification/tests/**/*.js",
+      "reso-client/tests/**/*.ts",
+      "reso-client/tests/**/*.tsx",
+      "reso-client/tests/**/*.js",
+      "reso-common/tests/**/*.ts",
+      "reso-common/tests/**/*.tsx",
+      "reso-common/tests/**/*.js",
+      "reso-mcp-server/tests/**/*.ts",
+      "reso-mcp-server/tests/**/*.tsx",
+      "reso-mcp-server/tests/**/*.js",
+      "reso-metadata-utils/tests/**/*.ts",
+      "reso-metadata-utils/tests/**/*.tsx",
+      "reso-metadata-utils/tests/**/*.js",
+      "reso-reference-server/tests/**/*.ts",
+      "reso-reference-server/tests/**/*.tsx",
+      "reso-reference-server/tests/**/*.js",
+      "reso-validation/tests/**/*.ts",
+      "reso-validation/tests/**/*.tsx",
+      "reso-validation/tests/**/*.js"
+    ],
+    "ignore": ["**/node_modules", "**/dist", "**/*.d.ts", "**/*.example.ts", "reso-certification/src/legacy/**"]
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "style": {
+        "useConst": "error",
+        "noVar": "error",
+        "noNonNullAssertion": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "warn"
+      }
+    }
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 140,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always",
+      "trailingCommas": "none",
+      "arrowParentheses": "asNeeded",
+      "bracketSameLine": true
+    }
+  }
+}

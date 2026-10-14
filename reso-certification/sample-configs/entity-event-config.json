@@ -1,0 +1,14 @@
+{
+  "providerUoi": "LOCAL-PROVIDER",
+  "configs": [
+    {
+      "description": "EntityEvent Testing — Full Mode",
+      "serviceRootUri": "http://localhost:8080",
+      "recipientUoi": "LOCAL-RECIPIENT",
+      "providerUsi": "LOCAL-SYSTEM",
+      "token": "admin-token",
+      "mode": "full",
+      "writableResource": "Property"
+    }
+  ]
+}

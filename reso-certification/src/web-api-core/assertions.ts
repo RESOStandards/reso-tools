@@ -1,0 +1,370 @@
+/**
+ * Web API Core assertion primitives.
+ *
+ * Five primitives cover all 45+ scenarios. Each returns a result
+ * with passed/failed status and a diagnostic message.
+ */
+
+import type { ODataResponse } from '../test-runner/types.js';
+import type { ComparisonOp, DataType, SortDirection } from './scenarios.js';
+
+/** Result of a single assertion. */
+export interface AssertionResult {
+  readonly passed: boolean;
+  readonly message: string;
+  /** The assertion could not be evaluated (e.g. the schema validator could not evaluate an item). Counts as
+   *  not-failed for `passed`, but a scenario carrying one is reported SKIPPED, never a determinate PASS. */
+  readonly indeterminate?: boolean;
+}
+
+// ── Comparison operators ──
+
+const numericOps: Readonly<Record<ComparisonOp, (a: number, b: number) => boolean>> = {
+  eq: (a, b) => a === b,
+  ne: (a, b) => a !== b,
+  gt: (a, b) => a > b,
+  ge: (a, b) => a >= b,
+  lt: (a, b) => a < b,
+  le: (a, b) => a <= b
+};
+
+const temporalOps: Readonly<Record<ComparisonOp, (a: string, b: string) => boolean>> = {
+  eq: (a, b) => a === b,
+  ne: (a, b) => a !== b,
+  gt: (a, b) => a > b,
+  ge: (a, b) => a >= b,
+  lt: (a, b) => a < b,
+  le: (a, b) => a <= b
+};
+
+/** Get the appropriate comparison function for a data type and operator. */
+const compareValue = (actual: unknown, op: ComparisonOp, expected: unknown, dataType: DataType): boolean => {
+  if (actual == null) return true; // null values are excluded from filter results by OData spec
+
+  switch (dataType) {
+    case 'integer':
+    case 'decimal':
+      return numericOps[op](Number(actual), Number(expected));
+    case 'date':
+    case 'datetime':
+      return temporalOps[op](String(actual), String(expected));
+  }
+};
+
+// ── Assertion Primitives ──
+
+/**
+ * Assert that every record's field value satisfies a comparison.
+ * Covers all integer, decimal, date, and datetime filter scenarios.
+ */
+export const assertScalarComparison = (
+  records: ReadonlyArray<Record<string, unknown>>,
+  field: string,
+  op: ComparisonOp,
+  value: unknown,
+  dataType: DataType
+): AssertionResult => {
+  const failures: string[] = [];
+
+  for (const [i, record] of records.entries()) {
+    const actual = record[field];
+    if (actual == null) continue;
+    if (!compareValue(actual, op, value, dataType)) {
+      failures.push(`Record ${i}: ${field}=${JSON.stringify(actual)} does not satisfy ${op} ${JSON.stringify(value)}`);
+    }
+  }
+
+  return failures.length === 0
+    ? { passed: true, message: `All ${records.length} records satisfy ${field} ${op} ${JSON.stringify(value)}` }
+    : {
+        passed: false,
+        message: `${failures.length}/${records.length} records failed: ${failures[0]}${failures.length > 1 ? ` (and ${failures.length - 1} more)` : ''}`
+      };
+};
+
+/**
+ * Per-record disjunction: each record must satisfy `(field op1 v1)` OR `(field op2 v2)`. This is the CORRECT
+ * semantics for a `field op1 v1 or field op2 v2` filter — it is NOT `assertScalarComparison(op1) || (op2)`, which
+ * would mean "ALL records satisfy op1" OR "ALL records satisfy op2" (a different, weaker claim). Null field values
+ * are skipped, consistent with {@link assertScalarComparison}.
+ */
+export const assertScalarCompoundOr = (
+  records: ReadonlyArray<Record<string, unknown>>,
+  field: string,
+  op1: ComparisonOp,
+  v1: unknown,
+  op2: ComparisonOp,
+  v2: unknown,
+  dataType: DataType
+): AssertionResult => {
+  const failures: string[] = [];
+
+  for (const [i, record] of records.entries()) {
+    const actual = record[field];
+    if (actual == null) continue;
+    if (!compareValue(actual, op1, v1, dataType) && !compareValue(actual, op2, v2, dataType)) {
+      failures.push(
+        `Record ${i}: ${field}=${JSON.stringify(actual)} satisfies neither ${op1} ${JSON.stringify(v1)} nor ${op2} ${JSON.stringify(v2)}`
+      );
+    }
+  }
+
+  return failures.length === 0
+    ? {
+        passed: true,
+        message: `All ${records.length} records satisfy ${field} ${op1} ${JSON.stringify(v1)} OR ${op2} ${JSON.stringify(v2)}`
+      }
+    : {
+        passed: false,
+        message: `${failures.length}/${records.length} records failed the OR: ${failures[0]}${failures.length > 1 ? ` (and ${failures.length - 1} more)` : ''}`
+      };
+};
+
+/**
+ * Assert that field values are monotonically sorted.
+ * Covers orderby-timestamp-asc/desc scenarios.
+ */
+export const assertSortOrder = (
+  records: ReadonlyArray<Record<string, unknown>>,
+  field: string,
+  direction: SortDirection
+): AssertionResult => {
+  const values = records.map(r => r[field]).filter(v => v != null);
+
+  for (let i = 1; i < values.length; i++) {
+    const prev = String(values[i - 1]);
+    const curr = String(values[i]);
+    const ordered = direction === 'asc' ? prev <= curr : prev >= curr;
+    if (!ordered) {
+      return {
+        passed: false,
+        message: `Sort order violated at position ${i}: ${prev} should be ${direction === 'asc' ? '<=' : '>='} ${curr}`
+      };
+    }
+  }
+
+  return { passed: true, message: `${values.length} values correctly sorted ${direction}` };
+};
+
+/**
+ * Assert single-value enumeration filtering.
+ * Covers enum has/eq/ne scenarios.
+ */
+export const assertEnumMatch = (
+  records: ReadonlyArray<Record<string, unknown>>,
+  field: string,
+  op: 'has' | 'eq' | 'ne',
+  value: string,
+  /** Decode a response value into member names for `has` — a flags enum may serialize as an integer
+   *  bitmask. Omitted for `eq`/`ne`, whose single-member string compares directly. */
+  decode?: (raw: unknown) => ReadonlyArray<string>
+): AssertionResult => {
+  const failures: string[] = [];
+
+  for (const [i, record] of records.entries()) {
+    const actual = record[field];
+    if (actual == null) continue;
+
+    const actualStr = String(actual);
+    const matches =
+      op === 'has'
+        ? (decode ? decode(actual) : actualStr.split(',').map(s => s.trim())).includes(value)
+        : op === 'eq'
+          ? actualStr === value
+          : actualStr !== value;
+
+    if (!matches) {
+      failures.push(`Record ${i}: ${field}=${JSON.stringify(actual)} does not satisfy ${op} ${JSON.stringify(value)}`);
+    }
+  }
+
+  return failures.length === 0
+    ? { passed: true, message: `All ${records.length} records satisfy enum ${op} ${JSON.stringify(value)}` }
+    : { passed: false, message: `${failures.length} records failed enum check: ${failures[0]}` };
+};
+
+/**
+ * Assert multi-value enumeration / collection lambda operations.
+ * Covers has on multi-value fields, any(), and all() scenarios.
+ */
+export const assertCollectionLambda = (
+  records: ReadonlyArray<Record<string, unknown>>,
+  field: string,
+  op: 'has' | 'any' | 'all',
+  values: ReadonlyArray<string>,
+  /** Decode a response value into member names — a flags enum may serialize as an integer bitmask or a
+   *  comma-joined string. Supplied for flags fields so the assertion compares like-for-like; omitted for
+   *  string collections, where the array / comma fallback below is correct. */
+  decode?: (raw: unknown) => ReadonlyArray<string>
+): AssertionResult => {
+  const failures: string[] = [];
+  // Drop empty / literal-"undefined" values (a retried candidate may have fewer than N distinct values);
+  // comparing against them would false-fail every record.
+  const checkValues = values.filter((v): v is string => typeof v === 'string' && v.length > 0 && v !== 'undefined');
+  if (checkValues.length === 0) {
+    return { passed: false, message: `${op}(): no valid comparison values available` };
+  }
+
+  for (const [i, record] of records.entries()) {
+    const actual = record[field];
+    if (actual == null) continue;
+
+    // Decode the collection into member names, then drop empty / whitespace members: an empty collection
+    // decodes to NO members regardless of how it arrives (an empty array `[]`, an empty string `''` which
+    // `split(',')` yields as `['']`, etc.). With no members, `all()` is VACUOUSLY TRUE and `any()` is false —
+    // the OData empty-collection semantics (web-api-core.md:107 "a record with an empty collection satisfies
+    // this vacuously"; §2.5.9.9.2). Without the filter, an empty-string collection would false-fail `all()`.
+    const items: ReadonlyArray<string> = (
+      decode
+        ? decode(actual)
+        : Array.isArray(actual)
+          ? (actual as unknown[]).map(String)
+          : String(actual)
+              .split(',')
+              .map(s => s.trim())
+    ).filter(s => s.length > 0);
+
+    const matches =
+      op === 'any'
+        ? checkValues.some(v => items.includes(v)) // any(x: x eq A [or B]) — at least one element is a requested value (false for an empty collection)
+        : op === 'has'
+          ? checkValues.every(v => items.includes(v)) // has A [and has B] — EVERY requested flag must be set (AND)
+          : items.every(item => checkValues.includes(item)); // all(x: x eq A [or B]) — EVERY element is within {values}; VACUOUSLY TRUE for an empty collection
+
+    if (!matches) {
+      failures.push(`Record ${i}: ${field}=${JSON.stringify(actual)} does not satisfy ${op}(${checkValues.join(', ')})`);
+    }
+  }
+
+  return failures.length === 0
+    ? { passed: true, message: `All ${records.length} records satisfy collection ${op}` }
+    : { passed: false, message: `${failures.length} records failed: ${failures[0]}` };
+};
+
+/** Cap on how much server-error detail we surface in an assertion message. */
+const MAX_ERROR_DETAIL = 300;
+
+/** Collapse whitespace and cap length so a captured server error stays a single readable line. Slices a
+ *  bounded prefix BEFORE collapsing: a misbehaving server can return a multi-MB error body and we only ever
+ *  keep MAX_ERROR_DETAIL chars, so this never scans the whole body. */
+const truncateErrorDetail = (s: string): string => {
+  const t = s
+    .slice(0, MAX_ERROR_DETAIL * 4)
+    .trim()
+    .replace(/\s+/g, ' ');
+  return t.length > MAX_ERROR_DETAIL ? `${t.slice(0, MAX_ERROR_DETAIL)}…` : t;
+};
+
+/**
+ * Extract a concise reason from a non-2xx OData response — the OData `error.message` when the body carries
+ * one, else a trimmed slice of the raw body — so a failure names WHY the server rejected the request, not
+ * just the status code. Returns '' when nothing useful is available.
+ */
+const describeErrorBody = (response: ODataResponse): string => {
+  const body = response.body;
+  if (typeof body === 'object' && body !== null) {
+    const err = (body as { readonly error?: unknown }).error;
+    if (typeof err === 'string' && err.trim().length > 0) return truncateErrorDetail(err);
+    if (typeof err === 'object' && err !== null) {
+      const message = (err as { readonly message?: unknown }).message;
+      if (typeof message === 'string' && message.trim().length > 0) return truncateErrorDetail(message);
+    }
+  }
+  return truncateErrorDetail(response.rawBody ?? '');
+};
+
+/**
+ * Assert structural OData response properties.
+ * Checks status code, OData-Version header, and valid JSON.
+ */
+export const assertODataResponse = (response: ODataResponse, expectedStatus: number): AssertionResult => {
+  if (response.status !== expectedStatus) {
+    // Capture the server's error detail (OData error.message, else the raw body) so a non-2xx failure is
+    // self-diagnosing — e.g. a provider that requires an OriginatingSystemName filter, or a genuine
+    // rejection — rather than an opaque "got 400". Previously only the status code was recorded.
+    const detail = describeErrorBody(response);
+    return { passed: false, message: `Expected HTTP ${expectedStatus}, got ${response.status}${detail ? ` — ${detail}` : ''}` };
+  }
+
+  if (expectedStatus >= 400) {
+    return { passed: true, message: `Server returned expected ${expectedStatus}` };
+  }
+
+  const odataVersion = response.headers['odata-version'];
+  if (!odataVersion) {
+    return { passed: false, message: 'Missing OData-Version response header' };
+  }
+  if (odataVersion !== '4.0' && odataVersion !== '4.01') {
+    return { passed: false, message: `Invalid OData-Version: ${odataVersion} (expected 4.0 or 4.01)` };
+  }
+
+  if (response.body == null) {
+    return { passed: false, message: 'Response body is null' };
+  }
+
+  return { passed: true, message: `HTTP ${expectedStatus}, OData-Version ${odataVersion}` };
+};
+
+/**
+ * Assert that response has results (non-empty value array).
+ */
+export const assertHasResults = (body: unknown): AssertionResult => {
+  const records = extractRecords(body);
+  return records.length > 0
+    ? { passed: true, message: `${records.length} records returned` }
+    : { passed: false, message: 'No records in response' };
+};
+
+/**
+ * Assert string comparison results (contains, startswith, endswith).
+ */
+export const assertStringComparison = (
+  records: ReadonlyArray<Record<string, unknown>>,
+  field: string,
+  op: 'eq' | 'ne',
+  value: string
+): AssertionResult => {
+  const failures: string[] = [];
+
+  for (const [i, record] of records.entries()) {
+    const actual = record[field];
+    if (actual == null) continue;
+    const actualStr = String(actual);
+    const matches = op === 'eq' ? actualStr === value : actualStr !== value;
+    if (!matches) {
+      failures.push(`Record ${i}: ${field}=${JSON.stringify(actualStr)} does not satisfy ${op} ${JSON.stringify(value)}`);
+    }
+  }
+
+  return failures.length === 0
+    ? { passed: true, message: `All ${records.length} records satisfy string ${op}` }
+    : { passed: false, message: `${failures.length} records failed: ${failures[0]}` };
+};
+
+// ── Helpers ──
+
+/** Extract the records array from an OData response body. */
+export const extractRecords = (body: unknown): ReadonlyArray<Record<string, unknown>> => {
+  if (body == null || typeof body !== 'object') return [];
+  const obj = body as Record<string, unknown>;
+  if (Array.isArray(obj.value)) return obj.value as ReadonlyArray<Record<string, unknown>>;
+  // Singleton result (fetch-by-key)
+  if ('value' in obj) return [];
+  return [obj as Record<string, unknown>];
+};
+
+/** Extract @odata.count from response body. */
+export const extractCount = (body: unknown): number | undefined => {
+  if (body == null || typeof body !== 'object') return undefined;
+  const obj = body as Record<string, unknown>;
+  const count = obj['@odata.count'];
+  return typeof count === 'number' ? count : undefined;
+};
+
+/** Extract @odata.nextLink from response body. */
+export const extractNextLink = (body: unknown): string | undefined => {
+  if (body == null || typeof body !== 'object') return undefined;
+  const obj = body as Record<string, unknown>;
+  const link = obj['@odata.nextLink'];
+  return typeof link === 'string' ? link : undefined;
+};

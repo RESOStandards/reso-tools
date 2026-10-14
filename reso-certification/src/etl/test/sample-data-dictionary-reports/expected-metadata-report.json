@@ -1,0 +1,118 @@
+{
+  "description": "RESO Data Dictionary Metadata Report",
+  "version": "1.7",
+  "generatedOn": "2022-03-15T10:12:32.319Z",
+  "type": "data_dictionary",
+  "fields": [
+    {
+      "resourceName": "Office",
+      "fieldName": "OfficeStateOrProvince",
+      "type": "States",
+      "standardRESO": true,
+      "payloads": ["IDX"]
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "AccessibilityFeatures",
+      "type": "PropertyEnums.AccessibilityFeatures",
+      "standardRESO": true,
+      "payloads": ["IDX"]
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "StandardStatus",
+      "type": "PropertyEnums.Statuses",
+      "standardRESO": true,
+      "payloads": ["IDX"]
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "ListPrice",
+      "type": "Edm.Decimal",
+      "standardRESO": true,
+      "payloads": ["IDX"]
+    },
+    {
+      "resourceName": "Property",
+      "fieldName": "CustomLookupField123",
+      "type": "CustomLookups.LookupField123",
+      "standardRESO": false
+    }
+  ],
+  "lookups": [
+    {
+      "lookupName": "States",
+      "lookupValue": "CA",
+      "type": "Edm.Int32",
+      "standardRESO": true,
+      "standardDisplayName": "CA"
+    },
+    {
+      "lookupName": "States",
+      "lookupValue": "HI",
+      "type": "Edm.Int32",
+      "standardRESO": true,
+      "standardDisplayName": "HI"
+    },
+    {
+      "lookupName": "PropertyEnums.AccessibilityFeatures",
+      "lookupValue": "_23923049",
+      "type": "Edm.Int32",
+      "standardRESO": false
+    },
+    {
+      "lookupName": "PropertyEnums.AccessibilityFeatures",
+      "lookupValue": "ReinforcedFloors",
+      "type": "Edm.Int32",
+      "standardRESO": true,
+      "standardDisplayName": "Reinforced Floors"
+    },
+    {
+      "lookupName": "PropertyEnums.AccessibilityFeatures",
+      "lookupValue": "PrivateElevator",
+      "type": "Edm.Int32",
+      "standardRESO": false
+    },
+    {
+      "lookupName": "PropertyEnums.Statuses",
+      "lookupValue": "Pending",
+      "type": "Edm.Int32",
+      "standardRESO": true,
+      "standardDisplayName": "Pending"
+    },
+    {
+      "lookupName": "PropertyEnums.Statuses",
+      "lookupValue": "ACTIVE_UC",
+      "type": "Edm.Int32",
+      "standardRESO": false
+    },
+    {
+      "lookupName": "CustomLookups.LookupField123",
+      "lookupValue": "LookupField123",
+      "type": "Edm.Int32",
+      "standardRESO": false
+    }
+  ],
+  "standardFieldsCount": 4,
+  "localFieldsCount": 1,
+  "totalFieldsCount": 5,
+  "standardResourcesCount": 2,
+  "localResourcesCount": 0,
+  "totalResourcesCount": 2,
+  "standardLookupsCount": 4,
+  "localLookupsCount": 4,
+  "totalLookupsCount": 8,
+  "iDXFieldsCount": 4,
+  "iDXResourcesCount": 2,
+  "iDXLookupsCount": 1,
+  "advertised": {
+    "Office": {
+      "fields": { "total": 1, "reso": 1, "idx": 1, "local": 0 },
+      "lookups": { "total": 2, "reso": 2, "idx": 0, "local": 0 }
+    },
+    "Property": {
+      "fields": { "total": 4, "reso": 3, "idx": 3, "local": 1 },
+      "lookups": { "total": 6, "reso": 2, "idx": 1, "local": 4 }
+    }
+  }
+}

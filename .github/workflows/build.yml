@@ -1,0 +1,51 @@
+name: Build
+
+# Public build + quality gate for the workspace: install once, build in dependency
+# order, then lint / typecheck / test every package. Runs on every PR and on pushes
+# to main and the version branches. Supersedes the stale reso-certification-utils
+# clone in compliance.yml for the plain build-and-test path.
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'v*']
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: lint · typecheck · test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22' # the engines floor (>=22); verifies the minimum supported runtime
+          cache: npm
+
+      # The committed lockfile is authored with npm 11 (the team's toolchain). Node 22
+      # ships npm 10, whose stricter `npm ci` rejects it. Pin npm 11 so CI reproduces the
+      # dev environment; the requirement is declared as engines.npm in the root package.json.
+      - name: Pin npm 11 (matches the committed lockfile)
+        run: npm install -g npm@11
+
+      - name: Install (workspaces)
+        run: npm ci
+
+      - name: Build (dependency order)
+        run: npm run build
+
+      - name: Lint (Biome)
+        run: npm run lint
+
+      - name: Typecheck (all packages)
+        run: npm run typecheck
+
+      - name: Test (all packages)
+        run: npm test

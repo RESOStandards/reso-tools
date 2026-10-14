@@ -1,0 +1,13 @@
+{
+  "providerUoi": "LOCAL-PROVIDER",
+  "configs": [
+    {
+      "description": "Web API Core Testing",
+      "serviceRootUri": "http://localhost:8080",
+      "recipientUoi": "LOCAL-RECIPIENT",
+      "providerUsi": "LOCAL-SYSTEM",
+      "token": "admin-token",
+      "version": "2.0.0"
+    }
+  ]
+}

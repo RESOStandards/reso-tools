@@ -1,0 +1,59 @@
+{
+  "name": "@reso-standards/reso-reference-server",
+  "version": "0.8.3",
+  "description": "RESO Reference OData Server \u2013 metadata-driven CRUD server for RESO Data Dictionary resources",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RESOStandards/reso-tools.git",
+    "directory": "reso-reference-server"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "src/ui-config.json",
+    "src/field-groups.json",
+    "server-metadata.json",
+    "seed-data",
+    "public"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "lint": "tsc --noEmit",
+    "seed": "node dist/seed.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "@reso-standards/odata-expression-parser": "^0.1.0",
+    "@reso-standards/reso-common": "^0.4.0",
+    "@reso-standards/reso-validation": "^0.1.0",
+    "better-sqlite3": "^13.0.0",
+    "express": "^4.21.0",
+    "mongodb": "^6.12.0",
+    "pg": "^8.13.0",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "@types/swagger-ui-express": "^4.1.7",
+    "fast-xml-parser": "^5.4.2",
+    "typescript": "~5.6.0",
+    "vitest": "^4.1.9"
+  }
+}

@@ -1,0 +1,109 @@
+# @reso-standards/reso-validation
+
+Isomorphic TypeScript validation library for RESO Data Dictionary records. Validates field types, lengths and ranges against metadata, plus resource-specific business rules with cross-field constraints. Zero external dependencies.
+
+> **[User Guide](doc/GUIDE.md)** – a task-oriented walk-through with realistic examples.
+
+## Install
+
+This package is not on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+
+```bash
+git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools/reso-validation
+npm install
+```
+
+This package has no sibling dependencies – `npm install` just runs. To bootstrap every package at once, run `npm run bootstrap` from the repo root instead.
+
+To consume the SDK from another project, link it locally with `npm link` or use a `file:` dependency.
+
+## Usage
+
+```typescript
+import { validateRecord, validateBusinessRules, getBusinessRules } from '@reso-standards/reso-validation';
+import type { ResoField, ValidationFailure } from '@reso-standards/reso-validation';
+
+// Validate a record against field metadata
+const failures = validateRecord(record, fields);
+
+// Validate resource-specific business rules
+const ruleFailures = validateBusinessRules('Property', record);
+
+// Get the rule definitions for a resource
+const rules = getBusinessRules('Property');
+```
+
+## API
+
+### `validateRecord(body, fields): ValidationFailure[]`
+
+Validates a record payload against RESO field metadata. Checks:
+
+- **Unknown fields** – fields not in metadata
+- **Type mismatches** – Edm.String, Edm.Boolean, Edm.Int32, Edm.Decimal, Edm.Date, Edm.DateTimeOffset, etc.
+- **Negative numerics** – rejects negative values for numeric types
+- **MaxLength** – strings exceeding `field.maxLength`
+- **Integer enforcement** – Int types must be whole numbers
+- **Collection fields** – must be arrays
+- **Enum fields** – must be string or number
+- **Business rules** – delegates to `validateBusinessRules()` for range/relationship checks
+
+Null, undefined and empty string values are silently skipped unless the field is required. Fields starting with `@` (OData annotations) are ignored.
+
+### `validateBusinessRules(resourceName, body): ValidationFailure[]`
+
+Validates resource-specific constraints:
+
+**Property:**
+- Required: City, StateOrProvince, PostalCode, Country
+- Price fields (> 0 to $1B): ListPrice, OriginalListPrice, PreviousListPrice, ClosePrice, ListPriceLow
+- Room counts (0 to 100): BedroomsTotal, BathroomsFull, BathroomsHalf, etc.
+- Expense/fee/amount fields ($0 to $10K): matched via `fieldPattern` regex `/(?:Expense|Amount|Fee\d?)$/`
+- Latitude and Longitude are exempt from the nonnegative rule (negative coordinates are valid)
+- Cross-field: `BathroomsTotalInteger = sum(BathroomsFull + BathroomsHalf + ...)`
+
+**Member:** Required MemberCity, MemberStateOrProvince, MemberPostalCode, MemberCountry
+
+**Office:** Required OfficeCity, OfficeStateOrProvince, OfficePostalCode, OfficeCountry
+
+### `getBusinessRules(resourceName): FieldRule[]`
+
+Returns the per-field constraint definitions for a resource.
+
+### Type Helpers
+
+- `isEnumType(type)` – true if type is an enum reference (not a primitive Edm type)
+- `isNumericEdmType(type)` – true for Edm.Decimal, Edm.Int32, Edm.Double, etc.
+- `isIntegerEdmType(type)` – true for Edm.Int16, Edm.Int32, Edm.Int64, Edm.Byte
+
+## Types
+
+```typescript
+interface ValidationFailure {
+  readonly field: string;
+  readonly reason: string;
+}
+
+interface FieldRule {
+  readonly fieldName: string;
+  readonly fieldPattern?: RegExp;  // regex alternative to fieldName for matching multiple fields
+  readonly required?: boolean;
+  readonly min?: number;
+  readonly max?: number;
+  readonly message?: string;
+}
+
+interface CrossFieldRule {
+  readonly name: string;
+  readonly validate: (body: Record<string, unknown>) => ValidationFailure | null;
+}
+```
+
+## Integration
+
+Used by both the reference server (request body validation on POST/PATCH) and the React UI (client-side form validation). Also used by `@reso-standards/reso-certification` for payload validation in compliance testing.
+
+## License
+
+See [LICENSE](https://github.com/RESOStandards/reso-tools/blob/main/LICENSE) in the repository root.

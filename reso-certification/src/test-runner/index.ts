@@ -1,0 +1,69 @@
+// Types
+export type {
+  AuthConfig,
+  TestConfig,
+  EntityProperty,
+  EntityType,
+  ParsedMetadata,
+  TestStatus,
+  TestAssertion,
+  ScenarioResult,
+  TestReport,
+  ODataResponse,
+  MockServerOptions
+} from './types.js';
+export type { ValidationFailure } from '@reso-standards/reso-validation';
+export type { RequestOptions } from './client.js';
+
+// Validators
+export {
+  validateODataVersionHeader,
+  validateStatusCode,
+  validateStatusCodeRange,
+  validateEntityIdHeader,
+  validateLocationHeader,
+  validatePreferenceApplied,
+  validateJsonResponse,
+  validateEmptyResponse,
+  validateODataAnnotation,
+  validateResponseContainsPayload,
+  validateODataError
+} from './validators.js';
+
+// Reporter
+export { formatConsoleReport, formatJsonReport } from './reporter.js';
+
+// Client
+export { odataRequest, buildResourceUrl } from './client.js';
+
+// Injectable request seam (containers — #125)
+export { webRequester, createSessionRequester } from './requester.js';
+export type { ODataRequester } from './requester.js';
+
+// Auth
+export { resolveAuthToken, fetchAccessToken } from './auth.js';
+
+// Metadata
+export {
+  fetchMetadata,
+  loadMetadataFromFile,
+  parseMetadataXml,
+  getEntityType,
+  validatePayloadAgainstMetadata,
+  toResoFields
+} from './metadata.js';
+
+// Helpers
+export { extractPrimaryKey, stripPrimaryKey, makeSchemaAssertion, buildScenarioResult } from './helpers.js';
+
+// Edm type validator
+export { validateValueAgainstEdm, validateRecordAgainstMetadata } from './edm-validator.js';
+
+// Payload field inspection
+export {
+  isEnumProperty,
+  extractPayloadFields,
+  extractEnumerations,
+  extractExpansions
+} from './payload-fields.js';
+export type { EnumerationDetail } from './payload-fields.js';

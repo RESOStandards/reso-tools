@@ -1,0 +1,459 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+import {
+  SOFTWARE_VERSION,
+  addEditReportGenerators,
+  coreReportGenerators,
+  createDetailedReportGenerator,
+  createGenericReportGenerator,
+  entityEventReportGenerators,
+  resolveSoftwareVersion,
+  serializeAddEditRemarks,
+  serializeCoreRemarks,
+  serializeEntityEventRemarks
+} from '../../src/sdk/reports.js';
+import type { PipelineResult, StepResult } from '../../src/sdk/types.js';
+
+const makeResult = (overrides: Partial<PipelineResult> = {}): PipelineResult => ({
+  status: 'passed',
+  endorsement: 'test',
+  steps: [],
+  context: {},
+  duration: 100,
+  ...overrides
+});
+
+const makeStep = (overrides: Partial<StepResult> = {}): StepResult => ({
+  name: 'test-step',
+  endorsement: 'test',
+  status: 'passed',
+  duration: 50,
+  ...overrides
+});
+
+describe('serializeAddEditRemarks', () => {
+  it('summarizes passed results with field count', () => {
+    const result = makeResult({
+      context: { resource: 'Property' },
+      steps: [
+        makeStep({ name: 'Fetch metadata', counts: { fields: 632 } }),
+        makeStep({ name: 'Run Add/Edit scenarios', counts: { total: 8, passed: 8, failed: 0 } })
+      ]
+    });
+
+    const remarks = serializeAddEditRemarks(result);
+
+    expect(remarks).toContain('8 of 8 scenarios passed');
+    expect(remarks).toContain('632 fields');
+    expect(remarks).toContain('Property');
+  });
+
+  it('pairs the FAILED count with the "failed" word when tests fail (#258 regression)', () => {
+    const result = makeResult({
+      status: 'failed',
+      context: { resource: 'Property' },
+      steps: [
+        makeStep({ name: 'Run Add/Edit scenarios', counts: { total: 8, passed: 6, failed: 2 }, errors: ['create failed', 'delete failed'] })
+      ]
+    });
+
+    const remarks = serializeAddEditRemarks(result);
+
+    // #258: report the FAILED count with "failed" — never the passed count paired with "failed".
+    expect(remarks).toContain('2 of 8 scenarios failed');
+    expect(remarks).not.toContain('6 of 8 scenarios failed');
+    expect(remarks).toContain('create failed');
+  });
+
+  it('handles missing test step gracefully', () => {
+    const result = makeResult({ status: 'failed' });
+    const remarks = serializeAddEditRemarks(result);
+
+    expect(remarks).toContain('failed');
+  });
+});
+
+describe('serializeEntityEventRemarks', () => {
+  it('includes mode and scenario counts', () => {
+    const result = makeResult({
+      context: { mode: 'full' },
+      steps: [makeStep({ name: 'Run EntityEvent scenarios', counts: { total: 11, passed: 11 } })]
+    });
+
+    const remarks = serializeEntityEventRemarks(result);
+
+    expect(remarks).toContain('11 of 11');
+    expect(remarks).toContain('full mode');
+  });
+});
+
+describe('serializeCoreRemarks', () => {
+  it('includes all count categories', () => {
+    const result = makeResult({
+      steps: [makeStep({ name: 'Run Core scenarios', counts: { total: 45, passed: 42, failed: 0, skipped: 3 } })]
+    });
+
+    const remarks = serializeCoreRemarks(result);
+
+    expect(remarks).toContain('42 passed');
+    expect(remarks).toContain('0 failed');
+    expect(remarks).toContain('3 skipped');
+  });
+
+  it('renders optional outcomes separately and never as a failure', () => {
+    const result = makeResult({
+      steps: [
+        makeStep({
+          name: 'Run Core scenarios',
+          counts: {
+            total: 10,
+            passed: 6,
+            failed: 0,
+            skipped: 1,
+            optionalPassed: 1,
+            optionalNotSupported: 1,
+            optionalNotTested: 1
+          }
+        })
+      ]
+    });
+
+    const remarks = serializeCoreRemarks(result);
+
+    // Required verdict surface reconciles: 6 + 0 + 1 = 7 required tests.
+    expect(remarks).toContain('6 passed, 0 failed, 1 skipped out of 7 required tests.');
+    expect(remarks).toContain('Optional: 1 passed, 1 not supported, 1 not tested.');
+    // An optional "not supported" must never read as a Core failure.
+    expect(remarks).not.toMatch(/[1-9]\d* failed/);
+  });
+
+  it('omits the optional clause when there are no optional tests', () => {
+    const result = makeResult({
+      steps: [makeStep({ name: 'Run Core scenarios', counts: { total: 5, passed: 5, failed: 0, skipped: 0 } })]
+    });
+    expect(serializeCoreRemarks(result)).not.toContain('Optional:');
+  });
+
+  it('reads the scenario step, not the earlier "Fetch metadata" step whose counts carry no pass/fail (counts-bug regression)', () => {
+    // The real Core pipeline emits a "Fetch metadata" step with counts {entityTypes, resources}
+    // BEFORE the "Run Core scenarios" step. serializeCoreRemarks previously used find(s => s.counts),
+    // which matched Fetch metadata first — its counts have no passed/failed/skipped — so every tally
+    // defaulted to 0 and the persisted report always read "0 passed, 0 failed, 0 skipped out of 0
+    // required tests", regardless of the run's real result (observed on the CDL/Cotality runs).
+    const result = makeResult({
+      status: 'failed',
+      steps: [
+        makeStep({ name: 'Fetch metadata', counts: { entityTypes: 14, resources: 5 } }),
+        makeStep({
+          name: 'Run Core scenarios',
+          status: 'failed',
+          counts: { total: 305, passed: 193, failed: 7, skipped: 90, optionalPassed: 6, optionalNotSupported: 0, optionalNotTested: 9 }
+        })
+      ]
+    });
+
+    const remarks = serializeCoreRemarks(result);
+
+    expect(remarks).toContain('193 passed, 7 failed, 90 skipped out of 290 required tests.');
+    expect(remarks).not.toContain('0 passed, 0 failed, 0 skipped out of 0 required tests.');
+  });
+});
+
+describe('createGenericReportGenerator', () => {
+  it('produces Cert API compatible report shape', () => {
+    const generator = createGenericReportGenerator('Web API Add/Edit', '2.0.0', () => 'test remarks');
+    const report = generator.generate(makeResult());
+
+    expect(report.description).toBe('Web API Add/Edit');
+    expect(report.version).toBe('2.0.0');
+    expect(report.softwareVersion).toBeTruthy();
+    expect(report.generatedOn).toBeTruthy();
+    expect(report.remarks).toBe('test remarks');
+    expect(report.outcome).toBe('passed');
+    // Base fields: the Cert API's required set, plus the RESO Tools software version for provenance
+    // and the run's own verdict.
+    //
+    // Exact equality on purpose. This is a guard against a field arriving in a submitted artifact
+    // without anyone deciding it should — it caught `outcome` being added, which is the behavior
+    // wanted. Adding a key here is a deliberate act, so update this list only alongside a reason.
+    // It asserts what we EMIT; it is not evidence about what the Cert API would reject.
+    expect(Object.keys(report)).toEqual(['description', 'version', 'softwareVersion', 'generatedOn', 'remarks', 'outcome']);
+  });
+
+  it('has correct filename', () => {
+    const generator = createGenericReportGenerator('Test', '1.0', () => '');
+    expect(generator.filename).toBe('report.json');
+    expect(generator.name).toBe('Generic');
+  });
+});
+
+describe('createDetailedReportGenerator', () => {
+  it('extends generic with outcome, steps, and duration', () => {
+    const generator = createDetailedReportGenerator('Web API Add/Edit', '2.0.0', () => 'remarks');
+    const result = makeResult({
+      steps: [makeStep({ name: 'step-1', summary: 'did stuff', counts: { x: 1 } })]
+    });
+
+    const report = generator.generate(result);
+
+    expect(report.description).toBe('Web API Add/Edit');
+    expect(report.outcome).toBe('passed');
+    expect(report.endorsement).toBe('test');
+    expect(report.duration).toBe(100);
+    expect(report.steps).toHaveLength(1);
+    const step = (report.steps as ReadonlyArray<Record<string, unknown>>)[0];
+    expect(step.name).toBe('step-1');
+    expect(step.summary).toBe('did stuff');
+    expect(step.counts).toEqual({ x: 1 });
+  });
+
+  it('has correct filename', () => {
+    const generator = createDetailedReportGenerator('Test', '1.0', () => '');
+    expect(generator.filename).toBe('report-detailed.json');
+    expect(generator.name).toBe('Detailed');
+  });
+
+  it('omits empty optional fields from steps', () => {
+    const generator = createDetailedReportGenerator('Test', '1.0', () => '');
+    const result = makeResult({
+      steps: [makeStep({ name: 'clean' })]
+    });
+
+    const report = generator.generate(result);
+    const step = (report.steps as ReadonlyArray<Record<string, unknown>>)[0];
+
+    expect(step).not.toHaveProperty('summary');
+    expect(step).not.toHaveProperty('params');
+    expect(step).not.toHaveProperty('errors');
+  });
+});
+
+describe('createDetailedReportGenerator — resourceReports', () => {
+  it('includes resourceReports from pipeline context when present', () => {
+    const generator = createDetailedReportGenerator('Web API Core', '2.1.0', () => 'remarks');
+    const result = makeResult({
+      context: {
+        resourceReports: [
+          {
+            resource: 'Property',
+            summary: { total: 54, passed: 45, failed: 2, skipped: 7 },
+            scenarios: [
+              {
+                name: 'Filter: eq integer',
+                tag: 'filter-eq-integer',
+                passed: true,
+                skipped: false,
+                duration: 120,
+                requestUrl: 'http://localhost/Property?$filter=BedroomsTotal eq 3',
+                assertions: [{ message: 'Status 200', passed: true }]
+              },
+              {
+                name: 'String enum collection: all()',
+                tag: 'string-enum-collection-all',
+                passed: false,
+                skipped: false,
+                duration: 85,
+                assertions: [{ message: '21 records failed validation', passed: false }]
+              }
+            ]
+          }
+        ]
+      },
+      steps: [makeStep({ name: 'Run Core scenarios' })]
+    });
+
+    const report = generator.generate(result);
+
+    expect(report.resourceReports).toBeDefined();
+    const rr = report.resourceReports as ReadonlyArray<Record<string, unknown>>;
+    expect(rr).toHaveLength(1);
+    expect(rr[0].resource).toBe('Property');
+    expect(rr[0].summary).toEqual({ total: 54, passed: 45, failed: 2, skipped: 7 });
+
+    const scenarios = rr[0].scenarios as ReadonlyArray<Record<string, unknown>>;
+    expect(scenarios).toHaveLength(2);
+    expect(scenarios[0].name).toBe('Filter: eq integer');
+    expect(scenarios[0].passed).toBe(true);
+    expect(scenarios[1].passed).toBe(false);
+  });
+
+  it('maps assertion message field to description in serialized output', () => {
+    const generator = createDetailedReportGenerator('Web API Core', '2.1.0', () => '');
+    const result = makeResult({
+      context: {
+        resourceReports: [
+          {
+            resource: 'Property',
+            summary: { total: 1, passed: 0, failed: 1, skipped: 0 },
+            scenarios: [
+              {
+                name: 'Test scenario',
+                tag: 'test',
+                passed: false,
+                skipped: false,
+                duration: 50,
+                assertions: [{ message: 'Expected 200 but got 400', passed: false }]
+              }
+            ]
+          }
+        ]
+      },
+      steps: []
+    });
+
+    const report = generator.generate(result);
+    const rr = report.resourceReports as ReadonlyArray<Record<string, unknown>>;
+    const scenarios = rr[0].scenarios as ReadonlyArray<Record<string, unknown>>;
+    const assertions = scenarios[0].assertions as ReadonlyArray<Record<string, unknown>>;
+
+    expect(assertions[0].description).toBe('Expected 200 but got 400');
+    expect(assertions[0].passed).toBe(false);
+  });
+
+  it('omits resourceReports when not present in context', () => {
+    const generator = createDetailedReportGenerator('Web API Add/Edit', '2.0.0', () => '');
+    const result = makeResult({ steps: [] });
+
+    const report = generator.generate(result);
+
+    expect(report).not.toHaveProperty('resourceReports');
+  });
+});
+
+describe('pre-built report generator sets', () => {
+  it('addEditReportGenerators produces 2 generators', () => {
+    const generators = addEditReportGenerators('2.0.0');
+    expect(generators).toHaveLength(2);
+    expect(generators[0].name).toBe('Generic');
+    expect(generators[1].name).toBe('Detailed');
+  });
+
+  it('entityEventReportGenerators produces 2 generators', () => {
+    const generators = entityEventReportGenerators('RCP-027');
+    expect(generators).toHaveLength(2);
+  });
+
+  it('coreReportGenerators produces 2 generators', () => {
+    const generators = coreReportGenerators('2.0.0');
+    expect(generators).toHaveLength(2);
+  });
+});
+
+describe('SOFTWARE_VERSION provenance', () => {
+  // A certified report must record WHICH tool version produced it. Truthy is
+  // not enough — the recorded value must be the actual package version, and
+  // every report the SDK can emit must carry it.
+  const manifestVersion = (() => {
+    const pkgPath = fileURLToPath(new URL('../../package.json', import.meta.url));
+    return (JSON.parse(readFileSync(pkgPath, 'utf8')) as { version?: string }).version;
+  })();
+
+  it('equals the package.json version (records the exact tool version, not a stale literal)', () => {
+    expect(SOFTWARE_VERSION).toBe(manifestVersion);
+  });
+
+  it('is a non-empty string — provenance is never blank', () => {
+    expect(typeof SOFTWARE_VERSION).toBe('string');
+    expect(SOFTWARE_VERSION.length).toBeGreaterThan(0);
+  });
+
+  it('every report generator from every endorsement stamps the exact SOFTWARE_VERSION', () => {
+    // Guards against a future report generator that forgets provenance: a
+    // silent gap where a certified result ships without its tool version.
+    const generators = [...addEditReportGenerators('2.0.0'), ...entityEventReportGenerators('RCP-027'), ...coreReportGenerators('2.0.0')];
+    expect(generators.length).toBeGreaterThan(0);
+    for (const generator of generators) {
+      const report = generator.generate(makeResult());
+      expect(report.softwareVersion).toBe(SOFTWARE_VERSION);
+    }
+  });
+
+  it('resolveSoftwareVersion reads the version from a readable manifest', () => {
+    expect(resolveSoftwareVersion(new URL('../../package.json', import.meta.url))).toBe(manifestVersion);
+  });
+
+  it('resolveSoftwareVersion falls back to "unknown" when the manifest path cannot be resolved (the bundled-context failure mode)', () => {
+    expect(resolveSoftwareVersion(new URL('./nonexistent-package-xyz.json', import.meta.url))).toBe('unknown');
+  });
+});
+
+describe('detailed report: field-preference steering', () => {
+  const generate = (fieldPreferences: unknown) =>
+    createDetailedReportGenerator('Core', '2.1.0', () => '').generate(
+      makeResult({ context: fieldPreferences === undefined ? {} : { fieldPreferences } })
+    ) as Record<string, unknown>;
+
+  it('carries the APPLIED set, not just the request', () => {
+    // The gap this closes: `appliedFieldPreferences` was computed per resource and read by nothing, so the
+    // report echoed the requested spec. A run that honored no preference reported as steered.
+    const report = generate({ requested: ['Office.FeedTypes'], applied: ['Office.FeedTypes'] });
+    expect(report.fieldPreferences).toEqual({ requested: ['Office.FeedTypes'], applied: ['Office.FeedTypes'] });
+  });
+
+  it('makes an unsteered run distinguishable from a steered one', () => {
+    const steered = generate({ requested: ['SyndicateTo'], applied: ['SyndicateTo'] });
+    const notSteered = generate({ requested: ['Office.FeedTypes'], applied: [], unmatched: ['Office.FeedTypes'] });
+    expect(steered.fieldPreferences).not.toEqual(notSteered.fieldPreferences);
+    expect((notSteered.fieldPreferences as Record<string, unknown>).applied).toEqual([]);
+    expect((notSteered.fieldPreferences as Record<string, unknown>).unmatched).toEqual(['Office.FeedTypes']);
+  });
+
+  it('omits the key on an ordinary unsteered run', () => {
+    expect(generate(undefined)).not.toHaveProperty('fieldPreferences');
+    expect(generate({ requested: [], applied: [] })).not.toHaveProperty('fieldPreferences');
+  });
+});
+
+/**
+ * `report.json` must state its own verdict.
+ *
+ * Observed on a real DD 2.1 run (2026-10-04): `report.json`'s keys were exactly
+ * `['description','generatedOn','remarks','softwareVersion','version']` — no verdict field at all.
+ * Its sibling `report-detailed.json` carried `outcome` AND a contradictory `steps` array, so a
+ * careful reader of that file could catch a wrong headline. A reader of `report.json` could not:
+ * the English remarks sentence was the only verdict signal, and on a failed run it said "passed".
+ *
+ * There is no compile-time control available here. `BaseReport` is documentation — nothing
+ * implements it — and `ReportGenerator.generate` returns `Record<string, unknown>`, so a generator
+ * that drops the field type-checks cleanly. These tests are the only thing standing between the
+ * field and a silent regression, which is why they assert per endorsement rather than once.
+ */
+describe('report.json carries its own outcome', () => {
+  const generic = (gens: ReadonlyArray<{ filename: string; generate: (r: PipelineResult) => Record<string, unknown> }>) =>
+    gens.find(g => g.filename === 'report.json');
+
+  const SETS: ReadonlyArray<
+    readonly [string, ReadonlyArray<{ filename: string; generate: (r: PipelineResult) => Record<string, unknown> }>]
+  > = [
+    ['Add/Edit', addEditReportGenerators('1.0.0')],
+    ['EntityEvent', entityEventReportGenerators('1.0.0')],
+    ['Core', coreReportGenerators('2.1.0')]
+  ];
+
+  it.each(['passed', 'failed', 'incomplete'] as const)('states outcome %s, not only in prose', status => {
+    const gen = createGenericReportGenerator('Data Dictionary', '2.1', () => `Data Dictionary compliance test ${status}.`);
+    const report = gen.generate(makeResult({ status }));
+    expect(report.outcome).toBe(status);
+  });
+
+  // The fix lives in the ONE shared generator, so every endorsement that uses it inherits the field.
+  // Asserting that per endorsement rather than trusting the wiring: the call sites were miscounted
+  // twice while diagnosing this, once too few and once too many.
+  it.each(SETS)('%s emits report.json with an outcome', (_label, gens) => {
+    const gen = generic(gens);
+    expect(gen).toBeDefined();
+    const report = gen!.generate(makeResult({ status: 'failed' }));
+    expect(report.outcome).toBe('failed');
+  });
+
+  it('never lets report.json disagree with report-detailed.json', () => {
+    // The two files are generated independently from the same result. A reader comparing them must
+    // never find two different verdicts, which is the precise failure the DD run exhibited.
+    const remarks = () => 'Web API Server Core compliance test failed.';
+    const result = makeResult({ status: 'failed' });
+    const summary = createGenericReportGenerator('Web API Server Core', '2.1.0', remarks).generate(result);
+    const detailed = createDetailedReportGenerator('Web API Server Core', '2.1.0', remarks).generate(result);
+    expect(summary.outcome).toBe(detailed.outcome);
+  });
+});

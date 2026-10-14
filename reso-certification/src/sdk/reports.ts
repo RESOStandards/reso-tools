@@ -1,0 +1,381 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { optionalOutcome } from '../web-api-core/test-runner.js';
+import { FETCH_METADATA, RUN_ADD_EDIT_SCENARIOS, RUN_CORE_SCENARIOS, RUN_ENTITY_EVENT_SCENARIOS } from './step-names.js';
+import type { BaseComplianceConfig, PipelineContext, PipelineResult, ProgressCallback } from './types.js';
+
+// ── Software version ──
+
+/**
+ * The RESO Tools version that produced a report, read from the package
+ * manifest at module load. Stamped onto every report for provenance —
+ * a certified result must record which tool version generated it.
+ * Falls back to 'unknown' if the manifest can't be resolved (e.g. bundled).
+ */
+/**
+ * Resolve the RESO Tools version from a package manifest. Returns the
+ * manifest's `version`, or 'unknown' if the manifest can't be read or parsed
+ * (e.g. a bundled context where the relative path misses) or carries no
+ * version. Pure and side-effect-free so the fallback is directly testable.
+ */
+export const resolveSoftwareVersion = (manifestUrl: URL | string): string => {
+  try {
+    const pkgPath = fileURLToPath(manifestUrl);
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version?: string };
+    return pkg.version ?? 'unknown';
+  } catch {
+    return 'unknown';
+  }
+};
+
+/**
+ * Build-time provenance injection. When this module is bundled (the desktop
+ * cert-worker esbuild bundle), `import.meta.url` points at the bundle — not the
+ * cert SDK — so the relative manifest read below resolves to the wrong package
+ * (or none) and provenance silently becomes 'unknown'. The bundler defines
+ * `__RESO_CERT_SDK_VERSION__` with the cert SDK version so the stamp is correct
+ * regardless of bundle location. Non-bundled (source, tests) the symbol is
+ * absent and we fall back to reading the manifest.
+ * See reso-desktop-client/scripts/bundle-cert-worker.mjs.
+ */
+declare const __RESO_CERT_SDK_VERSION__: string | undefined;
+
+// dist/sdk/reports.js → ../../package.json is the package root (non-bundled).
+export const SOFTWARE_VERSION: string =
+  typeof __RESO_CERT_SDK_VERSION__ !== 'undefined'
+    ? __RESO_CERT_SDK_VERSION__
+    : resolveSoftwareVersion(new URL('../../package.json', import.meta.url));
+
+// ── Output Path Builder ──
+
+const DEFAULT_RESULTS_PATH = '.reso-cert';
+
+/**
+ * Build the standard nested output path for any endorsement.
+ * Structure: {base}/{endorsement-version}/{providerUoi}-{providerUsi}/{recipientUoi}/current
+ */
+export const buildOutputPath = (endorsementSlug: string, version: string, config: BaseComplianceConfig): string => {
+  const resultsPath = config.options?.outputDir ?? join(process.cwd(), DEFAULT_RESULTS_PATH);
+  // A missing identifier falls back to its own PARAMETER NAME, so the path states which one was
+  // not supplied: `T00000012-providerUsi` reads directly where `T00000012-LOCAL-SYSTEM` has to be
+  // mapped back. The names carry no hyphen, so the `{providerUoi}-{providerUsi}` segment stays
+  // parseable, and no segment is ever dropped. Successive runs that never fill the identifiers in
+  // share one tree and rotate through `archived/`, which is what handles the collision.
+  //
+  // Not `??`, because blank must count as absent. `normalizeConfigEntry` fills a missing
+  // identifier with '' rather than undefined, so '' is the common case rather than an exotic one,
+  // and `??` would pass it through and collapse a path segment -- `T00000012-/current`, trailing
+  // dash, recipient dropped by `join`. Whitespace-only is treated the same way. The mappers guard
+  // this too; this is the backstop for any other caller of an exported function.
+  //
+  // The desktop client mirrors this function rather than importing it (reso-tools-private,
+  // `resolveOutputPath`). These three strings must change on both sides together.
+  const orName = (value: string | undefined, name: string): string => (value?.trim() ? value : name);
+  const providerUoi = orName(config.providerUoi, 'providerUoi');
+  const providerUsi = orName(config.providerUsi, 'providerUsi');
+  const recipientUoi = orName(config.recipientUoi, 'recipientUoi');
+
+  return join(resultsPath, `${endorsementSlug}-${version}`, `${providerUoi}-${providerUsi}`, recipientUoi, 'current');
+};
+
+/** Archive existing current results before a new run. */
+export const archiveCurrentResults = async (currentPath: string): Promise<void> => {
+  if (!existsSync(currentPath)) return;
+  const archivedDir = join(dirname(currentPath), 'archived', new Date().toISOString().replace(/[:.]/g, ''));
+  await mkdir(dirname(archivedDir), { recursive: true });
+  await rename(currentPath, archivedDir);
+};
+
+/**
+ * One-shot output-dir preparation for a compliance pipeline run:
+ * build the canonical nested path, archive any previous `current/`,
+ * then mkdir the new one. Returns the path so the caller can stash
+ * it on `BaseTestContext.outputPath` before the pipeline starts —
+ * downstream steps then have a writable location for artifacts
+ * (metadata.xml, downloaded payloads, etc.) without each runner
+ * reimplementing this prelude.
+ */
+export const prepareOutputDir = async (endorsementSlug: string, version: string, config: BaseComplianceConfig): Promise<string> => {
+  const outputPath = buildOutputPath(endorsementSlug, version, config);
+  await archiveCurrentResults(outputPath);
+  await mkdir(outputPath, { recursive: true });
+  return outputPath;
+};
+
+// ── Report Types ──
+
+/** Base fields shared by all report formats (required by the Cert API). */
+export type BaseReport = {
+  readonly description: string;
+  readonly version: string;
+  readonly softwareVersion: string;
+  readonly generatedOn: string;
+  readonly remarks: string;
+  /**
+   * The run's verdict, machine-readable.
+   *
+   * `report.json` shipped without this, carrying the verdict only inside the English `remarks`
+   * sentence. A consumer had to pattern-match prose to learn whether a run passed, and on a real
+   * failed run that sentence said "passed" — the one signal the file offered was the wrong one.
+   * `report-detailed.json` at least carried a contradictory steps array a reader could catch it on.
+   */
+  readonly outcome: PipelineResult['status'];
+};
+
+/** A report generator produces a report object from pipeline results. */
+export interface ReportGenerator<TContext extends PipelineContext = PipelineContext> {
+  readonly name: string;
+  readonly filename: string;
+  readonly generate: (result: PipelineResult<TContext>) => Record<string, unknown>;
+}
+
+// ── Remarks Serializers ──
+
+/** Serialize Add/Edit pipeline results into a human-readable remarks string. */
+export const serializeAddEditRemarks = (result: PipelineResult): string => {
+  const testStep = result.steps.find(s => s.name === RUN_ADD_EDIT_SCENARIOS);
+  if (!testStep?.counts) return `Add/Edit compliance test ${result.status}.`;
+
+  const { total = 0, passed = 0, failed = 0 } = testStep.counts;
+
+  const metadataStep = result.steps.find(s => s.name === FETCH_METADATA);
+  const fieldCount = metadataStep?.counts?.fields ?? 0;
+  const resource = (result.context as Record<string, unknown>).resource ?? 'Property';
+
+  // Pair the count with the matching word — a failed run reports its FAILED count, otherwise the passed
+  // count (#258: the remark previously read "<passed> of <total> scenarios failed", using the passed count
+  // with the run's status word).
+  const headline = failed > 0 ? `${failed} of ${total} scenarios failed` : `${passed} of ${total} scenarios passed`;
+  const parts = [headline];
+  if (fieldCount > 0) parts.push(`${fieldCount} fields validated against ${resource} metadata`);
+  if (failed > 0) {
+    const errors = testStep.errors ?? [];
+    if (errors.length > 0) parts.push(`Failures: ${errors.join(', ')}`);
+  }
+
+  return `${parts.join('. ')}.`;
+};
+
+/** Serialize EntityEvent pipeline results into a human-readable remarks string. */
+export const serializeEntityEventRemarks = (result: PipelineResult): string => {
+  const testStep = result.steps.find(s => s.name === RUN_ENTITY_EVENT_SCENARIOS);
+  if (!testStep?.counts) return `EntityEvent compliance test ${result.status}.`;
+
+  const { total = 0, passed = 0 } = testStep.counts;
+  const mode = (result.context as Record<string, unknown>).mode ?? 'observe';
+
+  return `${passed} of ${total} scenarios ${result.status} in ${mode} mode.`;
+};
+
+/** Serialize Web API Core pipeline results into a human-readable remarks string. */
+export const serializeCoreRemarks = (result: PipelineResult): string => {
+  // Target the scenario step by name, as the Add/Edit and EntityEvent serializers do. The prior
+  // `find(s => s.counts)` matched the earlier "Fetch metadata" step first — its counts are
+  // {entityTypes, resources}, with no passed/failed/skipped — so every tally defaulted to 0 and
+  // the persisted report's remarks always read "0 passed, 0 failed, 0 skipped out of 0 required
+  // tests", regardless of the run's real result.
+  const testStep = result.steps.find(s => s.name === RUN_CORE_SCENARIOS);
+  if (!testStep?.counts) return `Web API Core compliance test ${result.status}.`;
+
+  const {
+    passed = 0,
+    failed = 0,
+    skipped = 0,
+    warnings = 0,
+    optionalPassed = 0,
+    optionalNotSupported = 0,
+    optionalNotTested = 0
+  } = testStep.counts;
+  const requiredTotal = passed + failed + skipped;
+  const optionalTotal = optionalPassed + optionalNotSupported + optionalNotTested;
+  const warnSuffix = warnings > 0 ? ` ${warnings} warning${warnings === 1 ? '' : 's'} (non-gating).` : '';
+  const base = `${passed} passed, ${failed} failed, ${skipped} skipped out of ${requiredTotal} required tests.${warnSuffix}`;
+  return optionalTotal > 0
+    ? `${base} Optional: ${optionalPassed} passed, ${optionalNotSupported} not supported, ${optionalNotTested} not tested.`
+    : base;
+};
+
+// ── Generic Report Generator ──
+
+/** Create a generic report generator for any endorsement (Cert API compatible). */
+export const createGenericReportGenerator = (
+  description: string,
+  version: string,
+  serializeRemarks: (result: PipelineResult) => string
+): ReportGenerator => ({
+  name: 'Generic',
+  filename: 'report.json',
+  // Annotated `BaseReport` rather than left to infer. `ReportGenerator.generate` is typed
+  // `Record<string, unknown>`, so a dropped field would otherwise type-check cleanly and the only
+  // control would be a test. With the annotation, removing `outcome` here fails the build.
+  generate: (result): BaseReport => ({
+    description,
+    version,
+    softwareVersion: SOFTWARE_VERSION,
+    generatedOn: new Date().toISOString(),
+    remarks: serializeRemarks(result),
+    outcome: result.status
+  })
+});
+
+// ── Detailed Report Generator ──
+
+/**
+ * Per-resource sampling evidence. Field selection ranks the standard set on fill rate within the sample, so a
+ * thin sample quietly weakens selection; recording what the sample actually was makes "did we sample this
+ * resource adequately" answerable from the report rather than by re-reading source. Omitted when the params
+ * carry none, so an older report shape stays valid.
+ */
+const sampleEvidence = (params: unknown): Record<string, unknown> => {
+  const p = params as Record<string, unknown> | undefined;
+  if (p?.sampleRecordCount === undefined) return {};
+  return {
+    sample: {
+      recordCount: p.sampleRecordCount,
+      pagesFetched: p.samplePagesFetched,
+      stopReason: p.sampleStopReason,
+      complete: p.sampleComplete
+    }
+  };
+};
+
+/** Create a detailed report generator that extends the generic format with step results. */
+export const createDetailedReportGenerator = (
+  description: string,
+  version: string,
+  serializeRemarks: (result: PipelineResult) => string
+): ReportGenerator => ({
+  name: 'Detailed',
+  filename: 'report-detailed.json',
+  generate: result => {
+    // Extract resource-level test reports if available (Core, Add/Edit, EntityEvent)
+    const ctx = result.context as Record<string, unknown>;
+    const resourceReports = ctx.resourceReports as ReadonlyArray<Record<string, unknown>> | undefined;
+    // Field-selection preferences steer WHAT WAS TESTED, so a steered run says so in its report. Absent
+    // on an ordinary run rather than present and empty, so the key's presence is itself the signal. The
+    // value carries `requested`, `applied` and (when they differ) `unmatched` — the presence of the key
+    // means a preference was GIVEN, never that one took effect; `applied` is what answers that.
+    const fieldPreferences = ctx.fieldPreferences as { readonly requested: ReadonlyArray<string> } | undefined;
+
+    return {
+      description,
+      version,
+      softwareVersion: SOFTWARE_VERSION,
+      generatedOn: new Date().toISOString(),
+      ...(fieldPreferences && fieldPreferences.requested.length > 0 ? { fieldPreferences } : {}),
+      remarks: serializeRemarks(result),
+      outcome: result.status,
+      /**
+       * Whether the run is eligible for certification, with the reasons when it is not.
+       *
+       * Distinct from `outcome`: that says what happened while the run executed, this says whether
+       * what happened is enough to certify. A run can pass every step it ran and still not be
+       * certifiable because a required step never ran.
+       *
+       * Carried on the DETAILED report only. `report.json`'s key set is pinned by a test as the
+       * Cert API compatible shape, and widening a contract with the backend's ingestion path is not
+       * something to do on the assumption that unknown keys are tolerated. This file is also where
+       * the `steps` array lives, so the skipped step and the reason for ineligibility sit together.
+       */
+      certification: result.certification,
+      endorsement: result.endorsement,
+      duration: result.duration,
+      steps: result.steps.map(({ name, status, duration, summary, params, counts, artifacts, errors }) => ({
+        name,
+        status,
+        duration,
+        ...(summary ? { summary } : {}),
+        ...(params ? { params } : {}),
+        ...(counts ? { counts } : {}),
+        ...(artifacts ? { artifacts } : {}),
+        ...(errors && errors.length > 0 ? { errors } : {})
+      })),
+      // Include per-resource scenario results for test-running endorsements
+      ...(resourceReports
+        ? {
+            resourceReports: resourceReports.map((r: Record<string, unknown>) => ({
+              resource: r.resource,
+              ...sampleEvidence(r.params),
+              summary: r.summary,
+              scenarios: ((r.scenarios as ReadonlyArray<Record<string, unknown>>) ?? []).map(s => ({
+                name: s.name ?? s.scenario,
+                tag: s.tag,
+                passed: s.passed,
+                skipped: s.skipped ?? false,
+                // Non-gating warnings (single-enum ne, $expand RRK, later Fast Track / DD 3.0 suggestions) — carried so
+                // the CLI and the desktop UI can surface them; they never affect `passed` or the verdict.
+                ...(Array.isArray(s.warnings) && s.warnings.length > 0 ? { warnings: s.warnings } : {}),
+                // Optional ("Optional Tests") scenarios carry their rendered
+                // outcome (Passed / Not Supported / Not Tested) so the report
+                // is self-describing; required scenarios use passed/skipped.
+                ...(s.optional
+                  ? {
+                      optional: true,
+                      outcome: optionalOutcome({
+                        passed: Boolean(s.passed),
+                        skipped: Boolean(s.skipped),
+                        errored: Boolean(s.errored)
+                      })
+                    }
+                  : {}),
+                duration: s.duration,
+                requestUrl: s.requestUrl,
+                assertions: ((s.assertions as ReadonlyArray<Record<string, unknown>>) ?? []).map(a => ({
+                  description: a.description ?? a.message,
+                  passed: a.passed ?? a.status === 'pass',
+                  ...(a.expected !== undefined ? { expected: a.expected } : {}),
+                  ...(a.actual !== undefined ? { actual: a.actual } : {}),
+                  ...(a.status ? { status: a.status } : {})
+                }))
+              }))
+            }))
+          }
+        : {})
+    };
+  }
+});
+
+// ── Report Writer ──
+
+/** Write all reports from the given generators to the output directory. */
+export const writeReports = async (
+  result: PipelineResult,
+  generators: ReadonlyArray<ReportGenerator>,
+  outputDir: string,
+  _onProgress?: ProgressCallback
+): Promise<ReadonlyArray<{ readonly name: string; readonly path: string }>> => {
+  await mkdir(outputDir, { recursive: true });
+
+  const written: Array<{ name: string; path: string }> = [];
+
+  for (const generator of generators) {
+    const report = generator.generate(result);
+    const reportPath = join(outputDir, generator.filename);
+    await writeFile(reportPath, JSON.stringify(report, null, 2));
+    written.push({ name: generator.name, path: reportPath });
+  }
+
+  return written;
+};
+
+// ── Pre-built Report Generator Sets ──
+
+/** Report generators for Add/Edit endorsement. */
+export const addEditReportGenerators = (version: string): ReadonlyArray<ReportGenerator> => [
+  createGenericReportGenerator('Web API Add/Edit', version, serializeAddEditRemarks),
+  createDetailedReportGenerator('Web API Add/Edit', version, serializeAddEditRemarks)
+];
+
+/** Report generators for EntityEvent endorsement. */
+export const entityEventReportGenerators = (version: string): ReadonlyArray<ReportGenerator> => [
+  createGenericReportGenerator('EntityEvent (RCP-027)', version, serializeEntityEventRemarks),
+  createDetailedReportGenerator('EntityEvent (RCP-027)', version, serializeEntityEventRemarks)
+];
+
+/** Report generators for Web API Core endorsement. */
+export const coreReportGenerators = (version: string): ReadonlyArray<ReportGenerator> => [
+  createGenericReportGenerator('Web API Server Core', version, serializeCoreRemarks),
+  createDetailedReportGenerator('Web API Server Core', version, serializeCoreRemarks)
+];

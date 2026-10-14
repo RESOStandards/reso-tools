@@ -1,0 +1,233 @@
+{
+  "zombies": [
+    {
+      "resource": "Property",
+      "field": "ConstructionMaterials",
+      "lookup": "Aerated Concrete",
+      "data": {}
+    },
+    {
+      "resource": "Property",
+      "field": "ConstructionMaterials",
+      "lookup": "Brick over Foundation",
+      "data": {}
+    },
+    {
+      "resource": "Property",
+      "field": "ConstructionMaterials",
+      "lookup": "Frame/Wood",
+      "data": {}
+    },
+    {
+      "resource": "Property",
+      "field": "ConstructionMaterials",
+      "lookup": "Hardboard",
+      "data": {}
+    },
+    {
+      "resource": "Property",
+      "field": "ConstructionMaterials",
+      "lookup": "Masonry",
+      "data": {}
+    }
+  ],
+  "inconsistent_ft": [
+    {
+      "resource": "Property",
+      "field": "ConstructionMaterials",
+      "lookup": "?? Brick",
+      "parent": {
+        "suggestions": [
+          {
+            "suggestedResourceName": "Property",
+            "suggestedFieldName": "ConstructionMaterials",
+            "suggestedLookupValue": "Brick",
+            "isFastTrack": true
+          }
+        ]
+      },
+      "suggestion": {
+        "suggestedResourceName": "Property",
+        "suggestedFieldName": "ConstructionMaterials",
+        "suggestedLookupValue": "Brick",
+        "isFastTrack": true
+      }
+    },
+    {
+      "resource": "Property",
+      "field": "ConstructionMaterials",
+      "lookup": "1 Story",
+      "parent": {
+        "suggestions": [
+          {
+            "suggestedResourceName": "Property",
+            "suggestedFieldName": "Levels",
+            "suggestedLookupValue": "One",
+            "isFastTrack": true
+          }
+        ]
+      },
+      "suggestion": {
+        "suggestedResourceName": "Property",
+        "suggestedFieldName": "Levels",
+        "suggestedLookupValue": "One",
+        "isFastTrack": true
+      }
+    },
+    {
+      "resource": "Property",
+      "field": "ConstructionMaterials",
+      "lookup": "2 Story",
+      "parent": {
+        "suggestions": [
+          {
+            "suggestedResourceName": "Property",
+            "suggestedFieldName": "Levels",
+            "suggestedLookupValue": "Two",
+            "isFastTrack": true
+          }
+        ]
+      },
+      "suggestion": {
+        "suggestedResourceName": "Property",
+        "suggestedFieldName": "Levels",
+        "suggestedLookupValue": "Two",
+        "isFastTrack": true
+      }
+    },
+    {
+      "resource": "Property",
+      "field": "ConstructionMaterials",
+      "lookup": "6 Wood Siding Frame",
+      "parent": {
+        "suggestions": [
+          {
+            "suggestedResourceName": "Property",
+            "suggestedFieldName": "ConstructionMaterials",
+            "suggestedLookupValue": "Wood Siding",
+            "isFastTrack": true
+          }
+        ]
+      },
+      "suggestion": {
+        "suggestedResourceName": "Property",
+        "suggestedFieldName": "ConstructionMaterials",
+        "suggestedLookupValue": "Wood Siding",
+        "isFastTrack": true
+      }
+    },
+    {
+      "resource": "Property",
+      "field": "ConstructionMaterials",
+      "lookup": "7 Wood Siding Frame",
+      "parent": {
+        "suggestions": [
+          {
+            "suggestedResourceName": "Property",
+            "suggestedFieldName": "ConstructionMaterials",
+            "suggestedLookupValue": "Frame",
+            "isFastTrack": true
+          },
+          {
+            "suggestedResourceName": "Property",
+            "suggestedFieldName": "ConstructionMaterials",
+            "suggestedLookupValue": "Wood Siding",
+            "isFastTrack": true
+          }
+        ]
+      },
+      "suggestion": {
+        "suggestedResourceName": "Property",
+        "suggestedFieldName": "ConstructionMaterials",
+        "suggestedLookupValue": "Frame",
+        "isFastTrack": true
+      }
+    }
+  ],
+  "flagged_empty": [
+    {
+      "resource": "Property",
+      "field": "Heating",
+      "lookup": "Radiant",
+      "data": {
+        "isFastTrack": true
+      }
+    },
+    {
+      "resource": "Property",
+      "field": "PropertySubType",
+      "lookup": "Co-Ownership",
+      "data": {
+        "isFastTrack": true
+      }
+    },
+    {
+      "resource": "Property",
+      "field": "PropertySubType",
+      "lookup": "Tenancy in Common",
+      "data": {
+        "isFastTrack": true
+      }
+    },
+    {
+      "resource": "Property",
+      "field": "Appliances",
+      "lookup": "Dishwasher",
+      "data": {
+        "isFastTrack": true
+      }
+    },
+    {
+      "resource": "Property",
+      "field": "Appliances",
+      "lookup": "Dryer",
+      "data": {
+        "isFastTrack": true
+      }
+    }
+  ],
+  "extra_keys": [
+    {
+      "resource": "Property",
+      "field": "PropertySubType",
+      "lookup": "2 Story",
+      "suggestion": {
+        "suggestedResourceName": "Property",
+        "suggestedFieldName": "Levels",
+        "suggestedLookupValue": "Two",
+        "suggestedRelatedResourceName": "Property",
+        "suggestedRelatedFieldName": "PropertySubType",
+        "suggestedRelatedLookupValue": "SingleFamilyResidence",
+        "isFastTrack": true
+      }
+    },
+    {
+      "resource": "Property",
+      "field": "PropertySubType",
+      "lookup": "Acreage & Farms",
+      "suggestion": {
+        "suggestedResourceName": "Property",
+        "suggestedFieldName": "PropertySubType",
+        "suggestedLookupValue": "Farm",
+        "suggestedRelatedResourceName": "Property",
+        "suggestedRelatedFieldName": "PropertyType",
+        "suggestedRelatedLookupValue": "Land",
+        "isFastTrack": true
+      }
+    },
+    {
+      "resource": "Property",
+      "field": "PropertySubType",
+      "lookup": "Acreage/Farm",
+      "suggestion": {
+        "suggestedResourceName": "Property",
+        "suggestedFieldName": "PropertySubType",
+        "suggestedLookupValue": "Farm",
+        "suggestedRelatedResourceName": "Property",
+        "suggestedRelatedFieldName": "PropertyType",
+        "suggestedRelatedLookupValue": "Land",
+        "isFastTrack": true
+      }
+    }
+  ]
+}

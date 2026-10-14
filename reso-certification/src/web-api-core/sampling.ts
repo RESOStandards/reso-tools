@@ -1,0 +1,864 @@
+/**
+ * Field type resolution and value sampling from live server data.
+ *
+ * Ports the generate-resoscripts.sh logic to TypeScript:
+ * 1. Identify fields by OData type from metadata
+ * 2. Fetch sample records from the server
+ * 3. Pick the best field + median value for each required type
+ */
+
+import { type EnumRepresentation, isDeadlineError } from '@reso-standards/reso-client';
+import type { CsdlEnumType } from '@reso-standards/reso-metadata-utils';
+import { type ODataRequester, buildResourceUrl, webRequester } from '../test-runner/index.js';
+import type { EntityType } from '../test-runner/types.js';
+import { extractNextLink } from './assertions.js';
+import type { NowFieldPastness } from './empty-verdict.js';
+import { type EnumCandidate, isMultiRep, isSingleRep, selectEnumCandidates } from './enum-selection.js';
+import { MIN_DISCRIMINATING_VALUES, NO_FIELD_PREFERENCES, type PreferredFields, matchedPreferences } from './field-preference.js';
+import { rebaseNextLink } from './next-link.js';
+import { ORIGINATING_SYSTEM_ID_FIELD, ORIGINATING_SYSTEM_NAME_FIELD, originatingSystemFilterClause } from './queries.js';
+import { type ScalarCandidate, collectFieldValues, selectScalarCandidates } from './scalar-selection.js';
+import type { StandardMap } from './standard-map.js';
+
+/** Resolved test parameters for one resource. */
+export interface TestParams {
+  readonly resource: string;
+  readonly keyField: string;
+  readonly keyValue: string;
+  /** Optional OriginatingSystemName / OriginatingSystemID scope. When set, every resource-data filter query is
+   *  AND-scoped to it (mirrors the DD replication `prepareFilterExpression`), so a multi-tenant provider is
+   *  certified against the recipient org's own rows rather than reading "from the top". OSN takes precedence
+   *  over OSID. Set by resolveTestParams ONLY when the resource's metadata carries the field (resource-aware),
+   *  from the run config (`--config` / `--originating-system-name|id`). */
+  readonly originatingSystemName?: string;
+  readonly originatingSystemId?: string;
+  readonly enumMode: EnumMode;
+  readonly integerField?: string;
+  /** Median sampled value — for eq / ge / le / ne (the value's own record satisfies eq/ge/le; ne is gated). */
+  readonly integerValueLow?: number;
+  readonly integerValueHigh: number;
+  /** Sampled MIN — the `gt` target. `field gt min` matches iff a larger value exists (≥2 distinct), so the
+   *  empty-verdict gates it on the distinct count. Using the median would false-fail at low cardinality
+   *  (median == max when ≤2 distinct → `gt median` is correctly empty yet was scored a defect). */
+  readonly integerValueMin?: number;
+  /** Sampled MAX — the `lt` target (symmetric to {@link integerValueMin}). */
+  readonly integerValueMax?: number;
+  /** Sentinel for the `not(integerField le <sentinel>)` scenario — below the field's floor so `not` matches
+   *  every record (guaranteed non-empty). `-1` for a non-negative field (the old Commander value), or below
+   *  the sampled min for a signed one. Absent when there is no integer field. */
+  readonly integerNotSentinel?: number;
+  readonly decimalField?: string;
+  readonly decimalValueLow?: number;
+  readonly decimalValueHigh?: number;
+  /** Sampled decimal MIN / MAX — the `gt` / `lt` targets (see {@link integerValueMin}). */
+  readonly decimalValueMin?: number;
+  readonly decimalValueMax?: number;
+  readonly dateField?: string;
+  readonly dateValue?: string;
+  /** Sampled date MIN / MAX — the `gt` / `lt` targets (see {@link integerValueMin}). */
+  readonly dateValueMin?: string;
+  readonly dateValueMax?: string;
+  readonly timestampField?: string;
+  /** The field the `lt now()` / `le now()` scenarios use: the top-ranked datetime field carrying at least one
+   *  sampled value at or before now. Those two are the only scenarios needing it — an empty result on a `now()`
+   *  comparison is a fail, so a field whose values are all in the future false-fails a compliant server. ABSENT
+   *  when no datetime field on the resource carries a past value; they then run on {@link timestampField} and the
+   *  empty-verdict stops asserting a hit for them, because empty is then the correct answer. */
+  readonly timestampFieldForNow?: string;
+  /** What the sampled data says about the field the `lt/le now()` scenarios will query, which decides what an empty
+   *  result MEANS for them: a hit is mandatory, empty is provably correct, or nothing was compared at all. Feeds
+   *  `EmptyContext.nowFieldPastness`. See {@link nowFieldPastnessFor}. */
+  readonly nowFieldPastness?: NowFieldPastness;
+  /** Non-gating warning when the resource carries no usable `ModificationTimestamp`, so the timestamp scenarios
+   *  were grounded on a substitute. Rides `ScenarioResult.warnings` on every scenario that uses the timestamp
+   *  field; never touches `passed`, the verdict or the exit code. See {@link modificationTimestampWarning}. */
+  readonly timestampWarning?: string;
+  /** The sampled MIN timestamp — used for `gt` / `ge`. `gt min` is gated on {@link datetimeDistinctCount};
+   *  the previous first-seen value was the global MAX under a `…DESC` default sort, making `gt max` a false fail. */
+  readonly datetimeValue?: string;
+  /** The sampled MAX timestamp — used for `lt` (records below the max exist iff distinct > 1). Mirrors dateValueMax. */
+  readonly datetimeValueMax?: string;
+  readonly singleLookupField?: string;
+  readonly singleLookupValue?: string;
+  readonly multiLookupField?: string;
+  readonly multiLookupValue1?: string;
+  readonly multiLookupValue2?: string;
+  /** One real record's DISTINCT collection (the smallest observed) for the chosen multi-valued field — used to
+   *  build a GUARANTEED-MATCH `all(x: x eq v1 or … or vn)` / FLAGS `has v1 and has v2`, so the operator can be
+   *  demanded to return that record (empty → fail) rather than skipping on an empty result. Absent when no
+   *  sampled record carried a small-enough collection; then all() / has-and keeps its skip-on-empty verdict. */
+  readonly multiLookupSubsetValues?: ReadonlyArray<string>;
+  /** A plain (non-lookup) Edm.String field + a sample substring, for the
+   *  optional string-function tests (contains/startswith/endswith). */
+  readonly stringField?: string;
+  readonly stringValue?: string;
+  /** Additional sample values for the OData 4.01 `in` operator scenario.
+   *  Need at least 2 distinct lookup values; the runner skips the scenario
+   *  if fewer than 2 of `singleLookupValue` / `singleLookupValue2` /
+   *  `singleLookupValue3` are populated. */
+  readonly singleLookupValue2?: string;
+  readonly singleLookupValue3?: string;
+  /** The resolved representation of the chosen single/multi lookup field — the runner gates each enum
+   *  scenario on this (flags→has, single→eq/ne/in, collection→any/all) instead of the resource-wide mode. */
+  readonly singleLookupFieldRep?: EnumRepresentation;
+  readonly multiLookupFieldRep?: EnumRepresentation;
+  /** The CSDL enum type of the chosen enum-typed lookup field — lets the runner decode an integer-bitmask
+   *  response value back to member names when validating a flags field. Absent for string lookups. */
+  readonly singleLookupEnumType?: CsdlEnumType;
+  readonly multiLookupEnumType?: CsdlEnumType;
+  /** Ranked candidate fields per slot (standard-first). The runner tries alternates when the primary
+   *  field isn't queryable — we're not guaranteed a given field can be filtered on. */
+  readonly singleLookupCandidates?: ReadonlyArray<EnumCandidate>;
+  readonly multiLookupCandidates?: ReadonlyArray<EnumCandidate>;
+  /** Ranked candidate fields for the SCALAR slots (standard-first — see selectScalarCandidates), the scalar
+   *  counterpart of the enum ladders above. The runner substitutes each in turn when the primary field is not
+   *  queryable, so a server that rejects `$filter` on one field no longer fails the whole type. */
+  readonly integerCandidates?: ReadonlyArray<ScalarCandidate<number>>;
+  readonly decimalCandidates?: ReadonlyArray<ScalarCandidate<number>>;
+  readonly dateCandidates?: ReadonlyArray<ScalarCandidate<string>>;
+  /** Map from single-lookup field name to its RESO.OData.Metadata.LookupName
+   *  annotation value. Used by the Lookup Resource validation scenario
+   *  (`GET /Lookup?$filter=LookupName eq '<lookupName>'`). Sampled from the
+   *  metadata at test-setup time. Falls back to the field name if absent. */
+  readonly lookupNameByField?: Readonly<Record<string, string>>;
+  readonly expandField?: string;
+  /** ALL collection navigation properties declared on the resource, each with its unqualified target entity
+   *  type name. Core 2.1.0 tests $expand PER collection nav (GATING) — the runner fans one expand result out
+   *  per entry (GET {resource}?$expand={name}&$top=5, then schema-validate each expanded child against
+   *  {targetType}). Empty / absent ⇒ the resource declares no collection nav ⇒ the $expand scenario is N/A
+   *  (skip). {@link expandField} above stays the FIRST of these — kept for the RRK warning's default field
+   *  resolution and the single-field query path. */
+  readonly expandNavs?: ReadonlyArray<{ readonly name: string; readonly targetType: string }>;
+  /** True when the $top=1000 sample was the COMPLETE resource (no forward `@odata.nextLink`). The `ne`
+   *  empty-verdict needs this to distinguish "the field genuinely holds one value across the whole resource"
+   *  (empty is correct → pass) from "our sample only saw one value" (unknowable → skip). */
+  readonly sampleComplete: boolean;
+  /** How many records the sample actually holds. Recorded because fill rate within the standard set is the
+   *  field-ranking key, so a thin sample silently weakens selection — this makes "did we sample this
+   *  adequately" answerable from the report instead of by reading source. */
+  readonly sampleRecordCount?: number;
+  /** How many page requests the sample cost. 1 means the first page answered it. */
+  readonly samplePagesFetched?: number;
+  /** Why sampling stopped. See {@link SampleStopReason}. */
+  readonly sampleStopReason?: SampleStopReason;
+  /** Distinct sampled value counts for the chosen scalar fields — the `ne` verdict needs ≥2 to prove the
+   *  field holds another value (so an empty `field ne <sampled>` result is a defect, not the correct answer).
+   *  Enum slots carry their own count on the candidate (`EnumCandidate.distinctValueCount`). */
+  readonly integerDistinctCount?: number;
+  readonly decimalDistinctCount?: number;
+  readonly dateDistinctCount?: number;
+  readonly datetimeDistinctCount?: number;
+  /** Distinct sampled value counts for the CHOSEN enum lookup fields — the enum `ne` verdict's equivalent of
+   *  the scalar counts. The runner overrides these per candidate (`paramsWithCandidate`) as it tries the
+   *  ranked ladder, so each attempt carries its own field's count; the primary candidate seeds them here. */
+  readonly singleLookupDistinctCount?: number;
+  readonly multiLookupDistinctCount?: number;
+  readonly skippedTypes: ReadonlyArray<string>;
+  /** Field preferences that actually matched a candidate on this resource, exactly as the operator wrote them.
+   *  A preference re-orders selection, so it changes WHAT WAS TESTED — the report has to say so, or a steered
+   *  run is indistinguishable from an unsteered one and a provider could influence their own certification.
+   *  Only matched entries appear: a preference naming a field this resource does not carry had no effect and
+   *  must not be reported as though it did. */
+  readonly appliedFieldPreferences?: ReadonlyArray<string>;
+}
+
+/** The promotion rule, mirrored from the selectors so `applied` reports only what actually took effect: a
+ *  preference naming a non-discriminating field was refused there and must not be reported as honored here. */
+const enumCanDiscriminate = (c: EnumCandidate): boolean => c.distinctValueCount >= MIN_DISCRIMINATING_VALUES;
+const scalarCanDiscriminate = (c: ScalarCandidate<unknown>): boolean => c.stats.distinct >= MIN_DISCRIMINATING_VALUES;
+
+/** A sampled page is COMPLETE (the whole resource) when the OData response carries no forward
+ *  `@odata.nextLink`. Core 2.1.0 requires that link when more results exist, so its absence means we sampled
+ *  every record. A null/absent body is unknowable, so conservatively INCOMPLETE — never a false "complete". */
+export const isSampleComplete = (body: unknown): boolean => {
+  if (typeof body !== 'object' || body === null) return false;
+  const nextLink = (body as Record<string, unknown>)['@odata.nextLink'];
+  return nextLink == null;
+};
+
+/** The sentinel for the `not(field le sentinel)` test — strictly below the field's sampled floor so `not`
+ *  matches every record (guaranteed non-empty, making an empty result a determinate defect). A non-negative
+ *  field yields `-1` (min ≥ 0 ⇒ min−1 ≥ −1, so the −1 clamp wins — the old Commander value); a signed field
+ *  yields `sampledMin − 1`. Undefined when the field has no finite sampled values. */
+export const integerNotSentinelFor = (values: ReadonlyArray<unknown>): number | undefined => {
+  // Drop null/undefined BEFORE coercion — Number(null) is 0, which would masquerade as a real floor of 0.
+  const nums = values
+    .filter(v => v != null)
+    .map(Number)
+    .filter(Number.isFinite);
+  return nums.length > 0 ? Math.min(-1, Math.min(...nums) - 1) : undefined;
+};
+
+/** Well-known RESO resources with their key fields. */
+export const WELL_KNOWN_RESOURCES: ReadonlyArray<{ readonly resource: string; readonly keyField: string }> = [
+  { resource: 'Property', keyField: 'ListingKey' },
+  { resource: 'Member', keyField: 'MemberKey' },
+  { resource: 'Office', keyField: 'OfficeKey' },
+  { resource: 'Media', keyField: 'MediaKey' },
+  { resource: 'OpenHouse', keyField: 'OpenHouseKey' },
+  { resource: 'Showing', keyField: 'ShowingKey' }
+];
+
+/**
+ * Resources that MUST be available at the top level for Core 2.1.0 — if a provider declares one, it MUST be
+ * served there (it MAY also be expanded). The original core standard resources (Property/Member/Office), the
+ * metadata resources (Field can replace OData `$metadata`; Lookup carries enumerations; Field → Lookup), and
+ * EntityEvent (change tracking). Drives the declared-but-not-served carve-out (see serving.ts): a resource in
+ * this set that is determinately declared-but-not-served is a clean FAIL; anything else is Not Applicable.
+ */
+export const REQUIRED_RESOURCES_V21 = ['Property', 'Member', 'Office', 'Field', 'Lookup', 'EntityEvent'];
+
+/**
+ * Marker pushed into a resource's `skippedTypes` when its top-level sample page returned ZERO records — the
+ * runtime "not queryable at the top level" signal, independent of what the EntitySet declared (a declared set
+ * may be empty, access-denied, or randomly gated). The Core pipeline routes on it (see `resolveNoRecordsOutcome`
+ * in serving.ts): a non-required resource is Not Applicable (carried by `$expand`); a required one fails.
+ */
+export const NO_RECORDS_SAMPLED = 'all — no records found';
+
+/**
+ * Marker pushed into a resource's `skippedTypes` when its EntityType declares NO key property.
+ *
+ * OData requires every entity type to define at least one key (a compound key is several), and the CSDL validator
+ * already reports a violation with the spec citation ("Entity type 'X' has no key properties defined"). Core reads
+ * the key from the provider's own `<Key>` and does not substitute one: every scenario projects the key into
+ * `$select`, and the single-entity scenario addresses by it, so a fabricated key turns one metadata defect into a
+ * 400 on every scenario, misattributed to the server. The previous `?? 'ListingKey'` was also wrong for every
+ * resource but Property.
+ *
+ * Josh, 2026-10-01: "we should just get their key and fail if their resource doesn't have a key definition,
+ * standard or local, if we try and do anything that requires a key." So the Core pipeline FAILS the resource on
+ * this marker (`noKeyDeclaredReport`) rather than skipping it, and no sample request is issued for it.
+ */
+export const NO_KEY_DECLARED = 'all — no key declared in $metadata';
+
+// ── Type matchers ──
+
+const INTEGER_TYPES = ['Edm.Int16', 'Edm.Int32', 'Edm.Int64'];
+const DECIMAL_TYPES = ['Edm.Decimal', 'Edm.Double'];
+const DATE_TYPES = ['Edm.Date'];
+const DATETIME_TYPES = ['Edm.DateTimeOffset'];
+
+// The RESO-required modification timestamp — always <= now, so the safe field to ground the `lt/le now()`
+// scenarios on.
+const MODIFICATION_TIMESTAMP_FIELD = 'ModificationTimestamp';
+
+const isIntegerType = (type: string): boolean => INTEGER_TYPES.includes(type);
+const isDecimalType = (type: string): boolean => DECIMAL_TYPES.includes(type);
+const isDateType = (type: string): boolean => DATE_TYPES.includes(type);
+const isDateTimeType = (type: string): boolean => DATETIME_TYPES.includes(type);
+
+/** Detected or configured enumeration mode. */
+export type EnumMode = 'isflags' | 'collections' | 'string';
+
+/**
+ * Auto-detect enum mode from entity type properties.
+ *   - If any property uses Collection(Edm.String) with no enum types → 'string'
+ *   - If any property uses Collection(org.reso.metadata.enums.*) → 'collections'
+ *   - If any property uses org.reso.metadata.enums.* (no collections) → 'isflags'
+ *   - Default: 'string'
+ */
+export const detectEnumMode = (entityType: EntityType): EnumMode => {
+  const hasStringLookup = entityType.properties.some(p => p.type === 'Edm.String' && !!p.annotations?.['RESO.OData.Metadata.LookupName']);
+  const hasEnumCollection = entityType.properties.some(p => p.type.startsWith('Collection(org.reso.metadata.enums.'));
+  const hasEnumType = entityType.properties.some(p => p.type.startsWith('org.reso.metadata.enums.') && !p.type.startsWith('Collection('));
+
+  if (hasStringLookup) return 'string';
+  if (hasEnumCollection) return 'collections';
+  if (hasEnumType) return 'isflags';
+  return 'string';
+};
+
+// ── Sampling helpers ──
+
+/** The sample page size. A page that returns fewer than this AND carries no `@odata.nextLink` is the COMPLETE
+ *  resource; a full page (== SAMPLE_TOP) may be `$top`-capped with more records beyond it, so it is NOT proof
+ *  of completeness — treating it as complete would let a `ne` false-PASS through. */
+const SAMPLE_TOP = 1000;
+
+/** Backstop on sample page requests. A server that pages in very small chunks would otherwise cost one request
+ *  per page all the way to SAMPLE_TOP; the run deadline already bounds total time, this bounds the request
+ *  count for a single resource. Hitting it is recorded, never silent. */
+const MAX_SAMPLE_PAGES = 60;
+
+/** Ask for a full page up front. `odata.maxpagesize` is advisory per OData, so the nextLink loop still does the
+ *  real work — but a server that honors it hands us SAMPLE_TOP in one round trip instead of dozens. */
+const SAMPLE_PREFER_HEADER: Readonly<Record<string, string>> = { Prefer: `odata.maxpagesize=${SAMPLE_TOP}` };
+
+/** Why sampling stopped. Recorded per resource so "did we sample this adequately" is answerable from the
+ *  report instead of by reading source. */
+export type SampleStopReason =
+  /** The server ran out of pages — the sample IS the complete resource. */
+  | 'exhausted'
+  /** We collected SAMPLE_TOP records. More may exist beyond them. */
+  | 'reached-target'
+  /** A page request failed, or answered non-200. Sampled with the records already in hand. */
+  | 'page-error'
+  /** A page carried a forward link but no records, so paging made no progress. */
+  | 'empty-page'
+  /** MAX_SAMPLE_PAGES was reached. */
+  | 'page-cap';
+
+/** A resource's sample, with the evidence of how it was obtained. */
+export interface SampledRecords {
+  readonly records: ReadonlyArray<Record<string, unknown>>;
+  readonly pagesFetched: number;
+  readonly stopReason: SampleStopReason;
+  /** True ONLY when the sample is provably the whole resource: the server ran out of pages AND the total came
+   *  in under SAMPLE_TOP. Anything else is conservatively incomplete, because this drives the `ne`/`gt`/`lt`
+   *  empty-verdict's pass-vs-skip split and a false "complete" would let a `ne` false-PASS through. */
+  readonly complete: boolean;
+}
+
+/**
+ * Collect up to {@link SAMPLE_TOP} records, following `@odata.nextLink` until the target is met or the server
+ * runs out of pages (Josh, 2026-10-03: "if we can page we need to sample up to 1000"). Before this, sampling
+ * issued a single `$top=1000` and kept whatever came back, so a provider whose page size is capped below 1000
+ * was silently under-sampled — and since fill rate within the standard set is the field-ranking key, a thin
+ * sample degrades selection without saying so.
+ *
+ * `@odata.count` is deliberately NOT consulted. Providers' counts are frequently wrong (Josh, 2026-10-03:
+ * "they're off all the time"), so the only trusted stopping conditions are our own record tally and the
+ * absence of a forward link.
+ */
+const sampleRecords = async (firstUrl: string, authToken: string, requester: ODataRequester): Promise<SampledRecords> => {
+  const first = await requester.request({ method: 'GET', url: firstUrl, authToken, headers: SAMPLE_PREFER_HEADER });
+  const pageRecords = (body: unknown): ReadonlyArray<Record<string, unknown>> =>
+    (body as { value?: ReadonlyArray<Record<string, unknown>> } | null)?.value ?? [];
+
+  // The FIRST page gets the same status gate as every later one. reso-client does not throw on a non-200, so a
+  // 500 or an expired-token 401 arrives as an ordinary value whose body carries no `value` and no forward link.
+  // Read literally that looks identical to an empty resource, and the resource would be reported as provably
+  // complete and genuinely empty — which fails a REQUIRED resource and blames the provider for our own failed
+  // request. An errored sample is `page-error` and is never complete.
+  if (first.status !== 200) {
+    return { records: [], pagesFetched: 1, stopReason: 'page-error', complete: false };
+  }
+
+  // Local mutable accumulators for the paging walk, scoped to this function and never leaked.
+  const records: Record<string, unknown>[] = [...pageRecords(first.body)];
+  let nextLink = extractNextLink(first.body);
+  let pagesFetched = 1;
+  // Only the ABNORMAL exits are recorded as we go. The normal pair is derived at the end from the final state,
+  // because the two are distinguishable only there: a server that fills the `$top` window has no reason to emit
+  // a forward link, so "no nextLink" means exhausted ONLY when the tally came in under the target.
+  let earlyExit: SampleStopReason | undefined;
+
+  while (nextLink !== undefined && records.length < SAMPLE_TOP) {
+    if (pagesFetched >= MAX_SAMPLE_PAGES) {
+      earlyExit = 'page-cap';
+      break;
+    }
+    const pageUrl = rebaseNextLink(nextLink, firstUrl);
+    const page = await requester
+      .request({ method: 'GET', url: pageUrl, authToken, headers: SAMPLE_PREFER_HEADER })
+      .catch((err: unknown) => {
+        if (isDeadlineError(err)) throw err; // out of run budget — stop the run, not just paging
+        return undefined; // a page fetch failed; sample with what we have rather than failing the resource
+      });
+    if (page === undefined) {
+      earlyExit = 'page-error';
+      break;
+    }
+    pagesFetched += 1;
+    if (page.status !== 200) {
+      earlyExit = 'page-error';
+      break;
+    }
+    const got = pageRecords(page.body);
+    if (got.length === 0) {
+      // A forward link with no rows behind it makes no progress; continuing would spin.
+      earlyExit = 'empty-page';
+      break;
+    }
+    records.push(...got);
+    nextLink = extractNextLink(page.body);
+  }
+
+  // Trim an over-long final page so the sample size is deterministic at the target.
+  const sampled = records.length > SAMPLE_TOP ? records.slice(0, SAMPLE_TOP) : records;
+  // `exhausted` requires BOTH no forward link AND a tally under the target. A full sample with no link is
+  // `reached-target`: the window was satisfied, which is not evidence that the resource ran out.
+  const ranOut = nextLink === undefined && sampled.length < SAMPLE_TOP;
+  const stopReason: SampleStopReason = earlyExit ?? (ranOut ? 'exhausted' : 'reached-target');
+  return {
+    records: sampled,
+    pagesFetched,
+    stopReason,
+    complete: stopReason === 'exhausted'
+  };
+};
+
+/** Numeric min / median / max / distinct-count of a field's sampled values, NUMERICALLY deduped. An
+ *  IEEE754Compatible server serializes Edm.Decimal/Int64 as JSON strings, so the same value can arrive as
+ *  "100" and "100.00"; deduping by Number (not String) keeps a numerically single-valued field from
+ *  over-counting its distinct values and wrongly failing a correct `ne`/`gt`/`lt`. */
+export const numericStats = (
+  values: ReadonlyArray<unknown>
+): { readonly min: number; readonly median: number; readonly max: number; readonly distinct: number } | undefined => {
+  // Drop null/undefined BEFORE coercion — Number(null) is 0, which would inject a spurious 0 into the stats.
+  const nums = [
+    ...new Set(
+      values
+        .filter(v => v != null)
+        .map(Number)
+        .filter(Number.isFinite)
+    )
+  ].sort((a, b) => a - b);
+  return nums.length === 0
+    ? undefined
+    : { min: nums[0], median: nums[Math.floor(nums.length / 2)], max: nums[nums.length - 1], distinct: nums.length };
+};
+
+/** Date-only min / median / max / distinct-count. ISO date strings sort chronologically, so a lexicographic
+ *  sort suffices; the date-only slice normalizes any datetime-shaped value. */
+export const dateStats = (
+  values: ReadonlyArray<unknown>
+): { readonly min: string; readonly median: string; readonly max: string; readonly distinct: number } | undefined => {
+  const dates = [...new Set(values.map(v => String(v).split('T')[0]))].sort();
+  return dates.length === 0
+    ? undefined
+    : { min: dates[0], median: dates[Math.floor(dates.length / 2)], max: dates[dates.length - 1], distinct: dates.length };
+};
+
+/** Min + max timestamp + distinct count of a field's sampled full-timestamp values (ISO sorts chronologically). */
+const timestampStats = (
+  values: ReadonlyArray<unknown>
+): { readonly min: string; readonly max: string; readonly distinct: number } | undefined => {
+  const stamps = [...new Set(values.map(v => String(v)))].sort();
+  return stamps.length === 0 ? undefined : { min: stamps[0], max: stamps[stamps.length - 1], distinct: stamps.length };
+};
+
+/** Collect all non-null distinct values for a field across records. */
+const collectValues = (records: ReadonlyArray<Record<string, unknown>>, field: string): ReadonlyArray<unknown> =>
+  collectFieldValues(records, field).values;
+
+/**
+ * Rank a resource's COLLECTION navigation properties RESO-first — a standard DD expansion for the resource
+ * before a local one — so `expandField` (the RRK warning's default and the single-field query path) is the first
+ * STANDARD navigation rather than whichever the metadata happened to declare first, and the per-nav results list
+ * standard expansions first. Every declared collection nav is still tested ("see it, test it"): the ranking
+ * decides order and the default, never coverage. The sort is stable, so declaration order remains the tiebreak
+ * within each rank and selection stays deterministic.
+ */
+export const rankCollectionNavs = <T extends { readonly name: string }>(
+  navs: ReadonlyArray<T>,
+  standardMap: StandardMap,
+  resource: string
+): ReadonlyArray<T> => {
+  const rank = (nav: T): number => (standardMap.isStandardField(resource, nav.name) ? 0 : 1);
+  return [...navs].sort((a, b) => rank(a) - rank(b));
+};
+
+/**
+ * Rank a resource's populated `Edm.DateTimeOffset` fields for the timestamp scenarios.
+ *
+ * `ModificationTimestamp` first whenever it carries a value: it is RESO-required on every standard resource and is
+ * the semantically correct change-tracking field, not merely an eligible one. Then the DD-standard fields,
+ * most-used first, then the local ones, most-used first — the same filter-then-rank-on-usage rule the scalar
+ * groups follow (see selectScalarCandidates). Usage is fill rate in the sample. The sort is stable, so metadata
+ * declaration order remains the tiebreak at equal usage.
+ *
+ * Standard-ness comes from the DD reference, never from the field name. The previous implementation ranked on
+ * `endsWith('Timestamp')`, which was wrong in both directions: it admitted a local `MyCustomTimestamp` as though
+ * the DD defined it, and the DD itself carries start/end times ending in "Timestamp"
+ * (`InternetTrackingSummary.StartTimestamp` / `EndTimestamp`). The type filter is applied by the caller, which
+ * passes only `Edm.DateTimeOffset` fields.
+ *
+ * A future-dated field is NOT excluded here. Of the scenarios grounded on this slot, only `lt now()` and
+ * `le now()` need a value at or before now; the rest compare against a SAMPLED value or only sort, and work the
+ * same on a future-dated field. Restricting the whole family for those two would leave a well-populated
+ * future-dated field untested (Josh, 2026-10-01). Those two draw from {@link selectTimestampFieldForNow} instead.
+ */
+export const rankDatetimeFields = (
+  datetimeFields: ReadonlyArray<string>,
+  records: ReadonlyArray<Record<string, unknown>>,
+  standardMap: StandardMap,
+  resource: string
+): ReadonlyArray<string> => {
+  const isPopulated = (f: string): boolean => records.some(r => r[f] != null);
+  const usage = (f: string): number => (records.length > 0 ? collectFieldValues(records, f).fillCount / records.length : 0);
+  const mostUsedFirst = (fields: ReadonlyArray<string>): ReadonlyArray<string> => [...fields].sort((a, b) => usage(b) - usage(a));
+  const populated = datetimeFields.filter(isPopulated);
+  const rest = populated.filter(f => f !== MODIFICATION_TIMESTAMP_FIELD);
+  return [
+    ...populated.filter(f => f === MODIFICATION_TIMESTAMP_FIELD),
+    ...mostUsedFirst(rest.filter(f => standardMap.isStandardField(resource, f))),
+    ...mostUsedFirst(rest.filter(f => !standardMap.isStandardField(resource, f)))
+  ];
+};
+
+/** True when the field carries at least ONE sampled value at or before `now`.
+ *
+ *  This — not "every value is past" — is what `lt/le now()` needs: a field mixing past and future values still
+ *  returns its past rows, so the operator is testable on it. Only a field whose sampled values are ALL in the
+ *  future makes an empty result correct. Parsed to epoch rather than compared as strings, because a provider may
+ *  serialize `Z` and `+00:00` forms in the same feed. */
+const parseableTimestamps = (field: string, records: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<number> =>
+  collectValues(records, field)
+    .map(v => Date.parse(String(v)))
+    .filter(Number.isFinite);
+
+const hasPastValue = (field: string, records: ReadonlyArray<Record<string, unknown>>, now: number): boolean =>
+  parseableTimestamps(field, records).some(t => t <= now);
+
+/**
+ * Classify the field a `lt/le now()` scenario will actually query (see {@link NowFieldPastness}).
+ *
+ * The three states must stay distinct. `hasPastValue` alone cannot do it: it is an `Array.some`, which returns
+ * false both for "every value is in the future" and for "there were no values to look at", and those demand
+ * opposite answers — the first certifies the operator, the second certifies nothing. Note that a field can be
+ * "populated" (some record non-null) and still yield NO parseable timestamp, e.g. one serving the string 'N/A',
+ * which is why this reads parseable values rather than non-null ones.
+ */
+export const nowFieldPastnessFor = (
+  timestampField: string | undefined,
+  timestampFieldForNow: string | undefined,
+  records: ReadonlyArray<Record<string, unknown>>,
+  now: number = Date.now()
+): NowFieldPastness => {
+  // Sampling already found a field holding a past value, and those scenarios are steered onto it.
+  if (timestampFieldForNow !== undefined) return 'has-past';
+  if (timestampField === undefined) return 'no-values';
+  const stamps = parseableTimestamps(timestampField, records);
+  // Defensive: `timestampFieldForNow` being absent already implies no past value on any ranked field. Re-deriving
+  // it here keeps this function true on its own inputs rather than on that invariant holding elsewhere.
+  if (stamps.length === 0) return 'no-values';
+  return stamps.some(t => t <= now) ? 'has-past' : 'all-future';
+};
+
+/** The general timestamp slot: the top-ranked populated datetime field (see {@link rankDatetimeFields}). Undefined
+ *  only when the resource has no populated datetime field at all. */
+export const selectTimestampField = (
+  datetimeFields: ReadonlyArray<string>,
+  records: ReadonlyArray<Record<string, unknown>>,
+  standardMap: StandardMap,
+  resource: string
+): string | undefined => rankDatetimeFields(datetimeFields, records, standardMap, resource)[0];
+
+/**
+ * The field for the `lt now()` / `le now()` scenarios: the top-ranked candidate carrying at least one sampled value
+ * at or before now.
+ *
+ * Those two are the only scenarios needing that, and they need it absolutely, because the empty-verdict makes an
+ * empty result on a `now()` comparison a FAIL: run them against a field whose values are all in the FUTURE and a
+ * compliant server is false-failed for correctly matching nothing. `ne now()` is deliberately NOT in this set —
+ * every value other than now satisfies it, future ones included, so it can never be legitimately empty.
+ *
+ * Undefined when NO datetime field on the resource carries a past value. The two scenarios then run on the general
+ * slot, and the empty-verdict stops asserting a hit for them (see `EmptyContext.fieldHasPastValues`) — the empty
+ * result is the server being right.
+ */
+export const selectTimestampFieldForNow = (
+  datetimeFields: ReadonlyArray<string>,
+  records: ReadonlyArray<Record<string, unknown>>,
+  standardMap: StandardMap,
+  resource: string,
+  now: number = Date.now()
+): string | undefined => rankDatetimeFields(datetimeFields, records, standardMap, resource).find(f => hasPastValue(f, records, now));
+
+/** The non-gating warning for a resource whose sampled data carries no usable `ModificationTimestamp`. Core does
+ *  not fail for it — a standard resource missing the field is a Data Dictionary matter, not a Core one (Josh,
+ *  2026-10-01) — but the tester should hear it, because keys and timestamps are required for DD testing and the
+ *  timestamp scenarios are now grounded on a substitute field. Undefined when the field is present and populated. */
+export const modificationTimestampWarning = (
+  datetimeFields: ReadonlyArray<string>,
+  records: ReadonlyArray<Record<string, unknown>>,
+  resource: string,
+  chosenField: string | undefined
+): string | undefined => {
+  const present = datetimeFields.includes(MODIFICATION_TIMESTAMP_FIELD);
+  const populated = present && records.some(r => r[MODIFICATION_TIMESTAMP_FIELD] != null);
+  if (populated) return undefined;
+  const why = present ? 'declares it but sampled no value for it' : 'does not declare it';
+  const instead = chosenField ? `grounded the timestamp scenarios on '${chosenField}' instead` : 'found no usable datetime field';
+  return `${resource} ${why} for '${MODIFICATION_TIMESTAMP_FIELD}' — ${instead}. Keys and timestamps are required for Data Dictionary testing, so this is reported here and assessed there, not failed by Core.`;
+};
+
+// ── Main resolver ──
+
+/**
+ * Resolve test parameters for a resource by sampling live data.
+ *
+ * Fetches up to 1,000 records and finds the best field + value for each
+ * required OData type. Uses median selection for numeric/temporal values
+ * to ensure filter tests work bidirectionally.
+ */
+export const resolveTestParams = async (
+  serverUrl: string,
+  resource: string,
+  entityType: EntityType,
+  authToken: string,
+  enumTypes: ReadonlyArray<CsdlEnumType>,
+  standardMap: StandardMap,
+  enumModeOverride?: EnumMode,
+  requester: ODataRequester = webRequester,
+  originatingSystem?: { readonly name?: string; readonly id?: string },
+  preferFields: PreferredFields = NO_FIELD_PREFERENCES
+): Promise<TestParams> => {
+  // enumMode is retained as an informational/coverage field only — selection and gating are now per-field
+  // (resolveEnum), so the `--enumMode` override no longer steers field choice. Vestigial; a candidate for removal.
+  const enumMode = enumModeOverride ?? detectEnumMode(entityType);
+  // The key comes from the provider's CSDL `<Key>` and nowhere else — never a convention, never a literal. An
+  // EntityType with no key cannot be certified (see NO_KEY_DECLARED), so return before issuing any request: there
+  // is nothing to sample for a resource we are about to fail.
+  const keyField = entityType.keyProperties[0];
+  if (keyField === undefined) {
+    return {
+      resource,
+      keyField: '',
+      keyValue: '',
+      enumMode,
+      integerValueHigh: 2147483647,
+      sampleComplete: false,
+      skippedTypes: [NO_KEY_DECLARED]
+    };
+  }
+  const skippedTypes: string[] = [];
+
+  // Resource-aware OriginatingSystem (OSN/OSID) scope: apply the recipient-org filter ONLY when this resource's
+  // metadata actually carries the field, else the clause would 400 a field-less resource (see queries.ts). OSN
+  // takes precedence over OSID. The same clause scopes both the sample fetch below (so a provider that REQUIRES
+  // the filter can be sampled at all) and — via `osParams` on the returned object — every resource-data
+  // scenario query (buildScenarioQuery). Inert when no OriginatingSystem is configured.
+  const hasField = (name: string): boolean => entityType.properties.some(p => p.name === name);
+  const scopedOsn = originatingSystem?.name && hasField(ORIGINATING_SYSTEM_NAME_FIELD) ? originatingSystem.name : undefined;
+  const scopedOsid = originatingSystem?.id && hasField(ORIGINATING_SYSTEM_ID_FIELD) ? originatingSystem.id : undefined;
+  const osScopeClause = originatingSystemFilterClause(scopedOsn, scopedOsid);
+  const osParams: Pick<TestParams, 'originatingSystemName' | 'originatingSystemId'> = {
+    ...(scopedOsn ? { originatingSystemName: scopedOsn } : {}),
+    ...(scopedOsid ? { originatingSystemId: scopedOsid } : {})
+  };
+
+  // Fetch sample records, paging to SAMPLE_TOP. A wide sample is what makes field selection meaningful: more
+  // fields carry a value, and fill rate within the standard set is the ranking key. Scoped to the recipient
+  // org when OSN/OSID applies to this resource (above), matching the scenario queries.
+  const url = `${buildResourceUrl(serverUrl, resource)}?$top=${SAMPLE_TOP}${osScopeClause ? `&$filter=${encodeURIComponent(osScopeClause)}` : ''}`;
+  const sample = await sampleRecords(url, authToken, requester);
+  const records = sample.records;
+  // Was the sample the COMPLETE resource? Drives the ne/gt/lt empty-verdict's pass-vs-skip split, so it is true
+  // only when the server ran out of pages AND the total came in under SAMPLE_TOP (see SampledRecords.complete).
+  const sampleComplete = sample.complete;
+  const sampleStats: Pick<TestParams, 'sampleRecordCount' | 'samplePagesFetched' | 'sampleStopReason'> = {
+    sampleRecordCount: records.length,
+    samplePagesFetched: sample.pagesFetched,
+    sampleStopReason: sample.stopReason
+  };
+
+  if (records.length === 0) {
+    return {
+      resource,
+      keyField,
+      keyValue: '',
+      enumMode,
+      integerValueHigh: 2147483647,
+      sampleComplete,
+      ...sampleStats,
+      skippedTypes: [NO_RECORDS_SAMPLED],
+      ...osParams
+    };
+  }
+
+  const keyValue = String(records[0][keyField] ?? '');
+
+  // Categorize fields by type
+  const integerFields = entityType.properties.filter(p => isIntegerType(p.type)).map(p => p.name);
+  const decimalFields = entityType.properties.filter(p => isDecimalType(p.type)).map(p => p.name);
+  const dateFields = entityType.properties.filter(p => isDateType(p.type)).map(p => p.name);
+  const datetimeFields = entityType.properties.filter(p => isDateTimeType(p.type)).map(p => p.name);
+  // Enum fields: classify each by its REAL representation (resolveEnum), decode its sampled values, and
+  // rank candidates standard-first — replacing the resource-wide name-shape heuristic. A ladder of up to 3
+  // per group lets the runner try alternates when a field isn't queryable.
+  const singleLookupCandidates = selectEnumCandidates(
+    entityType.properties,
+    records,
+    enumTypes,
+    standardMap,
+    resource,
+    isSingleRep,
+    preferFields
+  );
+  const multiLookupCandidates = selectEnumCandidates(
+    entityType.properties,
+    records,
+    enumTypes,
+    standardMap,
+    resource,
+    isMultiRep,
+    preferFields
+  );
+
+  // Resolve integer field + values from the RESO-first ladder (standard DD fields before local ones; see
+  // selectScalarCandidates). The primary is the top-ranked candidate; the runner walks the rest when the server
+  // will not filter on it. median → eq/ge/le/ne; min → gt; max → lt (the gt/lt targets must be the extremes so a
+  // match exists iff another value lies beyond them — the empty-verdict gates gt/lt on distinct).
+  const integerCandidates = selectScalarCandidates(integerFields, records, standardMap, resource, numericStats, preferFields);
+  const intPrimary = integerCandidates[0];
+  const integerField = intPrimary?.field;
+  const integerValueLow = intPrimary?.stats.median;
+  const integerValueMin = intPrimary?.stats.min;
+  const integerValueMax = intPrimary?.stats.max;
+  const integerDistinctCount = intPrimary?.stats.distinct;
+  if (!integerField) skippedTypes.push('integer');
+  const integerNotSentinel = intPrimary ? integerNotSentinelFor(intPrimary.values) : undefined;
+
+  // Resolve decimal field + values (same ladder, same median/min/max scheme).
+  const decimalCandidates = selectScalarCandidates(decimalFields, records, standardMap, resource, numericStats, preferFields);
+  const decPrimary = decimalCandidates[0];
+  const decimalField = decPrimary?.field;
+  const decimalValueLow = decPrimary?.stats.median;
+  const decimalValueHigh = decPrimary?.stats.median; // le uses the high slot; median satisfies le (all ≤ median)
+  const decimalValueMin = decPrimary?.stats.min;
+  const decimalValueMax = decPrimary?.stats.max;
+  const decimalDistinctCount = decPrimary?.stats.distinct;
+  if (!decimalField) skippedTypes.push('decimal');
+
+  // Resolve date field + values (same ladder). This is the group the 2026-09-21 run failed on: a local Edm.Date
+  // declared first, a 500 on its $filter, and all six Date scenarios failed with standard Date fields available.
+  const dateCandidates = selectScalarCandidates(dateFields, records, standardMap, resource, dateStats, preferFields);
+
+  // Record which preferences took effect on THIS resource, for the report. Union across every candidate
+  // family, deduplicated, written as the operator wrote them.
+  const appliedPreferences = [
+    ...new Set([
+      ...matchedPreferences(singleLookupCandidates, preferFields, resource, c => c.field, enumCanDiscriminate),
+      ...matchedPreferences(multiLookupCandidates, preferFields, resource, c => c.field, enumCanDiscriminate),
+      ...matchedPreferences(integerCandidates, preferFields, resource, c => c.field, scalarCanDiscriminate),
+      ...matchedPreferences(decimalCandidates, preferFields, resource, c => c.field, scalarCanDiscriminate),
+      ...matchedPreferences(dateCandidates, preferFields, resource, c => c.field, scalarCanDiscriminate)
+    ])
+  ];
+  const datePrimary = dateCandidates[0];
+  const dateField = datePrimary?.field;
+  const dateValue = datePrimary?.stats.median;
+  const dateValueMin = datePrimary?.stats.min;
+  const dateValueMax = datePrimary?.stats.max;
+  const dateDistinctCount = datePrimary?.stats.distinct;
+  if (!dateField) skippedTypes.push('date');
+
+  // Resolve timestamp field + value (prefer fully populated for orderby). datetimeValue = sampled MIN (feeds
+  // gt/ge); the previous first-seen value was the global MAX under a `…DESC` default sort → `gt max` false-fail.
+  const timestampField = selectTimestampField(datetimeFields, records, standardMap, resource);
+  const timestampFieldForNow = selectTimestampFieldForNow(datetimeFields, records, standardMap, resource);
+  const timestampWarning = modificationTimestampWarning(datetimeFields, records, resource, timestampField);
+  const nowFieldPastness = nowFieldPastnessFor(timestampField, timestampFieldForNow, records);
+  const tsStats = timestampField ? timestampStats(collectValues(records, timestampField)) : undefined;
+  const datetimeValue = tsStats?.min;
+  const datetimeValueMax = tsStats?.max;
+  const datetimeDistinctCount = tsStats?.distinct;
+  if (!timestampField) skippedTypes.push('timestamp');
+
+  // Primary field per slot = the top-ranked candidate (standard-first). Values come from the field's own
+  // decoded samples, so they are type-correct for it; values[1]/[2] feed the has-and / in scenarios.
+  const single = singleLookupCandidates[0];
+  const singleLookupField = single?.field;
+  const singleLookupValue = single?.values[0];
+  const singleLookupValue2 = single?.values[1];
+  const singleLookupValue3 = single?.values[2];
+  if (!singleLookupField) skippedTypes.push('singleLookup');
+
+  const multi = multiLookupCandidates[0];
+  const multiLookupField = multi?.field;
+  const multiLookupValue1 = multi?.values[0];
+  const multiLookupValue2 = multi?.values[1];
+  if (!multiLookupField) skippedTypes.push('multiLookup');
+
+  // Resolve a plain string field + sample substring for the optional string
+  // function tests (contains/startswith/endswith). v2.1.0.
+  const stringSample = entityType.properties
+    .filter(p => p.type === 'Edm.String' && !p.annotations?.['RESO.OData.Metadata.LookupName'])
+    .map(p => {
+      const vals = collectValues(records, p.name);
+      const val = vals.length > 0 ? String(vals[0]) : '';
+      return val.length >= 3 ? { field: p.name, value: val.slice(0, Math.min(5, val.length)) } : undefined;
+    })
+    .find((m): m is { field: string; value: string } => m != null);
+  const stringField = stringSample?.field;
+  const stringValue = stringSample?.value;
+
+  // Collection navigation properties drive the 2.1.0 $expand scenario, now tested PER nav (GATING). Selection is
+  // RESO-first (rankCollectionNavs: standard DD expansions for this resource before local ones, declaration order
+  // within a rank — still deterministic, so tests stay stable); a collection is what `$top=5` and the RRK
+  // child-collection check expect. `expandField` = the first RANKED collection nav (kept for the RRK warning's
+  // default field resolution + the single-field query path); `expandNavs` = ALL of them with their unqualified
+  // target entity type names, so the runner can test each declared collection nav one at a time. No collection nav
+  // (or no navigation properties at all) ⇒ both stay empty ⇒ the $expand scenario skips gracefully (N/A).
+  const collectionNavs = rankCollectionNavs(
+    (entityType.navigationProperties ?? []).filter(np => np.isCollection),
+    standardMap,
+    resource
+  );
+  const expandField = collectionNavs[0]?.name;
+  const expandNavs = collectionNavs.map(np => ({ name: np.name, targetType: np.targetType }));
+
+  // LookupName per candidate field (from the RESO.OData.Metadata.LookupName annotation — string lookups
+  // only; enum-typed fields have no Lookup Resource) for the Lookup Resource validation scenario.
+  const lookupNameByField: Record<string, string> = {};
+  for (const candidate of [...singleLookupCandidates, ...multiLookupCandidates]) {
+    const lookupName = entityType.properties.find(p => p.name === candidate.field)?.annotations?.['RESO.OData.Metadata.LookupName'];
+    if (typeof lookupName === 'string' && lookupName) {
+      lookupNameByField[candidate.field] = lookupName;
+    }
+  }
+
+  return {
+    resource,
+    keyField,
+    keyValue,
+    enumMode,
+    ...osParams,
+    integerField,
+    integerValueLow,
+    integerValueHigh: 2147483647,
+    integerValueMin,
+    integerValueMax,
+    integerNotSentinel,
+    decimalField,
+    decimalValueLow,
+    decimalValueHigh,
+    decimalValueMin,
+    decimalValueMax,
+    dateField,
+    dateValue,
+    dateValueMin,
+    dateValueMax,
+    timestampField,
+    timestampFieldForNow,
+    nowFieldPastness,
+    timestampWarning,
+    datetimeValue,
+    datetimeValueMax,
+    sampleComplete,
+    ...sampleStats,
+    // Distinct value counts (NUMERICALLY deduped for numerics — see numericStats) — the ne/gt/lt verdict's gate.
+    integerDistinctCount,
+    decimalDistinctCount,
+    dateDistinctCount,
+    datetimeDistinctCount,
+    singleLookupField,
+    singleLookupValue,
+    singleLookupValue2,
+    singleLookupValue3,
+    ...(single && { singleLookupFieldRep: single.representation }),
+    ...(single?.enumType && { singleLookupEnumType: single.enumType }),
+    ...(single && { singleLookupDistinctCount: single.distinctValueCount }),
+    singleLookupCandidates,
+    integerCandidates,
+    decimalCandidates,
+    dateCandidates,
+    multiLookupField,
+    multiLookupValue1,
+    multiLookupValue2,
+    ...(multi && { multiLookupFieldRep: multi.representation }),
+    ...(multi?.enumType && { multiLookupEnumType: multi.enumType }),
+    ...(multi && { multiLookupDistinctCount: multi.distinctValueCount }),
+    multiLookupCandidates,
+    stringField,
+    stringValue,
+    expandField,
+    expandNavs,
+    lookupNameByField: Object.keys(lookupNameByField).length ? lookupNameByField : undefined,
+    skippedTypes,
+    appliedFieldPreferences: appliedPreferences.length > 0 ? appliedPreferences : undefined
+  };
+};
