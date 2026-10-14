@@ -71,10 +71,21 @@ cursor does not move.
 
 ### The executable bit
 
-`tsc` emits files in `dist/` as 0644. `prepublishOnly` runs the build, `npm pack` preserves whatever
-mode is on disk, and nothing downstream restores it, because npm does not chmod bin targets on
-install. So every tarball from 0.10.2 onward carried `package/dist/cli/index.js` as `-rw-r--r--`, and
-`reso-cert` answered `Permission denied`.
+`tsc` emits a **newly created** file in `dist/` as 0644, and leaves the mode alone when it overwrites
+an existing one. `prepublishOnly` runs the build and `npm pack` preserves whatever mode is on disk,
+so every tarball from 0.10.2 onward carried `package/dist/cli/index.js` as `-rw-r--r--`.
+
+Two corrections to how this was first described, both measured rather than assumed. **npm does
+restore the bit on install** – its `bin-links` step chmods the bin target – so a consumer installing
+from the registry was not affected. Verified by packing a tarball with the bit deliberately cleared,
+installing it, and finding the installed target at `-rwxr-xr-x`.
+
+Where it bit was **local development**. Nothing chmods anything after a bare `npm run build`, and the
+workspace bin link then points at a file that is no longer executable, so `./dist/cli/index.js` and
+`npx reso-cert` both answer `Permission denied` inside the repository. Verified by removing the chmod
+from the build, deleting `dist/`, and rebuilding: the fresh file comes out `-rw-r--r--` and both
+invocations fail. That the mode survives an overwrite is also why this went unnoticed for five
+releases – once any developer's copy had the bit, their rebuilds kept it.
 
 It misdirected as well as failed. `npx` treats a non-executable local bin as unusable and falls
 through to the registry copy, which had the same defect, so the error named a path inside the npx
