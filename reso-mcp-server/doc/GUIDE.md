@@ -1,4 +1,4 @@
-# MCP Guide for RESO Web API Servers
+# RESO MCP Server – User Guide
 
 The RESO MCP server lets an AI assistant answer questions about listings and other Web API data a user has access to without accessing the API directly. It uses the same client SDK RESO uses for certification for data access, meaning it only talks to Web API servers using standard queries and capabilities.
 
