@@ -3,7 +3,7 @@
 Compliance testing toolkit for RESO OData servers. Run certification tests from the command line, integrate them into your CI pipeline or call the SDK directly from your application.
 
 - **Three endorsements** ready to use: Add/Edit, EntityEvent, Web API Core
-- **No Java required** – pure TypeScript, built on [`reso-client`](../reso-client/) for OData and [`reso-validation`](../reso-validation/) for field validation
+- **Pure TypeScript** – built on [`reso-client`](../reso-client/) for OData and [`reso-validation`](../reso-validation/) for field validation
 - **Auto-configuring** – samples live server data to build test parameters, auto-detects enum mode from metadata
 - **SDK-first** – the CLI, Desktop Client and MCP server all call the same SDK functions with progress callbacks
 - **Flexible auth** – bearer tokens, OAuth2 Client Credentials, `.env` files or environment variables

@@ -12,14 +12,24 @@ Anyone who needs to know whether a RESO server passes the certification tests. R
 * **Technology providers** who need to verify their server still passes after every change to the schema, the data or the platform
 * **Integrators and consultants** who need to evaluate a third-party server's compliance before recommending or building against it
 * **CI pipelines** that run the cert flows on every pull request so regressions are caught before they ship
-* **Test engineers** who want a single source of truth for "is this thing actually conformant" that does not depend on running a Java toolchain
+* **Test engineers** who want a single source of truth for "is this thing actually conformant"
 * **AI agents and automation tools** that need to verify a server's behavior end to end as part of a larger workflow
 
 The package covers four endorsements: **Add/Edit (RCP-010)**, **EntityEvent (RCP-027)**, **Web API Core 2.0.0 / 2.1.0** and **Data Dictionary 2.0**. The same tests RESO runs in the official certification process, available as a CLI, an SDK and a Docker target.
 
 ## Install
 
-This package is not on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+```bash
+npm install @reso-standards/reso-certification
+```
+
+The CLI is available without installing, too:
+
+```bash
+npx @reso-standards/reso-certification --help
+```
+
+Or work from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo:
 
 ```bash
 git clone https://github.com/RESOStandards/reso-tools.git
@@ -27,9 +37,9 @@ cd reso-tools/reso-certification
 npm install
 ```
 
-The `preinstall` hook automatically builds sibling packages this one depends on (`reso-client`, `reso-validation`). To bootstrap every package at once, run `npm run bootstrap` from the repo root instead. To consume the SDK from another project, link it locally with `npm link` or use a `file:` dependency.
+The `preinstall` hook automatically builds sibling packages this one depends on (`reso-client`, `reso-validation`). To bootstrap every package at once, run `npm run bootstrap` from the repo root instead.
 
-The CLI is available as `reso-cert` after install. The SDK exports work in any Node.js 22+ environment. **No Java required** – the entire toolkit is pure TypeScript, built on the **[RESO Client SDK](../reso-client/)** for OData and the **[reso-validation](../reso-validation/)** library for field-level checks.
+The CLI is available as `reso-cert` after install. The SDK exports work in any Node.js 22+ environment. The toolkit is pure TypeScript, built on the **[RESO Client SDK](../reso-client/)** for OData and the **[reso-validation](../reso-validation/)** library for field-level checks.
 
 ---
 
@@ -50,7 +60,7 @@ This runs the **Web API Core 2.0.0** compliance test suite against the server at
 * Reports a per-scenario pass/fail summary at the end
 * Exits with code 0 if everything passed, 1 if anything failed, 2 if there was a runtime error
 
-You go from "I have a RESO server URL" to "I know exactly which scenarios pass and fail" in one command, with no Java toolchain, no XML config to edit and no manual test parameter wiring.
+You go from "I have a RESO server URL" to "I know exactly which scenarios pass and fail" in one command, with no XML config to edit and no manual test parameter wiring.
 
 ---
 

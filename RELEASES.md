@@ -16,6 +16,12 @@ monorepo on GitHub," followed by a `git clone`. All five packages have been publ
 so the first thing a reader saw on the package page was an instruction not to install the package
 they were looking at.
 
+The same line was in four of the user guides, which is where a reader who follows the guide link
+lands: `reso-certification`, `reso-client`, `reso-validation` and `odata-expression-parser`. The
+first sweep covered README files only and missed them. The guides are not in any package's `files`
+list, so they never shipped to npm; they reach the documentation site from `main`, and those
+corrections go live on merge rather than on a publish.
+
 The install sections now lead with `npm install @reso-standards/<package>` and keep the monorepo
 build as the secondary path, matching the shape `reso-metadata-utils` already used. The
 `reso-certification` page also documents `npx @reso-standards/reso-certification`, which resolves to
@@ -23,6 +29,13 @@ the `reso-cert` binary; that was verified against the published package rather t
 
 Two statements that only made sense while the packages were unpublished are gone with it: the advice
 to consume the SDK through `npm link` or a `file:` dependency.
+
+### The certification docs no longer position the toolkit against Java
+
+"No Java required", "does not depend on running a Java toolchain" and "with no Java toolchain" are
+out of the `reso-certification` guide and README. The toolkit is described by what it is, pure
+TypeScript on Node.js 22+, rather than by what it is not. `MIGRATION.md` still names the Java tools,
+because migrating off them is its subject.
 
 `reso-mcp-server` keeps its own wording. It is `private: true` and deliberately unpublished, so
 "not published to npm" is correct there.
