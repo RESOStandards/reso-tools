@@ -2,6 +2,40 @@
 
 ---
 
+## Documentation patch – 2026-10-14
+
+`odata-expression-parser 0.1.1` · `reso-validation 0.1.1` · `reso-client 0.2.4` ·
+`reso-reference-server 0.8.4` · `reso-certification 0.10.9`
+
+Documentation only. No code changed in any of the five packages.
+
+### Every package page on npm said the package was not on npm
+
+Five README files carried the line "This package is not on npm yet. Install from the `reso-tools`
+monorepo on GitHub," followed by a `git clone`. All five packages have been published for some time,
+so the first thing a reader saw on the package page was an instruction not to install the package
+they were looking at.
+
+The install sections now lead with `npm install @reso-standards/<package>` and keep the monorepo
+build as the secondary path, matching the shape `reso-metadata-utils` already used. The
+`reso-certification` page also documents `npx @reso-standards/reso-certification`, which resolves to
+the `reso-cert` binary; that was verified against the published package rather than assumed.
+
+Two statements that only made sense while the packages were unpublished are gone with it: the advice
+to consume the SDK through `npm link` or a `file:` dependency.
+
+`reso-mcp-server` keeps its own wording. It is `private: true` and deliberately unpublished, so
+"not published to npm" is correct there.
+
+### It also repairs the provenance link
+
+npm showed a "commit not found" warning against `reso-certification 0.10.8`, because the commit its
+provenance attestation names was squashed away when v1.0.0 was cut. Provenance records the commit of
+the publishing run, so publishing from the new `main` replaces the dangling reference. Nothing had to
+be done for this beyond republishing.
+
+---
+
 ## v1.0.0 – "Luna" – 2026-10-13
 
 The first stable release. RESO Tools splits into a **public, npm-published core** and a private application tier, so any project can consume the RESO libraries and the certification runner without the monorepo.
@@ -11,8 +45,8 @@ The first stable release. RESO Tools splits into a **public, npm-published core*
 > this release rather than successors to it.
 
 
-The first stable release. Two changes alter behavior for everyone, and both are about which
-environment a run talks to.
+Two changes in it alter behavior for everyone, and both are about which environment a run talks
+to.
 
 ### The desktop client authenticates against production
 
