@@ -102,9 +102,11 @@ Published while v1.0.0 was in development, newest first.
 shipped it non-executable. This release fixes that, and it is the reason to upgrade.
 
 Publish `reso-common` first. `reso-certification` calls `parseReplicationProgress` and
-`summarizeReplicationProgress` at runtime, and those arrive in 0.4.1. Installing 0.10.8 against
-`reso-common` 0.4.0 resolves a package whose progress renderer calls two functions that are not
-there.
+`summarizeReplicationProgress` at runtime, and those arrive in 0.4.1. The manifest requires
+`^0.4.1` rather than `^0.4.0`, because a range is the only place that constraint can be stated.
+Publishing bottom-up would have hidden it — `^0.4.0` resolves to 0.4.1 once it exists — while anyone
+with a lockfile pinning 0.4.0 would get a package whose progress renderer calls two functions that
+are not there.
 
 These publish as stable versions, as part of v1.0.0 rather than a beta.15 round. An earlier draft
 of this entry planned `-beta.1` prereleases so that the version string itself would disclose that
