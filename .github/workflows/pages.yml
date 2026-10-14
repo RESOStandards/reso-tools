@@ -324,7 +324,6 @@ jobs:
         run: |
           docs=(
             "RELEASES.md:Release Notes:releases"
-            "ANNOUNCEMENTS.md:Announcements:announcements"
             "SECURITY_AUDIT.md:Security Audit:security"
           )
           for entry in "${docs[@]}"; do
