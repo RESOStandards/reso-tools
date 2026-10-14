@@ -6,7 +6,11 @@ Isomorphic TypeScript validation library for RESO Data Dictionary records. Valid
 
 ## Install
 
-This package is not on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+```bash
+npm install @reso-standards/reso-validation
+```
+
+Or work from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo:
 
 ```bash
 git clone https://github.com/RESOStandards/reso-tools.git
@@ -15,8 +19,6 @@ npm install
 ```
 
 This package has no sibling dependencies – `npm install` just runs. To bootstrap every package at once, run `npm run bootstrap` from the repo root instead.
-
-To consume the SDK from another project, link it locally with `npm link` or use a `file:` dependency.
 
 ## Usage
 

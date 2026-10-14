@@ -272,7 +272,7 @@ Compliance tests run automatically on push to `main` and on pull requests via Gi
 
 ## Development
 
-This package is not on npm yet. Install from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo on GitHub:
+The server is published as [`@reso-standards/reso-reference-server`](https://www.npmjs.com/package/@reso-standards/reso-reference-server). To work on it, build from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo:
 
 ```bash
 git clone https://github.com/RESOStandards/reso-tools.git
