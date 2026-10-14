@@ -72,6 +72,27 @@ reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2
 
 The cert runner samples live records to find good test parameters automatically – it does not need a static config of "use ListPrice = 250000 for the integer test." It looks at what is actually in the server, picks values that exercise each operator and data type, and runs the scenarios against them.
 
+**Overriding which fields it picks.** Sampling takes up to 1,000 records per resource and ranks the
+candidates by how populated they are, most to least, with standard fields ahead of local ones. Where
+you would rather a particular field be the one on record as exercising a data type, name it:
+
+```bash
+reso-cert core --url https://api.example.com --auth-token TOKEN \
+  --prefer-fields Property.ListPrice,Office.FeedTypes
+```
+
+The same list works as `coreOptions.preferFields` in a config file, and in the desktop client under
+**Web API Core Options → Preferred Fields**. A bare `Field` is accepted as well as `Resource.Field`.
+
+It is a sparse override rather than a switch, which is the easy thing to get wrong. Naming a field
+moves it to the front of the candidates **for its data type**; every type you do not name is still
+chosen automatically. An entry that does not resolve against the server's metadata is ignored instead
+of failing the run, so a typo costs you that one override and nothing else. The flag replaces a
+config file's list rather than merging with it, so what you typed is exactly what runs.
+
+See [Field Selection](../src/web-api-core/README.md#field-selection) for how the ranking works and
+when overriding it is worth doing.
+
 ### Data Dictionary 2.0
 
 The metadata and data shape. Validates that the server's metadata document matches the RESO Data Dictionary 2.0 specification, that every declared field maps to a known DD field (or is documented as a local extension), and that the data in each resource is type-correct and lookup-valid.
