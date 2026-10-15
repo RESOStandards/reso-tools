@@ -23,13 +23,21 @@ export interface RequestOptions {
  * Uses @reso-standards/reso-client's createClient under the hood. Creates a lightweight
  * client per call since the auth token may vary between requests.
  */
+/**
+ * The headers this module adds on a caller's behalf, as opposed to the ones a caller passes.
+ *
+ * Exported because a second reader needs them: payload capture sits ABOVE this function and would
+ * otherwise record only `options.headers`, omitting `OData-Version` — the one request header a
+ * Core run most needs to show, since version negotiation is what it is testing. Reconstructing it
+ * there would be a second copy of this rule, one release away from disagreeing with this one.
+ */
+export const odataDefaultHeaders = (odataVersion?: string): Readonly<Record<string, string>> =>
+  odataVersion ? { 'OData-Version': odataVersion } : {};
+
 export const odataRequest = async (
   options: RequestOptions & { readonly odataVersion?: string; readonly session?: ResilienceSession }
 ): Promise<ODataResponse> => {
-  const defaultHeaders: Record<string, string> = {};
-  if (options.odataVersion) {
-    defaultHeaders['OData-Version'] = options.odataVersion;
-  }
+  const defaultHeaders: Record<string, string> = { ...odataDefaultHeaders(options.odataVersion) };
 
   // A shared session (created once per run) makes pacing + the circuit breaker persist across
   // the run's requests; omitted → a per-call default, i.e. today's behavior.
