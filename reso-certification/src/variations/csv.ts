@@ -323,8 +323,7 @@ export const parseDecisionsCsv = (csvData: string): ParsedDecisionsCsv => {
   // Nothing at all would be submitted, which is never what someone meant.
   if (parsed.length > 0 && askNothing.length === parsed.length) {
     throw new Error(
-      `Decision CSV has no Action or Comment on any row — nothing would be submitted. ` +
-        `Fill in the Action column with one of: ${SHEET_ACTION_NAMES.join(', ')}.`
+      `Decision CSV has no Action or Comment on any row — nothing would be submitted. Fill in the Action column with one of: ${SHEET_ACTION_NAMES.join(', ')}.`
     );
   }
 

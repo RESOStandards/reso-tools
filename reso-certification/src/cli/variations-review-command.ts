@@ -112,15 +112,34 @@ const csvCell = (value: unknown): string => {
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 
+/**
+ * The suggestion as the pool holds it. Nothing is inferred.
+ *
+ * A mapping that names a field and no resource is INCOMPLETE, not a statement that the resource
+ * is the same one. Filling the gap from the row's own identity would be a guess written into a
+ * sheet that someone then acts on, and a wrong guess is indistinguishable from a real mapping
+ * once it is in the file. Josh, 2026-10-15: "we should always have the suggested elements filled
+ * in, not assume that because one is missing that it's the same resource."
+ *
+ * So an incomplete mapping exports incomplete, and the decisions planner refuses it by name. That
+ * refusal is the correct outcome: the row cannot be acted on until the suggestion that produced it
+ * says what it actually proposes. The repair belongs where the suggestion is built.
+ */
+const suggestionAtDepth = (item: VariationReviewItem): { readonly resource: string; readonly field: string } => ({
+  resource: mappingField(item.mapping, 'suggestedResourceName'),
+  field: mappingField(item.mapping, 'suggestedFieldName')
+});
+
 /** The review items as CSV, header first. Round-trips through `parseVariationsCsv`. */
 export const formatReviewItemsCsv = (items: ReadonlyArray<VariationReviewItem>): string => {
-  const rows = items.map(item =>
-    [
+  const rows = items.map(item => {
+    const suggested = suggestionAtDepth(item);
+    return [
       item.resourceName,
       item.fieldName ?? '',
       item.lookupValue ?? '',
-      mappingField(item.mapping, 'suggestedResourceName'),
-      mappingField(item.mapping, 'suggestedFieldName'),
+      suggested.resource,
+      suggested.field,
       mappingField(item.mapping, 'suggestedLookupValue'),
       mappingField(item.mapping, 'suggestedStandardLookupValue'),
       mappingField(item.mapping, 'suggestedLegacyODataValue'),
@@ -132,8 +151,8 @@ export const formatReviewItemsCsv = (items: ReadonlyArray<VariationReviewItem>):
       item.outcome ?? '',
       '',
       ''
-    ].map(csvCell)
-  );
+    ].map(csvCell);
+  });
   return [CSV_HEADERS.map(csvCell).join(','), ...rows.map(r => r.join(','))].join('\n');
 };
 

@@ -114,6 +114,28 @@ describe('formatReviewItemsCsv', () => {
     expect(skippedColumns).toEqual([]);
   });
 
+  it('exports an incomplete mapping incomplete, inventing nothing', () => {
+    // The pool holds this row as `{suggestedFieldName}` with no resource. That is an INCOMPLETE
+    // mapping, not a claim that the resource is the same one. Filling it from the row's own
+    // identity would write a guess into a sheet someone then acts on, and once it is in the file
+    // a guess is indistinguishable from a real mapping.
+    const csv = formatReviewItemsCsv([
+      item({ resourceName: 'Property', fieldName: 'MBR_SoilType', mapping: { suggestedFieldName: 'SoilType' } })
+    ]);
+    const [head, row] = csv.split('\n');
+    const at = (name: string): string => row.split(',')[head.split(',').indexOf(name)];
+    expect(at('Suggested Resource Name')).toBe('');
+    expect(at('Suggested Field Name')).toBe('SoilType');
+  });
+
+  it('invents no suggestion for a row that has no mapping at all', () => {
+    const csv = formatReviewItemsCsv([item({ resourceName: 'Property', fieldName: 'OpenHouse' })]);
+    const [head, row] = csv.split('\n');
+    const at = (name: string): string => row.split(',')[head.split(',').indexOf(name)];
+    expect(at('Suggested Resource Name')).toBe('');
+    expect(at('Suggested Field Name')).toBe('');
+  });
+
   it('emits a header and nothing else for an empty pool', () => {
     expect(formatReviewItemsCsv([]).split('\n')).toHaveLength(1);
   });
