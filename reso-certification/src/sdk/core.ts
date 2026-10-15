@@ -5,10 +5,13 @@
  * pipeline pattern as Add/Edit and EntityEvent.
  */
 
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { isDeadlineError, runSettled } from '@reso-standards/reso-client';
 import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata, getEntityType, loadMetadataFromFile, parseMetadataXml, persistMetadataXml } from '../test-runner/metadata.js';
+import { createCapturingRequester } from '../test-runner/payload-capture.js';
 import { type ODataRequester, createCertSession, createSessionRequester } from '../test-runner/requester.js';
 import { type FieldPreferenceSummary, parseFieldPreferences, summarizeFieldPreferences } from '../web-api-core/field-preference.js';
 import {
@@ -356,7 +359,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // Wrap the run's requester so every request emits its URL as a structured progress detail — the CLI shows
     // it (dimmed) as the "currently testing" line. Report-only; the request itself is unchanged.
     const baseRequester = createSessionRequester(session);
-    const requester: ODataRequester = {
+    const progressRequester: ODataRequester = {
       request: options => {
         onProgress({
           step: RUN_CORE_SCENARIOS,
@@ -367,6 +370,20 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         return baseRequester.request(options);
       }
     };
+    // Capture is off unless a directory was asked for. It writes the provider's data to disk, so it
+    // is opt-in rather than something a run does by default. A write failure is reported and does
+    // not fail the run: instrumentation must not turn a passing certification into a failing one.
+    const requester: ODataRequester = config.savePayloadsDir
+      ? createCapturingRequester(
+          progressRequester,
+          async (fileName, contents) => {
+            await mkdir(config.savePayloadsDir as string, { recursive: true });
+            await writeFile(join(config.savePayloadsDir as string, fileName), contents, 'utf-8');
+          },
+          (fileName, error) =>
+            console.error(`  payload capture: could not write ${fileName} — ${error instanceof Error ? error.message : String(error)}`)
+        )
+      : progressRequester;
 
     // Core 2.1.0 $expand is GATING and schema-validates each expanded child item against its target entity
     // type. Build the validator ONCE per run from the provider's metadata report (generated from the EDMX we
