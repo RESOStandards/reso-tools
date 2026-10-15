@@ -24,6 +24,33 @@ const createDefinitions = async (resources, lookups, additionalProperties = fals
     'Edm.Date': 'string'
   };
 
+  /**
+   * True when a field is a DECIMAL whose scale is explicitly zero, which has no fractional digits
+   * and so is an integer.
+   *
+   * Narrow on purpose, in two ways that previously were not.
+   *
+   * It requires `Edm.Decimal`. The old guard ran for everything mapping to `number`, which also
+   * catches `Edm.Single` and `Edm.Double`. Scale is a Decimal facet; on a Double it means nothing,
+   * and `Precision` there is significant floating-point digits rather than a decimal scale. Both
+   * RESO specs name `Edm.Double` as a sanctioned way to express decimal values, so typing one as
+   * an integer fails a provider for declaring what the spec permits.
+   *
+   * It requires scale to be explicitly 0 rather than merely absent. The old guard, `!field.scale`,
+   * cannot tell those apart, because `!0` is true as well. The Data Dictionary says decimals "MAY
+   * contain Precision and Scale attributes ... which also MAY be omitted", so an omission is not a
+   * statement about the value and must not be read as one. The serializer drops the key entirely
+   * when the XML carries no Scale, so the two cases are genuinely distinguishable here.
+   *
+   * Found on a live run against metadata with 71 `Edm.Double` properties and no Scale anywhere:
+   * every one was typed integer, and $expand scenarios failed with "MUST be integer or null but
+   * found decimal" on Latitude, Longitude and LotSizeAcres among others.
+   *
+   * `precision` is still required, because it bounds the value and because keeping that condition
+   * means this change can only ever REMOVE a false failure, never introduce a new one.
+   */
+  const isScaleZeroDecimal = field => field.type === 'Edm.Decimal' && field.scale === 0 && !!field.precision;
+
   const EDM_DATE_TIME_OFFSET = typeMappings['Edm.DateTimeOffset'];
   const EDM_DATE = typeMappings['Edm.Date'];
 
@@ -96,9 +123,9 @@ const createDefinitions = async (resources, lookups, additionalProperties = fals
           if (field.type === EDM_DATE_TIME_OFFSET) itemTypeSchema['format'] = 'date-time';
           if (field.type === EDM_DATE) itemTypeSchema['format'] = 'date';
           if (mappedType === 'number') {
-            if (!field.scale && field.precision) {
-              // A numeric field with scale 0 is an integer (an int is a number with scale 0). Type it as
-              // JSON integer so fractional values (e.g. 3.5) are rejected, and cap it at the precision max.
+            if (isScaleZeroDecimal(field)) {
+              // A DECIMAL whose scale is explicitly 0 has no fractional digits, so it is an integer.
+              // Type it as JSON integer to reject fractional values, and cap it at the precision max.
               itemTypeSchema['type'] = 'integer';
               itemTypeSchema['maximum'] = Number('9'.repeat(field.precision));
             }
@@ -175,9 +202,9 @@ const createDefinitions = async (resources, lookups, additionalProperties = fals
         if (field.type === EDM_DATE_TIME_OFFSET) schema['format'] = 'date-time';
         if (field.type === EDM_DATE) schema['format'] = 'date';
         if (fieldType === 'number') {
-          if (!field.scale && field.precision) {
-            // A numeric field with scale 0 is an integer (an int is a number with scale 0). Type it as
-            // JSON integer so fractional values (e.g. 3.5) are rejected, and cap it at the precision max.
+          if (isScaleZeroDecimal(field)) {
+            // A DECIMAL whose scale is explicitly 0 has no fractional digits, so it is an integer.
+            // Type it as JSON integer to reject fractional values, and cap it at the precision max.
             schema['type'] = 'integer';
             schema['maximum'] = Number('9'.repeat(field.precision));
           }
