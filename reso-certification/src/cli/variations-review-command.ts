@@ -57,6 +57,75 @@ export const formatReviewItemsTable = (items: ReadonlyArray<VariationReviewItem>
 };
 
 /**
+ * The review as a sheet.
+ *
+ * The desktop client can export a review to CSV; the CLI could only print a table or `--json`.
+ * That gap matters most to the people who have no desktop client at all, because the decisions
+ * workflow round-trips through a sheet: export, edit, `submit-variation-decisions`. Without an
+ * export those users had to hand-build the file the CLI would read back.
+ *
+ * Columns follow the desktop export so a sheet from either side is the same artifact, plus
+ * `Strategy`, which neither side carried until now. `Status` is included because a CLI listing is
+ * typically the whole pool rather than one report, so a row has to say where it stands.
+ */
+const CSV_HEADERS: ReadonlyArray<string> = [
+  'Resource Name',
+  'Field Name',
+  'Lookup Value',
+  'Suggested Resource Name',
+  'Suggested Field Name',
+  'Suggested Lookup Value',
+  'Suggested Standard Lookup Value',
+  'Suggested Legacy OData Value',
+  'Suggested Related Resource Name',
+  'Suggested Related Field Name',
+  'Suggested Related Lookup Value',
+  'Strategy',
+  'Status',
+  'Outcome'
+];
+
+/** The mapping fields a row carries, read off `mapping` rather than re-derived from the key. */
+const mappingField = (mapping: VariationReviewItem['mapping'], field: string): string => {
+  const value = mapping?.[field];
+  return typeof value === 'string' ? value : '';
+};
+
+/**
+ * RFC-4180 quoting: wrap when the value holds a comma, a quote or a newline, and double any quote.
+ *
+ * An empty cell is written empty rather than as `-`. The table's `-` is a reading aid; a sheet is
+ * read back by `parseVariationsCsv`, and a literal dash there would be submitted as the string "-".
+ */
+const csvCell = (value: unknown): string => {
+  const text = value === undefined || value === null ? '' : String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+/** The review items as CSV, header first. Round-trips through `parseVariationsCsv`. */
+export const formatReviewItemsCsv = (items: ReadonlyArray<VariationReviewItem>): string => {
+  const rows = items.map(item =>
+    [
+      item.resourceName,
+      item.fieldName ?? '',
+      item.lookupValue ?? '',
+      mappingField(item.mapping, 'suggestedResourceName'),
+      mappingField(item.mapping, 'suggestedFieldName'),
+      mappingField(item.mapping, 'suggestedLookupValue'),
+      mappingField(item.mapping, 'suggestedStandardLookupValue'),
+      mappingField(item.mapping, 'suggestedLegacyODataValue'),
+      mappingField(item.mapping, 'suggestedRelatedResourceName'),
+      mappingField(item.mapping, 'suggestedRelatedFieldName'),
+      mappingField(item.mapping, 'suggestedRelatedLookupValue'),
+      item.strategy ?? '',
+      item.status,
+      item.outcome ?? ''
+    ].map(csvCell)
+  );
+  return [CSV_HEADERS.map(csvCell).join(','), ...rows.map(r => r.join(','))].join('\n');
+};
+
+/**
  * One line per submission: the identifiers it came in under, the endorsement, and where the review stands.
  *
  * The empty case says WHICH question was asked, because the two are easy to confuse and the bare
