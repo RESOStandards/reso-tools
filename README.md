@@ -1,6 +1,6 @@
 # RESO Tools
 
-![Tests](https://img.shields.io/badge/tests-2785%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-2824%20passed-brightgreen)
 ![Compliance](https://img.shields.io/badge/RESO%20compliance-4%2F4%20suites-blue)
 [![Release](https://img.shields.io/github/v/release/RESOStandards/reso-tools?label=release&color=blue)](https://github.com/RESOStandards/reso-tools/releases/latest)
 

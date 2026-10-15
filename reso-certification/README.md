@@ -232,7 +232,7 @@ docker compose --profile compliance-core up --build \
 ```bash
 npm install
 npm run build
-npm test        # ~1712 tests
+npm test        # ~1751 tests
 npm run dev     # Watch mode
 ```
 
