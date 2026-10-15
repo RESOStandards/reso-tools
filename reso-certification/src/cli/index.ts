@@ -406,6 +406,10 @@ const coreCmd = program
     "Enum mode: auto, string, collections or isflags (default: the config entry's coreOptions.enumMode, else auto-detect)"
   )
   .option('--full-coverage', 'Fail if any data type category has no coverage across all resources')
+  .option(
+    '--save-payloads <dir>',
+    'Write every request and response to <dir>, one JSON file each. Off unless given. Contains provider data; credentials are never written'
+  )
   .option('--originating-system-name <v>', 'Scope resource queries to OriginatingSystemName eq <v> (multi-tenant providers)')
   .option('--originating-system-id <v>', 'Scope resource queries to OriginatingSystemID eq <v> (used when no name; OSN takes precedence)')
   .option(
@@ -428,6 +432,7 @@ coreCmd.action(
     originatingSystemName?: string;
     originatingSystemId?: string;
     preferFields?: string;
+    savePayloads?: string;
     authToken?: string;
     clientId?: string;
     clientSecret?: string;
@@ -488,6 +493,9 @@ coreCmd.action(
             ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
             ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
             ...((preferFieldsFlag ?? baseConfig.preferFields) ? { preferFields: preferFieldsFlag ?? baseConfig.preferFields } : {}),
+            // Resolved here so every entry of a multi-entry config writes under one known directory
+            // rather than wherever each happened to be invoked from.
+            ...(opts.savePayloads ? { savePayloadsDir: resolve(opts.savePayloads) } : {}),
             ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {})
           };
 
@@ -513,6 +521,7 @@ coreCmd.action(
           ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
           ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
           ...(preferFieldsFlag ? { preferFields: preferFieldsFlag } : {}),
+          ...(opts.savePayloads ? { savePayloadsDir: resolve(opts.savePayloads) } : {}),
           options: {
             ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {})
           }

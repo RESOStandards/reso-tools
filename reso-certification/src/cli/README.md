@@ -157,6 +157,35 @@ reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2
 | `--enum-mode <auto\|string\|collections\|isflags>` | `auto` | How enumerations are represented (auto-detected by default) |
 | `--prefer-fields <list>` | _(auto)_ | Comma-separated `Resource.Field`, or a bare `Field`. Moves those to the front of the ranked candidates for their data type. A **sparse** override: every type not named here is still auto-selected. Replaces `coreOptions.preferFields` from a config rather than merging with it. |
 | `--full-coverage` | — | Fail if any data-type category has no coverage across all resources |
+| `--save-payloads <dir>` | *(off)* | Write every request and response to `<dir>`. See below. |
+
+**`--save-payloads`** records what the server actually returned, which the compliance report does
+not: the report keeps each scenario's `requestUrl` and no body, and a response body is retained only
+as error detail. A run that passes therefore leaves nothing to inspect. That is enough to audit a
+skip, since a skipped scenario issues no request at all, and not enough to audit a pass: whether an
+assertion read what it meant to read cannot be checked after the fact.
+
+Two files per request, sharing a stem so they sort together:
+
+```
+0002-get-Property-top-1000.json        the response body, byte for byte as it arrived
+0002-get-Property-top-1000.meta.json   method, url, status, headers, body size
+```
+
+The body is written exactly as it came off the wire rather than re-serialized from the parsed
+object, so key order and `Edm.Decimal` precision are preserved and the file is what the server sent.
+`$metadata` is saved as `.xml`, following the response's own content type.
+
+Headers are kept by **allowlist** and everything else is dropped, so no credential is written: the
+bearer token is never carried over, and a header reaches a file only by being named in
+`KEPT_HEADERS`. The list is the OData protocol family, `Accept` / `Content-Type`,
+`Accept-Language` / `Content-Language`, `Prefer` / `Preference-Applied`, `Retry-After` and
+`WWW-Authenticate` — each one a header the RESO specs or the protocol turn on. `WWW-Authenticate`
+is a server challenge and is kept deliberately: it is what names the expected scheme on a 401.
+
+Off unless the flag is given. A capture is a copy of a provider's data on disk, and it is large —
+one resource against a reference server produced 23 MB from a single page request. Point it outside
+the repository; `.gitignore` catches the conventional directory names and not an arbitrary path.
 
 ### `dd`
 Data Dictionary compliance — replicates a live endpoint and validates it against the DD.

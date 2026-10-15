@@ -369,6 +369,17 @@ export interface CoreConfig extends BaseComplianceConfig {
   /** Sparse field-selection override — see `ConfigCoreOptions.preferFields`. Re-orders ranked candidates;
    *  never adds one, never pins a failing field (the ladder falls through). Applied entries are reported. */
   readonly preferFields?: ReadonlyArray<string>;
+  /**
+   * Directory to write every request and its response into, one JSON file per exchange.
+   *
+   * ABSENT BY DEFAULT and only ever set by an explicit flag. A capture writes a provider's data to
+   * disk, so it is asked for rather than defaulted into. Credentials are never written: the
+   * `authToken` is not carried over and any credential-shaped header is filtered out.
+   *
+   * The report keeps `requestUrl` and no body, so without this a passing run cannot be reviewed
+   * after the fact.
+   */
+  readonly savePayloadsDir?: string;
 }
 
 /** Discriminated union of all endorsement configs. */
