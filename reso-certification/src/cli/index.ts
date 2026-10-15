@@ -1472,9 +1472,18 @@ program
   .action(async (opts: { report: string; decisions: string; dryRun?: boolean; json?: boolean }) => {
     try {
       const report = JSON.parse(await readFile(resolve(opts.report), 'utf-8')) as Record<string, unknown>;
-      const { items, recognizedColumns, skippedColumns } = parseDecisionsCsv(await readFile(resolve(opts.decisions), 'utf-8'));
+      const { items, recognizedColumns, skippedColumns, undecidedRows } = parseDecisionsCsv(
+        await readFile(resolve(opts.decisions), 'utf-8')
+      );
       if (skippedColumns.length) {
         console.error(`Ignoring unrecognized columns: ${skippedColumns.join(', ')}`);
+      }
+      // Named, not just counted. A row left blank on purpose and a row whose Action was mistyped
+      // look identical here, so the only way someone can tell them apart is by reading the list.
+      if (undecidedRows.length) {
+        console.error(
+          `${undecidedRows.length} row(s) carry no Action or Comment and will be left as they are: ${undecidedRows.join(', ')}`
+        );
       }
 
       const plan = planDecisionPush({ report: report as never, rows: items, now: new Date().toISOString() });
