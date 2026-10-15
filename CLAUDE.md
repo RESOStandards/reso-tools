@@ -138,7 +138,7 @@ here because it applies to any repo in the org.
 
 ### Version Branches
 - All work done in version branches named `vX.Y` (e.g., `v0.5`)
-- **⚠️ TEMPORARY (2026-09-03): the effective mainline is `v1.0.0-pre`, NOT `main`.** Base every branch/PR off `v1.0.0-pre` — the current Core 2.1.0 / cert 0.10.x code lives there and published releases (0.10.5, beta.10) came off it. `main` is the old pre-split stable: stale and partly incorrect. Branching off `main` gives divergent code (e.g. `test-runner.ts` differs by ~500 lines). **REMOVE this note once `v1.0.0-pre` → `v1.0.0` → new `main` lands.**
+- **`main` is the mainline.** The repository was reset for the public v1.0.0 release: `main` begins at a single squashed commit, `Release RESO Tools v1.0.0` (2026-10-13), and the pre-split history lives in [`RESOStandards/reso-tools-archive`](https://github.com/RESOStandards/reso-tools-archive). **A consequence worth knowing:** commit SHAs from before the reset are not ancestors of `main`, so `git merge-base --is-ancestor` returns false for work that is present, and an old local branch can report hundreds of commits "ahead" while being identical in content. Check whether a change is in the tree by looking at the tree (`git diff origin/main <ref> -- <subtree>`), not by ancestry.
 - GitHub milestones match the branch version
 - **Release tags**: Use short-form tags (`v0.8`, `v0.9`) until real patch releases ship in production. Package.json versions use full SemVer (`0.8.0`), but Git tags and GitHub Releases use short form so `/releases/tag/v0.8` works.
 
@@ -146,7 +146,7 @@ here because it applies to any repo in the org.
 
 The GitHub repo merges PRs with **Rebase and merge** — the trunk stays linear, with no merge commits. Keep feature branches linear so they remain rebaseable:
 
-- **To update a feature branch against its base, rebase it** (`git rebase origin/<base>`, e.g. `origin/v1.0.0-pre`) — do **not** merge the base into the branch. A merge commit on the branch makes the PR un-rebaseable, and GitHub reports "This branch cannot be rebased due to conflicts" even when an ordinary merge would be a clean fast-forward.
+- **To update a feature branch against its base, rebase it** (`git rebase origin/<base>`, e.g. `origin/main`) — do **not** merge the base into the branch. A merge commit on the branch makes the PR un-rebaseable, and GitHub reports "This branch cannot be rebased due to conflicts" even when an ordinary merge would be a clean fast-forward.
 - Conflict resolution captured inside a merge commit is **not** reused by rebase: rebase replays each commit individually, so it re-hits the original conflicts. That is the failure mode, not a real conflict.
 - If a branch already carries a merge commit, **linearize it** before opening/updating the PR — cherry-pick or rebase the real commits onto the base tip, drop the merge commit, resolve conflicts once, then force-push. (Force-push a feature branch only; never a release branch.)
 
@@ -178,7 +178,7 @@ The GitHub repo merges PRs with **Rebase and merge** — the trunk stays linear,
 - The OData client handles URI building, CRUD, pagination, and metadata parsing – it is used by both the web UI and the certification runner
 - Validation rules are isomorphic (shared between client and server)
 - The DD docs site is in a separate repo — see `RESOStandards/reso-data-dictionary-documentation` for styling and generator code
-- **Metadata reports — `metadata-report.json` is canonical.** As of v1.0.0-pre the scheme was inverted so `metadata-report.json` is **ALWAYS** the canonical *final* report (merged when a Lookup Resource is present, else the base), and the pre-merge base is written as `metadata-report.raw.json`. New runs no longer emit `.processed`, so downstream can **always rely on `metadata-report.json`** (see `src/sdk/dd.ts:159`, `metadata/lookup-resource.ts:158`). **Legacy exception:** older cert-utils bundles used the *opposite* pair — `metadata-report.json` = base, `metadata-report.processed.json` = merged — so when consuming a pre-inversion bundle, prefer `metadata-report.processed.json` when present, falling back to `metadata-report.json` (cf. desktop `main.ts:307`). This carve-out retires once old bundles age out.
+- **Metadata reports — `metadata-report.json` is canonical.** As of v1.0.0 the scheme was inverted so `metadata-report.json` is **ALWAYS** the canonical *final* report (merged when a Lookup Resource is present, else the base), and the pre-merge base is written as `metadata-report.raw.json`. New runs no longer emit `.processed`, so downstream can **always rely on `metadata-report.json`** (see `src/sdk/dd.ts:159`, `metadata/lookup-resource.ts:158`). **Legacy exception:** older cert-utils bundles used the *opposite* pair — `metadata-report.json` = base, `metadata-report.processed.json` = merged — so when consuming a pre-inversion bundle, prefer `metadata-report.processed.json` when present, falling back to `metadata-report.json` (cf. desktop `main.ts:307`). This carve-out retires once old bundles age out.
 
 ## DD Reference-Metadata Regeneration
 
