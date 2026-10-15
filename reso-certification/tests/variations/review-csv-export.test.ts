@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { formatReviewItemsCsv } from '../../src/cli/variations-review-command.js';
-import { parseVariationsCsv } from '../../src/variations/csv.js';
+import { parseDecisionsCsv, parseVariationsCsv } from '../../src/variations/csv.js';
 import type { VariationReviewItem } from '../../src/variations/review.js';
 
 const item = (over: Partial<VariationReviewItem> = {}): VariationReviewItem =>
@@ -51,7 +51,9 @@ describe('formatReviewItemsCsv', () => {
       suggestedFieldName: 'SoilType',
       strategy: 'Substring'
     });
-    expect(skippedColumns).toEqual(['Status']);
+    // Action, Comment and Status belong to the decisions workflow; an update sheet has no actions,
+    // so reporting them here is correct rather than noise.
+    expect(skippedColumns).toEqual(['Status', 'Action', 'Comment']);
   });
 
   it("writes an empty cell, not the table's dash", () => {
@@ -89,6 +91,27 @@ describe('formatReviewItemsCsv', () => {
     expect(row).toContain('Natural Gas');
     expect(row).toContain('NaturalGas');
     expect(row).toContain('Fast Track');
+  });
+
+  it('is a decisions template: it carries empty Action and Comment columns', () => {
+    // The export exists to be filled in and submitted back. Without these columns the person or
+    // agent editing it has nowhere to write the decision, and has to reshape the file by hand.
+    const header = formatReviewItemsCsv([item({ mapping: { suggestedFieldName: 'SoilType' } })]).split('\n')[0];
+    expect(header).toContain('Action');
+    expect(header).toContain('Comment');
+  });
+
+  it('round-trips through the decisions parser once an Action is filled in', () => {
+    // The whole workflow, in one assertion: export, fill in, submit.
+    const csv = formatReviewItemsCsv([item({ mapping: { suggestedFieldName: 'SoilType' }, strategy: 'Substring' })]);
+    const [head, row] = csv.split('\n');
+    const actionIndex = head.split(',').indexOf('Action');
+    const cells = row.split(',');
+    const filled = [head, cells.map((c, i) => (i === actionIndex ? 'ignore' : c)).join(',')].join('\n');
+
+    const { items, skippedColumns } = parseDecisionsCsv(filled);
+    expect(items[0]).toMatchObject({ resourceName: 'Property', fieldName: 'MBR_SoilType', action: 'ignore' });
+    expect(skippedColumns).toEqual([]);
   });
 
   it('emits a header and nothing else for an empty pool', () => {

@@ -199,10 +199,51 @@ const DECISION_COLUMNS: ReadonlyArray<{ readonly header: string; readonly field:
   { header: 'Suggested Related Lookup Value', field: 'suggestedRelatedLookupValue' }
 ];
 
+/**
+ * Header spellings the decisions sheet accepts beyond its canonical ones.
+ *
+ * The desktop client exports `Comments`; this sheet calls it `Comment`. The column was dropped,
+ * so a comment typed into an exported sheet was silently not submitted. One artifact has to work
+ * on both sides, and the canonical spelling stays what it was.
+ */
+/** The actions a decisions sheet accepts, for the message that tells someone how to fill it in. */
+const SHEET_ACTION_NAMES: ReadonlyArray<string> = ['ignore', 'remove', 'submit-to-ft'];
+
+const DECISION_HEADER_ALIASES: Readonly<Record<string, keyof DecisionCsvItem>> = {
+  comments: 'comment',
+  // The same coordinate under its other name. The service resolves a lookup target with
+  // `suggestedStandardLookupValue ?? suggestedLookupValue`, so the two columns name one thing and
+  // this sheet keeps the shorter spelling as canonical. The pool stores the standard form, so an
+  // exported review carries that column and would otherwise lose its lookup target on the way back.
+  'suggested standard lookup value': 'suggestedLookupValue'
+};
+
+/**
+ * Columns the sheet CARRIES but the push does not act on.
+ *
+ * `list-variation-reviews --csv` writes these so whoever is deciding can see where a mapping came
+ * from and where it stands. Reporting them as unrecognized on every submit of our own export
+ * teaches people to ignore the warning that exists to catch a real typo, so they are recognized
+ * and ignored rather than flagged.
+ */
+const DECISION_CONTEXT_HEADERS: ReadonlySet<string> = new Set(['strategy', 'status', 'outcome']);
+
 export interface ParsedDecisionsCsv {
   readonly items: ReadonlyArray<DecisionCsvItem>;
   readonly recognizedColumns: ReadonlyArray<string>;
   readonly skippedColumns: ReadonlyArray<string>;
+  /**
+   * Rows that named an element and asked for nothing, as `Property.MBR_SoilType`.
+   *
+   * Deciding on a subset is the normal case: a reviewer exports the pool, acts on a few items and
+   * leaves the rest pending. These rows used to be fatal, which made the exported sheet unusable
+   * for its own purpose.
+   *
+   * They are reported rather than dropped quietly. The original objection to skipping them was
+   * that a typo in the Action column would look like a successful no-op, and that objection is
+   * about SILENCE, not about skipping. The caller prints this.
+   */
+  readonly undecidedRows: ReadonlyArray<string>;
 }
 
 /**
@@ -219,11 +260,20 @@ export const parseDecisionsCsv = (csvData: string): ParsedDecisionsCsv => {
   const skipped: string[] = [];
   const fieldByIndex: ReadonlyArray<keyof DecisionCsvItem | undefined> = headerRow.map(cell => {
     const name = cell.trim();
-    const column = DECISION_COLUMNS.find(c => c.header.toLowerCase() === name.toLowerCase());
+    const lower = name.toLowerCase();
+    const column = DECISION_COLUMNS.find(c => c.header.toLowerCase() === lower);
     if (column) {
       recognized.push(column.header);
       return column.field;
     }
+    const aliased = DECISION_HEADER_ALIASES[lower];
+    if (aliased) {
+      // Recorded under the canonical header, because that is the column the sheet means.
+      recognized.push(DECISION_COLUMNS.find(c => c.field === aliased)?.header ?? name);
+      return aliased;
+    }
+    // Carried, not acted on, and deliberately not flagged. See DECISION_CONTEXT_HEADERS.
+    if (DECISION_CONTEXT_HEADERS.has(lower)) return undefined;
     if (name !== '') skipped.push(name);
     return undefined;
   });
@@ -234,7 +284,7 @@ export const parseDecisionsCsv = (csvData: string): ParsedDecisionsCsv => {
     );
   }
 
-  const items = dataRows.flatMap((cells, index) => {
+  const parsed = dataRows.flatMap((cells, index) => {
     // +2: the header is row 1 and dataRows are 0-indexed. Computed from the original position so
     // blank-row skipping never drifts the reported number.
     const rowNumber = index + 2;
@@ -252,15 +302,37 @@ export const parseDecisionsCsv = (csvData: string): ParsedDecisionsCsv => {
     if (typeof item.resourceName !== 'string' || item.resourceName.length === 0) {
       throw new Error(`Decision CSV row ${rowNumber} is missing a Resource Name.`);
     }
-    if (!item.action && !item.comment) {
-      throw new Error(`Decision CSV row ${rowNumber} has neither an Action nor a Comment — it names an element and asks for nothing.`);
-    }
-    return [item as DecisionCsvItem];
+    return [{ rowNumber, item }];
   });
+
+  // Validated after the pass, not during it, so the message can tell two different mistakes apart.
+  // A freshly exported review has no Action anywhere, and blaming row 2 sends someone to look at
+  // row 2 when what happened is they have not filled the sheet in yet. One blank row among filled
+  // ones IS a row-level mistake, and there the row is what they need to be pointed at.
+  const askNothing = parsed.filter(({ item }) => !item.action && !item.comment);
+
+  // Not an error. Deciding on a subset is the normal case: a reviewer exports the pool, acts on a
+  // few items and leaves the rest pending. Refusing the sheet made the export unusable for the
+  // workflow it exists to serve.
+  //
+  // They are REPORTED, which is what the original guard was really protecting. Its objection was
+  // that skipping such a row would make a typo in the Action column look like a successful no-op,
+  // and that objection is about silence rather than about skipping.
+  const undecidedRows = askNothing.map(({ item }) => [item.resourceName, item.fieldName, item.lookupValue].filter(Boolean).join('.'));
+
+  // Nothing at all would be submitted, which is never what someone meant.
+  if (parsed.length > 0 && askNothing.length === parsed.length) {
+    throw new Error(
+      `Decision CSV has no Action or Comment on any row — nothing would be submitted. ` +
+        `Fill in the Action column with one of: ${SHEET_ACTION_NAMES.join(', ')}.`
+    );
+  }
+
+  const items = parsed.filter(({ item }) => item.action || item.comment).map(({ item }) => item as DecisionCsvItem);
 
   if (items.length === 0) throw new Error('Decision CSV has a header but no decision rows.');
 
-  return { items, recognizedColumns: recognized, skippedColumns: skipped };
+  return { items, recognizedColumns: recognized, skippedColumns: skipped, undecidedRows };
 };
 
 /**

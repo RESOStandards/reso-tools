@@ -77,6 +77,8 @@ different thing from the RESO service credentials above.
 | [`find-variations`](#find-variations) | DD variations review via the v2 Variations Service |
 | [`metadata-report adapt`](#metadata-report-adapt) | Back-fill the `resources[]` block on a DD 2.0/2.1 report |
 | [`update-variations`](#update-variations) | Submit reviewed variation suggestions (admin) |
+| [`submit-variations-report`](#submit-variations-report) | Send a DD run's variations report to start or refresh a review |
+| [`submit-variation-decisions`](#submit-variation-decisions) | Mark a report from a sheet of actions and comments, and submit it |
 | [`list-variation-reviews`](#list-variation-reviews) | The variations in review — yours as a provider, the whole pool as an admin (read-only) |
 | [`variations-review-status`](#variations-review-status) | Where each variations submission stands (read-only) |
 
@@ -312,6 +314,48 @@ what the mapping is.
 This is the same shape `list-variation-reviews --csv` writes, so a review exports, gets edited and
 goes back in without reshaping the file.
 
+### `submit-variations-report`
+Send the `variations-report.json` a DD run produced to the Variations Service, which starts a
+review or refreshes one. The whole report goes up, buckets and all, and the service builds the
+pool rows from it — so each row keeps the matcher's suggestions, the strategy that produced its
+mapping, and the element level.
+
+```bash
+reso-cert submit-variations-report --report out/.../variations-report.json
+reso-cert submit-variations-report --report <path> --dry-run     # contacts nothing
+reso-cert submit-variations-report --report <path> --overwrite   # proceed over an existing pending review
+```
+
+`-r, --report <path>` (required) · `--overwrite` · `--dry-run` · `--json`.
+
+A fresh submission is a full replace of that report's review rows, declared explicitly rather
+than inferred, so an omission is read as a delta and never as a destructive operation.
+`--overwrite` proceeds over an existing **pending review**; it never proceeds over a **lock**,
+which means somebody is reviewing right now. A dry run contacts nothing and so needs no
+credentials.
+
+### `submit-variation-decisions`
+Apply a sheet of actions and comments to a variations report, then submit it. This is the review
+loop for anyone without the desktop client: export, edit, submit.
+
+```bash
+reso-cert list-variation-reviews --status pending --csv > review.csv
+# fill in Action on the rows you decided
+reso-cert submit-variation-decisions --report variations-report.json --decisions review.csv
+```
+
+The sheet's `Action` column takes `ignore`, `remove` or `submit-to-ft`. A row names an element and
+the sheet says what to do with it; the report's own suggestions carry their provenance, so nothing
+about the mapping needs restating.
+
+**Deciding on a subset is normal.** Rows with no `Action` and no `Comment` are left as they are and
+reported by name, so a row you left blank on purpose and a row whose `Action` you mistyped are
+both visible rather than one of them passing as a no-op. A sheet where *no* row asks for anything
+is refused, because nothing would be submitted.
+
+One push carries the whole sheet. If any row is unusable the report is returned unchanged rather
+than half-applied, so you never have to work out which rows landed.
+
 ## Variations review (read-only)
 
 Both read the same routes the web client's review page uses, with the same auth as
@@ -335,9 +379,16 @@ environment, role) · `--page-size <n>` (items per request; every page is fetche
 `--json` · `--csv`. The summary table shows the mapping, the strategy where the
 pool holds one, the tuple count and the earliest submission.
 
-**`--csv`** writes the sheet the desktop client exports, plus a `Strategy` column, so a review
-can be edited and fed back through `submit-variation-decisions`. The rows go to stdout and the
-item count to stderr, so `> review.csv` yields a clean file.
+**`--csv`** writes the sheet the desktop client exports, plus `Strategy`, `Status` and empty
+`Action` and `Comment` columns. That makes it a template rather than a report: fill in `Action`
+and feed the same file to `submit-variation-decisions` without reshaping it. Rows go to stdout
+and the item count to stderr, so `> review.csv` yields a clean file.
+
+```bash
+reso-cert list-variation-reviews --status pending --csv > review.csv
+# fill in Action on the rows you decided; leave the rest blank
+reso-cert submit-variation-decisions --report variations-report.json --decisions review.csv
+```
 
 A row the pool holds with no suggested mapping at all cannot be read back: the sheet is
 all-or-nothing, and such a row would ask for nothing. The error names the element, for example
