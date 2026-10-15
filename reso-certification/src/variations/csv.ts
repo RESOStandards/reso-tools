@@ -28,6 +28,10 @@ export interface VariationSuggestionItem {
   readonly suggestedRelatedResourceName?: string;
   readonly suggestedRelatedFieldName?: string;
   readonly suggestedRelatedLookupValue?: string;
+  /** How the matcher arrived at the suggested mapping: Substring, Edit Distance, Fast Track,
+   *  Admin Review. Carried through the sheet so a reviewer can weigh a suggestion without
+   *  leaving the CSV, and so the provenance survives a round trip through it. */
+  readonly strategy?: string;
   readonly outcome?: string;
 }
 
@@ -42,6 +46,7 @@ const COLUMNS: ReadonlyArray<{ readonly header: string; readonly field: keyof Va
   { header: 'Suggested Related Resource Name', field: 'suggestedRelatedResourceName' },
   { header: 'Suggested Related Field Name', field: 'suggestedRelatedFieldName' },
   { header: 'Suggested Related Lookup Value', field: 'suggestedRelatedLookupValue' },
+  { header: 'Strategy', field: 'strategy' },
   { header: 'Outcome', field: 'outcome' }
 ];
 
@@ -138,6 +143,14 @@ export interface DecisionCsvItem {
   readonly suggestedRelatedLookupValue?: string;
 }
 
+/**
+ * No Strategy column here, deliberately.
+ *
+ * A decisions sheet NAMES an entry and says what to do with it; `applySheetToReport` attaches the
+ * action to the matching entry of a report it was handed. The report's own suggestions already
+ * carry their strategy, so provenance travels that path untouched. A column here would let an
+ * operator type a provenance the path then ignores, which is worse than not offering it.
+ */
 const DECISION_COLUMNS: ReadonlyArray<{ readonly header: string; readonly field: keyof DecisionCsvItem }> = [
   { header: 'Resource Name', field: 'resourceName' },
   { header: 'Field Name', field: 'fieldName' },

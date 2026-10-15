@@ -14,6 +14,29 @@ describe('parseVariationsCsv', () => {
     expect(skippedColumns).toEqual([]);
   });
 
+  it("reads a Strategy column as the mapping's provenance", () => {
+    // The CLI is the whole surface for anyone without the desktop, so a suggestion's provenance
+    // has to survive a trip through the sheet. Before this column it was dropped on parse and the
+    // reviewer saw a mapping with no indication of where it came from.
+    const csv = [
+      'Resource Name,Field Name,Suggested Resource Name,Suggested Field Name,Strategy',
+      'Property,ListPriceX,Property,ListPrice,Substring',
+      'Property,RoofX,Property,Roof,Fast Track'
+    ].join('\n');
+
+    const { items, recognizedColumns, skippedColumns } = parseVariationsCsv(csv);
+    expect(items.map(i => i.strategy)).toEqual(['Substring', 'Fast Track']);
+    expect(recognizedColumns).toContain('Strategy');
+    expect(skippedColumns).toEqual([]);
+  });
+
+  it('leaves strategy absent when the sheet omits the column', () => {
+    // Absent, not an empty string or a placeholder. A row that says nothing about provenance is
+    // not a row asserting it has none.
+    const { items } = parseVariationsCsv('Resource Name,Suggested Resource Name,Suggested Field Name\nProperty,Property,ListPrice');
+    expect(items[0]).not.toHaveProperty('strategy');
+  });
+
   it('matches headers case-insensitively and trims them', () => {
     const { items, recognizedColumns } = parseVariationsCsv('resource name , SUGGESTED RESOURCE NAME\nProperty,Office');
     expect(items).toEqual([{ resourceName: 'Property', suggestedResourceName: 'Office' }]);
