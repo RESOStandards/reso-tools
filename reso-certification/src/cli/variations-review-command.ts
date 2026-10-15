@@ -67,6 +67,11 @@ export const formatReviewItemsTable = (items: ReadonlyArray<VariationReviewItem>
  * Columns follow the desktop export so a sheet from either side is the same artifact, plus
  * `Strategy`, which neither side carried until now. `Status` is included because a CLI listing is
  * typically the whole pool rather than one report, so a row has to say where it stands.
+ *
+ * `Action` and `Comment` are written empty. They are what makes this a template rather than a
+ * report: `submit-variation-decisions` reads them, so the exported file goes back in unchanged
+ * except for what the reviewer typed. `Strategy`, `Status` and `Outcome` ride along as context
+ * and are recognized-but-ignored on the way back, so our own sheet never warns about itself.
  */
 const CSV_HEADERS: ReadonlyArray<string> = [
   'Resource Name',
@@ -82,7 +87,12 @@ const CSV_HEADERS: ReadonlyArray<string> = [
   'Suggested Related Lookup Value',
   'Strategy',
   'Status',
-  'Outcome'
+  'Outcome',
+  // Empty on export, and the point of it. This sheet is filled in and submitted back through
+  // `submit-variation-decisions`, which reads these two. Without them there is nowhere to write
+  // the decision and the file has to be reshaped by hand before it can be used.
+  'Action',
+  'Comment'
 ];
 
 /** The mapping fields a row carries, read off `mapping` rather than re-derived from the key. */
@@ -119,7 +129,9 @@ export const formatReviewItemsCsv = (items: ReadonlyArray<VariationReviewItem>):
       mappingField(item.mapping, 'suggestedRelatedLookupValue'),
       item.strategy ?? '',
       item.status,
-      item.outcome ?? ''
+      item.outcome ?? '',
+      '',
+      ''
     ].map(csvCell)
   );
   return [CSV_HEADERS.map(csvCell).join(','), ...rows.map(r => r.join(','))].join('\n');

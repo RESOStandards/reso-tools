@@ -41,10 +41,19 @@ describe('parseDecisionsCsv', () => {
     expect(items).toEqual([{ resourceName: 'Property', fieldName: 'Roof', lookupValue: 'Steel', comment: 'Which steel construction?' }]);
   });
 
-  it('rejects a row carrying neither an action nor a comment', () => {
-    // Such a row names an element and asks for nothing. Silently skipping it would make a typo in the
-    // Action column look like a successful no-op.
-    expect(() => parseDecisionsCsv(sheet('Property,Roof,Steel,,\n'))).toThrow(/row 2 .*(action|comment)/i);
+  it('refuses a sheet where no row asks for anything', () => {
+    // Updated 2026-10-15. This used to be a row-level error. Deciding on a SUBSET is the normal
+    // case once a review can be exported, so an undecided row is now reported rather than fatal.
+    // A sheet where NOTHING is decided is still refused, because nothing would be submitted.
+    expect(() => parseDecisionsCsv(sheet('Property,Roof,Steel,,\n'))).toThrow(/no Action or Comment on any row/);
+  });
+
+  it('reports an undecided row by name instead of dropping it quietly', () => {
+    // The original objection to skipping was that a typo in the Action column would look like a
+    // successful no-op. That objection is about silence, so the row is named.
+    const { items, undecidedRows } = parseDecisionsCsv(sheet('Property,Roof,Steel,ignore,\nProperty,Heating,Gas,,\n'));
+    expect(items).toHaveLength(1);
+    expect(undecidedRows).toEqual(['Property.Heating.Gas']);
   });
 
   it('requires a Resource Name column', () => {
@@ -74,15 +83,74 @@ describe('parseDecisionsCsv', () => {
   });
 
   it('skips a wholly blank row without shifting the reported row number of a later error', () => {
-    expect(() => parseDecisionsCsv(sheet('\nProperty,Roof,Steel,,\n'))).toThrow(/row 3/i);
+    // A row with the wrong column count is still row-level, so the numbering guard still applies.
+    expect(() => parseDecisionsCsv(sheet('\nProperty,LeaseTerm,Months - 4,ignore,a,b\n'))).toThrow(/row 3/i);
   });
 
   it('rejects a row with more columns than the header, which means an unquoted comma', () => {
     expect(() => parseDecisionsCsv(sheet('Property,LeaseTerm,Months - 4,ignore,a,b\n'))).toThrow(/unquoted comma/i);
   });
 
-  it('does not accept an update sheet, whose Outcome column it does not know', () => {
-    // The guard that keeps the two sheets apart: an update sheet's rows carry no Action and no Comment.
-    expect(() => parseDecisionsCsv('Resource Name,Field Name,Outcome\nProperty,MBR_Foo,Ignored\n')).toThrow(/row 2 .*(action|comment)/i);
+  it('does not accept an update sheet, whose rows ask for nothing', () => {
+    // The guard that keeps the two sheets apart still holds: an update sheet's rows carry no
+    // Action and no Comment, so none of them asks for anything and the sheet is refused.
+    expect(() => parseDecisionsCsv('Resource Name,Field Name,Outcome\nProperty,MBR_Foo,Ignored\n')).toThrow(
+      /no Action or Comment on any row/
+    );
+  });
+});
+
+/**
+ * The export-edit-submit round trip.
+ *
+ * `list-variation-reviews --csv` writes the sheet, a person or an agent fills in the Action
+ * column, and `submit-variation-decisions` reads it back. That loop is the whole review workflow
+ * for anyone without the desktop client, so the file one side writes has to be the file the other
+ * side reads, warning-free.
+ */
+describe('parseDecisionsCsv — the exported sheet', () => {
+  it('accepts Comments, the spelling the desktop export writes', () => {
+    // The decisions sheet calls it `Comment`; the desktop export writes `Comments`. The column was
+    // therefore dropped, so a comment typed into an exported sheet was silently not submitted.
+    const csv = ['Resource Name,Field Name,Action,Comments', 'Property,MBR_SoilType,ignore,looks right'].join('\n');
+    const { items, skippedColumns } = parseDecisionsCsv(csv);
+    expect(items[0]).toMatchObject({ action: 'ignore', comment: 'looks right' });
+    expect(skippedColumns).toEqual([]);
+  });
+
+  it('does not warn about the context columns the export carries', () => {
+    // Strategy, Status and Outcome are context for whoever is deciding. The push does not act on
+    // them, but calling them "unrecognized" on every submit of our own sheet teaches people to
+    // ignore the warning that exists to catch a real typo.
+    const csv = [
+      'Resource Name,Field Name,Suggested Field Name,Strategy,Status,Outcome,Action',
+      'Property,MBR_SoilType,SoilType,Substring,pending,,ignore'
+    ].join('\n');
+    const { items, skippedColumns } = parseDecisionsCsv(csv);
+    expect(skippedColumns).toEqual([]);
+    expect(items[0]).toMatchObject({ action: 'ignore' });
+  });
+
+  it('still warns about a column that is a genuine typo', () => {
+    const csv = ['Resource Name,Field Name,Action,Stratgy', 'Property,MBR_SoilType,ignore,Substring'].join('\n');
+    expect(parseDecisionsCsv(csv).skippedColumns).toEqual(['Stratgy']);
+  });
+
+  it('says the sheet is unfilled when no row asks for anything', () => {
+    // A freshly exported review has no Action anywhere. Reporting that as a problem with row 2
+    // sends someone looking at row 2, when what happened is they have not filled it in yet.
+    const csv = [
+      'Resource Name,Field Name,Suggested Field Name,Action,Comment',
+      'Property,MBR_SoilType,SoilType,,',
+      'Property,MBR_YearRenovated,YearRenovated,,'
+    ].join('\n');
+    expect(() => parseDecisionsCsv(csv)).toThrow(/no Action or Comment on any row/);
+  });
+
+  it('leaves an undecided row alone and names it, when others are decided', () => {
+    const csv = ['Resource Name,Field Name,Action', 'Property,MBR_SoilType,ignore', 'Property,MBR_YearRenovated,'].join('\n');
+    const { items, undecidedRows } = parseDecisionsCsv(csv);
+    expect(items.map(i => i.fieldName)).toEqual(['MBR_SoilType']);
+    expect(undecidedRows).toEqual(['Property.MBR_YearRenovated']);
   });
 });
