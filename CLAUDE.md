@@ -139,6 +139,7 @@ here because it applies to any repo in the org.
 ### Version Branches
 - All work done in version branches named `vX.Y` (e.g., `v0.5`)
 - **`main` is the mainline.** The repository was reset for the public v1.0.0 release: `main` begins at a single squashed commit, `Release RESO Tools v1.0.0` (2026-10-13), and the pre-split history lives in [`RESOStandards/reso-tools-archive`](https://github.com/RESOStandards/reso-tools-archive). **A consequence worth knowing:** commit SHAs from before the reset are not ancestors of `main`, so `git merge-base --is-ancestor` returns false for work that is present, and an old local branch can report hundreds of commits "ahead" while being identical in content. Check whether a change is in the tree by looking at the tree (`git diff origin/main <ref> -- <subtree>`), not by ancestry.
+- **`v1.0.0-pre` no longer exists on the remote.** A local branch of that name is a leftover: stale, not a base, and worth deleting rather than branching from. Anything genuinely needed from before the reset is in [`reso-tools-archive`](https://github.com/RESOStandards/reso-tools-archive), which is where to look for an old ref rather than a local copy that happens to survive.
 - GitHub milestones match the branch version
 - **Release tags**: Use short-form tags (`v0.8`, `v0.9`) until real patch releases ship in production. Package.json versions use full SemVer (`0.8.0`), but Git tags and GitHub Releases use short form so `/releases/tag/v0.8` works.
 
