@@ -295,6 +295,15 @@ const skipResult = (scenario: CoreScenario, start: number, message: string): Sce
   duration: Date.now() - start
 });
 
+/**
+ * The reason a scenario carries when the run spent its total-timeout budget before reaching it.
+ *
+ * Exported because it is the only thing that distinguishes a deadline skip from a can't-sample
+ * skip, so the deadline tests select on it. A test that kept its own copy of the text went vacuous
+ * the moment the wording changed, and only a non-vacuity guard caught that.
+ */
+export const DEADLINE_SKIP_REASON = 'Not tested – run deadline reached';
+
 /** A "not tested — run deadline reached" result. Counts as SKIPPED, never failed: the
  *  scenario was never executed because the run spent its total-timeout budget. Distinct
  *  from a can't-sample skip by its reason, so a partial run never misreports a vendor. */
@@ -303,8 +312,8 @@ const deadlineSkipResult = (scenario: CoreScenario): ScenarioResult => ({
   name: scenario.name,
   passed: false,
   skipped: true,
-  skipReason: 'Not tested — run deadline reached',
-  assertions: [{ passed: true, message: 'Not tested — run deadline reached' }],
+  skipReason: DEADLINE_SKIP_REASON,
+  assertions: [{ passed: true, message: DEADLINE_SKIP_REASON }],
   duration: 0,
   optional: scenario.optional
 });
@@ -363,7 +372,7 @@ export const emptyOutcome = (
         skipped: false,
         retryable: false,
         message:
-          'Guaranteed-match filter returned 0 records for a value sampled from this field — the operator failed to return a known-present record'
+          'Guaranteed-match filter returned 0 records for a value sampled from this field – the operator failed to return a known-present record'
       };
     case 'pass':
       return {
@@ -385,7 +394,7 @@ export const emptyOutcome = (
         passed: false,
         skipped: true,
         retryable: true,
-        message: 'No records returned — filter executed but no matching data to validate'
+        message: 'No records returned – filter executed but no matching data to validate'
       };
   }
 };
@@ -429,7 +438,7 @@ export const expandRrkWarnings = (
       return String(rrk) === String(parentKey)
         ? []
         : [
-            `Expanded ${expandField} item ${RESOURCE_RECORD_KEY_FIELD} ${JSON.stringify(String(rrk))} does not match the parent ${keyField} ${JSON.stringify(String(parentKey))} it was expanded into — an expanded item's ${RESOURCE_RECORD_KEY_FIELD} should equal the parent record's primary key (RCP-039 / transport#22)`
+            `Expanded ${expandField} item ${RESOURCE_RECORD_KEY_FIELD} ${JSON.stringify(String(rrk))} does not match the parent ${keyField} ${JSON.stringify(String(parentKey))} it was expanded into – an expanded item's ${RESOURCE_RECORD_KEY_FIELD} should equal the parent record's primary key (RCP-039 / transport#22)`
           ];
     });
   });
@@ -503,21 +512,21 @@ const summarizeItemValidation = (
   const indeterminate = verdicts.filter(v => v.indeterminate);
   const notEvaluated =
     indeterminate.length > 0
-      ? ` (${indeterminate.length}/${items.length} not evaluated — ${indeterminate[0].reason ?? 'validator could not evaluate the item'})`
+      ? ` (${indeterminate.length}/${items.length} not evaluated – ${indeterminate[0].reason ?? 'validator could not evaluate the item'})`
       : '';
   if (invalid.length > 0) {
     const first = invalid[0];
     const detail = first.errors.slice(0, 3).join('; ') || 'schema validation failed';
     return {
       passed: false,
-      message: `${label}: ${invalid.length}/${items.length} item(s) schema-invalid against ${targetType} — item ${first.index}: ${detail}${notEvaluated}`
+      message: `${label}: ${invalid.length}/${items.length} item(s) schema-invalid against ${targetType} – item ${first.index}: ${detail}${notEvaluated}`
     };
   }
   if (indeterminate.length > 0) {
     return {
       passed: true,
       indeterminate: true,
-      message: `${label}: ${indeterminate.length}/${items.length} ${targetType} item(s) not evaluated — ${indeterminate[0].reason ?? 'validator could not evaluate the item'} — not validated (indeterminate)`
+      message: `${label}: ${indeterminate.length}/${items.length} ${targetType} item(s) not evaluated – ${indeterminate[0].reason ?? 'validator could not evaluate the item'} – not validated (indeterminate)`
     };
   }
   return { passed: true, message: `${label}: all ${items.length} ${targetType} item(s) valid against ${targetType}` };
@@ -599,11 +608,11 @@ const runOneExpandNav = async (
         name,
         passed: false,
         skipped: true,
-        skipReason: `$expand ${nav.name}: HTTP ${response.status} — expansion not supported / not accessible for this client (optional per RESO Core; OData §9.3.1/§11.2)`,
+        skipReason: `$expand ${nav.name}: HTTP ${response.status} – expansion not supported / not accessible for this client (optional per RESO Core; OData §9.3.1/§11.2)`,
         assertions: [
           {
             passed: true,
-            message: `$expand ${nav.name}: HTTP ${response.status} — expansion not supported / not accessible for this client (optional per RESO Core; OData §9.3.1/§11.2); skipped, status reported`
+            message: `$expand ${nav.name}: HTTP ${response.status} – expansion not supported / not accessible for this client (optional per RESO Core; OData §9.3.1/§11.2); skipped, status reported`
           }
         ],
         duration: Date.now() - start,
@@ -639,7 +648,7 @@ const runOneExpandNav = async (
           ...assertions,
           {
             passed: false,
-            message: `$expand ${nav.name}: expanded collection ${shapeErr} — a 2xx expansion must return an array ([] when empty, else a Collection of ${nav.targetType}); OData 4.01 JSON Format collection representation`
+            message: `$expand ${nav.name}: expanded collection ${shapeErr} – a 2xx expansion must return an array ([] when empty, else a Collection of ${nav.targetType}); OData 4.01 JSON Format collection representation`
           }
         ],
         duration: Date.now() - start,
@@ -663,7 +672,7 @@ const runOneExpandNav = async (
           ...assertions,
           {
             passed: true,
-            message: `$expand ${nav.name}: 200 received; per-item schema validation unavailable (no validator built) — not validated (skipped)`
+            message: `$expand ${nav.name}: 200 received; per-item schema validation unavailable (no validator built) – not validated (skipped)`
           }
         ],
         duration: Date.now() - start,
@@ -691,7 +700,7 @@ const runOneExpandNav = async (
     if (chosenParent == null) {
       assertions.push({
         passed: true,
-        message: `$expand ${nav.name}: no parent key in the $expand response — navigation-property-path leg not exercised (no data)`
+        message: `$expand ${nav.name}: no parent key in the $expand response – navigation-property-path leg not exercised (no data)`
       });
     } else {
       const parentKey = chosenParent[params.keyField];
@@ -710,7 +719,7 @@ const runOneExpandNav = async (
         // "can't access" boundary, not a records comparison.
         assertions.push({
           passed: true,
-          message: `Navigation-property-path GET ${resource}('…')/${nav.name} → HTTP ${navResp.status} — not supported / not accessible for this client (OData §9.3.1/§11.2); not faulted, status reported`
+          message: `Navigation-property-path GET ${resource}('…')/${nav.name} → HTTP ${navResp.status} – not supported / not accessible for this client (OData §9.3.1/§11.2); not faulted, status reported`
         });
       } else if (!navStatus.passed) {
         // A 2xx that is not 200 (e.g. 204 No Content) is the wrong code for a COLLECTION navigation-property-path:
@@ -718,7 +727,7 @@ const runOneExpandNav = async (
         // collection is never represented as 204 (204 is for a null single-valued nav). Served-but-wrong → FAIL.
         assertions.push({
           passed: false,
-          message: `Navigation-property-path GET ${resource}('…')/${nav.name} → HTTP 200 expected but got a malformed/wrong-code response (${navStatus.message}) — a collection navigation-property-path returns 200 with an empty result set when none, never 204 (OData §11.2.7; web-api-core.md §2.5.10.2/§2.6.1)`
+          message: `Navigation-property-path GET ${resource}('…')/${nav.name} → HTTP 200 expected but got a malformed/wrong-code response (${navStatus.message}) – a collection navigation-property-path returns 200 with an empty result set when none, never 204 (OData §11.2.7; web-api-core.md §2.5.10.2/§2.6.1)`
         });
       } else {
         // The nav-path collection value MUST be a JSON array of entity objects too (same rule as the inline leg —
@@ -727,7 +736,7 @@ const runOneExpandNav = async (
         if (navShapeErr) {
           assertions.push({
             passed: false,
-            message: `Navigation-property-path ${nav.name}: collection ${navShapeErr} — a collection navigation-property-path must return a JSON array of ${nav.targetType} entities (web-api-core.md §2.5.10.2)`
+            message: `Navigation-property-path ${nav.name}: collection ${navShapeErr} – a collection navigation-property-path must return a JSON array of ${nav.targetType} entities (web-api-core.md §2.5.10.2)`
           });
         } else {
           const navItems = extractRecords(navResp.body);
@@ -740,7 +749,7 @@ const runOneExpandNav = async (
           if (expandHasRecords !== navHasRecords) {
             assertions.push({
               passed: false,
-              message: `Navigation-property-path ${nav.name}: $expand=${nav.name} returned ${expandItemCount} item(s) for this ${params.keyField} but ${resource}('…')/${nav.name} returned ${navItems.length} — the $expand and navigation-property-path forms resolve the same relationship and MUST agree on whether related entities exist (OData §11.2.7; web-api-core.md §2.5.10.2)`
+              message: `Navigation-property-path ${nav.name}: $expand=${nav.name} returned ${expandItemCount} item(s) for this ${params.keyField} but ${resource}('…')/${nav.name} returned ${navItems.length} – the $expand and navigation-property-path forms resolve the same relationship and MUST agree on whether related entities exist (OData §11.2.7; web-api-core.md §2.5.10.2)`
             });
           } else {
             assertions.push({
@@ -780,11 +789,11 @@ const runOneExpandNav = async (
       name,
       passed: false,
       skipped: true,
-      skipReason: `$expand ${nav.name} errored — ${err instanceof Error ? err.message : String(err)}`,
+      skipReason: `$expand ${nav.name} errored – ${err instanceof Error ? err.message : String(err)}`,
       errored: true,
       assertions: [
         ...assertions,
-        { passed: false, message: `Skipped: $expand ${nav.name} errored — ${err instanceof Error ? err.message : String(err)}` }
+        { passed: false, message: `Skipped: $expand ${nav.name} errored – ${err instanceof Error ? err.message : String(err)}` }
       ],
       duration: Date.now() - start,
       requestUrl: query.url
@@ -809,7 +818,7 @@ export const runExpandNavScenarios = async (
 ): Promise<ReadonlyArray<ScenarioResult>> => {
   const navs = params.expandNavs ?? [];
   if (navs.length === 0) {
-    return [skipResult(scenario, Date.now(), 'resource declares no collection navigation property — nothing to expand (N/A)')];
+    return [skipResult(scenario, Date.now(), 'resource declares no collection navigation property – nothing to expand (N/A)')];
   }
   const results: ScenarioResult[] = [];
   for (const nav of navs) {
@@ -911,11 +920,11 @@ export const executeStandardScenario = async (
     if (dataAssertion) {
       if (isSingleEnumNe(scenario) && !dataAssertion.passed) {
         warnings.push(
-          `Single-enumeration ne — stricter than Core 2.0.0; reported as a WARNING pending WG sign-off, not failed: ${dataAssertion.message}`
+          `Single-enumeration ne – stricter than Core 2.0.0; reported as a WARNING pending WG sign-off, not failed: ${dataAssertion.message}`
         );
         assertions.push({
           passed: true,
-          message: `Single-enumeration ne: reported for review, not failed (see warnings) — ${dataAssertion.message}`
+          message: `Single-enumeration ne: reported for review, not failed (see warnings) – ${dataAssertion.message}`
         });
       } else {
         assertions.push(dataAssertion);
@@ -1257,7 +1266,7 @@ export const lookupResourcePresence = (
   if (isEnumerationIgnored(resource, field)) {
     return {
       passed: true,
-      message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} is on the committee-approved ignore-enumerations list — value presence not enforced`
+      message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} is on the committee-approved ignore-enumerations list – value presence not enforced`
     };
   }
   const present = sampleValues.filter((v): v is string => typeof v === 'string' && v.length > 0);
@@ -1297,7 +1306,7 @@ export const lookupResourceValueReport = (
   if (isEnumerationIgnored(resource, field)) {
     return {
       passed: true,
-      message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} is on the ignore-enumerations list — values not classified`
+      message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} is on the ignore-enumerations list – values not classified`
     };
   }
   // Prefer the precise per-field DD set (joined on the field's DD type); fall back to "any DD enum" only when
@@ -1316,7 +1325,7 @@ export const lookupResourceValueReport = (
   if (declared.length === 0) {
     return {
       passed: true,
-      message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} — no StandardLookupValue values to classify`
+      message: `Lookup Resource '${expectedLookupName}': ${resource}.${field} – no StandardLookupValue values to classify`
     };
   }
   const local = declared.filter(slv => !isDdStandard(slv));
@@ -1324,7 +1333,7 @@ export const lookupResourceValueReport = (
   if (local.length === 0) {
     return {
       passed: true,
-      message: `Lookup Resource '${expectedLookupName}': tested ${resource}.${field} — all ${declared.length} value(s) are DD-standard`
+      message: `Lookup Resource '${expectedLookupName}': tested ${resource}.${field} – all ${declared.length} value(s) are DD-standard`
     };
   }
   const examples =
@@ -1335,17 +1344,17 @@ export const lookupResourceValueReport = (
   if (standardMap.isClosedEnumField(resource, field)) {
     return {
       passed: true,
-      message: `Lookup Resource '${expectedLookupName}': tested ${resource}.${field} — ${standardCount} DD-standard, ${local.length} value(s) extending a closed enumeration (${examples}). Reported only — Core does not gate on enumeration membership, but extending a closed enumeration would not pass Data Dictionary testing.`
+      message: `Lookup Resource '${expectedLookupName}': tested ${resource}.${field} – ${standardCount} DD-standard, ${local.length} value(s) extending a closed enumeration (${examples}). Reported only – Core does not gate on enumeration membership, but extending a closed enumeration would not pass Data Dictionary testing.`
     };
   }
   // Resolvable non-closed enum → the openness rationale holds; unresolvable/provider-local field → state only
   // what is known (reported, not failed), since the field's enum-ness and openness are unknown.
   const rationale = resolved
     ? 'Local values are permitted for open enumerations; reported for review, not failed.'
-    : 'Reported for review, not failed — Core does not gate on enumeration membership.';
+    : 'Reported for review, not failed – Core does not gate on enumeration membership.';
   return {
     passed: true,
-    message: `Lookup Resource '${expectedLookupName}': tested ${resource}.${field} — ${standardCount} DD-standard, ${local.length} local value(s) (${examples}). ${rationale}`
+    message: `Lookup Resource '${expectedLookupName}': tested ${resource}.${field} – ${standardCount} DD-standard, ${local.length} local value(s) (${examples}). ${rationale}`
   };
 };
 
@@ -1474,7 +1483,7 @@ export const runLookupResourceScenario = async (
   const multi = (params.multiLookupCandidates ?? []).find(c => c.representation === 'COLLECTION_STRING');
   const targets = [single, multi].filter((c): c is EnumCandidate => c != null);
   if (targets.length === 0) {
-    return skipResult(scenario, start, 'no string (Lookup Resource) lookup field — enum-typed lookups have no Lookup Resource');
+    return skipResult(scenario, start, 'no string (Lookup Resource) lookup field – enum-typed lookups have no Lookup Resource');
   }
 
   // Validate each present string form against its own LookupName, sequentially so a LookupName shared across
@@ -1788,7 +1797,7 @@ const ODATA_SKIP_SPEC_URL = 'https://docs.oasis-open.org/odata/odata/v4.0/errata
 export const describeSkipOverlap = (overlap: number): string => {
   const keys = `${overlap} key${overlap === 1 ? '' : 's'}`;
   const verb = overlap === 1 ? 'appears' : 'appear';
-  return `$skip overlap: ${keys} ${verb} in both pages — consecutive pages must be disjoint. Absent $orderby, OData REQUIRES the service to impose a stable ordering across requests that include $top/$skip (4.0 §11.2.5.4 [$skip], §11.2.5.3 [$top]; 4.01 §11.2.6.3–.4) — a stable sort is mandatory, so $top=5 then $skip=5 must return different records. See ${ODATA_SKIP_SPEC_URL}`;
+  return `$skip overlap: ${keys} ${verb} in both pages – consecutive pages must be disjoint. Absent $orderby, OData REQUIRES the service to impose a stable ordering across requests that include $top/$skip (4.0 §11.2.5.4 [$skip], §11.2.5.3 [$top]; 4.01 §11.2.6.3–.4) – a stable sort is mandatory, so $top=5 then $skip=5 must return different records. See ${ODATA_SKIP_SPEC_URL}`;
 };
 
 /** Run structural scenarios (metadata, service-document, fetch-by-key, select, top, skip, count). Exported as a
@@ -1910,7 +1919,7 @@ export const runStructuralScenario = async (
       if (projectedDataFields.length === 0) {
         assertions.push({
           passed: true,
-          message: '$select: no non-key field available to project — multi-field projection not exercised on this resource'
+          message: '$select: no non-key field available to project – multi-field projection not exercised on this resource'
         });
       } else {
         const confirmed = projectedDataFields.filter(f => records.some(r => f in r));
@@ -1919,7 +1928,7 @@ export const runStructuralScenario = async (
           message:
             confirmed.length > 0
               ? `$select: projected fields present (${confirmed.join(', ')}); additional properties permitted (OData 4.01 §11.2.5.1)`
-              : '$select: projected data field null/omitted on this page — not a defect (OData 4.01 §11.2.5.1)'
+              : '$select: projected data field null/omitted on this page – not a defect (OData 4.01 §11.2.5.1)'
         });
       }
     } else {
@@ -1989,12 +1998,12 @@ export const runPagingScenario = async (
       topOneAssertions.push({
         passed: false,
         message:
-          '$top=1 MUST NOT return an @odata.nextLink — the single requested record is the complete response to a $top=1 request; a continuation would exceed $top=1 (web-api-core.md Server-Driven Paging §2.5; OData 4.01 §11.2.6.3).'
+          '$top=1 MUST NOT return an @odata.nextLink – the single requested record is the complete response to a $top=1 request; a continuation would exceed $top=1 (web-api-core.md Server-Driven Paging §2.5; OData 4.01 §11.2.6.3).'
       });
     } else {
       topOneAssertions.push({
         passed: true,
-        message: '$top=1 returned no @odata.nextLink (correct — the single requested record is the complete set)'
+        message: '$top=1 returned no @odata.nextLink (correct – the single requested record is the complete set)'
       });
     }
   } catch (err) {
@@ -2021,7 +2030,7 @@ export const runPagingScenario = async (
   if (!walkUrl) {
     assertions.push({
       passed: true,
-      message: 'Server-driven paging walk skipped — no timestamp field with ≥2 distinct sampled values to page through'
+      message: 'Server-driven paging walk skipped – no timestamp field with ≥2 distinct sampled values to page through'
     });
   } else {
     const seen = new Set<string>();
@@ -2057,12 +2066,12 @@ export const runPagingScenario = async (
           assertions.push({
             passed: false,
             message:
-              'Server-driven paging: a record key repeated across pages — each page MUST return records not already seen on a previous page (web-api-core.md Server-Driven Paging).'
+              'Server-driven paging: a record key repeated across pages – each page MUST return records not already seen on a previous page (web-api-core.md Server-Driven Paging).'
           });
         } else if (total > walkBound || (total >= walkBound && lastHadNext)) {
           assertions.push({
             passed: false,
-            message: `Server-driven paging: server returned ${total} records for $top=${walkBound}${lastHadNext ? ' and still offered an @odata.nextLink' : ''} — must be up to but not greater than $top (OData 4.01 §11.2.6.3).`
+            message: `Server-driven paging: server returned ${total} records for $top=${walkBound}${lastHadNext ? ' and still offered an @odata.nextLink' : ''} – must be up to but not greater than $top (OData 4.01 §11.2.6.3).`
           });
         } else if (pages > 1 && !lastHadNext) {
           assertions.push({
@@ -2072,12 +2081,12 @@ export const runPagingScenario = async (
         } else if (pages === 1 && !lastHadNext) {
           assertions.push({
             passed: true,
-            message: `Server-driven paging: whole filtered set returned in one page (${seen.size} records), no @odata.nextLink — valid (page size is the server's choice)`
+            message: `Server-driven paging: whole filtered set returned in one page (${seen.size} records), no @odata.nextLink – valid (page size is the server's choice)`
           });
         } else if (pages >= PAGING_WALK_MAX_PAGES && lastHadNext) {
           assertions.push({
             passed: true,
-            message: `Server-driven paging: ${pages} pages walked (page cap), ${seen.size} unique records, no overlap — paging works; the server did not honor the requested page size, so termination was not reached within the cap`
+            message: `Server-driven paging: ${pages} pages walked (page cap), ${seen.size} unique records, no overlap – paging works; the server did not honor the requested page size, so termination was not reached within the cap`
           });
         }
       }

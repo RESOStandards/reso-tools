@@ -122,12 +122,12 @@ const depthMismatch = (row: DecisionSheetRow): string | undefined => {
   // the value belongs to -- which is the shape that made a single-suggestion ignore unexpressible.
   const missing = named.filter(([d, , yes]) => d <= targetDepth && !yes).map(([, name]) => name);
   if (missing.length > 0) {
-    return `names ${TARGET} but does not name ${missing.join(' + ')} — give the suggestion at the same depth as the target.`;
+    return `names ${TARGET} but does not name ${missing.join(' + ')} – give the suggestion at the same depth as the target.`;
   }
 
   const beyond = named.filter(([d, , yes]) => d > targetDepth && yes).map(([, name]) => name);
   if (beyond.length > 0) {
-    return `names ${TARGET} but also names ${beyond.join(' + ')} — the suggestion goes deeper than the target.`;
+    return `names ${TARGET} but also names ${beyond.join(' + ')} – the suggestion goes deeper than the target.`;
   }
 
   return undefined;
@@ -285,7 +285,7 @@ export const applySheetToReport = (report: DecisionReport, rows: ReadonlyArray<D
       // store for every organization holding it, which is a different route, so the message names
       // it rather than just listing what is allowed.
       errors.push(
-        `${rowLabel(row)}: action must be one of ${SHEET_ACTIONS.join(', ')} — got "${row.action}". Resolving an item into the canonical store is a separate operation and cannot be done by pushing a report.`
+        `${rowLabel(row)}: action must be one of ${SHEET_ACTIONS.join(', ')} – got "${row.action}". Resolving an item into the canonical store is a separate operation and cannot be done by pushing a report.`
       );
       continue;
     }
@@ -305,7 +305,7 @@ export const applySheetToReport = (report: DecisionReport, rows: ReadonlyArray<D
     }
     if (matched.length > 1) {
       errors.push(
-        `${rowLabel(row)}: matches ${matched.length} entries (${matched.map(m => entryLabel(m.entry)).join(', ')}) — name the lookup value to disambiguate.`
+        `${rowLabel(row)}: matches ${matched.length} entries (${matched.map(m => entryLabel(m.entry)).join(', ')}) – name the lookup value to disambiguate.`
       );
       continue;
     }
@@ -322,7 +322,7 @@ export const applySheetToReport = (report: DecisionReport, rows: ReadonlyArray<D
     // Two rows naming one element but different suggestions are two different requests, and a change
     // carries one mapping. Picking either would silently drop the other's target.
     if (mapping && existing.mapping && JSON.stringify(existing.mapping) !== JSON.stringify(mapping)) {
-      errors.push(`${entryLabel(entry)}: two rows target different suggestions on the same element — submit them separately.`);
+      errors.push(`${entryLabel(entry)}: two rows target different suggestions on the same element – submit them separately.`);
       continue;
     }
 

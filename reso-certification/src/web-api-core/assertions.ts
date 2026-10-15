@@ -283,7 +283,7 @@ export const assertODataResponse = (response: ODataResponse, expectedStatus: num
     // self-diagnosing — e.g. a provider that requires an OriginatingSystemName filter, or a genuine
     // rejection — rather than an opaque "got 400". Previously only the status code was recorded.
     const detail = describeErrorBody(response);
-    return { passed: false, message: `Expected HTTP ${expectedStatus}, got ${response.status}${detail ? ` — ${detail}` : ''}` };
+    return { passed: false, message: `Expected HTTP ${expectedStatus}, got ${response.status}${detail ? ` – ${detail}` : ''}` };
   }
 
   if (expectedStatus >= 400) {

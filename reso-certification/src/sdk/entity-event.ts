@@ -58,7 +58,7 @@ const serviceCheck: PipelineStep<EntityEventContext> = {
       onProgress({ step: 'Service check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
     }
     const errorDetail = lastStatus
-      ? `HTTP ${lastStatus}${lastBody ? ` — ${lastBody}` : ''}`
+      ? `HTTP ${lastStatus}${lastBody ? ` – ${lastBody}` : ''}`
       : `No response after ${maxAttempts} attempts${lastBody ? ` (last error: ${lastBody})` : ''}`;
     return {
       context: ctx,
@@ -123,7 +123,7 @@ const generatePayloads = (config: EntityEventConfig): PipelineStep<EntityEventCo
     }
 
     if (ctx.mode !== 'full') {
-      return { context: ctx, status: 'skipped', summary: 'Observe mode — no payloads needed' };
+      return { context: ctx, status: 'skipped', summary: 'Observe mode – no payloads needed' };
     }
 
     const outputDir = config.options?.outputDir
@@ -256,7 +256,7 @@ export const entityEventValidForCertification =
   steps =>
     allOf(
       config.mode === 'observe'
-        ? notCertifiable(['observe mode — the run exercised no writes, so there is nothing to certify'])
+        ? notCertifiable(['observe mode – the run exercised no writes, so there is nothing to certify'])
         : CERTIFIABLE,
       everyStepPassed(steps)
     );

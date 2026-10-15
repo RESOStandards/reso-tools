@@ -59,5 +59,5 @@ export const formatValidationSummary = (result: MetadataValidationResult): strin
  */
 export const collectValidationErrors = (result: MetadataValidationResult): ReadonlyArray<string> => [
   ...result.xsdErrors.map(e => `[XSD] ${e.message}${e.line ? ` (line ${e.line})` : ''}`),
-  ...result.semanticErrors.map(e => `[${e.path}] ${e.message}${e.specUrl ? ` — ${e.specUrl}` : ''}`)
+  ...result.semanticErrors.map(e => `[${e.path}] ${e.message}${e.specUrl ? ` – ${e.specUrl}` : ''}`)
 ];

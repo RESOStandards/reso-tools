@@ -134,7 +134,7 @@ const tokenizeCsv = (text: string): ReadonlyArray<ReadonlyArray<string>> => {
     }
   }
   if (inQuotes) {
-    throw new Error('Variations CSV has an unterminated quoted field — a value opened with a quote that never closes.');
+    throw new Error('Variations CSV has an unterminated quoted field – a value opened with a quote that never closes.');
   }
   if (field !== '' || row.length > 0) {
     row.push(field);
@@ -291,7 +291,7 @@ export const parseDecisionsCsv = (csvData: string): ParsedDecisionsCsv => {
     if (cells.every(value => value.trim() === '')) return [];
     if (cells.length > headerRow.length) {
       throw new Error(
-        `Decision CSV row ${rowNumber} has ${cells.length} columns but the header has ${headerRow.length} — check for an unquoted comma.`
+        `Decision CSV row ${rowNumber} has ${cells.length} columns but the header has ${headerRow.length} – check for an unquoted comma.`
       );
     }
     const item = fieldByIndex.reduce<{ -readonly [K in keyof DecisionCsvItem]?: DecisionCsvItem[K] }>((acc, field, i) => {
@@ -323,7 +323,7 @@ export const parseDecisionsCsv = (csvData: string): ParsedDecisionsCsv => {
   // Nothing at all would be submitted, which is never what someone meant.
   if (parsed.length > 0 && askNothing.length === parsed.length) {
     throw new Error(
-      `Decision CSV has no Action or Comment on any row — nothing would be submitted. Fill in the Action column with one of: ${SHEET_ACTION_NAMES.join(', ')}.`
+      `Decision CSV has no Action or Comment on any row – nothing would be submitted. Fill in the Action column with one of: ${SHEET_ACTION_NAMES.join(', ')}.`
     );
   }
 
@@ -372,7 +372,7 @@ export const parseVariationsCsv = (csvData: string): ParsedVariationsCsv => {
     if (cells.every(value => value.trim() === '')) return [];
     if (cells.length > headerRow.length) {
       throw new Error(
-        `Variations CSV row ${rowNumber} has ${cells.length} columns but the header has ${headerRow.length} — check for an unquoted comma.`
+        `Variations CSV row ${rowNumber} has ${cells.length} columns but the header has ${headerRow.length} – check for an unquoted comma.`
       );
     }
     const item = fieldByIndex.reduce<{ -readonly [K in keyof VariationSuggestionItem]?: VariationSuggestionItem[K] }>((acc, field, i) => {
@@ -389,7 +389,7 @@ export const parseVariationsCsv = (csvData: string): ParsedVariationsCsv => {
       // with, which is identified by what it names rather than by where it landed in the file.
       const element = [item.resourceName, item.fieldName, item.lookupValue].filter(Boolean).join('.');
       throw new Error(
-        `Variations CSV row ${rowNumber} (${element}) names no suggestion and carries no Outcome — it would do nothing. ` +
+        `Variations CSV row ${rowNumber} (${element}) names no suggestion and carries no Outcome – it would do nothing. ` +
           `Name the target with any of: ${SUGGESTION_FIELDS.map(f => COLUMNS.find(c => c.field === f)?.header ?? f).join(', ')}.`
       );
     }

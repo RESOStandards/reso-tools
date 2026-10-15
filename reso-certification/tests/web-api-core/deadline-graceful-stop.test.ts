@@ -14,7 +14,7 @@ vi.mock('../../src/test-runner/metadata.js', async importOriginal => {
   };
 });
 
-import { runCoreResourceScenarios } from '../../src/web-api-core/test-runner.js';
+import { DEADLINE_SKIP_REASON, runCoreResourceScenarios } from '../../src/web-api-core/test-runner.js';
 
 const params: TestParams = {
   resource: 'Property',
@@ -30,8 +30,6 @@ const params: TestParams = {
   skippedTypes: [],
   sampleComplete: true
 };
-
-const DEADLINE_MSG = 'Not tested — run deadline reached';
 
 /** Build the deadline-exceeded error the resilient client throws once the run budget is spent. */
 const deadlineError = (): Error => Object.assign(new Error('Total run timeout exceeded'), { resilienceKind: 'deadline-exceeded' as const });
@@ -79,7 +77,7 @@ describe('runCoreResourceScenarios — graceful stop on the run deadline', () =>
     expect(cut.scenarios.filter(s => !s.skipped).length).toBeGreaterThan(0);
 
     // Every deadline-affected scenario is SKIPPED with the deadline reason, never failed.
-    const deadlineScenarios = cut.scenarios.filter(s => s.assertions.some(a => a.message === DEADLINE_MSG));
+    const deadlineScenarios = cut.scenarios.filter(s => s.assertions.some(a => a.message === DEADLINE_SKIP_REASON));
     expect(deadlineScenarios.length).toBeGreaterThan(0);
     for (const s of deadlineScenarios) {
       expect(s.skipped).toBe(true);

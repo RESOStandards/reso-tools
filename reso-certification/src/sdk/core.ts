@@ -165,10 +165,10 @@ export const deadlineResourceReport = (resource: string): ResourceTestReport => 
   scenarios: [
     {
       tag: 'resource-not-tested',
-      name: `${resource} not tested — run deadline reached`,
+      name: `${resource} not tested – run deadline reached`,
       passed: true,
       skipped: true,
-      assertions: [{ passed: true, message: 'Not tested — run deadline reached' }],
+      assertions: [{ passed: true, message: 'Not tested – run deadline reached' }],
       duration: 0
     }
   ],
@@ -209,7 +209,7 @@ export const requiredResourceNotServedReport = (resource: string): ResourceTestR
       assertions: [
         {
           passed: false,
-          message: `Required resource not served top level — ${resource} is declared in the metadata but is absent from both the service document and the served EntitySets, so it cannot be queried at the top level`
+          message: `Required resource not served top level – ${resource} is declared in the metadata but is absent from both the service document and the served EntitySets, so it cannot be queried at the top level`
         }
       ],
       duration: 0
@@ -240,7 +240,7 @@ export const noKeyDeclaredReport = (resource: string): ResourceTestReport => ({
       assertions: [
         {
           passed: false,
-          message: `No key declared — the EntityType for ${resource} defines no key property, which OData requires of every entity type (at least one; a compound key is several). Core certifies against the key in the provider's own <Key> element and never substitutes a conventional name, so every scenario that projects or addresses by the key is untestable here. See the metadata validation report for the CSDL violation and its spec reference.`
+          message: `No key declared – the EntityType for ${resource} defines no key property, which OData requires of every entity type (at least one; a compound key is several). Core certifies against the key in the provider's own <Key> element and never substitutes a conventional name, so every scenario that projects or addresses by the key is untestable here. See the metadata validation report for the CSDL violation and its spec reference.`
         }
       ],
       duration: 0
@@ -262,13 +262,13 @@ export const notServedNotApplicableReport = (resource: string): ResourceTestRepo
   scenarios: [
     {
       tag: 'resource-not-applicable',
-      name: `${resource} declared but not served at the top level — Not Applicable`,
+      name: `${resource} declared but not served at the top level – Not Applicable`,
       passed: true,
       skipped: true,
       assertions: [
         {
           passed: true,
-          message: `Not Applicable — ${resource} is declared in the metadata but not served as a top-level resource; per the Core 2.1.0 carve-out this is permitted (it may be available only via $expand)`
+          message: `Not Applicable – ${resource} is declared in the metadata but not served as a top-level resource; per the Core 2.1.0 carve-out this is permitted (it may be available only via $expand)`
         }
       ],
       duration: 0
@@ -328,7 +328,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // "Cannot read properties of undefined (reading 'toString')" from the XML parser.
     if (!ctx.metadataXml) {
       throw new Error(
-        'metadata unavailable — the server did not return a valid $metadata document (see the Fetch metadata failure above); cannot run Core scenarios'
+        'metadata unavailable – the server did not return a valid $metadata document (see the Fetch metadata failure above); cannot run Core scenarios'
       );
     }
     const metadata = parseMetadataXml(ctx.metadataXml);
@@ -381,7 +381,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
             await writeFile(join(config.savePayloadsDir as string, fileName), contents, 'utf-8');
           },
           (fileName, error) =>
-            console.error(`  payload capture: could not write ${fileName} — ${error instanceof Error ? error.message : String(error)}`)
+            console.error(`  payload capture: could not write ${fileName} – ${error instanceof Error ? error.message : String(error)}`)
         )
       : progressRequester;
 
@@ -398,7 +398,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         onProgress({
           step: RUN_CORE_SCENARIOS,
           status: 'running',
-          message: `$expand schema validation unavailable — ${err instanceof Error ? err.message : String(err)}`
+          message: `$expand schema validation unavailable – ${err instanceof Error ? err.message : String(err)}`
         });
         return undefined;
       }
@@ -459,7 +459,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           onProgress({
             step: RUN_CORE_SCENARIOS,
             status: 'running',
-            message: `${resource}: required resource declared but not served top level — one clean failure`,
+            message: `${resource}: required resource declared but not served top level – one clean failure`,
             detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'failed', note: 'declared but not served' }
           });
           return requiredResourceNotServedReport(resource);
@@ -468,7 +468,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           onProgress({
             step: RUN_CORE_SCENARIOS,
             status: 'running',
-            message: `${resource}: declared but not served top level — Not Applicable (may be expansion-only)`,
+            message: `${resource}: declared but not served top level – Not Applicable (may be expansion-only)`,
             detail: {
               kind: 'core-progress',
               event: 'phase',
@@ -528,7 +528,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           onProgress({
             step: RUN_CORE_SCENARIOS,
             status: 'running',
-            message: `${resource}: EntityType declares no key property — failure`,
+            message: `${resource}: EntityType declares no key property – failure`,
             detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'failed', note: 'no key declared' }
           });
           return noKeyDeclaredReport(resource);
@@ -543,7 +543,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           onProgress({
             step: RUN_CORE_SCENARIOS,
             status: 'running',
-            message: `${resource}: required resource returned no records at the top level — failure`,
+            message: `${resource}: required resource returned no records at the top level – failure`,
             detail: { kind: 'core-progress', event: 'phase', resource, phase: 'done', outcome: 'failed', note: 'no top-level records' }
           });
           return requiredResourceNotServedReport(resource);
@@ -552,7 +552,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           onProgress({
             step: RUN_CORE_SCENARIOS,
             status: 'running',
-            message: `${resource}: no records at the top level — Not Applicable (carried by $expand)`,
+            message: `${resource}: no records at the top level – Not Applicable (carried by $expand)`,
             detail: {
               kind: 'core-progress',
               event: 'phase',
@@ -573,7 +573,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           onProgress({
             step: RUN_CORE_SCENARIOS,
             status: 'running',
-            message: `${resource}: missing types: ${params.skippedTypes.join(', ')} — some scenarios will be skipped`
+            message: `${resource}: missing types: ${params.skippedTypes.join(', ')} – some scenarios will be skipped`
           });
         }
 
@@ -628,7 +628,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
             onProgress({
               step: RUN_CORE_SCENARIOS,
               status: 'running',
-              message: `${outcome.item}: skipped (could not sample) — ${reason}`,
+              message: `${outcome.item}: skipped (could not sample) – ${reason}`,
               detail: {
                 kind: 'core-progress',
                 event: 'phase',
@@ -714,14 +714,14 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
       onProgress({
         step: RUN_CORE_SCENARIOS,
         status: 'running',
-        message: `Field preference had no effect: ${preferenceSummary.unmatched.join(', ')} — matched no steerable candidate on any resource`,
+        message: `Field preference had no effect: ${preferenceSummary.unmatched.join(', ')} – matched no steerable candidate on any resource`,
         detail: { kind: 'core-progress', event: 'phase', phase: 'done', outcome: 'skipped', note: 'field preference unmatched' }
       });
     }
 
     const coverageMsg = fullCoverage ? 'Full type coverage achieved' : `Missing coverage: ${missingTypes.join(', ')}`;
     const modeMsg = requireFullCoverage ? ' (--full-coverage enabled)' : '';
-    const incompleteMsg = deadlineReached ? 'INCOMPLETE — run deadline reached; remaining resources/scenarios not tested. ' : '';
+    const incompleteMsg = deadlineReached ? 'INCOMPLETE – run deadline reached; remaining resources/scenarios not tested. ' : '';
 
     return {
       context: {
