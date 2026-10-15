@@ -37,6 +37,52 @@ describe('parseVariationsCsv', () => {
     expect(items[0]).not.toHaveProperty('strategy');
   });
 
+  it('accepts a suggestion named by field alone, with no Suggested Resource Name', () => {
+    // A same-resource mapping names only the field, so the pool stores `{suggestedFieldName}` and
+    // the desktop export leaves Suggested Resource Name empty. 14 of 17 rows in a real export did.
+    // The guard tested that one column alone, so the desktop's own sheet could not be read back
+    // by the CLI at all: "row 2 has neither a suggestion nor an Outcome".
+    const csv = ['Resource Name,Field Name,Suggested Field Name', 'Property,PricePerSquareFoot,LeasePricePerSquareFoot'].join('\n');
+    const { items } = parseVariationsCsv(csv);
+    expect(items[0]).toMatchObject({ resourceName: 'Property', suggestedFieldName: 'LeasePricePerSquareFoot' });
+  });
+
+  it('accepts a suggestion named by lookup value alone', () => {
+    const csv = ['Resource Name,Field Name,Lookup Value,Suggested Lookup Value', 'Property,Heating,Gas,Natural Gas'].join('\n');
+    expect(parseVariationsCsv(csv).items[0]).toMatchObject({ suggestedLookupValue: 'Natural Gas' });
+  });
+
+  it('accepts an expansion named by its related coordinates alone', () => {
+    const csv = [
+      'Resource Name,Field Name,Suggested Related Resource Name,Suggested Related Field Name',
+      'Property,Rooms,Room,RoomType'
+    ].join('\n');
+    expect(parseVariationsCsv(csv).items[0]).toMatchObject({ suggestedRelatedResourceName: 'Room' });
+  });
+
+  it('still refuses a row that names no suggestion and carries no outcome', () => {
+    // The guard's intent is right and stays: a row that says nothing does nothing.
+    expect(() => parseVariationsCsv('Resource Name,Field Name\nProperty,PricePerSquareFoot')).toThrow(
+      /row 2 \(Property\.PricePerSquareFoot\) names no suggestion/
+    );
+  });
+
+  it('keeps the lookup coordinates the desktop export writes', () => {
+    // A lookup mapping is named by the standard value or the legacy OData value. The sheet
+    // recognized neither, so both were reported as skipped and a lookup mapping could not survive
+    // a round trip through the file the CLI reads back.
+    const csv = [
+      'Resource Name,Field Name,Lookup Value,Suggested Field Name,Suggested Standard Lookup Value,Suggested Legacy OData Value',
+      'Property,Heating,Gas,Heating,Natural Gas,NaturalGas'
+    ].join('\n');
+    const { items, skippedColumns } = parseVariationsCsv(csv);
+    expect(items[0]).toMatchObject({
+      suggestedStandardLookupValue: 'Natural Gas',
+      suggestedLegacyODataValue: 'NaturalGas'
+    });
+    expect(skippedColumns).toEqual([]);
+  });
+
   it('matches headers case-insensitively and trims them', () => {
     const { items, recognizedColumns } = parseVariationsCsv('resource name , SUGGESTED RESOURCE NAME\nProperty,Office');
     expect(items).toEqual([{ resourceName: 'Property', suggestedResourceName: 'Office' }]);
@@ -82,7 +128,7 @@ describe('parseVariationsCsv', () => {
   });
 
   it('throws on a bare-identity row with no suggestion or outcome', () => {
-    expect(() => parseVariationsCsv('Resource Name,Field Name\nProperty,Foo')).toThrow(/row 2 has neither a suggestion .* nor an Outcome/);
+    expect(() => parseVariationsCsv('Resource Name,Field Name\nProperty,Foo')).toThrow(/row 2 \(Property\.Foo\) names no suggestion/);
   });
 
   it('skips fully blank rows and keeps accurate row numbers', () => {

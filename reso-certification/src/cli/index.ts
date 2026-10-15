@@ -63,6 +63,7 @@ import {
   duplicateVariationKeys,
   formatEndorsementStatusTable,
   formatProvenance,
+  formatReviewItemsCsv,
   formatReviewItemsTable
 } from './variations-review-command.js';
 
@@ -766,43 +767,54 @@ program
   .option('--status <status>', 'Filter by pool status: pending, ft-submitted or resolved')
   .option('--element-type <type>', 'Filter by element type: resource, field or lookup')
   .option('--provenance', 'Show every submission under each item instead of the summary table')
+  .option('--csv', 'Print the items as CSV, in the same shape the desktop client exports')
   .option('--page-size <n>', 'Items per request to the service; every page is fetched regardless')
   .option('--json', 'Print the items exactly as the service returned them')
-  .action(async (opts: { status?: string; elementType?: string; provenance?: boolean; pageSize?: string; json?: boolean }) => {
-    try {
-      if (opts.elementType !== undefined && !REVIEW_ELEMENT_TYPES.includes(opts.elementType as VariationReviewElementType)) {
-        throw new Error(`--element-type must be one of: ${REVIEW_ELEMENT_TYPES.join(', ')}`);
+  .action(
+    async (opts: { status?: string; elementType?: string; provenance?: boolean; pageSize?: string; json?: boolean; csv?: boolean }) => {
+      try {
+        if (opts.elementType !== undefined && !REVIEW_ELEMENT_TYPES.includes(opts.elementType as VariationReviewElementType)) {
+          throw new Error(`--element-type must be one of: ${REVIEW_ELEMENT_TYPES.join(', ')}`);
+        }
+        const pageSize = opts.pageSize === undefined ? undefined : Number.parseInt(opts.pageSize, 10);
+        if (pageSize !== undefined && (!Number.isInteger(pageSize) || pageSize <= 0)) {
+          throw new Error(`--page-size must be a positive integer, got '${opts.pageSize}'`);
+        }
+        const bearerToken = await mintOAuth2ClientCredentialsToken();
+        const items = await listVariationReviewItemsViaService({
+          fromCli: true,
+          ...(bearerToken ? { bearerToken } : {}),
+          ...(opts.status ? { status: opts.status } : {}),
+          ...(opts.elementType ? { elementType: opts.elementType as VariationReviewElementType } : {}),
+          ...(pageSize ? { limit: pageSize } : {})
+        });
+        const duplicates = duplicateVariationKeys(items);
+        if (duplicates.length > 0) {
+          console.error(
+            `Warning: the service returned ${duplicates.length} item(s) more than once across pages, with their provenance split ` +
+              `(${duplicates.join(', ')}). Rows are shown as served; a larger --page-size, or none, avoids the split.`
+          );
+        }
+        if (opts.json) {
+          console.log(JSON.stringify(items, null, 2));
+          return;
+        }
+        // CSV is the only output meant to be redirected into a file, so it goes to stdout alone and
+        // the count below still goes to stderr. `reso-cert list-variation-reviews --csv > sheet.csv`
+        // then yields a file `submit-variation-decisions` can read back.
+        if (opts.csv) {
+          console.log(formatReviewItemsCsv(items));
+          console.error(`${items.length} item(s) in review${opts.status ? ` with status ${opts.status}` : ''}.`);
+          return;
+        }
+        console.log(opts.provenance ? formatProvenance(items) : formatReviewItemsTable(items));
+        console.error(`${items.length} item(s) in review${opts.status ? ` with status ${opts.status}` : ''}.`);
+      } catch (error) {
+        console.error('Error:', error instanceof Error ? error.message : String(error));
+        process.exitCode = 2;
       }
-      const pageSize = opts.pageSize === undefined ? undefined : Number.parseInt(opts.pageSize, 10);
-      if (pageSize !== undefined && (!Number.isInteger(pageSize) || pageSize <= 0)) {
-        throw new Error(`--page-size must be a positive integer, got '${opts.pageSize}'`);
-      }
-      const bearerToken = await mintOAuth2ClientCredentialsToken();
-      const items = await listVariationReviewItemsViaService({
-        fromCli: true,
-        ...(bearerToken ? { bearerToken } : {}),
-        ...(opts.status ? { status: opts.status } : {}),
-        ...(opts.elementType ? { elementType: opts.elementType as VariationReviewElementType } : {}),
-        ...(pageSize ? { limit: pageSize } : {})
-      });
-      const duplicates = duplicateVariationKeys(items);
-      if (duplicates.length > 0) {
-        console.error(
-          `Warning: the service returned ${duplicates.length} item(s) more than once across pages, with their provenance split ` +
-            `(${duplicates.join(', ')}). Rows are shown as served; a larger --page-size, or none, avoids the split.`
-        );
-      }
-      if (opts.json) {
-        console.log(JSON.stringify(items, null, 2));
-        return;
-      }
-      console.log(opts.provenance ? formatProvenance(items) : formatReviewItemsTable(items));
-      console.error(`${items.length} item(s) in review${opts.status ? ` with status ${opts.status}` : ''}.`);
-    } catch (error) {
-      console.error('Error:', error instanceof Error ? error.message : String(error));
-      process.exitCode = 2;
     }
-  });
+  );
 
 const ENDORSEMENT_REVIEW_STATUSES: ReadonlyArray<EndorsementReviewStatus> = ['none', 'in-review', 'resolved'];
 
