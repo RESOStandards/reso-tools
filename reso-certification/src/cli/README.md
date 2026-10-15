@@ -291,6 +291,27 @@ reso-cert update-variations -s suggestions.csv --admin-review
 `submitted`, per-status stats, and any `permission-denied` / `validation-failed` /
 `corrections` — review those before assuming a clean run.
 
+**Sheet columns.** Headers are matched case-insensitively and trimmed; anything unrecognized is
+reported as skipped rather than dropped silently.
+
+| Column | |
+|---|---|
+| `Resource Name` | required on every row |
+| `Field Name`, `Lookup Value` | what the row is about |
+| `Suggested Resource Name`, `Suggested Field Name`, `Suggested Lookup Value` | the target |
+| `Suggested Standard Lookup Value`, `Suggested Legacy OData Value` | a lookup target, by display name or legacy value |
+| `Suggested Related Resource Name`, `Suggested Related Field Name`, `Suggested Related Lookup Value` | an expansion target |
+| `Strategy` | how the mapping was arrived at: `Substring`, `Edit Distance`, `Fast Track`, `Admin Review` |
+| `Outcome` | |
+
+A row must name a target with **any one** of the suggested columns, or carry an `Outcome`. A row
+that does neither is refused by name, for example `row 3 (Property.OpenHouse)`, because it would
+ask for nothing. `Strategy` alone will not carry a row; it says where a mapping came from, not
+what the mapping is.
+
+This is the same shape `list-variation-reviews --csv` writes, so a review exports, gets edited and
+goes back in without reshaping the file.
+
 ## Variations review (read-only)
 
 Both read the same routes the web client's review page uses, with the same auth as
@@ -305,13 +326,23 @@ org-wide pool. One line per variation key, collapsed across every tuple that fla
 reso-cert list-variation-reviews --status pending
 reso-cert list-variation-reviews --status pending --provenance   # every submitting tuple under each item
 reso-cert list-variation-reviews --element-type lookup --json    # exactly what the service returned
+reso-cert list-variation-reviews --status pending --csv > review.csv   # a sheet to edit and submit back
 ```
 
 `--status <pending|ft-submitted|resolved>` · `--element-type <resource|field|lookup>` ·
 `--provenance` (one line per submitting tuple: when, which provider/USI/recipient, by whom,
 environment, role) · `--page-size <n>` (items per request; every page is fetched regardless) ·
-`--json`. The summary table shows the mapping, the strategy where the
+`--json` · `--csv`. The summary table shows the mapping, the strategy where the
 pool holds one, the tuple count and the earliest submission.
+
+**`--csv`** writes the sheet the desktop client exports, plus a `Strategy` column, so a review
+can be edited and fed back through `submit-variation-decisions`. The rows go to stdout and the
+item count to stderr, so `> review.csv` yields a clean file.
+
+A row the pool holds with no suggested mapping at all cannot be read back: the sheet is
+all-or-nothing, and such a row would ask for nothing. The error names the element, for example
+`row 3 (Property.OpenHouse)`. Those rows are unreviewable in the pool too, so the fix is to
+resolve or remove them rather than to edit the sheet.
 
 ### `variations-review-status`
 Your submissions with their `lifecycle` and `review` status, one line each.

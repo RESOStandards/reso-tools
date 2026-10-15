@@ -25,6 +25,10 @@ export interface VariationSuggestionItem {
   readonly suggestedResourceName?: string;
   readonly suggestedFieldName?: string;
   readonly suggestedLookupValue?: string;
+  /** The display-name form the live dd.reso.org routes use, and the legacy OData form. A lookup
+   *  mapping is named by one of these, so a sheet that drops them cannot carry one. */
+  readonly suggestedStandardLookupValue?: string;
+  readonly suggestedLegacyODataValue?: string;
   readonly suggestedRelatedResourceName?: string;
   readonly suggestedRelatedFieldName?: string;
   readonly suggestedRelatedLookupValue?: string;
@@ -43,12 +47,41 @@ const COLUMNS: ReadonlyArray<{ readonly header: string; readonly field: keyof Va
   { header: 'Suggested Resource Name', field: 'suggestedResourceName' },
   { header: 'Suggested Field Name', field: 'suggestedFieldName' },
   { header: 'Suggested Lookup Value', field: 'suggestedLookupValue' },
+  { header: 'Suggested Standard Lookup Value', field: 'suggestedStandardLookupValue' },
+  { header: 'Suggested Legacy OData Value', field: 'suggestedLegacyODataValue' },
   { header: 'Suggested Related Resource Name', field: 'suggestedRelatedResourceName' },
   { header: 'Suggested Related Field Name', field: 'suggestedRelatedFieldName' },
   { header: 'Suggested Related Lookup Value', field: 'suggestedRelatedLookupValue' },
   { header: 'Strategy', field: 'strategy' },
   { header: 'Outcome', field: 'outcome' }
 ];
+
+/**
+ * The columns that NAME a suggested target. Any one of them makes a row actionable.
+ *
+ * The guard used to test `suggestedResourceName` alone. A same-resource mapping names only the
+ * field, so the pool stores `{suggestedFieldName}` and the desktop export leaves the resource
+ * column empty: 14 of 17 rows in a real export did. The desktop's own sheet therefore could not
+ * be read back by the CLI, which is the one path that has to work for anyone without a desktop
+ * client, since the decisions workflow round-trips through this file.
+ */
+const SUGGESTION_FIELDS: ReadonlyArray<keyof VariationSuggestionItem> = [
+  'suggestedResourceName',
+  'suggestedFieldName',
+  'suggestedLookupValue',
+  'suggestedStandardLookupValue',
+  'suggestedLegacyODataValue',
+  'suggestedRelatedResourceName',
+  'suggestedRelatedFieldName',
+  'suggestedRelatedLookupValue'
+];
+
+/** True when the row names a target at all, by any coordinate. */
+const namesASuggestion = (item: Partial<VariationSuggestionItem>): boolean =>
+  SUGGESTION_FIELDS.some(field => {
+    const value = item[field];
+    return typeof value === 'string' && value.length > 0;
+  });
 
 export interface ParsedVariationsCsv {
   readonly items: ReadonlyArray<VariationSuggestionItem>;
@@ -279,9 +312,14 @@ export const parseVariationsCsv = (csvData: string): ParsedVariationsCsv => {
     if (!isComplete(item)) {
       throw new Error(`Variations CSV row ${rowNumber} is missing a Resource Name.`);
     }
-    if (!item.outcome && !item.suggestedResourceName) {
+    if (!item.outcome && !namesASuggestion(item)) {
+      // Name the element, not only the row. A row number alone sends someone counting lines in a
+      // sheet of hundreds, and the usual cause is a pool row that never had a suggestion to begin
+      // with, which is identified by what it names rather than by where it landed in the file.
+      const element = [item.resourceName, item.fieldName, item.lookupValue].filter(Boolean).join('.');
       throw new Error(
-        `Variations CSV row ${rowNumber} has neither a suggestion (Suggested Resource Name) nor an Outcome — it would do nothing.`
+        `Variations CSV row ${rowNumber} (${element}) names no suggestion and carries no Outcome — it would do nothing. ` +
+          `Name the target with any of: ${SUGGESTION_FIELDS.map(f => COLUMNS.find(c => c.field === f)?.header ?? f).join(', ')}.`
       );
     }
     return [item];
