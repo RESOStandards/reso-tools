@@ -101,7 +101,7 @@ const serviceCheck: PipelineStep<DDContext> = {
       onProgress({ step: 'Service check', status: 'running', message: `Waiting for server (attempt ${i + 1})...` });
     }
     const errorDetail = lastStatus
-      ? `HTTP ${lastStatus}${lastBody ? ` — ${lastBody}` : ''}`
+      ? `HTTP ${lastStatus}${lastBody ? ` – ${lastBody}` : ''}`
       : `No response after ${maxAttempts} attempts${lastBody ? ` (last error: ${lastBody})` : ''}`;
     return {
       context: ctx,
@@ -278,7 +278,7 @@ const validateDdMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
       onProgress({
         step: 'sub:dd-metadata',
         status: 'running',
-        message: `${warnings.length} Suggested Max (SHOULD) deviation${warnings.length === 1 ? '' : 's'} — see metadata-validation-report.json`
+        message: `${warnings.length} Suggested Max (SHOULD) deviation${warnings.length === 1 ? '' : 's'} – see metadata-validation-report.json`
       });
     }
     const warningSuffix = warnings.length ? ` (${warnings.length} warning${warnings.length === 1 ? '' : 's'})` : '';

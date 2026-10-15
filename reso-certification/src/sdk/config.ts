@@ -167,7 +167,7 @@ const validateServiceRootUri = (uri: string, recipientUoi: string): string => {
   })();
   if (!parsed || (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')) {
     throw new Error(
-      `Config${where}: serviceRootUri ${JSON.stringify(value)} is not a valid URL — set an absolute http(s) server address. The CLI does not resolve placeholder shortcuts like "LOCAL_SERVER"; export a config with the real server address.`
+      `Config${where}: serviceRootUri ${JSON.stringify(value)} is not a valid URL – set an absolute http(s) server address. The CLI does not resolve placeholder shortcuts like "LOCAL_SERVER"; export a config with the real server address.`
     );
   }
   return value;
@@ -231,7 +231,7 @@ export const normalizeConfigFile = (raw: Record<string, unknown>): CertConfigFil
         : [];
 
   if (rawEntries.length === 0) {
-    throw new Error('Config file has no entries — expected a "configs" or "recipients" array (or a single entry with "serviceRootUri").');
+    throw new Error('Config file has no entries – expected a "configs" or "recipients" array (or a single entry with "serviceRootUri").');
   }
 
   const providerUoi = typeof raw.providerUoi === 'string' && raw.providerUoi ? raw.providerUoi : generateLocalUoi();

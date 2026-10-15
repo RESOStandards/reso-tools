@@ -55,7 +55,7 @@ export const computeVariationsViaService = async (input: ComputeVariationsViaSer
       'AUTH_REQUIRED',
       input.fromCli
         ? 'Variations check requires authentication. Set CERT_AUTH_API_BASE_URL, CERT_AUTH_API_USERNAME, and CERTIFICATION_API_KEY in your .env so the CLI can mint a provider token.'
-        : 'Variations check requires authentication. Pass a provider token (bearerToken) — e.g. the session token from logging in.'
+        : 'Variations check requires authentication. Pass a provider token (bearerToken) – e.g. the session token from logging in.'
     );
   }
 
@@ -222,7 +222,7 @@ export const updateVariationsViaService = async (input: UpdateVariationsViaServi
   for (const [index, batch] of chunks.entries()) {
     const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(batch) });
     // Name how much already landed so a mid-run failure is reconcilable.
-    const committed = index > 0 ? ` — ${index} of ${chunks.length} chunk(s) already committed to the store` : '';
+    const committed = index > 0 ? ` – ${index} of ${chunks.length} chunk(s) already committed to the store` : '';
 
     if (response.status === 401 || response.status === 403) {
       throw serviceError(
@@ -236,7 +236,7 @@ export const updateVariationsViaService = async (input: UpdateVariationsViaServi
       const detail = await response.text().catch(() => '');
       throw serviceError(
         'SERVICE_ERROR',
-        `Update variations chunk ${index + 1}/${chunks.length} failed: ${response.status} ${response.statusText}${detail ? ` — ${detail.slice(0, 500)}` : ''}${committed}`
+        `Update variations chunk ${index + 1}/${chunks.length} failed: ${response.status} ${response.statusText}${detail ? ` – ${detail.slice(0, 500)}` : ''}${committed}`
       );
     }
 

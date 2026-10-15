@@ -77,7 +77,7 @@ const loadLegacySchemaModule = async (): Promise<LegacySchemaModule> => {
   const mod: unknown = await import('../legacy/lib/schema/index.js' as string);
   const raw = (mod as { readonly default?: unknown }).default ?? mod;
   if (!isLegacySchemaModule(raw)) {
-    throw new Error('Failed to load the legacy schema module — expected generateJsonSchema / validate exports.');
+    throw new Error('Failed to load the legacy schema module – expected generateJsonSchema / validate exports.');
   }
   return raw;
 };

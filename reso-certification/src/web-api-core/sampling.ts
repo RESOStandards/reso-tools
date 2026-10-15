@@ -214,7 +214,7 @@ export const REQUIRED_RESOURCES_V21 = ['Property', 'Member', 'Office', 'Field', 
  * may be empty, access-denied, or randomly gated). The Core pipeline routes on it (see `resolveNoRecordsOutcome`
  * in serving.ts): a non-required resource is Not Applicable (carried by `$expand`); a required one fails.
  */
-export const NO_RECORDS_SAMPLED = 'all — no records found';
+export const NO_RECORDS_SAMPLED = 'all – no records found';
 
 /**
  * Marker pushed into a resource's `skippedTypes` when its EntityType declares NO key property.
@@ -230,7 +230,7 @@ export const NO_RECORDS_SAMPLED = 'all — no records found';
  * standard or local, if we try and do anything that requires a key." So the Core pipeline FAILS the resource on
  * this marker (`noKeyDeclaredReport`) rather than skipping it, and no sample request is issued for it.
  */
-export const NO_KEY_DECLARED = 'all — no key declared in $metadata';
+export const NO_KEY_DECLARED = 'all – no key declared in $metadata';
 
 // ── Type matchers ──
 
@@ -572,7 +572,7 @@ export const modificationTimestampWarning = (
   if (populated) return undefined;
   const why = present ? 'declares it but sampled no value for it' : 'does not declare it';
   const instead = chosenField ? `grounded the timestamp scenarios on '${chosenField}' instead` : 'found no usable datetime field';
-  return `${resource} ${why} for '${MODIFICATION_TIMESTAMP_FIELD}' — ${instead}. Keys and timestamps are required for Data Dictionary testing, so this is reported here and assessed there, not failed by Core.`;
+  return `${resource} ${why} for '${MODIFICATION_TIMESTAMP_FIELD}' – ${instead}. Keys and timestamps are required for Data Dictionary testing, so this is reported here and assessed there, not failed by Core.`;
 };
 
 // ── Main resolver ──

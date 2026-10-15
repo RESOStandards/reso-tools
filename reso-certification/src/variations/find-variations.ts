@@ -71,13 +71,13 @@ const loadMetadataReport = async (input: FindVariationsInput): Promise<unknown> 
   const hasInline = inline !== undefined;
   const hasPath = typeof path === 'string' && path.length > 0;
   if (hasInline && hasPath) {
-    throw new Error('findVariations: metadataReportJson and pathToMetadataReportJson are mutually exclusive — provide one.');
+    throw new Error('findVariations: metadataReportJson and pathToMetadataReportJson are mutually exclusive – provide one.');
   }
   if (hasInline) return inline;
   if (typeof path === 'string' && path.length > 0) {
     return JSON.parse(await readFile(path, { encoding: 'utf8' })) as unknown;
   }
-  throw new Error('findVariations: provide a metadata source — metadataReportJson (in-memory) or pathToMetadataReportJson (file).');
+  throw new Error('findVariations: provide a metadata source – metadataReportJson (in-memory) or pathToMetadataReportJson (file).');
 };
 
 export const findVariations = async (input: FindVariationsInput): Promise<VariationsServiceReport> => {

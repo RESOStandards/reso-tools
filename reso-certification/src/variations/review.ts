@@ -121,7 +121,7 @@ const resolveToken = async (input: ServiceAuthInput, what: string): Promise<stri
       'AUTH_REQUIRED',
       input.fromCli
         ? `${what} requires authentication. Set TOKEN_URI, CLIENT_ID and CLIENT_SECRET (or CERT_AUTH_API_BASE_URL, CERT_AUTH_API_USERNAME and CERTIFICATION_API_KEY) in your .env so the CLI can mint a provider token.`
-        : `${what} requires authentication. Pass a provider token (bearerToken) — e.g. the session token from logging in.`
+        : `${what} requires authentication. Pass a provider token (bearerToken) – e.g. the session token from logging in.`
     );
   }
   return token;

@@ -125,7 +125,7 @@ export const validateEventData = async (
     // Find entity type in metadata
     const entityType = metadata.entityTypes.find(et => et.name === resourceName);
     if (!entityType) {
-      warnings.push(`Resource "${resourceName}" not found in metadata — skipping validation`);
+      warnings.push(`Resource "${resourceName}" not found in metadata – skipping validation`);
       assertions.push({
         description: `${resourceName}: not found in metadata`,
         status: 'warn',
@@ -137,7 +137,7 @@ export const validateEventData = async (
 
     const keyField = getKeyFieldName(entityType);
     if (!keyField) {
-      warnings.push(`Resource "${resourceName}" has no key property — skipping validation`);
+      warnings.push(`Resource "${resourceName}" has no key property – skipping validation`);
       continue;
     }
 

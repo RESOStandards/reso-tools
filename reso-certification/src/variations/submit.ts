@@ -80,7 +80,7 @@ const resolveToken = async (input: ServiceAuthInput, what: string): Promise<stri
       'AUTH_REQUIRED',
       input.fromCli
         ? `${what} requires authentication. Set TOKEN_URI, CLIENT_ID and CLIENT_SECRET (or CERT_AUTH_API_BASE_URL, CERT_AUTH_API_USERNAME and CERTIFICATION_API_KEY) in your .env so the CLI can mint a provider token.`
-        : `${what} requires authentication. Pass a provider token (bearerToken) — e.g. the session token from logging in.`
+        : `${what} requires authentication. Pass a provider token (bearerToken) – e.g. the session token from logging in.`
     );
   }
   return token;
@@ -191,7 +191,7 @@ export const submitVariationsReportViaService = async (input: SubmitVariationsRe
   if (response.status === 503) {
     throw serviceError(
       'SERVICE_ERROR',
-      `${what} was refused: the service could not verify whether this report is being reviewed, so it wrote nothing. This is not a problem with your report — retry shortly.`
+      `${what} was refused: the service could not verify whether this report is being reviewed, so it wrote nothing. This is not a problem with your report – retry shortly.`
     );
   }
 
@@ -201,7 +201,7 @@ export const submitVariationsReportViaService = async (input: SubmitVariationsRe
     // and they need completely different fixes.
     const detail = await response.text().catch(() => '');
     const trimmed = detail.trim().slice(0, 300);
-    throw serviceError('SERVICE_ERROR', `${what} failed: ${response.status} ${response.statusText}${trimmed ? ` — ${trimmed}` : ''}`);
+    throw serviceError('SERVICE_ERROR', `${what} failed: ${response.status} ${response.statusText}${trimmed ? ` – ${trimmed}` : ''}`);
   }
 
   const body: unknown = await response.json().catch(() => undefined);
