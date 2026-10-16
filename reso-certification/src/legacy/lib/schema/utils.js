@@ -285,16 +285,26 @@ const addCustomValidationForEnum = ajv => {
             // outside the standard set is accepted, as a local field is. The DD-path rule (values must be advertised
             // in the provider's metadata) is untouched.
             valid.push(true);
+          } else if (validationConfig?.[version]?.[sourceModel || resourceName]?.[sourceModelField || fieldName]?.[IGNORE_ENUMS]) {
+            // The committee-approved carve-out in schema-validation-settings.json exempts this field's
+            // enumerations from the advertised-values rule for THIS version, so the value is accepted and
+            // nothing is reported — not an error, and no longer a warning either.
+            //
+            // It previously emitted "...were not advertised. This will fail in Data Dictionary 2.1", which
+            // was false wherever it appeared. The settings file grants the identical exemption under both
+            // "2.0" and "2.1", so the sentence predicted a failure in a version that exempts the field just
+            // as the current one does — on a 2.1 run it told a vendor they would fail the version they were
+            // being tested on. It carried real weight: in one run it accounted for all 2,259,945 warnings.
+            //
+            // Dropped rather than reworded (Josh, 2026-10-16): the deprecation it forward-references is not
+            // arriving in any minor version, so there is no release in which the prediction becomes true.
+            // The route to getting these values advertised is the Schools and Geographies work, which gives
+            // them somewhere to be advertised — not a threatened future failure. A warning nobody can act
+            // on is noise, and at this volume it buries the findings that do matter.
+            valid.push(true);
           } else {
             // Collect the needed error data if validation fails
             valid.push(false);
-            if (validationConfig?.[version]?.[sourceModel || resourceName]?.[sourceModelField || fieldName]?.[IGNORE_ENUMS]) {
-              // convert to warning is the failed field is ingored in the validation config
-              errorMessage.message = `The following enumerations in the ${
-                sourceModelField || fieldName
-              } Field were not advertised. This will fail in Data Dictionary 2.1`;
-              errorMessage.isWarning = true;
-            }
             validate.errors = validate.errors ?? [];
             validate.errors.push(errorMessage);
           }

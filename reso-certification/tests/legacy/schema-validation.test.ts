@@ -184,10 +184,8 @@ describe('Schema validation tests', async () => {
     expect(report.totalErrors).toBe(0);
   });
 
-  it('Should convert enum errors to warnings based on validation config', () => {
+  it('Should report nothing at all for an enum field the validation config ignores', () => {
     let errorMap = {};
-    const resourceName = 'Property';
-    const fieldName = 'MLSAreaMinor';
     const config = {
       '2.0': {
         Property: {
@@ -197,9 +195,6 @@ describe('Schema validation tests', async () => {
         }
       }
     };
-    const expectedEnumValue = 'TestEnumValuer';
-    const expectedErrorMessage =
-      'The following enumerations in the MLSAreaMinor Field were not advertised. This will fail in Data Dictionary 2.1';
 
     errorMap = validate({
       jsonSchema: schema,
@@ -210,15 +205,17 @@ describe('Schema validation tests', async () => {
       validationConfig: config
     });
     const report = combineErrors(errorMap);
+
+    // The carve-out accepts the value outright. It used to downgrade the error to a warning that read
+    // "...were not advertised. This will fail in Data Dictionary 2.1" — a prediction that was false
+    // wherever it appeared, since the settings grant the same exemption under 2.0 and 2.1 alike, and
+    // which no release will ever make true.
     expect(report.totalErrors).toBe(0);
-    expect(report.totalWarnings).toBe(1);
-    expect(!!report.warnings?.[expectedErrorMessage]).toBeTruthy();
-    expect(
-      !!report.warnings[expectedErrorMessage].resources?.[resourceName]?.fields?.[fieldName]?.lookups?.[expectedEnumValue]
-    ).toBeTruthy();
+    expect(report.totalWarnings).toBe(0);
+    expect(report.warnings ?? {}).toEqual({});
   });
 
-  it('Should convert expansion enum errors to warnings based on validation config', () => {
+  it('Should report nothing at all for an ignored enum field reached through an expansion', () => {
     let errorMap = {};
     const config = {
       '2.0': {
@@ -229,11 +226,6 @@ describe('Schema validation tests', async () => {
         }
       }
     };
-    const resourceName = 'Property';
-    const fieldName = 'Media';
-    const expectedEnumValue = 'Foo';
-    const expectedErrorMessage =
-      'The following enumerations in the ImageSizeDescription Field were not advertised. This will fail in Data Dictionary 2.1';
 
     errorMap = validate({
       jsonSchema: schema,
@@ -244,12 +236,12 @@ describe('Schema validation tests', async () => {
       validationConfig: config
     });
     const report = combineErrors(errorMap);
+
+    // Same contract as the non-expansion case, reached via sourceModel/sourceModelField: the carve-out
+    // is keyed on the EXPANDED model (Media.ImageSizeDescription), not the containing resource.
     expect(report.totalErrors).toBe(0);
-    expect(report.totalWarnings).toBe(1);
-    expect(!!report.warnings?.[expectedErrorMessage]).toBeTruthy();
-    expect(
-      !!report.warnings[expectedErrorMessage].resources?.[resourceName]?.fields?.[fieldName]?.lookups?.[expectedEnumValue]
-    ).toBeTruthy();
+    expect(report.totalWarnings).toBe(0);
+    expect(report.warnings ?? {}).toEqual({});
   });
 
   it('Should find errors in case of invalid enums in string list', () => {

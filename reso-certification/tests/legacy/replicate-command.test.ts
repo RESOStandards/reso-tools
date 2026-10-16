@@ -190,35 +190,59 @@ describe('runReplicate — --strict propagates a schema-validation failure (no f
     expect(JSON.stringify(warnings.warnings)).toMatch(/does not match the requested resource/);
   });
 
-  it('--version in the Core form (2.1.0) finds the 2.1-keyed exemptions: an exempt enumeration is a warning, not an error (the boundary normalizes)', async () => {
+  it('--version in the Core form (2.1.0) finds the 2.1-keyed exemptions: an exempt enumeration reports nothing, a non-exempt one still errors', async () => {
     const CITY = 'org.reso.metadata.enums.City';
-    const report21 = {
-      ...minimalReport,
-      version: '2.1',
-      fields: [...minimalReport.fields, { resourceName: RESOURCE, fieldName: 'MLSAreaMajor', type: CITY, annotations: [] }],
-      lookups: [{ lookupName: CITY, lookupValue: 'SampleCity', type: 'Edm.Int32', annotations: [] }]
-    };
-    const record = { ListingKey: 'E1', ModificationTimestamp: '2024-01-01T00:00:00.000Z', MLSAreaMajor: 'NotAnAdvertisedValue' };
-    const server = await startReplicationMockServer({ resource: RESOURCE, records: [record] });
-    cleanups.push(server.close);
-    const outputPath = await mkdtemp(join(tmpdir(), 'replicate-exempt-'));
-    cleanups.push(() => rm(outputPath, { recursive: true, force: true }));
-    const reportPath = join(outputPath, 'metadata-report.json');
-    await writeFile(reportPath, JSON.stringify(report21));
 
-    await runReplicate({
-      serviceRootUri: server.url,
-      strategy: 'TopAndSkip',
-      bearerToken: 'test-token',
-      metadataReportPath: reportPath,
-      outputPath,
-      version: '2.1.0',
-      jsonSchemaValidation: true,
-      secondsDelayBetweenRequests: 0
-    });
-    const written = await readdir(outputPath);
-    expect(written).not.toContain('data-availability-schema-validation-errors.json'); // before: the 2.1 exemption was missed under "2.1.0" → error
-    expect(written).toContain('data-availability-schema-validation-warnings.json');
+    // Two arms, because an exempt field now reports NOTHING rather than a warning. "No errors file" on
+    // its own would also hold if validation never ran at all, so the non-exempt arm is what makes the
+    // exempt arm's silence attributable to the exemption rather than to a no-op.
+    const runWithEnumField = async (fieldName: string): Promise<{ written: ReadonlyArray<string>; threw: boolean }> => {
+      const report21 = {
+        ...minimalReport,
+        version: '2.1',
+        fields: [...minimalReport.fields, { resourceName: RESOURCE, fieldName, type: CITY, annotations: [] }],
+        lookups: [{ lookupName: CITY, lookupValue: 'SampleCity', type: 'Edm.Int32', annotations: [] }]
+      };
+      const record = { ListingKey: 'E1', ModificationTimestamp: '2024-01-01T00:00:00.000Z', [fieldName]: 'NotAnAdvertisedValue' };
+      const server = await startReplicationMockServer({ resource: RESOURCE, records: [record] });
+      cleanups.push(server.close);
+      const outputPath = await mkdtemp(join(tmpdir(), 'replicate-exempt-'));
+      cleanups.push(() => rm(outputPath, { recursive: true, force: true }));
+      const reportPath = join(outputPath, 'metadata-report.json');
+      await writeFile(reportPath, JSON.stringify(report21));
+
+      // Strict is the default, so a non-exempt violation throws AFTER writing its report. The listing is
+      // what this test reads, so the throw is captured rather than propagated.
+      const threw = await runReplicate({
+        serviceRootUri: server.url,
+        strategy: 'TopAndSkip',
+        bearerToken: 'test-token',
+        metadataReportPath: reportPath,
+        outputPath,
+        // The Core form. Before the boundary normalized it, "2.1.0" missed the "2.1"-keyed exemptions.
+        version: '2.1.0',
+        jsonSchemaValidation: true,
+        secondsDelayBetweenRequests: 0
+      }).then(
+        () => false,
+        () => true
+      );
+      return { written: await readdir(outputPath), threw };
+    };
+
+    // MLSAreaMajor is carved out under "2.1" in schema-validation-settings.json: accepted outright, so
+    // nothing is reported and strict mode has nothing to fail on.
+    const exempt = await runWithEnumField('MLSAreaMajor');
+    expect(exempt.threw).toBe(false);
+    expect(exempt.written).not.toContain('data-availability-schema-validation-errors.json');
+    expect(exempt.written).not.toContain('data-availability-schema-validation-warnings.json');
+
+    // CityRegion is not carved out, so the identical unadvertised value is still a hard error that fails
+    // the run. This is what proves validation actually ran, and so that the exemption — not a no-op — is
+    // what produced the silence above.
+    const notExempt = await runWithEnumField('CityRegion');
+    expect(notExempt.threw).toBe(true);
+    expect(notExempt.written).toContain('data-availability-schema-validation-errors.json');
   });
 
   it('rejects up front when schema validation is requested without a metadata report', async () => {
