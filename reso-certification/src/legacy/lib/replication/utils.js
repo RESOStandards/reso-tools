@@ -1277,8 +1277,10 @@ const createODataRequestUri = ({ serviceRootUri, resourceName, expansionInfo = [
 
     return url.toString();
   } catch (err) {
-    console.error(err);
-    throw new Error(err);
+    // Neither logged nor re-wrapped by hand. `new Error(err)` stringified the original, so the
+    // message came out as "Error: Error: ..." and the stack of the thing that actually failed was
+    // discarded; logging here as well reported it twice, since the caller reports it too.
+    throw new Error(`Could not build the request URL: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
   }
 };
 
