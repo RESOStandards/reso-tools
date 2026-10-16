@@ -12,7 +12,7 @@ Replaces the Commander-based DD workflow entirely – metadata serialization, Lo
 reso-cert dd --url https://api.example.com --auth-token TOKEN
 
 # Strict mode (fail on variations and schema validation errors)
-reso-cert dd --url https://api.example.com --auth-token TOKEN --strict
+reso-cert dd --url https://api.example.com --auth-token TOKEN
 
 # Batch expand optimization (see below)
 reso-cert dd --url https://api.example.com --auth-token TOKEN --batch-expand
@@ -98,7 +98,8 @@ Tested against the RESO reference server (Docker, PostgreSQL, 153 Property recor
 |--------|---------|-------------|
 | `--dd-version` | 2.0 | DD version (2.0) |
 | `--limit` | 100000 | Max records to replicate per resource |
-| `--strict` | false | Fail on variations, enforce JSON schema validation |
+| `--strict` | true | Fail the run on JSON schema validation errors. On by default; variations fail a run independently of this |
+| `--no-strict` | – | Record schema validation errors without failing on them. Validation still runs. The run is **not eligible for certification** |
 | `--batch-expand` | false | Batch all expansions per resource into a single `$expand` request |
 
 ## Metadata Report

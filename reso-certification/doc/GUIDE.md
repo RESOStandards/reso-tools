@@ -111,7 +111,7 @@ The metadata and data shape. Validates that the server's metadata document match
 reso-cert dd --url https://api.example.com --auth-token TOKEN
 
 # Strict mode rejects any unrecognized fields and any data variations
-reso-cert dd --url https://api.example.com --auth-token TOKEN --strict
+reso-cert dd --url https://api.example.com --auth-token TOKEN
 ```
 
 The DD flow does several things in sequence:
