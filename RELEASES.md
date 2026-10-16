@@ -2,6 +2,67 @@
 
 ---
 
+## Certification 0.11.0 – 2026-10-15
+
+`reso-certification 0.11.0`
+
+Strict mode becomes the default for Data Dictionary runs, and two corrections change which
+providers pass.
+
+### A run now enforces what it validates
+
+A Data Dictionary run that did not pass `--strict` validated every payload and then enforced
+nothing. The errors were written to the report and the run was reported as passed, so a provider
+could hold a passing Data Dictionary result with thousands of schema validation errors recorded
+beside it.
+
+Two defaults had drifted apart inside the SDK. Enforcement defaulted to off while validation
+defaulted to on, so the work was done and the result was not acted on. The legacy replication module
+and the legacy command line had documented strict as the default throughout; only the newer path had
+moved away from it.
+
+Strict is now the default. `--no-strict` turns it off, and the run keeps going so that a single pass
+collects everything a feed needs fixed. Validation is no longer tied to enforcement: previously an
+explicit `strictMode: false` switched validation off altogether, which meant the one mode that
+exists to produce a full error list produced none.
+
+A run made with `--no-strict` is **not eligible for certification**, and says so. The reason travels
+with the verdict, and `report.json` carries it as well, so a consumer reading only the summary file
+cannot mistake the outcome for a certifiable result. That field is present only when a run is
+ineligible, so a certifiable run's summary is unchanged.
+
+A relaxed run also produces its full set of reports. Previously a run that found errors wrote the
+error file and nothing else, with no warnings file and no availability analytics, so the run with
+the most to report produced the least.
+
+### A decimal without a stated scale is no longer typed as an integer
+
+Any numeric field with no `Scale` facet was typed as an integer, including `Edm.Double`. Scale is a
+`Edm.Decimal` facet and means nothing on a double, and both RESO specifications name `Edm.Double` as
+a sanctioned way to express a decimal value, so this failed providers for declaring what the
+specification permits. It was found on a live run against metadata carrying 71 `Edm.Double`
+properties, every one of which was typed as an integer.
+
+A field is now typed as an integer only when it is an `Edm.Decimal` whose scale is explicitly zero.
+An omitted scale is no longer read as a statement about the value, which matches the Data Dictionary:
+decimals may carry precision and scale attributes, and those attributes may also be omitted.
+
+### Variations review
+
+A mapping's strategy now travels through the suggestion sheet, so an exported review states whether
+a mapping came from Fast Track or from the matcher rather than losing that on the way out. A review
+exports to a sheet that can be filled in and submitted back, and the desktop client's sheet is read
+back in the same shape.
+
+### Smaller changes
+
+- A Web API Core run can save what the server returned, not only what was asked for, which makes a
+  failed assertion reproducible from the captured payload.
+- Assertion text is written with an en dash, the dash RESO style allows.
+- Stale test counts in the documentation were corrected.
+
+---
+
 ## Documentation patch – 2026-10-14
 
 `odata-expression-parser 0.1.1` · `reso-validation 0.1.1` · `reso-client 0.2.4` ·

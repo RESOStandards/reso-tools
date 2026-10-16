@@ -96,7 +96,7 @@ Validates server metadata and data availability against the RESO Data Dictionary
 reso-cert dd --url https://api.example.com --auth-token TOKEN
 
 # Strict mode
-reso-cert dd --url https://api.example.com --auth-token TOKEN --strict
+reso-cert dd --url https://api.example.com --auth-token TOKEN
 ```
 
 [**More info**](src/data-dictionary/README.md)
