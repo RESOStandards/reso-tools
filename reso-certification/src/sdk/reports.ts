@@ -88,6 +88,41 @@ export const archiveCurrentResults = async (currentPath: string): Promise<void> 
   await rename(currentPath, archivedDir);
 };
 
+/** errno codes that mean "you are not allowed to write here", as opposed to any other I/O failure. */
+const PERMISSION_CODES: ReadonlySet<string> = new Set(['EACCES', 'EPERM', 'EROFS']);
+
+/** True when this process is running inside a container, so the advice given is advice that applies. */
+const inContainer = (): boolean => existsSync('/.dockerenv');
+
+/**
+ * Turn a permission failure on the output directory into an error that says what to do about it.
+ *
+ * Node reports this as `EACCES: permission denied, rename '<long path>' -> '<longer path>'`, which
+ * names neither the cause nor the remedy, and the two ways to hit it produce near-identical
+ * messages: the container runs as a user whose uid does not match the owner of a bind-mounted
+ * directory, or Docker created a missing bind-mount target as root, which locks out even the host
+ * user. Both are a one-line fix that the message never mentioned.
+ *
+ * The container advice is given only when actually in a container, because advice that does not
+ * apply is worse than none: it sends someone looking at Docker when a local run simply lacks write
+ * permission on the directory they chose.
+ *
+ * Anything that is not a permission problem passes through untouched. A disk-full or
+ * name-too-long failure should not be explained as a uid mismatch.
+ */
+export const permissionAwareOutputError = (err: unknown, outputPath: string): unknown => {
+  const code = typeof err === 'object' && err !== null ? (err as { code?: unknown }).code : undefined;
+  if (typeof code !== 'string' || !PERMISSION_CODES.has(code)) return err;
+
+  const remedy = inContainer()
+    ? 'This is running in a container, whose user will not match the owner of a mounted directory. ' +
+      'Run it with --user "$(id -u):$(id -g)", and create the directory on the host before the first ' +
+      'run -- a missing bind-mount target is created as root, which locks out the host user too.'
+    : 'Check that the directory exists and is writable by the user running this.';
+
+  return new Error(`Cannot write reports to ${outputPath} (${code}). ${remedy}`, { cause: err });
+};
+
 /**
  * One-shot output-dir preparation for a compliance pipeline run:
  * build the canonical nested path, archive any previous `current/`,
@@ -99,8 +134,12 @@ export const archiveCurrentResults = async (currentPath: string): Promise<void> 
  */
 export const prepareOutputDir = async (endorsementSlug: string, version: string, config: BaseComplianceConfig): Promise<string> => {
   const outputPath = buildOutputPath(endorsementSlug, version, config);
-  await archiveCurrentResults(outputPath);
-  await mkdir(outputPath, { recursive: true });
+  try {
+    await archiveCurrentResults(outputPath);
+    await mkdir(outputPath, { recursive: true });
+  } catch (err) {
+    throw permissionAwareOutputError(err, outputPath);
+  }
   return outputPath;
 };
 

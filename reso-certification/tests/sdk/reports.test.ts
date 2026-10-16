@@ -9,6 +9,7 @@ import {
   createDetailedReportGenerator,
   createGenericReportGenerator,
   entityEventReportGenerators,
+  permissionAwareOutputError,
   resolveSoftwareVersion,
   serializeAddEditRemarks,
   serializeCoreRemarks,
@@ -191,6 +192,38 @@ describe('createGenericReportGenerator', () => {
     const generator = createGenericReportGenerator('Test', '1.0', () => '');
     expect(generator.filename).toBe('report.json');
     expect(generator.name).toBe('Generic');
+  });
+});
+
+describe('permissionAwareOutputError', () => {
+  const errno = (code: string) => Object.assign(new Error(`${code}: permission denied, rename 'a' -> 'b'`), { code });
+
+  // The message Node gives names neither the cause nor the remedy, and the two ways to hit it in a
+  // container produce near-identical text. Both are a one-line fix the message never mentioned.
+  it('explains a permission failure and names the path', () => {
+    const out = permissionAwareOutputError(errno('EACCES'), '/repo/out/dd-2.1/X/Y/current');
+    expect(out).toBeInstanceOf(Error);
+    expect((out as Error).message).toContain('/repo/out/dd-2.1/X/Y/current');
+    expect((out as Error).message).toContain('EACCES');
+  });
+
+  it('keeps the original as the cause, so nothing is lost by rewriting the message', () => {
+    const original = errno('EPERM');
+    const out = permissionAwareOutputError(original, '/out');
+    expect((out as Error).cause).toBe(original);
+  });
+
+  // The failure direction that matters: a disk-full run explained as a uid mismatch sends someone
+  // to fix the wrong thing. Anything that is not a permission problem passes through untouched.
+  it('passes a non-permission error through unchanged', () => {
+    const original = errno('ENOSPC');
+    expect(permissionAwareOutputError(original, '/out')).toBe(original);
+  });
+
+  it('passes through anything that is not an errno at all', () => {
+    const plain = new Error('something else');
+    expect(permissionAwareOutputError(plain, '/out')).toBe(plain);
+    expect(permissionAwareOutputError('a string', '/out')).toBe('a string');
   });
 });
 
