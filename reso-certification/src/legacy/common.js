@@ -16,7 +16,8 @@ const NOT_OK = 1;
  */
 const DATA_DICTIONARY_VERSIONS = Object.freeze({
   v1_7: '1.7',
-  v2_0: '2.0'
+  v2_0: '2.0',
+  v2_1: '2.1'
 });
 
 /**
@@ -37,12 +38,16 @@ const CERTIFICATION_FILES = {
   SCHEMA_VALIDATION_ERROR_REPORT: 'data-availability-schema-validation-errors.json'
 };
 
-const CURRENT_DATA_DICTIONARY_VERSION = DATA_DICTIONARY_VERSIONS.v2_0,
-  DEFAULT_DD_VERSION = DATA_DICTIONARY_VERSIONS.v2_0,
-  PREVIOUS_DATA_DICTIONARY_VERSION = DATA_DICTIONARY_VERSIONS.v1_7,
+// The policy is Latest Minor: the tooling targets the newest minor of each spec, so a default
+// DERIVES from the matching "current" rather than restating a version number. Restating is what
+// let these drift — the live path moved to DD 2.1 while these stayed on 2.0, which made
+// isValidDataDictionaryVersion('2.1') return false and runDDTests throw on a 2.1 run.
+const CURRENT_DATA_DICTIONARY_VERSION = DATA_DICTIONARY_VERSIONS.v2_1,
+  DEFAULT_DD_VERSION = CURRENT_DATA_DICTIONARY_VERSION,
+  PREVIOUS_DATA_DICTIONARY_VERSION = DATA_DICTIONARY_VERSIONS.v2_0,
   CURRENT_WEB_API_CORE_VERSION = WEB_API_CORE_VERSIONS.v2_1_0,
   PREVIOUS_WEB_API_CORE_VERSION = WEB_API_CORE_VERSIONS.v2_0_0,
-  DEFAULT_WEB_API_CORE_VERSION = WEB_API_CORE_VERSIONS.v2_0_0;
+  DEFAULT_WEB_API_CORE_VERSION = CURRENT_WEB_API_CORE_VERSION;
 
 const DEFAULT_UPI_VERSION = '2.0';
 
