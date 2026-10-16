@@ -69,7 +69,7 @@ different thing from the RESO service credentials above.
 |---|---|
 | [`add-edit`](#add-edit) | RCP-010 Add/Edit endorsement compliance |
 | [`entity-event`](#entity-event) | RCP-027 EntityEvent change-tracking compliance |
-| [`core`](#core) | Web API Core 2.0.0 / 2.1.0 compliance |
+| [`core`](#core) | Web API Core 2.1.0 compliance |
 | [`dd`](#dd) | Data Dictionary compliance (replicate + validate a live endpoint) |
 | [`metadata`](#metadata) | Validate OData CSDL/EDMX and convert it to a metadata report |
 | [`schema validate` / `schema generate`](#schema) | JSON-Schema tools for a metadata report |
@@ -143,7 +143,7 @@ performs canary writes), `--writable-resource <name>` (default `Property`),
 `--metadata <path>`, `--mock`. Provide one of `--url`, `--config`, or `--mock`.
 
 ### `core`
-Web API Core 2.0.0 / 2.1.0 compliance.
+Web API Core 2.1.0 compliance. Core 2.0.0 remains certifiable and is selectable per run.
 
 ```bash
 reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2.1.0

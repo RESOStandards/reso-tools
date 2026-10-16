@@ -78,9 +78,9 @@ reso-cert entity-event --url https://api.example.com --auth-token TOKEN --mode o
 
 [**More info**](src/entity-event/README.md)
 
-### Web API Core 2.0.0 / 2.1.0
+### Web API Core 2.1.0
 
-Validates OData query capabilities: $filter across all data types, $select, $orderby, $top, $skip, $count, enumerations, error codes. v2.1.0 adds $expand, server-driven paging and string-based enum comparisons.
+Validates OData query capabilities: $filter across all data types, $select, $orderby, $top, $skip, $count, enumerations, error codes, $expand, server-driven paging and string-based enum comparisons. Core 2.0.0 remains certifiable and is selectable per run; 2.1.0 is the default.
 
 ```bash
 reso-cert core --url https://api.example.com --auth-token TOKEN
@@ -88,7 +88,7 @@ reso-cert core --url https://api.example.com --auth-token TOKEN
 
 [**More info**](src/web-api-core/README.md)
 
-### Data Dictionary 2.0
+### Data Dictionary 2.1
 
 Validates server metadata and data availability against the RESO Data Dictionary. Fetches metadata, merges Lookup Resource data, checks for variations and replicates data using multiple strategies.
 

@@ -22,8 +22,8 @@
 # Directory Structure
 - `/src/test-runner` – Shared infrastructure: types, validators, HTTP client, auth, metadata, reporter, helpers.
 - `/src/add-edit` – RCP-010 Add/Edit spec: scenario runner, compliance report, mock server.
-- `/src/web-api-core` – Web API Core 2.0.0 (stub).
-- `/src/data-dictionary` – Data Dictionary 2.0 (stub).
+- `/src/web-api-core` – Web API Core 2.1.0.
+- `/src/data-dictionary` – Data Dictionary 2.1.
 - `/src/cli` – Unified CLI entry point using commander.
 - `/src/index.ts` – Public SDK exports.
 - `/tests` – Vitest tests.

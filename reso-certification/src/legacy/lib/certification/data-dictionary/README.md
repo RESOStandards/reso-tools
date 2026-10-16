@@ -48,9 +48,9 @@ The following tests are run:
 2. **Data Availability Report** (RESO Cert Utils) - Data Availability sampling using the [`replicate` option](/lib/replication/README.md) and the TimestampDesc strategy
 
 
-# Data Dictionary 2.0
+# Data Dictionary 2.0 and 2.1
 
-To run Data Dictionary 2.0 tests, use the command:
+To run Data Dictionary tests, use the command:
 
 ```
 $ reso-certification-utils runDDTests -v 2.0 -p your-config.json -a
@@ -77,7 +77,7 @@ The following tests are run:
 
 In all cases, up to 100,000 records per resource / strategy / expansion will be run for certification by default.
 
-This means that for Data Dictionary 2.0, if the Property Resource has a Media and OpenHouse expansion, sampling will be as follows:
+This means that for Data Dictionary 2.0 and 2.1, if the Property Resource has a Media and OpenHouse expansion, sampling will be as follows:
 * Property Resource with TimestampDesc
 * Property + Media with TimestampDesc
 * Property + OpenHouse with TimestampDesc
@@ -207,7 +207,7 @@ If there are schema validation errors while sampling, the output will be in a fi
 
 The format of the schema validation reports can be [seen in the tests](/test/schema/). These are generally grouped into categories with error messages and counts. 
 
-Schema validation will also fail fast when used with Data Dictionary 2.0 testing, meaning that sampling will stop upon encountering a page of records that has validation errors. If you wish to run schema validation on its own, see the [`validate` action](/lib/schema/README.md). 
+Schema validation will also fail fast when used with Data Dictionary 2.0 or 2.1 testing, meaning that sampling will stop upon encountering a page of records that has validation errors. If you wish to run schema validation on its own, see the [`validate` action](/lib/schema/README.md). 
 
 This processs is also used for RESO Common Format testing.
 

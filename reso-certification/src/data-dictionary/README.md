@@ -1,6 +1,6 @@
 # Data Dictionary Compliance Testing
 
-Validates OData servers against the RESO Data Dictionary 2.0 specification. DD 2.1 coming soon.
+Validates OData servers against the RESO Data Dictionary. DD 2.1 is the default; 2.0 remains selectable with `--dd-version`.
 
 Replaces the Commander-based DD workflow entirely – metadata serialization, Lookup Resource fetching, and replication all happen natively in TypeScript, calling cert-utils inner functions directly for the replication strategies and variations checking.
 
