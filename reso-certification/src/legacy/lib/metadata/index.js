@@ -1,7 +1,7 @@
 'use strict';
 const { readFile, writeFile } = require('fs/promises');
 const { XMLParser } = require('fast-xml-parser');
-const { CERTIFICATION_FILES } = require('../../common');
+const { CERTIFICATION_FILES, DEFAULT_DD_VERSION } = require('../../common');
 
 /** CSDL wraps a collection's element type as `Collection(<inner>)`. */
 const COLLECTION_PREFIX = 'Collection(';
@@ -57,7 +57,7 @@ const COLLECTION_PREFIX = 'Collection(';
 
     */
 
-const convertMetadata = async xmlMetadata => {
+const convertMetadata = async (xmlMetadata, version = DEFAULT_DD_VERSION) => {
   try {
     const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
     const parsed = parser.parse(xmlMetadata);
@@ -159,7 +159,7 @@ const convertMetadata = async xmlMetadata => {
 
     return {
       description: 'RESO Data Dictionary Metadata Report',
-      version: '2.0',
+      version,
       generatedOn: new Date().toISOString(),
       ...processedMetadata
     };
@@ -177,10 +177,10 @@ const loadMetadataFile = async (pathToXmlMetadata = '') => {
   }
 };
 
-const convertAndSaveMetadata = async ({ pathToXmlMetadata = '' }) => {
+const convertAndSaveMetadata = async ({ pathToXmlMetadata = '', version }) => {
   try {
     const xmlMetadata = await loadMetadataFile(pathToXmlMetadata);
-    const metadataReportJson = await convertMetadata(xmlMetadata);
+    const metadataReportJson = await convertMetadata(xmlMetadata, version);
     await writeFile(CERTIFICATION_FILES.METADATA_REPORT, JSON.stringify(metadataReportJson, null, '  '));
   } catch (err) {
     console.error(`Something went wrong! Error: ${JSON.stringify(err, null, '  ')}`);
