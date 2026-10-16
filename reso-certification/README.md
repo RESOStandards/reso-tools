@@ -212,9 +212,18 @@ const result = await runComplianceTests({
 
 ### The certification image
 
-The image builds the workspace **from this repository** rather than installing the sibling
-`@reso-standards` packages from npm, so it runs the code in your checkout rather than the last
-published release. The build context is the repository root, not this package:
+Tagged releases publish a public image, so most uses are a pull rather than a build:
+
+```bash
+docker pull ghcr.io/resostandards/reso-tools/reso-cert:<version>
+```
+
+It is `linux/amd64`. On Apple silicon Docker runs it emulated, which works and is slower.
+
+To build it yourself — from an unreleased branch, or with local changes — note that the image
+builds the workspace **from this repository** rather than installing the sibling `@reso-standards`
+packages from npm, so it runs the code in your checkout rather than the last published release. The
+build context is the repository root, not this package:
 
 ```bash
 docker build -f reso-certification/Dockerfile -t reso-tools-cert:<version> .
