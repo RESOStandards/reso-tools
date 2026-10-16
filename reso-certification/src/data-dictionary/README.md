@@ -11,8 +11,9 @@ Replaces the Commander-based DD workflow entirely – metadata serialization, Lo
 ```bash
 reso-cert dd --url https://api.example.com --auth-token TOKEN
 
-# Strict mode (fail on variations and schema validation errors)
-reso-cert dd --url https://api.example.com --auth-token TOKEN
+# Relaxed: record schema validation errors without failing on them. The run surveys the
+# whole feed in one pass and is NOT eligible for certification.
+reso-cert dd --url https://api.example.com --auth-token TOKEN --no-strict
 
 # Batch expand optimization (see below)
 reso-cert dd --url https://api.example.com --auth-token TOKEN --batch-expand

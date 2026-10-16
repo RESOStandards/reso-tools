@@ -81,6 +81,15 @@ WORKDIR /repo
 
 # The user is created before the COPY because `--chown` resolves the name against this
 # image's /etc/passwd, and an unknown name fails the build.
+# Deliberately NOT pinned to a uid. Baking one in looks like the fix for a bind-mounted output
+# directory failing with EACCES, and is not: the mount keeps the HOST directory's ownership, so no
+# uid chosen here can be right for every host. 1000 is also already taken in this base image, by
+# node's own `node` user, and would not match a macOS host anyway, where the first user is 501.
+#
+# Nothing in the image depends on running as a known user -- no writable HOME, no passwd lookup --
+# so `docker run --user "$(id -u):$(id -g)"` works with any uid, which is what the README documents.
+# Create the output directory before the first run too: Docker creates a missing bind-mount target
+# as root, which then blocks even the host user, and the failure looks identical.
 RUN apk add --no-cache wget \
  && addgroup -S reso && adduser -S reso -G reso
 
