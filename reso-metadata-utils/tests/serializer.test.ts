@@ -26,6 +26,7 @@ const testEdmx = `<?xml version="1.0" encoding="utf-8"?>
         <Property Name="ModificationTimestamp" Type="Edm.DateTimeOffset" Nullable="true"/>
         <Property Name="Status" Type="org.reso.metadata.StandardStatus"/>
         <Property Name="Parking" Type="Collection(org.reso.metadata.ParkingFeatures)"/>
+        <Property Name="LocalFlags" Type="Collection(Edm.String)"/>
         <NavigationProperty Name="Media" Type="Collection(org.reso.metadata.Media)"/>
       </EntityType>
       <EntityType Name="Media">
@@ -63,7 +64,7 @@ describe('serializeMetadataReport', () => {
   it('extracts all fields from all resources', () => {
     const propertyFields = report.fields.filter(f => f.resourceName === 'Property');
     const mediaFields = report.fields.filter(f => f.resourceName === 'Media');
-    expect(propertyFields.length).toBe(9); // 8 properties + 1 nav
+    expect(propertyFields.length).toBe(10); // 9 properties + 1 nav
     expect(mediaFields.length).toBe(2);
   });
 
@@ -85,6 +86,8 @@ describe('serializeMetadataReport', () => {
     expect(media?.isExpansion).toBe(true);
     expect(media?.isCollection).toBe(true);
     expect(media?.isEnumeration).toBeFalsy();
+    // Declared `Collection(org.reso.metadata.Media)`; the report carries the ELEMENT type.
+    expect(media?.type).toBe('org.reso.metadata.Media');
   });
 
   it('marks enum fields with isEnumeration', () => {
@@ -97,6 +100,8 @@ describe('serializeMetadataReport', () => {
     const parking = report.fields.find(f => f.fieldName === 'Parking');
     expect(parking?.isCollection).toBe(true);
     expect(parking?.isEnumeration).toBe(true);
+    // Declared `Collection(org.reso.metadata.ParkingFeatures)`; the report carries the ELEMENT type.
+    expect(parking?.type).toBe('org.reso.metadata.ParkingFeatures');
   });
 
   it('does not mark primitive fields as enumerations', () => {
@@ -122,6 +127,48 @@ describe('serializeMetadataReport', () => {
     const statusLookups = report.lookups.filter(l => l.lookupName === 'org.reso.metadata.StandardStatus');
     expect(statusLookups.map(l => l.lookupValue).sort()).toEqual(['Active', 'Pending', 'Sold']);
   });
+
+  // The element-type contract. These are the assertions that were missing: every test above
+  // checked collection-NESS and none checked the TYPE, so the report could carry the CSDL
+  // `Collection(...)` wrapper and the whole suite stayed green.
+  //
+  // Expected values are read from the EDMX declarations at the top of this file, not from the
+  // serializer's own output. That matters: a fixture regenerated from the code under test only
+  // proves the code equals itself, so the expected side has to be pinned to the source of truth.
+  describe('a collection reports its element type, never the Collection() wrapper', () => {
+    it('unwraps a scalar collection — the vendor-extension shape', () => {
+      // Declared `Collection(Edm.String)` with no LookupName annotation, so nothing downstream
+      // normalizes it. This is the shape that produced "MUST be object but found string" against
+      // a payload that was a plain array of strings.
+      const flags = report.fields.find(f => f.fieldName === 'LocalFlags');
+      expect(flags?.type).toBe('Edm.String');
+      expect(flags?.isCollection).toBe(true);
+      expect(flags?.isEnumeration).toBeFalsy();
+    });
+
+    it('leaves no field in the report carrying a Collection() prefix', () => {
+      const wrapped = report.fields.filter(f => f.type.startsWith('Collection('));
+      expect(wrapped.map(f => `${f.resourceName}.${f.fieldName}=${f.type}`)).toEqual([]);
+    });
+
+    it('every collection still declares its collection-ness via isCollection', () => {
+      // The wrapper is gone, so `isCollection` is now the ONLY carrier of that fact. If the
+      // unwrap ever lands without the flag, collection-ness disappears silently.
+      const collections = report.fields.filter(f => f.isCollection);
+      expect(collections.map(f => f.fieldName).sort()).toEqual(['LocalFlags', 'Media', 'Parking']);
+      for (const f of collections) expect(f.type.startsWith('Collection(')).toBe(false);
+    });
+
+    it('keeps the wrapper in the PARSER, which is the layer that should be faithful to CSDL', () => {
+      // The boundary this fix lives on. A parser is right to preserve what the document said; a
+      // report is a different artifact with its own contract. Pinning both sides means a future
+      // "fix" applied in the parser instead of the serializer fails here rather than silently
+      // changing what every CSDL consumer sees.
+      const property = schema.entityTypes.find(t => t.name === 'Property');
+      const parsedFlags = property?.properties.find(pr => pr.name === 'LocalFlags');
+      expect(parsedFlags?.type).toBe('Collection(Edm.String)');
+    });
+  });
 });
 
 describe('generateMetadataReport', () => {
@@ -129,7 +176,7 @@ describe('generateMetadataReport', () => {
     const report = generateMetadataReport(testEdmx, '2.0');
     expect(report.description).toBe('RESO Data Dictionary Metadata Report');
     expect(report.resources).toHaveLength(2);
-    expect(report.fields.length).toBe(11);
+    expect(report.fields.length).toBe(12); // Property 9 props + 1 nav, Media 2
     expect(report.lookups).toHaveLength(5);
   });
 
