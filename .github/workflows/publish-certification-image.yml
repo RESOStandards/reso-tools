@@ -28,9 +28,6 @@ on:
       - 'reso-certification-v*'
   workflow_dispatch:
 
-env:
-  IMAGE: ghcr.io/${{ github.repository }}/reso-cert
-
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -60,6 +57,13 @@ jobs:
       - name: Resolve version for a main or manual run
         if: github.ref_type != 'tag'
         run: echo "VERSION=$(node -p "require('./reso-certification/package.json').version")" >> "$GITHUB_ENV"
+
+      # A registry reference must be lowercase, and `github.repository` is not: this org is
+      # `RESOStandards`. Built here rather than in a workflow-level `env:` because that block cannot
+      # transform a value, and the uppercase form fails at buildx with `invalid tag` rather than at
+      # any point that names the cause.
+      - name: Resolve the image name in lowercase
+        run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/reso-cert" >> "$GITHUB_ENV"
 
       - uses: docker/setup-buildx-action@v3
 
