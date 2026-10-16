@@ -215,7 +215,7 @@ const result = await runComplianceTests({
 Tagged releases publish a public image, so most uses are a pull rather than a build:
 
 ```bash
-docker pull ghcr.io/resostandards/reso-tools/reso-cert:<version>
+docker pull ghcr.io/resostandards/reso-tools/reso-cert:v0.11.0   # or :latest
 ```
 
 It is `linux/amd64`. On Apple silicon Docker runs it emulated, which works and is slower.

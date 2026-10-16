@@ -22,6 +22,8 @@ name: Publish certification image
 # than emulating.
 on:
   push:
+    branches:
+      - main
     tags:
       - 'reso-certification-v*'
   workflow_dispatch:
@@ -52,9 +54,10 @@ jobs:
           fi
           echo "VERSION=$PKG_VERSION" >> "$GITHUB_ENV"
 
-      # A manual run has no tag to read a version from, so it takes the manifest's and publishes
-      # only `edge`. It never moves `latest`, which stays a thing a tag produced.
-      - name: Resolve version for a manual run
+      # A main or manual run has no release tag to read a version from, so it takes the
+      # manifest's. It publishes only `edge` and never moves `latest`, which stays a thing a
+      # release tag produced.
+      - name: Resolve version for a main or manual run
         if: github.ref_type != 'tag'
         run: echo "VERSION=$(node -p "require('./reso-certification/package.json').version")" >> "$GITHUB_ENV"
 
@@ -76,9 +79,11 @@ jobs:
           file: reso-certification/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: |
-            ${{ env.IMAGE }}:${{ env.VERSION }}
-            ${{ github.ref_type == 'tag' && format('{0}:latest', env.IMAGE) || format('{0}:edge', env.IMAGE) }}
+          # A release tag publishes `v<version>` and moves `latest`. A main build publishes ONLY
+          # `edge`, never `v<version>`: main moves between releases, so reusing the version tag
+          # there would quietly replace a released image with an unreleased one under the name
+          # somebody pinned. `v`-prefixed to match how releases are named everywhere else here.
+          tags: ${{ github.ref_type == 'tag' && format('{0}:v{1},{0}:latest', env.IMAGE, env.VERSION) || format('{0}:edge', env.IMAGE) }}
           # Layer cache in the registry, so a docs-only retag does not reinstall the workspace.
           cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
           cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
@@ -90,8 +95,12 @@ jobs:
       # stage's node, and the built dist in one call.
       - name: Verify the pushed image
         run: |
-          PUSHED="$(docker run --rm "${IMAGE}:${VERSION}" --version)"
-          echo "pushed image reports: $PUSHED"
+          # Verify the tag this run actually pushed. The image is tagged v<version> on a release
+          # and `edge` otherwise; the CLI reports the bare version either way, so the comparison is
+          # always against the bare one.
+          TAG="${{ github.ref_type == 'tag' && format('v{0}', env.VERSION) || 'edge' }}"
+          PUSHED="$(docker run --rm "${IMAGE}:${TAG}" --version)"
+          echo "pushed ${IMAGE}:${TAG} reports: $PUSHED"
           if [ "$PUSHED" != "$VERSION" ]; then
             echo "::error::Pushed image reports $PUSHED, expected $VERSION"
             exit 1
