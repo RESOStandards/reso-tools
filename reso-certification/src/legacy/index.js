@@ -150,6 +150,7 @@ if (require?.main === module) {
     .command('metadata')
     .description('Converts metadata from OData XML to RESO Format')
     .requiredOption('-p, --pathToXmlMetadata <string>', 'Path to XML Metadata to parse')
+    .option('-v, --version <string>', `The DD version to stamp on the report. Defaults to ${DEFAULT_DD_VERSION}`)
     .action(options => convertAndSaveMetadata({ ...options, fromCli: FROM_CLI }));
 
   program
