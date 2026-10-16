@@ -432,8 +432,15 @@ const replicate = async ({
       });
     }
   } catch (err) {
-    LOG_ERROR(err);
+    // Log only when swallowing. That is the rule the inner catches state and defer to this one for,
+    // and this one did not follow it: it inspected the error object and then rethrew, so a caller that
+    // reports the failure properly got it reported twice -- once as its own summary line, and once as
+    // a stack trace with the entire validation result dumped beneath it. For a strict-mode schema
+    // failure, which is an expected outcome of a certification run rather than a fault, that reads as
+    // a crash. Every caller of the rethrow reports it: the Data Dictionary pipeline as a failed step,
+    // the replicate command as a one-line message.
     if (throwOnError) throw err;
+    LOG_ERROR(err);
     process.exit(NOT_OK);
   }
 };
