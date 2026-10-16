@@ -160,7 +160,24 @@ const fieldInfoToReportField = (
   return {
     resourceName: field.resourceName,
     fieldName: field.fieldName,
-    type: field.type,
+    // The ELEMENT type, with collection-ness carried solely by `isCollection` below. CSDL writes a
+    // collection as `Collection(<inner>)`, and the parser preserves that wrapper because it is
+    // faithful to the source — but a metadata report is not CSDL, and every consumer of one is
+    // written against the unwrapped form. Reports produced by the Java commander, which is what
+    // certified results carried for years, have no `Collection(` prefix on any field: a scalar
+    // collection reads `type: "Edm.String", isCollection: true` and an expansion reads
+    // `type: "com.example.Media", typeName: "Media", isCollection: true`.
+    //
+    // Emitting the wrapper here encodes collection-ness twice and silently breaks every bare-`Edm.*`
+    // test downstream: the JSON Schema generator falls through `typeMappings[field.type] || 'object'`
+    // and types the array's items as objects (legacy/lib/schema/generate.js:106), `isEnumType` reads
+    // it as an enumeration (reso-common metadata/helpers.ts:11), and `isComplexType` reads it as a
+    // complex type (metadata-map.ts:168). Most fields escape only by accident, because the Lookup
+    // Resource merge rewrites `type` for anything carrying a LookupName annotation. A vendor
+    // extension carries no such annotation and nothing normalizes it, which is how a single
+    // vendor extension field typed `Collection(Edm.String)` produced 1,109,350 "MUST be object
+    // but found string" errors against a payload that was a plain array of strings.
+    type: unwrapped,
     ...(field.typeName ? { typeName: field.typeName } : {}),
     ...(field.nullable != null ? { nullable: field.nullable } : {}),
     ...(field.maxLength != null ? { maxLength: field.maxLength } : {}),

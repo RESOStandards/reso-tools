@@ -3,6 +3,9 @@ const { readFile, writeFile } = require('fs/promises');
 const { XMLParser } = require('fast-xml-parser');
 const { CERTIFICATION_FILES } = require('../../common');
 
+/** CSDL wraps a collection's element type as `Collection(<inner>)`. */
+const COLLECTION_PREFIX = 'Collection(';
+
 /********************************
  * TODO
  * WIP Node Metadata Serializer
@@ -96,10 +99,32 @@ const convertMetadata = async xmlMetadata => {
                     Nullable: nullable,
                     isExpansion
                   }) => {
+                    // A collection reports its ELEMENT type in `type`, with the collection-ness carried
+                    // solely by `isCollection`. That is the contract every consumer of a metadata report
+                    // is written against, and the one `src/test-runner/metadata.ts` already follows for
+                    // the Core path ("extracting the inner type and setting isCollection").
+                    //
+                    // Keeping the CSDL `Collection(...)` wrapper here encodes collection-ness twice, and
+                    // the wrapped form then fails every bare-`Edm.*` test downstream, silently: the JSON
+                    // Schema generator maps it through `typeMappings[field.type] || 'object'` and types
+                    // the array's items as objects (schema/generate.js:106), `isEnumType` calls it an
+                    // enumeration (reso-common metadata/helpers.ts:11), and `isComplexType` calls it a
+                    // complex type (metadata-map.ts:168). Most fields escape this only by accident — the
+                    // Lookup Resource merge rewrites `type` for anything carrying a LookupName
+                    // annotation. A vendor extension has no such annotation, so nothing normalizes it:
+                    // A single vendor extension field typed `Collection(Edm.String)` produced
+                    // 1,109,350 "MUST be object but found string" errors against a payload that
+                    // was a plain string array.
+                    //
+                    // The Java commander emitted the unwrapped form, which is why reports certified
+                    // before this parser took over carry `type: "Edm.String"` with `isCollection: true`.
+                    const isCollection = typeof type === 'string' && type.startsWith(COLLECTION_PREFIX);
+                    const elementType = isCollection ? type.slice(COLLECTION_PREFIX.length, -1) : type;
+
                     return {
                       resourceName,
                       fieldName,
-                      type,
+                      type: elementType,
                       maxLength,
                       precision,
                       scale,
@@ -110,7 +135,7 @@ const convertMetadata = async xmlMetadata => {
                         })
                         : undefined,
                       isExpansion,
-                      isCollection: type?.startsWith('Collection(') ? true : undefined
+                      isCollection: isCollection ? true : undefined
                     };
                   }
                 );
