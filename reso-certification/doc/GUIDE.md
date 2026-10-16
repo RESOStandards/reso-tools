@@ -15,7 +15,7 @@ Anyone who needs to know whether a RESO server passes the certification tests. R
 * **Test engineers** who want a single source of truth for "is this thing actually conformant"
 * **AI agents and automation tools** that need to verify a server's behavior end to end as part of a larger workflow
 
-The package covers four endorsements: **Add/Edit (RCP-010)**, **EntityEvent (RCP-027)**, **Web API Core 2.0.0 / 2.1.0** and **Data Dictionary 2.0**. The same tests RESO runs in the official certification process, available as a CLI, an SDK and a Docker target.
+The package covers four endorsements: **Add/Edit (RCP-010)**, **EntityEvent (RCP-027)**, **Web API Core 2.1.0** and **Data Dictionary 2.1**. The same tests RESO runs in the official certification process, available as a CLI, an SDK and a Docker target.
 
 ## Install
 
@@ -51,7 +51,7 @@ The simplest possible run is one command and one URL:
 reso-cert core --url https://api.example.com --auth-token YOUR_TOKEN
 ```
 
-This runs the **Web API Core 2.0.0** compliance test suite against the server at `https://api.example.com`, authenticating with a bearer token. The CLI:
+This runs the **Web API Core 2.1.0** compliance test suite against the server at `https://api.example.com`, authenticating with a bearer token. The CLI:
 
 * Fetches the server's `$metadata` to learn the schema
 * Samples live data from each resource to find appropriate field values for every test case
@@ -68,7 +68,7 @@ You go from "I have a RESO server URL" to "I know exactly which scenarios pass a
 
 The toolkit ships four cert flows, one per endorsement RESO certifies. They share the same CLI shape, the same auth resolution and the same output formats – the only thing that changes is which subcommand you run and what it tests.
 
-### Web API Core 2.0.0 / 2.1.0
+### Web API Core 2.1.0
 
 The OData query surface. Validates `$filter` across every data type, `$select`, `$orderby`, `$top`, `$skip`, `$count`, enumerations, error code shapes, response metadata and the service document. Version 2.1.0 adds `$expand`, server-driven paging and string-based enum comparisons.
 
@@ -103,9 +103,9 @@ config file's list rather than merging with it, so what you typed is exactly wha
 See [Field Selection](../src/web-api-core/README.md#field-selection) for how the ranking works and
 when overriding it is worth doing.
 
-### Data Dictionary 2.0
+### Data Dictionary 2.1
 
-The metadata and data shape. Validates that the server's metadata document matches the RESO Data Dictionary 2.0 specification, that every declared field maps to a known DD field (or is documented as a local extension), and that the data in each resource is type-correct and lookup-valid.
+The metadata and data shape. Validates that the server's metadata document matches the RESO Data Dictionary 2.1 specification, that every declared field maps to a known DD field (or is documented as a local extension), and that the data in each resource is type-correct and lookup-valid.
 
 ```bash
 reso-cert dd --url https://api.example.com --auth-token TOKEN
