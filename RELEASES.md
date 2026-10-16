@@ -2,6 +2,62 @@
 
 ---
 
+## Certification 0.11.1 – 2026-10-16
+
+`reso-certification 0.11.1` · `reso-metadata-utils 0.1.4`
+
+A metadata report stops carrying the CSDL collection wrapper, an exempt enumeration stops
+predicting a failure that cannot arrive, and both specifications default to their latest minor.
+
+### A collection reports its element type, not the wrapper
+
+A metadata report has always carried a collection's element type in `type`, with the
+collection-ness in `isCollection`. The CSDL parser preserved the `Collection(<inner>)` wrapper,
+which is correct for a parser and wrong once it reaches a report. Collection-ness ended up
+encoded twice, and every consumer written against a bare `Edm.*` silently misread the wrapped
+form: the JSON Schema generator fell through to `object` and typed the array's items as objects,
+so every served string failed with "MUST be object but found string", and the maxLength and
+integer-range facets were skipped because they test the bare type names.
+
+Most fields escaped by accident, because the Lookup Resource merge rewrites `type` for anything
+carrying a LookupName annotation. A vendor extension carries no such annotation and nothing
+normalized it, so a single extension field typed `Collection(Edm.String)` produced 1,109,350 of
+those errors against a payload that was a plain array of strings. Reports from the Java commander
+carry the unwrapped form, which is why results certified under it were unaffected.
+
+### An exempt enumeration no longer predicts a 2.1 failure
+
+A value carved out by `schema-validation-settings.json` was reported as a warning reading "The
+following enumerations in the `<Field>` Field were not advertised. This will fail in Data
+Dictionary 2.1". The settings grant the identical exemption under both 2.0 and 2.1, so the
+sentence was false wherever it appeared: on a 2.1 run it told a provider they would fail the
+version they were being tested on. In one run it accounted for all 2,259,945 warnings, burying
+the findings that did matter. An exempt value is now accepted outright and reports nothing.
+
+### Both specifications default to their latest minor
+
+The tooling targets the latest minor of each specification, which is Data Dictionary 2.1 and Web
+API Core 2.1.0. Three defaults had drifted from that: the Data Dictionary default named 2.0 in two
+places and the Web API Core default named 2.0.0, while the matching current-version constants
+already named 2.1 and 2.1.0.
+
+The cause was a supported-versions list that did not include 2.1. Everything derived from it, so
+`isValidDataDictionaryVersion('2.1')` returned false and the legacy Data Dictionary runner
+rejected a 2.1 run outright. Live runs were unaffected, because the current runner passes the
+version explicitly rather than relying on a default. Each default now derives from its matching
+current-version constant instead of restating a number, so a future version bump is one edit.
+
+### Smaller changes
+
+- The OData client reports the version its package publishes. The constant said 0.2.3 while the
+  package was 0.2.4, so the client identified itself as the previous version in its User-Agent.
+- The standalone `metadata` command takes the Data Dictionary version as `-v, --version` instead
+  of stamping one version into every report it produces.
+- The certification documentation leads with Data Dictionary 2.1 and Web API Core 2.1.0. Earlier
+  minors remain supported and are named as such rather than shown as the default.
+
+---
+
 ## Certification 0.11.0 – 2026-10-15
 
 `reso-certification 0.11.0`
