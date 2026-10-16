@@ -42,10 +42,11 @@
     "test:certification": "cd reso-certification && npx vitest run",
     "test:mcp": "cd reso-mcp-server && npm test",
     "update:dd-reference": "node reso-certification/utils/fetch-dd-reference.mjs && npm run test:certification",
-    "precommit": "npm run lint && npm run typecheck && npm test",
+    "precommit": "npm run lint && npm run typecheck && npm test && npm run leak:cue",
     "bench": "npm run bench:filter-parser && npm run bench:certification",
     "bench:filter-parser": "cd odata-expression-parser && npx vitest bench",
-    "bench:certification": "cd reso-certification && npx vitest bench"
+    "bench:certification": "cd reso-certification && npx vitest bench",
+    "leak:cue": "echo '' && echo 'LEAK CHECK (agent): scan the staged diff AND the commit message for vendor identity or credentials before committing. Operator guard: ~/.claude/hooks/leak-guard/engine.py --pack pack-credentials.json --pack pack-reso.json --mode diff|text' && echo ''"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
