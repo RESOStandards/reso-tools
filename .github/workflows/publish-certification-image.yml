@@ -1,0 +1,98 @@
+name: Publish certification image
+
+# Publishes the certification CLI as a public container image to GitHub Container Registry.
+# Trigger: push a tag `reso-certification-v<version>` matching reso-certification/package.json —
+# the same tag that publishes the npm package, so the image and the package never disagree.
+#
+# The image builds the workspace FROM THIS REPOSITORY rather than installing the sibling
+# @reso-standards packages from npm (see reso-certification/Dockerfile for why), so a tag produces
+# an image of exactly that commit rather than of whatever happened to be published at the time.
+#
+# Pushed with the built-in GITHUB_TOKEN, so there is no PAT to rotate.
+#
+# ONE-TIME SETUP: a GHCR package is PRIVATE when first pushed, even from a public repository. The
+# first run creates it private, and it must be switched to public once under the package's settings
+# (Packages -> reso-cert -> Package settings -> Change visibility). Until that is done an AWS Batch
+# job pulling it will fail to authenticate, which reads like a broken image rather than a
+# visibility setting. After the switch it stays public for every later push.
+#
+# linux/amd64 only, deliberately. Batch runs amd64, and the arm64 half would be a QEMU build of a
+# full npm install plus six package builds — tens of minutes for a platform no job uses. If a local
+# arm64 image is ever wanted, add a native `ubuntu-24.04-arm` runner and merge the manifests rather
+# than emulating.
+on:
+  push:
+    tags:
+      - 'reso-certification-v*'
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}/reso-cert
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push to GHCR as the repository
+    steps:
+      - uses: actions/checkout@v4
+
+      # The same guard the npm publish workflow applies. An image tagged with a version its
+      # package.json does not carry is worse than no image: `--version` would contradict the tag it
+      # was pulled by, and the mismatch only surfaces at run time, in a job, in a container.
+      - name: Verify tag matches package version
+        if: github.ref_type == 'tag'
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#reso-certification-v}"
+          PKG_VERSION="$(node -p "require('./reso-certification/package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match reso-certification/package.json ($PKG_VERSION)"
+            exit 1
+          fi
+          echo "VERSION=$PKG_VERSION" >> "$GITHUB_ENV"
+
+      # A manual run has no tag to read a version from, so it takes the manifest's and publishes
+      # only `edge`. It never moves `latest`, which stays a thing a tag produced.
+      - name: Resolve version for a manual run
+        if: github.ref_type != 'tag'
+        run: echo "VERSION=$(node -p "require('./reso-certification/package.json').version")" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          # The repository root, not the package directory: the Dockerfile copies every workspace
+          # manifest so npm can reconcile the whole lockfile.
+          context: .
+          file: reso-certification/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ env.VERSION }}
+            ${{ github.ref_type == 'tag' && format('{0}:latest', env.IMAGE) || format('{0}:edge', env.IMAGE) }}
+          # Layer cache in the registry, so a docs-only retag does not reinstall the workspace.
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
+          provenance: true
+          sbom: true
+
+      # Proves the pushed image runs and is the version it claims, rather than trusting that a green
+      # build means a working image. `--version` is enough: it exercises the entrypoint, the runtime
+      # stage's node, and the built dist in one call.
+      - name: Verify the pushed image
+        run: |
+          PUSHED="$(docker run --rm "${IMAGE}:${VERSION}" --version)"
+          echo "pushed image reports: $PUSHED"
+          if [ "$PUSHED" != "$VERSION" ]; then
+            echo "::error::Pushed image reports $PUSHED, expected $VERSION"
+            exit 1
+          fi
