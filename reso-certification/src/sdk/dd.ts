@@ -18,7 +18,7 @@ import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadataWithVersion, persistMetadataXml } from '../test-runner/metadata.js';
 import { computeVariationsViaService } from '../variations/index.js';
-import { everyStepPassed } from './certification.js';
+import { CERTIFIABLE, allOf, everyStepPassed, notCertifiable } from './certification.js';
 import type { DDVersion } from './dd-versions.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
@@ -409,12 +409,19 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
   serviceRootUri: ctx.serverUrl,
   shouldGenerateReports: true,
   version: ctx.version,
-  strictMode: config.strictMode ?? false,
+  // Strict by default. A certification run that does not enforce what it validates reports a pass
+  // next to the errors that should have stopped it, so the safe value is the default and relaxing
+  // it is the explicit act (--no-strict), not the other way round.
+  strictMode: config.strictMode ?? true,
   pathToMetadataReportJson: ctx.metadataReportPath,
   REPLICATION_STATE_SERVICE: ctx.replicationStateService,
   fromCli: true,
   limit: config.limit ?? DEFAULT_LIMIT,
-  jsonSchemaValidation: config.strictMode ?? true,
+  // Deliberately NOT tied to strictMode. Validating and enforcing are different decisions: relaxing
+  // strict means "keep going and show me everything to fix", which is only possible if validation
+  // still runs. Tying them made an explicit `strictMode: false` switch validation off entirely, so
+  // the one mode that exists to produce a full error list produced none.
+  jsonSchemaValidation: true,
   batchExpand: config.batchExpand ?? false,
   outputPath: ctx.outputPath,
   throwOnError: true,
@@ -511,7 +518,9 @@ const replicateTimestampDesc =
     const progress = replicationProgressAdapter(onProgress, 'Timestamp Descending');
     await replicate({
       ...buildReplicationSettings(ctx, config),
-      jsonSchemaValidation: ctx.version !== '1.7' ? (config.strictMode ?? true) : false,
+      // DD 1.7 predates the schema the validator is generated from, so it stays off there. For every
+      // other version validation always runs; strictMode decides whether its errors fail the run.
+      jsonSchemaValidation: ctx.version !== '1.7',
       top: pageSize,
       strategy: REPLICATION_STRATEGIES.TIMESTAMP_DESC,
       onProgress: progress.callback
@@ -626,7 +635,22 @@ const deriveStatus = (steps: ReadonlyArray<StepResult>): 'passed' | 'failed' | '
  * metadata` return `skipped`; since `deriveStatus` does not consider `skipped`, such a run was
  * reported `passed` having validated no metadata at all.
  */
-export const ddValidForCertification: ValidForCertification = steps => everyStepPassed(steps);
+export const ddValidForCertification =
+  (config: DDConfig): ValidForCertification =>
+  steps =>
+    allOf(
+      everyStepPassed(steps),
+      // Relaxing strict is a legitimate thing to do while fixing a feed: the run keeps going and
+      // accumulates every schema error instead of stopping at the first. What it cannot do is
+      // certify, because nothing enforced what it validated. The config is closed over here rather
+      // than inferred from a step status because no step fails in this mode — that is the point of
+      // it — so the step list alone cannot see the difference.
+      config.strictMode === false
+        ? notCertifiable([
+            'Strict mode was disabled with --no-strict. Schema validation errors were recorded but not enforced, so this run is not eligible for certification.'
+          ])
+        : CERTIFIABLE
+    );
 
 /**
  * Exported so the report's verdict can be tested against the steps it reports on. `createPipeline`
@@ -653,7 +677,7 @@ export const writeComplianceReports = (config: DDConfig): PipelineStep<DDContext
       // The finalizer computes this itself rather than reading the pipeline's, because it runs
       // inside the pipeline and the returned result does not exist yet. It is the same pure
       // function over the same step list, so the report and the returned result cannot disagree.
-      certification: ddValidForCertification(steps),
+      certification: ddValidForCertification(config)(steps),
       // Summed from the recorded steps for the same reason the status is derived: the pipeline's own
       // wall clock is not available to a finalizer. DD steps run in sequence, so the sum tracks wall
       // clock closely, short by the between-step overhead and by this step's own time, which is not
@@ -684,7 +708,7 @@ export const createDDPipeline = (config: DDConfig) =>
       replicateAndValidate(config),
       writeComplianceReports(config)
     ],
-    ddValidForCertification
+    ddValidForCertification(config)
   );
 
 /** Run DD compliance tests with a single function call. */

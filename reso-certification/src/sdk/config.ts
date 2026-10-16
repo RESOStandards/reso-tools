@@ -361,7 +361,13 @@ export const configEntryToDD = (entry: ConfigEntry, providerUoi: string): DDConf
   },
   version: coerceDDVersion(entry.ddOptions?.version ?? entry.version),
   ...(entry.ddOptions?.limit !== undefined ? { limit: entry.ddOptions.limit } : {}),
-  ...(entry.ddOptions?.strictMode ? { strictMode: true } : {}),
+  // Presence, not truthiness. This is the shape the desktop client exports, so an unchecked Strict
+  // Mode box arrives here as `strictMode: false` — and a truthiness test erases it to absent. That
+  // was harmless while absent also meant false, and became a trap the moment absent started meaning
+  // strict: the config would run strict having explicitly asked not to, and because the value
+  // arrived as `undefined` rather than `false`, the not-certifiable gate that explains why would not
+  // fire either. The operator would get a hard failure naming no cause.
+  ...(entry.ddOptions?.strictMode !== undefined ? { strictMode: entry.ddOptions.strictMode } : {}),
   ...(entry.ddOptions?.batchExpand ? { batchExpand: true } : {}),
   ...(entry.ddOptions?.requestDelay !== undefined ? { requestDelay: entry.ddOptions.requestDelay } : {}),
   ...(entry.ddOptions?.rateLimitWait !== undefined ? { rateLimitWait: entry.ddOptions.rateLimitWait } : {}),

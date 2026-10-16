@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { CERTIFIABLE } from '../../src/sdk/certification.js';
 import {
   SOFTWARE_VERSION,
   addEditReportGenerators,
@@ -21,6 +22,11 @@ const makeResult = (overrides: Partial<PipelineResult> = {}): PipelineResult => 
   steps: [],
   context: {},
   duration: 100,
+  // Required on PipelineResult, and deliberately so: an absent verdict would make a run certifiable
+  // by omission. The fixture carries the eligible one because its default status is 'passed'; a case
+  // that needs the other verdict overrides it. (It compiled without this only because spreading a
+  // Partial into the literal suppresses the missing-property check.)
+  certification: CERTIFIABLE,
   ...overrides
 });
 
@@ -185,6 +191,32 @@ describe('createGenericReportGenerator', () => {
     const generator = createGenericReportGenerator('Test', '1.0', () => '');
     expect(generator.filename).toBe('report.json');
     expect(generator.name).toBe('Generic');
+  });
+});
+
+describe('report.json states ineligibility, and only then', () => {
+  const generator = () => createGenericReportGenerator('Data Dictionary', '2.1', () => 'remarks');
+
+  // The summary file is what a consumer reads first. A --no-strict run reports outcome 'passed' and
+  // is NOT certifiable, so a file carrying only the outcome tells that reader the opposite of what
+  // matters — the same shape as the bug this setting exists to close.
+  it('carries the certification verdict and its reasons when the run is not eligible', () => {
+    const report = generator().generate(
+      makeResult({ certification: { valid: false, reasons: ['Strict mode was disabled with --no-strict.'] } })
+    );
+
+    expect(report.outcome).toBe('passed');
+    expect(report.certification?.valid).toBe(false);
+    expect(report.certification?.reasons.join(' ')).toContain('--no-strict');
+  });
+
+  // Omitted rather than written as `valid: true`, so every certifiable run's report.json is exactly
+  // what it was before this field existed.
+  it('omits the field entirely when the run IS eligible', () => {
+    const report = generator().generate(makeResult());
+
+    expect(report.outcome).toBe('passed');
+    expect('certification' in report).toBe(false);
   });
 });
 

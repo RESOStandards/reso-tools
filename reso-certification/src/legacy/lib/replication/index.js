@@ -79,7 +79,10 @@ const replicate = async ({
   jsonSchemaValidation = false,
   fromCli = false,
   version = DEFAULT_DD_VERSION,
-  strictMode = false,
+  // Strict by default, matching this module's README and the legacy CLI's own -S default. Only this
+  // function default had drifted to false, so a caller that omitted the option got the opposite of
+  // what both of those documented.
+  strictMode = true,
   originatingSystemName,
   originatingSystemId,
   REPLICATION_STATE_SERVICE = createReplicationStateServiceInstance(),
@@ -396,21 +399,24 @@ const replicate = async ({
 
     if (shouldGenerateReports) {
       try {
+        // Each report is written on its own terms rather than as an either/or. These were once
+        // exclusive, which meant any run that found errors produced the error file and NOTHING
+        // else — no warnings file, no availability analytics. That is backwards for the mode the
+        // errors belong to: a relaxed run exists precisely to survey a feed, so the run that has
+        // the most to report was the one that reported the least.
         if (jsonSchemaValidation && schemaValidationResults?.stats?.totalErrors > 0) {
           await writeSchemaValidationErrorReport({ outputPath, errorMap: schemaValidationResults });
-        } else {
-          // no errors: the analytics reports, plus the warnings file when the run collected any (#298 — the
-          // transport-path context findings are warnings until DD 3.0 and were otherwise invisible)
-          if (jsonSchemaValidation && schemaValidationResults?.stats?.totalWarnings > 0) {
-            await writeSchemaValidationWarningsReport({ outputPath, errorMap: schemaValidationResults });
-          }
-          await writeAnalyticsReports({
-            outputPath,
-            version,
-            serviceRootUri,
-            replicationStateService: REPLICATION_STATE_SERVICE
-          });
         }
+        // #298 — the transport-path context findings are warnings until DD 3.0 and were otherwise invisible.
+        if (jsonSchemaValidation && schemaValidationResults?.stats?.totalWarnings > 0) {
+          await writeSchemaValidationWarningsReport({ outputPath, errorMap: schemaValidationResults });
+        }
+        await writeAnalyticsReports({
+          outputPath,
+          version,
+          serviceRootUri,
+          replicationStateService: REPLICATION_STATE_SERVICE
+        });
       } catch (err) {
         LOG_ERROR(`Could not write report! ${err}`);
         if (throwOnError) throw err;

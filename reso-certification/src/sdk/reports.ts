@@ -122,6 +122,17 @@ export type BaseReport = {
    * `report-detailed.json` at least carried a contradictory steps array a reader could catch it on.
    */
   readonly outcome: PipelineResult['status'];
+  /**
+   * Present ONLY when the run is not eligible for certification, carrying the reasons.
+   *
+   * Same argument as `outcome` above, one level up: eligibility and the verdict are different
+   * questions, and a run can pass everything it ran while still being uncertifiable — a --no-strict
+   * run is exactly that, and reports `outcome: 'passed'`. A consumer reading only this file would
+   * see the pass and nothing else, which is the shape of the bug this whole change was about.
+   *
+   * Omitted entirely when the run IS eligible, so a certifiable run's report.json is unchanged.
+   */
+  readonly certification?: Extract<PipelineResult['certification'], { valid: false }>;
 };
 
 /** A report generator produces a report object from pipeline results. */
@@ -216,7 +227,8 @@ export const createGenericReportGenerator = (
     softwareVersion: SOFTWARE_VERSION,
     generatedOn: new Date().toISOString(),
     remarks: serializeRemarks(result),
-    outcome: result.status
+    outcome: result.status,
+    ...(result.certification.valid ? {} : { certification: result.certification })
   })
 });
 

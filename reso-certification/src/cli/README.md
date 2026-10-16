@@ -192,7 +192,7 @@ Data Dictionary compliance — replicates a live endpoint and validates it again
 
 ```bash
 reso-cert dd --url https://api.example.com --auth-token TOKEN
-reso-cert dd --url https://api.example.com --auth-token TOKEN --strict
+reso-cert dd --url https://api.example.com --auth-token TOKEN
 ```
 
 | Option | Default | Meaning |
@@ -200,7 +200,8 @@ reso-cert dd --url https://api.example.com --auth-token TOKEN --strict
 | `--url <url>` | *(required)* | Server base URL |
 | `--dd-version <v>` | current DD | DD version (must be a certifiable version) |
 | `--limit <n>` | `100000` | Max records replicated per resource |
-| `--strict` | — | Fail on variations and enforce JSON-schema validation |
+| `--strict` | on | Fail the run on JSON-schema validation errors. On by default, so this flag is only needed to be explicit. Variations fail a run independently of this setting |
+| `--no-strict` | — | Record schema-validation errors without failing on them, so a long run surveys everything to fix. Validation still runs. The run is **not eligible for certification** and says so in its verdict |
 | `--skip-variations` | — | Do not check variations. The run is **not** eligible for certification |
 | `--batch-expand` | — | Batch every expansion per resource into one `$expand` request |
 
@@ -275,7 +276,8 @@ reso-cert replicate -u https://api.example.com -s TimestampDesc -r Property -l 1
 | `-l, --limit <n>` | Stop after N total records |
 | `--dd-version <ddVersion>` | DD version (default `2.1`) |
 | `--save-results` | Also write every raw response page to disk |
-| `--json-schema-validation` / `--strict` | Validate each payload against the metadata schema / fail on errors |
+| `--json-schema-validation` | Validate each payload against the metadata schema (requires `--metadata`) |
+| `--strict` / `--no-strict` | Fail on validation errors, or record them without failing. Strict is the default, and is inert unless validation is on |
 | `--originating-system-name <v>` / `--originating-system-id <v>` | Append an `OriginatingSystem*` filter to every query |
 
 Auth is via the shared `--auth-token` / OAuth2 flags.
