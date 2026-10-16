@@ -110,8 +110,9 @@ The metadata and data shape. Validates that the server's metadata document match
 ```bash
 reso-cert dd --url https://api.example.com --auth-token TOKEN
 
-# Strict mode rejects any unrecognized fields and any data variations
-reso-cert dd --url https://api.example.com --auth-token TOKEN
+# Relaxed: record schema validation errors without failing on them, so one pass
+# collects everything a feed needs fixed. The run is NOT eligible for certification.
+reso-cert dd --url https://api.example.com --auth-token TOKEN --no-strict
 ```
 
 The DD flow does several things in sequence:
@@ -122,7 +123,7 @@ The DD flow does several things in sequence:
 4. **Replicates a sample of data** using one of several strategies (full, top-of-file, modification timestamp window)
 5. **Validates the replicated records** against the merged metadata
 
-The output is a per-resource report showing what passed, what failed and where the variations are. Strict mode treats variations as failures; the default treats them as warnings so you can see what is nonstandard without immediately failing.
+The output is a per-resource report showing what passed, what failed and where the variations are. Strict mode governs schema validation and nothing else: it is on by default, and it fails the run when a replicated record does not validate against the merged metadata. `--no-strict` keeps the run going and records every error instead of stopping at the first, which is how you survey a feed in one pass – at the cost of the run's eligibility, since nothing enforced what it validated. Variations are separate and fail a run whether or not strict is on.
 
 ### Add/Edit (RCP-010)
 
@@ -391,7 +392,9 @@ This is the workflow that makes the "load any cert metadata report into a local 
 
 ## Running Cert in Docker
 
-The cert flows are also wired up as Docker Compose profiles inside the **[RESO Reference Server](../reso-reference-server/)**, so you can run them against a freshly seeded reference server with one command:
+Two different things run in Docker, and they are worth telling apart. To run the certification CLI against a real provider from an image built out of this repository rather than from npm, see [the certification image](../README.md#the-certification-image) – that section also covers the `--user` and output-directory handling a bind mount needs.
+
+The cert flows are *also* wired up as Docker Compose profiles inside the **[RESO Reference Server](../reso-reference-server/)**, so you can run them against a freshly seeded reference server with one command:
 
 ```bash
 cd ../reso-reference-server

@@ -95,8 +95,9 @@ Validates server metadata and data availability against the RESO Data Dictionary
 ```bash
 reso-cert dd --url https://api.example.com --auth-token TOKEN
 
-# Strict mode
-reso-cert dd --url https://api.example.com --auth-token TOKEN
+# Relaxed: record schema validation errors without failing on them, so one pass
+# surveys everything to fix. The run is NOT eligible for certification.
+reso-cert dd --url https://api.example.com --auth-token TOKEN --no-strict
 ```
 
 [**More info**](src/data-dictionary/README.md)
@@ -208,6 +209,54 @@ const result = await runComplianceTests({
 | 2 | Runtime error |
 
 ## Docker
+
+### The certification image
+
+The image builds the workspace **from this repository** rather than installing the sibling
+`@reso-standards` packages from npm, so it runs the code in your checkout rather than the last
+published release. The build context is the repository root, not this package:
+
+```bash
+docker build -f reso-certification/Dockerfile -t reso-tools-cert:<version> .
+```
+
+Running it against a config:
+
+```bash
+mkdir -p ./out                      # see "the out directory" below -- create it yourself
+
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  --env-file ./.env \
+  -v "$PWD/out:/repo/reso-certification/out" \
+  -v "$PWD/configs:/configs:ro" \
+  reso-tools-cert:<version> dd --config /configs/<name>.json --output-dir out --verbose
+```
+
+Four things that are easy to get wrong:
+
+- **`--user` is not optional when mounting an output directory.** The image runs as its own
+  unprivileged user, whose uid will not match yours, so reports fail to write with
+  `EACCES: permission denied, mkdir`. Passing `--user "$(id -u):$(id -g)"` runs as you. The image
+  carries no state that depends on being a known user, so any uid works, including a macOS 501.
+
+- **Create the output directory before the first run.** Docker creates a missing bind-mount target
+  as `root`, which then blocks even your own account, and the failure looks identical to the one
+  above. A directory that already exists keeps its own ownership.
+
+- **The variations step needs credentials.** Without `RESO_SERVICES_URL`, `TOKEN_URI`, `CLIENT_ID`
+  and `CLIENT_SECRET` in the container it throws rather than skipping, which is deliberate: a
+  misconfigured machine silently not checking variations would report a run that looked complete.
+  Pass them with `--env-file`, or pass `--skip-variations` and accept that the run is then not
+  eligible for certification. `TOKEN_URI` selects the environment, and the environment selects
+  which variations store the run reads.
+
+- **Prefer `--verbose` for a captured log.** The default renderer draws interactive spinner frames,
+  which are noise in a file. Verbose prints one timestamped line per step.
+
+Mount the config read-only. It carries the provider's token.
+
+### Compliance tests against the reference server
 
 Run compliance tests against the [RESO Reference Server](../reso-reference-server/):
 
