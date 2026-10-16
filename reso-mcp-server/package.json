@@ -2,7 +2,7 @@
   "name": "@reso-standards/reso-mcp-server",
   "version": "0.8.0",
   "private": true,
-  "description": "RESO MCP server \u2014 exposes OData query, validation, certification, and metadata tools for AI agents",
+  "description": "RESO MCP server — exposes OData query, validation, certification, and metadata tools for AI agents",
   "type": "module",
   "engines": {
     "node": ">=22.0.0"
@@ -26,7 +26,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@reso-standards/odata-expression-parser": "^0.1.0",
-    "@reso-standards/reso-certification": "^0.10.0",
+    "@reso-standards/reso-certification": "^0.11.0",
     "@reso-standards/reso-client": "^0.2.0",
     "@reso-standards/reso-metadata-utils": "^0.1.0",
     "@reso-standards/reso-validation": "^0.1.0",
