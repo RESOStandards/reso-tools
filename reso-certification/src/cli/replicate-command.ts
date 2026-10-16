@@ -134,7 +134,10 @@ export const runReplicate = async (opts: ReplicateOptions): Promise<ReplicateRes
     // the Data Dictionary form (2.1, not 2.1.0): the schema exemptions and the reference metadata are keyed by it
     version: normalizeDDVersion(opts.version ?? DEFAULT_DD_VERSION),
     jsonSchemaValidation: opts.jsonSchemaValidation ?? false,
-    strictMode: opts.strictMode ?? false,
+    // Strict by default, like `dd`. Inert unless schema validation is actually on (it is opt-in here
+    // via --json-schema-validation and requires --metadata), so a plain data pull is unaffected; when
+    // validation IS on, errors stop the run rather than scrolling past.
+    strictMode: opts.strictMode ?? true,
     shouldSaveResults: opts.shouldSaveResults ?? false,
     shouldGenerateReports: opts.shouldGenerateReports ?? true,
     originatingSystemName: opts.originatingSystemName,

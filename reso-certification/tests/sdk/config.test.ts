@@ -331,6 +331,30 @@ describe('configEntryToDD', () => {
     expect(config.originatingSystemName).toBe('MyMLS');
     expect(config.originatingSystemId).toBe('MLS-42');
   });
+
+  // strictMode is the one option where the three states differ in meaning, because absent now means
+  // strict. A truthiness test here erased an explicit `false` to absent, which silently ran the
+  // opposite of what the config asked for — and left the value undefined, so the gate that explains
+  // why the run is not certifiable could not fire either. All three states are pinned.
+  const entry = (strictMode?: boolean) => ({
+    serviceRootUri: 'https://api.example.com',
+    recipientUoi: 'R001',
+    providerUsi: 'S001',
+    token: 'test-token',
+    ...(strictMode === undefined ? {} : { ddOptions: { strictMode } })
+  });
+
+  it('carries an explicit strictMode: false through instead of erasing it to absent', () => {
+    expect(configEntryToDD(entry(false), 'P001').strictMode).toBe(false);
+  });
+
+  it('carries an explicit strictMode: true through', () => {
+    expect(configEntryToDD(entry(true), 'P001').strictMode).toBe(true);
+  });
+
+  it('leaves strictMode absent when the entry does not mention it, so the SDK default applies', () => {
+    expect(configEntryToDD(entry(), 'P001').strictMode).toBeUndefined();
+  });
 });
 
 describe('resolvePayloadKeys', () => {

@@ -554,7 +554,16 @@ const ddCmd = program
   // nothing supplied, and config mode needs that distinction to let an explicit flag win.
   .option('--dd-version <version>', `DD version (${CERTIFIABLE_DD_VERSIONS.join(' or ')}; default ${CURRENT_DD_VERSION})`)
   .option('--limit <n>', "Max records to replicate per resource (default: the config entry's ddOptions.limit, else 100000)")
-  .option('--strict', 'Strict mode: fail on variations and enforce JSON schema validation')
+  // Strict is the default, so `--strict` is a no-op kept for compatibility and `--no-strict` is the
+  // real switch. BOTH are declared rather than `--no-strict` alone: declaring only the negation makes
+  // Commander default `opts.strict` to true, which would destroy the same absent-vs-explicit
+  // distinction the --dd-version comment above protects, and config mode needs it to let a flag win.
+  // With both declared, opts.strict is undefined / true / false — verified against commander 12.
+  .option('--strict', 'Fail the run on JSON schema validation errors (the default)')
+  .option(
+    '--no-strict',
+    'Record schema validation errors without failing on them, so a long run surveys everything to fix. The run is NOT eligible for certification'
+  )
   .option('--skip-variations', 'Do not check variations. The step is reported as skipped and the run is NOT eligible for certification')
   .option('--batch-expand', 'Batch all expansions per resource into a single $expand request')
   .option('--originating-system-name <v>', 'Append OriginatingSystemName eq <v> to every replication query (multi-tenant providers)')
@@ -631,7 +640,11 @@ ddCmd.action(
             ...(servicesAuthToken ? { servicesAuthToken } : {}),
             server: { ...baseConfig.server, auth },
             limit: opts.limit !== undefined ? Number(opts.limit) : (baseConfig.limit ?? 100000),
-            ...(opts.strict ? { strictMode: true } : {}),
+            // Tested against undefined, not for truthiness: `--no-strict` sets this to `false`, which a
+            // truthiness test drops, so the flag would be accepted on the command line and then
+            // silently ignored in config mode. Absent still means absent, letting the config entry's
+            // own ddOptions.strictMode stand, and the SDK default (strict) apply when it has none.
+            ...(opts.strict !== undefined ? { strictMode: opts.strict } : {}),
             // Only set when the flag was passed, so an untouched run never carries the field and
             // the default (run the check) stands.
             ...(opts.skipVariations ? { runVariations: false } : {}),
@@ -1060,7 +1073,8 @@ program
   .option('--dd-version <ddVersion>', 'Data Dictionary version', CURRENT_DD_VERSION)
   .option('--save-results', 'Also write every raw response page to disk')
   .option('--json-schema-validation', 'Validate each payload against a schema generated from the metadata')
-  .option('--strict', 'Fail on schema-validation errors')
+  .option('--strict', 'Fail on schema-validation errors (the default when validation is on)')
+  .option('--no-strict', 'Record schema-validation errors without failing on them')
   .option('--originating-system-name <v>', 'Append OriginatingSystemName eq <v> to every query')
   .option('--originating-system-id <v>', 'Append OriginatingSystemID eq <v> to every query')
   .option('--auth-token <token>', 'Bearer token for authorization')

@@ -93,22 +93,51 @@ describe('the Data Dictionary rule', () => {
     step('Write reports', 'passed')
   ];
 
+  // The rule closes over config, so every case states the config it is judging. `strict` is the
+  // shape a default run has: nothing set, so the SDK default (strict) applies.
+  const strict = { endorsement: 'dd', version: '2.1', server: { url: 'https://x', auth: {} } } as unknown as DDConfig;
+  const relaxed = { ...strict, strictMode: false } as DDConfig;
+
   it('is valid when every step passed', () => {
-    expect(ddValidForCertification(ddSteps('passed'))).toEqual(CERTIFIABLE);
+    expect(ddValidForCertification(strict)(ddSteps('passed'))).toEqual(CERTIFIABLE);
   });
 
   // The case the --skip-variations flag produces, and the one this change was built for.
   it('is NOT valid when the variations check was skipped', () => {
-    const verdict = ddValidForCertification(ddSteps('skipped'));
+    const verdict = ddValidForCertification(strict)(ddSteps('skipped'));
     expect(verdict.valid).toBe(false);
     expect(reasonsOf(verdict).join(' ')).toContain('Check variations');
+  });
+
+  // --no-strict. No step fails in this mode — that is the whole point of it — so the step list alone
+  // cannot see the difference and the verdict has to come from the config.
+  it('is NOT valid when strict mode was disabled, even though every step passed', () => {
+    const verdict = ddValidForCertification(relaxed)(ddSteps('passed'));
+    expect(verdict.valid).toBe(false);
+    expect(reasonsOf(verdict).join(' ')).toContain('--no-strict');
+  });
+
+  // An absent strictMode is a default run, not a relaxed one. Getting this backwards would make
+  // every ordinary run ineligible.
+  it('is valid when strictMode is absent, because absent means strict', () => {
+    expect(ddValidForCertification(strict)(ddSteps('passed'))).toEqual(CERTIFIABLE);
+    expect(ddValidForCertification({ ...strict, strictMode: true } as DDConfig)(ddSteps('passed'))).toEqual(CERTIFIABLE);
+  });
+
+  // Both reasons survive: an operator fixing one should not have to re-run to discover the next.
+  it('keeps the step reason AND the strict reason when both apply', () => {
+    const verdict = ddValidForCertification(relaxed)(ddSteps('skipped'));
+    const reasons = reasonsOf(verdict).join(' ');
+    expect(verdict.valid).toBe(false);
+    expect(reasons).toContain('Check variations');
+    expect(reasons).toContain('--no-strict');
   });
 
   // The live hole found while writing this: getReferenceMetadata returns null rather than throwing
   // when its JSON cannot be loaded, so `Validate DD metadata` returns 'skipped' — and a run that
   // validated no metadata whatsoever was reported as passed.
   it('is NOT valid when DD metadata validation was skipped for want of reference metadata', () => {
-    const verdict = ddValidForCertification([
+    const verdict = ddValidForCertification(strict)([
       step('Resolve authentication', 'passed'),
       step('Generate metadata report', 'passed'),
       step('Validate DD metadata', 'skipped', 'No DD reference metadata for version 2.1'),
