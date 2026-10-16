@@ -23,7 +23,7 @@ import type { DDVersion } from './dd-versions.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
 import { createDetailedReportGenerator, createGenericReportGenerator, prepareOutputDir, writeReports } from './reports.js';
-import type { BaseTestContext, DDConfig, PipelineStep, StepResult, TestFunction, ValidForCertification } from './types.js';
+import type { BaseTestContext, DDConfig, PipelineStep, StepOutput, StepResult, TestFunction, ValidForCertification } from './types.js';
 import type { PipelineResult } from './types.js';
 
 // ── Cert-utils imports (local copy for modification) ──
@@ -511,36 +511,103 @@ const replicationProgressAdapter = (onProgress: import('./types.js').ProgressCal
   };
 };
 
+/** The file the replicator writes its schema validation findings to; named in the failure message so an
+ *  operator is pointed at the detail rather than shown it. Not re-exported by the legacy module. */
+const SCHEMA_VALIDATION_ERRORS_FILENAME = 'data-availability-schema-validation-errors.json';
+
+/** The validation summary the legacy replicator attaches to the error it throws in strict mode. */
+interface SchemaValidationFailure {
+  readonly stats?: { readonly totalErrors?: number; readonly totalWarnings?: number };
+}
+
+/** Narrow an unknown error to the strict-mode schema failure, or undefined when it is anything else. */
+const schemaValidationFailureOf = (err: unknown): SchemaValidationFailure | undefined => {
+  if (typeof err !== 'object' || err === null) return undefined;
+  const attached = (err as { schemaValidationResults?: unknown }).schemaValidationResults;
+  return typeof attached === 'object' && attached !== null ? (attached as SchemaValidationFailure) : undefined;
+};
+
+const plural = (n: number, word: string): string => `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`;
+
+/**
+ * Run a replication strategy, reporting a strict-mode schema failure as a failed step rather than
+ * letting it escape as an exception.
+ *
+ * A provider's payloads failing validation is an expected outcome of a certification run, not a
+ * fault in the tool. Thrown, it reached the terminal as a stack trace with the entire validation
+ * result inspected beneath it, which reads as a crash — and now that strict is the default, that is
+ * what every provider with schema errors would see. The step list already models this outcome: the
+ * variations step returns `status: 'failed'` for a finding of the same kind.
+ *
+ * The counts are carried into the message and the detail is left in the report file, which the run
+ * has already written and named on stdout. Repeating the whole object in the terminal told an
+ * operator nothing the file does not hold.
+ *
+ * Only this one error is converted. Anything else still throws, because anything else IS a fault.
+ */
+const replicateReportingSchemaFailures = async (
+  ctx: Readonly<DDContext>,
+  settings: Parameters<typeof replicate>[0],
+  summary: string,
+  getCounts: () => Record<string, number> | undefined
+): Promise<StepOutput<DDContext>> => {
+  try {
+    await replicate(settings);
+  } catch (err) {
+    const failure = schemaValidationFailureOf(err);
+    if (!failure) throw err;
+    const { totalErrors = 0, totalWarnings = 0 } = failure.stats ?? {};
+    const counted = [plural(totalErrors, 'error'), ...(totalWarnings > 0 ? [plural(totalWarnings, 'warning')] : [])];
+    const message = err instanceof Error ? err.message : 'Schema validation failed';
+    return {
+      context: ctx as DDContext,
+      // The summary states the problem, not the strategy. It is what the step line and the
+      // not-eligible reason both render, and naming the strategy there described how the run was
+      // reading the server at the moment it stopped rather than why it stopped.
+      status: 'failed',
+      summary: message,
+      errors: [`${message} – ${counted.join(' and ')} recorded in ${SCHEMA_VALIDATION_ERRORS_FILENAME}. Strategy: ${summary}.`]
+    };
+  }
+  return { context: ctx as DDContext, summary, counts: getCounts() };
+};
+
 const replicateTimestampDesc =
   (config: DDConfig): TestFunction<DDContext> =>
   async (ctx, onProgress) => {
     const pageSize = ctx.version === '1.7' ? DEFAULT_PAGE_SIZE_V17 : DEFAULT_PAGE_SIZE_V20;
     const progress = replicationProgressAdapter(onProgress, 'Timestamp Descending');
-    await replicate({
-      ...buildReplicationSettings(ctx, config),
-      // DD 1.7 predates the schema the validator is generated from, so it stays off there. For every
-      // other version validation always runs; strictMode decides whether its errors fail the run.
-      jsonSchemaValidation: ctx.version !== '1.7',
-      top: pageSize,
-      strategy: REPLICATION_STRATEGIES.TIMESTAMP_DESC,
-      onProgress: progress.callback
-    });
-    const stats = progress.getLastStats();
-    return { context: ctx, summary: `Timestamp Descending with $top=${pageSize}`, counts: stats };
+    return replicateReportingSchemaFailures(
+      ctx,
+      {
+        ...buildReplicationSettings(ctx, config),
+        // DD 1.7 predates the schema the validator is generated from, so it stays off there. For
+        // every other version validation always runs; strictMode decides whether errors fail the run.
+        jsonSchemaValidation: ctx.version !== '1.7',
+        top: pageSize,
+        strategy: REPLICATION_STRATEGIES.TIMESTAMP_DESC,
+        onProgress: progress.callback
+      },
+      `Timestamp Descending with $top=${pageSize}`,
+      () => progress.getLastStats()
+    );
   };
 
 const replicateNextLink =
   (config: DDConfig): TestFunction<DDContext> =>
   async (ctx, onProgress) => {
     const progress = replicationProgressAdapter(onProgress, 'NextLink');
-    await replicate({
-      ...buildReplicationSettings(ctx, config),
-      maxPageSize: DEFAULT_PAGE_SIZE_V20,
-      strategy: REPLICATION_STRATEGIES.NEXT_LINK,
-      onProgress: progress.callback
-    });
-    const stats = progress.getLastStats();
-    return { context: ctx, summary: `NextLink with maxPageSize=${DEFAULT_PAGE_SIZE_V20}`, counts: stats };
+    return replicateReportingSchemaFailures(
+      ctx,
+      {
+        ...buildReplicationSettings(ctx, config),
+        maxPageSize: DEFAULT_PAGE_SIZE_V20,
+        strategy: REPLICATION_STRATEGIES.NEXT_LINK,
+        onProgress: progress.callback
+      },
+      `NextLink with maxPageSize=${DEFAULT_PAGE_SIZE_V20}`,
+      () => progress.getLastStats()
+    );
   };
 
 const replicateNextLinkFiltered =
@@ -548,16 +615,19 @@ const replicateNextLinkFiltered =
   async (ctx, onProgress) => {
     const cutoffDate = new Date(new Date().getFullYear() - DEFAULT_YEARS_BACK, 0).toISOString();
     const progress = replicationProgressAdapter(onProgress, 'NextLink (modified-since filter)');
-    await replicate({
-      ...buildReplicationSettings(ctx, config),
-      maxPageSize: DEFAULT_PAGE_SIZE_V20,
-      strategy: REPLICATION_STRATEGIES.NEXT_LINK,
-      filter: `ModificationTimestamp ge ${cutoffDate}`,
-      orderby: 'ModificationTimestamp asc',
-      onProgress: progress.callback
-    });
-    const stats = progress.getLastStats();
-    return { context: ctx, summary: `NextLink (modified-since filter, ${DEFAULT_YEARS_BACK}yr lookback)`, counts: stats };
+    return replicateReportingSchemaFailures(
+      ctx,
+      {
+        ...buildReplicationSettings(ctx, config),
+        maxPageSize: DEFAULT_PAGE_SIZE_V20,
+        strategy: REPLICATION_STRATEGIES.NEXT_LINK,
+        filter: `ModificationTimestamp ge ${cutoffDate}`,
+        orderby: 'ModificationTimestamp asc',
+        onProgress: progress.callback
+      },
+      `NextLink (modified-since filter, ${DEFAULT_YEARS_BACK}yr lookback)`,
+      () => progress.getLastStats()
+    );
   };
 
 /** Build the replication step with all strategies as test functions. */

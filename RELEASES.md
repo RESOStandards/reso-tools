@@ -35,6 +35,23 @@ A relaxed run also produces its full set of reports. Previously a run that found
 error file and nothing else, with no warnings file and no availability analytics, so the run with
 the most to report produced the least.
 
+### A failed run no longer reads as a crash
+
+Stopping on schema validation printed a stack trace with the entire validation result inspected
+beneath it, twenty-five lines of it, for what is an expected outcome of a certification run. With
+strict on by default that would have become what every provider with schema errors sees.
+
+The replication step now reports the failure the way the variations step already did, by returning a
+failed status rather than throwing, and the replicator's top-level handler follows the rule its own
+inner handlers state: log only when swallowing, because a caller that receives the error reports it.
+The failure line carries the counts and names the file holding the detail:
+
+```
+Failures (1):
+  ✗ Replicate and validate: Schema validation errors found in the Property payload – 6,728 errors
+    and 3,411 warnings recorded in data-availability-schema-validation-errors.json.
+```
+
 ### A decimal without a stated scale is no longer typed as an integer
 
 Any numeric field with no `Scale` facet was typed as an integer, including `Edm.Double`. Scale is a
