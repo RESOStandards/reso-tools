@@ -7,7 +7,7 @@ const { createHash } = require('node:crypto');
 const queryString = require('node:querystring');
 
 // custom libs
-const { sleep, NOT_OK, resolveFilePathSync } = require('../../common');
+const { sleep, NOT_OK, resolveFilePathSync, DEFAULT_DD_VERSION } = require('../../common');
 
 const { combineErrors } = require('../schema');
 
@@ -42,8 +42,7 @@ const NUM_SHORT_HASH_CHARACTERS = 16;
 
 const UNKNOWN_ERROR_STRING = '<unknown>';
 
-const DEFAULT_DD_VERSION = '2.0',
-  POSTAL_CODE_FIELD_NAME = 'PostalCode',
+const POSTAL_CODE_FIELD_NAME = 'PostalCode',
   DEFAULT_TIMESTAMP_FIELD = 'ModificationTimestamp',
   ODATA_COUNT_PAYLOAD_KEY = '@odata.count';
 

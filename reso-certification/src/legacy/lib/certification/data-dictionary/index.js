@@ -458,7 +458,7 @@ const getDataDictionaryTestSteps = ({
           strategy: REPLICATION_STRATEGIES.TIMESTAMP_DESC
         })
     );
-  } else if (version === DATA_DICTIONARY_VERSIONS.v2_0) {
+  } else if (version === DATA_DICTIONARY_VERSIONS.v2_0 || version === DATA_DICTIONARY_VERSIONS.v2_1) {
     const DEFAULT_PAGE_SIZE = 1000;
 
     testSteps.push(
