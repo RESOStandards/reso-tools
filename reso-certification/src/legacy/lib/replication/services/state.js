@@ -14,6 +14,36 @@ const _resourceAvailabilityMap = {};
 /**
  * Used to detect whether we've pulled the same record using different strategies
  * Format of each entry is recordHash: count
+ *
+ * TODO (DD 2.2, with the sampling and schema-validation rewrite): the count is vestigial.
+ * Dedup itself is correct and this is not a live defect, but four things here are worth
+ * carrying into the rewrite rather than rediscovering:
+ *
+ *   1. The stored value is always 1. `addOrIncrementHashValue` increments `val`, which is a
+ *      local copy of the number, so the write never reaches the map. Nothing reads a count
+ *      either: the only consumer is `hashExists`, which is `!!value`, and 1 is truthy. So the
+ *      name, its doc, and the "recordHash: count" line above all describe a tally that is not
+ *      kept. Either make it real or drop the pretense, but do not leave it reading as collected.
+ *
+ *   2. A count here could never have measured cross-path overlap anyway. `hashJsonData` keys on
+ *      { modelName, parentModelName, normalizedRecord }, so the same record reached standalone
+ *      and reached through an expansion hashes differently and is two entries, not a repeat.
+ *      Measuring standalone-versus-expansion overlap needs a second key that excludes
+ *      parentModelName, which is a separate structure and roughly doubles the entry count.
+ *
+ *   3. Bucket 19 is never written. `getRandomInt` is exclusive (Math.floor(Math.random() * max))
+ *      and is called with `length - 1`, so it returns 0..18. Capacity is 19 maps, not 20.
+ *
+ *   4. Each lookup scans every map, and both call sites in utils.js run two scans per record:
+ *      `hashExists` then `addOrIncrementHashValue`, which repeats the same scan. Choosing the
+ *      bucket deterministically from the hash (hex characters are uniform, so the fill balances
+ *      itself) makes it one lookup, fixes 3, and removes the double scan.
+ *
+ * The capacity note below is worth keeping in mind alongside this: at 20 maps the ceiling is
+ * ~336m entries, but the hash is truncated to 15 hex characters, so the birthday collision
+ * probability near that ceiling is a few percent. Collisions undercount, which is the safe
+ * direction by design, but it does mean adding maps buys no usable headroom without widening
+ * the hash.
  */
 const _recordCountHashMaps = [];
 
