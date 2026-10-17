@@ -51,7 +51,7 @@ reso-cert core --url https://api.example.com --auth-token TOKEN
 # With options
 reso-cert core --url https://api.example.com --auth-token TOKEN \
   --resources Property,Member \
-  --version 2.1.0 \
+  --spec-version 2.1.0 \
   --full-coverage
 ```
 
@@ -135,16 +135,33 @@ The output directory structure is compatible with `reso-certification-utils`:
     <providerUoi>-<providerUsi>/
       <recipientUoi>/
         current/
+          report.json
+          report-detailed.json
           metadata.xml
           metadata-report.json
-          metadata-report.processed.json
+          metadata-report.raw.json
           lookup-resource-lookup-metadata.json
+          metadata-validation-report.json
+          variations-report.json
           data-availability-report.json
           data-availability-responses.json
-          data-dictionary-variations.json
         archived/
           <timestamp>/
 ```
+
+`report.json` and `report-detailed.json` are always written and are what the certification pipeline
+ingests. The rest land only when a run produces them: no `variations-report.json` on a run that found
+no variations, no availability files on a run that stopped before replication. `doc/RUN-REFERENCE.md`
+describes every file.
+
+Two names changed:
+
+- **`metadata-report.processed.json` is gone.** `metadata-report.json` is now always the final
+  report, merged with the Lookup Resource when the server serves one. The pre-merge base moved to
+  `metadata-report.raw.json`, written only when a merge happened. A bundle produced before the
+  inversion carries the opposite pair, so read `metadata-report.processed.json` when it is present.
+- **`data-dictionary-variations.json` comes from `find-variations`.** A `reso-cert dd` run writes
+  `variations-report.json`.
 
 For backward compatibility with tools that expect `results/`:
 
@@ -180,7 +197,7 @@ docker compose --profile compliance-core up --build    # reso-certification/Dock
 ## What Is Not Changed
 
 - Config file format (providerUoi, configs array, auth) – same as before
-- Output file names and content format – same as before
+- Output file names and content format – same as before, except the Data Dictionary metadata report, which inverted (see Output Directory)
 - Directory structure convention – same as before (.reso-cert instead of results)
 - Lookup Resource handling – same merge behavior
 - Schema validation settings – same file, never modified

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Open-source monorepo for building and testing RESO-compliant OData servers. Includes a reference server, desktop client, web UI, certification test runner and shared libraries.
+Open-source monorepo for building and testing RESO-compliant OData servers. Includes a reference server, a certification test runner, an MCP server and shared libraries. The desktop client and browser UI are not here: they live in the private `reso-tools-private` repo.
 
 ## Packages
 
@@ -67,10 +67,10 @@ docker compose --profile seed up seed
 - Use `.js` extensions in import paths (required for Node16 module resolution with ESM).
 - **Optional chaining and nullish coalescing**: prefer `a?.b?.c` and `x ?? fallback` over `a && a.b && a.b.c` or `x || fallback`. `??` is correct for "missing" (null/undefined); `||` is only right when zero/empty-string/false should also fall back, which is usually a bug waiting to happen. Apply to property access, method calls (`fn?.()`), and array indexing (`arr?.[0]`).
 - **State management (HIGH PRIORITY):**
-  1. **Inside closures** (reduce, map, flatMap) — local mutable state is fine. It is scoped and dies with the closure. Never leak it out.
-  2. **Function results** — bind to `const` on the RHS of an arrow function. No `let` unless absolutely necessary (justify it). No refs in the output.
-  3. **Return an interface** when the result will be reused — documents the contract and makes it promotable to DI later without changing consumers. Cheapest abstraction, never premature.
-  4. **DI service** — only when two or more callees need shared state with updates between them. Do not build the service until you actually have that need. Local to the package until reused across packages, then promote.
+  1. **Inside closures** (reduce, map, flatMap) – local mutable state is fine. It is scoped and dies with the closure. Never leak it out.
+  2. **Function results** – bind to `const` on the RHS of an arrow function. No `let` unless absolutely necessary (justify it). No refs in the output.
+  3. **Return an interface** when the result will be reused – documents the contract and makes it promotable to DI later without changing consumers. Cheapest abstraction, never premature.
+  4. **DI service** – only when two or more callees need shared state with updates between them. Do not build the service until you actually have that need. Local to the package until reused across packages, then promote.
 
 ## New Dependencies
 
@@ -91,33 +91,33 @@ The only TanStack dep is `@tanstack/react-virtual@3.13.24` in
 `reso-web-client`, which falls under the postmortem's
 confirmed-clean `@tanstack/virtual*` family. As of the v1.0.0 split
 `reso-web-client` moved to the private `reso-tools-private` repo, so
-this pinned dependency and the watch below now live there — **the
+this pinned dependency and the watch below now live there – **the
 public repo has no TanStack dependency.** The discipline is retained
 here because it applies to any repo in the org.
 
 - The dependency is pinned (no caret) as defense-in-depth so a
-  future compromise of the same package can't auto-resolve into a
+  future compromise of the same package cannot auto-resolve into a
   build via `npm install`.
 - Before bumping the pinned version, **re-check the advisory and
   postmortem** for additional affected releases and confirm the
-  target version is in a confirmed-clean family. If you're not
+  target version is in a confirmed-clean family. If you are not
   certain, ask before bumping.
-- If we add any new `@tanstack/*` dependency, same rule — verify the
+- If we add any new `@tanstack/*` dependency, same rule – verify the
   exact version against the latest advisory data and pin.
 
 ## Timing and Delays
 
 - NEVER use `setTimeout`, `setInterval`, or timing-based delays to fix race conditions or synchronization issues. These are hacks that mask the real problem.
-- If events arrive out of order, fix the ordering mechanism or make the consumer tolerant of any order — don't add delays.
+- If events arrive out of order, fix the ordering mechanism or make the consumer tolerant of any order – do not add delays.
 
 ## Prohibitions
 
 - DO NOT use classes or `this`.
 - DO NOT use `any`. Use `unknown` and narrow with type guards.
 - Use named constants for repeated string literals (endorsement types, status values, environment URLs, step names). Define them in a shared constants file rather than duplicating across components.
-- Prefer interfaces over implementations — when multiple data sources produce similar shapes, define a normalized interface and map to it rather than handling each shape ad hoc.
+- Prefer interfaces over implementations – when multiple data sources produce similar shapes, define a normalized interface and map to it rather than handling each shape ad hoc.
 - Always remove dead code when disabling a feature. If removal effort is high, ask first and open a ticket instead of leaving dead code with comments.
-- For new code, do not ignore compiler, linter, or bundler warnings. Fix them. If a build produces many warnings, summarize the classes at a high level and prompt before proceeding — don't silently accept them. Legacy code paths (e.g. `src/legacy/`) are the exception: flag them, leave them, and capture in a cleanup ticket if worth tracking.
+- For new code, do not ignore compiler, linter, or bundler warnings. Fix them. If a build produces many warnings, summarize the classes at a high level and prompt before proceeding – do not silently accept them. Legacy code paths (e.g. `src/legacy/`) are the exception: flag them, leave them, and capture in a cleanup ticket if worth tracking.
 
 ## Style Conventions
 
@@ -145,11 +145,11 @@ here because it applies to any repo in the org.
 
 ### Merge Strategy
 
-The GitHub repo merges PRs with **Rebase and merge** — the trunk stays linear, with no merge commits. Keep feature branches linear so they remain rebaseable:
+The GitHub repo merges PRs with **Rebase and merge** – the trunk stays linear, with no merge commits. Keep feature branches linear so they remain rebaseable:
 
-- **To update a feature branch against its base, rebase it** (`git rebase origin/<base>`, e.g. `origin/main`) — do **not** merge the base into the branch. A merge commit on the branch makes the PR un-rebaseable, and GitHub reports "This branch cannot be rebased due to conflicts" even when an ordinary merge would be a clean fast-forward.
+- **To update a feature branch against its base, rebase it** (`git rebase origin/<base>`, e.g. `origin/main`) – do **not** merge the base into the branch. A merge commit on the branch makes the PR un-rebaseable, and GitHub reports "This branch cannot be rebased due to conflicts" even when an ordinary merge would be a clean fast-forward.
 - Conflict resolution captured inside a merge commit is **not** reused by rebase: rebase replays each commit individually, so it re-hits the original conflicts. That is the failure mode, not a real conflict.
-- If a branch already carries a merge commit, **linearize it** before opening/updating the PR — cherry-pick or rebase the real commits onto the base tip, drop the merge commit, resolve conflicts once, then force-push. (Force-push a feature branch only; never a release branch.)
+- If a branch already carries a merge commit, **linearize it** before opening/updating the PR – cherry-pick or rebase the real commits onto the base tip, drop the merge commit, resolve conflicts once, then force-push. (Force-push a feature branch only; never a release branch.)
 
 ### Release Checklist
 
@@ -163,7 +163,7 @@ The GitHub repo merges PRs with **Rebase and merge** — the trunk stays linear,
 8. **Create PR**: `gh pr create --base main --head vX.Y --title "vX.Y – Release Name"`
 9. **Create draft release**: `gh release create vX.Y --draft --target vX.Y --title "vX.Y – Release Name"`
    - Include: highlights, what changed, download instructions, migration guide link
-   - Desktop download instructions for unsigned binaries (macOS xattr, Windows SmartScreen, Linux chmod)
+   - Desktop download instructions: macOS and Windows builds are signed, so no workaround is needed. The Linux AppImage needs `chmod +x` before first run.
 10. **Merge PR**: After review, merge to main
 11. **Tag**: Pushing a `v*` tag runs `release.yml`, which creates the Release as a draft when none exists and leaves an existing one untouched, assets included. It builds nothing – no binary is produced in this repo.
 12. **Publish release**: Remove draft status once `reso-tools-private` has attached the desktop binaries.
@@ -178,8 +178,8 @@ The GitHub repo merges PRs with **Rebase and merge** — the trunk stays linear,
 - The reference server uses a metadata-driven architecture: CSDL metadata defines the schema, and routes/queries are generated dynamically
 - The OData client handles URI building, CRUD, pagination, and metadata parsing – it is used by both the web UI and the certification runner
 - Validation rules are isomorphic (shared between client and server)
-- The DD docs site is in a separate repo — see `RESOStandards/reso-data-dictionary-documentation` for styling and generator code
-- **Metadata reports — `metadata-report.json` is canonical.** As of v1.0.0 the scheme was inverted so `metadata-report.json` is **ALWAYS** the canonical *final* report (merged when a Lookup Resource is present, else the base), and the pre-merge base is written as `metadata-report.raw.json`. New runs no longer emit `.processed`, so downstream can **always rely on `metadata-report.json`** (see `src/sdk/dd.ts:159`, `metadata/lookup-resource.ts:158`). **Legacy exception:** older cert-utils bundles used the *opposite* pair — `metadata-report.json` = base, `metadata-report.processed.json` = merged — so when consuming a pre-inversion bundle, prefer `metadata-report.processed.json` when present, falling back to `metadata-report.json` (cf. desktop `main.ts:307`). This carve-out retires once old bundles age out.
+- The DD docs site is in a separate repo – see `RESOStandards/reso-data-dictionary-documentation` for styling and generator code
+- **Metadata reports – `metadata-report.json` is canonical.** As of v1.0.0 the scheme was inverted so `metadata-report.json` is **ALWAYS** the canonical *final* report (merged when a Lookup Resource is present, else the base), and the pre-merge base is written as `metadata-report.raw.json`. New runs no longer emit `.processed`, so downstream can **always rely on `metadata-report.json`** (see `src/sdk/dd.ts:159`, `metadata/lookup-resource.ts:158`). **Legacy exception:** older cert-utils bundles used the *opposite* pair – `metadata-report.json` = base, `metadata-report.processed.json` = merged – so when consuming a pre-inversion bundle, prefer `metadata-report.processed.json` when present, falling back to `metadata-report.json` (cf. desktop `main.ts:307`). This carve-out retires once old bundles age out.
 
 ## DD Reference-Metadata Regeneration
 
@@ -191,20 +191,20 @@ The GitHub repo merges PRs with **Rebase and merge** — the trunk stays linear,
 >
 > That runs `reso-certification/utils/fetch-dd-reference.mjs`, which writes **`reso-common/reference-metadata/`** — the single source of truth. The cert pipeline (the `getReferenceMetadata`/`getMetadata` chokepoints in `src/etl`, feeding the DD gate, variations, ETL, schema and legacy) reads it via reso-common's `reference-metadata/*` subpath export (kept out of reso-common's browser-facing main index so the web client isn't bloated); the two cert tests that read the files off disk resolve the same subpath, and the desktop client packages `dd-2.0.json` / `dd-2.1.json` from the published reso-common (electron-builder `extraResources` in reso-tools-private). The former synced copy at `reso-certification/reference-metadata/` was retired in the DD 2.1 refresh of 2026-09-19 (Phase A tail closed; #217 remains for the ref server's Phase B). NOTE: the ref server's `reso-reference-server/server-metadata.json` is a *separate* DD-2.0 served-schema artifact, not updated here. The historical reso-tools-side generation workflow below is retained for reference; the live tooling is in transport.
 
-When DD sheets get a new revision, **transport** regenerates `dd-{ver}.json` (its `generate-dd-json` workflow) and reso-tools pulls the result via `npm run update:dd-reference` (above). Generation, linting, and fitness checks all run in transport now — the subsections below describe that workflow (which moved out of reso-tools) and how reso-tools consumes its output. This happens roughly once per DD update.
+When DD sheets get a new revision, **transport** regenerates `dd-{ver}.json` (its `generate-dd-json` workflow) and reso-tools pulls the result via `npm run update:dd-reference` (above). Generation, linting, and fitness checks all run in transport now – the subsections below describe that workflow (which moved out of reso-tools) and how reso-tools consumes its output. This happens roughly once per DD update.
 
 ### Source of truth
 
 - DD sheet PRs land in `RESOStandards/transport`, typically as an issue with the new XLSX attached (e.g. transport#198). Authoritative copies live at `transport/references/dd/RESODataDictionary-{ver}.xlsx` on `main`.
 - The DD docs site (`reso-data-dictionary-documentation`) pulls those same files via `fetch-data.mjs` for HTML output. We pull them directly for JSON generation.
 
-### Historical generation workflow — moved to transport
+### Historical generation workflow – moved to transport
 
 > The two scripted steps below (XLSX lint + JSON generation) used to run in reso-tools. They now live in transport's `references/dd/tools/` (all-Python/openpyxl) and run in its `generate-dd-json` workflow — **do not run them against reso-tools**; refresh via `npm run update:dd-reference` instead. They are kept here only as a description of what transport's workflow does. The one rule that outlives the move: DD XLSX write-back is **openpyxl only, never SheetJS**.
 
 The DD update workflow has two scripted steps that run on every refresh, on any version:
 
-1. **Lint the XLSX** — `reso-certification/utils/lint-dd-sheet.py` (Python + openpyxl) deterministically rewrites the dd.reso.org URLs on every row, on every refresh. The published XLSX sheets historically carried legacy `ddwiki.reso.org` Confluence URLs and inconsistent `dd.reso.org` shapes. The lint script forces all hyperlinks and `WikiPageUrl` cells to the canonical pattern in code rather than maintaining them by hand or by Excel formula (formulas were tried before and bloated the file too much).
+1. **Lint the XLSX** – `reso-certification/utils/lint-dd-sheet.py` (Python + openpyxl) deterministically rewrites the dd.reso.org URLs on every row, on every refresh. The published XLSX sheets historically carried legacy `ddwiki.reso.org` Confluence URLs and inconsistent `dd.reso.org` shapes. The lint script forces all hyperlinks and `WikiPageUrl` cells to the canonical pattern in code rather than maintaining them by hand or by Excel formula (formulas were tried before and bloated the file too much).
 
    **Tooling: openpyxl, not SheetJS.** SheetJS write-back strips cell formatting, comments, and merged-cell layout and roughly doubles the XLSX size. openpyxl preserves all of those and usually shrinks the file slightly. Never use SheetJS to write a DD sheet back out.
 
@@ -219,7 +219,7 @@ The DD update workflow has two scripted steps that run on every refresh, on any 
    | Lookups | `StandardLookupValue` | hyperlink only | `/DD{ver}/lookups/{LookupName}/{encodeURIComponent(StandardLookupValue)}/` |
    | Lookups | `WikiPageUrl` | value + hyperlink | same as above |
 
-   Note: the lookup-value URL uses `StandardLookupValue` (URL-encoded display name), not `LegacyODataValue` — the live dd.reso.org routes match the display-name shape. `WikiPageTitle` and `LegacyODataValue` columns are left untouched.
+   Note: the lookup-value URL uses `StandardLookupValue` (URL-encoded display name), not `LegacyODataValue` – the live dd.reso.org routes match the display-name shape. `WikiPageTitle` and `LegacyODataValue` columns are left untouched.
 
    Setup once (venv kept out of git):
    ```bash
@@ -237,7 +237,7 @@ The DD update workflow has two scripted steps that run on every refresh, on any 
 
    Expected output is ~0.81-0.84× the publisher's original (openpyxl trims unused metadata).
 
-2. **Generate reference-metadata JSON** — `reso-certification/utils/generate-reference-metadata.js` reads the linted XLSX and writes the same JSON shape as the Commander's MetadataReport (`resources`, `models`, `fields`, `lookups`, `actions`, `functions`). It is the source for the validation refs consumed across the cert stack.
+2. **Generate reference-metadata JSON** – `reso-certification/utils/generate-reference-metadata.js` reads the linted XLSX and writes the same JSON shape as the Commander's MetadataReport (`resources`, `models`, `fields`, `lookups`, `actions`, `functions`). It is the source for the validation refs consumed across the cert stack.
 
    ```bash
    node reso-certification/utils/generate-reference-metadata.js path/to/dd-{ver}.xlsx {ver} reso-common/reference-metadata/dd-{ver}.json
@@ -263,7 +263,7 @@ Watch for:
 
 - Renames listed in the PR show up cleanly (one add + one remove per rename, names match exactly).
 - New `SourceResource` entries on expansion fields actually populate `sourceResource` on the generated record.
-- Resource count: deltas should match the PR. A drop with no PR mention is usually a stray `https://ddwiki.reso.org/...` row being filtered out — that is cleanup, not regression.
+- Resource count: deltas should match the PR. A drop with no PR mention is usually a stray `https://ddwiki.reso.org/...` row being filtered out – that is cleanup, not regression.
 - Silent field removals (not in the PR changelog) deserve a callout back to whoever updated the sheet.
 
 ### Where the JSON ends up consumed
@@ -274,17 +274,17 @@ Watch for:
 | reso-tools cert runner + ETL | *(via the reso-common subpath)* | `getReferenceMetadata`/`getMetadata` in `src/etl` resolve to reso-common; feed the DD gate, variations, ETL, schema, legacy |
 | Desktop client (reso-tools-private) | `node_modules/@reso-standards/reso-common/reference-metadata/dd-{2.0,2.1}.json` | Packaged by electron-builder `extraResources` from the published reso-common; takes effect on the next reso-common publish + desktop build |
 | 2 cert tests (`dd-versions`, `dd-key-coverage`) | *(via the reso-common subpath)* | Read the files off disk through `createRequire(...).resolve` on the subpath export |
-| Ref server | `reso-reference-server/server-metadata.json` | *Separate* DD-2.0 served-schema artifact — NOT updated here (Phase B, #217) |
+| Ref server | `reso-reference-server/server-metadata.json` | *Separate* DD-2.0 served-schema artifact – NOT updated here (Phase B, #217) |
 | Cert backend `validateBatch` | `reso-certification-backend/aws/lambda-layers/reso-dd-reference/data/dd-{ver}.json` | Independent; needs a separate layer publish to take effect on QA/prod |
 | Legacy `getReferenceMetadata` lambda | `aws/lambda-functions/getReferenceMetadata/reference-metadata/dd-{ver}.json` | Independent; update if still in active use |
 
-The backend layer copies are independent of this repo — bumping refs here does not affect server-side `validateBatch` until the `reso-dd-reference` layer is republished.
+The backend layer copies are independent of this repo – bumping refs here does not affect server-side `validateBatch` until the `reso-dd-reference` layer is republished.
 
 ## Pre-publish review
 
-Non-trivial PRs against the DD reference data path — `reso-certification/utils/generate-reference-metadata.js`, the `dd-{ver}.json` files in `reso-common/reference-metadata/`, the principles doc at `reso-certification/docs/dd-reference-fitness-principles.md`, or the fitness checker at `reso-certification/utils/check-dd-reference-fitness.js` — are reviewed against codified invariants before they reach the cert backend's publish gate. The review applies refute-by-default precision against a private library of review patterns. The patterns themselves are RESO review IP and live in a separate private location; this CLAUDE.md does not reproduce them.
+Non-trivial PRs against the DD reference data path – the `dd-{ver}.json` files in `reso-common/reference-metadata/`, the fetcher at `reso-certification/utils/fetch-dd-reference.mjs`, the principles doc at `reso-certification/docs/dd-reference-fitness-principles.md`, or the fitness checker at `reso-certification/utils/check-dd-reference-fitness.js` – are reviewed against codified invariants before they reach the cert backend's publish gate. The review applies refute-by-default precision against a private library of review patterns. The patterns themselves are RESO review IP and live in a separate private location; this CLAUDE.md does not reproduce them.
 
-PR authors don't need to invoke the review themselves; it runs on the maintainer side before merge. The **most useful upstream signal** the review benefits from is a clear PR body that:
+PR authors do not need to invoke the review themselves; it runs on the maintainer side before merge. The **most useful upstream signal** the review benefits from is a clear PR body that:
 
 - Links the upstream XLSX change (transport ticket or transport PR).
 - Lists per-tab deltas matching the JSON diff magnitudes.
@@ -299,14 +299,14 @@ Documentation site: https://dd.reso.org/
 
 ### Four canonical element URLs
 
-- **Resource** — `/DD{version}/{ResourceName}/`
-- **Field** — `/DD{version}/{ResourceName}/{FieldName}/`
-- **Lookup (enum)** — `/DD{version}/lookups/{LookupName}/`
-- **Lookup Value** — `/DD{version}/lookups/{LookupName}/{LookupValue}/`
+- **Resource** – `/DD{version}/{ResourceName}/`
+- **Field** – `/DD{version}/{ResourceName}/{FieldName}/`
+- **Lookup (enum)** – `/DD{version}/lookups/{LookupName}/`
+- **Lookup Value** – `/DD{version}/lookups/{LookupName}/{LookupValue}/`
 
 Rules:
 - URL-encode path segments containing spaces or special characters (e.g. `Public Sewer` → `Public%20Sewer`).
-- `{LookupName}` in lookup paths is the enum/lookup name (typically the field name, but not always — some lookups are shared across fields).
+- `{LookupName}` in lookup paths is the enum/lookup name (typically the field name, but not always – some lookups are shared across fields).
 - `{version}` is the DD version short form, e.g. `2.0`, `2.1`.
 
 ### Other pages
@@ -318,4 +318,4 @@ For these or anything else, consult the current dd.reso.org structure directly r
 
 ### In code
 
-The legacy URL builder is [`getDDWikiUrl`](reso-certification/src/legacy/lib/variations/index.js) (`src/legacy/lib/variations/index.js`). When generating DD URLs in new code, match the four canonical shapes above exactly — do not invent alternate layouts like `/{Resource}/{Field}/{LookupValue}/`.
+The legacy URL builder is [`getDDWikiUrl`](reso-certification/src/legacy/lib/variations/index.js) (`src/legacy/lib/variations/index.js`). When generating DD URLs in new code, match the four canonical shapes above exactly – do not invent alternate layouts like `/{Resource}/{Field}/{LookupValue}/`.

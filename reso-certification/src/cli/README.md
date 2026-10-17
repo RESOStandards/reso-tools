@@ -1,4 +1,4 @@
-# `reso-cert` — CLI reference
+# `reso-cert` – CLI reference
 
 The unified command-line entry point for RESO certification compliance testing.
 This is the complete command reference; for a quick start and the SDK API see the
@@ -26,7 +26,7 @@ Several commands take their service URL and credentials from the environment rat
 so a working `.env` is often the difference between a command running and a command refusing.
 
 **Where it is found.** At startup the CLI looks for a file literally named `.env` in three places, in
-order, and the **first one found wins** — the rest are not read:
+order, and the **first one found wins** – the rest are not read:
 
 1. the current working directory
 2. the `reso-certification` package root
@@ -55,7 +55,7 @@ environment a command will write to, look at the host in `TOKEN_URI`.
 **Two auth paths, in that order.** A command first tries an OAuth2 client-credentials token from
 `TOKEN_URI` / `CLIENT_ID` / `CLIENT_SECRET`. If those are not configured it falls back to minting a
 provider token from the `CERT_AUTH_API_*` set. A command that reports "requires authentication" is
-telling you neither set is complete, not that one of them was rejected — a rejected credential
+telling you neither set is complete, not that one of them was rejected – a rejected credential
 reports separately.
 
 **Nothing here is passed on the command line**, and there is no flag that overrides the service URL.
@@ -70,20 +70,21 @@ different thing from the RESO service credentials above.
 | [`add-edit`](#add-edit) | RCP-010 Add/Edit endorsement compliance |
 | [`entity-event`](#entity-event) | RCP-027 EntityEvent change-tracking compliance |
 | [`core`](#core) | Web API Core 2.1.0 compliance |
-| [`dd`](#dd) | Data Dictionary compliance (replicate + validate a live endpoint) |
+| [`dd`](#dd) | Data Dictionary 2.1 compliance (replicate + validate a live endpoint) |
 | [`metadata`](#metadata) | Validate OData CSDL/EDMX and convert it to a metadata report |
 | [`schema validate` / `schema generate`](#schema) | JSON-Schema tools for a metadata report |
 | [`replicate`](#replicate) | Pull data from an endpoint using an OData replication strategy |
 | [`find-variations`](#find-variations) | DD variations review via the v2 Variations Service |
+| [`rcf`](#rcf) | RESO Common Format: infer a metadata report from payload data and run variations |
 | [`metadata-report adapt`](#metadata-report-adapt) | Back-fill the `resources[]` block on a DD 2.0/2.1 report |
 | [`update-variations`](#update-variations) | Submit reviewed variation suggestions (admin) |
 | [`submit-variations-report`](#submit-variations-report) | Send a DD run's variations report to start or refresh a review |
 | [`submit-variation-decisions`](#submit-variation-decisions) | Mark a report from a sheet of actions and comments, and submit it |
-| [`list-variation-reviews`](#list-variation-reviews) | The variations in review — yours as a provider, the whole pool as an admin (read-only) |
+| [`list-variation-reviews`](#list-variation-reviews) | The variations in review – yours as a provider, the whole pool as an admin (read-only) |
 | [`variations-review-status`](#variations-review-status) | Where each variations submission stands (read-only) |
 
 The first four are **endorsement runners** (a full compliance pipeline against a live
-server). The rest are **per-step utilities** — each does one stage of a run in isolation,
+server). The rest are **per-step utilities** – each does one stage of a run in isolation,
 so you can script the pipeline, debug a single step, or feed its artifact into the next.
 
 ## Shared options
@@ -93,7 +94,7 @@ so you can script the pipeline, debug a single step, or feed its artifact into t
 | Option | Meaning |
 |---|---|
 | `--auth-token <token>` | Pre-fetched bearer token |
-| `--client-id <id>` `--client-secret <secret>` `--token-url <url>` | OAuth2 client-credentials — minted at run time |
+| `--client-id <id>` `--client-secret <secret>` `--token-url <url>` | OAuth2 client-credentials – minted at run time |
 
 **Output** (endorsement runners):
 
@@ -119,12 +120,12 @@ reso-cert add-edit --config ./configs/add-edit-config.json   # multi-provider ba
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--url <url>` | — | Server base URL (mutually exclusive with `--config`) |
-| `--config <path>` | — | Config file with one or more provider entries |
+| `--url <url>` | – | Server base URL (mutually exclusive with `--config`) |
+| `--config <path>` | – | Config file with one or more provider entries |
 | `--resource <name>` | `Property` | OData resource under test |
-| `--payloads <dir>` | — | Directory of payload JSON files |
-| `--metadata <path>` | — | Local XML metadata (for `--mock`) |
-| `--mock` | — | Start a bundled mock OData server |
+| `--payloads <dir>` | – | Directory of payload JSON files |
+| `--metadata <path>` | – | Local XML metadata (for `--mock`) |
+| `--mock` | – | Start a bundled mock OData server |
 | `--spec-version <v>` | `2.0.0` | Spec version stamped into the report |
 
 Provide one of `--url`, `--config`, or `--mock`.
@@ -151,14 +152,19 @@ reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--url <url>` | *(required)* | Server base URL |
+| `--url <url>` | – | Server base URL (mutually exclusive with `--config`) |
+| `--config <path>` | – | Config file with one or more provider entries |
 | `--resources <list>` | well-known list | Comma-separated resource names |
 | `--spec-version <2.0.0\|2.1.0>` | `2.1.0` | Spec version. Config-file mode takes the version from the config entry and ignores this flag. |
 | `--enum-mode <auto\|string\|collections\|isflags>` | `auto` | How enumerations are represented (auto-detected by default) |
 | `--field-overrides <list>` | _(auto)_ | Comma-separated `Resource.Field` (a bare `Field` is not accepted). The named field **replaces** automatic selection for its data type on that resource, and for an enumeration for its own representation: it is the field tested, nothing automatic sits behind it, and a field the service will not filter on fails its test. Name two fields of the same type and both are tried, in the order written. A **sparse** override: every slot not named here is still auto-selected. An entry that resolves to nothing leaves its slot automatic and is reported as unmatched. Replaces `coreOptions.fieldOverrides` from a config rather than merging with it. |
-| `--prefer-fields <list>` | — | **Removed in 0.11.1.** Prints an explanation and is ignored. Use `--field-overrides`; note that the behavior changed from re-ordering candidates to replacing them, so a named field now owns its outcome. |
-| `--full-coverage` | — | Fail if any data-type category has no coverage across all resources |
+| `--prefer-fields <list>` | – | **Removed in 0.11.1.** Prints an explanation and is ignored. Use `--field-overrides`; note that the behavior changed from re-ordering candidates to replacing them, so a named field now owns its outcome. |
+| `--full-coverage` | – | Fail if any data-type category has no coverage across all resources |
+| `--originating-system-name <v>` | – | Scope resource queries to `OriginatingSystemName eq <v>` (multi-tenant providers) |
+| `--originating-system-id <v>` | – | Scope by `OriginatingSystemID` instead. Used only when no name is given |
 | `--save-payloads <dir>` | *(off)* | Write every request and response to `<dir>`. See below. |
+
+Provide one of `--url` or `--config`.
 
 **`--save-payloads`** records what the server actually returned, which the compliance report does
 not: the report keeps each scenario's `requestUrl` and no body, and a response body is retained only
@@ -181,30 +187,37 @@ Headers are kept by **allowlist** and everything else is dropped, so no credenti
 bearer token is never carried over, and a header reaches a file only by being named in
 `KEPT_HEADERS`. The list is the OData protocol family, `Accept` / `Content-Type`,
 `Accept-Language` / `Content-Language`, `Prefer` / `Preference-Applied`, `Retry-After` and
-`WWW-Authenticate` — each one a header the RESO specs or the protocol turn on. `WWW-Authenticate`
+`WWW-Authenticate` – each one a header the RESO specs or the protocol turn on. `WWW-Authenticate`
 is a server challenge and is kept deliberately: it is what names the expected scheme on a 401.
 
-Off unless the flag is given. A capture is a copy of a provider's data on disk, and it is large —
+Off unless the flag is given. A capture is a copy of a provider's data on disk, and it is large –
 one resource against a reference server produced 23 MB from a single page request. Point it outside
 the repository; `.gitignore` catches the conventional directory names and not an arbitrary path.
 
 ### `dd`
-Data Dictionary compliance — replicates a live endpoint and validates it against the DD.
+Data Dictionary 2.1 compliance – replicates a live endpoint and validates it against the DD.
+DD 2.0 remains certifiable and is selectable per run.
 
 ```bash
 reso-cert dd --url https://api.example.com --auth-token TOKEN
-reso-cert dd --url https://api.example.com --auth-token TOKEN
+reso-cert dd --url https://api.example.com --auth-token TOKEN --dd-version 2.0
+reso-cert dd --config ./sample-configs/dd-config.json        # multi-provider batch
 ```
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--url <url>` | *(required)* | Server base URL |
-| `--dd-version <v>` | current DD | DD version (must be a certifiable version) |
+| `--url <url>` | – | Server base URL (mutually exclusive with `--config`) |
+| `--config <path>` | – | Config file with one or more provider entries |
+| `--dd-version <v>` | `2.1` | DD version. 2.0 and 2.1 are certifiable. Anything else is refused, 1.7 included. In config-file mode the entry's version stands unless this flag is given |
 | `--limit <n>` | `100000` | Max records replicated per resource |
 | `--strict` | on | Fail the run on JSON-schema validation errors. On by default, so this flag is only needed to be explicit. Variations fail a run independently of this setting |
-| `--no-strict` | — | Record schema-validation errors without failing on them, so a long run surveys everything to fix. Validation still runs. The run is **not eligible for certification** and says so in its verdict |
-| `--skip-variations` | — | Do not check variations. The run is **not** eligible for certification |
-| `--batch-expand` | — | Batch every expansion per resource into one `$expand` request |
+| `--no-strict` | – | Record schema-validation errors without failing on them, so a long run surveys everything to fix. Validation still runs. The run is **not eligible for certification** and says so in its verdict |
+| `--skip-variations` | – | Do not check variations. The run is **not** eligible for certification |
+| `--batch-expand` | – | Batch every expansion per resource into one `$expand` request |
+| `--originating-system-name <v>` | – | Append `OriginatingSystemName eq <v>` to every replication query (multi-tenant providers) |
+| `--originating-system-id <v>` | – | Append `OriginatingSystemID` instead. Used only when no name is given |
+
+Provide one of `--url` or `--config`.
 
 The variations step computes through the Variations Service. It authenticates with the OAuth2
 client-credentials token minted from `.env` (`TOKEN_URI` / `CLIENT_ID` / `CLIENT_SECRET`), the
@@ -217,7 +230,7 @@ continuous-integration run against the reference server. It reports the step as 
 omitting it, and because the Data Dictionary requires every step to have passed, the run is recorded
 as not eligible for certification: `report-detailed.json` carries a `certification` object naming the
 step, and the run summary prints a `Not eligible for certification` line. The run's `outcome` is
-unaffected — it still describes what happened while the run executed. An absent
+unaffected – it still describes what happened while the run executed. An absent
 `RESO_SERVICES_URL` is never treated as a skip; that still fails the run, so a misconfigured machine
 cannot quietly stop checking variations.
 
@@ -225,7 +238,7 @@ cannot quietly stop checking variations.
 
 ### `metadata`
 Validate OData CSDL/EDMX (XSD + semantic) and convert it to a RESO-format metadata
-report. This is the first cert step and the one that gates the rest — if the metadata
+report. This is the first cert step and the one that gates the rest – if the metadata
 is invalid nothing downstream is meaningful.
 
 ```bash
@@ -246,9 +259,9 @@ reso-cert schema generate -m metadata-report.json --output-dir ./out
 reso-cert schema validate -m metadata-report.json -p payload.json --output-dir -
 ```
 
-- **`schema generate`** — build a JSON Schema from a metadata report. `-m, --metadata`
+- **`schema generate`** – build a JSON Schema from a metadata report. `-m, --metadata`
   (required; `-` stdin) · `-a, --additional-properties` · `--output-dir` (`-` stdout).
-- **`schema validate`** — validate a payload against a report's schema. `-m, --metadata`
+- **`schema validate`** – validate a payload against a report's schema. `-m, --metadata`
   (required) · `-p, --payload` (required; an OData collection `{ value: [...] }` or a
   single record; `-` stdin) · `--dd-version` (default `2.1`) · `-r, --resource` (else inferred from the
   payload `@odata.context`) · `-s, --settings <schema-validation-settings.json>` ·
@@ -269,7 +282,7 @@ reso-cert replicate -u https://api.example.com -s TimestampDesc -r Property -l 1
 | `-u, --url <uri>` | *(required)* OData service-root URI |
 | `-s, --strategy <s>` | *(required)* `TopAndSkip` \| `TimestampAsc` \| `TimestampDesc` \| `NextLink` |
 | `-r, --resource <name>` | Single-resource mode |
-| `-m, --metadata <path>` | Report-driven mode — replicate every resource in the report |
+| `-m, --metadata <path>` | Report-driven mode – replicate every resource in the report |
 | `-x, --expansions <list>` | Comma-separated expansions (single-resource mode) |
 | `-f, --filter <expr>` | OData `$filter` |
 | `-t, --top <n>` / `--max-page-size <n>` | Page size / `odata.maxpagesize` (NextLink) |
@@ -298,10 +311,40 @@ with `-u, --url <url>` (fetches and serializes the endpoint's `$metadata` in mem
 contexts: the auth flags authenticate the `--from-server` fetch; the `/compute` call
 authenticates to the Variations Service with `.env` service credentials.
 
+### `rcf`
+RESO Common Format certification. An RCF provider delivers data rather than a schema, so there is no
+`$metadata` to read: `rcf` infers the metadata report and the data-availability report from the payloads,
+then runs variations against the inferred report. DD schema validation is opt-in, under
+`--schema-validate`.
+
+```bash
+reso-cert rcf -i ./rcf-export/ --output-dir ./out
+reso-cert rcf -i payloads.zip --schema-validate --output-dir ./out
+reso-cert rcf -i payload.json --skip-variations --output-dir ./out   # offline, no credentials
+```
+
+`-i, --input <path>` (required; a `.json` file, a `.zip` or a directory of payloads or records) ·
+`--dd-version <v>` · `-f, --fuzziness <0–1>` (default `0.25`) · `--schema-validate` · `--strict`
+(fail on the first schema error, with `--schema-validate`) · `--skip-variations` ·
+`-a, --additional-properties` (accepted and inert: RCF is always extensible) · `--output-dir <path>`
+(default `.`).
+
+Writes `metadata-report.json` and `data-availability-report.json`, plus
+`data-dictionary-variations.json` when the variations step runs. The run version is `--dd-version` when
+given, else the version in the payload's `@reso.context`, else DD 2.0. The variations call authenticates
+with the `.env` service credentials, as `find-variations` does. `--skip-variations` mints no token, so an
+inference-only run needs none.
+
+Exit `0` pass / `1` schema errors / `2` nothing certifiable ingested or a variations pass that degraded.
+A file whose `@reso.context` cannot be read is a schema error under `--schema-validate` and a `2` without
+it, so an unreadable submission never reads as a clean pass. A variations outage leaves both reports on
+disk and names the reason. An auth misconfiguration is the exception: the run cannot do what was
+asked, so it fails with nothing written.
+
 ### `metadata-report adapt`
 Synthesize the top-level `resources[]` block on a DD 2.0/2.1 metadata report so it can
 be loaded by tools that expect a DD 2.2-shaped report (notably the Reference Server).
-Idempotent — DD 2.2+ reports pass through unchanged.
+Idempotent – DD 2.2+ reports pass through unchanged.
 
 ```bash
 reso-cert metadata-report adapt --in report-2.0.json --out report-adapted.json --pretty
@@ -323,7 +366,7 @@ reso-cert update-variations -s suggestions.csv --admin-review
 (how the submission is flagged) · `--overwrite` (allow overwriting canonical entries) ·
 `--chunk-size <n>` (suggestions per request, default `1000`). The run summary reports
 `submitted`, per-status stats, and any `permission-denied` / `validation-failed` /
-`corrections` — review those before assuming a clean run.
+`corrections` – review those before assuming a clean run.
 
 **Sheet columns.** Headers are matched case-insensitively and trimmed; anything unrecognized is
 reported as skipped rather than dropped silently.
@@ -349,7 +392,7 @@ goes back in without reshaping the file.
 ### `submit-variations-report`
 Send the `variations-report.json` a DD run produced to the Variations Service, which starts a
 review or refreshes one. The whole report goes up, buckets and all, and the service builds the
-pool rows from it — so each row keeps the matcher's suggestions, the strategy that produced its
+pool rows from it – so each row keeps the matcher's suggestions, the strategy that produced its
 mapping, and the element level.
 
 ```bash
@@ -439,7 +482,7 @@ reso-cert variations-review-status --review-status in-review   # admin: every pr
 
 ## Config-file mode
 
-`add-edit` and `entity-event` accept `--config <path>` instead of `--url` to run a batch
+`add-edit`, `entity-event`, `core` and `dd` accept `--config <path>` instead of `--url` to run a batch
 of providers from one file (each entry carries its own server URL, UOIs, and optional
 per-entry overrides). See the sample configs under
 [`sample-configs/`](../../sample-configs/).

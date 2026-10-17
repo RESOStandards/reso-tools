@@ -2,7 +2,7 @@
 
 The RESO MCP server lets an AI assistant answer questions about listings and other Web API data a user has access to without accessing the API directly. It uses the same client SDK RESO uses for certification for data access, meaning it only talks to Web API servers using standard queries and capabilities.
 
-That means the MCP server can also be used to add or edit listings, maintain media, offices and members, or synchronize data from a feed if the Web API server the user is connecting supports it and they're authorized.
+That means the MCP server can also be used to add or edit listings, maintain media, offices and members, or synchronize data from a feed if the Web API server the user is connecting supports it and they are authorized.
 
 ## Getting Started
 
@@ -26,7 +26,7 @@ RESO_CLIENT_SECRET=your-client-secret
 RESO_TOKEN_URI=https://your-server.example.com/oauth/token
 ```
 
-`RESO_BASE_URL` is important and should be verified so credentials aren't exposed to the wrong server.
+`RESO_BASE_URL` is important and should be verified so credentials are not exposed to the wrong server.
 
 AI assistants should never interact with authorization information directly. Additionally, keep `.env` out of version control. 
 
@@ -52,17 +52,17 @@ Keep the `-i`. Without it the server exits right away and looks like it worked.
 
 Using Claude Code, Codex or another coding assistant? Ask it to do all of this for you.
 
-RESO also hosts a cloud MCP server at `services.reso.org/mcp`, with no local installation needed. It's in beta for members. Contact **dev@reso.org** for a key, or for help with any of the above.
+RESO also hosts a cloud MCP server at `services.reso.org/mcp`, with no local installation needed. It is in beta for members. Contact **dev@reso.org** for a key, or for help with any of the above.
 
 ## Authorization and Data Usage
 Authorization relates to the data the user has access to on an API and available capabilities, like searching or updating data. 
 
-It doesn't cover what users can do with that data once they have access. Most services have data licensing agreements, and it's important to review terms and data usage rights to see what's covered.
+It does not cover what users can do with that data once they have access. Most services have data licensing agreements, and it is important to review terms and data usage rights to see what is covered.
 
 
 ## Exploring Listings and Related Data
 
-Once credentials are set up, it's easy to explore RESO data. 
+Once credentials are set up, it is easy to explore RESO data. 
 
 > **User**: Show me the top 10 most recent 3bd residential listings between $1-2m with pools and at least one acre in Austin
 

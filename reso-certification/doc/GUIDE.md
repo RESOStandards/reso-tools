@@ -73,11 +73,11 @@ The toolkit ships four cert flows, one per endorsement RESO certifies. They shar
 The OData query surface. Validates `$filter` across every data type, `$select`, `$orderby`, `$top`, `$skip`, `$count`, enumerations, error code shapes, response metadata and the service document. Version 2.1.0 adds `$expand`, server-driven paging and string-based enum comparisons.
 
 ```bash
-# Default version 2.0.0
+# Default: the current spec version, 2.1.0
 reso-cert core --url https://api.example.com --auth-token TOKEN
 
-# Version 2.1.0
-reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2.1.0
+# Pin the earlier version
+reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2.0.0
 ```
 
 The cert runner samples live records to find good test parameters automatically – it does not need a static config of "use ListPrice = 250000 for the integer test." It looks at what is actually in the server, picks values that exercise each operator and data type, and runs the scenarios against them.
@@ -98,7 +98,7 @@ field.
 
 **A named field is the field that gets tested.** There is no automatic choice behind it. If your
 service will not filter on the field you named, that test fails rather than quietly certifying on a
-different field — which is the point of naming it, and the difference from how this behaved in 0.11.0.
+different field – which is the point of naming it, and the difference from how this behaved in 0.11.0.
 
 It is a sparse override rather than a switch, which is the easy thing to get wrong. Naming a field
 replaces automatic selection **for its data type on that resource**, and for an enumeration for its
@@ -110,13 +110,13 @@ permits a provider to carry `Collection(Edm.String)` and `Collection(Edm.EnumTyp
 side, and each is certified by its own scenarios. Naming one of them does not touch the other.
 
 An entry that does not resolve against the server's metadata is ignored instead of failing the run,
-so a typo costs you that one override and nothing else — that slot simply stays automatic, and the
+so a typo costs you that one override and nothing else – that slot simply stays automatic, and the
 run says which entries landed, which matched nothing, and which were not in `Resource.Field` form.
 The flag replaces a config file's list rather than merging with it, so what you typed is exactly what
 runs.
 
 > **Changed in 0.11.1.** This was `--prefer-fields` / `coreOptions.preferFields`, it accepted a bare
-> field name, and it only moved a field to the front of the candidate list — so a named field that
+> field name, and it only moved a field to the front of the candidate list – so a named field that
 > the server would not filter on fell through to an automatic one. Both old spellings now print an
 > explanation and are ignored rather than being rerouted, because the new behavior is binding and is
 > not what a 0.11.0 user asked for.
@@ -272,6 +272,8 @@ The previous run is moved to `archived/{timestamp}` beside it, so repeated runs 
 
 An identifier missing from the config appears in that path as its own name. A segment reading `providerUsi` is therefore a signal that the field was not supplied, rather than a system actually called that.
 
+What lands in that directory, file by file and endorsement by endorsement, is in [Reading a Certification Run](RUN-REFERENCE.md).
+
 ### Samples
 
 A downloadable sample for each endorsement, with the full field reference, is in [`sample-configs/`](../sample-configs/README.md).
@@ -300,7 +302,7 @@ reso-cert core --url https://api.example.com --auth-token TOKEN --output-dir ./r
 
 **JSON mode** is the right choice when you are processing the cert results downstream – feeding them into a dashboard, archiving them in a results store or comparing two runs to see what regressed. The JSON shape is stable and matches the SDK's `PipelineResult` type.
 
-**`--output-dir`** writes a structured report tree to disk. Each cert run produces a per-scenario JSON file plus a top-level summary. This is the format the official certification submission expects, so a successful local run can be uploaded directly.
+**`--output-dir`** writes a structured report tree to disk. Every run writes `report.json` and `report-detailed.json`, and each endorsement writes its own artifacts beside them: Core, Add/Edit and EntityEvent carry per-resource scenario detail inside `report-detailed.json`, while a Data Dictionary run writes its metadata report, its data availability report and its schema validation findings as separate files. See [Reading a Certification Run](RUN-REFERENCE.md) for what each one contains. This is the format the official certification submission expects, so a successful local run can be uploaded directly.
 
 ---
 
@@ -362,7 +364,7 @@ const passed = results.filter((r) => r.result.status === 'passed').length;
 console.log(`${passed} of ${results.length} endorsements passed`);
 ```
 
-This is exactly how the **[RESO Desktop Client](../reso-desktop-client/)**'s certification UI runs cert in the background while a user watches the progress in real time.
+This is exactly how the **[RESO Desktop Client](https://github.com/RESOStandards/reso-tools/releases/latest)**'s certification UI runs cert in the background while a user watches the progress in real time.
 
 ### Using Config Files
 
@@ -431,7 +433,13 @@ docker compose --profile compliance-entity-event up --build \
 # Web API Core
 docker compose --profile compliance-core up --build \
   --exit-code-from compliance-core compliance-core
+
+# Data Dictionary
+docker compose --profile compliance-dd up --build \
+  --exit-code-from compliance-dd
 ```
+
+Each endorsement also has MongoDB and SQLite profiles, named `<profile>-mongo` and `<profile>-sqlite`. The Data Dictionary and Web API Core variants also need the backend profile, because they share `server-mongo` and `server-sqlite`; the Add/Edit and EntityEvent variants carry their own database and server inside their compliance profile and do not, for example `--profile mongodb --profile compliance-dd-mongo`.
 
 Each profile spins up a clean server, seeds it with realistic data, runs the cert flow and exits with the cert result code. This is the form most CI pipelines use because it produces a deterministic, reproducible cert result against a known data set.
 
@@ -454,17 +462,18 @@ Use code `1` to gate a release, code `2` to alert someone that the test infrastr
 ## Where to Next
 
 * **A target server to run cert against** – the **[RESO Reference Server](../reso-reference-server/)** is the most useful target during development. Spin it up locally, seed it, point cert at it, get a clean baseline. Every example in this guide runs against it cleanly.
-* **Generating test data first** – the **[RESO Data Generator](../reso-data-generator/)** is what produces the records cert runs against. If you want to seed a custom shape, start there.
+* **Generating test data first** – the reference server seeds itself with realistic records. Run `docker compose --profile seed up seed` from `reso-reference-server/`. The standalone test-data generator is not part of this repository.
 * **Calling a server from your own code** – the **[RESO Client SDK](../reso-client/)** is the OData client the cert runner uses internally. If you are integrating with a server outside the cert flow, that is the right entry point.
 * **Validating individual records** – the **[reso-validation](../reso-validation/)** library is the field-level and resource-level validator the cert runner uses for record checks. It is also a stand-alone library you can call directly from your own application.
-* **Running cert through an AI agent** – the **[RESO MCP Server](../reso-mcp-server/)** exposes RESO tools to AI hosts and is the path toward agent-driven cert workflows. Issue **[reso-tools#104](https://github.com/RESOStandards/reso-tools/issues/104)** tracks the work to expose the cert flows themselves as first-class MCP tools, targeted for the webinar following the Spring RESO 2026 conference.
+* **Running cert through an AI agent** – the **[RESO MCP Server](../reso-mcp-server/)** exposes RESO tools to AI hosts and is the path toward agent-driven cert workflows. Issue **[reso-tools#104](https://github.com/RESOStandards/reso-tools/issues/104)** tracks the work to expose the cert flows themselves as first-class MCP tools.
 
 ## Reference
 
+* **[Reading a Certification Run](RUN-REFERENCE.md)** – what every step does and what every report file contains
 * **[Package README](../)** – full CLI flag reference, endorsement details and SDK exports
 * **[Source on GitHub](https://github.com/RESOStandards/reso-tools/tree/main/reso-certification)**
-* **[GitHub source](https://github.com/RESOStandards/reso-tools/tree/main/reso-certification)**
 * **[RCP-010 Add/Edit](https://github.com/RESOStandards/transport/blob/main/proposals/web-api-add-edit.md)** – the spec the Add/Edit cert flow validates
 * **[RCP-027 EntityEvent](https://github.com/RESOStandards/transport/blob/main/proposals/entity-event.md)** – the spec the EntityEvent cert flow validates
 * **[RESO Web API Core](https://github.com/RESOStandards/web-api-commander)** – the canonical reference for what Web API Core compliance covers
-* **[RESO Data Dictionary](https://www.reso.org/data-dictionary/)** – the schema the DD cert flow validates against
+* **[RESO Data Dictionary](https://dd.reso.org/)** – the published Data Dictionary the DD cert flow validates against
+* **[DD reference metadata](https://github.com/RESOStandards/reso-tools/tree/main/reso-common/reference-metadata)** – the exact projection of that Dictionary a run compares to, one file per version

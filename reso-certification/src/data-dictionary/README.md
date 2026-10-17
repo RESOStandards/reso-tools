@@ -4,7 +4,7 @@ Validates OData servers against the RESO Data Dictionary. DD 2.1 is the default;
 
 Replaces the Commander-based DD workflow entirely – metadata serialization, Lookup Resource fetching, and replication all happen natively in TypeScript, calling cert-utils inner functions directly for the replication strategies and variations checking.
 
-> **Note:** RESO no longer certifies providers on DD 1.7. The CLI enforces DD 2.0. DD 1.7 is available via the SDK for historical compatibility only.
+> **Note:** RESO no longer certifies providers on DD 1.7. The CLI accepts DD 2.0 and 2.1 only. DD 1.7 is available via the SDK for historical compatibility only.
 
 ## Usage
 
@@ -32,12 +32,12 @@ The DD pipeline executes these steps:
 | Resolve auth | Bearer token or OAuth2 Client Credentials |
 | Generate metadata report | Fetch `/$metadata`, serialize to metadata-report.json, fetch and merge Lookup Resource data if available |
 | Initialize replication state | Shared state service that tracks stats across all replication strategies |
-| Check variations (DD 2.0) | Compare metadata against reference DD, flag non-standard fields/lookups |
+| Check variations (DD 2.0 and higher) | Compare metadata against reference DD, flag non-standard fields/lookups |
 | Replicate: TIMESTAMP_DESC | Fetch all records ordered by ModificationTimestamp descending |
-| Replicate: NEXT_LINK (DD 2.0) | Fetch all records using server-driven paging |
-| Replicate: NEXT_LINK + filter (DD 2.0) | Fetch recent records with ModificationTimestamp filter |
+| Replicate: NEXT_LINK (DD 2.0 and higher) | Fetch all records using server-driven paging |
+| Replicate: NEXT_LINK + filter (DD 2.0 and higher) | Fetch recent records with ModificationTimestamp filter |
 
-### DD 2.0 Testing
+### Testing on DD 2.0 and Higher
 
 | Capability | Details |
 |------------|---------|
@@ -97,7 +97,7 @@ Tested against the RESO reference server (Docker, PostgreSQL, 153 Property recor
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--dd-version` | 2.0 | DD version (2.0) |
+| `--dd-version` | 2.1 | DD version: 2.0 or 2.1 |
 | `--limit` | 100000 | Max records to replicate per resource |
 | `--strict` | true | Fail the run on JSON schema validation errors. On by default; variations fail a run independently of this |
 | `--no-strict` | – | Record schema validation errors without failing on them. Validation still runs. The run is **not eligible for certification** |
@@ -154,7 +154,7 @@ Results are written to a directory structure compatible with `reso-certification
           lookup-resource-lookup-metadata.json    # Raw Lookup Resource data dump
           data-availability-report.json          # Replication results and field coverage
           data-availability-responses.json       # Raw OData response data
-          data-dictionary-variations.json        # Variations report (DD 2.0)
+          variations-report.json                 # Variations report (DD 2.0 and higher)
         archived/
           20260406T033000000Z/                   # Previous run (auto-archived)
             ...
@@ -193,7 +193,7 @@ ln -s .reso-cert results
 | `lookup-resource-lookup-metadata.json` | Raw Lookup Resource records (LookupName, LookupValue, StandardLookupValue, LegacyODataValue) |
 | `data-availability-report.json` | Field coverage, record counts, and data availability statistics per resource |
 | `data-availability-responses.json` | Raw OData response payloads from replication |
-| `data-dictionary-variations.json` | Non-standard fields and lookups found during variations checking (DD 2.0) |
+| `variations-report.json` | Non-standard fields and lookups found during variations checking, written only when variations were found (DD 2.0 and higher) |
 
 ## Future Optimizations
 

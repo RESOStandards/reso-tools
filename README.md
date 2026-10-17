@@ -10,19 +10,19 @@
 [![Linux AppImage](https://img.shields.io/badge/Linux-AppImage-FCC624?logo=linux&logoColor=black)](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-desktop-client-linux-x86_64.AppImage)
 [![Linux deb](https://img.shields.io/badge/Linux-.deb-A81D33?logo=debian&logoColor=white)](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-desktop-client-linux-amd64.deb)
 
-Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compliant OData servers. This repository holds the reference server, the certification test runner (`reso-cert`), an MCP server for AI agents, and the shared libraries for OData parsing, metadata processing and validation – all published to npm so any project can consume them without the monorepo. The desktop certification app (which bundles a reference server and a local test-data UI) is built separately and distributed here as a downloadable [release](https://github.com/RESOStandards/reso-tools/releases/latest).
+Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compliant OData servers. This repository holds the reference server, the certification test runner (`reso-cert`), an MCP server for AI agents and the shared libraries for OData parsing, metadata processing and validation. Seven of the eight packages publish to npm, so any project can consume them without the monorepo. The MCP server is not published and runs from this repository. The desktop certification app (which bundles a reference server and a local test-data UI) is built separately and distributed here as a downloadable [release](https://github.com/RESOStandards/reso-tools/releases/latest).
 
 ## Packages
 
 | Package | Description | Tests |
 |---------|-------------|-------|
 | [`reso-common/`](reso-common/) | Universal (browser + Node) RESO metadata model and projections – the shared `ResoMetadata` shape, pure helpers and EDMX generator (zero runtime dependencies) | 41 |
-| [`reso-metadata-utils/`](reso-metadata-utils/) | RESO OData metadata processing – CSDL parse + validate (CSDL/XSD), EDMX → metadata-report serialization, live metadata fetching (the deps-requiring side of the metadata split) | 156 |
+| [`reso-metadata-utils/`](reso-metadata-utils/) | RESO OData metadata processing – CSDL parse + validate (CSDL/XSD), EDMX → metadata-report serialization, live metadata fetching (the deps-requiring side of the metadata split) | 160 |
 | [`reso-client/`](reso-client/) | OData 4.01 client SDK – URI builder, CRUD helpers, CSDL metadata parsing, OAuth2 Client Credentials | 211 |
 | [`odata-expression-parser/`](odata-expression-parser/) | Zero-dependency `$filter` and `$expand` expression parser | 180 |
 | [`reso-validation/`](reso-validation/) | Isomorphic field and business-rule validation for RESO Data Dictionary records | 98 |
 | [`reso-reference-server/`](reso-reference-server/) | Metadata-driven OData reference server (PostgreSQL, MongoDB, SQLite) | 286 |
-| [`reso-certification/`](reso-certification/) | RESO Certification CLI + SDK – Add/Edit, EntityEvent, Web API Core, Data Dictionary + RCP-010 schema/replicate/variations ([docs](reso-certification/README.md)) | 1768 |
+| [`reso-certification/`](reso-certification/) | RESO Certification CLI + SDK – Add/Edit (RCP-010), EntityEvent (RCP-027), Web API Core and Data Dictionary, plus per-step utilities for metadata, schema, replication and variations ([docs](reso-certification/README.md)) | 1834 |
 | [`reso-mcp-server/`](reso-mcp-server/) | MCP server – exposes OData query, write, validation, certification tools for AI agents ([guide](reso-mcp-server/doc/GUIDE.md)) | 101 |
 
 ## Quick Start
@@ -32,8 +32,7 @@ Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compl
 Build everything from a fresh clone with a single command:
 
 ```bash
-npm run bootstrap        # builds only packages that need it
-npm run bootstrap:force  # rebuilds everything from scratch
+npm run bootstrap
 ```
 
 This installs dependencies and builds all 8 packages in the correct order. Takes about 30 seconds on a warm cache.
@@ -95,7 +94,7 @@ npm run test:server
 npm run test:certification
 npm run test:mcp
 
-# Lint + typecheck + tests — run before every commit
+# Lint + typecheck + tests – run before every commit
 npm run precommit
 ```
 
@@ -125,10 +124,10 @@ Or run compliance suites against the reference server via Docker:
 cd reso-reference-server
 docker compose up -d --build --wait db server
 
-# Data Dictionary 2.0
+# Data Dictionary 2.0 – the version the reference server serves
 docker compose --profile compliance-dd up --build --exit-code-from compliance-dd
 
-# Web API Core 2.0.0
+# Web API Core 2.1.0
 docker compose --profile compliance-core up --build --exit-code-from compliance-core
 
 # Add/Edit RCP-010

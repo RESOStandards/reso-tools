@@ -1,6 +1,6 @@
 # How the RESO MCP Server Works
 
-The RESO MCP server wraps the same client SDK used for certification. As a result there's not much code required to make it work, but it allows users to search, input, and edit data using natural language with no knowledge of RESO, the Web API, or OData.
+The RESO MCP server wraps the same client SDK used for certification. As a result there is not much code required to make it work, but it allows users to search, input, and edit data using natural language with no knowledge of RESO, the Web API, or OData.
 
 AI agents can read and write RESO data without managing credentials or being allowed to make their own HTTP requests. It leverages 
 existing Web API authorization (OAuth 2.0), which has been proven in production.
@@ -13,7 +13,7 @@ existing Web API authorization (OAuth 2.0), which has been proven in production.
   <sub>Click to expand full size</sub>
 </div>
 
-> **Data Access Is Based on a User's Credentials**: if a user is authorized to read 100 IDX fields through the RESO Web API, their AI can only see those data elements, and can only access the data using standard authorization, queries, and API capabilities. What it can do with that data once it's accessed depends on the data licensing agreement between the end user and data provider. It's up to end users to follow those terms. 
+> **Data Access Is Based on a User's Credentials**: if a user is authorized to read 100 IDX fields through the RESO Web API, their AI can only see those data elements, and can only access the data using standard authorization, queries, and API capabilities. What it can do with that data once it is accessed depends on the data licensing agreement between the end user and data provider. It is up to end users to follow those terms. 
 
 The [User Guide](GUIDE.md) covers using the server. This covers how it is built.
 
@@ -111,15 +111,15 @@ checks only for `200` will report successful writes as failures.
 
 ## Authorization and Security
 
-It's important to keep credentials isolated from the rest of the system, including AI assistants. The MCP server
+It is important to keep credentials isolated from the rest of the system, including AI assistants. The MCP server
 uses OAuth 2.0 to grant authorization through bearer tokens or client credentials (which resolve to bearer tokens). 
 The server handles this behind the scenes so the user's AI cannot access sensitive information. 
 
-Authorization determines what a user can access and do on an API, but it doesn't establish their identity, 
+Authorization determines what a user can access and do on an API, but it does not establish their identity, 
 so end users should be careful to protect their credentials and treat them like passwords. Anyone who 
 gets ahold of them has access. 
 
-### AI Agents Don't Store Tokens and Don't Make Requests
+### AI Agents Do Not Store Tokens and Do Not Make Requests
 
 Both matter, and they are enforced in different places.
 
