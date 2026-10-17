@@ -88,17 +88,38 @@ you would rather a particular field be the one on record as exercising a data ty
 
 ```bash
 reso-cert core --url https://api.example.com --auth-token TOKEN \
-  --prefer-fields Property.ListPrice,Office.FeedTypes
+  --field-overrides Property.ListPrice,Office.FeedTypes
 ```
 
-The same list works as `coreOptions.preferFields` in a config file, and in the desktop client under
-**Web API Core Options → Preferred Fields**. A bare `Field` is accepted as well as `Resource.Field`.
+The same list works as `coreOptions.fieldOverrides` in a config file, and in the desktop client under
+**Web API Core Options → Field Overrides**. Each entry is `Resource.Field`. A bare field name is not
+accepted, because an override is binding and a bare name would apply to every resource carrying that
+field.
+
+**A named field is the field that gets tested.** There is no automatic choice behind it. If your
+service will not filter on the field you named, that test fails rather than quietly certifying on a
+different field — which is the point of naming it, and the difference from how this behaved in 0.11.0.
 
 It is a sparse override rather than a switch, which is the easy thing to get wrong. Naming a field
-moves it to the front of the candidates **for its data type**; every type you do not name is still
-chosen automatically. An entry that does not resolve against the server's metadata is ignored instead
-of failing the run, so a typo costs you that one override and nothing else. The flag replaces a
-config file's list rather than merging with it, so what you typed is exactly what runs.
+replaces automatic selection **for its data type on that resource**, and for an enumeration for its
+own **representation**; every other type, representation and resource is still chosen automatically.
+So naming one field leaves the rest of the run alone.
+
+That representation detail matters on a server that serves more than one enumeration form. RESO
+permits a provider to carry `Collection(Edm.String)` and `Collection(Edm.EnumType)` fields side by
+side, and each is certified by its own scenarios. Naming one of them does not touch the other.
+
+An entry that does not resolve against the server's metadata is ignored instead of failing the run,
+so a typo costs you that one override and nothing else — that slot simply stays automatic, and the
+run says which entries landed, which matched nothing, and which were not in `Resource.Field` form.
+The flag replaces a config file's list rather than merging with it, so what you typed is exactly what
+runs.
+
+> **Changed in 0.11.1.** This was `--prefer-fields` / `coreOptions.preferFields`, it accepted a bare
+> field name, and it only moved a field to the front of the candidate list — so a named field that
+> the server would not filter on fell through to an automatic one. Both old spellings now print an
+> explanation and are ignored rather than being rerouted, because the new behavior is binding and is
+> not what a 0.11.0 user asked for.
 
 See [Field Selection](../src/web-api-core/README.md#field-selection) for how the ranking works and
 when overriding it is worth doing.

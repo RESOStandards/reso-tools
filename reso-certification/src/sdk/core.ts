@@ -13,7 +13,7 @@ import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata, getEntityType, loadMetadataFromFile, parseMetadataXml, persistMetadataXml } from '../test-runner/metadata.js';
 import { createCapturingRequester } from '../test-runner/payload-capture.js';
 import { type ODataRequester, createCertSession, createSessionRequester } from '../test-runner/requester.js';
-import { type FieldPreferenceSummary, parseFieldPreferences, summarizeFieldPreferences } from '../web-api-core/field-preference.js';
+import { type FieldOverrideSummary, parseFieldOverrides, summarizeFieldOverrides } from '../web-api-core/field-override.js';
 import {
   NO_KEY_DECLARED,
   NO_RECORDS_SAMPLED,
@@ -45,10 +45,10 @@ interface CoreContext extends BaseTestContext {
   readonly enumMode: 'auto' | 'isflags' | 'collections' | 'string';
   readonly resources: ReadonlyArray<string>;
   readonly resourceReports?: ReadonlyArray<ResourceTestReport>;
-  /** Field-selection steering for this run: requested, applied, and what matched nothing. Recorded
-   *  because a preference changes WHAT WAS TESTED, so a reviewer has to be able to see both that a run
-   *  was steered and whether the steering actually landed. */
-  readonly fieldPreferences?: FieldPreferenceSummary;
+  /** Field-selection overrides for this run: requested, applied, what matched nothing, and what was not
+   *  well-formed. Recorded because an override changes WHAT WAS TESTED, so a reviewer has to be able to see
+   *  both that a run was overridden and whether the override actually landed. */
+  readonly fieldOverrides?: FieldOverrideSummary;
   readonly [key: string]: unknown;
 }
 
@@ -334,9 +334,9 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     const metadata = parseMetadataXml(ctx.metadataXml);
     const version = ctx.version;
     // Standard map (DD reference) built once per run — field/value membership for standard-first selection.
-    // Parse the operator's field preferences once for the run: config (`coreOptions.preferFields`, which the
+    // Parse the operator's field overrides once for the run: config (`coreOptions.fieldOverrides`, which the
     // desktop writes) and the CLI flag land in the same place by the time they reach here.
-    const fieldPreferences = parseFieldPreferences(config.preferFields);
+    const fieldOverrides = parseFieldOverrides(config.fieldOverrides);
     const standardMap = buildStandardMap(version);
 
     // Lookup Resource validation dependencies, built ONCE per run and shared across resources:
@@ -504,9 +504,9 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           // Resource-aware OriginatingSystem scope (multi-tenant): resolveTestParams applies it only to
           // resources whose metadata carries the field, and to its own sample fetch. Inert when unset.
           { name: config.originatingSystemName, id: config.originatingSystemId },
-          // Field preferences re-order the ranked candidates for this resource. Parsed once per run,
+          // Field overrides REPLACE the ranked candidates for a slot on this resource. Parsed once per run,
           // inert when the config and the flag both leave it unset.
-          fieldPreferences
+          fieldOverrides
         ).catch((err: unknown) => {
           if (isDeadlineError(err)) return null;
           throw err;
@@ -700,24 +700,56 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     const deadlineReached = resourceReports.some(r => r.deadlineReached);
     const status = coreVerdict({ totalFailed, coverageFailed, deadlineReached });
 
-    // A preference that matched no candidate on any resource changed nothing. Say so out loud rather than
-    // letting the operator assume the run was steered: a field only becomes preferable once it has a sampled
-    // value AND its representation matches a scenario, and neither is obvious from the outside.
-    const preferenceSummary =
-      fieldPreferences.entries.length > 0
-        ? summarizeFieldPreferences(
-            fieldPreferences,
-            resourceReports.map(r => r.params.appliedFieldPreferences ?? [])
+    // An override that matched no candidate on any resource changed nothing. Say so out loud rather than
+    // letting the operator assume the run was overridden: a field only becomes eligible once it has a sampled
+    // value, its representation matches a scenario, AND it can discriminate — none of which is obvious from
+    // the outside. Three distinct things get said, because they want three different corrections: what landed
+    // (and so decided a verdict), what was well-formed but matched nothing, and what was never well-formed.
+    const overrideSummary =
+      fieldOverrides.entries.length > 0 || fieldOverrides.malformed.length > 0
+        ? summarizeFieldOverrides(
+            fieldOverrides,
+            resourceReports.map(r => r.params.appliedFieldOverrides ?? [])
           )
         : undefined;
-    if (preferenceSummary?.unmatched?.length) {
+    if (overrideSummary?.applied.length) {
       onProgress({
         step: RUN_CORE_SCENARIOS,
         status: 'running',
-        message: `Field preference had no effect: ${preferenceSummary.unmatched.join(', ')} – matched no steerable candidate on any resource`,
-        detail: { kind: 'core-progress', event: 'phase', phase: 'done', outcome: 'skipped', note: 'field preference unmatched' }
+        message: `Field override applied: ${overrideSummary.applied.join(', ')} – these fields were tested instead of the automatic choice, and a failure on one is a failure of the named field`,
+        detail: { kind: 'core-progress', event: 'phase', phase: 'done', outcome: 'passed', note: 'field override applied' }
       });
     }
+    if (overrideSummary?.unmatched?.length) {
+      onProgress({
+        step: RUN_CORE_SCENARIOS,
+        status: 'running',
+        message: `Field override had no effect: ${overrideSummary.unmatched.join(', ')} – matched no eligible candidate on any resource, so that selection stayed automatic`,
+        detail: { kind: 'core-progress', event: 'phase', phase: 'done', outcome: 'skipped', note: 'field override unmatched' }
+      });
+    }
+    if (overrideSummary?.malformed?.length) {
+      onProgress({
+        step: RUN_CORE_SCENARIOS,
+        status: 'running',
+        message: `Field override ignored: ${overrideSummary.malformed.join(', ')} – not in Resource.Field form. An override is binding, so it needs an explicit resource; a bare field name is rejected rather than applied to every resource carrying it`,
+        detail: { kind: 'core-progress', event: 'phase', phase: 'done', outcome: 'skipped', note: 'field override malformed' }
+      });
+    }
+
+    // The three messages above are `status: 'running'`, which in DEFAULT render mode lands in a transient
+    // activity slot that the next update overwrites (see cli/render.ts) - so they survive only under
+    // --verbose. The override state decided WHAT WAS TESTED, so it also goes on the summary line, which
+    // persists in every render mode and in a continuous-integration log.
+    const overrideMsg = overrideSummary
+      ? [
+          overrideSummary.applied.length > 0 ? `Field overrides applied: ${overrideSummary.applied.join(', ')}` : '',
+          overrideSummary.unmatched?.length ? `overrides matching nothing: ${overrideSummary.unmatched.join(', ')}` : '',
+          overrideSummary.malformed?.length ? `overrides ignored as malformed: ${overrideSummary.malformed.join(', ')}` : ''
+        ]
+          .filter(part => part.length > 0)
+          .join('; ')
+      : '';
 
     const coverageMsg = fullCoverage ? 'Full type coverage achieved' : `Missing coverage: ${missingTypes.join(', ')}`;
     const modeMsg = requireFullCoverage ? ' (--full-coverage enabled)' : '';
@@ -728,15 +760,15 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         ...ctx,
         resourceReports,
         coverageMatrix: { coveredTypes, missingTypes, fullCoverage },
-        // Only when the run was actually steered, so an unsteered report carries no empty key. Reporting the
-        // REQUESTED spec alone would be worse than reporting nothing: a preference naming a field that never
+        // Only when the run was actually overridden, so an automatic report carries no empty key. Reporting the
+        // REQUESTED spec alone would be worse than reporting nothing: an override naming a field that never
         // qualified changes nothing, and a report that echoed the request would make that run indistinguishable
-        // from one the preference actually steered. So requested and applied are reported separately, and what
+        // from one the override actually decided. So requested and applied are reported separately, and what
         // matched nothing anywhere is named outright.
-        ...(preferenceSummary ? { fieldPreferences: preferenceSummary } : {})
+        ...(overrideSummary ? { fieldOverrides: overrideSummary } : {})
       },
       status,
-      summary: `${incompleteMsg}${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped${totalWarnings > 0 ? `, ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}` : ''}${optTotal > 0 ? `; optional: ${optPassed} passed, ${optNotSupported} not supported, ${optNotTested} not tested` : ''} (${totalScenarios} scenarios across ${resourceReports.length} resources). ${coverageMsg}${modeMsg}`,
+      summary: `${incompleteMsg}${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped${totalWarnings > 0 ? `, ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}` : ''}${optTotal > 0 ? `; optional: ${optPassed} passed, ${optNotSupported} not supported, ${optNotTested} not tested` : ''} (${totalScenarios} scenarios across ${resourceReports.length} resources). ${coverageMsg}${modeMsg}${overrideMsg ? `. ${overrideMsg}` : ''}`,
       counts: {
         total: totalScenarios,
         passed: totalPassed,

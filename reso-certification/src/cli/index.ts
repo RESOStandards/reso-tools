@@ -52,6 +52,7 @@ import { submitVariationsReportViaService } from '../variations/submit.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { mintOAuth2ClientCredentialsToken, resolveCliAuth } from './auth.js';
 import { formatPlan, planDecisionPush } from './decisions-command.js';
+import { overrideRenameNotice, removedPreferFields } from './deprecations.js';
 import { runMetadataStep } from './metadata-command.js';
 import { resolveRcfExitCode, runRcf } from './rcf-command.js';
 import { resolveRenderMode, runConfigEntries, runWithProgress } from './render.js';
@@ -413,14 +414,17 @@ const coreCmd = program
   .option('--originating-system-name <v>', 'Scope resource queries to OriginatingSystemName eq <v> (multi-tenant providers)')
   .option('--originating-system-id <v>', 'Scope resource queries to OriginatingSystemID eq <v> (used when no name; OSN takes precedence)')
   .option(
-    '--prefer-fields <list>',
-    'Comma-separated field-selection preferences, Resource.Field or bare Field (e.g., Office.FeedTypes). Reorders ' +
-      'the ranked candidates; auto-selection decides everything else. Overrides coreOptions.preferFields from a config.'
-  );
+    '--field-overrides <list>',
+    'Comma-separated Resource.Field (e.g., Office.FeedTypes). The named field REPLACES automatic selection for ' +
+      'its data type: it is the field tested, there is no fallback behind it, and a failure on it is a failure. ' +
+      'Sparse – every slot you do not name still auto-selects. Replaces coreOptions.fieldOverrides from a config.'
+  )
+  // Removed in 0.11.1, declared only so the old spelling gets an explanation instead of "unknown option".
+  // Its value is never read, so nothing downstream depends on the old name.
+  .option('--prefer-fields <list>', 'Removed – use --field-overrides (see the message it prints).');
 
 addAuthOptions(coreCmd);
 addOutputOptions(coreCmd);
-
 coreCmd.action(
   async (opts: {
     url?: string;
@@ -431,6 +435,8 @@ coreCmd.action(
     fullCoverage?: boolean;
     originatingSystemName?: string;
     originatingSystemId?: string;
+    fieldOverrides?: string;
+    /** Removed in 0.11.1 — read only to explain the change, never forwarded. */
     preferFields?: string;
     savePayloads?: string;
     authToken?: string;
@@ -456,11 +462,17 @@ coreCmd.action(
 
       // Flags apply only when given: a config entry's coreOptions block is the next source, then auto-detect.
       const enumModeFlag = opts.enumMode as 'auto' | 'isflags' | 'collections' | 'string' | undefined;
-      // A preference list from the flag replaces the config's rather than merging: an override the operator
-      // typed should be exactly what runs, with no invisible union from the file.
-      const preferFieldsFlag: ReadonlyArray<string> | undefined =
-        typeof opts.preferFields === 'string' && opts.preferFields.trim().length > 0
-          ? opts.preferFields
+      // `--prefer-fields` was the 0.11.0 spelling and it re-ordered candidates instead of replacing them. The
+      // value is deliberately NOT forwarded: silently rerouting it would give the old flag the new, binding
+      // behavior, which is a different thing from what its user asked for. Say what changed and let them retype.
+      if (typeof opts.preferFields === 'string' && opts.preferFields.trim().length > 0) {
+        console.error(overrideRenameNotice('--prefer-fields', '--field-overrides', [opts.preferFields]));
+      }
+      // An override list from the flag replaces the config's rather than merging: what the operator typed
+      // should be exactly what runs, with no invisible union from the file.
+      const fieldOverridesFlag: ReadonlyArray<string> | undefined =
+        typeof opts.fieldOverrides === 'string' && opts.fieldOverrides.trim().length > 0
+          ? opts.fieldOverrides
               .split(',')
               .map((v: string) => v.trim())
               .filter((v: string) => v.length > 0)
@@ -478,6 +490,13 @@ coreCmd.action(
         // Config-file mode — run every entry. The entry supplies server/auth/version/OSN (reso-certification-utils
         // format); CLI flags apply run-level knobs (resources / enum-mode / coverage) and can override auth/OSN.
         const configFile = await loadConfigFile(resolve(opts.config));
+        // A config still carrying the removed key gets the same explanation the flag gets. Its value is not
+        // forwarded: rerouting it would hand the old key the new binding behavior, which is not what its
+        // author asked for. Deduplicated across entries so a multi-recipient config says it once.
+        const removedInConfig = [...new Set(configFile.configs.flatMap(entry => removedPreferFields(entry.coreOptions)))];
+        if (removedInConfig.length > 0) {
+          console.error(overrideRenameNotice('coreOptions.preferFields', 'coreOptions.fieldOverrides', removedInConfig));
+        }
         const authFlags = { authToken: opts.authToken, clientId: opts.clientId, clientSecret: opts.clientSecret, tokenUrl: opts.tokenUrl };
 
         const entries = configFile.configs.map(entry => {
@@ -492,7 +511,9 @@ coreCmd.action(
             ...(opts.fullCoverage || baseConfig.fullCoverage ? { fullCoverage: true } : {}),
             ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
             ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
-            ...((preferFieldsFlag ?? baseConfig.preferFields) ? { preferFields: preferFieldsFlag ?? baseConfig.preferFields } : {}),
+            ...((fieldOverridesFlag ?? baseConfig.fieldOverrides)
+              ? { fieldOverrides: fieldOverridesFlag ?? baseConfig.fieldOverrides }
+              : {}),
             // Resolved here so every entry of a multi-entry config writes under one known directory
             // rather than wherever each happened to be invoked from.
             ...(opts.savePayloads ? { savePayloadsDir: resolve(opts.savePayloads) } : {}),
@@ -520,7 +541,7 @@ coreCmd.action(
           resources,
           ...(opts.originatingSystemName ? { originatingSystemName: opts.originatingSystemName } : {}),
           ...(opts.originatingSystemId ? { originatingSystemId: opts.originatingSystemId } : {}),
-          ...(preferFieldsFlag ? { preferFields: preferFieldsFlag } : {}),
+          ...(fieldOverridesFlag ? { fieldOverrides: fieldOverridesFlag } : {}),
           ...(opts.savePayloads ? { savePayloadsDir: resolve(opts.savePayloads) } : {}),
           options: {
             ...(opts.outputDir ? { outputDir: resolve(opts.outputDir) } : {})

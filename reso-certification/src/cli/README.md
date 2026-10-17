@@ -155,7 +155,8 @@ reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2
 | `--resources <list>` | well-known list | Comma-separated resource names |
 | `--spec-version <2.0.0\|2.1.0>` | `2.1.0` | Spec version. Config-file mode takes the version from the config entry and ignores this flag. |
 | `--enum-mode <auto\|string\|collections\|isflags>` | `auto` | How enumerations are represented (auto-detected by default) |
-| `--prefer-fields <list>` | _(auto)_ | Comma-separated `Resource.Field`, or a bare `Field`. Moves those to the front of the ranked candidates for their data type. A **sparse** override: every type not named here is still auto-selected. Replaces `coreOptions.preferFields` from a config rather than merging with it. |
+| `--field-overrides <list>` | _(auto)_ | Comma-separated `Resource.Field` (a bare `Field` is not accepted). The named field **replaces** automatic selection for its data type on that resource, and for an enumeration for its own representation: it is the field tested, nothing automatic sits behind it, and a field the service will not filter on fails its test. Name two fields of the same type and both are tried, in the order written. A **sparse** override: every slot not named here is still auto-selected. An entry that resolves to nothing leaves its slot automatic and is reported as unmatched. Replaces `coreOptions.fieldOverrides` from a config rather than merging with it. |
+| `--prefer-fields <list>` | — | **Removed in 0.11.1.** Prints an explanation and is ignored. Use `--field-overrides`; note that the behavior changed from re-ordering candidates to replacing them, so a named field now owns its outcome. |
 | `--full-coverage` | — | Fail if any data-type category has no coverage across all resources |
 | `--save-payloads <dir>` | *(off)* | Write every request and response to `<dir>`. See below. |
 

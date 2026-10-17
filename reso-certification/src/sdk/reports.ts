@@ -304,18 +304,18 @@ export const createDetailedReportGenerator = (
     // Extract resource-level test reports if available (Core, Add/Edit, EntityEvent)
     const ctx = result.context as Record<string, unknown>;
     const resourceReports = ctx.resourceReports as ReadonlyArray<Record<string, unknown>> | undefined;
-    // Field-selection preferences steer WHAT WAS TESTED, so a steered run says so in its report. Absent
-    // on an ordinary run rather than present and empty, so the key's presence is itself the signal. The
-    // value carries `requested`, `applied` and (when they differ) `unmatched` — the presence of the key
-    // means a preference was GIVEN, never that one took effect; `applied` is what answers that.
-    const fieldPreferences = ctx.fieldPreferences as { readonly requested: ReadonlyArray<string> } | undefined;
+    // Field overrides decide WHAT WAS TESTED, so an overridden run says so in its report. Absent on an
+    // ordinary run rather than present and empty, so the key's presence is itself the signal. The value
+    // carries `requested`, `applied` and (when they differ) `unmatched` and `malformed` — the presence of
+    // the key means an override was GIVEN, never that one took effect; `applied` is what answers that.
+    const fieldOverrides = ctx.fieldOverrides as { readonly requested: ReadonlyArray<string> } | undefined;
 
     return {
       description,
       version,
       softwareVersion: SOFTWARE_VERSION,
       generatedOn: new Date().toISOString(),
-      ...(fieldPreferences && fieldPreferences.requested.length > 0 ? { fieldPreferences } : {}),
+      ...(fieldOverrides && fieldOverrides.requested.length > 0 ? { fieldOverrides } : {}),
       remarks: serializeRemarks(result),
       outcome: result.status,
       /**

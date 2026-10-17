@@ -14,7 +14,7 @@ import type { EntityType } from '../test-runner/types.js';
 import { extractNextLink } from './assertions.js';
 import type { NowFieldPastness } from './empty-verdict.js';
 import { type EnumCandidate, isMultiRep, isSingleRep, selectEnumCandidates } from './enum-selection.js';
-import { MIN_DISCRIMINATING_VALUES, NO_FIELD_PREFERENCES, type PreferredFields, matchedPreferences } from './field-preference.js';
+import { type FieldOverrides, MIN_DISCRIMINATING_VALUES, NO_FIELD_OVERRIDES, matchedOverrides } from './field-override.js';
 import { rebaseNextLink } from './next-link.js';
 import { ORIGINATING_SYSTEM_ID_FIELD, ORIGINATING_SYSTEM_NAME_FIELD, originatingSystemFilterClause } from './queries.js';
 import { type ScalarCandidate, collectFieldValues, selectScalarCandidates } from './scalar-selection.js';
@@ -154,16 +154,16 @@ export interface TestParams {
   readonly singleLookupDistinctCount?: number;
   readonly multiLookupDistinctCount?: number;
   readonly skippedTypes: ReadonlyArray<string>;
-  /** Field preferences that actually matched a candidate on this resource, exactly as the operator wrote them.
-   *  A preference re-orders selection, so it changes WHAT WAS TESTED — the report has to say so, or a steered
-   *  run is indistinguishable from an unsteered one and a provider could influence their own certification.
-   *  Only matched entries appear: a preference naming a field this resource does not carry had no effect and
-   *  must not be reported as though it did. */
-  readonly appliedFieldPreferences?: ReadonlyArray<string>;
+  /** Field overrides that actually pinned a candidate on this resource, exactly as the operator wrote them.
+   *  An override replaces selection for its slot, so it changes WHAT WAS TESTED — the report has to say so, or
+   *  an overridden run is indistinguishable from an automatic one and a provider could influence their own
+   *  certification. Only matched entries appear: an override naming a field this resource does not carry had no
+   *  effect and must not be reported as though it did. */
+  readonly appliedFieldOverrides?: ReadonlyArray<string>;
 }
 
-/** The promotion rule, mirrored from the selectors so `applied` reports only what actually took effect: a
- *  preference naming a non-discriminating field was refused there and must not be reported as honored here. */
+/** The eligibility rule, mirrored from the selectors so `applied` reports only what actually took effect: an
+ *  override naming a non-discriminating field was refused there and must not be reported as honored here. */
 const enumCanDiscriminate = (c: EnumCandidate): boolean => c.distinctValueCount >= MIN_DISCRIMINATING_VALUES;
 const scalarCanDiscriminate = (c: ScalarCandidate<unknown>): boolean => c.stats.distinct >= MIN_DISCRIMINATING_VALUES;
 
@@ -594,7 +594,7 @@ export const resolveTestParams = async (
   enumModeOverride?: EnumMode,
   requester: ODataRequester = webRequester,
   originatingSystem?: { readonly name?: string; readonly id?: string },
-  preferFields: PreferredFields = NO_FIELD_PREFERENCES
+  fieldOverrides: FieldOverrides = NO_FIELD_OVERRIDES
 ): Promise<TestParams> => {
   // enumMode is retained as an informational/coverage field only — selection and gating are now per-field
   // (resolveEnum), so the `--enumMode` override no longer steers field choice. Vestigial; a candidate for removal.
@@ -676,7 +676,7 @@ export const resolveTestParams = async (
     standardMap,
     resource,
     isSingleRep,
-    preferFields
+    fieldOverrides
   );
   const multiLookupCandidates = selectEnumCandidates(
     entityType.properties,
@@ -685,14 +685,14 @@ export const resolveTestParams = async (
     standardMap,
     resource,
     isMultiRep,
-    preferFields
+    fieldOverrides
   );
 
   // Resolve integer field + values from the RESO-first ladder (standard DD fields before local ones; see
   // selectScalarCandidates). The primary is the top-ranked candidate; the runner walks the rest when the server
   // will not filter on it. median → eq/ge/le/ne; min → gt; max → lt (the gt/lt targets must be the extremes so a
   // match exists iff another value lies beyond them — the empty-verdict gates gt/lt on distinct).
-  const integerCandidates = selectScalarCandidates(integerFields, records, standardMap, resource, numericStats, preferFields);
+  const integerCandidates = selectScalarCandidates(integerFields, records, standardMap, resource, numericStats, fieldOverrides);
   const intPrimary = integerCandidates[0];
   const integerField = intPrimary?.field;
   const integerValueLow = intPrimary?.stats.median;
@@ -703,7 +703,7 @@ export const resolveTestParams = async (
   const integerNotSentinel = intPrimary ? integerNotSentinelFor(intPrimary.values) : undefined;
 
   // Resolve decimal field + values (same ladder, same median/min/max scheme).
-  const decimalCandidates = selectScalarCandidates(decimalFields, records, standardMap, resource, numericStats, preferFields);
+  const decimalCandidates = selectScalarCandidates(decimalFields, records, standardMap, resource, numericStats, fieldOverrides);
   const decPrimary = decimalCandidates[0];
   const decimalField = decPrimary?.field;
   const decimalValueLow = decPrimary?.stats.median;
@@ -715,17 +715,17 @@ export const resolveTestParams = async (
 
   // Resolve date field + values (same ladder). This is the group the 2026-09-21 run failed on: a local Edm.Date
   // declared first, a 500 on its $filter, and all six Date scenarios failed with standard Date fields available.
-  const dateCandidates = selectScalarCandidates(dateFields, records, standardMap, resource, dateStats, preferFields);
+  const dateCandidates = selectScalarCandidates(dateFields, records, standardMap, resource, dateStats, fieldOverrides);
 
   // Record which preferences took effect on THIS resource, for the report. Union across every candidate
   // family, deduplicated, written as the operator wrote them.
-  const appliedPreferences = [
+  const appliedOverrides = [
     ...new Set([
-      ...matchedPreferences(singleLookupCandidates, preferFields, resource, c => c.field, enumCanDiscriminate),
-      ...matchedPreferences(multiLookupCandidates, preferFields, resource, c => c.field, enumCanDiscriminate),
-      ...matchedPreferences(integerCandidates, preferFields, resource, c => c.field, scalarCanDiscriminate),
-      ...matchedPreferences(decimalCandidates, preferFields, resource, c => c.field, scalarCanDiscriminate),
-      ...matchedPreferences(dateCandidates, preferFields, resource, c => c.field, scalarCanDiscriminate)
+      ...matchedOverrides(singleLookupCandidates, fieldOverrides, resource, c => c.field, enumCanDiscriminate),
+      ...matchedOverrides(multiLookupCandidates, fieldOverrides, resource, c => c.field, enumCanDiscriminate),
+      ...matchedOverrides(integerCandidates, fieldOverrides, resource, c => c.field, scalarCanDiscriminate),
+      ...matchedOverrides(decimalCandidates, fieldOverrides, resource, c => c.field, scalarCanDiscriminate),
+      ...matchedOverrides(dateCandidates, fieldOverrides, resource, c => c.field, scalarCanDiscriminate)
     ])
   ];
   const datePrimary = dateCandidates[0];
@@ -859,6 +859,6 @@ export const resolveTestParams = async (
     expandNavs,
     lookupNameByField: Object.keys(lookupNameByField).length ? lookupNameByField : undefined,
     skippedTypes,
-    appliedFieldPreferences: appliedPreferences.length > 0 ? appliedPreferences : undefined
+    appliedFieldOverrides: appliedOverrides.length > 0 ? appliedOverrides : undefined
   };
 };

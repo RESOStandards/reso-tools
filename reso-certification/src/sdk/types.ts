@@ -366,9 +366,10 @@ export interface CoreConfig extends BaseComplianceConfig {
   readonly originatingSystemName?: string;
   /** Optional filter — `OriginatingSystemID eq '<value>'` when no name is provided (OSN takes precedence). */
   readonly originatingSystemId?: string;
-  /** Sparse field-selection override — see `ConfigCoreOptions.preferFields`. Re-orders ranked candidates;
-   *  never adds one, never pins a failing field (the ladder falls through). Applied entries are reported. */
-  readonly preferFields?: ReadonlyArray<string>;
+  /** Sparse field-selection override — see `ConfigCoreOptions.fieldOverrides`. REPLACES the ranked candidates
+   *  for a slot, so a named field owns its outcome and fails rather than falling through; it still never adds
+   *  a candidate. Entries are `Resource.Field`; a bare field name is rejected. Applied entries are reported. */
+  readonly fieldOverrides?: ReadonlyArray<string>;
   /**
    * Directory to write every request and its response into, one JSON file per exchange.
    *
