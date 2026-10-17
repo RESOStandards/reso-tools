@@ -4,7 +4,7 @@ const { readFile, writeFile, mkdir } = require('fs/promises');
 const { join, normalize, resolve } = require('path');
 const { existsSync } = require('fs');
 
-const { REPLICATION_STRATEGIES, fetchTopLevelResourceCount } = require('./utils');
+const { REPLICATION_STRATEGIES, fetchTopLevelResourceCount, describeSchemaErrors } = require('./utils');
 const { NOT_OK, getLoggers } = require('../../common');
 
 const { replicationIterator } = require('./replication-iterator');
@@ -123,6 +123,7 @@ const replicate = async ({
     let generatedSchema, validationConfig;
 
     let schemaValidationResults = {};
+
 
     if (jsonSchemaValidation) {
 
@@ -332,18 +333,20 @@ const replicate = async ({
                     acquisition: 'transport'
                   }) ?? {};
 
-                const {
-                  stats: { totalErrors = 0 }
-                } = schemaValidationResults ?? {};
+                // One line per page that has errors, carrying the totals and the per-class breakdown. A page
+                // with errors that printed nothing would read as a page that passed.
+                const schemaReport = describeSchemaErrors({ errorMap: schemaValidationResults, resourceName });
+                if (schemaReport.line) LOG_ERROR(schemaReport.line);
 
-                const hasValidationErrors = totalErrors > 0;
+                const hasValidationErrors = schemaReport.totals !== null;
 
                 if (hasValidationErrors) {
-                  LOG_ERROR(`Schema validation errors found in the ${resourceName} payload!`);
                   if (strictMode) {
                     await writeSchemaValidationErrorReport({ outputPath, errorMap: schemaValidationResults });
                     if (throwOnError) {
-                      const err = new Error(`Schema validation errors found in the ${resourceName} payload`);
+                      // The totals travel in the message as well as the attached results: a caller that only
+                      // surfaces `err.message` otherwise reports a failure with no magnitude.
+                      const err = new Error(`Schema validation errors found in the ${resourceName} payload: ${schemaReport.totals}`);
                       err.schemaValidationResults = schemaValidationResults;
                       throw err;
                     }

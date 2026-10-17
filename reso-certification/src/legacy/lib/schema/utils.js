@@ -429,6 +429,11 @@ const changeKeyMapToList = errorCache => {
  * @param {String} obj.version
  * @returns {Object} Consolidated error and warning report
  */
+/** How many DISTINCT offending values to record per field on a type-mismatch finding.
+ *  An enum field's values come from a picklist and stay small; a type error can be on free text, so the
+ *  distinct set is unbounded and an uncapped tally could put hundreds of thousands of strings in a report. */
+const MAX_SCHEMA_VALUES_RECORDED = 25;
+
 const combineErrors = ({ errorCache, warningsCache, stats, version }) => {
   return {
     description: 'RESO Common Format Schema Validation Summary',
@@ -484,7 +489,8 @@ const updateCacheAndStats = ({
   sourceModelField,
   keyField,
   keyFieldValue,
-  failedEnum
+  failedEnum,
+  failedTypeValue
 }) => {
   const filePath = fileName;
   if (isReservedKey(filePath)) {
@@ -544,6 +550,31 @@ const updateCacheAndStats = ({
       cache[message].resources[resourceName].fields[failedItemName] = error;
     } else {
       cache[message].resources[resourceName].fields[failedItemName].count++;
+    }
+
+    // Record WHICH value failed, not only how many did. The value was computed to build the message
+    // ("...but found string") and then discarded, so a report could say "56 strings in CeilingHeight" and
+    // leave an operator unable to act on it: "", "8.5" and "N/A" are three different conversations with a
+    // provider. `failedTypeValue` is a dedicated channel rather than a reuse of `failedItemValue`, because
+    // other keywords deliberately blank that field (`additional-properties` sets it to '') and must not
+    // start recording values. Note this runs AFTER the node above is replaced, not before, or it would be
+    // dropped by that replacement.
+    if (failedTypeValue !== undefined) {
+      const node = cache[message].resources[resourceName].fields[failedItemName];
+      const key =
+        failedTypeValue === null || typeof failedTypeValue !== 'object'
+          ? String(failedTypeValue)
+          : Array.isArray(failedTypeValue)
+            ? '(array)'
+            : '(object)';
+      if (!node.values) node.values = {};
+      if (node.values[key]) {
+        node.values[key].count++;
+      } else if (Object.keys(node.values).length < MAX_SCHEMA_VALUES_RECORDED) {
+        node.values[key] = { count: 1 };
+      } else {
+        node.valuesOmitted = (node.valuesOmitted ?? 0) + 1;
+      }
     }
   }
 

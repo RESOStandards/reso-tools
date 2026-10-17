@@ -388,11 +388,15 @@ const generateErrorReport = ({
       }, null);
     }
 
+    // The offending value is kept on its own channel before `failedItemValue` is blanked, so the report can
+    // name WHICH value failed and not only how many did. See updateCacheAndStats.
+    let failedTypeValue;
     if (keyword === SCHEMA_ERROR_KEYWORDS.TYPE) {
       const schemaType = params?.type;
       const schemaTypeFormatted = Array.isArray(schemaType) ? schemaType.join(' or ') : schemaType;
       message = `MUST be ${schemaTypeFormatted} but found ${determineType(failedItemValue)}`;
       transformedValue = determineType(failedItemValue);
+      failedTypeValue = failedItemValue;
       failedItemValue = '';
     }
 
@@ -520,7 +524,8 @@ const generateErrorReport = ({
       sourceModelField,
       keyField,
       keyFieldValue,
-      failedEnum
+      failedEnum,
+      failedTypeValue
     });
     return acc;
   }, {});

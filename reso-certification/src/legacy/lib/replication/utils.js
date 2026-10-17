@@ -1429,6 +1429,90 @@ const fetchTopLevelResourceCount = async ({ resourceName, serviceRootUri, filter
  */
 const getRandomInt = (max = 9) => Math.floor(Math.random() * max);
 
+/** How many of an error class's failing fields to name before summarizing the rest. Enough to show the
+ *  shape of the problem, few enough that one error class stays on one line. */
+const MAX_SCHEMA_FIELDS_LOGGED = 5;
+
+/**
+ * Describe a page's schema-validation state as ONE operator-facing line.
+ *
+ * Replaces a generic line emitted per page - "Schema validation errors found in the <Resource> payload!" -
+ * with no count, no field and no error class, so a 1,770-page run produced 1,770 identical copies of a
+ * sentence that was impossible to ignore and told the operator nothing.
+ *
+ * The fix is to make the line CARRY the state, not to print it less often. Announcing each error class once
+ * and then going quiet was the first attempt and it was wrong for a specific reason (Josh, 2026-10-16):
+ * **a page with errors that prints nothing reads as a page that passed.** Silence is not a safe default when
+ * the subject is a failure. So every page with errors emits a line, every time.
+ *
+ * Consequences of that, deliberately: there is NO carried state - no announce-set, no page cadence - so the
+ * same accumulator always renders the same line, there is nothing to reset between replication strategies,
+ * and no caller can suppress a page by threading history back in. Classes are ordered largest first so the
+ * dominant problem reads first, and the whole state stays on one line so a long run is still greppable.
+ *
+ * Every number here was already in the accumulator at runtime; this only reports it.
+ *
+ * @param {Object} obj
+ * @param {Object} obj.errorMap the accumulated validation result (`stats` + `errorCache`)
+ * @param {String} obj.resourceName resource the current page belongs to
+ * @returns {{line: String|null, totals: String|null}} both null when the page found no errors
+ */
+const describeSchemaErrors = ({ errorMap, resourceName }) => {
+  const { stats: { totalErrors = 0, totalWarnings = 0 } = {}, errorCache = {} } = errorMap ?? {};
+  if (!(totalErrors > 0)) return { line: null, totals: null };
+
+  const count = n => Number(n || 0).toLocaleString('en-US');
+  const plural = (n, word) => `${count(n)} ${word}${Number(n || 0) === 1 ? '' : 's'}`;
+  const classes = Object.keys(errorCache);
+  const totals = `${plural(totalErrors, 'error')}, ${plural(totalWarnings, 'warning')}, ${plural(classes.length, 'distinct type')}`;
+
+  // Only classes that actually hit THIS resource are broken down; errorCache is keyed by MESSAGE across
+  // every resource, so naming another resource's finding here would send the operator to the wrong place.
+  // The totals stay run-wide, because they are run-wide.
+  const breakdown = classes
+    .map(message => ({ message, hit: errorCache[message]?.resources?.[resourceName] }))
+    .filter(({ hit }) => hit)
+    .map(({ message, hit }) => {
+      // Largest fields first, so the cap hides the SMALLEST rather than whichever was recorded last. On a
+      // live run the old insertion order collapsed `Rooms` (12,351, the biggest and the field under
+      // investigation) into "+1 more" while `Heating` (104) kept a visible slot. A field's own count is the
+      // sum of its per-value counts; a class that records no per-value counts sorts to all-zero and the
+      // stable sort then preserves the recorded order, which is the only order it has.
+      // A field's own count comes from one of TWO shapes, because the validator records two. An enum-class
+      // field carries `{ lookups: { value: { count } } }` and no field-level count; a type-class field
+      // carries `{ count }` and no lookups at all. Reading only the lookups scored every type-class field at
+      // zero and silently fell back to recorded order. A field with neither sorts to zero, which is correct:
+      // there is nothing to order it by.
+      const fieldCount = fv =>
+        fv?.count !== undefined
+          ? Number(fv.count || 0)
+          : Object.values(fv?.lookups ?? {}).reduce((s, v) => s + Number(v?.count || 0), 0);
+      const fields = Object.entries(hit.fields ?? {})
+        .map(([field, fv]) => ({ field, n: fieldCount(fv) }))
+        .sort((a, b) => b.n - a.n)
+        .map(({ field }) => field);
+      const shown = fields.slice(0, MAX_SCHEMA_FIELDS_LOGGED);
+      const remaining = fields.length - shown.length;
+      const where = shown.length
+        ? ` on ${plural(fields.length, 'field')} (${shown.join(', ')}${remaining > 0 ? `, +${remaining} more` : ''})`
+        : '';
+      return { n: Number(hit.count || 0), text: `${message} ${count(hit.count)}${where}` };
+    })
+    .sort((a, b) => b.n - a.n);
+
+  // The lead number is THIS resource's own count, so the line reconciles against its own breakdown. Leading
+  // with `stats.totalErrors` instead was a measured defect: it is cumulative across every resource, so a
+  // live run printed "Schema validation (Member): 42,793 errors ... 3,996 on 1 field", and a resource with
+  // none of its own printed a five-figure count and no breakdown - reading as catastrophe on a clean
+  // resource, the exact inverse of the bug this logging was written to fix. The cumulative figure is still
+  // shown, labeled as cumulative, because watching it climb is the point of a per-page line.
+  const own = breakdown.reduce((sum, { n }) => sum + n, 0);
+  const head = `${plural(own, 'error')}, ${plural(breakdown.length, 'type')} here (${count(totalErrors)} run total)`;
+  const detail = breakdown.length > 0 ? ` \u00b7 ${breakdown.map(({ text }) => text).join(' \u00b7 ')}` : '';
+
+  return { line: `Schema validation (${resourceName}): ${head}${detail}`, totals };
+};
+
 module.exports = {
   ERROR_TYPES,
   REPLICATION_DIRECTORY_NAME,
@@ -1443,6 +1527,7 @@ module.exports = {
   writeSchemaValidationErrorReport,
   writeSchemaValidationWarningsReport,
   SCHEMA_VALIDATION_WARNINGS_FILENAME,
+  describeSchemaErrors,
   processHttpErrorResponse,
   parseResourceNameFromODataRequestUri,
   buildOutputFilePath,
