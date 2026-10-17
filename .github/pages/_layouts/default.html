@@ -301,6 +301,15 @@
       font-size: 0.75rem;
       color: var(--reso-gray-500);
     }
+    /* The platform download links live inside .package-meta spans. The span rule above colors the span, not
+       a nested anchor, and the site sets no generic `a` color, so without this they fell back to the browser
+       default blue - which does not change in dark mode and read as off-palette there. Matches .view-link,
+       since both appear on the same card. */
+    .package-meta a {
+      color: var(--reso-blue);
+      text-decoration: none;
+    }
+    .package-meta a:hover { text-decoration: underline; }
 
     /* View link */
     .view-link {
@@ -780,6 +789,7 @@
     html.dark .package-name { color: #90cdf4; }
     html.dark .package-desc { color: #a0aec0; }
     html.dark .package-meta span { color: #718096; }
+    html.dark .package-meta a { color: #63b3ed; }
     html.dark .package-item { border-color: #4a5568; }
     html.dark .view-link { color: #63b3ed; }
     html.dark .arch-diagram { background: #2d3748; border-color: #4a5568; }
