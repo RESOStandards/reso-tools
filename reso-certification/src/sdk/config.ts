@@ -47,12 +47,13 @@ interface ConfigCoreOptions {
   readonly fullCoverage?: boolean;
   readonly originatingSystemName?: string;
   readonly originatingSystemId?: string;
-  /** Sparse "use auto except for these" override on field selection — `Office.FeedTypes` to scope it to one
-   *  resource, or a bare `FeedTypes` to apply wherever the field appears. A preference re-orders the ranked
-   *  candidates and nothing else: it cannot add a candidate, and the runner still falls through to automatic
-   *  order when a preferred field is not queryable. Written here rather than only as a CLI flag so the desktop
-   *  client can author it. Every applied preference is recorded in the compliance report. */
-  readonly preferFields?: ReadonlyArray<string>;
+  /** Sparse "use auto except for these" replacement of field selection — `Office.FeedTypes`, one entry per
+   *  field, and the resource is required. An override REPLACES the ranked candidates for its data-type slot:
+   *  the named field is the one tested, there is no ladder behind it, and a named field the service will not
+   *  filter on fails its test rather than falling through. It still cannot add a candidate — naming an
+   *  ineligible field leaves that slot automatic. Written here rather than only as a CLI flag so the desktop
+   *  client can author it. Every applied override is recorded in the compliance report. */
+  readonly fieldOverrides?: ReadonlyArray<string>;
 }
 interface ConfigAddEditOptions {
   readonly resource?: string;
@@ -332,7 +333,7 @@ export const configEntryToCore = (entry: ConfigEntry, providerUoi: string): Core
   ...(entry.coreOptions?.enumMode ? { enumMode: entry.coreOptions.enumMode } : {}),
   ...(coreResources(entry.coreOptions?.resources) ? { resources: coreResources(entry.coreOptions?.resources) } : {}),
   ...(entry.coreOptions?.fullCoverage ? { fullCoverage: true } : {}),
-  ...(entry.coreOptions?.preferFields?.length ? { preferFields: entry.coreOptions.preferFields } : {}),
+  ...(entry.coreOptions?.fieldOverrides?.length ? { fieldOverrides: entry.coreOptions.fieldOverrides } : {}),
   ...(osn(entry.coreOptions, entry) ? { originatingSystemName: osn(entry.coreOptions, entry) } : {}),
   ...(osid(entry.coreOptions, entry) ? { originatingSystemId: osid(entry.coreOptions, entry) } : {}),
   // The three identifiers `buildOutputPath` reads off the config. They were used here only to

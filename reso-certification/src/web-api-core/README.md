@@ -228,24 +228,51 @@ prefer a particular field be the one on record as exercising a type.
 
 ```bash
 reso-cert core --url https://api.example.com --auth-token TOKEN \
-  --prefer-fields Property.ListPrice,Office.FeedTypes,StandardStatus
+  --field-overrides Property.ListPrice,Office.FeedTypes
 ```
 
 Or in a config entry:
 
 ```json
-{ "coreOptions": { "version": "2.1.0", "preferFields": ["Property.ListPrice", "Office.FeedTypes"] } }
+{ "coreOptions": { "version": "2.1.0", "fieldOverrides": ["Property.ListPrice", "Office.FeedTypes"] } }
 ```
+
+An override **replaces** automatic selection for its data-type slot rather than re-ordering it. The
+named field is the one queried, there is no candidate ladder behind it, and a field the service will
+not filter on fails its test instead of falling through to an automatic choice. The candidate ladder
+exists because ranking is uncorrelated with filterability and the engine is otherwise *guessing*;
+under an override it is not guessing, so the provider owns the outcome.
+
+Three things an override cannot do. It cannot add a candidate — naming a field that is absent, of the
+wrong type, or unable to discriminate leaves that slot automatic and is reported as unmatched. It
+cannot use a bare field name, since a binding instruction needs an explicit resource. And it cannot
+steer timestamp selection, which has its own ranker (`rankDatetimeFields`).
 
 The flag **replaces** a config's list rather than merging, so what an operator typed is exactly what
 runs, with no invisible union from the file. The desktop client exposes the same list under Web API
 Core Options.
 
+Every applied override travels into the compliance report as `fieldOverrides`, with `requested`,
+`applied`, and — when they apply — `unmatched` and `malformed`. An overridden run must be visibly
+overridden: which field was tested is part of the evidence for the verdict.
+
+`applied` means the override **replaced that resource's candidates** for a slot. It is not a promise
+that a scenario queried the field: scenarios are pinned to one representation each, so an override on
+a `Collection(Edm.EnumType)` field cannot serve a `Collection(Edm.String)` scenario however highly it
+ranks. The field a scenario actually queried is in its own `requestUrl`.
+
 Three properties are worth being explicit about, because each is an easy wrong assumption:
 
-- **It is sparse.** Naming a field does not turn auto-selection off. It re-orders the candidates for
-  that field's data type; every other type is still chosen automatically.
-- **It is a preference, not an assertion.** An entry that does not resolve against the provider's
-  metadata is ignored, leaving the auto-selected candidate in place. It does not fail the run.
+- **It is sparse.** Naming a field does not turn auto-selection off. It replaces the candidates for
+  that field's own data type, and for an enumeration its own **representation**; every other type,
+  representation and resource is still chosen automatically. An override on a
+  `Collection(Edm.String)` field leaves a `Collection(Edm.EnumType)` field on the same resource
+  automatic, because the two are certified by different scenarios.
+- **A named field owns its outcome.** This is the part that is not a preference: there is no
+  candidate behind the field you named, so a field the service will not filter on fails its test.
+- **But it cannot fail a run by not resolving.** An entry that does not resolve against the
+  provider's metadata — absent, wrong type, or unable to discriminate — never became a candidate, so
+  that slot stays automatic and the entry is reported as unmatched. A typo costs you that one
+  override and nothing else.
 - **The type is detected at runtime**, from the provider's metadata, rather than declared. You name
-  the field; which data type it covers follows from what it is.
+  the field; which data type and representation it covers follows from what it is.

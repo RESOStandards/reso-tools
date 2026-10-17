@@ -17,7 +17,7 @@
  * that field by construction; the standard map is a ranking input, never a value source.
  */
 
-import { MIN_DISCRIMINATING_VALUES, NO_FIELD_PREFERENCES, type PreferredFields, applyFieldPreferences } from './field-preference.js';
+import { type FieldOverrides, MIN_DISCRIMINATING_VALUES, NO_FIELD_OVERRIDES, applyFieldOverrides } from './field-override.js';
 import type { StandardMap } from './standard-map.js';
 
 /** Min / median / max over a field's sampled values, plus the type-aware distinct count. Produced by the
@@ -94,7 +94,7 @@ export const selectScalarCandidates = <V>(
   standardMap: StandardMap,
   resource: string,
   stats: (values: ReadonlyArray<unknown>) => ScalarStats<V> | undefined,
-  preferred: PreferredFields = NO_FIELD_PREFERENCES
+  overrides: FieldOverrides = NO_FIELD_OVERRIDES
 ): ReadonlyArray<ScalarCandidate<V>> => {
   const candidates = fields
     .map(field => {
@@ -116,10 +116,11 @@ export const selectScalarCandidates = <V>(
   // Standard before local (the filter), then usage, then distinct count as a usage tiebreak only.
   const rank = (c: ScalarCandidate<V>): number => (c.isStandard ? 0 : 1);
   const ranked = [...candidates].sort((a, b) => rank(a) - rank(b) || b.fillRate - a.fillRate || b.stats.distinct - a.stats.distinct);
-  // See MIN_DISCRIMINATING_VALUES: steering may not promote a field that cannot exercise ne/gt/lt.
-  return applyFieldPreferences(
+  // An override REPLACES this slot rather than re-ordering it. Only a field that can actually exercise
+  // ne/gt/lt is eligible (see MIN_DISCRIMINATING_VALUES); otherwise the slot stays automatic.
+  return applyFieldOverrides(
     ranked,
-    preferred,
+    overrides,
     resource,
     c => c.field,
     c => c.stats.distinct >= MIN_DISCRIMINATING_VALUES

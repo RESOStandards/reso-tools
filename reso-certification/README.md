@@ -84,6 +84,11 @@ Validates OData query capabilities: $filter across all data types, $select, $ord
 
 ```bash
 reso-cert core --url https://api.example.com --auth-token TOKEN
+
+# Name the field tested for a data type instead of letting sampling choose. The named field is the
+# one tested, so a field the service will not filter on fails its test rather than falling back.
+reso-cert core --url https://api.example.com --auth-token TOKEN \
+  --field-overrides Property.ListPrice,Office.FeedTypes
 ```
 
 [**More info**](src/web-api-core/README.md)
@@ -290,7 +295,7 @@ docker compose --profile compliance-core up --build \
 ```bash
 npm install
 npm run build
-npm test        # ~1751 tests
+npm test        # ~1,834 tests
 npm run dev     # Watch mode
 ```
 
