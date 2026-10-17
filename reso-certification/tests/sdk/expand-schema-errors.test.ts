@@ -15,6 +15,54 @@ describe('errorMessagesFromCache — field-qualified expand errors', () => {
     expect(msgs).toEqual(['MUST be advertised in the metadata (fields: PhotoUrl, ImageOf)']);
   });
 
+  // A key inside an EXPANDED child fails against the child's own definition, but the validator files the
+  // finding under the PARENT's expansion field — `fields.Media` — and carries the real location in
+  // `sourceModel` / `sourceModelField`. Reading only the field KEY therefore names a navigation property that
+  // IS advertised and hides the field that is not. Observed on a live Core run 2026-10-17, where the message
+  // read "(field: Media)" for a provider whose Property type declares Media correctly; the offending key was
+  // `MimeType` on the Media child, and the cache said so all along.
+  it('names the nested field, not the parent expansion, when the failure is one level down', () => {
+    const errorCache = {
+      'Fields MUST be advertised in the metadata': {
+        resources: {
+          Property: {
+            fields: { Media: { count: 30, sourceModel: 'Media', sourceModelField: 'MimeType' } },
+            count: 30
+          }
+        }
+      }
+    };
+    expect(errorMessagesFromCache(errorCache)).toEqual(['Fields MUST be advertised in the metadata (field: Media.MimeType)']);
+  });
+
+  it('keeps the parent name when a nested failure records no sourceModelField', () => {
+    const errorCache = {
+      'Fields MUST be advertised in the metadata': {
+        resources: { Property: { fields: { Media: { count: 2, sourceModel: 'Media' } }, count: 2 } }
+      }
+    };
+    expect(errorMessagesFromCache(errorCache)).toEqual(['Fields MUST be advertised in the metadata (field: Media)']);
+  });
+
+  it('separates a nested failure from a top-level failure of the same rule', () => {
+    const errorCache = {
+      'Fields MUST be advertised in the metadata': {
+        resources: {
+          Property: {
+            fields: {
+              Media: { count: 3, sourceModel: 'Media', sourceModelField: 'MimeType' },
+              LocalOnlyField: { count: 1 }
+            },
+            count: 4
+          }
+        }
+      }
+    };
+    expect(errorMessagesFromCache(errorCache)).toEqual([
+      'Fields MUST be advertised in the metadata (fields: Media.MimeType, LocalOnlyField)'
+    ]);
+  });
+
   it('falls back to the bare message when no field is attributed', () => {
     expect(errorMessagesFromCache({ 'Some structural error': {} })).toEqual(['Some structural error']);
   });

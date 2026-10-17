@@ -161,14 +161,28 @@ export const errorMessagesFromCache = (errorCache: Record<string, unknown> | und
     const resources = asRecord(asRecord(entry)?.resources);
     if (!resources) return message;
 
-    // Keyed by field name, so a field appearing under several resources is one entry — and a Map preserves
-    // the insertion order the previous `new Set(...)` relied on.
+    // Keyed by the DISPLAYED name, so a field appearing under several resources is one entry — and a Map
+    // preserves the insertion order the previous `new Set(...)` relied on.
+    //
+    // The displayed name is not always the cache key. When the failure is one level down — a key inside an
+    // EXPANDED child, checked against the child's own definition — the validator files it under the PARENT's
+    // expansion field and puts the real location in `sourceModel` / `sourceModelField`
+    // (`utils.js` parseNestedPropertyForResourceAndField; `validate.js` keeps the parent name BECAUSE
+    // sourceModel is set). Reading only the key then names a navigation property that IS advertised and drops
+    // the field that is not, which is the opposite of self-diagnosing: it points the reader at correct
+    // metadata. Qualifying it as `Parent.Field` keeps the parent's context and restores the real name.
     const valuesByField = new Map<string, Set<string>>();
     for (const resource of Object.values(resources)) {
       for (const [fieldName, fieldNode] of Object.entries(asRecord(asRecord(resource)?.fields) ?? {})) {
-        const bucket = valuesByField.get(fieldName) ?? new Set<string>();
-        for (const value of Object.keys(asRecord(asRecord(fieldNode)?.lookups) ?? {})) bucket.add(value);
-        valuesByField.set(fieldName, bucket);
+        const node = asRecord(fieldNode);
+        const nestedField = typeof node?.sourceModelField === 'string' ? node.sourceModelField : undefined;
+        const parentModel = typeof node?.sourceModel === 'string' ? node.sourceModel : fieldName;
+        // No sourceModelField recorded (a nested failure the validator could not place, or an ordinary
+        // top-level one) renders exactly as before, so every existing message is byte-identical.
+        const label = nestedField ? `${parentModel}.${nestedField}` : fieldName;
+        const bucket = valuesByField.get(label) ?? new Set<string>();
+        for (const value of Object.keys(asRecord(node?.lookups) ?? {})) bucket.add(value);
+        valuesByField.set(label, bucket);
       }
     }
     if (valuesByField.size === 0) return message;

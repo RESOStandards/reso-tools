@@ -2,6 +2,42 @@
 
 ---
 
+## Certification 0.11.2 – 2026-10-17
+
+`reso-certification 0.11.2`
+
+A schema finding inside an expanded record now names the field that failed.
+
+### An expanded child's failure names the child's field, not the parent expansion
+
+When a key inside an expanded record is not advertised, the validator checks it against the
+child's own definition but files the finding under the parent's expansion field, carrying the
+real location alongside it. The report summarizer read only the key it was filed under, so a
+provider whose `Property` type declares `Media` correctly was told:
+
+```
+$expand Listings: 20/20 item(s) schema-invalid against Property
+  – item 0: Fields MUST be advertised in the metadata (field: Media)
+```
+
+`Media` is advertised. The field that was not advertised sat one level down, on the `Media`
+records themselves. The message pointed at correct metadata and omitted the only name that
+would have resolved it, which is worse than saying less: a reader checks the named field, finds
+it declared, and concludes the tool is wrong. It takes a reading of the error cache to discover
+that the answer was recorded the whole time.
+
+The same finding now reads:
+
+```
+  – item 0: Fields MUST be advertised in the metadata (field: Media.MimeType)
+```
+
+A finding with no nested location recorded renders exactly as before, so existing messages are
+byte-identical and anything matching on the rule text still matches. The rule constants are
+untouched.
+
+---
+
 ## Certification 0.11.1 – 2026-10-16
 
 `reso-certification 0.11.1` · `reso-metadata-utils 0.1.4`
