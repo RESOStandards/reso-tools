@@ -47,6 +47,75 @@ rejected a 2.1 run outright. Live runs were unaffected, because the current runn
 version explicitly rather than relying on a default. Each default now derives from its matching
 current-version constant instead of restating a number, so a future version bump is one edit.
 
+### Field selection can be overridden, and an override now decides the outcome
+
+Core testing samples live data and picks, per type, the field most likely to produce a meaningful
+query. A provider who knows their own data can name a field instead. That already existed, as
+`--prefer-fields` and `coreOptions.preferFields`, but it only moved the named field to the front of
+a ranked list. The runner walks that list and falls through when a field is not queryable, so a
+named field the service would not filter on quietly handed the test to an automatic choice. The
+report then read the same as an unsteered run.
+
+It is now `--field-overrides` and `coreOptions.fieldOverrides`, and the named field is the field
+that gets tested. Nothing automatic sits behind it, so a field the service will not filter on fails
+its test. That is the point of naming it: if you steer, you own the outcome.
+
+Three limits keep that from being a trap. An override still cannot invent a candidate, so naming a
+field that is absent, of the wrong type, or holding one distinct value across the sample leaves that
+selection automatic and is reported as unmatched; a typo costs that one override and nothing else.
+An override is sparse, replacing selection for one data type on one resource, and for an enumeration
+for one representation, so a provider serving `Collection(Edm.String)` and `Collection(Edm.EnumType)`
+fields side by side keeps both certified by their own scenarios. And every override is recorded in
+the report as `fieldOverrides`, carrying what was requested, what took effect, what matched nothing
+and what was not well formed, because a run whose verdict was decided by a named field has to say so.
+
+Each entry is `Resource.Field`. A bare field name is no longer accepted: an override is binding, and
+a bare name applies to every resource carrying that field, so one entry could decide several
+resources at once.
+
+`--prefer-fields` and `coreOptions.preferFields` are removed. Both are still recognized and print an
+explanation naming the replacement, and neither value is carried over, because applying the new
+binding behavior to a list written for the old one would change what a run certifies.
+
+### A schema validation failure says what failed, on every page
+
+A replication that failed JSON Schema validation logged one line per page reading only "Schema
+validation errors found in the <Resource> payload!" with no count, no field and no error class. A full
+replication is thousands of pages, so a run whose first page had a problem produced thousands of
+identical copies of a sentence that was impossible to ignore and told the operator nothing. One run
+reached roughly 885,000 records that way.
+
+Every page that has errors now prints one line carrying the running totals and the per-class
+breakdown. The line is not printed less often: a page with errors that printed nothing would read as
+a page that passed, and silence is not a safe default when the subject is a failure. A page with no
+errors prints nothing, which is the one case where silence is correct, so total silence across a run
+means nothing was found anywhere rather than nothing was reported.
+
+```
+Schema validation (Property): 17,715 errors, 3 types here (23,705 run total) · MUST be advertised in
+the metadata 17,311 on 6 fields (Rooms, City, CountyOrParish, MlsStatus, StreetSuffix, +1 more) · …
+```
+
+Three properties of that line are deliberate. The lead number is **this resource's own** count, so it
+reconciles against its own breakdown, and the cumulative figure is shown separately and labeled;
+leading with the cumulative figure meant a resource with none of its own printed a five figure count
+and no breakdown at all, which read as catastrophe on a clean resource. Error classes and their
+fields are both ordered **largest first**, because a cap that hides by insertion order reliably hides
+the field that matters: on a live run the largest contributor was collapsed into "+1 more" while a
+field with a hundredth of its count kept a visible slot. And the whole state stays on one line, so a
+long run is still greppable and a page count is still a line count.
+
+A type mismatch also records **which value** failed, not only how many did. The value was computed to
+build the message ("MUST be number or null but found string") and then discarded, so a report could
+say "56 strings in CeilingHeight" and leave an operator unable to act, since an empty string, "8.5"
+and "N/A" are three different conversations with a provider. Those values now appear on the field in
+the errors report, bounded at 25 distinct values with a count of what was omitted, because a type
+error can be on free text and its distinct set is unbounded.
+
+Every number here was already in the accumulator at the time, so this reports what the run already
+knew. The strict mode failure carries the totals in its message as well, since a caller that surfaces
+only the message was reporting a failure with no magnitude.
+
 ### Smaller changes
 
 - The OData client reports the version its package publishes. The constant said 0.2.3 while the
@@ -55,6 +124,8 @@ current-version constant instead of restating a number, so a future version bump
   of stamping one version into every report it produces.
 - The certification documentation leads with Data Dictionary 2.1 and Web API Core 2.1.0. Earlier
   minors remain supported and are named as such rather than shown as the default.
+- The Core run summary names the field overrides that took effect, so the record of what was tested
+  survives in a continuous-integration log rather than only in a live terminal.
 
 ---
 
