@@ -9,8 +9,8 @@
 - **Immutability:** Use `const` always; avoid `let` and `var`. Do not mutate objects/arrays. Use `Object.freeze()` when appropriate – note that it is shallow, so deep-clone nested objects before mutation. Prefer `Readonly<T>` and `ReadonlyArray<T>` in type signatures where practical.
 - **Naming:** camelCase for variables/functions, PascalCase for types/interfaces, snake_case for directories.
 - **Async:** Use `async/await`.
-- **HTTP:** Use the native `fetch` API (Node 18+). Check `response.ok` before reading the body.
-- **Linting and Formatting:** No eslint/prettier config exists yet. If added, follow the project config.
+- **HTTP:** Use the native `fetch` API (Node 22+). Check `response.ok` before reading the body.
+- **Linting and Formatting:** Biome, configured in `biome.json` at the repository root. Run `npm run lint` and `npm run lint:fix` from there.
 - **Style**: Always use arrow functions.
 
 # TypeScript
@@ -22,8 +22,18 @@
 # Directory Structure
 - `/src/test-runner` – Shared infrastructure: types, validators, HTTP client, auth, metadata, reporter, helpers.
 - `/src/add-edit` – RCP-010 Add/Edit spec: scenario runner, compliance report, mock server.
+- `/src/entity-event` – RCP-027 EntityEvent spec: scenario runner, compliance report, data validator, mock server.
 - `/src/web-api-core` – Web API Core 2.1.0.
 - `/src/data-dictionary` – Data Dictionary 2.1.
+- `/src/sdk` – Public SDK surface: per-endorsement entry points, pipeline and step types, config, DD and Core version constants.
+- `/src/metadata` – Metadata report generation: EDMX to `metadata-report.json`, with the optional Lookup Resource merge.
+- `/src/etl` – CommonJS ETL: metadata, data-availability and Lookup Resource processing, plus the `getReferenceMetadata` chokepoint.
+- `/src/variations` – DD variation detection over a metadata report, as a thin client over the backend service.
+- `/src/variations-v2` – The `/compute` read path, reimplemented as a single descent.
+- `/src/rcf` – RESO Common Format schema inference: a DD metadata report inferred from sampled records.
+- `/src/replication` – Generic OData replication iterator: the paging loop and nothing else.
+- `/src/xsd` – XSD validation of CSDL XML against the OASIS OData schemas.
+- `/src/legacy` – Legacy CommonJS cert-utils: schema, DD tests, UPI, variations, replication, metadata conversion.
 - `/src/cli` – Unified CLI entry point using commander.
 - `/src/index.ts` – Public SDK exports.
 - `/tests` – Vitest tests.
@@ -33,7 +43,8 @@
 - Build: `npm run build`
 - Test: `npm test`
 - Dev: `npm run dev`
-- Lint: `npm run lint`
+- Typecheck: `npm run lint` (`tsc --noEmit`)
+- Biome lint: `npm run lint` at the repository root
 
 # Prohibitions
 - DO NOT use classes or `this`.

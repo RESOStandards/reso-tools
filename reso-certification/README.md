@@ -2,7 +2,7 @@
 
 Compliance testing toolkit for RESO OData servers. Run certification tests from the command line, integrate them into your CI pipeline or call the SDK directly from your application.
 
-- **Three endorsements** ready to use: Add/Edit, EntityEvent, Web API Core
+- **Four endorsements** ready to use: Add/Edit, EntityEvent, Web API Core and Data Dictionary
 - **Pure TypeScript** – built on [`reso-client`](../reso-client/) for OData and [`reso-validation`](../reso-validation/) for field validation
 - **Auto-configuring** – samples live server data to build test parameters, auto-detects enum mode from metadata
 - **SDK-first** – the CLI, Desktop Client and MCP server all call the same SDK functions with progress callbacks
@@ -30,7 +30,7 @@ cd reso-tools/reso-certification
 npm install
 ```
 
-The `preinstall` hook automatically builds sibling packages this one depends on (`reso-client`, `reso-validation`). To bootstrap every package at once, run `npm run bootstrap` from the repo root instead.
+This package depends on the siblings `reso-common`, `reso-client`, `reso-metadata-utils` and `reso-validation`, which have to be built first. `npm run bootstrap` from the repository root installs and builds every package.
 
 ## Getting Started
 
@@ -43,6 +43,9 @@ reso-cert entity-event --url https://api.example.com --auth-token TOKEN
 
 # Web API Core compliance
 reso-cert core --url https://api.example.com --auth-token TOKEN
+
+# Data Dictionary compliance
+reso-cert dd --url https://api.example.com --auth-token TOKEN
 ```
 
 > **[Full CLI reference](src/cli/README.md)** – every command and option, including the per-step utilities (`metadata`, `schema`, `replicate`, `find-variations`) and the `update-variations` admin command.
@@ -55,6 +58,8 @@ Auth is resolved automatically from the first available source:
 2. **Config file**: `--config path/to/config.json` (per-entry auth)
 3. **`.env` file**: in the current directory
 4. **Environment variables**: `RESO_AUTH_TOKEN` or `RESO_CLIENT_ID`/`RESO_CLIENT_SECRET`/`RESO_TOKEN_URI`
+
+A Data Dictionary run authenticates twice. Besides the server credentials above, it reaches the Variations Service, which reads `RESO_SERVICES_URL`, `TOKEN_URI`, `CLIENT_ID` and `CLIENT_SECRET` from `.env` or the environment. A missing `RESO_SERVICES_URL` fails the run at the variations step rather than skipping it, so a misconfigured machine cannot quietly stop checking variations. `--skip-variations` runs without them. That run is not eligible for certification.
 
 ## Endorsements
 
@@ -95,7 +100,7 @@ reso-cert core --url https://api.example.com --auth-token TOKEN \
 
 ### Data Dictionary 2.1
 
-Validates server metadata and data availability against the RESO Data Dictionary. Fetches metadata, merges Lookup Resource data, checks for variations and replicates data using multiple strategies.
+Validates server metadata and data availability against the RESO Data Dictionary. Fetches metadata, merges Lookup Resource data, checks for variations and replicates data using multiple strategies. Data Dictionary 2.0 remains certifiable and is selectable per run; 2.1 is the default.
 
 ```bash
 reso-cert dd --url https://api.example.com --auth-token TOKEN
@@ -103,6 +108,9 @@ reso-cert dd --url https://api.example.com --auth-token TOKEN
 # Relaxed: record schema validation errors without failing on them, so one pass
 # surveys everything to fix. The run is NOT eligible for certification.
 reso-cert dd --url https://api.example.com --auth-token TOKEN --no-strict
+
+# Certify against Data Dictionary 2.0 instead of the default 2.1.
+reso-cert dd --url https://api.example.com --auth-token TOKEN --dd-version 2.0
 ```
 
 [**More info**](src/data-dictionary/README.md)
@@ -220,12 +228,12 @@ const result = await runComplianceTests({
 Tagged releases publish a public image, so most uses are a pull rather than a build:
 
 ```bash
-docker pull ghcr.io/resostandards/reso-tools/reso-cert:v0.11.0   # or :latest
+docker pull ghcr.io/resostandards/reso-tools/reso-cert:v0.11.1   # or :latest
 ```
 
 It is `linux/amd64`. On Apple silicon Docker runs it emulated, which works and is slower.
 
-To build it yourself — from an unreleased branch, or with local changes — note that the image
+To build it yourself – from an unreleased branch, or with local changes – note that the image
 builds the workspace **from this repository** rather than installing the sibling `@reso-standards`
 packages from npm, so it runs the code in your checkout rather than the last published release. The
 build context is the repository root, not this package:
@@ -288,7 +296,17 @@ docker compose --profile compliance-entity-event up --build \
 # Web API Core
 docker compose --profile compliance-core up --build \
   --exit-code-from compliance-core compliance-core
+
+# Data Dictionary
+docker compose --profile compliance-dd up --build \
+  --exit-code-from compliance-dd
 ```
+
+Each endorsement also has MongoDB and SQLite profiles, named `<profile>-mongo` and
+`<profile>-sqlite`. The Data Dictionary and Web API Core variants need the backend profile enabled
+as well, for example `--profile mongodb --profile compliance-dd-mongo`, because they share the
+common server. Add/Edit and EntityEvent carry their own database and server inside their own
+compliance profile.
 
 ## Development
 

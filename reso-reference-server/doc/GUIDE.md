@@ -1,6 +1,6 @@
 # RESO Reference Server – User Guide
 
-A task-oriented walk-through of the RESO Reference Server. This is the package that gives you a complete, certified RESO-compliant OData server you can run on your laptop, in CI or in a container, against the database backend of your choice, with realistic test data ready to query in seconds.
+A task-oriented walk-through of the RESO Reference Server. This is the package that gives you a complete, RESO-compliant OData server you can run on your laptop, in CI or in a container, against the database backend of your choice, with realistic test data ready to query in seconds.
 
 If you have ever needed a real RESO server to develop against and did not want to ask an MLS for credentials, this is the server that ends that pattern.
 
@@ -16,11 +16,11 @@ Anyone who needs a working RESO Web API on demand. Real examples:
 * **Demo and training environments** where the audience needs to see real-looking listings, agents, offices and media records on screen
 * **Anyone evaluating a RESO-related tool** who needs a server to point it at without setting up a database from scratch
 
-The reference server is intentionally a *complete* server – not a mock, not a stub, not a partial implementation. It speaks OData 4.01, it passes RESO Web API Core compliance tests, it passes Data Dictionary compliance tests, and it passes Add/Edit (RCP-010) compliance tests. What you build against it is what you build against any compliant production server.
+The reference server is intentionally a *complete* server – not a mock, not a stub, not a partial implementation. It speaks OData 4.01 and passes the RESO Web API Core, Data Dictionary, Add/Edit (RCP-010) and EntityEvent (RCP-027) compliance tests. What you build against it is what you build against any compliant production server.
 
 ## Install
 
-The reference server runs as a Docker stack, or you can install and run it directly with Node.js. Docker is the recommended path for almost everything because it bundles the database, the API and the web UI into one command.
+The reference server runs as a Docker stack, or you can install and run it directly with Node.js. Docker is the recommended path for almost everything because it bundles the database and the API into one command.
 
 ```bash
 git clone https://github.com/RESOStandards/reso-tools.git
@@ -41,10 +41,9 @@ cd reso-reference-server
 docker compose up -d
 ```
 
-Three services come up:
+Two services come up:
 
 * **API server** at `http://localhost:8080` – the OData endpoints, the `$metadata` document, the OpenAPI docs, the health check
-* **Web UI** at `http://localhost:5173` – the React browser for exploring the data interactively
 * **PostgreSQL database** at `localhost:5432` – the persistence layer (the default backend)
 
 ### Seed It with Test Data
@@ -53,7 +52,7 @@ Three services come up:
 docker compose --profile seed up seed
 ```
 
-This runs the data generator with full dependency resolution: it creates Office records, Member records, OUID records, Teams and Properties, then backfills the foreign keys, then creates child collections (Media, OpenHouse, Showing, PropertyRooms). About 892 records total in a single run, all wired correctly. Detailed walk-through of what the generator does and why is in the **[RESO Data Generator guide](../reso-data-generator/)**.
+This loads the committed seed dataset through `POST /admin/seed`: 948 records across 12 resources, with the keys preserved so the foreign key links survive. The call is idempotent, so it is a no-op once the server is already seeded.
 
 ### Verify It Is Working
 
@@ -67,9 +66,6 @@ curl http://localhost:8080/\$metadata
 # Query the first five Property records
 curl -H 'Accept: application/json' \
   'http://localhost:8080/Property?$top=5&$select=ListPrice,City,StateOrProvince'
-
-# Browse the data in the UI
-open http://localhost:5173
 ```
 
 You now have a fully populated RESO server. The next sections walk through everything you can do with it.
@@ -94,8 +90,8 @@ docker compose --profile seed up seed
 Use it when you are building against a document-oriented backend, when you want to exercise the cert flows against a nonrelational store or when you are validating that an integration works the same way against both shapes.
 
 ```bash
-docker compose --profile mongodb up -d mongodb server-mongo ui-mongo
-docker compose --profile seed-mongo up seed-mongo
+docker compose --profile mongodb up -d mongodb server-mongo
+docker compose --profile mongodb --profile seed-mongo up seed-mongo
 ```
 
 ### SQLite
@@ -103,7 +99,7 @@ docker compose --profile seed-mongo up seed-mongo
 The lightest backend. No external database container, no separate process – the SQLite file lives in a Docker volume. Use it when you want a fast, ephemeral, low-footprint server for unit tests, CI runs or local development on a constrained machine.
 
 ```bash
-docker compose --profile sqlite up -d server-sqlite ui-sqlite
+docker compose --profile sqlite up -d server-sqlite
 docker compose --profile sqlite --profile seed-sqlite up seed-sqlite
 ```
 
@@ -150,7 +146,7 @@ curl 'http://localhost:8080/Property?$count=true&$top=5'
 curl 'http://localhost:8080/Property?$filter=City eq %27Austin%27 and ListPrice gt 200000&$select=ListPrice,City&$orderby=ListPrice desc&$top=10'
 ```
 
-The server supports the full RESO Web API Core 2.0.0 query surface – every comparison operator, the logical operators, string functions, date and time functions, lambda operators (`any`, `all`) for collection-valued properties, and the math functions. The full list lives in the **[OData Expression Parser guide](../odata-expression-parser/)** since that is the package the server uses to parse the filter strings into ASTs before turning them into SQL or MongoDB queries.
+The server supports the full RESO Web API Core 2.1.0 query surface – every comparison operator, the logical operators, string functions, date and time functions, lambda operators (`any`, `all`) for collection-valued properties, and the math functions. The full list lives in the **[OData Expression Parser guide](../odata-expression-parser/)** since that is the package the server uses to parse the filter strings into ASTs before turning them into SQL or MongoDB queries.
 
 ### Reading a Single Record
 
@@ -297,7 +293,7 @@ ENUM_MODE=enum-type docker compose up -d --build
 
 This mode is closer to "by-the-book" OData 4.01 enum handling and is useful when you are testing how a client handles enum types declared in EDMX.
 
-Both modes pass the Web API Core 2.0.0 compliance tests. Pick whichever your client expects.
+Both modes pass the Web API Core 2.1.0 compliance tests. Pick whichever your client expects.
 
 ---
 
@@ -329,9 +325,9 @@ The full polling-replication consumer pattern – how to read the feed, how to d
 
 ## Running Compliance Tests Against It
 
-The reference server is a target for the **[RESO Certification](../reso-certification/)** test runners. Three cert flows ship as Docker Compose profiles, ready to run:
+The reference server is a target for the **[RESO Certification](../reso-certification/)** test runners. Four cert flows ship as Docker Compose profiles, ready to run:
 
-### Web API Core 2.0.0
+### Web API Core 2.1.0
 
 Validates the full OData query surface – every comparison operator, every logical operator, every string and date function, the `$expand` and `$select` and `$filter` mechanics, the response shapes, the metadata document, and the service document.
 
@@ -342,17 +338,19 @@ docker compose --profile seed up --exit-code-from seed
 docker compose --profile compliance-core up --build --exit-code-from compliance-core
 ```
 
-The current status of the reference server against this flow is **42 passed, 0 failed, 3 skipped**. The 3 skipped tests are for the `has` operator, which is N/A in `string` enumeration mode.
+The current status of the reference server against this flow is **219 passed, 0 failed, 112 skipped out of 331 required tests**, with 12 of the 18 optional tests passed.
 
 ### Data Dictionary 2.0
 
 Validates metadata compliance, field mappings and data availability against the RESO DD 2.0 specification. Walks every resource, checks every declared field, samples the data for type correctness and validates the lookup tables.
 
+The profile runs with `--skip-variations`, because continuous integration has no Variations Service to reach. The variations step is reported as skipped, so the run is recorded as not eligible for certification.
+
 ```bash
 docker compose --profile compliance-dd up --build --exit-code-from compliance-dd
 ```
 
-Current status: **1,034 passed, 570 skipped, 0 failed, 0 schema validation errors**.
+Current status: **passed** – 14 resources, 1,090 fields and 3,788 lookups validated.
 
 ### Add/Edit (RCP-010)
 
@@ -364,21 +362,31 @@ docker compose --profile compliance-addedit up --build --exit-code-from complian
 
 Current status: **8 passed, 0 failed**.
 
-All three cert flows run against any of the three database backends. The MongoDB and SQLite variants live under `--profile compliance-*-mongo` and `--profile compliance-*-sqlite` respectively, and they pass too. This is the full coverage matrix the cert tools were built to handle.
+### EntityEvent (RCP-027)
+
+Validates the change-tracking feed described above. The profile runs in full mode, which exercises the feed with canary writes rather than observing it read-only.
+
+```bash
+docker compose --profile compliance-entity-event up --build --exit-code-from compliance-entity-event
+```
+
+Current status: **12 of 12 scenarios passed**.
+
+All four cert flows run against any of the three database backends. The MongoDB and SQLite variants live under `--profile compliance-*-mongo` and `--profile compliance-*-sqlite` respectively, and they pass too. The Core and Data Dictionary variants need their backend profile enabled alongside the compliance profile, and the README carries the full recipes. Continuous integration runs every flow on every backend on each pull request, adding an MCP server smoke test on PostgreSQL.
 
 ---
 
 ## Where to Next
 
-* **Filling the server with data** – the **[RESO Data Generator](../reso-data-generator/)** is the package that produced the seed data above, and it can produce more on demand. If you need 500 Properties or 5,000, that is the right entry point.
-* **Querying the server interactively** – the **[RESO Desktop Client](../reso-desktop-client/)** and the **[RESO Web Client](../reso-web-client/)** are both built around the **[RESO Client SDK](../reso-client/)** and connect to any RESO server, including this one.
+* **Filling the server with data** – the seed dataset above is committed to this repository. The generator that produced it moved to the private `reso-tools-private` repository in the v1.0.0 split, along with the browser UI and the CORS proxy.
+* **Querying the server interactively** – the desktop certification app, distributed from [Releases](https://github.com/RESOStandards/reso-tools/releases/latest), bundles a browser UI over this server. It is built around the **[RESO Client SDK](../reso-client/)**, which connects to any RESO server, including this one.
 * **Validating records** – the **[reso-validation](../reso-validation/)** library runs on every Add/Edit write against the reference server. It is also a stand-alone library you can use in your own application to check records before sending them.
 * **Running the cert tools as code** – the **[RESO Certification](../reso-certification/)** package gives you a CLI and an SDK for running every cert flow programmatically, not just through Docker. Useful for CI pipelines and for embedding cert testing inside other tools.
 * **Connecting an AI agent** – the **[RESO MCP Server](../reso-mcp-server/)** exposes this exact server through the Model Context Protocol so any MCP-aware AI host (Claude Code, Claude Desktop, Cursor, others) can read, query and write through a real RESO server. The MCP guide walks through the full Add/Edit and EntityEvent flows against this reference server with verbatim tool calls.
 
 ## Reference
 
-* **[Package README](../)** – full Docker Compose recipes, supported resources table, OData compliance details, environment variable reference
+* **[Package README](../)** – full Docker Compose recipes, supported resources table, OData compliance details
 * **[Source on GitHub](https://github.com/RESOStandards/reso-tools/tree/main/reso-reference-server)**
 * **[OData 4.01 Part 1: Protocol](https://docs.oasis-open.org/odata/odata/v4.01/odata-v4.01-part1-protocol.html)** – the spec the server implements
 * **[RESO Data Dictionary](https://www.reso.org/data-dictionary/)** – the schema the server is built around

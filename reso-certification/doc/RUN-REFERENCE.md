@@ -200,6 +200,29 @@ reference server, each carrying `LookupKey`, `LookupName`, `LookupValue`, `Stand
 `LegacyODataValue`, and `ModificationTimestamp`. Written only when the server serves a Lookup
 Resource.
 
+### `metadata-validation-report.json`
+
+The per-field findings from **Validate DD metadata**: the MUST errors and the SHOULD warnings that step
+raised, rather than hundreds of individual lines in the progress output. Written whenever the step
+produced at least one finding, so its absence means the metadata matched the reference cleanly.
+
+Five keys: `version`, `generatedOn`, `errorCount`, `warningCount` and `findings`. A run that passes the
+step with warnings writes this file too, so the file is the detail behind either outcome and not by
+itself a sign of failure.
+
+### `variations-report.json`
+
+The output of **Check variations**: the local elements the Variations Service matched as near-misses
+against the standard. Written only when variations were found, which is the same condition that fails
+the step.
+
+Alongside the variation buckets it carries `version`, `providerUoi`, `providerUsi`, `recipientUoi`,
+`generatedOn` and `fuzziness`, so the file alone says which provider, which recipient and what match
+sensitivity produced it even if the surrounding job record is lost.
+
+Not to be confused with `data-dictionary-variations.json`, which is the output of the standalone
+`find-variations` command. A certification run never writes that name.
+
 ### `data-availability-report.json`
 
 What the replicated sample actually contained, which is a different question from what the metadata
@@ -219,6 +242,23 @@ that a field is declared but unused.
 The raw responses behind the availability report. Large, and the evidence trail for any availability
 number that is questioned.
 
+### `data-availability-schema-validation-errors.json` and `data-availability-schema-validation-warnings.json`
+
+The schema validation findings from **Replicate and validate**. Both files share one shape:
+`description`, `generatedOn`, `version`, `totalErrors`, `totalWarnings`, `errors` and `warnings`.
+
+Strict mode decides which of them appears and whether the availability reports appear with it:
+
+- **Strict mode, the default.** The run stops at the first page of records that fails validation. It
+  writes the errors file and nothing after it, so neither availability report is written. This is the
+  way a Data Dictionary run fails in strict mode, so the errors file holds the detail.
+- **`--no-strict`.** The run records every error and keeps going, so it writes the errors file **and**
+  both availability reports. Surveying a feed in one pass is the point of the flag, so the run with the
+  most to report is not the one that reports the least.
+
+The warnings file is written only when the run finished replication with warnings and **no** errors. A
+run that had both writes the errors file alone.
+
 ### `payloads/` and `entity-event-payloads/`
 
 The request bodies Add/Edit and EntityEvent used, written before they were sent so a result can be
@@ -233,7 +273,10 @@ A generated create payload against the reference server carries `ListPrice`, `Be
 
 The Data Dictionary run stops at the first failing step. Everything after it is recorded as `skipped`,
 which is honest: those steps did not run. The report files are still written, because the step that
-writes them always runs, so a failed run leaves the same evidence on disk as a passing one.
+writes them always runs, so a failed run leaves `report.json` and `report-detailed.json` on disk
+exactly as a passing one does. The per-step artifacts are what differ: a step that never ran wrote
+nothing, while a strict-mode schema validation failure writes
+`data-availability-schema-validation-errors.json` in place of the two availability reports.
 
 That is worth knowing when a run fails early. A failure in `Generate metadata report` means there is
 no metadata report to inspect, but `metadata.xml` is already on disk and is usually enough to see why.
@@ -248,7 +291,11 @@ no metadata report to inspect, but `metadata.xml` is already on disk and is usua
 | `metadata-report.json` | Generate metadata report | Data Dictionary runs |
 | `metadata-report.raw.json` | Generate metadata report | only when a Lookup Resource merge happened |
 | `lookup-resource-lookup-metadata.json` | Generate metadata report | only when a Lookup Resource was served |
-| `data-availability-report.json` | Replicate and validate | Data Dictionary runs that reached replication |
-| `data-availability-responses.json` | Replicate and validate | Data Dictionary runs that reached replication |
+| `metadata-validation-report.json` | Validate DD metadata | only when that step raised a finding |
+| `variations-report.json` | Check variations | only when variations were found |
+| `data-availability-report.json` | Replicate and validate | Data Dictionary runs that finished replication |
+| `data-availability-responses.json` | Replicate and validate | Data Dictionary runs that finished replication |
+| `data-availability-schema-validation-errors.json` | Replicate and validate | runs with schema validation errors. In strict mode it replaces the two reports above |
+| `data-availability-schema-validation-warnings.json` | Replicate and validate | only when a finished run had warnings and no errors |
 | `payloads/*.json` | Generate payloads | Add/Edit runs |
 | `entity-event-payloads/*.json` | Generate payloads | EntityEvent runs in full mode |

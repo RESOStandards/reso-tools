@@ -41,7 +41,7 @@ This starts:
 Seed with test data:
 
 ```bash
-docker compose --profile seed-mongo up seed-mongo
+docker compose --profile mongodb --profile seed-mongo up seed-mongo
 ```
 
 ### SQLite
@@ -109,7 +109,7 @@ Seeding loads a committed static data set (`seed-data/seed.json.gz`) via `POST /
 ```bash
 docker compose down -v        # or: docker compose --profile mongodb down -v
 docker compose up -d          # start your chosen backend
-docker compose --profile seed up seed   # or: --profile seed-mongo up seed-mongo
+docker compose --profile seed up seed   # or: --profile mongodb --profile seed-mongo up seed-mongo
 ```
 
 ## Architecture
@@ -142,7 +142,7 @@ The `DataAccessLayer` interface abstracts persistence, allowing the same OData h
 | Member | MemberKey | 87 |
 | Office | OfficeKey | 73 |
 | Media | MediaKey | 41 |
-| OpenHouse | OpenHouseKey | 26 |
+| OpenHouse | OpenHouseKey | 33 |
 | Showing | ShowingKey | 44 |
 | PropertyGreenVerification | GreenVerificationKey | 15 |
 | PropertyPowerProduction | PowerProductionKey | 12 |
@@ -184,7 +184,7 @@ The server implements OData 4.01 features required by the RESO Web API Add/Edit 
 
 The server supports two enumeration representations via `ENUM_MODE` environment variable:
 
-- **`string` (default)** – Enum fields use `Edm.String` with `LookupName` annotations. A Lookup Resource at `/Lookup` exposes all 3,634 valid values. Human-readable display names (e.g., "Active Under Contract").
+- **`string` (default)** – Enum fields use `Edm.String` with `LookupName` annotations. A Lookup Resource at `/Lookup` exposes all 3,788 valid values. Human-readable display names (e.g., "Active Under Contract").
 - **`enum-type`** – Enum fields reference `Edm.EnumType` definitions in EDMX metadata. PascalCase member names (e.g., `ActiveUnderContract`). No Lookup Resource.
 
 ```bash
@@ -195,17 +195,17 @@ ENUM_MODE=enum-type docker compose up -d --build
 ENUM_MODE=enum-type docker compose --profile compliance-core up compliance-core
 ```
 
-Both modes pass all Web API Core 2.0.0 compliance tests.
+Both modes pass all Web API Core 2.1.0 compliance tests.
 
 ## Compliance Testing
 
-The server includes Docker-based compliance testing against RESO Certification tools and a custom Add/Edit test runner. Tests run against seeded data and validate OData protocol compliance, metadata structure, field mappings and query behavior.
+The server includes Docker-based compliance testing against the [`@reso-standards/reso-certification`](../reso-certification/) test runner. Tests run against seeded data and validate OData protocol compliance, metadata structure, field mappings and query behavior.
 
-### Web API Core 2.0.0
+### Web API Core 2.1.0
 
-Validates OData query operations (`$filter`, `$select`, `$orderby`, `$top`, `$skip`, `$count`, `$expand`), response formats, metadata and service document compliance. Uses the RESO [web-api-commander](https://github.com/RESOStandards/web-api-commander).
+Validates OData query operations (`$filter`, `$select`, `$orderby`, `$top`, `$skip`, `$count`, `$expand`), response formats, metadata and service document compliance. Uses the `reso-cert core` pipeline from [`@reso-standards/reso-certification`](../reso-certification/).
 
-**Current status: 42 passed, 0 failed, 3 skipped** (3 skipped: `has` operator tests, N/A for string enumerations)
+**Current status: 219 passed, 0 failed, 112 skipped out of 331 required tests** (plus 12 of the 18 optional tests passed)
 
 ```bash
 # PostgreSQL
@@ -216,7 +216,7 @@ docker compose --profile compliance-core up --build --exit-code-from compliance-
 # MongoDB
 docker compose --profile mongodb up -d --build --wait mongodb server-mongo
 docker compose --profile mongodb --profile seed-mongo up seed-mongo
-docker compose --profile compliance-core-mongo up --build --exit-code-from compliance-core-mongo
+docker compose --profile mongodb --profile compliance-core-mongo up --build --exit-code-from compliance-core-mongo
 
 # SQLite
 docker compose --profile sqlite up -d --build --wait server-sqlite
@@ -224,20 +224,22 @@ docker compose --profile sqlite --profile seed-sqlite up seed-sqlite
 docker compose --profile sqlite --profile compliance-core-sqlite up --build --exit-code-from compliance-core-sqlite
 ```
 
-The test generates RESOScript XML configs dynamically from live server data (`compliance/generate-resoscripts.sh`), sampling records to find appropriate field values for each data type (integer, decimal, date, timestamp, single/multi-value lookups).
+The run samples live server data to pick field values for each data type (integer, decimal, date, timestamp, single and multi-value lookups).
 
 ### Data Dictionary 2.0
 
-Validates metadata compliance, field mappings and data availability against the RESO Data Dictionary 2.0 specification. Uses the RESO [reso-certification-utils](https://github.com/RESOStandards/reso-certification-utils).
+Validates metadata compliance, field mappings and data availability against the RESO Data Dictionary 2.0 specification. Uses the `reso-cert dd` pipeline from [`@reso-standards/reso-certification`](../reso-certification/).
 
-**Current status: 1,034 passed, 570 skipped, 0 failed, 0 schema validation errors**
+The profile runs with `--skip-variations`, because continuous integration has no Variations Service to reach. The variations step is reported as skipped, so the run is recorded as not eligible for certification.
+
+**Current status: passed** – 14 resources, 1,090 fields and 3,788 lookups validated
 
 ```bash
 # PostgreSQL
 docker compose --profile compliance-dd up --build --exit-code-from compliance-dd
 
 # MongoDB
-docker compose --profile compliance-dd-mongo up --build --exit-code-from compliance-dd-mongo
+docker compose --profile mongodb --profile compliance-dd-mongo up --build --exit-code-from compliance-dd-mongo
 
 # SQLite
 docker compose --profile sqlite --profile compliance-dd-sqlite up --build --exit-code-from compliance-dd-sqlite
@@ -266,9 +268,26 @@ npx reso-cert add-edit \
 
 The `--output-dir` flag writes the report tree: `report.json` carries the machine-readable verdict and `report-detailed.json` adds the per-step and per-scenario detail, which is the shape the certification submission expects.
 
+### EntityEvent (RCP-027)
+
+Validates EntityEvent change tracking in full mode, which exercises the feed with canary writes rather than observing it read-only. Uses the `reso-cert entity-event` pipeline from [`@reso-standards/reso-certification`](../reso-certification/).
+
+**Current status: 12 of 12 scenarios passed**
+
+```bash
+# PostgreSQL
+docker compose --profile compliance-entity-event up --build --exit-code-from compliance-entity-event
+
+# MongoDB
+docker compose --profile compliance-entity-event-mongo up --build --exit-code-from compliance-entity-event-mongo
+
+# SQLite
+docker compose --profile compliance-entity-event-sqlite up --build --exit-code-from compliance-entity-event-sqlite
+```
+
 ### CI/CD
 
-Compliance tests run automatically on push to `main` and on pull requests via GitHub Actions (`.github/workflows/compliance.yml`). Both PostgreSQL and MongoDB backends are tested in parallel. Results are uploaded as build artifacts.
+Compliance tests run automatically on pull requests via GitHub Actions (`.github/workflows/compliance.yml`). All three backends – PostgreSQL, MongoDB and SQLite – run in parallel, each covering the Data Dictionary, Web API Core, Add/Edit and EntityEvent flows. The PostgreSQL job adds an MCP server smoke test. Results are uploaded as build artifacts.
 
 ## Development
 
