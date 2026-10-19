@@ -126,6 +126,16 @@ here because it applies to any repo in the org.
 - Commit messages: imperative mood, concise first line, body for context
 - No parenthetical terms in DD documentation (e.g., show "Property Resource" not "Property Resource (Res)")
 
+## Licensing
+
+Every public RESO repository carries the RESO End-user License Agreement as a top-level `LICENSE` file, copied verbatim. The canonical text is this repository's own `LICENSE`, which is byte-identical to the copy in `RESOStandards/transport`.
+
+- **Copy it, do not rewrite it.** The contact block is part of the agreement's presentation. A repository that paraphrases it, drops the address or substitutes a maintainer's own details is not carrying the same document.
+- **It is in place before a repository publishes anything, not after.** The agreement takes effect when a reader obtains the resources, so adding the file later does not reach anyone who already cloned.
+- **An open-source license is not a substitute.** GitHub reports the EULA as `NOASSERTION` because it is not an SPDX-recognized license. That is expected. Swapping in MIT or Apache-2.0 to clear the label changes the terms RESO publishes under, and is a decision for RESO staff rather than repository cleanup.
+
+A specification posted as an RCP additionally carries its own EULA and Section 7 License blocks filled with the real text, never stubbed, even while its status is in progress.
+
 ## Architecture Notes
 
 - Each package manages its own `package.json` and dependencies
