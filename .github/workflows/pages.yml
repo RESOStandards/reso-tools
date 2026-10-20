@@ -277,14 +277,67 @@ jobs:
           # level deeper). The ../../ patterns must come BEFORE the
           # ../ patterns so sed matches the longer form first.
           #
-          # A bare sibling like ](ARCHITECTURE.md) means <pkg>/doc/ARCHITECTURE.md, and only
-          # GUIDE.md is published per package — so on the site that resolved to
-          # /guides/<pkg>/ARCHITECTURE.md and 404'd. It becomes an absolute GitHub link, matching
-          # how doc/ files are treated elsewhere. The character class excludes '/', so this cannot
-          # swallow ../foo.md, and it ignores bare #anchors.
+          # A bare sibling like ](ARCHITECTURE.md) means <pkg>/doc/ARCHITECTURE.md. Every markdown file
+          # in <pkg>/doc/ is published as its own page, so such a link now resolves on the site instead
+          # of leaving for GitHub. It used to resolve to /guides/<pkg>/ARCHITECTURE.md and 404, which is
+          # why it was being sent to GitHub at all.
+          #
+          # The per-sibling rules are generated from the files that exist and must come BEFORE the
+          # catch-all, which is kept so a link to something NOT published still goes to GitHub rather
+          # than to an invented 404. The catch-all's character class excludes '/', so it cannot swallow
+          # ../foo.md, and it ignores bare #anchors.
+          doc_slug() {
+            printf '%s\n' "${1%.md}" | tr '[:upper:]' '[:lower:]'
+          }
+
+          # GUIDE.md is the package's guide root; every other doc is a child page of it. This is the one
+          # place the URL shape is decided - the emitter and the link rewriter both call it, so a page
+          # cannot be published at one path and linked at another.
+          doc_permalink() {
+            local pkg_dir="$1" base="$2"
+            if [ "$base" = "GUIDE.md" ]; then
+              printf '/guides/%s/\n' "$pkg_dir"
+            else
+              printf '/guides/%s/%s/\n' "$pkg_dir" "$(doc_slug "$base")"
+            fi
+          }
+
+          # Images and diagrams live beside the markdown in <pkg>/doc/ and are referenced by bare
+          # filename. Copied into the site and rewritten per asset, by exact name - ARCHITECTURE.md
+          # references its diagram from raw HTML (<img src>, <a href>), which no markdown-link rule
+          # would touch, so the rewrite covers the HTML attributes as well as ](...).
+          DOC_ASSET_DIR="assets/guides"
+
+          copy_doc_assets() {
+            local pkg_dir="$1" asset base
+            for asset in "${pkg_dir}"/doc/*.svg "${pkg_dir}"/doc/*.png "${pkg_dir}"/doc/*.jpg "${pkg_dir}"/doc/*.jpeg "${pkg_dir}"/doc/*.gif "${pkg_dir}"/doc/*.webp; do
+              [ -f "$asset" ] || continue
+              base=$(basename "$asset")
+              mkdir -p ".github/pages/${DOC_ASSET_DIR}/${pkg_dir}"
+              cp "$asset" ".github/pages/${DOC_ASSET_DIR}/${pkg_dir}/${base}"
+              echo "  → /${DOC_ASSET_DIR}/${pkg_dir}/${base}  (from ${asset})"
+            done
+          }
+
           rewrite_guide_links() {
             local pkg_dir="$1"
+            local -a doc_rules=()
+            local sib asset base escaped
+            for sib in "${pkg_dir}"/doc/*.md; do
+              [ -f "$sib" ] || continue
+              base=$(basename "$sib")
+              escaped=${base//./\\.}
+              doc_rules+=(-e "s|\]\(${escaped}(#[A-Za-z0-9._-]*)?\)|]($(doc_permalink "$pkg_dir" "$base")\1)|g")
+            done
+            for asset in "${pkg_dir}"/doc/*.svg "${pkg_dir}"/doc/*.png "${pkg_dir}"/doc/*.jpg "${pkg_dir}"/doc/*.jpeg "${pkg_dir}"/doc/*.gif "${pkg_dir}"/doc/*.webp; do
+              [ -f "$asset" ] || continue
+              base=$(basename "$asset")
+              escaped=${base//./\\.}
+              doc_rules+=(-e "s|\]\(${escaped}\)|](/${DOC_ASSET_DIR}/${pkg_dir}/${base})|g")
+              doc_rules+=(-e "s|(src\|href)=\"${escaped}\"|\1=\"/${DOC_ASSET_DIR}/${pkg_dir}/${base}\"|g")
+            done
             sed -E \
+              "${doc_rules[@]}" \
               -e "s|\]\(\.\./\.\./reso-([a-z0-9-]+)/\)|\](/packages/reso-\1/)|g" \
               -e "s|\]\(\.\./\.\./odata-expression-parser/\)|\](/packages/odata-expression-parser/)|g" \
               -e "s|\]\(\.\./\.\./\)|\](${GH_TREE}/${pkg_dir})|g" \
@@ -322,6 +375,37 @@ jobs:
 
             echo "  → /guides/${pkg_dir}/  (from ${guide})"
             guide_count=$((guide_count + 1))
+
+            copy_doc_assets "$pkg_dir"
+
+            # Every other markdown file in <pkg>/doc/ becomes a child page. Before this they were
+            # reachable only as raw files on GitHub, so following one left the documentation site.
+            # guides.html lists its tiles by hand rather than looping the collection, so these do not
+            # appear as top-level guides; they are reached from the guide that links them.
+            for sibling in "${pkg_dir}"/doc/*.md; do
+              [ -f "$sibling" ] || continue
+              sibling_base=$(basename "$sibling")
+              [ "$sibling_base" = "GUIDE.md" ] && continue
+
+              sibling_slug=$(doc_slug "$sibling_base")
+              sibling_title=$(extract_title "$sibling" "$sibling_base")
+              sibling_out=".github/pages/_guides/${pkg_dir}-${sibling_slug}.md"
+
+              cat > "$sibling_out" <<SIBLING
+          ---
+          title: "${sibling_title}"
+          package: "${pkg_name}"
+          package_url: "/packages/${pkg_dir}/"
+          layout: guide
+          permalink: "$(doc_permalink "$pkg_dir" "$sibling_base")"
+          ---
+
+          SIBLING
+              rewrite_guide_links "$pkg_dir" < "$sibling" >> "$sibling_out"
+
+              echo "  → $(doc_permalink "$pkg_dir" "$sibling_base")  (from ${sibling})"
+              guide_count=$((guide_count + 1))
+            done
           done
 
           echo
