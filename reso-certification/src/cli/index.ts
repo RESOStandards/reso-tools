@@ -58,6 +58,7 @@ import { runMetadataStep } from './metadata-command.js';
 import { resolveRcfExitCode, runRcf } from './rcf-command.js';
 import { resolveRenderMode, runConfigEntries, runWithProgress } from './render.js';
 import { REPLICATION_STRATEGY_VALUES, runReplicate } from './replicate-command.js';
+import { runRestore } from './restore-command.js';
 import { formatResultJson } from './result-json.js';
 import { generateSchemaFromReport, loadSettings, validateSchemaPayload } from './schema-command.js';
 import { addAuthOptions, addOutputOptions } from './shared-options.js';
@@ -1612,5 +1613,78 @@ program
       process.exitCode = 2;
     }
   });
+
+program
+  .command('restore')
+  .description('Restore a certification server backup to a Cert API instance')
+  .requiredOption('--path <dir>', 'Backup root, the directory holding the endorsement-type folders')
+  .requiredOption('--url <url>', 'Base URL of the Cert API')
+  .option('--execute', 'Actually send. Without it this is a dry run and nothing is posted.')
+  .option('--limit <n>', 'Stop after this many reports, for a smoke test')
+  .option('--concurrency <n>', 'Reports in flight at once', '4')
+  .option('--ledger <path>', 'Where restored keys are recorded so a re-run resumes')
+  .option('--derive-missing-type', 'Supply a missing report type where the directory and the document version agree')
+  .action(
+    async (opts: {
+      path: string;
+      url: string;
+      execute?: boolean;
+      limit?: string;
+      concurrency: string;
+      ledger?: string;
+      deriveMissingType?: boolean;
+    }) => {
+      try {
+        const limit = opts.limit === undefined ? undefined : Number.parseInt(opts.limit, 10);
+        if (limit !== undefined && (!Number.isInteger(limit) || limit <= 0)) {
+          throw new Error(`--limit must be a positive integer, got '${opts.limit}'`);
+        }
+        const concurrency = Number.parseInt(opts.concurrency, 10);
+        if (!Number.isInteger(concurrency) || concurrency <= 0) {
+          throw new Error(`--concurrency must be a positive integer, got '${opts.concurrency}'`);
+        }
+
+        const summary = await runRestore(
+          {
+            path: opts.path,
+            url: opts.url,
+            execute: Boolean(opts.execute),
+            ...(limit === undefined ? {} : { limit }),
+            concurrency,
+            deriveMissingType: Boolean(opts.deriveMissingType),
+            ledgerPath: opts.ledger ?? `${opts.path.replace(/\/+$/, '')}/.restore-ledger`
+          },
+          (line: string) => console.error(line)
+        );
+
+        console.log(opts.execute ? 'Restore' : 'DRY RUN - nothing was sent');
+        console.log(`  found        : ${summary.considered}`);
+        console.log(`  already done : ${summary.alreadyDone}`);
+        console.log(
+          `  ${opts.execute ? 'sent' : 'would send'} : ${opts.execute ? summary.sent : summary.considered - summary.alreadyDone}`
+        );
+        if (opts.execute) console.log(`  succeeded    : ${summary.succeeded}`);
+        if (summary.missingType > 0) {
+          const action = opts.deriveMissingType ? 'type derived for' : 'would be refused, derivable';
+          console.log(
+            `  no type      : ${summary.missingType} (${action} ${summary.derivable}, different shape ${summary.missingType - summary.derivable})`
+          );
+        }
+        for (const [endorsement, count] of [...summary.byEndorsement].sort((a, b) => b[1] - a[1])) {
+          console.log(`    ${String(count).padStart(6)}  ${endorsement}`);
+        }
+        if (summary.failures.length > 0) {
+          console.error(`\n${summary.failures.length} failed. First few:`);
+          for (const failure of summary.failures.slice(0, 5)) {
+            console.error(`  ${failure.status}  ${failure.key}  ${failure.message}`);
+          }
+          process.exitCode = 1;
+        }
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exitCode = 2;
+      }
+    }
+  );
 
 program.parse();
