@@ -54,7 +54,10 @@ export const computeVariationsViaService = async (input: ComputeVariationsViaSer
     throw serviceError(
       'AUTH_REQUIRED',
       input.fromCli
-        ? 'Variations check requires authentication. Set CERT_AUTH_API_BASE_URL, CERT_AUTH_API_USERNAME, and CERTIFICATION_API_KEY in your .env so the CLI can mint a provider token.'
+        ? // Both paths, in the order the CLI actually tries them. Naming only the fallback made a
+          // correctly configured OAuth setup read as incomplete, and sent people to set three
+          // variables that were never required. Same wording as `submit.ts`.
+          'Variations check requires authentication. Set TOKEN_URI, CLIENT_ID and CLIENT_SECRET (or CERT_AUTH_API_BASE_URL, CERT_AUTH_API_USERNAME and CERTIFICATION_API_KEY) in your .env so the CLI can mint a provider token.'
         : 'Variations check requires authentication. Pass a provider token (bearerToken) – e.g. the session token from logging in.'
     );
   }

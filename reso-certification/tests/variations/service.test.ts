@@ -80,6 +80,41 @@ describe('computeVariationsViaService — coded auth errors', () => {
     expect((err as Error).message).toMatch(/\.env/);
   });
 
+  /**
+   * The CLI mints a provider token by OAuth first - TOKEN_URI, CLIENT_ID, CLIENT_SECRET - and
+   * only then falls back to the certification-API credentials. The message named ONLY the
+   * fallback, so a correctly configured OAuth setup read as incomplete and the advice was to set
+   * three variables that were never required. `submit.ts` already names both paths; this pins the
+   * same for the compute path.
+   *
+   * Asserted on the variable NAMES deliberately: a message that explains how to authenticate has
+   * to be complete, or it sends people to fix the wrong thing.
+   */
+  it('names BOTH authentication paths, not only the fallback credentials', async () => {
+    const err = await computeVariationsViaService({ metadataReportJson: {}, version: '2.1', fromCli: true }).catch(e => e);
+    const message = (err as Error).message;
+    for (const name of ['TOKEN_URI', 'CLIENT_ID', 'CLIENT_SECRET']) {
+      expect(message).toContain(name);
+    }
+    for (const name of ['CERT_AUTH_API_BASE_URL', 'CERT_AUTH_API_USERNAME', 'CERTIFICATION_API_KEY']) {
+      expect(message).toContain(name);
+    }
+  });
+
+  /** Naming a variable is help; printing what is in it is a leak. */
+  it('names the variables without printing their values', async () => {
+    const sentinel = 'sentinel-value-must-not-appear';
+    const previous = { ...process.env };
+    process.env.CLIENT_SECRET = sentinel;
+    process.env.CERTIFICATION_API_KEY = sentinel;
+    try {
+      const err = await computeVariationsViaService({ metadataReportJson: {}, version: '2.1', fromCli: true }).catch(e => e);
+      expect((err as Error).message).not.toContain(sentinel);
+    } finally {
+      process.env = previous;
+    }
+  });
+
   it('SDK (not CLI) with no token: AUTH_REQUIRED pointing at passing a provider token', async () => {
     const err = await computeVariationsViaService({ metadataReportJson: {}, version: '2.1' }).catch(e => e);
     expect(codeOf(err)).toBe('AUTH_REQUIRED');
