@@ -18,6 +18,7 @@ import { generateOpenApiSpec } from './metadata/openapi-generator.js';
 import { TARGET_RESOURCES } from './metadata/types.js';
 import { resolveBaseUrl } from './odata/base-url.js';
 import { createODataRouter } from './odata/router.js';
+import { describeProxyFailure, proxyFailureLogLine } from './proxy-failure.js';
 
 /** Options for creating the server app. */
 export interface CreateAppOptions {
@@ -385,8 +386,11 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
       const body = await upstream.text();
       res.send(body);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Proxy request failed';
-      res.status(502).json({ error: message });
+      // The upstream could not be reached at all. Log why, and tell the client why: Node's fetch
+      // only says "fetch failed" and keeps the real reason in its cause (see proxy-failure.ts).
+      const failure = describeProxyFailure(err);
+      console.error(proxyFailureLogLine(req.method, targetUrl, failure));
+      res.status(502).json(failure);
     }
   });
 
