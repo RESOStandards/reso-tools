@@ -49,6 +49,20 @@ export const isServiceAuthError = (error: unknown): boolean => {
 };
 
 /**
+ * What a CLI caller is told when no provider token could be had. One text for every service call.
+ *
+ * It names both credential sets, the current one first. And it points at the mint's own line: when
+ * TOKEN_URI, CLIENT_ID and CLIENT_SECRET are set and the endpoint refused them, telling someone to
+ * set them sends them the wrong way, and the reason is in the line printed just before this one.
+ */
+export const cliAuthRequiredMessage = (what: string): string =>
+  `${what} requires authentication. Set TOKEN_URI, CLIENT_ID and CLIENT_SECRET (or CERT_AUTH_API_BASE_URL, CERT_AUTH_API_USERNAME and CERTIFICATION_API_KEY) in your .env so the CLI can mint a provider token. If "OAuth2 token mint failed" is printed above, that line says why.`;
+
+/** What a CLI caller is told when the service refuses the token. The token came from either credential set. */
+export const cliAuthRejectedMessage = (what: string): string =>
+  `${what}: the provider token was rejected. Re-check the credentials in your .env: TOKEN_URI, CLIENT_ID and CLIENT_SECRET, or CERT_AUTH_API_*.`;
+
+/**
  * Mint a provider token from `.env` credentials — the CLI path. Mirrors the
  * legacy `fetchProviderToken` so CLI auth is unchanged. Returns undefined when
  * credentials are absent or the mint fails. SDK callers that already hold a
