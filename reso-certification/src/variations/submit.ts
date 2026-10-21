@@ -24,7 +24,14 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { lockedError, mintProviderToken, resolveServicesUrl, serviceError } from '../sdk/common.js';
+import {
+  cliAuthRejectedMessage,
+  cliAuthRequiredMessage,
+  lockedError,
+  mintProviderToken,
+  resolveServicesUrl,
+  serviceError
+} from '../sdk/common.js';
 import type { LockHolderInfo } from '../sdk/common.js';
 import { countBucketedEntries } from './constants.js';
 import type { LevelBuckets } from './constants.js';
@@ -79,7 +86,7 @@ const resolveToken = async (input: ServiceAuthInput, what: string): Promise<stri
     throw serviceError(
       'AUTH_REQUIRED',
       input.fromCli
-        ? `${what} requires authentication. Set TOKEN_URI, CLIENT_ID and CLIENT_SECRET (or CERT_AUTH_API_BASE_URL, CERT_AUTH_API_USERNAME and CERTIFICATION_API_KEY) in your .env so the CLI can mint a provider token.`
+        ? cliAuthRequiredMessage(what)
         : `${what} requires authentication. Pass a provider token (bearerToken) – e.g. the session token from logging in.`
     );
   }
@@ -169,9 +176,7 @@ export const submitVariationsReportViaService = async (input: SubmitVariationsRe
   if (response.status === 401 || response.status === 403) {
     throw serviceError(
       'AUTH_REJECTED',
-      input.fromCli
-        ? `${what}: the provider token was rejected. Re-check your .env credentials.`
-        : `${what}: your session token was rejected or has expired. Log in again to continue.`
+      input.fromCli ? cliAuthRejectedMessage(what) : `${what}: your session token was rejected or has expired. Log in again to continue.`
     );
   }
 

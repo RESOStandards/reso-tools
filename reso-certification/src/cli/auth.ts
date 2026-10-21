@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 import { parseEnv } from 'node:util';
 import { authConfigFromEnv } from '@reso-standards/reso-client';
 import type { AuthConfig } from '../test-runner/types.js';
-import { registerSecret } from './secrets.js';
+import { maskSecrets, registerSecret } from './secrets.js';
 
 /** CLI option flags related to authentication. */
 export interface CliAuthFlags {
@@ -46,6 +46,66 @@ export const loadDotEnv = (searchPaths?: ReadonlyArray<string>): void => {
   }
 };
 
+/** The two fields an OAuth2 error response carries (RFC 6749, section 5.2). */
+export interface OAuth2ErrorFields {
+  readonly error: string;
+  readonly description?: string;
+}
+
+/** Long enough for any real reason, short enough that a body that is not one cannot flood the terminal. */
+const MAX_REASON_LENGTH = 200;
+
+/** The OAuth2 errors that mean "these credentials were refused", as opposed to a malformed request or a server fault. */
+const CREDENTIAL_REFUSALS: ReadonlySet<string> = new Set(['invalid_client', 'access_denied', 'unauthorized_client']);
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+
+/**
+ * Read the error fields from a failed token response, or undefined when the body carries none.
+ *
+ * Only the two named string fields are kept. The rest of the body is never printed: a gateway or a
+ * misconfigured host can answer with HTML or with anything else, and none of it is a reason.
+ */
+export const readOAuth2ErrorFields = (body: unknown): OAuth2ErrorFields | undefined => {
+  if (!isRecord(body) || typeof body.error !== 'string' || !body.error) return undefined;
+  const description = typeof body.error_description === 'string' && body.error_description ? body.error_description : undefined;
+  return {
+    error: body.error.slice(0, MAX_REASON_LENGTH),
+    ...(description ? { description: description.slice(0, MAX_REASON_LENGTH) } : {})
+  };
+};
+
+/**
+ * What to print when the token endpoint refuses, one line per entry.
+ *
+ * The status alone cannot tell a wrong secret from a server fault, and the server's own reason is
+ * the only thing that can, so it is printed when there is one. The endpoint's origin is printed too,
+ * because a file naming the wrong host fails the same way as a wrong secret.
+ */
+export const describeMintRefusal = (
+  status: number,
+  statusText: string,
+  origin: string,
+  fields: OAuth2ErrorFields | undefined
+): ReadonlyArray<string> => {
+  const reason = fields ? ` (${fields.error}${fields.description ? `: ${fields.description}` : ''})` : '';
+  const headline = `OAuth2 token mint failed: HTTP ${status}${statusText ? ` ${statusText}` : ''} from ${origin}${reason}.`;
+  if (!fields || !CREDENTIAL_REFUSALS.has(fields.error)) return [headline];
+  return [
+    headline,
+    '  The token endpoint refused CLIENT_ID and CLIENT_SECRET. Download a fresh Certification Environment File from your account on the certification site and try again.',
+    '  CLIENT_ID, CLIENT_SECRET or TOKEN_URI set in your shell take precedence over the .env file, so check those if a new file changes nothing.'
+  ];
+};
+
+const originOf = (url: string): string => {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return 'the token endpoint';
+  }
+};
+
 /**
  * Mint a fresh OAuth2 bearer token via the client_credentials grant when
  * the env carries `TOKEN_URI`, `CLIENT_ID`, and `CLIENT_SECRET`. Returns the
@@ -63,6 +123,9 @@ export const mintOAuth2ClientCredentialsToken = async (): Promise<string | undef
   const clientId = process.env.CLIENT_ID;
   const clientSecret = process.env.CLIENT_SECRET;
   if (!tokenUri || !clientId || !clientSecret) return undefined;
+  // Registered where it is used: this path reads the secret from the environment, so the chokepoint
+  // in resolveCliAuth never sees it.
+  registerSecret(clientSecret);
 
   try {
     const params = new URLSearchParams({
@@ -76,7 +139,9 @@ export const mintOAuth2ClientCredentialsToken = async (): Promise<string | undef
       body: params.toString()
     });
     if (!res.ok) {
-      console.error(`OAuth2 token mint failed: HTTP ${res.status} ${res.statusText}`);
+      const body: unknown = await res.json().catch(() => undefined);
+      const lines = describeMintRefusal(res.status, res.statusText, originOf(tokenUri), readOAuth2ErrorFields(body));
+      for (const line of lines) console.error(maskSecrets(line));
       return undefined;
     }
     const parsed = (await res.json()) as { access_token?: unknown };

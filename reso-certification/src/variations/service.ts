@@ -17,7 +17,14 @@
  */
 
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { isServiceAuthError, mintProviderToken, resolveServicesUrl, serviceError } from '../sdk/common.js';
+import {
+  cliAuthRejectedMessage,
+  cliAuthRequiredMessage,
+  isServiceAuthError,
+  mintProviderToken,
+  resolveServicesUrl,
+  serviceError
+} from '../sdk/common.js';
 import type { ServiceErrorCode } from '../sdk/common.js';
 import { MAX_COMPUTE_PAYLOAD_BYTES, PAYLOAD_TOO_LARGE_MESSAGE } from './constants.js';
 import type { VariationSuggestionItem } from './csv.js';
@@ -54,7 +61,7 @@ export const computeVariationsViaService = async (input: ComputeVariationsViaSer
     throw serviceError(
       'AUTH_REQUIRED',
       input.fromCli
-        ? 'Variations check requires authentication. Set CERT_AUTH_API_BASE_URL, CERT_AUTH_API_USERNAME, and CERTIFICATION_API_KEY in your .env so the CLI can mint a provider token.'
+        ? cliAuthRequiredMessage('Variations check')
         : 'Variations check requires authentication. Pass a provider token (bearerToken) – e.g. the session token from logging in.'
     );
   }
@@ -92,7 +99,7 @@ export const computeVariationsViaService = async (input: ComputeVariationsViaSer
     throw serviceError(
       'AUTH_REJECTED',
       input.fromCli
-        ? 'Variations check: the provider token was rejected. Re-check your CERT_AUTH_API_* .env credentials.'
+        ? cliAuthRejectedMessage('Variations check')
         : 'Variations check: your session token was rejected or has expired. Log in again to continue.'
     );
   }
@@ -196,7 +203,7 @@ export const updateVariationsViaService = async (input: UpdateVariationsViaServi
     throw serviceError(
       'AUTH_REQUIRED',
       input.fromCli
-        ? 'Updating variations requires authentication. Set TOKEN_URI, CLIENT_ID, and CLIENT_SECRET in your .env so the CLI can mint a provider token.'
+        ? cliAuthRequiredMessage('Updating variations')
         : 'Updating variations requires authentication. Pass a provider token (bearerToken).'
     );
   }
