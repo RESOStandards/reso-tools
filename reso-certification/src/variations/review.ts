@@ -15,7 +15,7 @@
  * configuration errors carry the shared `code` (see `../sdk/common`).
  */
 
-import { mintProviderToken, resolveServicesUrl, serviceError } from '../sdk/common.js';
+import { cliAuthRejectedMessage, cliAuthRequiredMessage, mintProviderToken, resolveServicesUrl, serviceError } from '../sdk/common.js';
 
 /** One submission of a variation key, as the items route reports it. */
 export interface VariationReviewProvenance {
@@ -120,7 +120,7 @@ const resolveToken = async (input: ServiceAuthInput, what: string): Promise<stri
     throw serviceError(
       'AUTH_REQUIRED',
       input.fromCli
-        ? `${what} requires authentication. Set TOKEN_URI, CLIENT_ID and CLIENT_SECRET (or CERT_AUTH_API_BASE_URL, CERT_AUTH_API_USERNAME and CERTIFICATION_API_KEY) in your .env so the CLI can mint a provider token.`
+        ? cliAuthRequiredMessage(what)
         : `${what} requires authentication. Pass a provider token (bearerToken) – e.g. the session token from logging in.`
     );
   }
@@ -133,9 +133,7 @@ const getJson = async (url: URL, token: string, input: ServiceAuthInput, what: s
   if (response.status === 401 || response.status === 403) {
     throw serviceError(
       'AUTH_REJECTED',
-      input.fromCli
-        ? `${what}: the provider token was rejected. Re-check your CERT_AUTH_API_* .env credentials.`
-        : `${what}: your session token was rejected or has expired. Log in again to continue.`
+      input.fromCli ? cliAuthRejectedMessage(what) : `${what}: your session token was rejected or has expired. Log in again to continue.`
     );
   }
   if (!response.ok) {
