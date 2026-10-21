@@ -5,10 +5,10 @@
 [![Release](https://img.shields.io/github/v/release/RESOStandards/reso-tools?label=release&color=blue)](https://github.com/RESOStandards/reso-tools/releases/latest)
 
 **Download the desktop app** &nbsp;
-[![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon-black?logo=apple&logoColor=white)](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-desktop-client-mac-arm64.dmg)
-[![Windows](https://img.shields.io/badge/Windows-x64-0078D4?logo=windows&logoColor=white)](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-desktop-client-win-x64.exe)
-[![Linux AppImage](https://img.shields.io/badge/Linux-AppImage-FCC624?logo=linux&logoColor=black)](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-desktop-client-linux-x86_64.AppImage)
-[![Linux deb](https://img.shields.io/badge/Linux-.deb-A81D33?logo=debian&logoColor=white)](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-desktop-client-linux-amd64.deb)
+[![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon-black?logo=apple&logoColor=white)](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-mac-arm64.dmg)
+[![Windows](https://img.shields.io/badge/Windows-x64-0078D4?logo=windows&logoColor=white)](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-win-x64.exe)
+[![Linux AppImage](https://img.shields.io/badge/Linux-AppImage-FCC624?logo=linux&logoColor=black)](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-linux-x86_64.AppImage)
+[![Linux deb](https://img.shields.io/badge/Linux-.deb-A81D33?logo=debian&logoColor=white)](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-linux-amd64.deb)
 
 Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compliant OData servers. This repository holds the reference server, the certification test runner (`reso-cert`), an MCP server for AI agents and the shared libraries for OData parsing, metadata processing and validation. Seven of the eight packages publish to npm, so any project can consume them without the monorepo. The MCP server is not published and runs from this repository. The desktop certification app (which bundles a reference server and a local test-data UI) is built separately and distributed here as a downloadable [release](https://github.com/RESOStandards/reso-tools/releases/latest).
 
@@ -52,9 +52,9 @@ A cross-platform desktop app (macOS, Windows, Linux) runs the full certification
 
 | Platform | Download | Roll back one version | Notes |
 |---|---|---|---|
-| macOS (Apple Silicon) | [`.dmg`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-desktop-client-mac-arm64.dmg) · [`.zip`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-desktop-client-mac-arm64.zip) | [`.dmg`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-desktop-client-mac-arm64-previous.dmg) | Signed and notarized |
-| Windows (x64) | [`.exe`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-desktop-client-win-x64.exe) | [`.exe`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-desktop-client-win-x64-previous.exe) | Authenticode signed |
-| Linux | [`.AppImage`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-desktop-client-linux-x86_64.AppImage) · [`.deb`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-desktop-client-linux-amd64.deb) | [`.AppImage`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-desktop-client-linux-x86_64-previous.AppImage) · [`.deb`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-desktop-client-linux-amd64-previous.deb) | `chmod +x` the AppImage before first run |
+| macOS (Apple Silicon) | [`.dmg`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-mac-arm64.dmg) · [`.zip`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-mac-arm64.zip) | [`.dmg`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-mac-arm64-previous.dmg) | Signed and notarized |
+| Windows (x64) | [`.exe`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-win-x64.exe) | [`.exe`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-win-x64-previous.exe) | Authenticode signed |
+| Linux | [`.AppImage`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-linux-x86_64.AppImage) · [`.deb`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-linux-amd64.deb) | [`.AppImage`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-linux-x86_64-previous.AppImage) · [`.deb`](https://github.com/RESOStandards/reso-tools/releases/latest/download/reso-linux-amd64-previous.deb) | `chmod +x` the AppImage before first run |
 
 Every link above is a permalink. The asset names carry no version, so they keep resolving to the newest release without the README going stale. The **roll back** column is the version immediately before it, carried forward into each release so a bad update has a one-click way out. For anything further back, see [all releases](https://github.com/RESOStandards/reso-tools/releases).
 
