@@ -10,7 +10,6 @@ import { existsSync } from 'node:fs';
 import { copyFile, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { runDdMetadataChecks } from '../metadata/dd-metadata-checks.js';
 import type { DdReference } from '../metadata/dd-metadata-checks.js';
@@ -22,6 +21,7 @@ import { CERTIFIABLE, allOf, everyStepPassed, notCertifiable } from './certifica
 import type { DDVersion } from './dd-versions.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
+import { generateMetadataReport, normalizeReportJson } from './report-field-types.js';
 import { createDetailedReportGenerator, createGenericReportGenerator, prepareOutputDir, writeReports } from './reports.js';
 import type { BaseTestContext, DDConfig, PipelineStep, StepOutput, StepResult, TestFunction, ValidForCertification } from './types.js';
 import type { PipelineResult } from './types.js';
@@ -336,7 +336,8 @@ export const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
     // canonical + in-review blend and the matcher server-side. Forward the
     // caller's session bearer (UI/Desktop); the CLI path mints from .env.
     const metadataReportJson =
-      ctx.metadataReport ?? (ctx.metadataReportPath ? (JSON.parse(await readFile(ctx.metadataReportPath, 'utf8')) as unknown) : undefined);
+      ctx.metadataReport ??
+      (ctx.metadataReportPath ? normalizeReportJson(JSON.parse(await readFile(ctx.metadataReportPath, 'utf8'))) : undefined);
     const { variations, fuzziness } = await computeVariationsViaService({
       metadataReportJson,
       version: ctx.version,
