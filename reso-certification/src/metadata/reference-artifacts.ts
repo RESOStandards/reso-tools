@@ -12,8 +12,8 @@
  * self-test harness's concern.
  */
 import type { EnumMode } from '@reso-standards/reso-common';
-import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
+import { generateMetadataReport } from '../sdk/report-field-types.js';
 import { mergeWithLookupResource, serializeLookupResourceDump, synthesizeLookupResourceRecords } from './lookup-resource.js';
 import type { LookupResourceDump } from './lookup-resource.js';
 import { generateReferenceEdmx } from './reference-edmx.js';

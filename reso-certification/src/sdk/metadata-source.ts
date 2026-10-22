@@ -10,9 +10,9 @@
  * the DD pipeline uses; serialization is `generateMetadataReport`.
  */
 
-import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { fetchMetadataWithVersion } from '../test-runner/metadata.js';
+import { generateMetadataReport } from './report-field-types.js';
 
 export interface FetchMetadataReportFromServerInput {
   /** OData service root URL (no resource name or query). */
