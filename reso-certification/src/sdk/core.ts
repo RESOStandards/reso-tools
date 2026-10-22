@@ -8,7 +8,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { isDeadlineError, runSettled } from '@reso-standards/reso-client';
-import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata, getEntityType, loadMetadataFromFile, parseMetadataXml, persistMetadataXml } from '../test-runner/metadata.js';
 import { createCapturingRequester } from '../test-runner/payload-capture.js';
@@ -34,6 +33,7 @@ import { coerceCoreVersion, isCore21OrLater } from './core-versions.js';
 import { createExpandSchemaValidator, isEnumerationIgnored, loadValidationConfig } from './expand-schema.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
+import { generateMetadataReport } from './report-field-types.js';
 import { coreReportGenerators, prepareOutputDir, writeReports } from './reports.js';
 import { FETCH_METADATA, RUN_CORE_SCENARIOS } from './step-names.js';
 import type { BaseTestContext, CoreConfig, PipelineStep, StepResult, ValidForCertification } from './types.js';

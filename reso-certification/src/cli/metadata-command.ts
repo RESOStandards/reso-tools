@@ -9,10 +9,10 @@ import type { DDVersion } from '../sdk/dd-versions.js';
  * output routing and exit codes live in the command action (`index.ts`); this module is pure over its inputs.
  */
 
-import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from '../sdk/metadata-validation.js';
 import type { MetadataValidationResult } from '../sdk/metadata-validation.js';
+import { generateMetadataReport } from '../sdk/report-field-types.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
 
 /** DD version stamped into the generated report when the caller does not specify one. */
