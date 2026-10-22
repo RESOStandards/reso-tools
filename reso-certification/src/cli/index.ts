@@ -53,6 +53,7 @@ import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { mintOAuth2ClientCredentialsToken, resolveCliAuth } from './auth.js';
 import { formatPlan, planDecisionPush } from './decisions-command.js';
 import { overrideRenameNotice, removedPreferFields } from './deprecations.js';
+import { loadEnvFile } from './env-file.js';
 import { runMetadataStep } from './metadata-command.js';
 import { resolveRcfExitCode, runRcf } from './rcf-command.js';
 import { resolveRenderMode, runConfigEntries, runWithProgress } from './render.js';
@@ -113,6 +114,31 @@ const program = new Command();
 // `-V` / `--version` (Commander's default flags) report the CLI's own version. Per-command spec versions use
 // their own explicit flags (`core --spec-version`, `dd --dd-version`) so they never collide with this.
 program.name('reso-cert').description('RESO certification compliance testing tools').version(CLI_VERSION);
+
+program.option(
+  '--env-file <path>',
+  'Read environment variables from a file first. Defaults to ./credentials.env then ./.env when either is present.'
+);
+
+/** The flag's value, without asserting a type onto whatever commander parsed. */
+const envFileOption = (): string | undefined => {
+  const value = program.opts().envFile;
+  return typeof value === 'string' ? value : undefined;
+};
+
+/**
+ * Applied before any action runs, so a command that mints a token sees the file.
+ *
+ * Reported by NAME only. The file's whole purpose is to carry a credential, and a loader that
+ * announces what it loaded by value would undo the masking three lines below it.
+ */
+program.hook('preAction', () => {
+  const loaded = loadEnvFile(envFileOption());
+  if (!loaded.path) return;
+  const applied = loaded.applied.length > 0 ? loaded.applied.join(', ') : 'nothing new';
+  const alreadySet = loaded.skipped.length > 0 ? `; already set, left alone: ${loaded.skipped.join(', ')}` : '';
+  console.error(`Read ${loaded.path} (${applied}${alreadySet})`);
+});
 
 // ── Shared option builders live in ./shared-options.ts ──
 // addAuthOptions (OAuth2/bearer cluster) and addOutputOptions (compliance-report
