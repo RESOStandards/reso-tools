@@ -333,7 +333,7 @@ const COLLECTION_TYPE = /^Collection\((.+)\)$/;
  * The engine normalizes reports where they enter (src/sdk/report-field-types.ts), but a report can also reach this
  * generator straight from a file, through the replicate and schema commands, written by any tool or version. This
  * is the one place every schema is built, so it holds the line here too. On 2026-10-21 an install with
- * reso-metadata-utils 0.1.3 turned MLS Grid's MlgCanUse, a plain array of strings, into 2,779 false errors.
+ * reso-metadata-utils 0.1.3 turned a provider's MlgCanUse, a plain array of strings, into 2,779 false errors.
  * Returns the same object when no field is wrapped.
  */
 const withElementTypes = metadataJson => {

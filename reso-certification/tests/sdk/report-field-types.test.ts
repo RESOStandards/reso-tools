@@ -14,7 +14,7 @@ import {
  * A metadata report's `type` is a field's ELEMENT type; collection-ness lives only in `isCollection`. A wrapped
  * `Collection(Edm.String)` reaching the schema generator falls through to `object`, and every string in the array
  * fails "MUST be object but found string". `reso-metadata-utils` 0.1.4 fixed that at its source on 2026-10-16, but on
- * 2026-10-21 an install that resolved 0.1.3 brought it back: MLS Grid's `MlgCanUse`, a plain array of strings,
+ * 2026-10-21 an install that resolved 0.1.3 brought it back: a provider's `MlgCanUse`, a plain array of strings,
  * produced 2,779 false errors and failed a certification run. Each test below guards one way it can come back.
  */
 
@@ -74,10 +74,10 @@ describe('normalizeFieldType', () => {
 
   it('unwraps an expansion the way reso-metadata-utils 0.1.4 does, keeping it an expansion', () => {
     const out = normalizeFieldType(
-      field({ type: 'Collection(com.mlsgrid.metadata.PropertyRooms)', typeName: 'PropertyRooms', isExpansion: true })
+      field({ type: 'Collection(com.example.metadata.PropertyRooms)', typeName: 'PropertyRooms', isExpansion: true })
     );
     expect(out).toMatchObject({
-      type: 'com.mlsgrid.metadata.PropertyRooms',
+      type: 'com.example.metadata.PropertyRooms',
       typeName: 'PropertyRooms',
       isExpansion: true,
       isCollection: true

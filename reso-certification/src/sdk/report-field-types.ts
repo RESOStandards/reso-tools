@@ -14,7 +14,7 @@ import type { MetadataReport, MetadataReportField } from '@reso-standards/reso-m
  * The dependency floor stops a fresh install from picking an unfixed release, but an install can still resolve
  * one from a stale cache, and a report written by an older tool can arrive from disk. So the engine also
  * normalizes every report where it enters, and a report has the same shape whichever version wrote it. On
- * 2026-10-21 a `reso-metadata-utils` 0.1.3 install turned MLS Grid's `MlgCanUse` (a plain array of strings)
+ * 2026-10-21 a `reso-metadata-utils` 0.1.3 install turned a provider's `MlgCanUse` (a plain array of strings)
  * into 2,779 false errors and failed a certification run.
  */
 

@@ -72,8 +72,8 @@ const serviceCheck: PipelineStep<DDContext> = {
   run: async (ctx, onProgress) => {
     const url = ctx.serverUrl;
     // Identifying User-Agent + explicit Accept so servers behind WAFs
-    // (e.g. MLS Grid) do not reject the request based on the
-    // unidentified default User-Agent ('node') that undici emits.
+    // do not reject the request based on the unidentified default
+    // User-Agent ('node') that undici emits.
     const headers: Record<string, string> = {
       Accept: 'application/json',
       'User-Agent': 'RESO-Cert/0.11'
