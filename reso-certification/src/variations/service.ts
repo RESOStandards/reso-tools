@@ -79,7 +79,7 @@ export const computeVariationsViaService = async (input: ComputeVariationsViaSer
   // Rough pre-check: reject an obviously-oversized compressed body before the
   // upload. `>=` because the 6 MB cap is on the whole event (body + envelope), so
   // an exactly-6 MB body already can't fit. The gateway 413 below is the precise
-  // backstop for the envelope edge; both hand back the same message. Cotality-scale
+  // backstop for the envelope edge; both hand back the same message. Large-provider
   // reports (~45 MB raw → ~3.2 MB compressed) clear this easily.
   if (compressedBody.length >= MAX_COMPUTE_PAYLOAD_BYTES) {
     const mb = (bytes: number): string => (bytes / 1024 / 1024).toFixed(1);
