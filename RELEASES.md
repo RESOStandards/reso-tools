@@ -2,6 +2,56 @@
 
 ---
 
+## Certification 0.11.3 – 2026-10-21
+
+`reso-certification 0.11.3` · `reso-reference-server 0.8.5`
+
+A collection field outside the Data Dictionary no longer fails schema validation when its values are correct, a refused token request now says why, and the reference server says why it could not reach a server it proxies to.
+
+### Collection fields are always read as collections of their element type
+
+A metadata report records a field's **element** type, such as `Edm.String`, and marks a list with `isCollection`. Releases of `reso-metadata-utils` before 0.1.4 kept the CSDL form `Collection(Edm.String)` in the type instead. The schema generator does not recognize that form, so it typed each item of the list as an object. Every value then failed:
+
+```
+Schema validation (Property): 2,779 errors, 1 type here (2,779 run total) · MUST be object but found string 2,779 on 1 field (<field>)
+```
+
+Most fields escaped this by accident, because the Lookup Resource merge rewrites the type of any field with a lookup. A collection field with no lookup, typically a vendor extension, did not. A list of plain strings that matched the metadata exactly produced thousands of errors and failed the run.
+
+`reso-metadata-utils` 0.1.4 already writes the element type. 0.11.2 accepted any 0.1.x, though, so an install that resolved an older release brought the problem back. This release:
+
+- **Requires `reso-metadata-utils` 0.1.4 or later.**
+- **Normalizes every metadata report as it enters the engine,** whether it is generated from a server's metadata or read from a file. A report has the same shape whichever version wrote it.
+- **Normalizes again where every JSON Schema is built,** so the `replicate` and `schema` commands are covered when they are given a report file written by an older tool.
+
+If a run failed on a collection field with "MUST be object but found string" and the values are plain strings, rerun with this release.
+
+### A refused token request says why
+
+When the token endpoint refuses `CLIENT_ID` and `CLIENT_SECRET`, the CLI now prints the endpoint's address and the server's reason:
+
+```
+OAuth2 token mint failed: HTTP 400 Bad Request from https://cert-api.reso.org (access_denied: Unauthorized).
+  The token endpoint refused CLIENT_ID and CLIENT_SECRET. Download a fresh Certification Environment File from your account on the certification site and try again.
+  CLIENT_ID, CLIENT_SECRET or TOKEN_URI set in your shell take precedence over the .env file, so check those if a new file changes nothing.
+```
+
+Before, only the status was printed, and the variations check then suggested setting a different set of variables. The service messages now name `TOKEN_URI`, `CLIENT_ID` and `CLIENT_SECRET` first, and point back to this line when it was printed. Only the two standard OAuth2 error fields are printed, never the rest of a response, and the client secret is masked wherever it appears.
+
+### The reference server says why it could not reach an upstream server
+
+The reference server's `/api/proxy` forwards requests to another server, such as a certification API. When that server could not be reached at all, the proxy answered `502` with a bare "fetch failed" and logged nothing, so a network that blocks the call looked the same as a server that is down.
+
+The `502` body now carries the reason, and the proxy logs it with the origin and path only, never the query string:
+
+```json
+{ "error": "unable to get local issuer certificate", "code": "UNABLE_TO_GET_ISSUER_CERT_LOCALLY", "kind": "tls" }
+```
+
+`kind` is one of `tls`, `dns`, `connect`, `timeout` or `other`, so a client can tell a corporate network that inspects HTTPS from a server that is down.
+
+---
+
 ## Certification 0.11.2 – 2026-10-17
 
 `reso-certification 0.11.2`

@@ -117,7 +117,7 @@ docker compose --profile seed up seed   # or: --profile mongodb --profile seed-m
 ```
 reso-reference-server/
 ├── src/             # Node/Express/TypeScript OData server source
-├── tests/           # Vitest test suite (286 tests)
+├── tests/           # Vitest test suite (295 tests)
 ├── compliance/      # RESO compliance test infrastructure (Docker)
 ├── docker-compose.yml
 └── CLAUDE.md        # Coding conventions
@@ -298,7 +298,7 @@ git clone https://github.com/RESOStandards/reso-tools.git
 cd reso-tools/reso-reference-server
 npm install    # preinstall builds sibling deps if their dist/ is missing
 npm run build
-npm test       # 286 tests
+npm test       # 295 tests
 npm run dev    # tsc --watch
 npm start      # node dist/index.js
 ```

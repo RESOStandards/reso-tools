@@ -1,6 +1,6 @@
 {
   "name": "@reso-standards/reso-reference-server",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "description": "RESO Reference OData Server \u2013 metadata-driven CRUD server for RESO Data Dictionary resources",
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
