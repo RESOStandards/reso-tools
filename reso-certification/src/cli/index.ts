@@ -30,6 +30,7 @@ import { configEntryToAddEdit, configEntryToCore, configEntryToDD, configEntryTo
 import { CURRENT_CORE_VERSION, SUPPORTED_CORE_VERSIONS, isCoreVersion } from '../sdk/core-versions.js';
 import { CERTIFIABLE_DD_VERSIONS, CURRENT_DD_VERSION, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
 import { fetchMetadataReportFromServer } from '../sdk/metadata-source.js';
+import { normalizeReportFieldTypes } from '../sdk/report-field-types.js';
 import type { AddEditConfig, CoreConfig, DDConfig, EntityEventConfig, PipelineResult } from '../sdk/types.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import {
@@ -911,7 +912,7 @@ metadataReportCmd
       const outPath = resolve(opts.out);
 
       const raw = await readFile(inPath, 'utf-8');
-      const parsed = JSON.parse(raw) as MetadataReport;
+      const parsed = normalizeReportFieldTypes(JSON.parse(raw) as MetadataReport);
       const adapted = synthesizeResourcesFromFields(parsed);
 
       const output = opts.pretty ? JSON.stringify(adapted, null, 2) : JSON.stringify(adapted);

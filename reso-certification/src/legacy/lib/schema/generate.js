@@ -322,8 +322,35 @@ const getResourcesFromMetadata = metadata => {
   return resources;
 };
 
-const generateSchema = async (metadataJson, additionalProperties) => {
+/** CSDL's collection form: `Collection(<element type>)`. */
+const COLLECTION_TYPE = /^Collection\((.+)\)$/;
+
+/**
+ * A report's `type` is a field's ELEMENT type, with collection-ness only in `isCollection`. Everything below tests
+ * `type` against a bare `Edm.*`, so a wrapped `Collection(Edm.String)` falls through `typeMappings[field.type] ||
+ * 'object'` and every string in the array fails "MUST be object but found string".
+ *
+ * The engine normalizes reports where they enter (src/sdk/report-field-types.ts), but a report can also reach this
+ * generator straight from a file, through the replicate and schema commands, written by any tool or version. This
+ * is the one place every schema is built, so it holds the line here too. On 2026-10-21 an install with
+ * reso-metadata-utils 0.1.3 turned MLS Grid's MlgCanUse, a plain array of strings, into 2,779 false errors.
+ * Returns the same object when no field is wrapped.
+ */
+const withElementTypes = metadataJson => {
+  const fields = Array.isArray(metadataJson?.fields) ? metadataJson.fields : null;
+  const isWrapped = field => typeof field?.type === 'string' && COLLECTION_TYPE.test(field.type);
+  if (!fields || !fields.some(isWrapped)) return metadataJson;
+  return {
+    ...metadataJson,
+    fields: fields.map(field =>
+      isWrapped(field) ? { ...field, type: COLLECTION_TYPE.exec(field.type)[1], isCollection: true } : field
+    )
+  };
+};
+
+const generateSchema = async (reportJson, additionalProperties) => {
   try {
+    const metadataJson = withElementTypes(reportJson);
     const resources = getResourcesFromMetadata(metadataJson);
     const schema = await createSchema(resources, metadataJson?.lookups, additionalProperties);
     const { metadataMap = {} } = buildMetadataMap(metadataJson) || {};
@@ -350,5 +377,6 @@ const generateJsonSchema = async ({
 
 module.exports = {
   generateSchema,
+  withElementTypes,
   generateJsonSchema
 };
