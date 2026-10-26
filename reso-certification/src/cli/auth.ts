@@ -3,11 +3,10 @@ import { ensureHttps } from '../sdk/common.js';
  * CLI auth resolution chain: flags > config entry > .env file > env vars.
  */
 
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { parseEnv } from 'node:util';
 import { authConfigFromEnv } from '@reso-standards/reso-client';
 import type { AuthConfig } from '../test-runner/types.js';
+import { type EnvFileLoad, firstExisting, loadEnvFile } from './env-file.js';
 import { maskSecrets, registerSecret } from './secrets.js';
 
 /** CLI option flags related to authentication. */
@@ -20,30 +19,20 @@ export interface CliAuthFlags {
 
 /**
  * Load a .env file from the first directory in `searchPaths` that contains
- * one, merging its values into process.env. Existing env vars take precedence.
+ * one, merging its values into process.env. Existing env vars take precedence,
+ * and credentials are registered for masking (`loadEnvFile`).
  *
  * If no `searchPaths` argument is given, falls back to `[process.cwd()]` —
  * preserves the old single-cwd behavior.
  *
- * No-op if no .env file is found in any of the search paths.
+ * No-op if no .env file is found in any of the search paths. The CLI itself
+ * reads its file through `env-bootstrap.ts`, which also looks for
+ * `credentials.env` and honors `--env-file`.
  */
-export const loadDotEnv = (searchPaths?: ReadonlyArray<string>): void => {
+export const loadDotEnv = (searchPaths?: ReadonlyArray<string>): EnvFileLoad | undefined => {
   const paths = searchPaths && searchPaths.length > 0 ? searchPaths : [process.cwd()];
-  for (const dir of paths) {
-    const envPath = resolve(dir, '.env');
-    try {
-      const content = readFileSync(envPath, 'utf-8');
-      const parsed = parseEnv(content);
-      for (const [key, value] of Object.entries(parsed)) {
-        if (!(key in process.env)) {
-          process.env[key] = value;
-        }
-      }
-      return;
-    } catch {
-      // try next path
-    }
-  }
+  const found = firstExisting(paths.map(dir => resolve(dir, '.env')));
+  return found === undefined ? undefined : loadEnvFile(found);
 };
 
 /** The two fields an OAuth2 error response carries (RFC 6749, section 5.2). */

@@ -11,11 +11,11 @@
  * Exit codes: 0 = all scenarios passed, 1 = one or more failed, 2 = runtime error.
  */
 
-// IMPORTANT: env-bootstrap MUST be the very first import. It calls
-// loadDotEnv() as an import-time side effect so that subsequent imports
+// IMPORTANT: env-bootstrap MUST be the very first import. It reads the run's
+// environment file as an import-time side effect so that subsequent imports
 // (notably anything that transitively touches src/legacy/*) see env vars
 // like RESO_SERVICES_URL populated when they destructure process.env.
-import './env-bootstrap.js';
+import { ENV_BOOTSTRAP } from './env-bootstrap.js';
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -114,6 +114,26 @@ const program = new Command();
 // `-V` / `--version` (Commander's default flags) report the CLI's own version. Per-command spec versions use
 // their own explicit flags (`core --spec-version`, `dd --dd-version`) so they never collide with this.
 program.name('reso-cert').description('RESO certification compliance testing tools').version(CLI_VERSION);
+
+/**
+ * What startup read, reported before any action runs. A file that exists but could not be read stops the
+ * command here, before anything authenticates.
+ *
+ * Reported by NAME only. The file's whole purpose is to carry a credential, and a report of what it loaded
+ * by value would undo the masking the loader registered.
+ */
+program.hook('preAction', () => {
+  if (ENV_BOOTSTRAP.error !== undefined) {
+    // Stopped outright, with the CLI's runtime-error code: nothing has run yet, and nothing should.
+    console.error('Error:', ENV_BOOTSTRAP.error);
+    process.exit(2);
+  }
+  const loaded = ENV_BOOTSTRAP.load;
+  if (loaded === undefined) return;
+  const applied = loaded.applied.length > 0 ? loaded.applied.join(', ') : 'nothing new';
+  const alreadySet = loaded.skipped.length > 0 ? `; already set, left alone: ${loaded.skipped.join(', ')}` : '';
+  console.error(`Read ${loaded.path} (${applied}${alreadySet})`);
+});
 
 // ── Shared option builders live in ./shared-options.ts ──
 // addAuthOptions (OAuth2/bearer cluster) and addOutputOptions (compliance-report

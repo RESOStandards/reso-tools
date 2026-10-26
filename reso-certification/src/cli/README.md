@@ -25,15 +25,18 @@ human-readable summary goes to **stderr**, so you can pipe `--output json` clean
 Several commands take their service URL and credentials from the environment rather than from flags,
 so a working `.env` is often the difference between a command running and a command refusing.
 
-**Where it is found.** At startup the CLI looks for a file literally named `.env` in three places, in
-order, and the **first one found wins** – the rest are not read:
+**Where it is found.** At startup the CLI reads one file. It looks in these places, in order, and the
+**first one found wins** – the rest are not read:
 
-1. the current working directory
-2. the `reso-certification` package root
-3. the `reso-tools` monorepo root
+1. `credentials.env` in the current working directory, the name the certification site downloads
+2. `.env` in the current working directory
+3. `.env` in the `reso-certification` package root
+4. `.env` in the `reso-tools` monorepo root
 
 A variable already set in the real environment is **never** overwritten by the file, so
-`RESO_SERVICES_URL=… npx reso-cert …` overrides whatever `.env` says.
+`RESO_SERVICES_URL=… npx reso-cert …` overrides whatever the file says. Before a command runs, the CLI
+prints which file it read and the **names** of the variables it set, never their values. A value whose name
+ends in `SECRET`, `PASSWORD` or `API_KEY` is masked in everything the CLI prints.
 
 **Which environment a run touches is decided by `TOKEN_URI`, and by nothing else.**
 `RESO_SERVICES_URL` is the **same value for every environment**, so reading it tells you nothing
