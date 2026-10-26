@@ -2,6 +2,26 @@
 
 ---
 
+## Certification 0.11.4 – 2026-10-26
+
+`reso-certification 0.11.4`
+
+The published package carries no organization identifiers, and publishing now checks the packed artifact before it leaves.
+
+### Publishing checks the packed artifact for organization identifiers
+
+- **The README's example configuration uses synthetic identifiers** for the recipient and the provider system.
+- **Publishing scans what `npm pack` produces before it publishes.** `scripts/scan-pack.mjs` fails the release on an organization UOI, or on a bare number beside a USI key, that is not a sanctioned example. RESO's own identifier and a small set of synthetic values are sanctioned. It reads the tarball rather than a diff, because a diff cannot see content that was committed before the check existed.
+- **Run it locally with `npm run scan:pack:certification`.**
+- A source comment no longer names a provider.
+
+### Documentation and housekeeping
+
+- The README says which endorsements need production data and which may be tested against a development environment.
+- `.gitignore` covers the output directories a comparison run writes, which carry provider payloads.
+
+---
+
 ## Certification 0.11.3 – 2026-10-21
 
 `reso-certification 0.11.3` · `reso-reference-server 0.8.5`
