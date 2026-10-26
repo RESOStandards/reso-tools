@@ -146,15 +146,19 @@ reso-cert add-edit --config path/to/config.json
 
 **Add/Edit is the exception**, because it writes to the server and has to know what a valid and an invalid record look like. It needs `payloads` inline or a `payloadsDir`.
 
+Unlike other endorsements, Add/Edit should not be tested against production servers, since records are created and deleted. A development environment is sufficient.
+
+All other endorsements require production data sets, with the exception of technology providers certifying themselves with their own development data to demonstrate that their systems can pass the specification.
+
 ```json
 {
   "providerUoi": "T00000012",
   "configs": [
     {
-      "description": "Production feed",
+      "description": "Certification feed",
       "serviceRootUri": "https://api.example.com/odata",
-      "recipientUoi": "M00000554",
-      "providerUsi": "50039",
+      "recipientUoi": "M00000000",
+      "providerUsi": "99999",
       "token": "your-bearer-token"
     }
   ]
