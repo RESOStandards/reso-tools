@@ -355,7 +355,7 @@ const buildQueryForCategory = (serverUrl: string, resource: string, scenario: Co
 };
 
 // ── OriginatingSystem (OSN/OSID) scoping ──
-// Multi-tenant providers (e.g. MLS Grid) commingle many orgs behind one endpoint; some also REQUIRE an
+// Multi-tenant providers commingle many orgs behind one endpoint; some also REQUIRE an
 // OriginatingSystemName filter and 400 without it. Certifying a recipient org must therefore scope resource
 // queries to that org rather than reading "from the top" (huge, slow, and validating the wrong data). DD
 // replication already does this via prepareFilterExpression; this mirrors it for Core.

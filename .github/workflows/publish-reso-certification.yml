@@ -71,5 +71,12 @@ jobs:
       - name: Test
         run: npm test -w @reso-standards/reso-certification
 
+      # The last check before the artifact leaves. A review of each change cannot see
+      # content committed before it began, so a README example carrying a real identifier
+      # from the start can pass review in every release while still shipping. This reads
+      # what `npm pack` produces instead, where a file is either in the tarball or it is not.
+      - name: Scan the packed artifact for organization identifiers
+        run: node scripts/scan-pack.mjs @reso-standards/reso-certification
+
       - name: Publish (Trusted Publishing / OIDC)
         run: npm publish -w @reso-standards/reso-certification --access public
