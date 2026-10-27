@@ -20,7 +20,13 @@ import { fileURLToPath } from 'node:url';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { type ReferenceMap, inferMetadataReport } from '../rcf/index.js';
 import { SUPPORTED_DD_VERSIONS, isSupportedDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
-import { type VariationsServiceReport, computeVariationsViaService, isVariationsAuthError } from '../variations/index.js';
+import {
+  type LevelBuckets,
+  type VariationsServiceReport,
+  computeVariationsViaService,
+  countBucketedEntries,
+  isVariationsAuthError
+} from '../variations/index.js';
 import { type RcfPayload, readRcfPayloads } from './rcf-input.js';
 import { type DdSchemaValidator, createDdSchemaValidator } from './schema-command.js';
 
@@ -225,6 +231,81 @@ export const resolveRcfExitCode = (result: Pick<RcfResult, 'stats' | 'variations
   if (result.stats.invalidContextFiles > 0) return 2;
   if (result.variationsError) return 2;
   return 0;
+};
+
+/** The three coordinates a variations review is filed under, beside the run's DD version. */
+export interface RcfReportIdentity {
+  readonly providerUoi: string;
+  readonly providerUsi: string;
+  readonly recipientUoi: string;
+}
+
+/** Each coordinate and the flag it comes from, in the order the flags are named. */
+const IDENTITY_FLAGS: ReadonlyArray<readonly [keyof RcfReportIdentity, string]> = [
+  ['providerUoi', '--provider-uoi'],
+  ['providerUsi', '--provider-usi'],
+  ['recipientUoi', '--recipient-uoi']
+];
+
+export type RcfReportIdentityRead =
+  | { readonly ok: true; readonly identity: RcfReportIdentity | undefined }
+  | { readonly ok: false; readonly error: string };
+
+/**
+ * The report identity from `rcf`'s flags: all three, or none.
+ *
+ * A review is filed under a provider, a system and a recipient together, so a partial set could not be submitted
+ * and is refused before the run rather than written. A value is taken as given, less surrounding space. One with a
+ * space or a slash inside is refused, since each is a single segment of the review's address. Whether the values
+ * name real organizations and systems is the service's to decide when the report is submitted.
+ */
+export const readRcfReportIdentity = (flags: Readonly<Partial<Record<keyof RcfReportIdentity, string>>>): RcfReportIdentityRead => {
+  const value = (key: keyof RcfReportIdentity): string => flags[key]?.trim() ?? '';
+  const identity: RcfReportIdentity = {
+    providerUoi: value('providerUoi'),
+    providerUsi: value('providerUsi'),
+    recipientUoi: value('recipientUoi')
+  };
+  const missing = IDENTITY_FLAGS.filter(([key]) => identity[key] === '').map(([, flag]) => flag);
+  if (missing.length === IDENTITY_FLAGS.length) return { ok: true, identity: undefined };
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      error: `${IDENTITY_FLAGS.map(([, flag]) => flag).join(', ')} go together, because a review is filed under all three. Missing: ${missing.join(', ')}`
+    };
+  }
+  const malformed = IDENTITY_FLAGS.filter(([key]) => /[\s/]/.test(identity[key])).map(([, flag]) => flag);
+  if (malformed.length > 0) return { ok: false, error: `${malformed.join(', ')} must be one value, with no spaces or slashes` };
+  return { ok: true, identity };
+};
+
+/** The file `submit-variations-report` takes. A DD run writes it under the same name. */
+export const SUBMITTABLE_REPORT_FILENAME = 'variations-report.json';
+
+/**
+ * The variations report as a DD run writes it and `submit-variations-report` reads it: the run's DD version and the
+ * three coordinates at the top, then when it was made and the match sensitivity, then the buckets.
+ *
+ * Undefined when there is nothing to submit: no identity was given, variations did not run, or they found nothing.
+ * A DD run writes no report in that last case either.
+ */
+export const submittableVariationsReport = (
+  result: Pick<RcfResult, 'version' | 'variations'>,
+  identity: RcfReportIdentity | undefined,
+  generatedOn: string
+): Record<string, unknown> | undefined => {
+  if (!identity || !result.variations) return undefined;
+  const buckets = result.variations.variations;
+  if (countBucketedEntries(buckets as LevelBuckets) === 0) return undefined;
+  return {
+    version: result.version,
+    providerUoi: identity.providerUoi,
+    providerUsi: identity.providerUsi,
+    recipientUoi: identity.recipientUoi,
+    generatedOn,
+    fuzziness: result.variations.fuzziness,
+    ...buckets
+  };
 };
 
 /**

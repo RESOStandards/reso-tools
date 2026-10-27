@@ -39,7 +39,7 @@ import type { LevelBuckets } from './constants.js';
 const REPORT_ROUTE = '/v2/certification/variations-reports';
 
 export interface SubmitVariationsReportInput {
-  /** Path to the `variations-report.json` a DD run produced. */
+  /** Path to the `variations-report.json` a DD or rcf run produced. */
   readonly reportPath?: string;
   /** The report body, when the caller already holds it. Takes precedence over `reportPath`. */
   readonly report?: Record<string, unknown>;
@@ -109,7 +109,7 @@ const coordinatesOf = (
   if (missing.length > 0) {
     throw serviceError(
       'SERVICE_ERROR',
-      `The report is missing ${missing.join(', ')}. A variations report produced by a DD run carries all four; this file may be the wrong artifact.`
+      `The report is missing ${missing.join(', ')}. A DD run's variations-report.json carries all four, as does an rcf run's when it is given --provider-uoi, --provider-usi and --recipient-uoi. This file may be the wrong artifact.`
     );
   }
   return { version, providerUoi, providerUsi, recipientUoi };
