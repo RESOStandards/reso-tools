@@ -182,7 +182,7 @@ The cert runner supports every auth shape a real RESO server might use. Auth is 
 
 1. **CLI flags** – `--auth-token` for bearer, or `--client-id` plus `--client-secret` plus `--token-url` for OAuth2 client credentials
 2. **Config file** – `--config path/to/config.json` lets each entry in the file specify its own auth
-3. **`.env` file** in the current directory
+3. **A credentials file** – `credentials.env`, as the certification site hands it out, or a `.env`. The CLI reads the first one it finds at startup, from the places the [CLI reference](../src/cli/README.md#environment-env) lists
 4. **Environment variables** – `RESO_AUTH_TOKEN` for bearer, or `RESO_CLIENT_ID` plus `RESO_CLIENT_SECRET` plus `RESO_TOKEN_URI` for client credentials
 
 All four resolvers know about the same set of variables, so a config file in production can be replaced by environment variables in CI without changing the command. The same flag names work everywhere.
@@ -203,8 +203,8 @@ RESO_CLIENT_SECRET=YOUR_CLIENT_SECRET \
 RESO_TOKEN_URI=https://auth.example.com/oauth/token \
 reso-cert core --url https://api.example.com
 
-# Same OAuth2, via .env file
-node --env-file=.env $(which reso-cert) core --url https://api.example.com
+# Same OAuth2, from a credentials.env or .env in the working directory, which the CLI reads itself
+reso-cert core --url https://api.example.com
 ```
 
 ---

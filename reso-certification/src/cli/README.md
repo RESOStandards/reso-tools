@@ -54,6 +54,7 @@ environment a command will write to, look at the host in `TOKEN_URI`.
 | `CLIENT_ID`, `CLIENT_SECRET` | the same commands | OAuth2 client credentials the token is minted from. |
 | `FT_ADMIN_SECRET` | `update-variations --fast-track` | Fast Track admin credential. A fast-track submission is refused without it, before any request is made. |
 | `CERT_AUTH_API_BASE_URL`, `CERT_AUTH_API_USERNAME`, `CERTIFICATION_API_KEY`, `CURRENT_PROVIDER_UOI` | the SDK's provider-token fallback | The second auth path, used when the OAuth2 variables are absent. |
+| `RESO_VARIATIONS_HANDLER` | the variations step of `dd`, `find-variations` and `rcf` | For a host that runs the SDK: the path of a module whose `computeVariations` computes variations in place of the Variations Service, so no service address or token is needed. Unset, the service is called as usual. See the [package README](../../README.md#computing-variations-with-your-own-module). |
 
 **Two auth paths, in that order.** A command first tries an OAuth2 client-credentials token from
 `TOKEN_URI` / `CLIENT_ID` / `CLIENT_SECRET`. If those are not configured it falls back to minting a
@@ -85,6 +86,7 @@ different thing from the RESO service credentials above.
 | [`submit-variation-decisions`](#submit-variation-decisions) | Mark a report from a sheet of actions and comments, and submit it |
 | [`list-variation-reviews`](#list-variation-reviews) | The variations in review – yours as a provider, the whole pool as an admin (read-only) |
 | [`variations-review-status`](#variations-review-status) | Where each variations submission stands (read-only) |
+| [`restore`](#restore) | Restore a certification server backup to a Cert API (admin) |
 
 The first four are **endorsement runners** (a full compliance pipeline against a live
 server). The rest are **per-step utilities** – each does one stage of a run in isolation,
@@ -433,6 +435,37 @@ is refused, because nothing would be submitted.
 
 One push carries the whole sheet. If any row is unusable the report is returned unchanged rather
 than half-applied, so you never have to work out which rows landed.
+
+### `restore`
+
+Restore a certification server backup to a Cert API: walk the backup, decompress each report and post it
+to the restore endpoint, then print what was found and what was sent.
+
+```bash
+reso-cert restore --path <backup root> --url <cert api> [--execute] [--limit n] [--derive-missing-type]
+```
+
+| Option | Meaning |
+|---|---|
+| `--path <dir>` | The backup root, the directory holding the endorsement-type folders. Required. |
+| `--url <url>` | Base URL of the Cert API. Required. |
+| `--execute` | Actually send. Without it the command is a dry run and nothing is posted. |
+| `--limit <n>` | Stop after this many reports, for a smoke test. |
+| `--concurrency <n>` | Reports in flight at once. Default 4. |
+| `--ledger <path>` | Where restored reports are recorded. Default `.restore-ledger` in the backup root. |
+| `--derive-missing-type` | Supply a missing report type, only where the directory and the report's own version agree. |
+
+- **A rerun resumes.** Every report that lands is recorded in the ledger, and a later run skips it.
+- **Archived reports are recognized by where they sit.** The backup keeps them under their own
+  `archived/` tree, and there is no flag that could mark a live report archived.
+- **A report written before the type field existed is refused by the server** unless
+  `--derive-missing-type` supplies the type. It is supplied only when the endorsement directory's version
+  matches the version inside the report. One source alone would be a guess.
+- **The credential is `CLIENT_SECRET`,** as the downloaded credentials file carries it, or
+  `CERTIFICATION_API_KEY`. A dry run needs neither. With neither, an `--execute` run stops before it
+  reads the backup.
+- **Exit code** `0` when everything was sent or would be, `1` when any report failed and `2` on an error
+  such as a missing credential.
 
 ## Variations review (read-only)
 
