@@ -129,8 +129,9 @@ export type {
 
 // ── Variations (standalone; also used by the DD pipeline) ──
 
-export { computeVariationsViaService, isVariationsAuthError, findVariations } from './variations/index.js';
+export { computeVariationsViaService, isVariationsAuthError, findVariations, VARIATIONS_HANDLER_ENV } from './variations/index.js';
 export type {
+  ComputeVariationsRequest,
   ComputeVariationsViaServiceInput,
   VariationsServiceReport,
   VariationsServiceErrorCode,

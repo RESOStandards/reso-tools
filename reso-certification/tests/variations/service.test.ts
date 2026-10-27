@@ -5,9 +5,12 @@
  */
 
 import { randomBytes } from 'node:crypto';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { computeVariationsViaService, isVariationsAuthError } from '../../src/variations/index.js';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { VARIATIONS_HANDLER_ENV, computeVariationsViaService, isVariationsAuthError } from '../../src/variations/index.js';
 
 const report = {
   description: 'Data Dictionary Variations Report',
@@ -138,5 +141,100 @@ describe('computeVariationsViaService — service failures', () => {
     expect(codeOf(err)).toBe('SERVICE_ERROR');
     expect((err as Error).message).toMatch(/too large/i);
     expect((err as Error).message).toMatch(/dev@reso\.org/);
+  });
+});
+
+describe("computeVariationsViaService — a host's handler module", () => {
+  // Real modules on disk, loaded the way a host's would be. Each records what it was handed on globalThis.
+  const dir = { path: '' };
+  const handlerModule = (name: string, source: string): string => {
+    const path = join(dir.path, name);
+    writeFileSync(path, source);
+    return path;
+  };
+  const seen = (): unknown => (globalThis as Record<string, unknown>).__variationsHandlerSeen;
+
+  beforeAll(() => {
+    dir.path = mkdtempSync(join(tmpdir(), 'variations-handler-'));
+  });
+  afterAll(() => {
+    rmSync(dir.path, { recursive: true, force: true });
+  });
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, '__variationsHandlerSeen');
+  });
+
+  it('calls the module the host names with the /compute body, and needs no services address and no token', async () => {
+    // biome-ignore lint/performance/noDelete: unsetting an env var requires `delete`.
+    delete process.env.RESO_SERVICES_URL;
+    process.env[VARIATIONS_HANDLER_ENV] = handlerModule(
+      'ok.mjs',
+      `export const computeVariations = async request => {
+        globalThis.__variationsHandlerSeen = request;
+        return { description: 'Data Dictionary Variations Report', version: request.version, fuzziness: 0.25, variations: { fields: ['from-handler'] } };
+      };`
+    );
+
+    const result = await computeVariationsViaService({
+      metadataReportJson: { fields: [], lookups: [] },
+      version: '2.1',
+      fuzziness: 0.3,
+      bearerToken: 'sess-123'
+    });
+
+    expect(result.variations).toEqual({ fields: ['from-handler'] });
+    expect(mockFetch()).not.toHaveBeenCalled();
+    // The /compute body, exactly. A bearer passed in is not handed on.
+    expect(seen()).toEqual({ metadataReportJson: { fields: [], lookups: [] }, version: '2.1', fuzziness: 0.3 });
+  });
+
+  it('refuses a module that exports no computeVariations, naming the variable', async () => {
+    process.env[VARIATIONS_HANDLER_ENV] = handlerModule('empty.mjs', 'export const somethingElse = 1;');
+
+    const error = await computeVariationsViaService({ metadataReportJson: {}, version: '2.1' }).catch((e: unknown) => e);
+
+    expect(codeOf(error)).toBe('SERVICE_ERROR');
+    expect((error as Error).message).toContain(VARIATIONS_HANDLER_ENV);
+    expect((error as Error).message).toContain('no computeVariations function');
+  });
+
+  it('refuses a module that cannot be loaded', async () => {
+    process.env[VARIATIONS_HANDLER_ENV] = join(dir.path, 'missing.mjs');
+
+    const error = await computeVariationsViaService({ metadataReportJson: {}, version: '2.1' }).catch((e: unknown) => e);
+
+    expect(codeOf(error)).toBe('SERVICE_ERROR');
+    expect((error as Error).message).toContain('could not be loaded');
+  });
+
+  it('reports a module that fails as a service error, with its reason', async () => {
+    process.env[VARIATIONS_HANDLER_ENV] = handlerModule(
+      'throws.mjs',
+      `export const computeVariations = async () => { throw new Error('the backend refused this job'); };`
+    );
+
+    const error = await computeVariationsViaService({ metadataReportJson: {}, version: '2.1' }).catch((e: unknown) => e);
+
+    expect(codeOf(error)).toBe('SERVICE_ERROR');
+    expect((error as Error).message).toContain('the backend refused this job');
+  });
+
+  it('refuses an answer that is not a variations report', async () => {
+    process.env[VARIATIONS_HANDLER_ENV] = handlerModule('wrong.mjs', 'export const computeVariations = async () => ({ nope: true });');
+
+    const error = await computeVariationsViaService({ metadataReportJson: {}, version: '2.1' }).catch((e: unknown) => e);
+
+    expect(codeOf(error)).toBe('SERVICE_ERROR');
+    expect((error as Error).message).toContain('answered without a variations report');
+  });
+
+  it('treats a blank variable as unset, so the HTTP path runs as before', async () => {
+    process.env[VARIATIONS_HANDLER_ENV] = '   ';
+    mockFetch().mockResolvedValue({ ok: true, status: 200, text: async () => gzipB64(report) });
+
+    const result = await computeVariationsViaService({ metadataReportJson: {}, version: '2.1', bearerToken: 'sess-123' });
+
+    expect(result.variations).toEqual({ fields: [] });
+    expect(mockFetch()).toHaveBeenCalledTimes(1);
   });
 });

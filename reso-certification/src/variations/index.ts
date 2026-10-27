@@ -10,6 +10,8 @@ export {
   computeVariationsViaService,
   updateVariationsViaService,
   isVariationsAuthError,
+  VARIATIONS_HANDLER_ENV,
+  type ComputeVariationsRequest,
   type ComputeVariationsViaServiceInput,
   type UpdateVariationsViaServiceInput,
   type UpdateVariationsResult,
