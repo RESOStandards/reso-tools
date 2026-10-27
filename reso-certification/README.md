@@ -56,10 +56,10 @@ Auth is resolved automatically from the first available source:
 
 1. **CLI flags**: `--auth-token` or `--client-id`/`--client-secret`/`--token-url`
 2. **Config file**: `--config path/to/config.json` (per-entry auth)
-3. **`.env` file**: in the current directory
+3. **A credentials file**: `credentials.env`, as the certification site hands it out, or a `.env`. The CLI reads the first one it finds at startup, from the places the [CLI reference](src/cli/README.md#environment-env) lists.
 4. **Environment variables**: `RESO_AUTH_TOKEN` or `RESO_CLIENT_ID`/`RESO_CLIENT_SECRET`/`RESO_TOKEN_URI`
 
-A Data Dictionary run authenticates twice. Besides the server credentials above, it reaches the Variations Service, which reads `RESO_SERVICES_URL`, `TOKEN_URI`, `CLIENT_ID` and `CLIENT_SECRET` from `.env` or the environment. A missing `RESO_SERVICES_URL` fails the run at the variations step rather than skipping it, so a misconfigured machine cannot quietly stop checking variations. `--skip-variations` runs without them. That run is not eligible for certification.
+A Data Dictionary run authenticates twice. Besides the server credentials above, it reaches the Variations Service, which reads `RESO_SERVICES_URL`, `TOKEN_URI`, `CLIENT_ID` and `CLIENT_SECRET` from the credentials file or the environment. A missing `RESO_SERVICES_URL` fails the run at the variations step rather than skipping it, so a misconfigured machine cannot quietly stop checking variations. `--skip-variations` runs without them. That run is not eligible for certification.
 
 ## Endorsements
 
@@ -216,6 +216,20 @@ const result = await runComplianceTests({
   console.log(`${progress.step}: ${progress.status}`);
 });
 ```
+
+### Computing variations with your own module
+
+A host that runs the SDK can compute a Data Dictionary run's variations with a module of its own instead of the HTTP variations service. Set `RESO_VARIATIONS_HANDLER` to the module's path. The module exports `computeVariations(request)`, which takes the body the service's compute route takes (`metadataReportJson`, `version` and an optional `fuzziness`) and answers what that route answers:
+
+```typescript
+import type { ComputeVariationsRequest } from '@reso-standards/reso-certification';
+
+export const computeVariations = async (request: ComputeVariationsRequest) => {
+  // Answer what the compute route answers: an object with a `variations` report.
+};
+```
+
+The variable is an explicit switch. Without it the SDK calls the HTTP service exactly as before. A module that cannot be loaded, exports no `computeVariations`, throws or answers without a variations report fails the variations step with an error that names the variable.
 
 ## Exit Codes
 

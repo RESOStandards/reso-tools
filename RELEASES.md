@@ -2,11 +2,55 @@
 
 ---
 
-## Certification 0.11.4 – 2026-10-26
+## Certification 0.11.4 – 2026-10-27
 
 `reso-certification 0.11.4`
 
-The published package carries no organization identifiers, and publishing now checks the packed artifact before it leaves.
+The CLI reads the credentials file the certification site hands out, a new `restore` command puts a certification server backup back on a Cert API, and a host can compute variations with a module of its own. The published package carries no organization identifiers, and publishing now checks the packed artifact before it leaves.
+
+### The CLI reads the downloaded `credentials.env`
+
+The certification site hands out a file named `credentials.env`, but the CLI never looked for it. Someone who put the downloaded file beside the CLI got an authentication error. At startup the CLI now reads the first of these that exists, and no other:
+
+1. `credentials.env` in the working directory
+2. `.env` in the working directory
+3. `.env` in the `reso-certification` package root
+4. `.env` in the `reso-tools` monorepo root
+
+Only the first is new. The other three are where the CLI already looked, in the same order.
+
+- **The environment always wins.** A variable already set in the shell, in CI or inline is never overwritten by the file.
+- **The CLI says what it read.** Before a command runs, it prints the file and the names of the variables it set, never their values.
+- **Credentials are masked as they load.** A value whose name ends in `SECRET`, `PASSWORD` or `API_KEY` is masked in everything the CLI prints.
+- **A file that exists but cannot be read stops the command** with exit code 2, rather than being skipped for the next one.
+
+### `reso-cert restore` puts a certification server backup back
+
+```
+reso-cert restore --path <backup root> --url <cert api> [--execute] [--limit n] [--derive-missing-type]
+```
+
+It walks the backup, decompresses each report and posts it to the Cert API's restore endpoint, then prints what it found and what it sent.
+
+- **A dry run is the default.** Nothing is sent without `--execute`, and `--limit` sends only the first few.
+- **A rerun resumes.** A ledger beside the backup records each report that landed, and a later run skips them. `--ledger` puts it elsewhere.
+- **Whether a report was archived comes from where it sits in the backup,** under its own `archived/` tree, never from a flag.
+- **A missing report type is supplied only when two sources agree.** With `--derive-missing-type`, a report written before the type field existed takes its type from its directory, and only when the directory's version matches the report's own.
+- **It reads `CLIENT_SECRET`,** the value the downloaded credentials file carries, or `CERTIFICATION_API_KEY`.
+
+### A host can compute variations with its own module
+
+A host that runs the SDK can name a module that computes variations in place of the HTTP variations service:
+
+```
+RESO_VARIATIONS_HANDLER=/path/to/module.js
+```
+
+The module exports `computeVariations(request)`. It takes the body the service's compute route takes (`metadataReportJson`, `version` and an optional `fuzziness`) and answers what that route answers. On that path no service address or token is needed.
+
+- **It is an explicit setting.** Nothing infers where the SDK is running. Without the variable the HTTP service is called exactly as before, so the CLI and the desktop, which never set it, are unaffected.
+- **A failure names the variable.** A module that cannot be loaded, exports no `computeVariations`, throws or answers without a variations report fails the variations step.
+- `VARIATIONS_HANDLER_ENV` and the `ComputeVariationsRequest` type are exported for hosts writing the module.
 
 ### Publishing checks the packed artifact for organization identifiers
 
@@ -17,6 +61,8 @@ The published package carries no organization identifiers, and publishing now ch
 
 ### Documentation and housekeeping
 
+- The tools site publishes every document a guide links to, so the certification run reference and the MCP server's architecture open on the site rather than on GitHub.
+- The package README and the guide say where the CLI reads its credentials from, and the CLI reference documents `restore` and `RESO_VARIATIONS_HANDLER`.
 - The README says which endorsements need production data and which may be tested against a development environment.
 - `.gitignore` covers the output directories a comparison run writes, which carry provider payloads.
 
