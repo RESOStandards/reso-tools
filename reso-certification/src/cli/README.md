@@ -82,7 +82,7 @@ different thing from the RESO service credentials above.
 | [`rcf`](#rcf) | RESO Common Format: infer a metadata report from payload data and run variations |
 | [`metadata-report adapt`](#metadata-report-adapt) | Back-fill the `resources[]` block on a DD 2.0/2.1 report |
 | [`update-variations`](#update-variations) | Submit reviewed variation suggestions (admin) |
-| [`submit-variations-report`](#submit-variations-report) | Send a DD run's variations report to start or refresh a review |
+| [`submit-variations-report`](#submit-variations-report) | Send a DD or rcf run's variations report to start or refresh a review |
 | [`submit-variation-decisions`](#submit-variation-decisions) | Mark a report from a sheet of actions and comments, and submit it |
 | [`list-variation-reviews`](#list-variation-reviews) | The variations in review – yours as a provider, the whole pool as an admin (read-only) |
 | [`variations-review-status`](#variations-review-status) | Where each variations submission stands (read-only) |
@@ -326,16 +326,24 @@ then runs variations against the inferred report. DD schema validation is opt-in
 reso-cert rcf -i ./rcf-export/ --output-dir ./out
 reso-cert rcf -i payloads.zip --schema-validate --output-dir ./out
 reso-cert rcf -i payload.json --skip-variations --output-dir ./out   # offline, no credentials
+
+# Variations for review: name the provider, system and recipient, then submit what rcf wrote
+reso-cert rcf -i ./rcf-export/ --output-dir ./out --provider-uoi <UOI> --provider-usi <USI> --recipient-uoi <UOI>
+reso-cert submit-variations-report --report ./out/variations-report.json
 ```
 
 `-i, --input <path>` (required; a `.json` file, a `.zip` or a directory of payloads or records) ·
 `--dd-version <v>` · `-f, --fuzziness <0–1>` (default `0.25`) · `--schema-validate` · `--strict`
 (fail on the first schema error, with `--schema-validate`) · `--skip-variations` ·
 `-a, --additional-properties` (accepted and inert: RCF is always extensible) · `--output-dir <path>`
-(default `.`).
+(default `.`) · `--provider-uoi <uoi>` · `--provider-usi <usi>` · `--recipient-uoi <uoi>` (all three or
+none).
 
 Writes `metadata-report.json` and `data-availability-report.json`, plus
-`data-dictionary-variations.json` when the variations step runs. The run version is `--dd-version` when
+`data-dictionary-variations.json` when the variations step runs. Given the provider, system and recipient,
+it also writes `variations-report.json` when variations are found: the file a DD run writes, which
+`submit-variations-report` takes to start a review. A partial set of the three stops the run before it
+starts. The run version is `--dd-version` when
 given, else the version in the payload's `@reso.context`, else DD 2.0. The variations call authenticates
 with the `.env` service credentials, as `find-variations` does. `--skip-variations` mints no token, so an
 inference-only run needs none.
@@ -395,8 +403,8 @@ This is the same shape `list-variation-reviews --csv` writes, so a review export
 goes back in without reshaping the file.
 
 ### `submit-variations-report`
-Send the `variations-report.json` a DD run produced to the Variations Service, which starts a
-review or refreshes one. The whole report goes up, buckets and all, and the service builds the
+Send the `variations-report.json` a DD run produced, or an `rcf` run given the provider, system and
+recipient, to the Variations Service, which starts a review or refreshes one. The whole report goes up, buckets and all, and the service builds the
 pool rows from it – so each row keeps the matcher's suggestions, the strategy that produced its
 mapping, and the element level.
 

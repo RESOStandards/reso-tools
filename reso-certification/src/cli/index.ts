@@ -55,7 +55,13 @@ import { mintOAuth2ClientCredentialsToken, resolveCliAuth } from './auth.js';
 import { formatPlan, planDecisionPush } from './decisions-command.js';
 import { overrideRenameNotice, removedPreferFields } from './deprecations.js';
 import { runMetadataStep } from './metadata-command.js';
-import { resolveRcfExitCode, runRcf } from './rcf-command.js';
+import {
+  SUBMITTABLE_REPORT_FILENAME,
+  readRcfReportIdentity,
+  resolveRcfExitCode,
+  runRcf,
+  submittableVariationsReport
+} from './rcf-command.js';
 import { resolveRenderMode, runConfigEntries, runWithProgress } from './render.js';
 import { REPLICATION_STRATEGY_VALUES, runReplicate } from './replicate-command.js';
 import { runRestore } from './restore-command.js';
@@ -1354,6 +1360,12 @@ program
   )
   .option('--strict', 'Fail fast on the first schema-validation error (with --schema-validate)')
   .option('--skip-variations', 'Skip the variations service call (infer + reports only)')
+  .option(
+    '--provider-uoi <uoi>',
+    `Your organization's UOI. With --provider-usi and --recipient-uoi, variations are also written to ${SUBMITTABLE_REPORT_FILENAME} for submit-variations-report`
+  )
+  .option('--provider-usi <usi>', 'The system (USI) the data comes from')
+  .option('--recipient-uoi <uoi>', 'The organization (UOI) the data is for')
   .action(
     async (opts: {
       input: string;
@@ -1364,12 +1376,23 @@ program
       additionalProperties?: boolean;
       strict?: boolean;
       skipVariations?: boolean;
+      providerUoi?: string;
+      providerUsi?: string;
+      recipientUoi?: string;
     }) => {
       try {
         const fuzziness = Number.parseFloat(opts.fuzziness);
         if (!Number.isFinite(fuzziness) || fuzziness < 0 || fuzziness > 1) {
           throw new Error(`--fuzziness must be a number in [0, 1], got '${opts.fuzziness}'`);
         }
+        // Read before the run, so a partial identity stops it here rather than after the work is done.
+        const identityRead = readRcfReportIdentity({
+          providerUoi: opts.providerUoi,
+          providerUsi: opts.providerUsi,
+          recipientUoi: opts.recipientUoi
+        });
+        if (!identityRead.ok) throw new Error(identityRead.error);
+        const generatedOn = new Date().toISOString();
         // The /compute token for the variations service (from .env; the service mints its own if absent).
         const bearerToken = opts.skipVariations ? undefined : await mintOAuth2ClientCredentialsToken();
 
@@ -1380,7 +1403,7 @@ program
           additionalProperties: opts.additionalProperties,
           strict: opts.strict,
           schemaValidate: opts.schemaValidate,
-          generatedOn: new Date().toISOString(),
+          generatedOn,
           runVariations: !opts.skipVariations,
           ...(bearerToken ? { bearerToken } : {})
         });
@@ -1399,6 +1422,16 @@ program
         );
         if (result.variationsError) {
           process.stderr.write(`rcf: variations skipped (reports still written): ${result.variationsError}\n`);
+        }
+        const submittable = submittableVariationsReport(result, identityRead.identity, generatedOn);
+        if (submittable) {
+          const reportPath = resolve(dir, SUBMITTABLE_REPORT_FILENAME);
+          await writeFile(reportPath, JSON.stringify(submittable, null, 2));
+          process.stderr.write(`rcf: to start a review of these variations: reso-cert submit-variations-report --report ${reportPath}\n`);
+        } else if (!identityRead.identity && (s.variationsTotal ?? 0) > 0) {
+          process.stderr.write(
+            'rcf: to submit these variations for review, run again with --provider-uoi, --provider-usi and --recipient-uoi\n'
+          );
         }
         if (s.totalRecords === 0) {
           process.stderr.write(`rcf: no certifiable records were ingested from ${resolve(opts.input)} – nothing to certify\n`);
@@ -1442,8 +1475,8 @@ program
 
 program
   .command('submit-variations-report')
-  .description('Submit a variations report from a DD run to the Variations Service to start or refresh a review')
-  .requiredOption('-r, --report <path>', 'Path to the variations-report.json a DD run produced')
+  .description('Submit a variations report from a DD or rcf run to the Variations Service to start or refresh a review')
+  .requiredOption('-r, --report <path>', 'Path to the variations-report.json a DD or rcf run produced')
   .option('--overwrite', 'Proceed over an existing pending review (never over a lock)')
   .option('--dry-run', 'Report what would be submitted and send nothing')
   .option('--json', 'Print the result as JSON')
@@ -1531,7 +1564,7 @@ program
 program
   .command('submit-variation-decisions')
   .description('Mark a variations report from a sheet of actions and comments, and submit it for review')
-  .requiredOption('-r, --report <path>', 'Path to the variations-report.json a DD run produced')
+  .requiredOption('-r, --report <path>', 'Path to the variations-report.json a DD or rcf run produced')
   .requiredOption('-d, --decisions <path>', 'Path to the sheet (Resource Name, Field Name, Lookup Value, Action, Comment)')
   .option('--dry-run', 'Show what would be marked and send nothing')
   .option('--json', 'Print the marked report instead of submitting it')
