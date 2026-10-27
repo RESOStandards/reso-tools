@@ -10,12 +10,18 @@
  *  - CLI (non-members, the free path): omit the bearer and a provider token is
  *    minted from `.env` credentials, exactly as `findVariations` did.
  *
+ * A host that runs the SDK inside RESO's own backend sets `RESO_VARIATIONS_HANDLER`
+ * to a module that computes variations in place of the HTTP call (see
+ * `VARIATIONS_HANDLER_ENV`). The CLI and the desktop never set it.
+ *
  * It throws rather than silently degrading. Auth failures carry a `code` so
  * callers can react — the UI catches an auth code to prompt re-login; the CLI
  * surfaces the `.env` setup instructions. The `fromCli` flag (threaded from the
  * Commander CLI helper, as the legacy did) tailors the not-configured message.
  */
 
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import {
   cliAuthRejectedMessage,
@@ -53,7 +59,75 @@ export type VariationsServiceErrorCode = ServiceErrorCode;
 /** True for the two auth failures — the UI uses this to decide to prompt login. Alias of `isServiceAuthError`. */
 export const isVariationsAuthError = isServiceAuthError;
 
+/**
+ * The variable naming a module that computes variations in place of the HTTP service.
+ *
+ * A host that runs the SDK inside RESO's own backend sets it; the CLI and the desktop never do, and without it
+ * nothing changes. It is an explicit setting: nothing here infers where the SDK is running. The module exports
+ * `computeVariations(request)`, takes what the `/compute` route takes and answers what that route answers. No
+ * token is passed to it: the host's module authenticates however its own environment allows.
+ */
+export const VARIATIONS_HANDLER_ENV = 'RESO_VARIATIONS_HANDLER';
+
+/** What the `/compute` route takes, and what a handler module is handed. */
+export interface ComputeVariationsRequest {
+  readonly metadataReportJson: unknown;
+  readonly version: string;
+  readonly fuzziness?: number;
+}
+
+type VariationsHandler = (request: ComputeVariationsRequest) => unknown;
+
+const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isHandler = (value: unknown): value is VariationsHandler => typeof value === 'function';
+
+/** An answer in the shape the `/compute` route answers: at least a report with its variations. */
+const isReport = (value: unknown): value is VariationsServiceReport => isRecord(value) && isRecord(value.variations);
+
+const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+/** The module a host configured, or undefined. A blank value is no value. */
+const configuredHandler = (): string | undefined => {
+  const value = process.env[VARIATIONS_HANDLER_ENV]?.trim();
+  return value ? value : undefined;
+};
+
+/** Compute through the host's module. Every failure names the variable, so a misconfigured host says where to look. */
+const computeViaHandler = async (modulePath: string, request: ComputeVariationsRequest): Promise<VariationsServiceReport> => {
+  const loaded: unknown = await import(pathToFileURL(resolve(modulePath)).href).catch((error: unknown): never => {
+    throw serviceError('SERVICE_ERROR', `${VARIATIONS_HANDLER_ENV} names a module that could not be loaded: ${messageOf(error)}`);
+  });
+  const handler = isRecord(loaded) ? loaded.computeVariations : undefined;
+  if (!isHandler(handler)) {
+    throw serviceError('SERVICE_ERROR', `${VARIATIONS_HANDLER_ENV} names a module that exports no computeVariations function`);
+  }
+  const answer: unknown = await Promise.resolve()
+    .then(() => handler(request))
+    .catch((error: unknown): never => {
+      throw serviceError('SERVICE_ERROR', `Variations check failed in the module ${VARIATIONS_HANDLER_ENV} names: ${messageOf(error)}`);
+    });
+  if (!isReport(answer)) {
+    throw serviceError('SERVICE_ERROR', `The module ${VARIATIONS_HANDLER_ENV} names answered without a variations report`);
+  }
+  return answer;
+};
+
 export const computeVariationsViaService = async (input: ComputeVariationsViaServiceInput): Promise<VariationsServiceReport> => {
+  const body: ComputeVariationsRequest = {
+    metadataReportJson: input.metadataReportJson,
+    version: input.version,
+    ...(input.fuzziness !== undefined ? { fuzziness: input.fuzziness } : {})
+  };
+
+  // A host's module, when one is configured, replaces the HTTP call and everything it needs: no
+  // services address and no token. A bearer passed in is not handed to the module.
+  const handlerPath = configuredHandler();
+  if (handlerPath !== undefined) {
+    return computeViaHandler(handlerPath, body);
+  }
+
   const servicesUrl = resolveServicesUrl();
 
   const token = input.bearerToken ?? (await mintProviderToken());
@@ -65,12 +139,6 @@ export const computeVariationsViaService = async (input: ComputeVariationsViaSer
         : 'Variations check requires authentication. Pass a provider token (bearerToken) – e.g. the session token from logging in.'
     );
   }
-
-  const body = {
-    metadataReportJson: input.metadataReportJson,
-    version: input.version,
-    ...(input.fuzziness !== undefined ? { fuzziness: input.fuzziness } : {})
-  };
 
   // text/plain + gzip+base64 mirrors the legacy /search call: large metadata
   // reports compress well, and the handler compresses its response in kind.
