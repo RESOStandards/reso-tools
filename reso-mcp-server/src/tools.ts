@@ -5,6 +5,7 @@
  * reso-certification, or odata-expression-parser.
  */
 
+import { CURRENT_CORE_VERSION, CURRENT_DD_VERSION } from '@reso-standards/reso-certification';
 import {
   CLIENT_CREDENTIAL_ARG_NAMES,
   ENV_AUTH_TOKEN,
@@ -223,14 +224,14 @@ export const deleteTool: ToolDef = {
 export const validateTool: ToolDef = {
   name: 'validate',
   description:
-    'Validate a record against RESO Data Dictionary field rules. Returns validation failures with field names, expected types, and error descriptions.',
+    'A stub, not yet a validator: it counts the fields of a record and compares none of them with the RESO Data Dictionary, so it never reports a failure. Its answer carries checked: false. Do not use it to tell a user that a record is valid.',
   scope: 'all',
   inputSchema: {
     type: 'object',
     properties: {
-      record: { type: 'object', description: 'The record to validate (key-value pairs)' },
-      resource: { type: 'string', description: 'Resource name (e.g., Property) for looking up field rules' },
-      version: { type: 'string', description: 'DD version: "1.7" or "2.0"', default: '2.0' }
+      record: { type: 'object', description: 'The record (key-value pairs)' },
+      resource: { type: 'string', description: 'Resource name (e.g., Property)' },
+      version: { type: 'string', description: 'DD version. Ignored while this tool is a stub.' }
     },
     required: ['record', 'resource']
   }
@@ -269,7 +270,7 @@ export const runComplianceTool: ToolDef = {
       url: { type: 'string', description: 'OData service root URL' },
       ...authProperties,
       resource: { type: 'string', description: 'Resource name (required for add-edit, optional for core)' },
-      version: { type: 'string', description: 'Spec version (e.g., "2.0.0" for core)' },
+      version: { type: 'string', description: `Web API Core version for core: "2.0.0" or "2.1.0" (default "${CURRENT_CORE_VERSION}")` },
       mode: { type: 'string', description: 'EntityEvent mode: "observe" or "full"' },
       resources: {
         type: 'array',
@@ -284,13 +285,14 @@ export const runComplianceTool: ToolDef = {
 export const metadataReportTool: ToolDef = {
   name: 'metadata-report',
   description:
-    "Generate a RESO metadata compliance report from a server's $metadata. Checks entity types, fields, and annotations against the Data Dictionary.",
+    "Convert a server's $metadata into a RESO metadata report: its resources, fields, lookups and annotations, in the shape the certification tools read. It describes the server and compares nothing with the Data Dictionary.",
   scope: 'cert',
   inputSchema: {
     type: 'object',
     properties: {
       url: { type: 'string', description: 'OData service root URL' },
-      ...authProperties
+      ...authProperties,
+      version: { type: 'string', description: `Data Dictionary version the report is labeled with (default "${CURRENT_DD_VERSION}")` }
     },
     required: ['url']
   }

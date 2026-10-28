@@ -115,6 +115,10 @@ export {
   writeReports
 } from './sdk/index.js';
 
+// The versions a caller gets when it names none, so another host defaults to what the CLI does.
+export { CURRENT_CORE_VERSION } from './sdk/core-versions.js';
+export { CURRENT_DD_VERSION } from './sdk/dd-versions.js';
+
 export type {
   ComplianceConfig,
   AddEditConfig,

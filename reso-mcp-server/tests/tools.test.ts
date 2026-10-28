@@ -1,3 +1,4 @@
+import { CURRENT_DD_VERSION } from '@reso-standards/reso-certification';
 import { describe, expect, it } from 'vitest';
 import { CREDENTIAL_ARG_NAMES, ENV_AUTH_TOKEN, ENV_CLIENT_ID, ENV_CLIENT_SECRET, ENV_TOKEN_URI } from '../src/auth-env.js';
 import { allTools, toolsForScope } from '../src/tools.js';
@@ -157,5 +158,19 @@ describe('tool definitions', () => {
   it('run-compliance tool is in cert scope', () => {
     const compliance = allTools.find(t => t.name === 'run-compliance');
     expect(compliance?.scope).toBe('cert');
+  });
+
+  it('validate says it is a stub, so its answer is not read as a pass', () => {
+    const validate = allTools.find(t => t.name === 'validate');
+    expect(validate?.description).toMatch(/stub/);
+    expect(validate?.description).not.toMatch(/Returns validation failures/);
+  });
+
+  it('metadata-report takes a DD version and claims no comparison with the Data Dictionary', () => {
+    const report = allTools.find(t => t.name === 'metadata-report');
+    const props = report!.inputSchema.properties as Record<string, Record<string, unknown>>;
+    expect(String(props.version?.description)).toContain(CURRENT_DD_VERSION);
+    expect(report?.description).toMatch(/compares nothing/);
+    expect(report?.description).not.toMatch(/Checks .* against the Data Dictionary/);
   });
 });
