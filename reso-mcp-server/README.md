@@ -1,6 +1,6 @@
 # RESO MCP Server
 
-MCP server that exposes RESO tools for AI agents. Query OData servers, parse metadata, validate records, run compliance tests – all through the [Model Context Protocol](https://modelcontextprotocol.io/).
+MCP server that exposes RESO tools for AI agents. Query and edit records on OData servers, parse metadata, run compliance tests – all through the [Model Context Protocol](https://modelcontextprotocol.io/).
 
 Works with any MCP client: Claude, Cursor, Windsurf, VS Code or your own application.
 
@@ -156,7 +156,7 @@ not mean a record is valid. Wiring it to `@reso-standards/reso-validation` is a 
 
 ```
 validate({ record, resource })
-→ { resource, fieldsProvided, message }
+→ { resource, fieldsProvided, checked: false, message: "Not validated. …" }
 ```
 
 ### parse-filter
@@ -170,16 +170,18 @@ parse-filter({ filter })
 
 ### run-compliance
 
-Run RESO Certification compliance tests. Supports Add/Edit (RCP-010), EntityEvent (RCP-027) and Web API Core.
+Run RESO Certification compliance tests. Supports Add/Edit (RCP-010), EntityEvent (RCP-027) and Web API Core. Web API Core defaults to 2.1.0, the CLI's current version.
+
+The answer carries `certification` beside `status`, because a run can pass and still certify nothing: an EntityEvent run in observe mode exercises no writes. Reports go under the system temp directory (`<tmpdir>/reso-mcp-server/`), never the server's working directory, which the MCP host chooses and is often not writable. `reports` names the run's folder.
 
 ```
 run-compliance({ endorsement, url, resource?, version?, mode?, resources? })
-→ { status: "passed", steps: [...], duration: 450 }
+→ { status: "passed", certification: { valid: true }, reports: "<tmpdir>/reso-mcp-server/…/current", steps: [...], duration: 450 }
 ```
 
 ### metadata-report
 
-Generate a RESO metadata compliance report. Checks entity types, fields and annotations.
+Convert a server's `$metadata` into a RESO metadata report: its resources, fields, lookups and annotations, in the shape the certification tools read. It describes the server and compares nothing with the Data Dictionary. `version` labels the report and defaults to 2.1, the CLI's current DD version.
 
 ```
 metadata-report({ url, version? })

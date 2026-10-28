@@ -2,7 +2,16 @@
  * MCP tool handlers — implement each tool by calling SDK functions.
  */
 
-import { fetchMetadata, getEntityType, parseMetadataXml, runComplianceTests } from '@reso-standards/reso-certification';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  CURRENT_CORE_VERSION,
+  CURRENT_DD_VERSION,
+  fetchMetadata,
+  getEntityType,
+  parseMetadataXml,
+  runComplianceTests
+} from '@reso-standards/reso-certification';
 import type { AuthConfig, ComplianceConfig } from '@reso-standards/reso-certification';
 import { createClient, createEntity, deleteEntity, queryEntities, resolveToken, updateEntity } from '@reso-standards/reso-client';
 import type { ODataClient } from '@reso-standards/reso-client';
@@ -530,17 +539,20 @@ export const handleMetadata = async (args: Record<string, unknown>): Promise<Han
 
 // ── Validate ──
 
+/**
+ * A stub until it is wired to `@reso-standards/reso-validation` (doc/ARCHITECTURE.md). It checks
+ * nothing, so it says so: `checked: false`, and a message an agent cannot read as a pass. The
+ * message used to send the agent to the metadata tool first, which changed nothing here.
+ */
 export const handleValidate = async (args: Record<string, unknown>): Promise<HandlerResult> => {
   const { record, resource } = args as { record: Record<string, unknown>; resource: string };
 
-  // Fetch field definitions for the resource
-  // For now, return a basic validation check
-  // TODO: integrate with reso-validation when field metadata is available
   const fieldCount = Object.keys(record).length;
   return textResult({
     resource,
     fieldsProvided: fieldCount,
-    message: `Record has ${fieldCount} fields. Full DD validation requires server metadata, so call the metadata tool first to fetch field definitions.`
+    checked: false,
+    message: `Not validated. This tool is a stub: it counted ${fieldCount} fields and compared none of them with the Data Dictionary, so it never reports a failure. Do not tell the user the record is valid.`
   });
 };
 
@@ -561,6 +573,13 @@ export const handleParseFilter = async (args: Record<string, unknown>): Promise<
 
 // ── Run Compliance ──
 
+/**
+ * Where compliance runs write their reports: a directory under the system temp dir, never the
+ * server's working directory. An MCP host starts the server wherever it likes, often `/`, and
+ * the SDK's default there (`<cwd>/.reso-cert`) failed before a single test ran.
+ */
+const REPORTS_DIR = join(tmpdir(), 'reso-mcp-server');
+
 export const handleRunCompliance = async (args: Record<string, unknown>): Promise<HandlerResult> => {
   const { endorsement, url, resource, version, mode, resources } = args as {
     endorsement: string;
@@ -576,14 +595,21 @@ export const handleRunCompliance = async (args: Record<string, unknown>): Promis
 
   const buildConfig = (): ComplianceConfig => {
     const server = { url, auth };
+    const options = { outputDir: REPORTS_DIR };
 
     switch (endorsement) {
       case 'add-edit':
-        return { endorsement: 'add-edit' as const, server, resource: resource ?? 'Property' };
+        return { endorsement: 'add-edit' as const, server, options, resource: resource ?? 'Property' };
       case 'entity-event':
-        return { endorsement: 'entity-event' as const, server, mode: (mode as 'observe' | 'full') ?? 'observe' };
+        return { endorsement: 'entity-event' as const, server, options, mode: (mode as 'observe' | 'full') ?? 'observe' };
       case 'core':
-        return { endorsement: 'core' as const, server, version: (version as '2.0.0' | '2.1.0') ?? '2.0.0', resources };
+        return {
+          endorsement: 'core' as const,
+          server,
+          options,
+          version: (version as '2.0.0' | '2.1.0') ?? CURRENT_CORE_VERSION,
+          resources
+        };
       default:
         throw new Error(`Unknown endorsement: ${endorsement}`);
     }
@@ -598,10 +624,14 @@ export const handleRunCompliance = async (args: Record<string, unknown>): Promis
     progressLog.push(`${icon} ${progress.step}${msg}${dur}`);
   });
 
+  // `certification` travels with `status`: a run can pass and still certify nothing (EntityEvent's
+  // observe mode), and an answer without it reads as certifiable.
   return textResult({
     status: result.status,
+    certification: result.certification,
     endorsement: result.endorsement,
     duration: result.duration,
+    reports: typeof result.context.outputPath === 'string' ? result.context.outputPath : null,
     steps: result.steps.map((s: { name: string; status: string; duration: number; summary?: string; errors?: ReadonlyArray<string> }) => ({
       name: s.name,
       status: s.status,
@@ -620,7 +650,7 @@ export const handleMetadataReport = async (args: Record<string, unknown>): Promi
   const { url, version } = args as { url: string; version?: string };
 
   const metadataXml = await fetchMetadata(url, authToken);
-  const report = generateMetadataReport(metadataXml, version ?? '2.0');
+  const report = generateMetadataReport(metadataXml, version ?? CURRENT_DD_VERSION);
 
   return textResult(report);
 };

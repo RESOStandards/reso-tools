@@ -46,6 +46,16 @@ describe('handleValidate', () => {
     expect(data.fieldsProvided).toBe(3);
     expect(data.resource).toBe('Property');
   });
+
+  it('says it checked nothing, even for a record that is plainly wrong', async () => {
+    // A stub that answered like a validator let an agent report a bad record as valid.
+    const result = await handlers.validate({ record: { ListPrice: 'abc', BedroomsTotal: -3 }, resource: 'Property' });
+    const data = JSON.parse(result.content[0].text);
+    expect(data.checked).toBe(false);
+    expect(data.message).toMatch(/^Not validated\./);
+    // It used to send the agent to the metadata tool first, which changed nothing here.
+    expect(data.message).not.toMatch(/metadata tool/);
+  });
 });
 
 describe('auth resolution', () => {
