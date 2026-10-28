@@ -340,7 +340,10 @@ reso-cert submit-variations-report --report ./out/variations-report.json
 none).
 
 Writes `metadata-report.json` and `data-availability-report.json`, plus
-`data-dictionary-variations.json` when the variations step runs. Given the provider, system and recipient,
+`data-dictionary-variations.json` when the variations step runs. RCF accepts a lookup value in its
+machine-friendly Legacy OData form (`ComingSoon` for `Coming Soon`) until DD 3.0, so such values are not
+variations: the service lists them under `deprecations` in that file, and `rcf` says how many there are,
+with a few examples. Given the provider, system and recipient,
 it also writes `variations-report.json` when variations are found: the file a DD run writes, which
 `submit-variations-report` takes to start a review. A partial set of the three stops the run before it
 starts. The run version is `--dd-version` when

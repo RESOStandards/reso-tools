@@ -137,6 +137,7 @@ export { computeVariationsViaService, isVariationsAuthError, findVariations, VAR
 export type {
   ComputeVariationsRequest,
   ComputeVariationsViaServiceInput,
+  VariationDeprecation,
   VariationsServiceReport,
   VariationsServiceErrorCode,
   FindVariationsInput

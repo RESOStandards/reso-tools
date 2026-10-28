@@ -44,6 +44,25 @@ export interface ComputeVariationsViaServiceInput {
   /** True when invoked from the CLI — points the not-configured error at the
    *  `.env` credentials rather than passing a token programmatically. */
   readonly fromCli?: boolean;
+  /**
+   * The report was inferred from RESO Common Format data. The service then accepts a lookup value written in the
+   * Legacy OData form of a standard value (`ComingSoon` for `Coming Soon`) until DD 3.0, and lists it under
+   * `deprecations` instead of as a variation. Only `rcf` sets it.
+   */
+  readonly isRCF?: boolean;
+}
+
+/** A value that is standard today, in a form a later Data Dictionary drops. Never a variation. */
+export interface VariationDeprecation {
+  readonly level: 'lookup';
+  readonly reason: string;
+  readonly resourceName: string;
+  readonly fieldName: string;
+  /** The value as served. */
+  readonly lookupValue: string;
+  /** The same standard value in the form that stays. */
+  readonly standardLookupValue: string;
+  readonly deprecatedInVersion: string;
 }
 
 export interface VariationsServiceReport {
@@ -51,6 +70,8 @@ export interface VariationsServiceReport {
   readonly version: string;
   readonly fuzziness: number;
   readonly variations: Record<string, unknown>;
+  /** Present when the request set `isRCF` and the service understands it. */
+  readonly deprecations?: ReadonlyArray<VariationDeprecation>;
 }
 
 /** @deprecated Alias of `ServiceErrorCode` in `../sdk/common` — kept for back-compat. */
@@ -74,6 +95,7 @@ export interface ComputeVariationsRequest {
   readonly metadataReportJson: unknown;
   readonly version: string;
   readonly fuzziness?: number;
+  readonly isRCF?: boolean;
 }
 
 type VariationsHandler = (request: ComputeVariationsRequest) => unknown;
@@ -118,7 +140,8 @@ export const computeVariationsViaService = async (input: ComputeVariationsViaSer
   const body: ComputeVariationsRequest = {
     metadataReportJson: input.metadataReportJson,
     version: input.version,
-    ...(input.fuzziness !== undefined ? { fuzziness: input.fuzziness } : {})
+    ...(input.fuzziness !== undefined ? { fuzziness: input.fuzziness } : {}),
+    ...(input.isRCF === true ? { isRCF: true } : {})
   };
 
   // A host's module, when one is configured, replaces the HTTP call and everything it needs: no

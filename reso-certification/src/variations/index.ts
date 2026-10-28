@@ -15,6 +15,7 @@ export {
   type ComputeVariationsViaServiceInput,
   type UpdateVariationsViaServiceInput,
   type UpdateVariationsResult,
+  type VariationDeprecation,
   type VariationsServiceReport,
   type VariationsServiceErrorCode
 } from './service.js';

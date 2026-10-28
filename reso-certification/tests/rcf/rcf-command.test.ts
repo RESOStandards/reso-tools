@@ -366,6 +366,53 @@ describe('runRcf (offline)', () => {
     expect(resolveRcfExitCode(result)).toBe(1);
   });
 
+  // RCP-25 accepts a lookup value's Legacy OData form, so every rcf compute says the report is RCF, and what the
+  // service lists as deprecated is counted apart from the variations.
+  it('asks the service for the RCF reading and counts the deprecations it lists', async () => {
+    mockedCompute.mockResolvedValueOnce({
+      description: 'Data Dictionary Variations Report',
+      version: '2.0',
+      fuzziness: 0.25,
+      variations: { lookups: [] },
+      deprecations: [
+        {
+          level: 'lookup',
+          reason: 'legacy-odata-form',
+          resourceName: 'Property',
+          fieldName: 'StandardStatus',
+          lookupValue: 'ComingSoon',
+          standardLookupValue: 'Coming Soon',
+          deprecatedInVersion: '3.0'
+        }
+      ]
+    });
+    const result = await runRcf({
+      input: resolve(fixtures, 'single-payload.json'),
+      generatedOn: '2026-01-01T00:00:00.000Z',
+      runVariations: true,
+      bearerToken: 'test-token'
+    });
+    expect(mockedCompute).toHaveBeenCalledWith(expect.objectContaining({ isRCF: true }));
+    expect(result.stats.variationsTotal).toBe(0);
+    expect(result.stats.deprecationsTotal).toBe(1);
+  });
+
+  it('reports no deprecation count when the service lists none, as an older service would', async () => {
+    mockedCompute.mockResolvedValueOnce({
+      description: 'Data Dictionary Variations Report',
+      version: '2.0',
+      fuzziness: 0.25,
+      variations: {}
+    });
+    const result = await runRcf({
+      input: resolve(fixtures, 'single-payload.json'),
+      generatedOn: '2026-01-01T00:00:00.000Z',
+      runVariations: true,
+      bearerToken: 'test-token'
+    });
+    expect('deprecationsTotal' in result.stats).toBe(false);
+  });
+
   // Data-loss guard: a variations failure must never discard the already-computed reports.
   it('degrades to reports-only on a non-auth service failure (e.g. /compute payload too large)', async () => {
     mockedCompute.mockRejectedValueOnce(serviceError('SERVICE_ERROR', 'Compressed request is 9 MB (limit ~6 MB).'));
