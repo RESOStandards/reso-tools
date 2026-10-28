@@ -207,6 +207,8 @@ export interface RcfResult {
     readonly invalidContextFiles: number;
     readonly invalidContextRecords: number;
     readonly variationsTotal?: number;
+    /** Values accepted in their machine-friendly form until DD 3.0, when the service listed them. */
+    readonly deprecationsTotal?: number;
   };
 }
 
@@ -388,6 +390,8 @@ export const runRcf = async (opts: {
           version,
           ...(opts.fuzziness !== undefined ? { fuzziness: opts.fuzziness } : {}),
           fromCli: true,
+          // RCF accepts a lookup value's Legacy OData form until DD 3.0 (RCP-25); the service lists those apart.
+          isRCF: true,
           ...(opts.bearerToken ? { bearerToken: opts.bearerToken } : {})
         })
       };
@@ -417,7 +421,8 @@ export const runRcf = async (opts: {
       fields: metadataReport.fields.length,
       lookups: metadataReport.lookups.length,
       schemaErrors: stream.schemaErrors,
-      ...(variationsTotal !== undefined ? { variationsTotal } : {})
+      ...(variationsTotal !== undefined ? { variationsTotal } : {}),
+      ...(Array.isArray(variations?.deprecations) ? { deprecationsTotal: variations.deprecations.length } : {})
     }
   };
 };

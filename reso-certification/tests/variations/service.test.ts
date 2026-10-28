@@ -8,7 +8,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { gzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VARIATIONS_HANDLER_ENV, computeVariationsViaService, isVariationsAuthError } from '../../src/variations/index.js';
 
@@ -236,5 +236,84 @@ describe("computeVariationsViaService — a host's handler module", () => {
 
     expect(result.variations).toEqual({ fields: [] });
     expect(mockFetch()).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('computeVariationsViaService — RESO Common Format', () => {
+  const deprecation = {
+    level: 'lookup',
+    reason: 'legacy-odata-form',
+    resourceName: 'Property',
+    fieldName: 'StandardStatus',
+    lookupValue: 'ComingSoon',
+    standardLookupValue: 'Coming Soon',
+    deprecatedInVersion: '3.0'
+  } as const;
+
+  /** The /compute body the client sent, decoded from the compressed request. */
+  const sentBody = (): Record<string, unknown> => {
+    const [, opts] = mockFetch().mock.calls[0] as unknown as readonly [string, { body: string }];
+    return JSON.parse(gunzipSync(Buffer.from(opts.body, 'base64')).toString('utf8')) as Record<string, unknown>;
+  };
+
+  it('sends isRCF only when the caller says the report came from RCF', async () => {
+    for (const [extra, expected] of [
+      [{ isRCF: true }, true],
+      [{}, undefined],
+      [{ isRCF: false }, undefined]
+    ] as const) {
+      mockFetch().mockReset();
+      mockFetch().mockResolvedValue({ ok: true, status: 200, text: async () => gzipB64(report) });
+      await computeVariationsViaService({
+        metadataReportJson: { fields: [], lookups: [] },
+        version: '2.1',
+        bearerToken: 'sess-1',
+        ...extra
+      });
+      expect(sentBody().isRCF, JSON.stringify(extra)).toBe(expected);
+    }
+  });
+
+  it('returns the deprecations the service lists, and none when it lists none', async () => {
+    mockFetch().mockResolvedValue({ ok: true, status: 200, text: async () => gzipB64({ ...report, deprecations: [deprecation] }) });
+    const listed = await computeVariationsViaService({
+      metadataReportJson: { fields: [], lookups: [] },
+      version: '2.1',
+      bearerToken: 'sess-1',
+      isRCF: true
+    });
+    expect(listed.deprecations).toEqual([deprecation]);
+
+    mockFetch().mockResolvedValue({ ok: true, status: 200, text: async () => gzipB64(report) });
+    const none = await computeVariationsViaService({
+      metadataReportJson: { fields: [], lookups: [] },
+      version: '2.1',
+      bearerToken: 'sess-1'
+    });
+    expect(none.deprecations).toBeUndefined();
+  });
+
+  it("hands isRCF to a host's handler module with the rest of the /compute body", async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'variations-handler-rcf-'));
+    try {
+      const path = join(dir, 'rcf.mjs');
+      writeFileSync(
+        path,
+        `export const computeVariations = async request => {
+          globalThis.__variationsHandlerSeenRcf = request;
+          return { description: 'Data Dictionary Variations Report', version: request.version, fuzziness: 0.25, variations: {} };
+        };`
+      );
+      process.env[VARIATIONS_HANDLER_ENV] = path;
+      await computeVariationsViaService({ metadataReportJson: { fields: [], lookups: [] }, version: '2.1', isRCF: true });
+      expect((globalThis as Record<string, unknown>).__variationsHandlerSeenRcf).toEqual({
+        metadataReportJson: { fields: [], lookups: [] },
+        version: '2.1',
+        isRCF: true
+      });
+    } finally {
+      Reflect.deleteProperty(globalThis, '__variationsHandlerSeenRcf');
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -1423,6 +1423,17 @@ program
         if (result.variationsError) {
           process.stderr.write(`rcf: variations skipped (reports still written): ${result.variationsError}\n`);
         }
+        // Accepted, so not variations, but deprecated: say so once, with a few examples and where the rest are.
+        const deprecations = result.variations?.deprecations ?? [];
+        if (deprecations.length > 0) {
+          const examples = deprecations
+            .slice(0, 3)
+            .map(d => `${d.fieldName} ${d.lookupValue} → ${d.standardLookupValue}`)
+            .join('; ');
+          process.stderr.write(
+            `rcf: ${deprecations.length} lookup value(s) use the machine-friendly form, accepted until DD ${deprecations[0].deprecatedInVersion} and deprecated there (${examples}${deprecations.length > 3 ? '; ...' : ''}). All are listed under "deprecations" in ${VARIATIONS_REPORT_FILENAME}\n`
+          );
+        }
         const submittable = submittableVariationsReport(result, identityRead.identity, generatedOn);
         if (submittable) {
           const reportPath = resolve(dir, SUBMITTABLE_REPORT_FILENAME);
