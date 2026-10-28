@@ -35,7 +35,7 @@ reso-cert entity-event --config sample-configs/entity-event-config.json
 | query-filter | `$filter=ResourceName eq 'Property'` works |
 | query-orderby-top-skip | `$orderby`, `$top`, `$skip` work on EntityEvent |
 | query-count | `$count=true` returns `@odata.count` |
-| incremental-sync | Poll for new events (observe) or query after writes (full) |
+| incremental-sync | Events after the newest one at the start: polled for (observe) or queried after the canary writes (full) |
 | data-validation | Batch fetch and validate EntityEvent record structure |
 
 ### Full Mode Only (3 additional scenarios)
