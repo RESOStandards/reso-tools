@@ -42,6 +42,24 @@ const parseEntityEvents = (body: unknown): ReadonlyArray<EntityEventRecord> => {
 /** Waits for the specified number of milliseconds. */
 const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
+/** The incremental-sync baseline: the newest sequence on the server, or the status that refused it. */
+type Baseline = { readonly sequence: number } | { readonly sequence: null; readonly status: number };
+
+/**
+ * Reads the newest EntityEventSequence on the server, 0 for an empty log.
+ *
+ * Read here rather than taken from the sample. The sample is the first `maxEvents` events, oldest
+ * first, so on a log longer than that its highest sequence was an old event, every later event
+ * counted as new, and incremental-sync passed whether or not anything had been written.
+ */
+const fetchBaseline = async (serverUrl: string, authToken: string): Promise<Baseline> => {
+  const url = `${buildResourceUrl(serverUrl, 'EntityEvent')}?$orderby=EntityEventSequence desc&$top=1`;
+  const response = await odataRequest({ method: 'GET', url, authToken });
+  if (response.status !== 200) return { sequence: null, status: response.status };
+  const [newest] = parseEntityEvents(response.body);
+  return { sequence: newest?.EntityEventSequence ?? 0 };
+};
+
 // ── Scenarios ──
 
 /** Validates EntityEvent appears in $metadata with correct fields and types. */
@@ -356,20 +374,34 @@ const runQueryCount = async (serverUrl: string, authToken: string): Promise<Scen
   return buildScenarioResult('query-count', ['@entity-event', '@rcp-027', '@query'], assertions, start);
 };
 
+const SYNC_TAGS = ['@entity-event', '@rcp-027', '@sync'];
+
 /**
- * Incremental sync: records highest sequence, waits, queries for new events.
- * In observe mode, polls with timeout. In full mode, just checks after canary writes.
+ * Incremental sync: from the newest sequence read before anything was written or waited for,
+ * queries for later events. In observe mode, polls with timeout. In full mode, just checks after
+ * canary writes.
  */
 const runIncrementalSync = async (
   serverUrl: string,
   authToken: string,
-  highWaterMark: number,
+  baseline: Baseline,
   config: EntityEventConfig,
   onProgress?: (message: string) => void
 ): Promise<{ readonly result: ScenarioResult; readonly pollDurationMs: number; readonly newEvents: number }> => {
   const start = Date.now();
   const assertions: TestAssertion[] = [];
   let newEventCount = 0;
+
+  if (baseline.sequence === null) {
+    assertions.push({
+      description: 'Newest EntityEventSequence read as the baseline ($orderby=EntityEventSequence desc, $top=1)',
+      status: 'fail',
+      expected: 'HTTP 200',
+      actual: `HTTP ${baseline.status}`
+    });
+    return { result: buildScenarioResult('incremental-sync', SYNC_TAGS, assertions, start), pollDurationMs: 0, newEvents: 0 };
+  }
+  const highWaterMark = baseline.sequence;
 
   const base = buildResourceUrl(serverUrl, 'EntityEvent');
   const filterExpr = encodeURIComponent(`EntityEventSequence gt ${highWaterMark}`);
@@ -444,7 +476,7 @@ const runIncrementalSync = async (
 
   const pollDuration = Date.now() - start;
   return {
-    result: buildScenarioResult('incremental-sync', ['@entity-event', '@rcp-027', '@sync'], assertions, start),
+    result: buildScenarioResult('incremental-sync', SYNC_TAGS, assertions, start),
     pollDurationMs: pollDuration,
     newEvents: newEventCount
   };
@@ -690,7 +722,8 @@ export const runAllEntityEventScenarios = async (
   scenarios.push(await runQueryCount(config.serverUrl, authToken));
 
   // ── Full-mode scenarios ──
-  const highWaterMark = events.length > 0 ? Math.max(...events.map(e => e.EntityEventSequence)) : 0;
+  // The incremental-sync baseline, read just before anything is written or polled.
+  const baseline = await fetchBaseline(config.serverUrl, authToken);
 
   if (config.mode === 'full') {
     if (!config.payloadsDir) {
@@ -728,7 +761,7 @@ export const runAllEntityEventScenarios = async (
   }
 
   // 8/11. Incremental sync
-  const syncResult = await runIncrementalSync(config.serverUrl, authToken, highWaterMark, config, onProgress);
+  const syncResult = await runIncrementalSync(config.serverUrl, authToken, baseline, config, onProgress);
   scenarios.push(syncResult.result);
 
   // ── Data validation ──

@@ -181,3 +181,30 @@ describe('full mode', () => {
     expect(syncScenario?.passed).toBe(true);
   });
 });
+
+describe('incremental-sync on a log longer than maxEvents', () => {
+  // The sample is the oldest `maxEvents` events. The baseline used to be the highest sequence among
+  // them, so on a longer log every later event counted as new and the scenario could not fail.
+  const seedLog = (count: number): void =>
+    seedEntityEvents(Array.from({ length: count }, (_, i) => ({ ResourceName: 'Property', ResourceRecordKey: `seed-${i + 1}` })));
+
+  it('observe mode reports no new events when nothing is written', async () => {
+    seedLog(30);
+    const report = await runAllEntityEventScenarios(makeConfig({ maxEvents: 10 }));
+    const assertions = report.scenarios.find(s => s.scenario === 'incremental-sync')?.assertions ?? [];
+    expect(assertions.map(a => a.description)).not.toContain('New events have sequences greater than high water mark');
+    expect(assertions.find(a => a.description === 'New events observed during poll window')?.status).toBe('warn');
+  });
+
+  it("full mode's new events are the canary's own", async () => {
+    seedLog(30);
+    const report = await runAllEntityEventScenarios(
+      makeConfig({ mode: 'full', maxEvents: 10, payloadsDir: `${import.meta.dirname}/../sample-payloads` })
+    );
+    const sync = report.scenarios.find(s => s.scenario === 'incremental-sync');
+    expect(sync?.passed).toBe(true);
+    const above = sync?.assertions.find(a => a.description === 'New event sequences > high water mark');
+    expect(above?.expected).toBe('> 30');
+    expect(above?.actual).toBe('min: 31');
+  });
+});
