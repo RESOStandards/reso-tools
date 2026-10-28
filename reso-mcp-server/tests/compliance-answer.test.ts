@@ -9,6 +9,7 @@
  * The SDK's compliance runner and metadata fetch are faked; the handlers run as they are.
  */
 
+import { statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -64,9 +65,23 @@ describe('run-compliance', () => {
     it(`writes ${endorsement} reports under the system temp dir, never the server's working directory`, async () => {
       await handlers['run-compliance']({ endorsement, url: SERVER, authToken: 'token' });
       const options = configOf().options as { outputDir?: string };
-      expect(options?.outputDir).toBe(join(tmpdir(), 'reso-mcp-server'));
+      expect(options?.outputDir?.startsWith(join(tmpdir(), 'reso-mcp-server-'))).toBe(true);
     });
   }
+
+  it('uses one private directory per server process', async () => {
+    // A fixed name under a shared temp dir could be created first by another user on the machine.
+    await handlers['run-compliance']({ endorsement: 'core', url: SERVER, authToken: 'token' });
+    const first = (configOf().options as { outputDir: string }).outputDir;
+    vi.mocked(runComplianceTests).mockClear();
+    await handlers['run-compliance']({ endorsement: 'add-edit', url: SERVER, authToken: 'token' });
+    const second = (configOf().options as { outputDir: string }).outputDir;
+    expect(second).toBe(first);
+    const stat = statSync(first);
+    expect(stat.isDirectory()).toBe(true);
+    expect(stat.mode & 0o777).toBe(0o700);
+    expect(stat.uid).toBe(process.getuid?.());
+  });
 
   it('answers with the certification verdict and where the reports are', async () => {
     const answer = answerOf(await handlers['run-compliance']({ endorsement: 'entity-event', url: SERVER, authToken: 'token' }));
