@@ -167,12 +167,13 @@ export const ensureHttps = (raw: string, variableName = 'URL'): string => {
  * The Variations Service base URL from the environment, as https.
  *
  * One implementation, because this was resolved in four places with the same two lines and none of
- * them normalized anything.
+ * them normalized anything. `service` names the caller in the error, since more than the Variations
+ * Service is reached through this address.
  */
-export const resolveServicesUrl = (): string => {
+export const resolveServicesUrl = (service = 'Variations Service'): string => {
   const raw = process.env.RESO_SERVICES_URL;
   if (!raw || !raw.trim()) {
-    throw serviceError('SERVICE_ERROR', 'Variations Service: RESO_SERVICES_URL is not set.');
+    throw serviceError('SERVICE_ERROR', `${service}: RESO_SERVICES_URL is not set.`);
   }
   return ensureHttps(raw, 'RESO_SERVICES_URL');
 };

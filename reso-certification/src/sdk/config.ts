@@ -95,6 +95,11 @@ interface ConfigEntry extends ConfigAuth {
 export interface CertConfigFile {
   readonly providerUoi: string;
   readonly configs: ReadonlyArray<ConfigEntry>;
+  /**
+   * How many recipients the provider's API can be tested against at once: how many a cloud run starts together.
+   * The desktop runs that many locally too, up to its own limit. The CLI runs its entries one at a time.
+   */
+  readonly concurrency?: number;
 }
 
 // ── Auth Resolution ──
@@ -236,7 +241,15 @@ export const normalizeConfigFile = (raw: Record<string, unknown>): CertConfigFil
   }
 
   const providerUoi = typeof raw.providerUoi === 'string' && raw.providerUoi ? raw.providerUoi : generateLocalUoi();
-  return { providerUoi, configs: rawEntries.map(normalizeConfigEntry) };
+  const { concurrency } = raw;
+  if (concurrency !== undefined && (typeof concurrency !== 'number' || !Number.isInteger(concurrency) || concurrency < 1)) {
+    throw new Error(`Config file "concurrency" must be a positive whole number, got ${JSON.stringify(concurrency)}.`);
+  }
+  return {
+    providerUoi,
+    configs: rawEntries.map(normalizeConfigEntry),
+    ...(typeof concurrency === 'number' ? { concurrency } : {})
+  };
 };
 
 /** Load and normalize a config file from disk (any supported shape → canonical `{ providerUoi, configs }`). */

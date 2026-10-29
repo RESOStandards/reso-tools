@@ -49,7 +49,7 @@ environment a command will write to, look at the host in `TOKEN_URI`.
 
 | Variable | Used by | What it is |
 |---|---|---|
-| `RESO_SERVICES_URL` | `find-variations`, `rcf`, `update-variations`, the variations-review commands | Base URL of the Variations Service. Same for every environment. |
+| `RESO_SERVICES_URL` | `find-variations`, `rcf`, `update-variations`, the variations-review commands, the `cloud` commands | Base URL of RESO's services, the Variations Service and cloud runs. Same for every environment. |
 | `TOKEN_URI` | the same commands | OAuth2 token endpoint. **This is what selects QA versus production.** |
 | `CLIENT_ID`, `CLIENT_SECRET` | the same commands | OAuth2 client credentials the token is minted from. |
 | `FT_ADMIN_SECRET` | `update-variations --fast-track` | Fast Track admin credential. A fast-track submission is refused without it, before any request is made. |
@@ -86,6 +86,7 @@ different thing from the RESO service credentials above.
 | [`submit-variation-decisions`](#submit-variation-decisions) | Mark a report from a sheet of actions and comments, and submit it |
 | [`list-variation-reviews`](#list-variation-reviews) | The variations in review – yours as a provider, the whole pool as an admin (read-only) |
 | [`variations-review-status`](#variations-review-status) | Where each variations submission stands (read-only) |
+| [`cloud status`](#cloud-status) | Your cloud runs and where each stands (read-only) |
 | [`restore`](#restore) | Restore a certification server backup to a Cert API (admin) |
 
 The first four are **endorsement runners** (a full compliance pipeline against a live
@@ -168,6 +169,7 @@ reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2
 | `--originating-system-name <v>` | – | Scope resource queries to `OriginatingSystemName eq <v>` (multi-tenant providers) |
 | `--originating-system-id <v>` | – | Scope by `OriginatingSystemID` instead. Used only when no name is given |
 | `--save-payloads <dir>` | *(off)* | Write every request and response to `<dir>`. See below. |
+| `--start-cloud-run` | – | At the end, start a certification run in RESO's cloud for the entries that passed and can be certified, without asking. Needs `--config`. See [Cloud runs](#cloud-runs). |
 
 Provide one of `--url` or `--config`.
 
@@ -527,9 +529,53 @@ reso-cert variations-review-status --review-status in-review   # admin: every pr
 
 `--review-status <none|in-review|resolved>` (admin queue instead of your own) · `--json`.
 
+## Cloud runs
+
+A cloud run happens in RESO's cloud rather than on your machine, with RESO's copy of the tests. It is started
+only at the end of a local run that passed, never on its own. The cloud run is the one that certifies.
+
+**At the end of `core --config`**, when at least one entry passed and can be certified:
+
+- In a terminal, the CLI asks: `2 of 3 passed and can be certified. Start a certification run in RESO's cloud
+  for them? [y/N]`. Only `y` or `yes` starts anything.
+- `--start-cloud-run` answers yes in advance, for scripts and agents. It still sends only the entries that
+  passed and can be certified.
+- With neither, the CLI prints one line saying how to choose it.
+
+Entries that failed, stopped or cannot be certified are listed with the reason and never sent. What is sent is
+each entry as it ran: its server, its credential and its options, including any flag that changed them, such as
+`--auth-token` or `--field-overrides`, plus a record of the local run that passed. The credentials go to RESO's
+service with the request and are never printed. Messages go to stderr, so with `--output json` stdout stays the
+run's own JSON, and what was started is printed as JSON there too.
+
+A cloud run is addressed to the provider, system and recipient a config file names, so `--start-cloud-run` needs
+`--config`. The config file's `concurrency` says how many recipients your API can take at once, which is how many
+the cloud runs together. Sign-in is the same as the variations commands: an OAuth2 client-credentials token from
+`.env`, falling back to the `CERT_AUTH_API_*` provider-token mint.
+
+If RESO's service refuses a request, its reason is printed and the exit code is `2`, even when every local run
+passed.
+
+### `cloud status`
+Your cloud runs, newest change first. One line per recipient of each run: its status, when that last
+changed, the report once one is published, and the error or the step it is on.
+
+```bash
+reso-cert cloud status --in-progress
+reso-cert cloud status --since 2026-10-29T00:00:00Z --status failed,error
+```
+
+`--since <time>` (an ISO timestamp or epoch milliseconds) · `--status <list>` (any of `scheduled`,
+`running`, `passed`, `failed` and `error`) · `--in-progress` (`scheduled` or `running`; not with
+`--status`) · `--limit <n>` · `--json` (the rows exactly as the service returned them).
+
 ## Config-file mode
 
 `add-edit`, `entity-event`, `core` and `dd` accept `--config <path>` instead of `--url` to run a batch
 of providers from one file (each entry carries its own server URL, UOIs, and optional
 per-entry overrides). See the sample configs under
 [`sample-configs/`](../../sample-configs/).
+
+An optional top-level `concurrency` says how many recipients your API can be tested against at once. The CLI
+runs its entries one at a time either way; a [cloud run](#cloud-runs) runs that many together. It must be a
+positive whole number.
