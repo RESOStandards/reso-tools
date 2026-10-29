@@ -143,6 +143,20 @@ export type {
   FindVariationsInput
 } from './variations/index.js';
 
+// ── Cloud runs (start a run in RESO's cloud; read where each stands) ──
+
+export { CLOUD_ENDORSEMENT, listCloudRunStatus, submitCloudRun } from './cloud/runs.js';
+export { cloudEntryOf, cloudTargetOf, isSuccessfulRun, localRunRecordOf } from './cloud/local-run.js';
+export type { CloudConfigEntry, LocalRunRecord } from './cloud/local-run.js';
+export type {
+  AcceptedCloudRun,
+  CloudRunRecipient,
+  CloudRunStatusInput,
+  CloudRunStatusPage,
+  CloudRunStatusRow,
+  SubmitCloudRunInput
+} from './cloud/runs.js';
+
 // ── Metadata source (--from-server: fetch $metadata from a live endpoint + serialize) ──
 
 export { fetchMetadataReportFromServer } from './sdk/metadata-source.js';
