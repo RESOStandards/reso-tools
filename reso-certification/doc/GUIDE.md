@@ -538,6 +538,8 @@ The CLI uses three exit codes so scripts and CI pipelines can branch on the resu
 | `1` | One or more scenarios failed (the cert run completed; some checks did not pass) |
 | `2` | Runtime error (the cert run could not complete; the network failed, the server was unreachable, the metadata could not be parsed) |
 
+With a config file, one entry whose run could not complete makes the command exit `2`, whatever the other entries did. The CLI lists those entries, with the reason, after the run.
+
 Use code `1` to gate a release, code `2` to alert someone that the test infrastructure itself is broken. They mean different things and the response should be different.
 
 ---
