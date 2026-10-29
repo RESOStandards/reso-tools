@@ -2,6 +2,57 @@
 
 ---
 
+## Certification 0.11.5 – 2026-10-28
+
+`reso-certification 0.11.5`
+
+`rcf` can write a variations report that goes straight to review, and it reads machine-friendly lookup values the way RESO Common Format allows them: accepted until Data Dictionary 3.0, and listed as deprecated there. EntityEvent's incremental-sync check now looks only at events written during the run. The CLI's default versions are exported for other hosts.
+
+### `rcf` writes a report you can submit for review
+
+```
+reso-cert rcf --input <payloads> --provider-uoi <uoi> --provider-usi <usi> --recipient-uoi <uoi>
+```
+
+With the three identity options, `rcf` also writes `variations-report.json`, the file `submit-variations-report` takes, so RCF variations go to review the way Data Dictionary variations do.
+
+- **The three go together,** because a review is filed under a provider, a system and a recipient. A partial set stops the command and names what is missing.
+- **Without them `rcf` runs as before,** and says which options would write the file.
+
+### Machine-friendly lookup values are accepted until DD 3.0
+
+RESO Common Format allows a lookup value in its machine-friendly form (`ComingSoon`) as well as its human-friendly form (`Coming Soon`). Until now `rcf` reported every machine-friendly value as a variation to fix.
+
+- **`rcf` asks the variations service for the RCF reading.** A value that is exactly a standard value's machine-friendly form is that standard value, not a variation.
+- **Each one is listed as a deprecation**, because Data Dictionary 3.0 stops accepting them. The run prints how many it found with a few examples, and `data-dictionary-variations.json` lists every one under `deprecations` with the standard value it stands for. SDK callers get the count as `stats.deprecationsTotal`.
+- **Every other variation is unchanged.** On one provider's sample, 337 variations became 166, plus 171 deprecations, and the 171 that left were exactly the 171 deprecations.
+
+### EntityEvent's incremental-sync check can fail again
+
+- **The baseline is the newest event on the server**, read just before the canary writes (full mode) or the poll (observe mode). It used to be the highest sequence among the first `--max-events` events, which are read oldest first. On any longer log every later event counted as new, so the check passed whether or not anything had been written.
+- **Observe mode on a quiet server now waits out its poll window** (`--poll-timeout`, 30 seconds by default) and warns that no new events arrived.
+- **A server that refuses the baseline read fails the scenario.**
+- Certification verdicts do not change. Observe mode certifies nothing, and full mode's three write scenarios already checked the canary's own events.
+
+### The CLI's default versions, for other hosts
+
+`CURRENT_CORE_VERSION` (`2.1.0`) and `CURRENT_DD_VERSION` (`2.1`) are exported, so a host that names no version can default to what the CLI does.
+
+### The MCP server
+
+The MCP server is not published to npm. These changes are in the repository.
+
+- **`run-compliance` writes its reports under the system temp directory**, not the server's working directory, which the MCP host chooses and which is often not writable. Its answer says where the reports are, carries the certification verdict beside the status, and Web API Core defaults to 2.1.0.
+- **`validate` says it is a stub.** Its answer carries `checked: false`, and its description no longer promises failures.
+- **`metadata-report` takes a `version`** (default 2.1) and no longer claims to compare a server with the Data Dictionary.
+
+### Housekeeping
+
+- `rcf --help` says `--dd-version` wins and that the payload's `@reso.context` decides only without it. It used to say the reverse, and to call the report DD-2.0 whatever the version.
+- `package-lock.json` records the current versions of three workspace packages that had fallen behind.
+
+---
+
 ## Certification 0.11.4 – 2026-10-27
 
 `reso-certification 0.11.4`

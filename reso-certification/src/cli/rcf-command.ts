@@ -38,7 +38,8 @@ const { buildMetadataMap } = requireCjs(resolve(here, '../legacy/common.js')) as
   buildMetadataMap: (r: unknown) => { metadataMap: ReferenceMap };
 };
 
-const DEFAULT_VERSION = '2.0';
+/** The Data Dictionary version an `rcf` run uses when neither `--dd-version` nor the first payload's context names one. */
+export const RCF_DEFAULT_DD_VERSION = '2.0';
 /** Records kept per resource for inference; availability is scored over ALL records regardless. */
 const DEFAULT_SAMPLE_CAP = 5000;
 
@@ -331,7 +332,7 @@ export const runRcf = async (opts: {
   // The run version: declared (--version), else the first payload's context, else the default — normalized to
   // the Data Dictionary form (2.1.0 → 2.1) and refused when no reference ships for it. Before this guard a
   // context naming 3.0 or 2.00 passed the shape check and the run died on a null reference deep inside.
-  const requested = opts.version ?? (await peekVersion(opts.input)) ?? DEFAULT_VERSION;
+  const requested = opts.version ?? (await peekVersion(opts.input)) ?? RCF_DEFAULT_DD_VERSION;
   if (!isSupportedDDVersion(requested)) {
     throw new Error(
       `Unsupported Data Dictionary version "${requested}" (from ${opts.version ? '--version' : "the input's @reso.context"}); supported: ${SUPPORTED_DD_VERSIONS.join(', ')}`

@@ -15,7 +15,7 @@ Anyone who needs to know whether a RESO server passes the certification tests. R
 * **Test engineers** who want a single source of truth for "is this thing actually conformant"
 * **AI agents and automation tools** that need to verify a server's behavior end to end as part of a larger workflow
 
-The package covers four endorsements: **Add/Edit (RCP-010)**, **EntityEvent (RCP-027)**, **Web API Core 2.1.0** and **Data Dictionary 2.1**. The same tests RESO runs in the official certification process, available as a CLI, an SDK and a Docker target.
+The package covers four endorsements: **Add/Edit (RCP-010)**, **EntityEvent (RCP-027)**, **Web API Core 2.1.0** and **Data Dictionary 2.1**. The same tests RESO runs in the official certification process, available as a CLI, an SDK and a Docker target. It also checks **RESO Common Format (RCF)** data files against the Data Dictionary, with no server involved.
 
 ## Install
 
@@ -173,6 +173,89 @@ reso-cert entity-event --url https://api.example.com --auth-token TOKEN --mode f
 **Full mode** writes a small number of canary records to exercise the full create → observe → update → observe → delete → observe loop. Twelve scenarios. Use it when you control the server and you want to verify that writes actually produce events with the right shape.
 
 The full polling-replication consumer pattern – how to read the feed, how to disambiguate creates from updates from deletes, how to handle the empty-result-on-follow-up-fetch case – is walked through end to end in Section 4 of the **[RESO MCP Server guide](../reso-mcp-server/)** with verbatim tool calls and responses against the **[RESO Reference Server](../reso-reference-server/)**.
+
+---
+
+## Testing RESO Common Format Data
+
+RESO Common Format (RCF) data arrives as files of records, with no server and no `$metadata` behind it. `reso-cert rcf` checks those files against the Data Dictionary. It reads the records and works out a metadata report and a data-availability report from them. Then it checks the report for variations: local names that look like near-misses of a standard one.
+
+A small file shows each part. Save this as `property.json`:
+
+```json
+{
+  "@reso.context": "urn:reso:metadata:2.1:resource:property",
+  "value": [
+    { "ListingKey": "SAMPLE-1", "StandardStatus": "Active", "PropertyType": "Residential", "ListPrice": 450000, "City": "Anytown", "BedroomTotal": 3 },
+    { "ListingKey": "SAMPLE-2", "StandardStatus": "Coming Soon", "PropertyType": "Residential", "ListPrice": 525000, "City": "Anytown", "BedroomTotal": 4 },
+    { "ListingKey": "SAMPLE-3", "StandardStatus": "ComingSoon", "PropertyType": "ResidentialLease", "ListPrice": 2400, "City": "Lakeside", "BedroomTotal": 2 },
+    { "ListingKey": "SAMPLE-4", "StandardStatus": "Pending", "PropertyType": "Residential", "ListPrice": 389000, "City": "Lakeside", "BedroomTotal": 3 }
+  ]
+}
+```
+
+Every RCF file carries an `@reso.context` that names its resource and its Data Dictionary version, here `Property` and 2.1. The input can be one file, a directory of files or a `.zip`.
+
+```bash
+reso-cert rcf --input property.json --output-dir out
+```
+
+```
+rcf: DD2.1 – 4 records → 1 resources, 6 fields, 6 lookups; 1 variation(s) → /path/to/out
+rcf: 2 lookup value(s) use the machine-friendly form, accepted until DD 3.0 and deprecated there (StandardStatus ComingSoon → Coming Soon; PropertyType ResidentialLease → Residential Lease). All are listed under "deprecations" in data-dictionary-variations.json
+rcf: to submit these variations for review, run again with --provider-uoi, --provider-usi and --recipient-uoi
+```
+
+What it found:
+
+* **One variation.** `BedroomTotal` is one letter away from the standard field `BedroomsTotal`, so it is reported as a near-miss with `BedroomsTotal` as the suggestion. A variation is something to change, or to explain in a review.
+* **Two values in their machine-friendly form.** RCF accepts a lookup value written either way: `Coming Soon` or `ComingSoon`. The machine-friendly form is accepted until Data Dictionary 3.0, so `ComingSoon` and `ResidentialLease` are not variations. They are listed as deprecations, each with the standard value it stands for, so they can be changed before 3.0 arrives.
+* `Coming Soon` on the second record is already the standard value and raises nothing.
+
+The variations check uses your RESO services credentials, the `credentials.env` the certification site gives you (see [Authentication](#authentication)). `--skip-variations` runs without them and leaves the check out.
+
+### What the Run Writes
+
+`rcf` writes straight into `--output-dir`:
+
+* `metadata-report.json` – every field and lookup value the records carry, with Data Dictionary fields linked to their Data Dictionary pages
+* `data-availability-report.json` – for each field, how many records carry it and what share of all the records that is
+* `data-dictionary-variations.json` – the variations, with the deprecations under `deprecations`
+
+What each file contains is in [Reading a Certification Run](RUN-REFERENCE.md#reso-common-format-rcf).
+
+### Submitting the Variations for Review
+
+Name your organization, your system and the recipient, and `rcf` also writes `variations-report.json`, the file `submit-variations-report` sends to start a review:
+
+```bash
+reso-cert rcf --input property.json --output-dir out \
+  --provider-uoi <your UOI> --provider-usi <your USI> --recipient-uoi <recipient UOI>
+reso-cert submit-variations-report --report out/variations-report.json
+```
+
+* **The three go together**, because a review is filed under a provider, a system and a recipient. With only some of them the run stops before it starts and names the ones that are missing.
+* **`variations-report.json` is written only when there are variations.** With none, there is nothing to review.
+
+### Checking Records Against the Data Dictionary Types
+
+```bash
+reso-cert rcf --input property.json --output-dir out --schema-validate
+```
+
+`--schema-validate` checks each record against the Data Dictionary. RCF is extensible, so local fields and local values are accepted. A field the Data Dictionary defines has to have the right type, though: a `ListPrice` of `"three eighty-nine"` is an error. The run prints how many errors it found and exits with `1`. `--strict` stops at the first one.
+
+### Which Data Dictionary Version
+
+`--dd-version` when you give it. Otherwise the version in the files' `@reso.context`, which is 2.1 in the sample, and 2.0 when neither says.
+
+### Exit Codes for `rcf`
+
+| Code | Meaning |
+|---|---|
+| `0` | The files were read and checked. Variations and deprecations do not change the code, so read them in the report. |
+| `1` | Schema errors, with `--schema-validate` |
+| `2` | The run could not do what was asked: nothing certifiable was read, a file's `@reso.context` could not be read (with `--schema-validate` that is a schema error, so `1`), the three identity options were incomplete or the variations check could not run |
 
 ---
 
