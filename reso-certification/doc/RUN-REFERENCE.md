@@ -3,7 +3,8 @@
 What each part of a run does, and what every file it writes contains.
 
 Every example below comes from a real run against the RESO reference server, which serves synthetic
-seed data. No sample here contains provider data.
+seed data. The RESO Common Format examples come from a synthetic four-record file instead, the one in
+the user guide. No sample here contains provider data.
 
 ## What a Run Is
 
@@ -89,6 +90,11 @@ Same first three steps, then:
 An observe-mode run is never eligible for certification. It exercises no writes, so there is nothing
 to certify.
 
+### RESO Common Format
+
+`rcf` has no named steps. What it does, in order, is under
+[RESO Common Format (RCF)](#reso-common-format-rcf).
+
 ## Scenario Skips Are Not Step Skips
 
 Web API Core routinely reports something like `219 passed, 0 failed, 112 skipped`. Those 112 are
@@ -110,6 +116,9 @@ Every endorsement writes into:
 
 In the examples below those path segments are the literal placeholders a reference-server run
 produces. A real run carries the organization's own identifiers there.
+
+`rcf` is the exception: it writes straight into `--output-dir`. Its files are under
+[RESO Common Format (RCF)](#reso-common-format-rcf).
 
 ### `report.json`
 
@@ -220,8 +229,8 @@ Alongside the variation buckets it carries `version`, `providerUoi`, `providerUs
 `generatedOn` and `fuzziness`, so the file alone says which provider, which recipient and what match
 sensitivity produced it even if the surrounding job record is lost.
 
-Not to be confused with `data-dictionary-variations.json`, which is the output of the standalone
-`find-variations` command. A certification run never writes that name.
+Not to be confused with `data-dictionary-variations.json`, which `find-variations` and `rcf` write. A
+Data Dictionary run never writes that name.
 
 ### `data-availability-report.json`
 
@@ -269,6 +278,98 @@ the scenario passes when the server correctly rejects them.
 A generated create payload against the reference server carries `ListPrice`, `BedroomsTotal`,
 `BathroomsTotalInteger`, `City`, `StateOrProvince`, `PostalCode`, and `Country`.
 
+## RESO Common Format (RCF)
+
+`rcf` reads files rather than a server, so there is no `$metadata`, no named step and no
+`report.json`. The examples here come from the four-record synthetic file in the user guide's
+[RCF section](GUIDE.md#testing-reso-common-format-data).
+
+In order, `rcf`:
+
+1. **Reads the files** – one `.json` file, a directory of files or a `.zip`. Each file carries an
+   `@reso.context` that names its resource and Data Dictionary version, such as
+   `urn:reso:metadata:2.1:resource:property`. A file whose context cannot be read is not skipped, so a
+   run cannot pass on the readable files alone.
+2. **Infers the metadata report** from the records: every field and every lookup value they carry,
+   with Data Dictionary fields linked to their Data Dictionary pages. It looks at up to 5,000 records
+   per resource for this.
+3. **Counts availability** over every record read, however many there are.
+4. **Checks types**, only with `--schema-validate`. A Data Dictionary field must have the right type.
+   Local fields and local values are accepted, because RCF is extensible.
+5. **Checks variations**, unless `--skip-variations`. A lookup value in its machine-friendly form
+   (`ComingSoon` for `Coming Soon`) is accepted until Data Dictionary 3.0, so it is listed as a
+   deprecation instead of a variation.
+6. **Writes the files** into `--output-dir`.
+
+### `metadata-report.json` (RCF)
+
+The same kind of report a Data Dictionary run writes (`resources`, `fields`, `lookups`), inferred from
+the records instead of read from `$metadata`. From the sample: 1 resource, 6 fields and 6 lookup
+values.
+
+### `data-availability-report.json` (RCF)
+
+One entry per field, with `frequency`, the number of records that carry it, and `availability`, the
+share of all records that do:
+
+```json
+{ "resourceName": "Property", "fieldName": "ListingKey", "frequency": 4, "availability": 1 }
+```
+
+Unlike a Data Dictionary run's, it has no `resources` or `lookupValues` section.
+
+### `data-dictionary-variations.json` (RCF)
+
+Written whenever the variations check runs, with or without findings. `variations` holds the buckets
+(`resources`, `fields`, `lookups`, `expansions`, `complexTypes`), and `deprecations` lists the values in
+their machine-friendly form. The sample's one variation:
+
+```json
+{
+  "level": "field",
+  "resourceName": "Property",
+  "fieldName": "BedroomTotal",
+  "suggestions": [
+    {
+      "suggestedResourceName": "Property",
+      "suggestedFieldName": "BedroomsTotal",
+      "ddWikiUrl": "https://dd.reso.org/DD2.1/Property/BedroomsTotal/",
+      "distance": 1,
+      "maxDistance": 3,
+      "strategy": "Edit Distance",
+      "closeMatch": true
+    }
+  ],
+  "enforcement": "must-fix"
+}
+```
+
+And one of its two deprecations:
+
+```json
+{
+  "level": "lookup",
+  "reason": "legacy-odata-form",
+  "resourceName": "Property",
+  "fieldName": "StandardStatus",
+  "lookupValue": "ComingSoon",
+  "standardLookupValue": "Coming Soon",
+  "deprecatedInVersion": "3.0"
+}
+```
+
+### `variations-report.json` (RCF)
+
+The file `submit-variations-report` takes to start a review. It is written only with all three of
+`--provider-uoi`, `--provider-usi` and `--recipient-uoi`, and only when variations were found. It has
+the same shape as a Data Dictionary run's `variations-report.json`: the variation buckets, with
+`version`, `providerUoi`, `providerUsi`, `recipientUoi`, `generatedOn` and `fuzziness`.
+
+### Schema errors (RCF)
+
+With `--schema-validate`, the console reports how many there are ("1 schema error(s)") and the run exits
+with `1`. No file lists them.
+
 ## How a Run Fails, and What You Still Get
 
 The Data Dictionary run stops at the first failing step. Everything after it is recorded as `skipped`,
@@ -293,6 +394,7 @@ no metadata report to inspect, but `metadata.xml` is already on disk and is usua
 | `lookup-resource-lookup-metadata.json` | Generate metadata report | only when a Lookup Resource was served |
 | `metadata-validation-report.json` | Validate DD metadata | only when that step raised a finding |
 | `variations-report.json` | Check variations | only when variations were found |
+| `data-dictionary-variations.json` | `rcf` (and `find-variations`) | `rcf` runs that checked variations |
 | `data-availability-report.json` | Replicate and validate | Data Dictionary runs that finished replication |
 | `data-availability-responses.json` | Replicate and validate | Data Dictionary runs that finished replication |
 | `data-availability-schema-validation-errors.json` | Replicate and validate | runs with schema validation errors. In strict mode it replaces the two reports above |
