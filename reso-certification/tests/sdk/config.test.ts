@@ -110,6 +110,26 @@ describe('normalizeConfigFile — accept legacy / desktop / single shapes', () =
   });
 });
 
+describe('normalizeConfigFile — concurrency', () => {
+  const entry = { serviceRootUri: 'https://api.example.com', recipientUoi: 'M00000000', providerUsi: '99999', token: 't' };
+
+  it("keeps how many recipients the provider's API takes at once", () => {
+    expect(normalizeConfigFile({ providerUoi: 'T00000000', concurrency: 100, configs: [entry] }).concurrency).toBe(100);
+  });
+
+  it('leaves it out when the file does not say', () => {
+    expect('concurrency' in normalizeConfigFile({ providerUoi: 'T00000000', configs: [entry] })).toBe(false);
+  });
+
+  it('refuses anything but a positive whole number', () => {
+    for (const concurrency of [0, -1, 2.5, '4', null]) {
+      expect(() => normalizeConfigFile({ providerUoi: 'T00000000', concurrency, configs: [entry] })).toThrow(
+        'Config file "concurrency" must be a positive whole number'
+      );
+    }
+  });
+});
+
 describe('loadConfigFile', () => {
   const sampleConfigPath = resolve(import.meta.dirname, '../../sample-configs/add-edit-config.json');
 

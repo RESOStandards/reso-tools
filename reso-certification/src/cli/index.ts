@@ -20,9 +20,11 @@ import { ENV_BOOTSTRAP } from './env-bootstrap.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
+import { createInterface } from 'node:readline/promises';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { Command } from 'commander';
 import { startMockServer, stopMockServer } from '../add-edit/mock/server.js';
+import { CLOUD_ENDORSEMENT, listCloudRunStatus, submitCloudRun } from '../cloud/runs.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
 import { synthesizeResourcesFromFields } from '../metadata/index.js';
 import { lockHolderOf } from '../sdk/common.js';
@@ -52,6 +54,7 @@ import {
 import { submitVariationsReportViaService } from '../variations/submit.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { mintOAuth2ClientCredentialsToken, resolveCliAuth } from './auth.js';
+import { type CloudOfferIo, type RanEntry, formatRunStatusTable, offerCloudRun, planCloudRequests } from './cloud-command.js';
 import { formatPlan, planDecisionPush } from './decisions-command.js';
 import { overrideRenameNotice, removedPreferFields } from './deprecations.js';
 import { runMetadataStep } from './metadata-command.js';
@@ -68,6 +71,7 @@ import { REPLICATION_STRATEGY_VALUES, runReplicate } from './replicate-command.j
 import { runRestore } from './restore-command.js';
 import { formatResultJson } from './result-json.js';
 import { generateSchemaFromReport, loadSettings, validateSchemaPayload } from './schema-command.js';
+import { maskSecrets } from './secrets.js';
 import { addAuthOptions, addOutputOptions } from './shared-options.js';
 import {
   duplicateVariationKeys,
@@ -432,6 +436,39 @@ entityEventCmd.action(
 
 // ── Web API Core Subcommand ──
 
+/**
+ * The CLI's side of the cloud-run choice. It asks and reports on stderr, so stdout stays the run's own output,
+ * and sends with the variations commands' auth, minted once and only if something is sent.
+ */
+const cliCloudOfferIo = (): CloudOfferIo => {
+  const held: { token?: Promise<string | undefined> } = {};
+  const token = (): Promise<string | undefined> => {
+    held.token ??= mintOAuth2ClientCredentialsToken();
+    return held.token;
+  };
+  return {
+    ask: async question => {
+      const terminal = createInterface({ input: process.stdin, output: process.stderr });
+      try {
+        return await terminal.question(question);
+      } finally {
+        terminal.close();
+      }
+    },
+    say: text => console.error(maskSecrets(text)),
+    submit: async request => {
+      const bearerToken = await token();
+      return submitCloudRun({
+        fromCli: true,
+        ...(bearerToken ? { bearerToken } : {}),
+        endorsementName: CLOUD_ENDORSEMENT.webApiCore,
+        endorsementVersion: request.endorsementVersion,
+        config: request.body
+      });
+    }
+  };
+};
+
 const coreCmd = program
   .command('core')
   .description('Web API Core 2.0.0/2.1.0 compliance testing')
@@ -460,7 +497,12 @@ const coreCmd = program
   )
   // Removed in 0.11.1, declared only so the old spelling gets an explanation instead of "unknown option".
   // Its value is never read, so nothing downstream depends on the old name.
-  .option('--prefer-fields <list>', 'Removed – use --field-overrides (see the message it prints).');
+  .option('--prefer-fields <list>', 'Removed – use --field-overrides (see the message it prints).')
+  .option(
+    '--start-cloud-run',
+    "At the end, start a certification run in RESO's cloud for the entries that passed and can be certified, " +
+      'without asking. Needs --config. In a terminal, the CLI asks instead'
+  );
 
 addAuthOptions(coreCmd);
 addOutputOptions(coreCmd);
@@ -469,6 +511,7 @@ coreCmd.action(
     url?: string;
     config?: string;
     resources?: string;
+    startCloudRun?: boolean;
     specVersion: string;
     enumMode?: string;
     fullCoverage?: boolean;
@@ -492,6 +535,11 @@ coreCmd.action(
       }
       if (!opts.url && !opts.config) {
         throw new Error('Provide --url or --config.');
+      }
+      // Refused before anything runs: a cloud run is addressed to the provider, system and recipient a config
+      // file names, and `--url` names none of them.
+      if (opts.startCloudRun && !opts.config) {
+        throw new Error('--start-cloud-run needs --config, which names the provider, system and recipient a cloud run is addressed to.');
       }
 
       if (!isCoreVersion(opts.specVersion)) {
@@ -525,6 +573,8 @@ coreCmd.action(
 
       let results: ReadonlyArray<PipelineResult>;
       let stopped = 0;
+      // Each entry as it ran, for the cloud-run choice at the end. Config-file mode only.
+      let ranForCloud: { readonly providerUoi: string; readonly concurrency?: number; readonly ran: ReadonlyArray<RanEntry> } | undefined;
 
       if (opts.config) {
         // Config-file mode — run every entry. The entry supplies server/auth/version/OSN (reso-certification-utils
@@ -566,6 +616,11 @@ coreCmd.action(
         const outcomes = await runConfigEntries(entries, renderMode);
         results = resultsOf(outcomes);
         stopped = stoppedOf(outcomes).length;
+        ranForCloud = {
+          providerUoi: configFile.providerUoi,
+          ...(configFile.concurrency === undefined ? {} : { concurrency: configFile.concurrency }),
+          ran: entries.map((entry, index) => ({ label: entry.label, config: entry.config, outcome: outcomes[index] }))
+        };
       } else {
         const auth = resolveCliAuth({
           authToken: opts.authToken,
@@ -599,6 +654,22 @@ coreCmd.action(
       }
 
       process.exitCode = resolveExitCode(results, stopped);
+
+      if (ranForCloud !== undefined) {
+        const plan = planCloudRequests(ranForCloud.providerUoi, ranForCloud.concurrency, ranForCloud.ran);
+        const offered = await offerCloudRun(
+          plan,
+          ranForCloud.ran.length,
+          {
+            startCloudRun: opts.startCloudRun === true,
+            interactive: renderMode !== 'silent' && process.stdin.isTTY === true,
+            json: opts.output === 'json'
+          },
+          cliCloudOfferIo()
+        );
+        // The local runs may have passed, but what was asked for did not happen: a runtime error.
+        if (offered === 'failed') process.exitCode = 2;
+      }
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : String(error));
       process.exitCode = 2;
@@ -928,6 +999,49 @@ program
       console.log(opts.json ? JSON.stringify(rows, null, 2) : formatEndorsementStatusTable(rows, opts.reviewStatus, mine?.providerUoi));
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exitCode = 2;
+    }
+  });
+
+// ── Cloud runs ──
+//
+// Where each run in RESO's cloud stands. A cloud run is started only at the end of a local run that passed
+// (`core --start-cloud-run`, or a yes in a terminal), never on its own. Auth as the variations commands: an
+// OAuth2 client_credentials token from .env (TOKEN_URI / CLIENT_ID / CLIENT_SECRET), falling back to the
+// CERT_AUTH_API_* provider-token mint.
+
+const cloudCmd = program.command('cloud').description("Certification runs in RESO's cloud: see where each stands");
+
+cloudCmd
+  .command('status')
+  .description('List your cloud runs and where each stands, newest change first – read-only')
+  .option('--since <time>', 'Only runs changed since this time: an ISO timestamp or epoch milliseconds')
+  .option('--status <list>', 'Only runs in these statuses, comma-separated (for example running,failed)')
+  .option('--in-progress', 'Only runs still scheduled or running')
+  .option('--limit <n>', 'At most this many rows')
+  .option('--json', 'Print the rows exactly as the service returned them')
+  .action(async (opts: { since?: string; status?: string; inProgress?: boolean; limit?: string; json?: boolean }) => {
+    try {
+      const limit = opts.limit === undefined ? undefined : Number(opts.limit);
+      if (limit !== undefined && (!Number.isInteger(limit) || limit <= 0)) {
+        throw new Error(`--limit must be a positive whole number, got '${opts.limit}'`);
+      }
+      const statuses = opts.status
+        ?.split(',')
+        .map(s => s.trim())
+        .filter(s => s !== '');
+      const bearerToken = await mintOAuth2ClientCredentialsToken();
+      const page = await listCloudRunStatus({
+        fromCli: true,
+        ...(bearerToken ? { bearerToken } : {}),
+        ...(opts.since === undefined ? {} : { since: opts.since }),
+        ...(statuses === undefined ? {} : { statuses }),
+        ...(opts.inProgress ? { inProgressOnly: true } : {}),
+        ...(limit === undefined ? {} : { limit })
+      });
+      console.log(maskSecrets(opts.json ? JSON.stringify(page, null, 2) : formatRunStatusTable(page)));
+    } catch (error) {
+      console.error('Error:', maskSecrets(error instanceof Error ? error.message : String(error)));
       process.exitCode = 2;
     }
   });
