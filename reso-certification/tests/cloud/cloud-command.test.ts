@@ -4,6 +4,7 @@ import {
   type CloudOfferMode,
   type RanEntry,
   cloudRunHint,
+  cloudRunPrerequisite,
   formatAcceptedRun,
   formatRunStatusTable,
   offerCloudRun,
@@ -119,29 +120,64 @@ describe('offerCloudRun', () => {
 
   const io = () => {
     const said: Array<string> = [];
+    const order: Array<string> = [];
     const calls: CloudOfferIo = {
       say: text => {
         said.push(text);
       },
-      submit: vi.fn(async request => accepted(request.endorsementVersion))
+      reserve: vi.fn(async request => {
+        order.push(`reserve ${request.endorsementVersion}`);
+        return {
+          certificationRequestId: `test-T00000000-reserved-${request.endorsementVersion}`,
+          expiresAt: '2026-10-30T20:00:00.000Z',
+          recipients: []
+        };
+      }),
+      submit: vi.fn(async request => {
+        order.push(`submit ${request.endorsementVersion}`);
+        return accepted(request.endorsementVersion);
+      })
     };
-    return { calls, said };
+    return { calls, said, order };
   };
 
   const mode = (over: Partial<CloudOfferMode> = {}): CloudOfferMode => ({ startCloudRun: false, json: false, ...over });
 
   const onePassed = planCloudRequests('T00000000', undefined, [ran('Feed one', 'M00000000', passed)], NOW);
 
-  it('starts the run with --start-cloud-run', async () => {
-    const { calls, said } = io();
+  it('with --start-cloud-run, reserves the entries that passed and starts from that reservation', async () => {
+    const { calls, said, order } = io();
     await expect(offerCloudRun(onePassed, mode({ startCloudRun: true }), calls)).resolves.toBe('started');
-    expect(calls.submit).toHaveBeenCalledOnce();
+    expect(order).toEqual(['reserve 2.1.0', 'submit 2.1.0']);
+    expect(vi.mocked(calls.submit).mock.calls[0]?.[0].body.certificationRequestId).toBe('test-T00000000-reserved-2.1.0');
     expect(said.join('\n')).toContain('Request: test-T00000000-2.1.0');
   });
 
-  it('without --start-cloud-run, says how to choose it next time and starts nothing', async () => {
+  it('starts nothing for a group whose reservation was refused, and still sends the others', async () => {
+    const twoVersions = planCloudRequests(
+      'T00000000',
+      undefined,
+      [ran('Feed one', 'M00000000', passed), ran('Feed two', 'M00000001', passed, { version: '2.0.0' })],
+      NOW
+    );
+    const { calls, said } = io();
+    const refusing: CloudOfferIo = {
+      ...calls,
+      reserve: vi.fn(async request => {
+        if (request.endorsementVersion === '2.1.0') throw new Error('Reserving the web-api-core 2.1.0 run was refused: not allowed.');
+        return { certificationRequestId: 'test-T00000000-reserved-2.0.0', expiresAt: '2026-10-30T20:00:00.000Z', recipients: [] };
+      })
+    };
+
+    await expect(offerCloudRun(twoVersions, mode({ startCloudRun: true }), refusing)).resolves.toBe('failed');
+    expect(vi.mocked(refusing.submit).mock.calls.map(c => c[0].endorsementVersion)).toEqual(['2.0.0']);
+    expect(said).toContain('Error: Reserving the web-api-core 2.1.0 run was refused: not allowed.');
+  });
+
+  it('without --start-cloud-run, says how to choose it next time and reserves and starts nothing', async () => {
     const { calls, said } = io();
     await expect(offerCloudRun(onePassed, mode(), calls)).resolves.toBe('hinted');
+    expect(calls.reserve).not.toHaveBeenCalled();
     expect(calls.submit).not.toHaveBeenCalled();
     expect(said).toEqual([cloudRunHint(1)]);
   });
@@ -156,6 +192,7 @@ describe('offerCloudRun', () => {
     const asked = io();
     await expect(offerCloudRun(nonePassed, mode({ startCloudRun: true }), asked.calls)).resolves.toBe('none');
     expect(asked.said[0]).toBe('No entry passed and can be certified, so no cloud run was started.');
+    expect(asked.calls.reserve).not.toHaveBeenCalled();
     expect(asked.calls.submit).not.toHaveBeenCalled();
   });
 
@@ -251,5 +288,31 @@ describe('formatRunStatusTable', () => {
     expect(formatRunStatusTable({ results: [{ ...row, status: 'running' }], hasMore: true })).toMatch(
       /\nMore runs match than are shown\. Narrow with --since\.$/
     );
+  });
+});
+
+describe('cloudRunPrerequisite', () => {
+  const services = { RESO_SERVICES_URL: 'https://services.example.org' };
+
+  it('is met by the service address and either set of credentials', () => {
+    expect(
+      cloudRunPrerequisite({ ...services, TOKEN_URI: 'https://auth.example.org', CLIENT_ID: 'id', CLIENT_SECRET: 'secret' })
+    ).toBeUndefined();
+    expect(
+      cloudRunPrerequisite({
+        ...services,
+        CERT_AUTH_API_BASE_URL: 'https://cert.example.org',
+        CERT_AUTH_API_USERNAME: 'u',
+        CERTIFICATION_API_KEY: 'k'
+      })
+    ).toBeUndefined();
+  });
+
+  it('names what is missing, and never a value', () => {
+    const reason = cloudRunPrerequisite({ TOKEN_URI: 'https://auth.example.org', CLIENT_ID: 'id', CLIENT_SECRET: 'secret-for-tests' });
+    expect(reason).toContain('RESO_SERVICES_URL');
+    expect(reason).not.toContain('secret-for-tests');
+    expect(cloudRunPrerequisite({ ...services, TOKEN_URI: 'https://auth.example.org', CLIENT_ID: 'id' })).toContain('CLIENT_SECRET');
+    expect(cloudRunPrerequisite({ ...services, CLIENT_SECRET: ' ' })).toBeDefined();
   });
 });

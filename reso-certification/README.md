@@ -209,11 +209,14 @@ reso-cert core --config providers.json --start-cloud-run
 reso-cert cloud status --in-progress
 ```
 
-- **Only entries that passed and can be certified are sent.** The others are listed with the reason.
+- **Only entries that passed and can be certified are sent.** The others are listed with the reason. When entries
+  pass, the CLI reserves a request ID for them with RESO's service, then starts the cloud run from it. Nothing is
+  sent before a pass.
 - **Each entry is sent as it ran**, including any flag that changed it, such as `--auth-token` or
   `--field-overrides`, with a record of the local run that passed.
 - **Without `--start-cloud-run`, nothing is sent.** A run with entries that could go prints how to send them next
-  time.
+  time. With it, the CLI checks for RESO's service address and credentials before the run, so a long run is not
+  wasted.
 - **`concurrency`** at the top of the config file tells RESO's cloud how many recipients your API can take at
   once.
 - **`reso-cert cloud status`** lists your cloud runs and where each stands, with `--json` for scripts.
