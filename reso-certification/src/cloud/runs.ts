@@ -1,11 +1,13 @@
 /**
  * Cloud certification runs: starting one, and reading where each stands.
  *
- * Two routes on reso-services-v2, the ones the desktop calls, so the CLI and the UI share them:
- *  - `POST /v2/certification/requests/{endorsementName}/{endorsementVersion}/{providerUoi}` starts a
- *    run from a configuration file, the same file a local run reads. The service records one row per
- *    recipient and answers 202 with the request's id. The credentials in the file go to the service,
- *    which seals them for the run. It never echoes them back.
+ * Three routes on reso-services-v2, the ones the desktop calls, so the CLI and the UI share them:
+ *  - `POST /v2/certification/reservations/{endorsementName}/{endorsementVersion}/{providerUoi}` reserves a
+ *    request ID as a local run starts, so the service records when it started. It takes the targets only, never
+ *    a credential.
+ *  - `POST /v2/certification/requests/{endorsementName}/{endorsementVersion}/{providerUoi}` starts the cloud
+ *    run from that reservation, with the entries that passed and a record of each one's local run. The
+ *    credentials in the entries go to the service, which seals them for the run. It never echoes them back.
  *  - `GET /v2/certification/requests/status` lists the caller's runs in the environment their token
  *    names, newest change first.
  *
@@ -24,6 +26,7 @@ export const CLOUD_ENDORSEMENT = {
 export const CLOUD_RUNS_SERVICE = 'Cloud runs';
 
 const REQUESTS_ROUTE = '/v2/certification/requests';
+const RESERVATIONS_ROUTE = '/v2/certification/reservations';
 const STATUS_ROUTE = '/v2/certification/requests/status';
 
 /** The most of a failure's body worth showing. Enough for any reason the service writes. */
@@ -34,6 +37,27 @@ interface CloudAuthInput {
   readonly bearerToken?: string;
   /** True when invoked from the CLI, so an auth failure points at `.env`. */
   readonly fromCli?: boolean;
+}
+
+/** One recipient a reservation is for: what the cloud run will be addressed to. No credential. */
+export interface CloudRunTarget {
+  readonly recipientUoi: string;
+  readonly providerUsi: string;
+  readonly serviceRootUri: string;
+}
+
+export interface ReserveCloudRunInput extends CloudAuthInput {
+  readonly endorsementName: string;
+  readonly endorsementVersion: string;
+  readonly providerUoi: string;
+  readonly targets: ReadonlyArray<CloudRunTarget>;
+}
+
+/** A request ID reserved for a local run, and until when a cloud run can start from it. */
+export interface CloudRunReservation {
+  readonly certificationRequestId: string;
+  readonly expiresAt: string;
+  readonly recipients: ReadonlyArray<CloudRunRecipient>;
 }
 
 export interface SubmitCloudRunInput extends CloudAuthInput {
@@ -165,9 +189,49 @@ const acceptedRunOf = (body: unknown): AcceptedCloudRun | undefined => {
   };
 };
 
+const reservationOf = (body: unknown): CloudRunReservation | undefined => {
+  if (!isRecord(body) || !nonEmpty(body.certificationRequestId) || !nonEmpty(body.expiresAt) || !Array.isArray(body.recipients)) {
+    return undefined;
+  }
+  if (!body.recipients.every(isRecipient)) return undefined;
+  return {
+    certificationRequestId: body.certificationRequestId,
+    expiresAt: body.expiresAt,
+    recipients: body.recipients.map(r => ({ recipientUoi: r.recipientUoi, providerUsi: r.providerUsi }))
+  };
+};
+
 /**
- * Start a run in RESO's cloud. Returns once the service has recorded it, not when it finishes: follow
- * it with {@link listCloudRunStatus}.
+ * Reserve a request ID as a local run starts. Only the targets are sent: the recipient, the system and the
+ * server each entry will test. The cloud run is started from the ID once the run has passed, within the window
+ * the service gives (`expiresAt`).
+ */
+export const reserveCloudRun = async (input: ReserveCloudRunInput): Promise<CloudRunReservation> => {
+  const what = `Reserving the ${input.endorsementName} ${input.endorsementVersion} run`;
+  const servicesUrl = resolveServicesUrl(CLOUD_RUNS_SERVICE);
+  const token = await resolveToken(input);
+
+  const path = [input.endorsementName, input.endorsementVersion, input.providerUoi].map(encodeURIComponent).join('/');
+  const response = await fetch(`${servicesUrl}${RESERVATIONS_ROUTE}/${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      providerUoi: input.providerUoi,
+      configs: input.targets.map(t => ({ recipientUoi: t.recipientUoi, providerUsi: t.providerUsi, serviceRootUri: t.serviceRootUri }))
+    })
+  });
+  if (!response.ok) throw await failure(response, input, what);
+
+  const reservation = reservationOf(await response.json().catch(() => undefined));
+  if (reservation === undefined) {
+    throw serviceError('SERVICE_ERROR', `${what}: the service answered ${response.status} without a request ID and its window.`);
+  }
+  return reservation;
+};
+
+/**
+ * Start a run in RESO's cloud from a reservation. Returns once the service has recorded it, not when it
+ * finishes: follow it with {@link listCloudRunStatus}.
  */
 export const submitCloudRun = async (input: SubmitCloudRunInput): Promise<AcceptedCloudRun> => {
   const what = `Starting the ${input.endorsementName} ${input.endorsementVersion} run`;

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CLOUD_ENDORSEMENT, configProviderUoi, listCloudRunStatus, submitCloudRun } from '../../src/cloud/runs.js';
+import { CLOUD_ENDORSEMENT, configProviderUoi, listCloudRunStatus, reserveCloudRun, submitCloudRun } from '../../src/cloud/runs.js';
 
 /**
  * Starting a run in RESO's cloud and reading where it stands, against a stubbed service.
@@ -207,5 +207,48 @@ describe('listCloudRunStatus', () => {
   it('refuses an answer that is not a list of runs', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply(200, { results: 'none' })));
     await expect(listCloudRunStatus({ bearerToken: TOKEN })).rejects.toThrow('without a list of runs');
+  });
+});
+
+describe('reserveCloudRun', () => {
+  const targets = [{ recipientUoi: 'M00000000', providerUsi: '99999', serviceRootUri: 'https://api.example.com/odata' }];
+  const reservation = {
+    certificationRequestId: 'test-T00000000-1700000000000',
+    providerUoi: 'T00000000',
+    reservedAt: '2026-10-29T20:00:00.000Z',
+    expiresAt: '2026-10-30T20:00:00.000Z',
+    recipients: [{ recipientUoi: 'M00000000', providerUsi: '99999' }]
+  };
+  const reserve = () =>
+    reserveCloudRun({
+      bearerToken: TOKEN,
+      endorsementName: CLOUD_ENDORSEMENT.webApiCore,
+      endorsementVersion: '2.1.0',
+      providerUoi: 'T00000000',
+      targets
+    });
+
+  it('posts the targets only, no credential, to the reservation route, and returns the reservation', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(reply(201, reservation));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(reserve()).resolves.toEqual({
+      certificationRequestId: reservation.certificationRequestId,
+      expiresAt: reservation.expiresAt,
+      recipients: reservation.recipients
+    });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${SERVICES}/v2/certification/reservations/web-api-core/2.1.0/T00000000`);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ providerUoi: 'T00000000', configs: targets });
+  });
+
+  it("gives the service's reason when it refuses, and refuses an answer without an ID and a window", async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply(400, { message: 'Entry 1 has no providerUsi.' })));
+    await expect(reserve()).rejects.toThrow('Reserving the web-api-core 2.1.0 run was refused: Entry 1 has no providerUsi.');
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply(201, { certificationRequestId: 'x' })));
+    await expect(reserve()).rejects.toThrow('without a request ID and its window');
   });
 });

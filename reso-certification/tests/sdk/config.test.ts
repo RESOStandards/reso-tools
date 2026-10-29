@@ -6,6 +6,7 @@ import {
   configEntryToDD,
   configEntryToEntityEvent,
   generateLocalUoi,
+  isGeneratedLocalUoi,
   loadConfigFile,
   normalizeConfigFile,
   parseConfigText,
@@ -107,6 +108,14 @@ describe('normalizeConfigFile — accept legacy / desktop / single shapes', () =
         configs: [{ serviceRootUri: 'https://api.example.com', recipientUoi: 'R1', providerUsi: 'S1', token: 't' }]
       })
     ).not.toThrow();
+  });
+});
+
+describe('isGeneratedLocalUoi', () => {
+  it('recognizes the placeholder a config without a providerUoi gets, and no real UOI', () => {
+    expect(isGeneratedLocalUoi(generateLocalUoi())).toBe(true);
+    expect(isGeneratedLocalUoi('T00000000')).toBe(false);
+    expect(isGeneratedLocalUoi('LOCAL-PROVIDER')).toBe(false);
   });
 });
 

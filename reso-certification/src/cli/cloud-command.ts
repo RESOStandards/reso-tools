@@ -7,7 +7,7 @@
  */
 
 import { type CloudConfigEntry, type LocalRunRecord, cloudEntryOf, isSuccessfulRun, localRunRecordOf } from '../cloud/local-run.js';
-import type { AcceptedCloudRun, CloudRunStatusPage, CloudRunStatusRow } from '../cloud/runs.js';
+import type { AcceptedCloudRun, CloudRunReservation, CloudRunStatusPage, CloudRunStatusRow } from '../cloud/runs.js';
 import type { CoreConfig, PipelineResult } from '../sdk/types.js';
 import type { EntryOutcome } from './render.js';
 import { cell, renderTable } from './table.js';
@@ -27,6 +27,8 @@ export interface NotOffered {
 
 /** The body of one cloud request: the entries to run and the local run each one passed. */
 export interface CloudRequestBody {
+  /** The reservation the cloud run starts from, made once these entries passed. */
+  readonly certificationRequestId?: string;
   readonly providerUoi: string;
   readonly concurrency?: number;
   readonly configs: ReadonlyArray<CloudConfigEntry>;
@@ -119,6 +121,8 @@ export interface CloudOfferMode {
 /** The offer's side effects, injected so it can be tested without a network. */
 export interface CloudOfferIo {
   readonly say: (text: string) => void;
+  /** Reserve a request ID for the entries that passed. Called only once they have. */
+  readonly reserve: (request: PlannedCloudRequest) => Promise<CloudRunReservation>;
   readonly submit: (request: PlannedCloudRequest) => Promise<AcceptedCloudRun>;
 }
 
@@ -126,8 +130,11 @@ export type CloudOfferOutcome = 'none' | 'hinted' | 'started' | 'failed';
 
 /**
  * Present the choice at the end of a run. Only `--start-cloud-run` starts anything. Without it, a run with
- * entries that qualify says how to choose it next time, and nothing waits for input. A request the service
- * refuses is reported with its reason, and the others are still sent.
+ * entries that qualify says how to choose it next time, and nothing waits for input.
+ *
+ * With it, the entries that passed are reserved, never before they pass, and the cloud run starts from that
+ * reservation. A reservation or a start the service refuses is reported with its reason, and the other groups
+ * are still sent.
  */
 export const offerCloudRun = async (plan: CloudPlan, mode: CloudOfferMode, io: CloudOfferIo): Promise<CloudOfferOutcome> => {
   if (plan.offered === 0) {
@@ -146,7 +153,8 @@ export const offerCloudRun = async (plan: CloudPlan, mode: CloudOfferMode, io: C
   const sent = await plan.requests.reduce<Promise<ReadonlyArray<boolean>>>(async (done, request) => {
     const previous = await done;
     try {
-      const run = await io.submit(request);
+      const reservation = await io.reserve(request);
+      const run = await io.submit({ ...request, body: { ...request.body, certificationRequestId: reservation.certificationRequestId } });
       io.say(mode.json ? JSON.stringify(run) : formatAcceptedRun(run, 'Web API Core'));
       return [...previous, true];
     } catch (error) {
@@ -155,6 +163,22 @@ export const offerCloudRun = async (plan: CloudPlan, mode: CloudOfferMode, io: C
     }
   }, Promise.resolve([]));
   return sent.every(Boolean) ? 'started' : 'failed';
+};
+
+const present = (value: string | undefined): boolean => typeof value === 'string' && value.trim() !== '';
+
+/**
+ * Why `--start-cloud-run` cannot send a pass, checked before the run so a long run is not wasted: RESO's service
+ * address and one set of credentials have to be there. Names only, never values. `undefined` when all is set.
+ */
+export const cloudRunPrerequisite = (env: Readonly<Record<string, string | undefined>>): string | undefined => {
+  const clientCredentials = present(env.TOKEN_URI) && present(env.CLIENT_ID) && present(env.CLIENT_SECRET);
+  const providerToken = present(env.CERT_AUTH_API_BASE_URL) && present(env.CERT_AUTH_API_USERNAME) && present(env.CERTIFICATION_API_KEY);
+  if (present(env.RESO_SERVICES_URL) && (clientCredentials || providerToken)) return undefined;
+  return (
+    "--start-cloud-run sends a pass to RESO's service, so it needs RESO_SERVICES_URL and either TOKEN_URI, CLIENT_ID " +
+    'and CLIENT_SECRET or the CERT_AUTH_API_* set, from your credentials file or the environment.'
+  );
 };
 
 /** What was started, and how to follow it. */
