@@ -239,10 +239,35 @@ export const normalizeConfigFile = (raw: Record<string, unknown>): CertConfigFil
   return { providerUoi, configs: rawEntries.map(normalizeConfigEntry) };
 };
 
+/** Where the parser says the fault is, as V8 writes it: `(line 1 column 37)`. Nothing of the text itself. */
+const faultPosition = (error: unknown): string | undefined =>
+  error instanceof Error ? /\(line \d+ column \d+\)/.exec(error.message)?.[0] : undefined;
+
+const isJsonObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/**
+ * Parse a config file's text. A config file carries credentials, and the parser's own message quotes
+ * the text around a fault (`Unexpected token 'p', ..."token": provider-s"...`), so a bad file is
+ * refused with where the fault is, never with what is there.
+ */
+export const parseConfigText = (text: string, path: string): Record<string, unknown> => {
+  const parsed: unknown = (() => {
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      const position = faultPosition(error);
+      throw new Error(`Config file ${path} is not valid JSON${position ? ` ${position}` : ''}.`);
+    }
+  })();
+  if (!isJsonObject(parsed)) throw new Error(`Config file ${path} must hold a JSON object.`);
+  return parsed;
+};
+
 /** Load and normalize a config file from disk (any supported shape → canonical `{ providerUoi, configs }`). */
 export const loadConfigFile = async (path: string): Promise<CertConfigFile> => {
   const content = await readFile(path, 'utf-8');
-  return normalizeConfigFile(JSON.parse(content) as Record<string, unknown>);
+  return normalizeConfigFile(parseConfigText(content, path));
 };
 
 /** Generate a local placeholder UOI for testing. */

@@ -8,6 +8,7 @@ import {
   generateLocalUoi,
   loadConfigFile,
   normalizeConfigFile,
+  parseConfigText,
   resolvePayloadKeys
 } from '../../src/sdk/config.js';
 import { CURRENT_CORE_VERSION } from '../../src/sdk/core-versions.js';
@@ -122,6 +123,45 @@ describe('loadConfigFile', () => {
 
   it('throws on missing file', async () => {
     await expect(loadConfigFile('/nonexistent.json')).rejects.toThrow();
+  });
+});
+
+describe('parseConfigText', () => {
+  // Synthetic. A config file carries credentials, and the parser's own message quotes the text near a fault.
+  const TOKEN = 'provider-server-token-0001';
+
+  it('refuses a file that is not JSON without quoting it', () => {
+    // An unquoted value: the parser's message would quote from here, the credential's start.
+    const text = `{"providerUoi": "T00000000", "configs": [{"token": ${TOKEN}}]}`;
+    const refusal = (() => {
+      try {
+        parseConfigText(text, 'config.json');
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+      return undefined;
+    })();
+    expect(refusal).toBe('Config file config.json is not valid JSON.');
+    expect(refusal).not.toContain(TOKEN.slice(0, 8));
+  });
+
+  it('says where the fault is when the parser does, still without the text', () => {
+    expect(() => parseConfigText(`{"token": "${TOKEN}" ]`, 'config.json')).toThrow(
+      /^Config file config\.json is not valid JSON \(line 1 column \d+\)\.$/
+    );
+  });
+
+  it('refuses JSON that is not an object', () => {
+    for (const text of ['null', '[]', '"text"', '7']) {
+      expect(() => parseConfigText(text, 'config.json')).toThrow('Config file config.json must hold a JSON object.');
+    }
+  });
+
+  it('returns the object as written', () => {
+    expect(parseConfigText('{"providerUoi": "T00000000", "configs": []}', 'config.json')).toEqual({
+      providerUoi: 'T00000000',
+      configs: []
+    });
   });
 });
 
