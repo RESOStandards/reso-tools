@@ -465,9 +465,16 @@ export const runHeaderSummary = (result: PipelineResult): string => {
   return `${tally('passed')} passed, ${tally('failed')} failed${skipped > 0 ? `, ${skipped} skipped` : ''}`;
 };
 
-/** Run a single pipeline with listr2 progress rendering. */
+/**
+ * Run a single pipeline with listr2 progress rendering.
+ *
+ * A run that stops before producing a result (its output directory cannot be made, or a fatal error
+ * ends it) rethrows that error, so the caller reports it and exits as a runtime error. It used to
+ * fall through to the summary with no result, and the message became "Cannot read properties of
+ * undefined" instead of the cause.
+ */
 export const runWithProgress = async (config: ComplianceConfig, label: string, renderMode: RenderMode): Promise<PipelineResult> => {
-  let pipelineResult: PipelineResult | undefined;
+  const run: { result?: PipelineResult; error?: unknown } = {};
 
   const tasks = new Listr(
     [
@@ -475,7 +482,11 @@ export const runWithProgress = async (config: ComplianceConfig, label: string, r
         title: label,
         task: async (_ctx, task) => {
           const view = createCoreProgressView();
-          pipelineResult = await runComplianceTests(config, handleProgress(task, label, renderMode, view));
+          const pipelineResult = await runComplianceTests(config, handleProgress(task, label, renderMode, view)).catch((error: unknown) => {
+            run.error = error;
+            throw error;
+          });
+          run.result = pipelineResult;
 
           task.title = `${label} \u2013 ${runHeaderSummary(pipelineResult)} (${humanizeDuration(pipelineResult.duration)})`;
           // Reflect the verdict in the PARENT task glyph: a non-passing run throws so listr2 marks it \u2717
@@ -495,27 +506,50 @@ export const runWithProgress = async (config: ComplianceConfig, label: string, r
   try {
     await tasks.run();
   } catch {
-    /* the failing run throws to mark the task \u2717; the verdict is in pipelineResult */
+    /* the failing run throws to mark the task \u2717; the verdict is in run.result */
   }
-  printRunSummary(pipelineResult!, renderMode);
-  return pipelineResult!;
+  if (run.result === undefined) throw run.error ?? new Error(`${label} stopped before producing a result.`);
+  printRunSummary(run.result, renderMode);
+  return run.result;
 };
 
-/** Run multiple config entries sequentially with listr2 progress rendering. */
+/**
+ * One config entry's outcome: its result, or the error that stopped it before it produced one.
+ * A stopped entry is never dropped. Dropping it let a batch whose every run crashed exit 0.
+ */
+export type EntryOutcome = { readonly label: string; readonly result: PipelineResult } | { readonly label: string; readonly error: string };
+
+/** The results of the entries that produced one, in entry order. */
+export const resultsOf = (outcomes: ReadonlyArray<EntryOutcome>): ReadonlyArray<PipelineResult> =>
+  outcomes.flatMap(o => ('result' in o ? [o.result] : []));
+
+/** The entries that stopped before producing a result, with why. */
+export const stoppedOf = (outcomes: ReadonlyArray<EntryOutcome>): ReadonlyArray<{ readonly label: string; readonly error: string }> =>
+  outcomes.flatMap(o => ('error' in o ? [o] : []));
+
+const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+/**
+ * Run multiple config entries sequentially with listr2 progress rendering. Returns one outcome per
+ * entry, in entry order.
+ */
 export const runConfigEntries = async (
   entries: ReadonlyArray<{ readonly config: ComplianceConfig; readonly label: string }>,
   renderMode: RenderMode
-): Promise<ReadonlyArray<PipelineResult>> => {
-  const results: PipelineResult[] = [];
+): Promise<ReadonlyArray<EntryOutcome>> => {
+  const outcomes: Array<EntryOutcome | undefined> = entries.map(() => undefined);
 
   const tasks = new Listr(
-    entries.map(({ config, label }) => ({
+    entries.map(({ config, label }, index) => ({
       title: label,
       task: async (_ctx: unknown, task: { title: string; output: string }) => {
         const view = createCoreProgressView();
-        const result = await runComplianceTests(config, handleProgress(task, label, renderMode, view));
+        const result = await runComplianceTests(config, handleProgress(task, label, renderMode, view)).catch((error: unknown) => {
+          outcomes[index] = { label, error: messageOf(error) };
+          throw error;
+        });
 
-        results.push(result);
+        outcomes[index] = { label, result };
 
         task.title = `${label} \u2013 ${runHeaderSummary(result)} (${humanizeDuration(result.duration)})`;
         if (result.status !== 'passed') throw new Error('non-passing run'); // parent glyph \u2192 \u2717 (see runWithProgress)
@@ -533,8 +567,15 @@ export const runConfigEntries = async (
   try {
     await tasks.run();
   } catch {
-    /* failing runs throw to mark their tasks \u2717; verdicts are in results */
+    /* failing runs throw to mark their tasks \u2717; verdicts are in the outcomes */
   }
-  for (const result of results) printRunSummary(result, renderMode);
-  return results;
+  const settled: ReadonlyArray<EntryOutcome> = outcomes.map((o, index) => o ?? { label: entries[index].label, error: 'It did not run.' });
+  for (const result of resultsOf(settled)) printRunSummary(result, renderMode);
+  const stopped = stoppedOf(settled);
+  if (stopped.length > 0) {
+    // On stderr, whatever the render mode: the exit code alone would not say which entries or why.
+    console.error(`Stopped before producing a result (${stopped.length} of ${settled.length}):`);
+    for (const s of stopped) console.error(`  \u2717 ${s.label}: ${s.error}`);
+  }
+  return settled;
 };

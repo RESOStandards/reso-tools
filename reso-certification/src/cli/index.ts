@@ -63,7 +63,7 @@ import {
   runRcf,
   submittableVariationsReport
 } from './rcf-command.js';
-import { resolveRenderMode, runConfigEntries, runWithProgress } from './render.js';
+import { resolveRenderMode, resultsOf, runConfigEntries, runWithProgress, stoppedOf } from './render.js';
 import { REPLICATION_STRATEGY_VALUES, runReplicate } from './replicate-command.js';
 import { runRestore } from './restore-command.js';
 import { formatResultJson } from './result-json.js';
@@ -111,9 +111,13 @@ const loadDefaultMetadata = async (): Promise<string> => {
 
 /** Determine exit code from pipeline results. A run cut short by its total-timeout budget
  *  is `incomplete` — not a clean pass, so it exits non-zero (like a failure) rather than
- *  letting a truncated run read as success; the report distinguishes incomplete from failed. */
-const resolveExitCode = (results: ReadonlyArray<PipelineResult>): number =>
-  results.some(r => r.status === 'failed' || r.status === 'incomplete') ? 1 : 0;
+ *  letting a truncated run read as success; the report distinguishes incomplete from failed.
+ *  A config entry that stopped before producing a result is a runtime error (2), ahead of any
+ *  verdict: its run was never counted, so a config whose every run crashed exited 0. */
+const resolveExitCode = (results: ReadonlyArray<PipelineResult>, stopped = 0): number => {
+  if (stopped > 0) return 2;
+  return results.some(r => r.status === 'failed' || r.status === 'incomplete') ? 1 : 0;
+};
 
 // ── Program ──
 
@@ -203,6 +207,7 @@ addEditCmd.action(
       }
 
       let results: ReadonlyArray<PipelineResult>;
+      let stopped = 0;
 
       if (opts.config) {
         // Config file mode
@@ -226,7 +231,9 @@ addEditCmd.action(
           };
         });
 
-        results = await runConfigEntries(entries, renderMode);
+        const outcomes = await runConfigEntries(entries, renderMode);
+        results = resultsOf(outcomes);
+        stopped = stoppedOf(outcomes).length;
       } else {
         // Direct mode
         const serverUrl = mockServer?.url ?? opts.url!;
@@ -259,7 +266,7 @@ addEditCmd.action(
         console.log(formatResultJson(results));
       }
 
-      process.exitCode = resolveExitCode(results);
+      process.exitCode = resolveExitCode(results, stopped);
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : String(error));
       process.exitCode = 2;
@@ -345,6 +352,7 @@ entityEventCmd.action(
       }
 
       let results: ReadonlyArray<PipelineResult>;
+      let stopped = 0;
 
       if (opts.config) {
         // Config file mode
@@ -372,7 +380,9 @@ entityEventCmd.action(
           };
         });
 
-        results = await runConfigEntries(entries, renderMode);
+        const outcomes = await runConfigEntries(entries, renderMode);
+        results = resultsOf(outcomes);
+        stopped = stoppedOf(outcomes).length;
       } else {
         // Direct mode
         const serverUrl = mockServer?.url ?? opts.url!;
@@ -408,7 +418,7 @@ entityEventCmd.action(
         console.log(formatResultJson(results));
       }
 
-      process.exitCode = resolveExitCode(results);
+      process.exitCode = resolveExitCode(results, stopped);
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : String(error));
       process.exitCode = 2;
@@ -514,6 +524,7 @@ coreCmd.action(
       const resources = opts.resources?.split(',').map(r => r.trim());
 
       let results: ReadonlyArray<PipelineResult>;
+      let stopped = 0;
 
       if (opts.config) {
         // Config-file mode — run every entry. The entry supplies server/auth/version/OSN (reso-certification-utils
@@ -552,7 +563,9 @@ coreCmd.action(
           return { config, label: entry.description ?? runLabel(entry, configFile.providerUoi) };
         });
 
-        results = await runConfigEntries(entries, renderMode);
+        const outcomes = await runConfigEntries(entries, renderMode);
+        results = resultsOf(outcomes);
+        stopped = stoppedOf(outcomes).length;
       } else {
         const auth = resolveCliAuth({
           authToken: opts.authToken,
@@ -585,7 +598,7 @@ coreCmd.action(
         console.log(formatResultJson(results));
       }
 
-      process.exitCode = resolveExitCode(results);
+      process.exitCode = resolveExitCode(results, stopped);
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : String(error));
       process.exitCode = 2;
@@ -667,6 +680,7 @@ ddCmd.action(
       const renderMode = resolveRenderMode(opts);
 
       let results: ReadonlyArray<PipelineResult>;
+      let stopped = 0;
 
       if (opts.config) {
         // Config-file mode — run every entry. The entry supplies server/auth/version/OSN (reso-certification-utils
@@ -707,7 +721,9 @@ ddCmd.action(
           return { config, label: entry.description ?? runLabel(entry, configFile.providerUoi) };
         });
 
-        results = await runConfigEntries(entries, renderMode);
+        const outcomes = await runConfigEntries(entries, renderMode);
+        results = resultsOf(outcomes);
+        stopped = stoppedOf(outcomes).length;
       } else {
         const auth = resolveCliAuth({
           authToken: opts.authToken,
@@ -741,7 +757,7 @@ ddCmd.action(
         console.log(formatResultJson(results));
       }
 
-      process.exitCode = resolveExitCode(results);
+      process.exitCode = resolveExitCode(results, stopped);
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : String(error));
       process.exitCode = 2;
