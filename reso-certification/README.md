@@ -2,8 +2,7 @@
 
 Compliance testing toolkit for RESO OData servers. Run certification tests from the command line, integrate them into your CI pipeline or call the SDK directly from your application.
 
-- **Four endorsements** ready to use: Add/Edit, EntityEvent, Web API Core and Data Dictionary
-- **RESO Common Format (RCF)** files checked against the Data Dictionary, with no server involved
+- **Endorsements** ready to use: Add/Edit, EntityEvent, Web API Core, Data Dictionary and RESO Common Format (RCF)
 - **Pure TypeScript** – built on [`reso-client`](../reso-client/) for OData and [`reso-validation`](../reso-validation/) for field validation
 - **Auto-configuring** – samples live server data to build test parameters, auto-detects enum mode from metadata
 - **SDK-first** – the CLI, Desktop Client and MCP server all call the same SDK functions with progress callbacks
@@ -48,7 +47,7 @@ reso-cert core --url https://api.example.com --auth-token TOKEN
 # Data Dictionary compliance
 reso-cert dd --url https://api.example.com --auth-token TOKEN
 
-# RESO Common Format files
+# RESO Common Format (RCF) compliance
 reso-cert rcf --input ./rcf-export/ --output-dir ./out
 ```
 
@@ -119,7 +118,7 @@ reso-cert dd --url https://api.example.com --auth-token TOKEN --dd-version 2.0
 
 [**More info**](src/data-dictionary/README.md)
 
-## RESO Common Format (RCF)
+### RESO Common Format (RCF)
 
 RCF data arrives as files of records, with no server and no `$metadata` behind it. `rcf` reads the files and works out a metadata report and a data-availability report from the records. Then it checks the report for variations.
 
@@ -141,7 +140,7 @@ reso-cert submit-variations-report --report ./out/variations-report.json
 - **Variations do not change the exit code.** `rcf` exits `1` on schema errors with `--schema-validate`, and `2` when it could not do what was asked.
 - **The variations check uses your RESO services credentials.** `--skip-variations` runs without them.
 
-[**More info**](doc/GUIDE.md) – "Testing RESO Common Format Data" in the User Guide
+[**More info**](doc/GUIDE.md) – "RESO Common Format (RCF)" in the User Guide
 
 ## Output
 

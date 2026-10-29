@@ -282,7 +282,7 @@ A generated create payload against the reference server carries `ListPrice`, `Be
 
 `rcf` reads files rather than a server, so there is no `$metadata`, no named step and no
 `report.json`. The examples here come from the four-record synthetic file in the user guide's
-[RCF section](GUIDE.md#testing-reso-common-format-data).
+[RCF section](GUIDE.md#reso-common-format-rcf).
 
 In order, `rcf`:
 
