@@ -536,7 +536,9 @@ only at the end of a local run that passed, never on its own. The cloud run is t
 
 **At the end of `core --config`**, when at least one entry passed and can be certified:
 
-- With `--start-cloud-run`, the CLI sends those entries.
+- With `--start-cloud-run`, the CLI reserves a request ID for those entries with RESO's service and starts the
+  cloud run from that reservation. Nothing is sent before a pass. A reservation can start a cloud run once,
+  within 24 hours, and the newest pass of a recipient is the one that counts.
 - Without it, nothing is sent, and the CLI prints one line saying how to send them next time. Nothing waits for
   input.
 
@@ -547,7 +549,8 @@ service with the request and are never printed. Messages go to stderr, so with `
 run's own JSON, and what was started is printed as JSON there too.
 
 A cloud run is addressed to the provider, system and recipient a config file names, so `--start-cloud-run` needs
-`--config`. The config file's `concurrency` tells RESO's cloud how many recipients your API can take at once.
+`--config`, with its `providerUoi`. It also checks, before the run, that `RESO_SERVICES_URL` and one set of the
+credentials below are set, and refuses without them. The config file's `concurrency` tells RESO's cloud how many recipients your API can take at once.
 Sign-in is the same as the variations commands: an OAuth2 client-credentials token from `.env`, falling back to
 the `CERT_AUTH_API_*` provider-token mint.
 

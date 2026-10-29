@@ -261,6 +261,9 @@ export const loadConfigFile = async (path: string): Promise<CertConfigFile> => {
 /** Generate a local placeholder UOI for testing. */
 export const generateLocalUoi = (): string => `LOCAL-${Date.now()}`;
 
+/** A UOI `generateLocalUoi` made up because the config named none. It names no organization. */
+export const isGeneratedLocalUoi = (uoi: string): boolean => /^LOCAL-\d+$/.test(uoi);
+
 // ── Config to ComplianceConfig Conversion ──
 
 /** An endorsement's OSN: its own block first, then the flat entry-level value (which normalization already

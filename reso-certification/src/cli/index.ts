@@ -23,11 +23,18 @@ import { resolve } from 'node:path';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { Command } from 'commander';
 import { startMockServer, stopMockServer } from '../add-edit/mock/server.js';
-import { CLOUD_ENDORSEMENT, listCloudRunStatus, submitCloudRun } from '../cloud/runs.js';
+import { CLOUD_ENDORSEMENT, listCloudRunStatus, reserveCloudRun, submitCloudRun } from '../cloud/runs.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
 import { synthesizeResourcesFromFields } from '../metadata/index.js';
 import { lockHolderOf } from '../sdk/common.js';
-import { configEntryToAddEdit, configEntryToCore, configEntryToDD, configEntryToEntityEvent, loadConfigFile } from '../sdk/config.js';
+import {
+  configEntryToAddEdit,
+  configEntryToCore,
+  configEntryToDD,
+  configEntryToEntityEvent,
+  isGeneratedLocalUoi,
+  loadConfigFile
+} from '../sdk/config.js';
 import { CURRENT_CORE_VERSION, SUPPORTED_CORE_VERSIONS, isCoreVersion } from '../sdk/core-versions.js';
 import { CERTIFIABLE_DD_VERSIONS, CURRENT_DD_VERSION, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
 import { fetchMetadataReportFromServer } from '../sdk/metadata-source.js';
@@ -53,7 +60,14 @@ import {
 import { submitVariationsReportViaService } from '../variations/submit.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { mintOAuth2ClientCredentialsToken, resolveCliAuth } from './auth.js';
-import { type CloudOfferIo, type RanEntry, formatRunStatusTable, offerCloudRun, planCloudRequests } from './cloud-command.js';
+import {
+  type CloudOfferIo,
+  type RanEntry,
+  cloudRunPrerequisite,
+  formatRunStatusTable,
+  offerCloudRun,
+  planCloudRequests
+} from './cloud-command.js';
 import { formatPlan, planDecisionPush } from './decisions-command.js';
 import { overrideRenameNotice, removedPreferFields } from './deprecations.js';
 import { runMetadataStep } from './metadata-command.js';
@@ -447,6 +461,17 @@ const cliCloudOfferIo = (): CloudOfferIo => {
   };
   return {
     say: text => console.error(maskSecrets(text)),
+    reserve: async request => {
+      const bearerToken = await token();
+      return reserveCloudRun({
+        fromCli: true,
+        ...(bearerToken ? { bearerToken } : {}),
+        endorsementName: CLOUD_ENDORSEMENT.webApiCore,
+        endorsementVersion: request.endorsementVersion,
+        providerUoi: request.body.providerUoi,
+        targets: request.body.configs
+      });
+    },
     submit: async request => {
       const bearerToken = await token();
       return submitCloudRun({
@@ -532,6 +557,10 @@ coreCmd.action(
       if (opts.startCloudRun && !opts.config) {
         throw new Error('--start-cloud-run needs --config, which names the provider, system and recipient a cloud run is addressed to.');
       }
+      // Also before the run, so a long run is not wasted: a pass can be sent only with the service's address and
+      // credentials. Nothing is sent before the run passes.
+      const cloudPrerequisite = opts.startCloudRun ? cloudRunPrerequisite(process.env) : undefined;
+      if (cloudPrerequisite !== undefined) throw new Error(cloudPrerequisite);
 
       if (!isCoreVersion(opts.specVersion)) {
         throw new Error(`Invalid --spec-version "${opts.specVersion}". Must be one of: ${SUPPORTED_CORE_VERSIONS.join(', ')}.`);
@@ -571,6 +600,9 @@ coreCmd.action(
         // Config-file mode — run every entry. The entry supplies server/auth/version/OSN (reso-certification-utils
         // format); CLI flags apply run-level knobs (resources / enum-mode / coverage) and can override auth/OSN.
         const configFile = await loadConfigFile(resolve(opts.config));
+        if (opts.startCloudRun && isGeneratedLocalUoi(configFile.providerUoi)) {
+          throw new Error('--start-cloud-run needs the config file to name its providerUoi, the organization a cloud run certifies.');
+        }
         // A config still carrying the removed key gets the same explanation the flag gets. Its value is not
         // forwarded: rerouting it would hand the old key the new binding behavior, which is not what its
         // author asked for. Deduplicated across entries so a multi-recipient config says it once.

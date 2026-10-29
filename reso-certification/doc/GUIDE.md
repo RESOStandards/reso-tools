@@ -387,6 +387,8 @@ Follow it with: reso-cert cloud status --in-progress
 
 ### What Is Sent
 
+When entries pass, the CLI first reserves a request ID for them with RESO's service, and then starts the cloud run from that reservation. Nothing is sent before a pass. A reservation can start a cloud run once, within 24 hours, and if the same recipient passes again, the newest pass is the one that counts.
+
 Each entry goes as it ran: its server, its credential, its originating-system scope and its Core options, including any flag that changed them for the local run, such as `--auth-token` or `--field-overrides`. With it goes a record of the local run that passed: the server it tested, the versions, when it ran and its verdict. The credentials travel to RESO's service with the request, and the CLI never prints them.
 
 An entry that failed, stopped before producing a result or cannot be certified is listed with the reason and not sent.
@@ -397,7 +399,7 @@ Without `--start-cloud-run`, nothing is sent. A run with entries that could go s
 1 passed and can be certified. To start a certification run in RESO's cloud at the end of a run like this one, add --start-cloud-run.
 ```
 
-`--start-cloud-run` needs `--config`, because a cloud run is addressed to the provider, system and recipient a config file names.
+`--start-cloud-run` needs `--config`, because a cloud run is addressed to the provider, system and recipient a config file names, and the file has to name its `providerUoi`. It also needs `RESO_SERVICES_URL` and RESO credentials, which it checks before the run so a long run is not wasted.
 
 ### How Many at Once
 
