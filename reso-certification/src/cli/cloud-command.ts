@@ -101,14 +101,7 @@ export const planCloudRequests = (
   return { requests, notOffered, offered: qualified.length };
 };
 
-/** The question asked in a terminal. The answer defaults to no. */
-export const cloudRunQuestion = (offered: number, total: number): string =>
-  `${offered} of ${total} passed and can be certified. Start a certification run in RESO's cloud for ${offered === 1 ? 'it' : 'them'}? [y/N] `;
-
-/** Only an explicit yes starts anything. */
-export const isYes = (answer: string): boolean => /^\s*y(es)?\s*$/i.test(answer);
-
-/** Said when no terminal can be asked and no flag answered in advance. */
+/** Said at the end of a run with entries that qualify, when `--start-cloud-run` was not given. */
 export const cloudRunHint = (offered: number): string =>
   `${offered} passed and can be certified. To start a certification run in RESO's cloud at the end of a run like this one, add --start-cloud-run.`;
 
@@ -116,28 +109,27 @@ export const cloudRunHint = (offered: number): string =>
 export const formatNotOffered = (notOffered: ReadonlyArray<NotOffered>): string =>
   [`Not sent to RESO's cloud (${notOffered.length}):`, ...notOffered.map(n => `  ✗ ${n.label}: ${n.reason}`)].join('\n');
 
-/** How the choice is made: answered in advance by `--start-cloud-run`, asked in a terminal, or neither. */
+/** How the choice is made: `--start-cloud-run`, given with the run. Nothing waits for an answer. */
 export interface CloudOfferMode {
   readonly startCloudRun: boolean;
-  readonly interactive: boolean;
   /** `--output json`: what was started is printed as JSON, still on stderr, so stdout stays the run's JSON. */
   readonly json: boolean;
 }
 
-/** The offer's side effects, injected so it can be tested without a terminal or a network. */
+/** The offer's side effects, injected so it can be tested without a network. */
 export interface CloudOfferIo {
-  readonly ask: (question: string) => Promise<string>;
   readonly say: (text: string) => void;
   readonly submit: (request: PlannedCloudRequest) => Promise<AcceptedCloudRun>;
 }
 
-export type CloudOfferOutcome = 'none' | 'hinted' | 'declined' | 'started' | 'failed';
+export type CloudOfferOutcome = 'none' | 'hinted' | 'started' | 'failed';
 
 /**
- * Present the choice at the end of a run. Nothing is started without a yes: `--start-cloud-run`, or "y" typed
- * in a terminal. A request the service refuses is reported with its reason, and the others are still sent.
+ * Present the choice at the end of a run. Only `--start-cloud-run` starts anything. Without it, a run with
+ * entries that qualify says how to choose it next time, and nothing waits for input. A request the service
+ * refuses is reported with its reason, and the others are still sent.
  */
-export const offerCloudRun = async (plan: CloudPlan, total: number, mode: CloudOfferMode, io: CloudOfferIo): Promise<CloudOfferOutcome> => {
+export const offerCloudRun = async (plan: CloudPlan, mode: CloudOfferMode, io: CloudOfferIo): Promise<CloudOfferOutcome> => {
   if (plan.offered === 0) {
     if (mode.startCloudRun) {
       io.say('No entry passed and can be certified, so no cloud run was started.');
@@ -145,15 +137,11 @@ export const offerCloudRun = async (plan: CloudPlan, total: number, mode: CloudO
     }
     return 'none';
   }
-  if (!mode.startCloudRun && !mode.interactive) {
+  if (!mode.startCloudRun) {
     io.say(cloudRunHint(plan.offered));
     return 'hinted';
   }
   if (plan.notOffered.length > 0) io.say(formatNotOffered(plan.notOffered));
-  if (!mode.startCloudRun && !isYes(await io.ask(cloudRunQuestion(plan.offered, total)))) {
-    io.say('No cloud run was started.');
-    return 'declined';
-  }
 
   const sent = await plan.requests.reduce<Promise<ReadonlyArray<boolean>>>(async (done, request) => {
     const previous = await done;

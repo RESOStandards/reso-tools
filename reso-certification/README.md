@@ -198,6 +198,30 @@ All three identifiers appear in the output path as `{providerUoi}-{providerUsi}/
 
 See [`sample-configs/`](sample-configs/README.md) for a downloadable sample per endorsement and the full field reference.
 
+## Cloud Runs
+
+A cloud run tests your server from RESO's cloud, with RESO's own copy of the tests. It is the run that certifies.
+A cloud run starts only at the end of a local run that passed. Run locally with a config file and add
+`--start-cloud-run`:
+
+```bash
+reso-cert core --config providers.json --start-cloud-run
+reso-cert cloud status --in-progress
+```
+
+- **Only entries that passed and can be certified are sent.** The others are listed with the reason.
+- **Each entry is sent as it ran**, including any flag that changed it, such as `--auth-token` or
+  `--field-overrides`, with a record of the local run that passed.
+- **Without `--start-cloud-run`, nothing is sent.** A run with entries that could go prints how to send them next
+  time.
+- **`concurrency`** at the top of the config file tells RESO's cloud how many recipients your API can take at
+  once.
+- **`reso-cert cloud status`** lists your cloud runs and where each stands, with `--json` for scripts.
+
+Cloud runs cover Web API Core. They sign in with the same `TOKEN_URI`, `CLIENT_ID` and
+`CLIENT_SECRET` from your credentials file as the Variations Service (see [Authentication](#authentication)). The
+[CLI reference](src/cli/README.md#cloud-runs) has the details.
+
 ## Metadata Report Utilities
 
 ### `reso-cert metadata-report adapt`
@@ -264,7 +288,7 @@ The variable is an explicit switch. Without it the SDK calls the HTTP service ex
 |------|---------|
 | 0 | All scenarios passed |
 | 1 | One or more scenarios failed |
-| 2 | Runtime error |
+| 2 | Runtime error, including a cloud run RESO's service refused |
 
 ## Docker
 
