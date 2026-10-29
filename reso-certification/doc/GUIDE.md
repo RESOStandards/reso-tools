@@ -15,7 +15,7 @@ Anyone who needs to know whether a RESO server passes the certification tests. R
 * **Test engineers** who want a single source of truth for "is this thing actually conformant"
 * **AI agents and automation tools** that need to verify a server's behavior end to end as part of a larger workflow
 
-The package covers four endorsements: **Add/Edit (RCP-010)**, **EntityEvent (RCP-027)**, **Web API Core 2.1.0** and **Data Dictionary 2.1**. The same tests RESO runs in the official certification process, available as a CLI, an SDK and a Docker target. It also checks **RESO Common Format (RCF)** data files against the Data Dictionary, with no server involved.
+The package covers these endorsements: **Add/Edit (RCP-010)**, **EntityEvent (RCP-027)**, **Web API Core 2.1.0**, **Data Dictionary 2.1** and **RESO Common Format (RCF)**. The same tests RESO runs in the official certification process, available as a CLI, an SDK and a Docker target.
 
 ## Install
 
@@ -64,9 +64,9 @@ You go from "I have a RESO server URL" to "I know exactly which scenarios pass a
 
 ---
 
-## The Four Endorsements
+## Endorsements
 
-The toolkit ships four cert flows, one per endorsement RESO certifies. They share the same CLI shape, the same auth resolution and the same output formats – the only thing that changes is which subcommand you run and what it tests.
+The toolkit ships one cert flow per endorsement RESO certifies. Those that test a server share the same CLI shape, the same auth resolution and the same output formats – the only thing that changes is which subcommand you run and what it tests. RESO Common Format tests files instead of a server, so it takes `--input` where they take `--url`.
 
 ### Web API Core 2.1.0
 
@@ -174,9 +174,7 @@ reso-cert entity-event --url https://api.example.com --auth-token TOKEN --mode f
 
 The full polling-replication consumer pattern – how to read the feed, how to disambiguate creates from updates from deletes, how to handle the empty-result-on-follow-up-fetch case – is walked through end to end in Section 4 of the **[RESO MCP Server guide](../reso-mcp-server/)** with verbatim tool calls and responses against the **[RESO Reference Server](../reso-reference-server/)**.
 
----
-
-## Testing RESO Common Format Data
+### RESO Common Format (RCF)
 
 RESO Common Format (RCF) data arrives as files of records, with no server and no `$metadata` behind it. `reso-cert rcf` checks those files against the Data Dictionary. It reads the records and works out a metadata report and a data-availability report from them. Then it checks the report for variations: local names that look like near-misses of a standard one.
 
@@ -214,7 +212,7 @@ What it found:
 
 The variations check uses your RESO services credentials, the `credentials.env` the certification site gives you (see [Authentication](#authentication)). `--skip-variations` runs without them and leaves the check out.
 
-### What the Run Writes
+#### What the Run Writes
 
 `rcf` writes straight into `--output-dir`:
 
@@ -224,7 +222,7 @@ The variations check uses your RESO services credentials, the `credentials.env` 
 
 What each file contains is in [Reading a Certification Run](RUN-REFERENCE.md#reso-common-format-rcf).
 
-### Submitting the Variations for Review
+#### Submitting the Variations for Review
 
 Name your organization, your system and the recipient, and `rcf` also writes `variations-report.json`, the file `submit-variations-report` sends to start a review:
 
@@ -237,7 +235,7 @@ reso-cert submit-variations-report --report out/variations-report.json
 * **The three go together**, because a review is filed under a provider, a system and a recipient. With only some of them the run stops before it starts and names the ones that are missing.
 * **`variations-report.json` is written only when there are variations.** With none, there is nothing to review.
 
-### Checking Records Against the Data Dictionary Types
+#### Checking Records Against the Data Dictionary Types
 
 ```bash
 reso-cert rcf --input property.json --output-dir out --schema-validate
@@ -245,11 +243,11 @@ reso-cert rcf --input property.json --output-dir out --schema-validate
 
 `--schema-validate` checks each record against the Data Dictionary. RCF is extensible, so local fields and local values are accepted. A field the Data Dictionary defines has to have the right type, though: a `ListPrice` of `"three eighty-nine"` is an error. The run prints how many errors it found and exits with `1`. `--strict` stops at the first one.
 
-### Which Data Dictionary Version
+#### Which Data Dictionary Version
 
 `--dd-version` when you give it. Otherwise the version in the files' `@reso.context`, which is 2.1 in the sample, and 2.0 when neither says.
 
-### Exit Codes for `rcf`
+#### Exit Codes for `rcf`
 
 | Code | Meaning |
 |---|---|
@@ -317,11 +315,13 @@ A minimal file needs five things: the organization being certified, and then per
 }
 ```
 
-### One File Runs Three of the Four Endorsements
+### One File Runs Data Dictionary, Web API Core and EntityEvent
 
 **Data Dictionary, Web API Core and EntityEvent all run from that same entry**, with no additions. Every option specific to those endorsements has a default, so the file above works for all three and only the command changes.
 
 **Add/Edit is the exception.** It creates, updates and deletes records, so it has to know what a valid and an invalid record look like for the server under test. Give it `payloads` inline or point it at a directory with `payloadsDir`. Without either it will try to sample the server to build them, which often works but cannot always succeed – an update or delete payload with no key field, and no create payload to chain from, leaves it nothing to act on.
+
+**RESO Common Format takes no entry.** It reads files, so it takes `--input` and needs no server.
 
 ### Scoping a Multi-Tenant Feed
 
