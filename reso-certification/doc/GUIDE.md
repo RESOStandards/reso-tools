@@ -363,6 +363,69 @@ A downloadable sample for each endorsement, with the full field reference, is in
 
 ---
 
+## Running in RESO's Cloud
+
+Testing on your own machine is how you get a server ready. The run that certifies happens in RESO's cloud, with RESO's own copy of the tests, so its result does not depend on anyone's machine.
+
+A cloud run starts from a local run that passed, and there is no other way to start one. Run the local tests from a config file with `--start-cloud-run`. At the end, the CLI sends every entry that passed and can be certified:
+
+```bash
+reso-cert core --config providers.json --start-cloud-run
+```
+
+```
+✔ Feed one – 219 passed, 0 failed, 112 skipped (1.5s)
+✖ Feed two – 2 passed, 3 failed (20.0s)
+Not sent to RESO's cloud (1):
+  ✗ Feed two: it failed
+Started Web API Core 2.1.0 in RESO's cloud for T00000000.
+Request: test-T00000000-1700000000000
+Recipients (1):
+  M00000000, system 99999
+Follow it with: reso-cert cloud status --in-progress
+```
+
+### What Is Sent
+
+Each entry goes as it ran: its server, its credential, its originating-system scope and its Core options, including any flag that changed them for the local run, such as `--auth-token` or `--field-overrides`. With it goes a record of the local run that passed: the server it tested, the versions, when it ran and its verdict. The credentials travel to RESO's service with the request, and the CLI never prints them.
+
+An entry that failed, stopped before producing a result or cannot be certified is listed with the reason and not sent.
+
+Without `--start-cloud-run`, nothing is sent. A run with entries that could go says how to send them next time:
+
+```
+1 passed and can be certified. To start a certification run in RESO's cloud at the end of a run like this one, add --start-cloud-run.
+```
+
+`--start-cloud-run` needs `--config`, because a cloud run is addressed to the provider, system and recipient a config file names.
+
+### How Many at Once
+
+A config file can tell RESO's cloud how many recipients your API can take at once:
+
+```json
+{
+  "providerUoi": "T00000000",
+  "concurrency": 25,
+  "configs": [ ... ]
+}
+```
+
+It has to be a positive whole number. Your own machine runs a config's entries one at a time either way.
+
+### Following a Cloud Run
+
+```bash
+reso-cert cloud status --in-progress
+reso-cert cloud status --since 2026-10-29T00:00:00Z --json
+```
+
+There is one line per recipient of each run: its status (`scheduled`, `running`, `passed`, `failed` or `error`), when that last changed, the report once one is published, and the error or the step it is on.
+
+Cloud runs cover Web API Core. They sign in with the `TOKEN_URI`, `CLIENT_ID` and `CLIENT_SECRET` from your credentials file, the same as the variations commands. If RESO's service refuses a request, the CLI prints its reason and exits `2`.
+
+---
+
 ## Choosing the Output Format
 
 The default output is a progress display with spinners – good for interactive runs where a human is watching. For everything else, there are three other formats:
@@ -536,7 +599,7 @@ The CLI uses three exit codes so scripts and CI pipelines can branch on the resu
 |---|---|
 | `0` | All scenarios passed |
 | `1` | One or more scenarios failed (the cert run completed; some checks did not pass) |
-| `2` | Runtime error (the cert run could not complete; the network failed, the server was unreachable, the metadata could not be parsed) |
+| `2` | Runtime error (the cert run could not complete; the network failed, the server was unreachable, the metadata could not be parsed), or RESO's service refused a cloud run |
 
 With a config file, one entry whose run could not complete makes the command exit `2`, whatever the other entries did. The CLI lists those entries, with the reason, after the run.
 

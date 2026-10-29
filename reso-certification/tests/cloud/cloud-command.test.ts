@@ -4,10 +4,8 @@ import {
   type CloudOfferMode,
   type RanEntry,
   cloudRunHint,
-  cloudRunQuestion,
   formatAcceptedRun,
   formatRunStatusTable,
-  isYes,
   offerCloudRun,
   planCloudRequests
 } from '../../src/cli/cloud-command.js';
@@ -16,7 +14,7 @@ import type { CoreConfig, PipelineResult } from '../../src/sdk/types.js';
 
 /**
  * The cloud-run choice at the end of a local run: only entries that passed and can be certified are offered,
- * nothing starts without a yes, and the lines the CLI prints.
+ * nothing starts without `--start-cloud-run`, nothing waits for input, and the lines the CLI prints.
  *
  * Identities and credentials here are synthetic.
  */
@@ -110,15 +108,6 @@ describe('planCloudRequests', () => {
   });
 });
 
-describe('the question and the answer', () => {
-  it('asks with no as the default, and takes only an explicit yes', () => {
-    expect(cloudRunQuestion(2, 3)).toBe("2 of 3 passed and can be certified. Start a certification run in RESO's cloud for them? [y/N] ");
-    expect(cloudRunQuestion(1, 1)).toContain('for it?');
-    for (const yes of ['y', 'Y', 'yes', ' YES ']) expect(isYes(yes)).toBe(true);
-    for (const other of ['', 'n', 'no', 'yep', 'sure', 'y y']) expect(isYes(other)).toBe(false);
-  });
-});
-
 describe('offerCloudRun', () => {
   const accepted = (version: string): AcceptedCloudRun => ({
     certificationRequestId: `test-T00000000-${version}`,
@@ -128,10 +117,9 @@ describe('offerCloudRun', () => {
     recipients: [{ recipientUoi: 'M00000000', providerUsi: '99999' }]
   });
 
-  const io = (answer = '') => {
+  const io = () => {
     const said: Array<string> = [];
     const calls: CloudOfferIo = {
-      ask: vi.fn(async () => answer),
       say: text => {
         said.push(text);
       },
@@ -140,36 +128,20 @@ describe('offerCloudRun', () => {
     return { calls, said };
   };
 
-  const mode = (over: Partial<CloudOfferMode> = {}): CloudOfferMode => ({ startCloudRun: false, interactive: false, json: false, ...over });
+  const mode = (over: Partial<CloudOfferMode> = {}): CloudOfferMode => ({ startCloudRun: false, json: false, ...over });
 
   const onePassed = planCloudRequests('T00000000', undefined, [ran('Feed one', 'M00000000', passed)], NOW);
 
-  it('starts without asking when --start-cloud-run answered in advance', async () => {
+  it('starts the run with --start-cloud-run', async () => {
     const { calls, said } = io();
-    await expect(offerCloudRun(onePassed, 1, mode({ startCloudRun: true }), calls)).resolves.toBe('started');
-    expect(calls.ask).not.toHaveBeenCalled();
+    await expect(offerCloudRun(onePassed, mode({ startCloudRun: true }), calls)).resolves.toBe('started');
     expect(calls.submit).toHaveBeenCalledOnce();
     expect(said.join('\n')).toContain('Request: test-T00000000-2.1.0');
   });
 
-  it('asks in a terminal, and starts on a yes', async () => {
-    const { calls } = io('y');
-    await expect(offerCloudRun(onePassed, 1, mode({ interactive: true }), calls)).resolves.toBe('started');
-    expect(calls.ask).toHaveBeenCalledWith(cloudRunQuestion(1, 1));
-    expect(calls.submit).toHaveBeenCalledOnce();
-  });
-
-  it('starts nothing on anything but a yes', async () => {
-    const { calls, said } = io('');
-    await expect(offerCloudRun(onePassed, 1, mode({ interactive: true }), calls)).resolves.toBe('declined');
-    expect(calls.submit).not.toHaveBeenCalled();
-    expect(said).toContain('No cloud run was started.');
-  });
-
-  it('says how to choose it when nothing can be asked, and starts nothing', async () => {
+  it('without --start-cloud-run, says how to choose it next time and starts nothing', async () => {
     const { calls, said } = io();
-    await expect(offerCloudRun(onePassed, 1, mode(), calls)).resolves.toBe('hinted');
-    expect(calls.ask).not.toHaveBeenCalled();
+    await expect(offerCloudRun(onePassed, mode(), calls)).resolves.toBe('hinted');
     expect(calls.submit).not.toHaveBeenCalled();
     expect(said).toEqual([cloudRunHint(1)]);
   });
@@ -178,11 +150,11 @@ describe('offerCloudRun', () => {
     const nonePassed = planCloudRequests('T00000000', undefined, [ran('Feed one', 'M00000000', { ...passed, status: 'failed' })], NOW);
 
     const quiet = io();
-    await expect(offerCloudRun(nonePassed, 1, mode({ interactive: true }), quiet.calls)).resolves.toBe('none');
+    await expect(offerCloudRun(nonePassed, mode(), quiet.calls)).resolves.toBe('none');
     expect(quiet.said).toEqual([]);
 
     const asked = io();
-    await expect(offerCloudRun(nonePassed, 1, mode({ startCloudRun: true }), asked.calls)).resolves.toBe('none');
+    await expect(offerCloudRun(nonePassed, mode({ startCloudRun: true }), asked.calls)).resolves.toBe('none');
     expect(asked.said[0]).toBe('No entry passed and can be certified, so no cloud run was started.');
     expect(asked.calls.submit).not.toHaveBeenCalled();
   });
@@ -203,7 +175,7 @@ describe('offerCloudRun', () => {
       })
     };
 
-    await expect(offerCloudRun(twoVersions, 2, mode({ startCloudRun: true }), refusing)).resolves.toBe('failed');
+    await expect(offerCloudRun(twoVersions, mode({ startCloudRun: true }), refusing)).resolves.toBe('failed');
     expect(refusing.submit).toHaveBeenCalledTimes(2);
     expect(said).toContain('Error: Certification runs cannot be started here yet.');
     expect(said.join('\n')).toContain('Request: test-T00000000-2.0.0');
@@ -211,7 +183,7 @@ describe('offerCloudRun', () => {
 
   it('prints what was started as JSON with --output json', async () => {
     const { calls, said } = io();
-    await offerCloudRun(onePassed, 1, mode({ startCloudRun: true, json: true }), calls);
+    await offerCloudRun(onePassed, mode({ startCloudRun: true, json: true }), calls);
     expect(JSON.parse(said[0])).toEqual(accepted('2.1.0'));
   });
 });
