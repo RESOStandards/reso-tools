@@ -2,6 +2,7 @@
  * MCP tool handlers — implement each tool by calling SDK functions.
  */
 
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -577,8 +578,19 @@ export const handleParseFilter = async (args: Record<string, unknown>): Promise<
  * Where compliance runs write their reports: a directory under the system temp dir, never the
  * server's working directory. An MCP host starts the server wherever it likes, often `/`, and
  * the SDK's default there (`<cwd>/.reso-cert`) failed before a single test ran.
+ *
+ * One directory per server process, made by `mkdtemp`: a fresh name, owned by this user and
+ * readable by no one else. A fixed name under a shared temp dir could be created first by
+ * another user on the machine, and every report would then land in a directory they control.
+ * Made on the first run, so starting the server creates nothing.
  */
-const REPORTS_DIR = join(tmpdir(), 'reso-mcp-server');
+const reportsDir = ((): (() => string) => {
+  let dir: string | undefined;
+  return () => {
+    dir ??= mkdtempSync(join(tmpdir(), 'reso-mcp-server-'));
+    return dir;
+  };
+})();
 
 export const handleRunCompliance = async (args: Record<string, unknown>): Promise<HandlerResult> => {
   const { endorsement, url, resource, version, mode, resources } = args as {
@@ -595,7 +607,7 @@ export const handleRunCompliance = async (args: Record<string, unknown>): Promis
 
   const buildConfig = (): ComplianceConfig => {
     const server = { url, auth };
-    const options = { outputDir: REPORTS_DIR };
+    const options = { outputDir: reportsDir() };
 
     switch (endorsement) {
       case 'add-edit':
