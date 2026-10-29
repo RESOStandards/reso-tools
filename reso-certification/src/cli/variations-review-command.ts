@@ -6,23 +6,10 @@
  */
 
 import type { EndorsementStatusRow, VariationReviewItem } from '../variations/review.js';
+import { cell, renderTable } from './table.js';
 
 /** The variation key joins its segments with the unit separator; show it as dots. */
 const KEY_SEPARATOR = '';
-
-const cell = (value: unknown): string => (value === undefined || value === null || value === '' ? '-' : String(value));
-
-const pad = (value: string, width: number): string => value.padEnd(width);
-
-const renderTable = (headers: ReadonlyArray<string>, rows: ReadonlyArray<ReadonlyArray<string>>): string => {
-  const widths = headers.map((h, i) => Math.max(h.length, ...rows.map(r => r[i].length)));
-  const line = (cells: ReadonlyArray<string>): string =>
-    cells
-      .map((c, i) => pad(c, widths[i]))
-      .join('  ')
-      .trimEnd();
-  return [line(headers), line(widths.map(w => '-'.repeat(w))), ...rows.map(line)].join('\n');
-};
 
 /** `Property.Roof.Corrugated` from the pool's separator-joined key. */
 export const displayVariationKey = (variationKey: string): string => variationKey.split(KEY_SEPARATOR).join('.');

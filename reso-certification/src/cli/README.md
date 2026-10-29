@@ -49,7 +49,7 @@ environment a command will write to, look at the host in `TOKEN_URI`.
 
 | Variable | Used by | What it is |
 |---|---|---|
-| `RESO_SERVICES_URL` | `find-variations`, `rcf`, `update-variations`, the variations-review commands | Base URL of the Variations Service. Same for every environment. |
+| `RESO_SERVICES_URL` | `find-variations`, `rcf`, `update-variations`, the variations-review commands, the `cloud` commands | Base URL of RESO's services, the Variations Service and cloud runs. Same for every environment. |
 | `TOKEN_URI` | the same commands | OAuth2 token endpoint. **This is what selects QA versus production.** |
 | `CLIENT_ID`, `CLIENT_SECRET` | the same commands | OAuth2 client credentials the token is minted from. |
 | `FT_ADMIN_SECRET` | `update-variations --fast-track` | Fast Track admin credential. A fast-track submission is refused without it, before any request is made. |
@@ -86,6 +86,8 @@ different thing from the RESO service credentials above.
 | [`submit-variation-decisions`](#submit-variation-decisions) | Mark a report from a sheet of actions and comments, and submit it |
 | [`list-variation-reviews`](#list-variation-reviews) | The variations in review – yours as a provider, the whole pool as an admin (read-only) |
 | [`variations-review-status`](#variations-review-status) | Where each variations submission stands (read-only) |
+| [`cloud core`](#cloud-core) | Start a Web API Core run in RESO's cloud from a config file |
+| [`cloud status`](#cloud-status) | Your cloud runs and where each stands (read-only) |
 | [`restore`](#restore) | Restore a certification server backup to a Cert API (admin) |
 
 The first four are **endorsement runners** (a full compliance pipeline against a live
@@ -526,6 +528,40 @@ reso-cert variations-review-status --review-status in-review   # admin: every pr
 ```
 
 `--review-status <none|in-review|resolved>` (admin queue instead of your own) · `--json`.
+
+## Cloud runs
+
+A cloud run happens in RESO's cloud rather than on your machine. It reads the same config file a
+local run reads (see [Config-file mode](#config-file-mode)) and uses the same auth as the variations
+commands: an OAuth2 client-credentials token from `.env`, falling back to the `CERT_AUTH_API_*`
+provider-token mint. RESO's service decides what it accepts, and a refusal prints its reason.
+
+### `cloud core`
+Starts a Web API Core run and returns as soon as RESO has recorded it, with the request id and one
+line per recipient. Follow it with `cloud status`.
+
+```bash
+reso-cert cloud core --config providers.json
+reso-cert cloud core --config providers.json --spec-version 2.0.0 --json
+```
+
+`--config <path>` (required; every entry runs) · `--spec-version <2.0.0|2.1.0>` (default: the
+current version) · `--json`. The file must name its `providerUoi`, the organization the run
+certifies. The credentials in the file go to RESO's service with the request. The CLI never prints
+them, and a file that is not valid JSON is refused without quoting it.
+
+### `cloud status`
+Your cloud runs, newest change first. One line per recipient of each run: its status, when that last
+changed, the report once one is published, and the error or the step it is on.
+
+```bash
+reso-cert cloud status --in-progress
+reso-cert cloud status --since 2026-10-29T00:00:00Z --status failed,error
+```
+
+`--since <time>` (an ISO timestamp or epoch milliseconds) · `--status <list>` (any of `scheduled`,
+`running`, `passed`, `failed` and `error`) · `--in-progress` (`scheduled` or `running`; not with
+`--status`) · `--limit <n>` · `--json` (the rows exactly as the service returned them).
 
 ## Config-file mode
 
