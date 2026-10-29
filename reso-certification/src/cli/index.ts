@@ -56,6 +56,7 @@ import { formatPlan, planDecisionPush } from './decisions-command.js';
 import { overrideRenameNotice, removedPreferFields } from './deprecations.js';
 import { runMetadataStep } from './metadata-command.js';
 import {
+  RCF_DEFAULT_DD_VERSION,
   SUBMITTABLE_REPORT_FILENAME,
   readRcfReportIdentity,
   resolveRcfExitCode,
@@ -1347,7 +1348,7 @@ program
   .requiredOption('-i, --input <path>', 'RCF input: a .json file, a .zip or a directory of payloads/records')
   // `--dd-version`, not `-v, --version`: the program's own version flag wins over a subcommand's,
   // so the old spelling printed the package version and exited 0 without ever running the command.
-  .option('--dd-version <ver>', `DD version. Without it, the first payload's @reso.context decides, else ${CURRENT_DD_VERSION}`)
+  .option('--dd-version <ver>', `DD version. Without it, the first payload's @reso.context decides, else ${RCF_DEFAULT_DD_VERSION}`)
   .option('-f, --fuzziness <float>', `Variations fuzzy-match threshold (0–1, default ${DEFAULT_FUZZINESS})`, String(DEFAULT_FUZZINESS))
   .option('--output-dir <path>', 'Directory for the reports (created if missing)', '.')
   .option(
