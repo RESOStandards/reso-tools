@@ -169,7 +169,7 @@ reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2
 | `--originating-system-name <v>` | – | Scope resource queries to `OriginatingSystemName eq <v>` (multi-tenant providers) |
 | `--originating-system-id <v>` | – | Scope by `OriginatingSystemID` instead. Used only when no name is given |
 | `--save-payloads <dir>` | *(off)* | Write every request and response to `<dir>`. See below. |
-| `--start-cloud-run` | – | At the end, start a certification run in RESO's cloud for the entries that passed and can be certified, without asking. Needs `--config`. See [Cloud runs](#cloud-runs). |
+| `--start-cloud-run` | – | At the end, start a certification run in RESO's cloud for the entries that passed and can be certified. Needs `--config`. See [Cloud runs](#cloud-runs). |
 
 Provide one of `--url` or `--config`.
 
@@ -536,11 +536,9 @@ only at the end of a local run that passed, never on its own. The cloud run is t
 
 **At the end of `core --config`**, when at least one entry passed and can be certified:
 
-- In a terminal, the CLI asks: `2 of 3 passed and can be certified. Start a certification run in RESO's cloud
-  for them? [y/N]`. Only `y` or `yes` starts anything.
-- `--start-cloud-run` answers yes in advance, for scripts and agents. It still sends only the entries that
-  passed and can be certified.
-- With neither, the CLI prints one line saying how to choose it.
+- With `--start-cloud-run`, the CLI sends those entries.
+- Without it, nothing is sent, and the CLI prints one line saying how to send them next time. Nothing waits for
+  input.
 
 Entries that failed, stopped or cannot be certified are listed with the reason and never sent. What is sent is
 each entry as it ran: its server, its credential and its options, including any flag that changed them, such as
@@ -549,9 +547,9 @@ service with the request and are never printed. Messages go to stderr, so with `
 run's own JSON, and what was started is printed as JSON there too.
 
 A cloud run is addressed to the provider, system and recipient a config file names, so `--start-cloud-run` needs
-`--config`. The config file's `concurrency` says how many recipients your API can take at once, which is how many
-the cloud runs together. Sign-in is the same as the variations commands: an OAuth2 client-credentials token from
-`.env`, falling back to the `CERT_AUTH_API_*` provider-token mint.
+`--config`. The config file's `concurrency` tells RESO's cloud how many recipients your API can take at once.
+Sign-in is the same as the variations commands: an OAuth2 client-credentials token from `.env`, falling back to
+the `CERT_AUTH_API_*` provider-token mint.
 
 If RESO's service refuses a request, its reason is printed and the exit code is `2`, even when every local run
 passed.
@@ -577,5 +575,5 @@ per-entry overrides). See the sample configs under
 [`sample-configs/`](../../sample-configs/).
 
 An optional top-level `concurrency` says how many recipients your API can be tested against at once. The CLI
-runs its entries one at a time either way; a [cloud run](#cloud-runs) runs that many together. It must be a
+runs its entries one at a time either way, and a [cloud run](#cloud-runs) sends it to RESO's cloud. It must be a
 positive whole number.

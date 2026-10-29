@@ -20,7 +20,6 @@ import { ENV_BOOTSTRAP } from './env-bootstrap.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
-import { createInterface } from 'node:readline/promises';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { Command } from 'commander';
 import { startMockServer, stopMockServer } from '../add-edit/mock/server.js';
@@ -437,8 +436,8 @@ entityEventCmd.action(
 // ── Web API Core Subcommand ──
 
 /**
- * The CLI's side of the cloud-run choice. It asks and reports on stderr, so stdout stays the run's own output,
- * and sends with the variations commands' auth, minted once and only if something is sent.
+ * The CLI's side of the cloud-run choice. It reports on stderr, so stdout stays the run's own output, and sends
+ * with the variations commands' auth, minted once and only if something is sent.
  */
 const cliCloudOfferIo = (): CloudOfferIo => {
   const held: { token?: Promise<string | undefined> } = {};
@@ -447,14 +446,6 @@ const cliCloudOfferIo = (): CloudOfferIo => {
     return held.token;
   };
   return {
-    ask: async question => {
-      const terminal = createInterface({ input: process.stdin, output: process.stderr });
-      try {
-        return await terminal.question(question);
-      } finally {
-        terminal.close();
-      }
-    },
     say: text => console.error(maskSecrets(text)),
     submit: async request => {
       const bearerToken = await token();
@@ -500,8 +491,8 @@ const coreCmd = program
   .option('--prefer-fields <list>', 'Removed – use --field-overrides (see the message it prints).')
   .option(
     '--start-cloud-run',
-    "At the end, start a certification run in RESO's cloud for the entries that passed and can be certified, " +
-      'without asking. Needs --config. In a terminal, the CLI asks instead'
+    "At the end, start a certification run in RESO's cloud for the entries that passed and can be certified. " +
+      'Needs --config. Without it, nothing is started'
   );
 
 addAuthOptions(coreCmd);
@@ -659,12 +650,7 @@ coreCmd.action(
         const plan = planCloudRequests(ranForCloud.providerUoi, ranForCloud.concurrency, ranForCloud.ran);
         const offered = await offerCloudRun(
           plan,
-          ranForCloud.ran.length,
-          {
-            startCloudRun: opts.startCloudRun === true,
-            interactive: renderMode !== 'silent' && process.stdin.isTTY === true,
-            json: opts.output === 'json'
-          },
+          { startCloudRun: opts.startCloudRun === true, json: opts.output === 'json' },
           cliCloudOfferIo()
         );
         // The local runs may have passed, but what was asked for did not happen: a runtime error.
@@ -1006,7 +992,7 @@ program
 // ── Cloud runs ──
 //
 // Where each run in RESO's cloud stands. A cloud run is started only at the end of a local run that passed
-// (`core --start-cloud-run`, or a yes in a terminal), never on its own. Auth as the variations commands: an
+// (`core --start-cloud-run`), never on its own. Auth as the variations commands: an
 // OAuth2 client_credentials token from .env (TOKEN_URI / CLIENT_ID / CLIENT_SECRET), falling back to the
 // CERT_AUTH_API_* provider-token mint.
 
