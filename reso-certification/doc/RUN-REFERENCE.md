@@ -70,12 +70,14 @@ report written mid-flight.
 
 Same first three steps, then:
 
-4. **Sample records** – reads existing records to build realistic payloads. Omitted when payloads
-   were supplied.
-5. **Generate payloads** – writes the six payload files it is about to use.
-6. **Run Add/Edit scenarios** – exercises create, update, and delete, in both the succeeding and the
-   correctly-rejected direction.
-7. **Write reports**
+4. **Sample records** – only with auto payloads, when an update or a delete is tested without a
+   create to make the record. Reads two records by the resource's own key.
+5. **Generate payloads** – checks the provider's payloads for the actions tested, or writes auto ones.
+   A run given no payloads, or given them two ways, fails here, and nothing is written to the server.
+6. **Run Add/Edit scenarios** – the actions and formats chosen, each in the succeeding and the
+   correctly-rejected direction. Its parameters say what was tested. An update or a delete that names
+   no record uses one the run created.
+7. **Write reports** – the summary's remarks say what was tested, or why no test ran.
 
 ### EntityEvent
 

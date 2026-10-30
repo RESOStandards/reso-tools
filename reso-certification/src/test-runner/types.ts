@@ -28,6 +28,10 @@ export interface TestConfig {
   readonly metadataPath?: string;
   /** If true, start mock server instead of hitting real server */
   readonly useMock?: boolean;
+  /** Add/Edit: the actions to test. Absent: create, update and delete. */
+  readonly actions?: ReadonlyArray<string>;
+  /** Add/Edit: the formats to test, by action. An action left out tests both. */
+  readonly formats?: Readonly<Record<string, ReadonlyArray<string>>>;
 }
 
 // ── Metadata ──

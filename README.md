@@ -105,8 +105,8 @@ The root `package.json` provides convenience scripts for linting, typechecking a
 Test any RESO OData server from the command line:
 
 ```bash
-# Add/Edit
-reso-cert add-edit --url http://localhost:8080 --auth-token TOKEN
+# Add/Edit (the reference server, so the tool writes the payloads; elsewhere give yours with --payloads)
+reso-cert add-edit --url http://localhost:8080 --auth-token TOKEN --auto-payloads
 
 # EntityEvent
 reso-cert entity-event --url http://localhost:8080 --auth-token TOKEN

@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import type { AddEditAction, AddEditFormats } from '../add-edit/plan.js';
 import type { AuthConfig } from '../test-runner/types.js';
 import { coerceCoreVersion } from './core-versions.js';
 import { coerceDDVersion } from './dd-versions.js';
@@ -59,6 +60,12 @@ interface ConfigAddEditOptions {
   readonly resource?: string;
   readonly specVersion?: string;
   readonly payloadsDir?: string;
+  /** The actions to test. Absent: create, update and delete. */
+  readonly actions?: ReadonlyArray<AddEditAction>;
+  /** The formats to test, by action. An action left out tests both. */
+  readonly formats?: AddEditFormats;
+  /** Write the payloads instead of taking them from the provider. Property only. */
+  readonly autoPayloads?: boolean;
 }
 interface ConfigEntityEventOptions {
   readonly mode?: 'observe' | 'full';
@@ -317,6 +324,10 @@ export const configEntryToAddEdit = (entry: ConfigEntry, providerUoi: string): A
   ...((entry.addEditOptions?.payloadsDir ?? entry.payloadsDir)
     ? { payloadsDir: entry.addEditOptions?.payloadsDir ?? entry.payloadsDir }
     : {}),
+  ...(entry.payloads ? { payloads: entry.payloads } : {}),
+  ...(entry.addEditOptions?.actions ? { actions: entry.addEditOptions.actions } : {}),
+  ...(entry.addEditOptions?.formats ? { formats: entry.addEditOptions.formats } : {}),
+  ...(entry.addEditOptions?.autoPayloads ? { autoPayloads: true } : {}),
   // The three identifiers `buildOutputPath` reads off the config. They were used here only to
   // compose `outputDir`, so the nested path fell back to LOCAL placeholders on every run even
   // when the config declared them -- and the LOCAL providerUoi carries a timestamp, so each run
@@ -431,75 +442,3 @@ export const configEntryToDD = (entry: ConfigEntry, providerUoi: string): DDConf
     outputDir: `.reso-cert/${providerUoi}/${entry.recipientUoi}-${entry.providerUsi}/dd`
   }
 });
-
-// ── Key Chaining ──
-
-/** Payload set with resolved keys for Add/Edit testing. */
-export interface ResolvedPayloads {
-  readonly createSucceeds: Record<string, unknown>;
-  readonly createFails: Record<string, unknown>;
-  readonly updateSucceeds: Record<string, unknown>;
-  readonly updateFails: Record<string, unknown>;
-  readonly deleteSucceeds: Record<string, unknown>;
-  readonly deleteFails: Record<string, unknown>;
-  readonly keyChained: boolean;
-}
-
-/**
- * Resolve payload keys for Add/Edit testing.
- *
- * If update/delete payloads are missing keys and a create payload exists,
- * the created record's key will be injected at runtime by the pipeline.
- *
- * If no create payload and no key on update/delete, throws an error.
- */
-export const resolvePayloadKeys = (payloads: ConfigPayloads, keyField: string, createdKey?: string): ResolvedPayloads => {
-  const hasCreate = !!payloads.createSucceeds && Object.keys(payloads.createSucceeds).length > 0;
-
-  const updateSucceeds = { ...payloads.updateSucceeds };
-  const updateFails = { ...payloads.updateFails };
-  const deleteFails = payloads.deleteFails ?? { id: '00000000-0000-0000-0000-000000000000' };
-
-  let keyChained = false;
-
-  // Resolve update keys
-  if (updateSucceeds && !(keyField in updateSucceeds)) {
-    if (createdKey) {
-      (updateSucceeds as Record<string, unknown>)[keyField] = createdKey;
-      keyChained = true;
-    } else if (!hasCreate) {
-      throw new Error(`Update payload missing "${keyField}" and no Create step to chain from. Provide a key or add a Create payload.`);
-    }
-    // If hasCreate but no createdKey yet, the pipeline will inject it after the create step
-  }
-
-  if (updateFails && !(keyField in updateFails)) {
-    if (createdKey) {
-      (updateFails as Record<string, unknown>)[keyField] = createdKey;
-      keyChained = true;
-    } else if (!hasCreate) {
-      throw new Error(`Update (fails) payload missing "${keyField}" and no Create step to chain from.`);
-    }
-  }
-
-  // Resolve delete keys
-  const deletePayload = payloads.deleteSucceeds ?? {};
-  if (!('id' in deletePayload) && !deletePayload[keyField as keyof typeof deletePayload]) {
-    if (createdKey) {
-      (deletePayload as Record<string, unknown>).id = createdKey;
-      keyChained = true;
-    } else if (!hasCreate) {
-      throw new Error(`Delete payload missing key and no Create step to chain from. Provide an "id" or add a Create payload.`);
-    }
-  }
-
-  return {
-    createSucceeds: payloads.createSucceeds ?? {},
-    createFails: payloads.createFails ?? {},
-    updateSucceeds,
-    updateFails,
-    deleteSucceeds: deletePayload,
-    deleteFails,
-    keyChained
-  };
-};

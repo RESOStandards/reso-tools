@@ -148,13 +148,22 @@ The output is a per-resource report showing what passed, what failed and where t
 
 ### Add/Edit (RCP-010)
 
-Create, Update and Delete operations with both `representation` and `minimal` response modes. Eight certification scenarios covering the full RCP-010 surface – successful creates, successful updates, successful deletes, validation failures, the right response headers (`Location`, `Preference-Applied`, `OData-EntityId`), the right annotations (`@odata.context`, `@odata.id`, `@odata.editLink`, `@odata.etag`) and the right error format (`error.code`, `error.message`, `error.details[].target`).
+Create, update and delete. Each action is a test that should succeed and one that should fail, and create and update each answer in two formats, `representation` (the record comes back) and `minimal` (headers only). Up to eight scenarios cover the RCP-010 surface: the successes, the validation failures, the right response headers (`Location`, `Preference-Applied`, `EntityId`), the right annotations (`@odata.context`, `@odata.id`, `@odata.editLink`, `@odata.etag`) and the right error format (`error.code`, `error.message`, `error.details[].target`).
+
+RCP-010 lets a provider implement as many or as few actions as its business needs, so a run tests the ones you choose, and passing those is a pass. The report says what was tested.
 
 ```bash
-reso-cert add-edit --url https://api.example.com --auth-token TOKEN
+# Every action, both formats
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads
+
+# Creates only, headers-only responses
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads \
+  --actions create --create-formats minimal
 ```
 
-The runner generates realistic test payloads automatically. It does not need a static fixture file. It samples your server's metadata, picks values that satisfy the type constraints, runs each scenario and verifies the responses match the spec.
+The payloads are yours, as RCP-010 asks: for each action tested, a record that should succeed and one that should fail, in a folder (`create-succeeds.json`, `create-fails.json`, `update-…`, `delete-…`) or inline in a config file. A folder needs only the files of the actions tested. An update or a delete that names no record uses one the run created, so a run that tests every action leaves your own records alone. A run with no payloads is refused before it writes anything.
+
+On the reference server, `--auto-payloads` has the tool write the payloads instead, for Property.
 
 ### EntityEvent (RCP-027)
 
@@ -623,7 +632,7 @@ Use code `1` to gate a release, code `2` to alert someone that the test infrastr
 * **[Package README](../)** – full CLI flag reference, endorsement details and SDK exports
 * **[Source on GitHub](https://github.com/RESOStandards/reso-tools/tree/main/reso-certification)**
 * **[RCP-010 Add/Edit](https://github.com/RESOStandards/transport/blob/main/proposals/web-api-add-edit.md)** – the spec the Add/Edit cert flow validates
-* **[RCP-027 EntityEvent](https://github.com/RESOStandards/transport/blob/main/proposals/entity-event.md)** – the spec the EntityEvent cert flow validates
+* **[RCP-027 EntityEvent](https://github.com/RESOStandards/transport/blob/main/proposals/entity-events.md)** – the spec the EntityEvent cert flow validates
 * **[RESO Web API Core](https://github.com/RESOStandards/web-api-commander)** – the canonical reference for what Web API Core compliance covers
 * **[RESO Data Dictionary](https://dd.reso.org/)** – the published Data Dictionary the DD cert flow validates against
 * **[DD reference metadata](https://github.com/RESOStandards/reso-tools/tree/main/reso-common/reference-metadata)** – the exact projection of that Dictionary a run compares to, one file per version

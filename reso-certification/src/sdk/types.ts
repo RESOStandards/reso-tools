@@ -1,3 +1,4 @@
+import type { AddEditAction, AddEditFormats } from '../add-edit/plan.js';
 import type { AuthConfig } from '../test-runner/types.js';
 import type { DDVersion } from './dd-versions.js';
 
@@ -323,12 +324,21 @@ export interface InlinePayloads {
   readonly deleteFails?: Record<string, unknown>;
 }
 
-/** Add/Edit (RCP-010) endorsement config. */
+/**
+ * Add/Edit (RCP-010) endorsement config. A run tests the actions and formats it is given, with the payloads the
+ * provider gives for each one (`payloadsDir` or `payloads`), or with payloads the tool writes (`autoPayloads`).
+ */
 export interface AddEditConfig extends BaseComplianceConfig {
   readonly endorsement: 'add-edit';
   readonly resource: string;
   readonly payloadsDir?: string;
   readonly payloads?: InlinePayloads;
+  /** Write the payloads instead of taking them from the provider. Property only. */
+  readonly autoPayloads?: boolean;
+  /** The actions to test. Absent: create, update and delete. */
+  readonly actions?: ReadonlyArray<AddEditAction>;
+  /** The formats to test, by action. An action left out tests both. */
+  readonly formats?: AddEditFormats;
   readonly metadataPath?: string;
   readonly specVersion?: string;
 }

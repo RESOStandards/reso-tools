@@ -2,7 +2,7 @@
   "providerUoi": "LOCAL-PROVIDER",
   "configs": [
     {
-      "description": "Add/Edit Testing — Bearer Token",
+      "description": "Add/Edit Testing \u2014 Bearer Token",
       "serviceRootUri": "http://localhost:8080",
       "recipientUoi": "LOCAL-RECIPIENT",
       "providerUsi": "LOCAL-SYSTEM",
@@ -10,7 +10,7 @@
       "resource": "Property",
       "payloads": {
         "createSucceeds": {
-          "ListPrice": 350000.00,
+          "ListPrice": 350000.0,
           "BedroomsTotal": 4,
           "BathroomsTotalInteger": 3,
           "City": "Test City",
@@ -19,19 +19,64 @@
           "Country": "US"
         },
         "createFails": {
-          "ListPrice": -99999.00,
+          "ListPrice": -99999.0,
           "BedroomsTotal": 3,
           "BathroomsTotalInteger": 2
         },
         "updateSucceeds": {
-          "ListPrice": 375000.00
+          "ListPrice": 375000.0
         },
         "updateFails": {
-          "ListPrice": -1.00
+          "ListPrice": -1.0
         },
         "deleteSucceeds": {},
         "deleteFails": {
           "id": "00000000-0000-0000-0000-000000000000"
+        }
+      }
+    },
+    {
+      "description": "Add/Edit Testing \u2014 Creates and Updates Only",
+      "serviceRootUri": "http://localhost:8080",
+      "recipientUoi": "LOCAL-RECIPIENT",
+      "providerUsi": "LOCAL-SYSTEM",
+      "token": "admin-token",
+      "resource": "Property",
+      "addEditOptions": {
+        "actions": [
+          "create",
+          "update"
+        ],
+        "formats": {
+          "create": [
+            "minimal"
+          ],
+          "update": [
+            "representation",
+            "minimal"
+          ]
+        }
+      },
+      "payloads": {
+        "createSucceeds": {
+          "ListPrice": 350000.0,
+          "BedroomsTotal": 4,
+          "BathroomsTotalInteger": 3,
+          "City": "Test City",
+          "StateOrProvince": "CA",
+          "PostalCode": "90210",
+          "Country": "US"
+        },
+        "createFails": {
+          "ListPrice": -99999.0,
+          "BedroomsTotal": 3,
+          "BathroomsTotalInteger": 2
+        },
+        "updateSucceeds": {
+          "ListPrice": 375000.0
+        },
+        "updateFails": {
+          "ListPrice": -1.0
         }
       }
     }

@@ -119,7 +119,9 @@ or **stdout** (for `--output-dir -`), so they compose in a pipe.
 RCP-010 Add/Edit endorsement testing.
 
 ```bash
-reso-cert add-edit --url https://api.example.com --auth-token TOKEN
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads --actions create,update --update-formats minimal
+reso-cert add-edit --url http://localhost:8080 --auth-token admin-token --auto-payloads   # the reference server
 reso-cert add-edit --mock                       # against a bundled mock OData server
 reso-cert add-edit --config ./configs/add-edit-config.json   # multi-provider batch
 ```
@@ -129,12 +131,16 @@ reso-cert add-edit --config ./configs/add-edit-config.json   # multi-provider ba
 | `--url <url>` | – | Server base URL (mutually exclusive with `--config`) |
 | `--config <path>` | – | Config file with one or more provider entries |
 | `--resource <name>` | `Property` | OData resource under test |
-| `--payloads <dir>` | – | Directory of payload JSON files |
+| `--payloads <dir>` | – | Directory of payload JSON files: the two for each action tested |
+| `--actions <list>` | all | The actions to test: `create`, `update`, `delete` |
+| `--create-formats <list>` | both | The create responses to test: `representation`, `minimal` |
+| `--update-formats <list>` | both | The update responses to test: `representation`, `minimal` |
+| `--auto-payloads` | – | The tool writes the payloads, for Property, as on the reference server |
 | `--metadata <path>` | – | Local XML metadata (for `--mock`) |
-| `--mock` | – | Start a bundled mock OData server |
+| `--mock` | – | Start a bundled mock OData server, which writes its own payloads unless `--payloads` gives them |
 | `--spec-version <v>` | `2.0.0` | Spec version stamped into the report |
 
-Provide one of `--url`, `--config`, or `--mock`.
+Provide one of `--url`, `--config`, or `--mock`, and the payloads one way: `--payloads`, a config file's `payloads` or `--auto-payloads`. With `--config`, `--actions`, the format options and `--auto-payloads` apply to every entry.
 
 ### `entity-event`
 RCP-027 EntityEvent change-tracking testing.

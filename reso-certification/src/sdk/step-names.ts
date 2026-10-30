@@ -9,3 +9,4 @@ export const FETCH_METADATA = 'Fetch metadata';
 export const RUN_CORE_SCENARIOS = 'Run Core scenarios';
 export const RUN_ADD_EDIT_SCENARIOS = 'Run Add/Edit scenarios';
 export const RUN_ENTITY_EVENT_SCENARIOS = 'Run EntityEvent scenarios';
+export const GENERATE_PAYLOADS = 'Generate payloads';

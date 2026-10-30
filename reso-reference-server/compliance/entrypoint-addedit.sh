@@ -6,7 +6,9 @@ set -e
 #
 # 1. Seed the static dataset (POST /admin/seed)
 # 2. Run the reso-cert add-edit pipeline (handles health check, metadata,
-#    record sampling, payload generation, test execution, and reports)
+#    payload generation, test execution, and reports). This is the reference
+#    server, which has no provider to give payloads, so the tool writes them
+#    (--auto-payloads) and the run tests every action.
 # ---------------------------------------------------------------------------
 
 SERVER_URL="${SERVER_URL:-http://server:8080}"
@@ -41,6 +43,7 @@ exec node dist/cli/index.js add-edit \
   --url "$SERVER_URL" \
   --resource "$RESOURCE" \
   --auth-token "$AUTH_TOKEN" \
+  --auto-payloads \
   --verbose \
   --output-dir /tmp/compliance-results \
   --spec-version "${SPEC_VERSION:-2.0.0}"

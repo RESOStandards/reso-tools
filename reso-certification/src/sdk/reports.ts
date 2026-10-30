@@ -3,7 +3,7 @@ import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { optionalOutcome } from '../web-api-core/test-runner.js';
-import { FETCH_METADATA, RUN_ADD_EDIT_SCENARIOS, RUN_CORE_SCENARIOS, RUN_ENTITY_EVENT_SCENARIOS } from './step-names.js';
+import { FETCH_METADATA, GENERATE_PAYLOADS, RUN_ADD_EDIT_SCENARIOS, RUN_CORE_SCENARIOS, RUN_ENTITY_EVENT_SCENARIOS } from './step-names.js';
 import type { BaseComplianceConfig, PipelineContext, PipelineResult, ProgressCallback } from './types.js';
 
 // ── Software version ──
@@ -186,7 +186,11 @@ export interface ReportGenerator<TContext extends PipelineContext = PipelineCont
 /** Serialize Add/Edit pipeline results into a human-readable remarks string. */
 export const serializeAddEditRemarks = (result: PipelineResult): string => {
   const testStep = result.steps.find(s => s.name === RUN_ADD_EDIT_SCENARIOS);
-  if (!testStep?.counts) return `Add/Edit compliance test ${result.status}.`;
+  if (!testStep?.counts) {
+    // Refused before any test ran: the reason is the payload step's, and the reader needs it.
+    const refusal = result.steps.find(s => s.name === GENERATE_PAYLOADS && s.status === 'failed')?.errors ?? [];
+    return refusal.length > 0 ? `No test ran. ${refusal.join(' ')}` : `Add/Edit compliance test ${result.status}.`;
+  }
 
   const { total = 0, passed = 0, failed = 0 } = testStep.counts;
 
@@ -198,8 +202,11 @@ export const serializeAddEditRemarks = (result: PipelineResult): string => {
   // count (#258: the remark previously read "<passed> of <total> scenarios failed", using the passed count
   // with the run's status word).
   const headline = failed > 0 ? `${failed} of ${total} scenarios failed` : `${passed} of ${total} scenarios passed`;
-  const parts = [headline];
+  // What was tested, which RCP-010 has the report show: the actions, and the formats for each that has them.
+  const tested = typeof testStep.params?.tested === 'string' ? testStep.params.tested : undefined;
+  const parts = [headline, ...(tested ? [`Tested ${tested}`] : [])];
   if (fieldCount > 0) parts.push(`${fieldCount} fields validated against ${resource} metadata`);
+  if (testStep.params?.payloads === 'auto') parts.push('The tool wrote the payloads');
   if (failed > 0) {
     const errors = testStep.errors ?? [];
     if (errors.length > 0) parts.push(`Failures: ${errors.join(', ')}`);

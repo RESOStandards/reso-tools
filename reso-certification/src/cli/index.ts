@@ -23,6 +23,7 @@ import { resolve } from 'node:path';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { Command } from 'commander';
 import { startMockServer, stopMockServer } from '../add-edit/mock/server.js';
+import { ADD_EDIT_ACTIONS, ADD_EDIT_FORMATS } from '../add-edit/plan.js';
 import { CLOUD_ENDORSEMENT, listCloudRunStatus, reserveCloudRun, submitCloudRun } from '../cloud/runs.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
 import { synthesizeResourcesFromFields } from '../metadata/index.js';
@@ -59,6 +60,7 @@ import {
 } from '../variations/index.js';
 import { submitVariationsReportViaService } from '../variations/submit.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
+import { addEditSelectionOf } from './add-edit-options.js';
 import { mintOAuth2ClientCredentialsToken, resolveCliAuth } from './auth.js';
 import {
   type CloudOfferIo,
@@ -177,9 +179,19 @@ const addEditCmd = program
   .option('--url <url>', 'Server base URL')
   .option('--config <path>', 'Path to config file (mutually exclusive with --url)')
   .option('--resource <name>', 'OData resource name (e.g., Property)', 'Property')
-  .option('--payloads <dir>', 'Path to directory containing payload JSON files')
+  .option(
+    '--payloads <dir>',
+    'Directory holding the payloads for the actions tested: create-succeeds.json, create-fails.json, update-succeeds.json, update-fails.json, delete-succeeds.json, delete-fails.json'
+  )
+  .option('--actions <list>', `The actions to test, comma-separated: ${ADD_EDIT_ACTIONS.join(', ')} (default: all)`)
+  .option('--create-formats <list>', `The create responses to test, comma-separated: ${ADD_EDIT_FORMATS.join(', ')} (default: both)`)
+  .option('--update-formats <list>', `The update responses to test, comma-separated: ${ADD_EDIT_FORMATS.join(', ')} (default: both)`)
+  .option(
+    '--auto-payloads',
+    'Write the payloads instead of reading them, for a server such as the reference server or the mock: Property only'
+  )
   .option('--metadata <path>', 'Path to local XML metadata file')
-  .option('--mock', 'Start a mock OData server')
+  .option('--mock', 'Start a mock OData server. Its payloads are written for it unless --payloads gives them')
   .option('--spec-version <version>', 'Specification version for report', '2.0.0');
 
 addAuthOptions(addEditCmd);
@@ -201,6 +213,10 @@ addEditCmd.action(
     output: string;
     outputDir?: string;
     specVersion: string;
+    actions?: string;
+    createFormats?: string;
+    updateFormats?: string;
+    autoPayloads?: boolean;
   }) => {
     let mockServer: Awaited<ReturnType<typeof startMockServer>> | null = null;
 
@@ -212,6 +228,11 @@ addEditCmd.action(
       if (!opts.url && !opts.config && !opts.mock) {
         throw new Error('Provide --url, --config or --mock.');
       }
+      if (opts.payloads && opts.autoPayloads) {
+        throw new Error('--payloads and --auto-payloads are two ways of giving the payloads. Use one.');
+      }
+      // What to test, checked before anything starts, by the same rules the run applies.
+      const selection = addEditSelectionOf(opts);
 
       const renderMode = resolveRenderMode(opts);
 
@@ -235,10 +256,12 @@ addEditCmd.action(
           const baseConfig = configEntryToAddEdit(entry, configFile.providerUoi);
           const auth = resolveCliAuth(authFlags, baseConfig.server.auth);
 
+          // A flag given on the command line applies to every entry.
           const config: AddEditConfig = {
             ...baseConfig,
             server: { ...baseConfig.server, auth },
-            ...(entry.payloads ? { payloads: entry.payloads } : {}),
+            ...selection,
+            ...(opts.autoPayloads ? { autoPayloads: true } : {}),
             ...(opts.outputDir ? { options: { ...baseConfig.options, outputDir: resolve(opts.outputDir) } } : {})
           };
 
@@ -266,6 +289,9 @@ addEditCmd.action(
           server: { url: serverUrl, auth },
           resource: opts.resource,
           payloadsDir: opts.payloads ? resolve(opts.payloads) : undefined,
+          // A mock has no provider to give payloads, so it gets written ones unless --payloads gives them.
+          ...(opts.autoPayloads || (opts.mock && !opts.payloads) ? { autoPayloads: true } : {}),
+          ...selection,
           metadataPath: opts.metadata ? resolve(opts.metadata) : undefined,
           specVersion: opts.specVersion,
           options: {
