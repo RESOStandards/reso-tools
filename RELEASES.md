@@ -2,6 +2,26 @@
 
 ---
 
+## Unreleased
+
+### Add/Edit tests the actions and formats you support
+
+RCP-010 lets a provider implement as many or as few actions as its business needs. `add-edit` now tests the ones you choose, and passing those is a pass:
+
+```
+reso-cert add-edit --url <url> --auth-token <token> --payloads ./payloads --actions create,update --update-formats minimal
+```
+
+- **Choose the actions and the formats.** `--actions` takes `create`, `update` and `delete`, and `--create-formats` and `--update-formats` take `representation` and `minimal`. A delete has no format. In a config file they are `addEditOptions.actions` and `addEditOptions.formats`. With none given, a run tests everything, as before.
+- **The report says what was tested,** for example `Tested create (minimal), update (representation, minimal)`.
+- **Each action tested needs your two payloads,** one that should succeed and one that should fail, as RCP-010 asks. A folder needs only those files. A run given none is refused before it writes anything. Before, it sampled two of your records, changed one and deleted the other.
+- **An update or a delete that names no record uses one the run created,** so a run that tests every action leaves your own records alone. Without a create to use, each one has to name its record. A write without a key is never sent, because it would reach the whole collection.
+- **`--auto-payloads` has the tool write the payloads,** for Property, as on the reference server. It counts like any other run.
+- **The mock works out of the box.** `reso-cert add-edit --mock` writes its own payloads, and the package now ships the metadata the mock serves, which now validates.
+- **The MCP server's `run-compliance`** takes `actions`, `formats`, `payloads` and `autoPayloads` for Add/Edit.
+
+---
+
 ## Certification 0.11.5 – 2026-10-28
 
 `reso-certification 0.11.5`

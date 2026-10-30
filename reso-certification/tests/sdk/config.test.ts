@@ -9,8 +9,7 @@ import {
   isGeneratedLocalUoi,
   loadConfigFile,
   normalizeConfigFile,
-  parseConfigText,
-  resolvePayloadKeys
+  parseConfigText
 } from '../../src/sdk/config.js';
 import { CURRENT_CORE_VERSION } from '../../src/sdk/core-versions.js';
 import { CURRENT_DD_VERSION } from '../../src/sdk/dd-versions.js';
@@ -146,8 +145,16 @@ describe('loadConfigFile', () => {
     const config = await loadConfigFile(sampleConfigPath);
 
     expect(config.providerUoi).toBe('LOCAL-PROVIDER');
-    expect(config.configs).toHaveLength(1);
+    expect(config.configs).toHaveLength(2);
     expect(config.configs[0].serviceRootUri).toBe('http://localhost:8080');
+  });
+
+  it('reads the sample that tests only some actions and formats into a run of just those', async () => {
+    const config = await loadConfigFile(sampleConfigPath);
+    const subset = configEntryToAddEdit(config.configs[1], config.providerUoi);
+    expect(subset.actions).toEqual(['create', 'update']);
+    expect(subset.formats).toEqual({ create: ['minimal'], update: ['representation', 'minimal'] });
+    expect(Object.keys(subset.payloads ?? {})).toEqual(['createSucceeds', 'createFails', 'updateSucceeds', 'updateFails']);
   });
 
   it('throws on missing file', async () => {
@@ -257,6 +264,23 @@ describe('configEntryToAddEdit', () => {
     const noResource = { ...entry, resource: undefined };
     const config = configEntryToAddEdit(noResource, 'P001');
     expect(config.resource).toBe('Property');
+  });
+
+  it('carries the inline payloads and what the entry chooses to test', () => {
+    const payloads = { createSucceeds: { ListPrice: 1 }, createFails: { ListPrice: -1 } };
+    const config = configEntryToAddEdit(
+      { ...entry, payloads, addEditOptions: { actions: ['create'], formats: { create: ['minimal'] } } },
+      'P001'
+    );
+    expect(config.payloads).toEqual(payloads);
+    expect(config.actions).toEqual(['create']);
+    expect(config.formats).toEqual({ create: ['minimal'] });
+    expect(config.autoPayloads).toBeUndefined();
+  });
+
+  it('carries auto payloads only when the entry asks for them', () => {
+    expect(configEntryToAddEdit({ ...entry, addEditOptions: { autoPayloads: true } }, 'P001').autoPayloads).toBe(true);
+    expect(configEntryToAddEdit({ ...entry, addEditOptions: { autoPayloads: false } }, 'P001')).not.toHaveProperty('autoPayloads');
   });
 });
 
@@ -423,76 +447,5 @@ describe('configEntryToDD', () => {
 
   it('leaves strictMode absent when the entry does not mention it, so the SDK default applies', () => {
     expect(configEntryToDD(entry(), 'P001').strictMode).toBeUndefined();
-  });
-});
-
-describe('resolvePayloadKeys', () => {
-  const keyField = 'ListingKey';
-
-  it('injects createdKey into update payloads missing keys', () => {
-    const payloads = {
-      createSucceeds: { ListPrice: 350000 },
-      updateSucceeds: { ListPrice: 375000 },
-      updateFails: { ListPrice: -1 }
-    };
-
-    const resolved = resolvePayloadKeys(payloads, keyField, 'KEY-123');
-
-    expect(resolved.updateSucceeds.ListingKey).toBe('KEY-123');
-    expect(resolved.updateFails.ListingKey).toBe('KEY-123');
-    expect(resolved.keyChained).toBe(true);
-  });
-
-  it('injects createdKey into delete payload missing id', () => {
-    const payloads = {
-      createSucceeds: { ListPrice: 350000 },
-      deleteSucceeds: {}
-    };
-
-    const resolved = resolvePayloadKeys(payloads, keyField, 'KEY-456');
-
-    expect(resolved.deleteSucceeds.id).toBe('KEY-456');
-    expect(resolved.keyChained).toBe(true);
-  });
-
-  it('preserves existing keys in payloads', () => {
-    const payloads = {
-      createSucceeds: { ListPrice: 350000 },
-      updateSucceeds: { ListingKey: 'EXISTING-KEY', ListPrice: 375000 },
-      updateFails: { ListingKey: 'EXISTING-KEY', ListPrice: -1 },
-      deleteSucceeds: { id: 'EXISTING-DELETE-KEY' }
-    };
-
-    const resolved = resolvePayloadKeys(payloads, keyField, 'SHOULD-NOT-USE');
-
-    expect(resolved.updateSucceeds.ListingKey).toBe('EXISTING-KEY');
-    expect(resolved.updateFails.ListingKey).toBe('EXISTING-KEY');
-    expect(resolved.deleteSucceeds.id).toBe('EXISTING-DELETE-KEY');
-    expect(resolved.keyChained).toBe(false);
-  });
-
-  it('throws when update missing key and no create payload', () => {
-    const payloads = {
-      updateSucceeds: { ListPrice: 375000 }
-    };
-
-    expect(() => resolvePayloadKeys(payloads, keyField)).toThrow('Update payload missing');
-  });
-
-  it('throws when delete missing key and no create payload', () => {
-    const payloads = {
-      updateSucceeds: { ListingKey: 'HAS-KEY', ListPrice: 100 },
-      updateFails: { ListingKey: 'HAS-KEY', ListPrice: -1 },
-      deleteSucceeds: {}
-    };
-
-    expect(() => resolvePayloadKeys(payloads, keyField)).toThrow('Delete payload missing');
-  });
-
-  it('provides default deleteFails payload when no payloads given', () => {
-    const payloads = { createSucceeds: { ListPrice: 350000 } };
-    const resolved = resolvePayloadKeys(payloads, keyField);
-
-    expect(resolved.deleteFails.id).toBe('00000000-0000-0000-0000-000000000000');
   });
 });

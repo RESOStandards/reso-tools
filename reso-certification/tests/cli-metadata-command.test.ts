@@ -41,7 +41,7 @@ describe('runMetadataStep — the metadata cert step (validate + serialize)', ()
   // A metadata document with no EntityContainer is caught at the semantic layer (the new validator check) and
   // also can't serialize — the step fails with both signals, each pointing at the missing container.
   it('fails when the metadata declares no EntityContainer, surfacing a report error too', async () => {
-    const xml = await readFixture('../sample-metadata.xml');
+    const xml = await readFixture('fixtures/commander/edmx-no-entity-container.xml');
     const result = await runMetadataStep({ metadataXml: xml, ddVersion: '2.0' });
     expect(result.passed).toBe(false);
     expect(result.validation.semanticValid).toBe(false);

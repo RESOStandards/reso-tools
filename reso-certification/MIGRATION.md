@@ -67,11 +67,11 @@ reso-cert core --url https://api.example.com --auth-token TOKEN \
 # Before (via Docker entrypoint with shell script payload generation)
 docker compose --profile compliance-addedit up
 
-# After
-reso-cert add-edit --url https://api.example.com --auth-token TOKEN
-
-# Payloads auto-generated from sampled server data, or provide your own
+# After: your payloads, for the actions and formats you support
 reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./my-payloads
+
+# On the reference server, the tool can write them
+reso-cert add-edit --url http://localhost:8080 --auth-token admin-token --auto-payloads
 ```
 
 ### EntityEvent (RCP-027)

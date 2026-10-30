@@ -172,10 +172,12 @@ parse-filter({ filter })
 
 Run RESO Certification compliance tests. Supports Add/Edit (RCP-010), EntityEvent (RCP-027) and Web API Core. Web API Core defaults to 2.1.0, the CLI's current version.
 
+For Add/Edit, `actions` and `formats` choose what to test (default: everything), and `payloads` gives the records to write, the two for each action tested. `autoPayloads` has the tool write them instead, for Property, as on the reference server.
+
 The answer carries `certification` beside `status`, because a run can pass and still certify nothing: an EntityEvent run in observe mode exercises no writes. Reports go in a directory of their own under the system temp directory (`<tmpdir>/reso-mcp-server-XXXXXX/`), made once per server process and readable only by its user, never the server's working directory, which the MCP host chooses and is often not writable. `reports` names the run's folder.
 
 ```
-run-compliance({ endorsement, url, resource?, version?, mode?, resources? })
+run-compliance({ endorsement, url, resource?, version?, mode?, resources?, actions?, formats?, payloads?, autoPayloads? })
 → { status: "passed", certification: { valid: true }, reports: "<tmpdir>/reso-mcp-server-XXXXXX/…/current", steps: [...], duration: 450 }
 ```
 

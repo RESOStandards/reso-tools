@@ -136,9 +136,7 @@ Each endorsement reads an optional block. Everything in these blocks has a defau
 
 ### Add/Edit Needs Payloads
 
-Add/Edit is the one endorsement that cannot run from the common fields alone, because it creates, updates and deletes records and has to know what a valid and an invalid record look like for the server under test.
-
-Supply them inline as `payloads`, or point at a directory with `payloadsDir`:
+Add/Edit creates, updates and deletes records, so it needs to know what a valid and an invalid record look like for the server under test. Each action tested needs its two payloads, one that should succeed and one that should fail. Supply them inline as `payloads`, or point at a directory with `payloadsDir`:
 
 ```json
 "resource": "Property",
@@ -152,7 +150,24 @@ Supply them inline as `payloads`, or point at a directory with `payloadsDir`:
 }
 ```
 
-With no payloads supplied the runner samples the server to build them, which works for many feeds but cannot always succeed: an update or delete payload with no key field and no create payload to chain from leaves it nothing to act on. Supplying payloads explicitly is the reliable path.
+An update or a delete that names no record, like the two above, uses one the run created. With no create to use, each one has to name its record. A run given no payloads is refused before it writes anything.
+
+To test only some actions, or only some response formats, say so in `addEditOptions`. Only those payloads are needed:
+
+```json
+"addEditOptions": {
+  "actions": ["create", "update"],
+  "formats": { "create": ["minimal"], "update": ["representation", "minimal"] }
+},
+"payloads": {
+  "createSucceeds": { "ListPrice": 350000.00, "City": "Test City" },
+  "createFails": { "ListPrice": -99999.00 },
+  "updateSucceeds": { "ListPrice": 375000.00 },
+  "updateFails": { "ListPrice": -1.00 }
+}
+```
+
+For the reference server or the mock, `"autoPayloads": true` in `addEditOptions` has the tool write them instead, for Property.
 
 See [`add-edit-config.json`](add-edit-config.json) for a complete example.
 

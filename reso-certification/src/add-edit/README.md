@@ -1,99 +1,104 @@
 # Add/Edit Compliance Testing (RCP-010)
 
-Validates OData CRUD operations against the RESO Add/Edit specification. Tests create, update, and delete with both `return=representation` and `return=minimal` preferences, plus error handling for invalid payloads.
+Validates OData create, update and delete against the RESO Add/Edit specification. A provider tests the actions it supports, with the responses it supports for each, and passing those is a pass. RCP-010 lets providers "implement as many or as few actions as makes sense for their business case."
 
 ## Usage
 
 ```bash
-# Auto-generate payloads from sampled server data
-reso-cert add-edit --url https://api.example.com --auth-token TOKEN
-
-# Provide your own payload files
+# Test every action, with your own payloads
 reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./my-payloads
+
+# Test only creates and updates, and updates only with headers-only responses
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./my-payloads \
+  --actions create,update --update-formats minimal
 
 # Use a config file with inline payloads
 reso-cert add-edit --config sample-configs/add-edit-config.json
 
-# Mock server for offline testing
-reso-cert add-edit --mock --payloads sample-payloads
+# The reference server, where the tool writes the payloads
+reso-cert add-edit --url http://localhost:8080 --auth-token admin-token --auto-payloads
+
+# The mock server, for offline testing. It writes its own payloads unless --payloads gives them
+reso-cert add-edit --mock
 ```
 
-## Scenarios
+## What a run tests
 
-8 certification scenarios covering the full CRUD lifecycle:
+Each action is a pair of tests, one that should succeed and one that should fail. Create and update each have two response formats as well: `return=representation`, where the record comes back, and `return=minimal`, headers only. Choose any of them:
 
-| # | Scenario | Operation | Preference | Expected |
-|---|----------|-----------|------------|----------|
-| 1 | create-succeeds-representation | POST | return=representation | 201 with entity body |
-| 2 | create-succeeds-minimal | POST | return=minimal | 204 with Location header |
-| 3 | create-fails | POST | – | 400 with OData error |
-| 4 | update-succeeds-representation | PATCH | return=representation | 200 with updated entity |
-| 5 | update-succeeds-minimal | PATCH | return=minimal | 204 with headers |
-| 6 | update-fails | PATCH | – | 400 with OData error |
-| 7 | delete-succeeds | DELETE | – | 204, follow-up GET returns 404 |
-| 8 | delete-fails | DELETE | – | 4xx for non-existent key |
+| Option | In a config file | Default |
+|---|---|---|
+| `--actions create,update,delete` | `addEditOptions.actions` | all three |
+| `--create-formats representation,minimal` | `addEditOptions.formats.create` | both |
+| `--update-formats representation,minimal` | `addEditOptions.formats.update` | both |
 
-Each scenario validates:
-- HTTP status code
-- OData-Version header (4.0 or 4.01)
-- Response body structure (JSON entity, OData annotations, error format)
-- Follow-up GET for create/delete verification
+A delete has no format. The run passes when every test it ran passes, and at least one action must be chosen. The report says what was tested, for example `Tested create (minimal), update (representation, minimal)`.
 
-## Pipeline
+| Scenario | Action | Format | Expected |
+|---|---|---|---|
+| create-succeeds-representation | create | representation | 201 with the record |
+| create-succeeds-minimal | create | minimal | 204 with `Location` and `EntityId` |
+| create-fails | create | – | 400 with an OData error |
+| update-succeeds-representation | update | representation | 200 with the updated record |
+| update-succeeds-minimal | update | minimal | 204 with headers |
+| update-fails | update | – | 400 with an OData error |
+| delete-succeeds | delete | – | 204, then a GET returns 404 |
+| delete-fails | delete | – | 4xx for a record that does not exist |
 
-When you run `reso-cert add-edit`, the SDK pipeline executes these steps:
-
-1. **Health check** – wait for the server to respond
-2. **Resolve auth** – token or OAuth2 Client Credentials
-3. **Fetch metadata** – download and parse `/$metadata`
-4. **Sample records** – fetch 2 existing records for update/delete keys
-5. **Generate payloads** – create 6 JSON payload files (or use provided ones)
-6. **Run scenarios** – execute all 8 scenarios sequentially
-7. **Write reports** – generic + detailed JSON reports
+Each test checks the status code, the `OData-Version` header and the response's structure (the record, its annotations, the error format), and the tests that write follow up with a GET.
 
 ## Payloads
 
-The tool needs 6 payload files. You can provide them via `--payloads <dir>`, inline them in a config file, or let the pipeline auto-generate them from sampled server data.
+Each action tested needs its two payloads. RCP-010: "Those being certified will provide known good and bad payloads that can trigger each of these responses." Give them as a folder (`--payloads <dir>`) or inline in a config file (`payloads`), one way or the other:
 
-| File | Purpose |
-|------|---------|
-| `create-succeeds.json` | Valid payload for POST (required fields) |
-| `create-fails.json` | Invalid payload for POST (e.g., negative ListPrice) |
-| `update-succeeds.json` | Valid PATCH payload (key + fields to update) |
-| `update-fails.json` | Invalid PATCH payload |
-| `delete-succeeds.json` | `{ "id": "<existing-key>" }` |
-| `delete-fails.json` | `{ "id": "<non-existent-key>" }` |
+| File | Inline name | What it holds |
+|---|---|---|
+| `create-succeeds.json` | `createSucceeds` | A valid record to create |
+| `create-fails.json` | `createFails` | An invalid one, such as a negative `ListPrice` |
+| `update-succeeds.json` | `updateSucceeds` | A valid change, with the record's key or without (below) |
+| `update-fails.json` | `updateFails` | An invalid change |
+| `delete-succeeds.json` | `deleteSucceeds` | `{ "id": "<a record it may delete>" }`, or `{}` (below) |
+| `delete-fails.json` | `deleteFails` | `{ "id": "<a record that does not exist>" }` |
 
-**Key chaining**: If update/delete payloads omit the key field and a create payload exists, the pipeline automatically injects the created record's key into subsequent payloads.
+A folder needs only the files of the actions tested. A run given no payloads is refused before it writes anything.
 
-## Report Format
+**An update or a delete that names no record uses one the run created.** When create is tested too, an update payload without the resource's key changes the record the first create made, and a delete payload without an `id` or a `url` deletes the record the last create made. A run that tests every action this way leaves the server's own records alone. With no create to use, every update and delete has to name its record, and the run is refused before it writes anything when one does not. A write is never sent without a key, because it would go to the whole collection.
+
+**Auto payloads**, `--auto-payloads` (`addEditOptions.autoPayloads` in a config file), are written by the tool, for the reference server and the mock. They are written for Property only. Update and delete use the record the run creates, or, when create is not tested, two records sampled by the resource's key. A run on auto payloads certifies what it passed, like any other, and its report says the tool wrote the payloads.
+
+## Pipeline
+
+1. **Resolve authentication** – a token or OAuth2 client credentials
+2. **Service check** – waits for the server to respond (skipped for the mock)
+3. **Fetch metadata** – downloads and validates `$metadata`
+4. **Sample records** – auto payloads only, when an update or a delete is tested without a create
+5. **Generate payloads** – checks the provider's payloads, or writes auto ones, for the actions tested
+6. **Run Add/Edit scenarios** – the tests chosen, in order: create, update, delete
+7. **Write reports** – the summary report and the detailed report
+
+## Report
+
+`report.json` is the summary:
 
 ```json
 {
   "description": "Web API Add/Edit",
   "version": "2.0.0",
-  "generatedOn": "2026-04-06T00:00:00.000Z",
-  "outcome": "passed",
-  "remarks": "8 passed, 0 failed",
-  "scenarios": [
-    {
-      "name": "create-succeeds-representation",
-      "operation": "Create",
-      "preference": "return=representation",
-      "resource": "Property",
-      "status": "passed",
-      "durationMs": 42
-    }
-  ]
+  "generatedOn": "2026-10-30T15:08:09.214Z",
+  "remarks": "7 of 7 scenarios passed. Tested create (minimal), update (representation, minimal), delete. 722 fields validated against Property metadata.",
+  "outcome": "passed"
 }
 ```
+
+`report-detailed.json` adds every step, with the actions and formats tested, and every scenario with its assertions.
 
 ## Files
 
 ```
 src/add-edit/
-├── test-runner.ts        # Runs all 8 scenarios
-├── compliance-report.ts  # Generates Cert API compatible report
+├── plan.ts               # The tests a run's actions and formats select
+├── test-runner.ts        # Runs them, using the records its creates make
+├── compliance-report.ts  # Generates the Cert API compatible report
 ├── mock/
 │   └── server.ts         # Express-based mock OData server for offline testing
 └── index.ts              # Exports

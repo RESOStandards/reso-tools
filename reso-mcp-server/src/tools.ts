@@ -276,6 +276,25 @@ export const runComplianceTool: ToolDef = {
         type: 'array',
         items: { type: 'string' },
         description: 'Resources to test (core only, defaults to well-known list)'
+      },
+      actions: {
+        type: 'array',
+        items: { type: 'string', enum: ['create', 'update', 'delete'] },
+        description: 'Add/Edit: the actions to test (default: all three)'
+      },
+      formats: {
+        type: 'object',
+        description:
+          'Add/Edit: the responses to test by action, "representation" or "minimal", e.g. {"create": ["minimal"]}. An action left out tests both. A delete has none.'
+      },
+      payloads: {
+        type: 'object',
+        description:
+          'Add/Edit: the records to write, by name: createSucceeds, createFails, updateSucceeds, updateFails, deleteSucceeds, deleteFails. Each action tested needs its two. An update or a delete that names no record uses the one the run creates.'
+      },
+      autoPayloads: {
+        type: 'boolean',
+        description: 'Add/Edit: write the payloads instead of giving them, as for the reference server or a mock. Property only.'
       }
     },
     required: ['endorsement', 'url']

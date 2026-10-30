@@ -150,6 +150,15 @@ describe('tool definitions', () => {
     expect(endorsement.enum).toContain('core');
   });
 
+  it('run-compliance takes what an Add/Edit run tests, and its payloads', () => {
+    const compliance = allTools.find(t => t.name === 'run-compliance');
+    const props = compliance!.inputSchema.properties as Record<string, Record<string, unknown>>;
+    expect((props.actions?.items as Record<string, unknown>).enum).toEqual(['create', 'update', 'delete']);
+    expect(props.formats?.type).toBe('object');
+    expect(props.payloads?.type).toBe('object');
+    expect(props.autoPayloads?.type).toBe('boolean');
+  });
+
   it('metadata tool is in all scope', () => {
     const metadata = allTools.find(t => t.name === 'metadata');
     expect(metadata?.scope).toBe('all');

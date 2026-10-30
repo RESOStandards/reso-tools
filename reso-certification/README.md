@@ -35,8 +35,8 @@ This package depends on the siblings `reso-common`, `reso-client`, `reso-metadat
 ## Getting Started
 
 ```bash
-# Add/Edit compliance
-reso-cert add-edit --url https://api.example.com --auth-token TOKEN
+# Add/Edit compliance, with your payloads
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads
 
 # EntityEvent compliance
 reso-cert entity-event --url https://api.example.com --auth-token TOKEN
@@ -68,10 +68,11 @@ A Data Dictionary run authenticates twice. Besides the server credentials above,
 
 ### Add/Edit (RCP-010)
 
-Validates CRUD operations: create, update and delete with representation/minimal preferences and error handling. 8 certification scenarios.
+Validates create, update and delete, each as a test that should succeed and one that should fail, with `representation` and `minimal` responses for create and update. Test the actions and formats you support, with your payloads for each. The tool can write them instead for the reference server.
 
 ```bash
-reso-cert add-edit --url https://api.example.com --auth-token TOKEN
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads --actions create --create-formats minimal
 ```
 
 [**More info**](src/add-edit/README.md)

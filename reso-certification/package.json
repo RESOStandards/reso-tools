@@ -28,7 +28,8 @@
     "xsd",
     "xsd-validator/index.js",
     "xsd-validator/package.json",
-    "schema-validation-settings.json"
+    "schema-validation-settings.json",
+    "sample-metadata.xml"
   ],
   "publishConfig": {
     "access": "public"

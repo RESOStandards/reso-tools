@@ -33,6 +33,10 @@
         <Property Name="LegacyODataValue" Type="Edm.String"/>
         <Property Name="ModificationTimestamp" Precision="27" Type="Edm.DateTimeOffset" Nullable="false"/>
       </EntityType>
+      <EntityContainer Name="Default">
+        <EntitySet Name="Property" EntityType="org.reso.metadata.Property"/>
+        <EntitySet Name="Lookup" EntityType="org.reso.metadata.Lookup"/>
+      </EntityContainer>
     </Schema>
   </edmx:DataServices>
 </edmx:Edmx>

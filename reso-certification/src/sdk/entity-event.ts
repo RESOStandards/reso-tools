@@ -8,7 +8,7 @@ import { CERTIFIABLE, allOf, everyStepPassed, notCertifiable } from './certifica
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
 import { entityEventReportGenerators, prepareOutputDir, writeReports } from './reports.js';
-import { FETCH_METADATA, RUN_ENTITY_EVENT_SCENARIOS } from './step-names.js';
+import { FETCH_METADATA, GENERATE_PAYLOADS, RUN_ENTITY_EVENT_SCENARIOS } from './step-names.js';
 import type { BaseTestContext, EntityEventConfig, PipelineStep, ValidForCertification } from './types.js';
 import type { StepResult } from './types.js';
 
@@ -113,7 +113,7 @@ const fetchAndParseMetadata = (config: EntityEventConfig): PipelineStep<EntityEv
 
 /** Generate payload files for full mode canary writes. */
 const generatePayloads = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
-  name: 'Generate payloads',
+  name: GENERATE_PAYLOADS,
   run: async ctx => {
     if (config.payloadsDir) {
       return {

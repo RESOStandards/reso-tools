@@ -13,7 +13,7 @@ import {
   parseMetadataXml,
   runComplianceTests
 } from '@reso-standards/reso-certification';
-import type { AuthConfig, ComplianceConfig } from '@reso-standards/reso-certification';
+import type { AddEditConfig, AuthConfig, ComplianceConfig } from '@reso-standards/reso-certification';
 import { createClient, createEntity, deleteEntity, queryEntities, resolveToken, updateEntity } from '@reso-standards/reso-client';
 import type { ODataClient } from '@reso-standards/reso-client';
 import { generateMetadataReport } from '@reso-standards/reso-metadata-utils';
@@ -593,13 +593,18 @@ const reportsDir = ((): (() => string) => {
 })();
 
 export const handleRunCompliance = async (args: Record<string, unknown>): Promise<HandlerResult> => {
-  const { endorsement, url, resource, version, mode, resources } = args as {
+  const { endorsement, url, resource, version, mode, resources, actions, formats, payloads, autoPayloads } = args as {
     endorsement: string;
     url: string;
     resource?: string;
     version?: string;
     mode?: string;
     resources?: ReadonlyArray<string>;
+    // The SDK checks these as it reads them, and refuses what it cannot test with the reason.
+    actions?: AddEditConfig['actions'];
+    formats?: AddEditConfig['formats'];
+    payloads?: AddEditConfig['payloads'];
+    autoPayloads?: boolean;
   };
 
   const auth = buildAuthConfig(args as AuthArgs);
@@ -611,7 +616,16 @@ export const handleRunCompliance = async (args: Record<string, unknown>): Promis
 
     switch (endorsement) {
       case 'add-edit':
-        return { endorsement: 'add-edit' as const, server, options, resource: resource ?? 'Property' };
+        return {
+          endorsement: 'add-edit' as const,
+          server,
+          options,
+          resource: resource ?? 'Property',
+          ...(actions ? { actions } : {}),
+          ...(formats ? { formats } : {}),
+          ...(payloads ? { payloads } : {}),
+          ...(autoPayloads ? { autoPayloads: true } : {})
+        };
       case 'entity-event':
         return { endorsement: 'entity-event' as const, server, options, mode: (mode as 'observe' | 'full') ?? 'observe' };
       case 'core':
