@@ -2,7 +2,7 @@
   "providerUoi": "LOCAL-PROVIDER",
   "configs": [
     {
-      "description": "Add/Edit Testing \u2014 Bearer Token",
+      "description": "Add/Edit Testing – Bearer Token",
       "serviceRootUri": "http://localhost:8080",
       "recipientUoi": "LOCAL-RECIPIENT",
       "providerUsi": "LOCAL-SYSTEM",
@@ -36,7 +36,7 @@
       }
     },
     {
-      "description": "Add/Edit Testing \u2014 Creates and Updates Only",
+      "description": "Add/Edit Testing – Creates and Updates Only",
       "serviceRootUri": "http://localhost:8080",
       "recipientUoi": "LOCAL-RECIPIENT",
       "providerUsi": "LOCAL-SYSTEM",
