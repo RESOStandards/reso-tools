@@ -228,8 +228,9 @@ The variations check uses your RESO services credentials, the `credentials.env` 
 * `metadata-report.json` – every field and lookup value the records carry, with Data Dictionary fields linked to their Data Dictionary pages
 * `data-availability-report.json` – for each field, how many records carry it and what share of all the records that is
 * `data-dictionary-variations.json` – the variations, with the deprecations under `deprecations`
+* `report.json` and `report-detailed.json` – the summary and the full record of the run, as every run writes them, even when it fails. The detailed report holds a fingerprint of the files read, so a later run can confirm it scored the same data.
 
-What each file contains is in [Reading a Certification Run](RUN-REFERENCE.md#reso-common-format-rcf).
+A run is eligible for certification only when it checked records with `--schema-validate` and checked variations. What each file contains is in [Reading a Certification Run](RUN-REFERENCE.md#reso-common-format-rcf).
 
 #### Submitting the Variations for Review
 

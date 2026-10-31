@@ -272,6 +272,19 @@ const result = await runComplianceTests({
 });
 ```
 
+RESO Common Format reads files rather than a server, so it has its own entry point. `rcf` runs it:
+
+```typescript
+import { runRcfCompliance } from '@reso-standards/reso-certification';
+
+const result = await runRcfCompliance({
+  endorsement: 'rcf',
+  input: './property.json',
+  schemaValidate: true,
+  options: { outputDir: './out' },
+});
+```
+
 ### Computing variations with your own module
 
 A host that runs the SDK can compute a Data Dictionary run's variations with a module of its own instead of the HTTP variations service. Set `RESO_VARIATIONS_HANDLER` to the module's path. The module exports `computeVariations(request)`, which takes the body the service's compute route takes (`metadataReportJson`, `version` and an optional `fuzziness`) and answers what that route answers:

@@ -10,3 +10,6 @@ export const RUN_CORE_SCENARIOS = 'Run Core scenarios';
 export const RUN_ADD_EDIT_SCENARIOS = 'Run Add/Edit scenarios';
 export const RUN_ENTITY_EVENT_SCENARIOS = 'Run EntityEvent scenarios';
 export const GENERATE_PAYLOADS = 'Generate payloads';
+export const READ_RCF_INPUT = 'Read RCF input';
+export const INFER_RCF_REPORTS = 'Infer RCF reports';
+export const WRITE_REPORTS = 'Write reports';
