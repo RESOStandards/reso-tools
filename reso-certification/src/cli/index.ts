@@ -39,6 +39,7 @@ import {
 import { CURRENT_CORE_VERSION, SUPPORTED_CORE_VERSIONS, isCoreVersion } from '../sdk/core-versions.js';
 import { CERTIFIABLE_DD_VERSIONS, CURRENT_DD_VERSION, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
 import { fetchMetadataReportFromServer } from '../sdk/metadata-source.js';
+import { rcfRunOutcome, runRcfCompliance } from '../sdk/rcf.js';
 import { normalizeReportFieldTypes } from '../sdk/report-field-types.js';
 import type { AddEditConfig, CoreConfig, DDConfig, EntityEventConfig, PipelineResult } from '../sdk/types.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
@@ -78,7 +79,6 @@ import {
   SUBMITTABLE_REPORT_FILENAME,
   readRcfReportIdentity,
   resolveRcfExitCode,
-  runRcf,
   submittableVariationsReport
 } from './rcf-command.js';
 import { resolveRenderMode, resultsOf, runConfigEntries, runWithProgress, stoppedOf } from './render.js';
@@ -1567,29 +1567,31 @@ program
           recipientUoi: opts.recipientUoi
         });
         if (!identityRead.ok) throw new Error(identityRead.error);
-        const generatedOn = new Date().toISOString();
         // The /compute token for the variations service (from .env; the service mints its own if absent).
         const bearerToken = opts.skipVariations ? undefined : await mintOAuth2ClientCredentialsToken();
+        const dir = resolve(opts.outputDir);
 
-        const result = await runRcf({
+        // The pipeline the SDK runs, so a local run and a cloud run of the same files are the same run. It writes the
+        // reports, report.json among them, into the output directory.
+        const run = await runRcfCompliance({
+          endorsement: 'rcf',
           input: resolve(opts.input),
           version: opts.ddVersion,
           fuzziness,
-          additionalProperties: opts.additionalProperties,
           strict: opts.strict,
           schemaValidate: opts.schemaValidate,
-          generatedOn,
           runVariations: !opts.skipVariations,
-          ...(bearerToken ? { bearerToken } : {})
+          ...(bearerToken ? { servicesAuthToken: bearerToken } : {}),
+          ...(identityRead.identity ?? {}),
+          options: { outputDir: dir }
         });
-
-        const dir = resolve(opts.outputDir);
-        await mkdir(dir, { recursive: true });
-        await writeFile(resolve(dir, 'metadata-report.json'), JSON.stringify(result.metadataReport, null, 2));
-        await writeFile(resolve(dir, 'data-availability-report.json'), JSON.stringify(result.dataAvailabilityReport, null, 2));
-        if (result.variations) {
-          await writeFile(resolve(dir, VARIATIONS_REPORT_FILENAME), JSON.stringify(result.variations, null, 2));
+        const outcome = rcfRunOutcome(run);
+        if (!outcome.inferred) {
+          process.stderr.write(`rcf: ${outcome.error}\n`);
+          process.exitCode = outcome.schemaFailure ? 1 : 2;
+          return;
         }
+        const result = outcome.inferred;
 
         const s = result.stats;
         process.stderr.write(
@@ -1609,10 +1611,9 @@ program
             `rcf: ${deprecations.length} lookup value(s) use the machine-friendly form, accepted until DD ${deprecations[0].deprecatedInVersion} and deprecated there (${examples}${deprecations.length > 3 ? '; ...' : ''}). All are listed under "deprecations" in ${VARIATIONS_REPORT_FILENAME}\n`
           );
         }
-        const submittable = submittableVariationsReport(result, identityRead.identity, generatedOn);
-        if (submittable) {
+        // The pipeline wrote it when there is one; this only says where.
+        if (submittableVariationsReport(result, identityRead.identity, run.context.generatedOn as string)) {
           const reportPath = resolve(dir, SUBMITTABLE_REPORT_FILENAME);
-          await writeFile(reportPath, JSON.stringify(submittable, null, 2));
           process.stderr.write(`rcf: to start a review of these variations: reso-cert submit-variations-report --report ${reportPath}\n`);
         } else if (!identityRead.identity && (s.variationsTotal ?? 0) > 0) {
           process.stderr.write(

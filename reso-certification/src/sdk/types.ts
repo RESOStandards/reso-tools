@@ -393,5 +393,39 @@ export interface CoreConfig extends BaseComplianceConfig {
   readonly savePayloadsDir?: string;
 }
 
+/**
+ * RESO Common Format config. RCF reads files rather than a server, so it has no `server` and is not part of
+ * {@link ComplianceConfig}: run it with `runRcfCompliance`.
+ */
+export interface RcfConfig {
+  readonly endorsement: 'rcf';
+  /** A `.json` file, a directory of them or a `.zip`. */
+  readonly input: string;
+  /** The Data Dictionary version. Without it, the first payload's `@reso.context` decides. */
+  readonly version?: string;
+  /** The variations match threshold, 0 to 1. */
+  readonly fuzziness?: number;
+  /** Check every record against the Data Dictionary. A run that did not is not certifiable. */
+  readonly schemaValidate?: boolean;
+  /** Stop at the first schema error. */
+  readonly strict?: boolean;
+  /** Run variations (default true). A run that did not is not certifiable. */
+  readonly runVariations?: boolean;
+  /** Bearer for the variations service. Without it, the service is called with its own credentials. */
+  readonly servicesAuthToken?: string;
+  /** Overrides the schema validator's settings. */
+  readonly validationConfig?: unknown;
+  /** With providerUsi and recipientUoi, a variations report to submit for review is written too. All three or none. */
+  readonly providerUoi?: string;
+  readonly providerUsi?: string;
+  readonly recipientUoi?: string;
+  readonly options?: {
+    /** The directory the reports are written to, as `rcf --output-dir` writes them (default: the working directory). */
+    readonly outputDir?: string;
+    /** Stop at the first failed step (default true). */
+    readonly failFast?: boolean;
+  };
+}
+
 /** Discriminated union of all endorsement configs. */
 export type ComplianceConfig = DDConfig | AddEditConfig | EntityEventConfig | CoreConfig;

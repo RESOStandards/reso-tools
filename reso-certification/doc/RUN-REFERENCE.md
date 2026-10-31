@@ -94,8 +94,10 @@ to certify.
 
 ### RESO Common Format
 
-`rcf` has no named steps. What it does, in order, is under
-[RESO Common Format (RCF)](#reso-common-format-rcf).
+`rcf` runs three steps: `Read RCF input`, `Infer RCF reports` and `Write reports`. What each does is
+under [RESO Common Format (RCF)](#reso-common-format-rcf). A run is eligible for certification only when
+every step passed, it ran with `--schema-validate` and it checked variations. Without either check, no
+record or no name was checked against the Data Dictionary.
 
 ## Scenario Skips Are Not Step Skips
 
@@ -282,16 +284,17 @@ A generated create payload against the reference server carries `ListPrice`, `Be
 
 ## RESO Common Format (RCF)
 
-`rcf` reads files rather than a server, so there is no `$metadata`, no named step and no
-`report.json`. The examples here come from the four-record synthetic file in the user guide's
-[RCF section](GUIDE.md#reso-common-format-rcf).
+`rcf` reads files rather than a server, so there is no `$metadata`. Like every run, it writes
+`report.json` and `report-detailed.json`. The examples here come from the four-record synthetic file in
+the user guide's [RCF section](GUIDE.md#reso-common-format-rcf).
 
 In order, `rcf`:
 
 1. **Reads the files** – one `.json` file, a directory of files or a `.zip`. Each file carries an
    `@reso.context` that names its resource and Data Dictionary version, such as
    `urn:reso:metadata:2.1:resource:property`. A file whose context cannot be read is not skipped, so a
-   run cannot pass on the readable files alone.
+   run cannot pass on the readable files alone. The run records a fingerprint of the files it read
+   (`Read RCF input`), so a later run can confirm it scored the same data.
 2. **Infers the metadata report** from the records: every field and every lookup value they carry,
    with Data Dictionary fields linked to their Data Dictionary pages. It looks at up to 5,000 records
    per resource for this.
@@ -301,7 +304,22 @@ In order, `rcf`:
 5. **Checks variations**, unless `--skip-variations`. A lookup value in its machine-friendly form
    (`ComingSoon` for `Coming Soon`) is accepted until Data Dictionary 3.0, so it is listed as a
    deprecation instead of a variation.
-6. **Writes the files** into `--output-dir`.
+6. **Writes the files** into `--output-dir`, `report.json` and `report-detailed.json` among them, even
+   when the run fails.
+
+### `report.json` (RCF)
+
+The summary a certification takes: `description` is `RESO Common Format`, `version` is the Data
+Dictionary version of the data, and `remarks` give the counts, the schema errors and the variations,
+or why no report was inferred. A run that is not eligible for certification carries `certification`
+with the reasons, as every run's summary does.
+
+### The fingerprint (RCF)
+
+In `report-detailed.json`, under the `Read RCF input` step's `params`. It is the SHA-256 of a list
+with one line per file read, the file's own SHA-256 and its path, sorted by path. The same files give
+the same fingerprint as a `.json`, a folder or a `.zip`, and a changed byte, a renamed file or a file
+added or removed changes it.
 
 ### `metadata-report.json` (RCF)
 
