@@ -13,7 +13,8 @@ export type {
   AddEditConfig,
   EntityEventConfig,
   CoreConfig,
-  ComplianceConfig
+  ComplianceConfig,
+  RcfConfig
 } from './types.js';
 
 export { createPipeline } from './pipeline.js';
@@ -21,6 +22,8 @@ export { runAddEditCompliance, createAddEditPipeline } from './add-edit.js';
 export { runEntityEventCompliance, createEntityEventPipeline } from './entity-event.js';
 export { runCoreCompliance, createCorePipeline } from './core.js';
 export { runDDCompliance, createDDPipeline } from './dd.js';
+export { runRcfCompliance, createRcfPipeline, rcfValidForCertification } from './rcf.js';
+export { fingerprintRcfInput, type RcfInputFingerprint, type RcfInputFile } from '../rcf/fingerprint.js';
 export {
   writeReports,
   addEditReportGenerators,
