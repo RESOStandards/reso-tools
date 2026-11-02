@@ -36,7 +36,7 @@ import {
   isGeneratedLocalUoi,
   loadConfigFile
 } from '../sdk/config.js';
-import { CURRENT_CORE_VERSION, SUPPORTED_CORE_VERSIONS, isCoreVersion } from '../sdk/core-versions.js';
+import { CERTIFIABLE_CORE_VERSIONS, CURRENT_CORE_VERSION, SUPPORTED_CORE_VERSIONS, isCoreVersion } from '../sdk/core-versions.js';
 import {
   CERTIFIABLE_DD_VERSIONS,
   CURRENT_DD_VERSION,
@@ -525,7 +525,11 @@ const coreCmd = program
   .option('--resources <list>', 'Comma-separated resource names (default: well-known list)')
   // `--spec-version` (not `--version`, which is reserved for the program's own `-V`). Defaults to the current
   // minor, so a plain `reso-cert core --url …` certifies the latest Core without the caller passing a version.
-  .option('--spec-version <version>', `Web API Core spec version: ${SUPPORTED_CORE_VERSIONS.join(' or ')}`, CURRENT_CORE_VERSION)
+  .option(
+    '--spec-version <version>',
+    `Web API Core spec version: ${SUPPORTED_CORE_VERSIONS.join(' or ')}. Certification is on ${CERTIFIABLE_CORE_VERSIONS.join(' or ')}, the latest minor; an older one runs as a retest`,
+    CURRENT_CORE_VERSION
+  )
   .option(
     '--enum-mode <mode>',
     "Enum mode: auto, string, collections or isflags (default: the config entry's coreOptions.enumMode, else auto-detect)"

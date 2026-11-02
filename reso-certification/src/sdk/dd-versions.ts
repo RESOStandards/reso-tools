@@ -18,6 +18,8 @@
  *   - CURRENT     – the version new work defaults to.
  */
 
+import { latestOfEachMajor, whyVersionDoesNotCertify } from './version-policy.js';
+
 /** Versions we ship reference metadata for. SOURCE OF TRUTH — kept in sync with
  *  `reference-metadata/dd-{ver}.json` by `tests/sdk/dd-versions.test.ts`. */
 export const SUPPORTED_DD_VERSIONS = ['1.7', '2.0', '2.1'] as const;
@@ -36,29 +38,18 @@ export const TESTABLE_DD_VERSIONS: ReadonlyArray<TestableDDVersion> = SUPPORTED_
   (v): v is TestableDDVersion => !(DEPRECATED_DD_VERSIONS as ReadonlyArray<string>).includes(v)
 );
 
-const majorOf = (version: string): string => version.split('.')[0] ?? '';
-const minorOf = (version: string): number => Number(version.split('.')[1]);
-
 /**
  * Versions a provider can be certified on: the latest minor of each testable major. Derived, so a
  * new minor's reference metadata moves certification to it without an edit here.
  */
-export const CERTIFIABLE_DD_VERSIONS: ReadonlyArray<TestableDDVersion> = TESTABLE_DD_VERSIONS.filter(v =>
-  TESTABLE_DD_VERSIONS.every(other => majorOf(other) !== majorOf(v) || minorOf(other) <= minorOf(v))
-);
+export const CERTIFIABLE_DD_VERSIONS: ReadonlyArray<TestableDDVersion> = latestOfEachMajor(TESTABLE_DD_VERSIONS);
 
 /**
  * Why a run on this version cannot certify, or undefined when it can. An older minor is a retest;
  * a version with no certifiable minor in its major (1.7) is not certified at all.
  */
-export const whyDDVersionDoesNotCertify = (version: string): string | undefined => {
-  const normalized = normalizeDDVersion(version);
-  if ((CERTIFIABLE_DD_VERSIONS as ReadonlyArray<string>).includes(normalized)) return undefined;
-  const latest = CERTIFIABLE_DD_VERSIONS.find(v => majorOf(v) === majorOf(normalized));
-  return latest
-    ? `Certification is on Data Dictionary ${latest}, the latest ${majorOf(latest)}.x. A run on ${normalized} is a retest and is not eligible for certification.`
-    : `RESO does not certify Data Dictionary ${normalized}.`;
-};
+export const whyDDVersionDoesNotCertify = (version: string): string | undefined =>
+  whyVersionDoesNotCertify('Data Dictionary', normalizeDDVersion(version), CERTIFIABLE_DD_VERSIONS);
 
 /** The current DD version new work defaults to. */
 export const CURRENT_DD_VERSION: DDVersion = '2.1';

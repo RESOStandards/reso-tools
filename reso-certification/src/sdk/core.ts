@@ -28,8 +28,8 @@ import {
   runProviderScenarios,
   summarizeScenarios
 } from '../web-api-core/test-runner.js';
-import { everyStepPassed } from './certification.js';
-import { coerceCoreVersion, isCore21OrLater } from './core-versions.js';
+import { allOf, everyStepPassed, versionCertifies } from './certification.js';
+import { coerceCoreVersion, isCore21OrLater, whyCoreVersionDoesNotCertify } from './core-versions.js';
 import { createExpandSchemaValidator, isEnumerationIgnored, loadValidationConfig } from './expand-schema.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
@@ -821,7 +821,7 @@ const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> =
       context: ctx,
       // The same pure rule the pipeline applies to its returned result, over the same step list, so
       // the written report and the returned result cannot disagree.
-      certification: coreValidForCertification(steps),
+      certification: coreValidForCertification(config)(steps),
       duration: 0
     };
 
@@ -851,8 +851,14 @@ const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> =
 /**
  * Exported so the rule can be tested directly. The alternative is reaching it only through a full
  * pipeline run against a live server, which would leave the rule itself unobserved.
+ *
+ * The version is the one the run used, resolved the way the run resolves it. Only the latest minor
+ * certifies, so a 2.0.0 run is a retest.
  */
-export const coreValidForCertification: ValidForCertification = steps => everyStepPassed(steps);
+export const coreValidForCertification =
+  (config: CoreConfig): ValidForCertification =>
+  steps =>
+    allOf(everyStepPassed(steps), versionCertifies(whyCoreVersionDoesNotCertify(coerceCoreVersion(config.version))));
 
 /** Create the Web API Core compliance test pipeline. */
 export const createCorePipeline = (config: CoreConfig) => {
@@ -865,7 +871,7 @@ export const createCorePipeline = (config: CoreConfig) => {
       sampleAndTest(config),
       writeComplianceReports(config)
     ],
-    coreValidForCertification
+    coreValidForCertification(config)
   );
 };
 

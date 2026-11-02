@@ -15,7 +15,7 @@ import { ddValidForCertification, runVariations } from '../../src/sdk/dd.js';
 import { entityEventValidForCertification } from '../../src/sdk/entity-event.js';
 import { createPipeline } from '../../src/sdk/pipeline.js';
 import { createDetailedReportGenerator } from '../../src/sdk/reports.js';
-import type { DDConfig, EntityEventConfig, PipelineResult, PipelineStep, StepResult, StepStatus } from '../../src/sdk/types.js';
+import type { CoreConfig, DDConfig, EntityEventConfig, PipelineResult, PipelineStep, StepResult, StepStatus } from '../../src/sdk/types.js';
 
 const step = (name: string, status: StepStatus, summary?: string): StepResult => ({
   name,
@@ -165,6 +165,10 @@ describe('the Data Dictionary rule', () => {
 });
 
 describe('the Web API Core rule', () => {
+  const core = (version?: string): CoreConfig =>
+    ({ endorsement: 'core', ...(version ? { version } : {}), server: { url: 'https://x', auth: {} } }) as unknown as CoreConfig;
+  const passed = [step('Resolve authentication', 'passed'), step('Run Core scenarios', 'passed')];
+
   // Core routinely reports large skip counts — "219 passed, 0 failed, 112 skipped" — but those are
   // SCENARIO-level and live in the step's counts while the step itself passes. Remove this and a
   // rule written against the wrong level would mark every ordinary Core run ineligible.
@@ -177,7 +181,19 @@ describe('the Web API Core rule', () => {
       counts: { passed: 219, failed: 0, skipped: 112 }
     };
 
-    expect(coreValidForCertification([step('Resolve authentication', 'passed'), scenariosStep])).toEqual(CERTIFIABLE);
+    expect(coreValidForCertification(core('2.1.0'))([step('Resolve authentication', 'passed'), scenariosStep])).toEqual(CERTIFIABLE);
+  });
+
+  // RESO certifies on the latest minor of a major, for Core as for every endorsement.
+  it('is NOT valid on an older minor, a retest, even though every step passed', () => {
+    expect(reasonsOf(coreValidForCertification(core('2.0.0'))(passed))).toEqual([
+      'Certification is on Web API Core 2.1.0, the latest 2.x. A run on 2.0.0 is a retest and is not eligible for certification.'
+    ]);
+  });
+
+  // A run with no version runs the current one, so it is judged as the current one.
+  it('is valid with no version, which runs the current minor', () => {
+    expect(coreValidForCertification(core())(passed)).toEqual(CERTIFIABLE);
   });
 });
 

@@ -1,6 +1,6 @@
 # Web API Core Compliance Testing
 
-Validates OData query capabilities against the [RESO Web API Core specification](https://transport.reso.org/proposals/web-api-core). Supports both v2.0.0 and v2.1.0. Replaces the Java-based [web-api-commander](https://github.com/RESOStandards/web-api-commander).
+Validates OData query capabilities against the [RESO Web API Core specification](https://transport.reso.org/proposals/web-api-core). Runs v2.0.0 and v2.1.0. Only v2.1.0, the latest minor, certifies, so a v2.0.0 run is a retest that is not eligible for certification. Replaces the Java-based [web-api-commander](https://github.com/RESOStandards/web-api-commander).
 
 ## Usage
 

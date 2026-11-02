@@ -126,7 +126,7 @@ Cert tools run the correct, complete and strict check by default. Relaxing one i
 - **DD:** strict schema validation is the default. `--no-strict` records errors without failing on them, and `--skip-variations` skips variations. Either makes the run ineligible.
 - **RCF:** schema validation and variations both run by default. `--skip-schema-validation` or `--skip-variations` makes the run ineligible.
 - **The SDK:** an option the caller leaves out means the strict, complete behavior (`strictMode`, `schemaValidate`, `runVariations`).
-- **Versions:** RESO certifies on the latest minor of a major, 2.1 today (`CERTIFIABLE_DD_VERSIONS`, derived from the supported versions). The CLI still runs older minors (`TESTABLE_DD_VERSIONS`) as retests, and their verdict says they are not eligible.
+- **Versions:** RESO certifies on the latest minor of a major, for every endorsement: Data Dictionary 2.1 and Web API Core 2.1.0 today. `version-policy.ts` holds the rule, and each standard's certifiable list is derived from its supported versions (`CERTIFIABLE_DD_VERSIONS`, `CERTIFIABLE_CORE_VERSIONS`). The CLI still runs older minors as retests, and their verdict says they are not eligible. Majors stand apart until one is deprecated.
 
 ## Style Conventions
 
