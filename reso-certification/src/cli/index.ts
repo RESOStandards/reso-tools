@@ -27,6 +27,7 @@ import { ADD_EDIT_ACTIONS, ADD_EDIT_FORMATS } from '../add-edit/plan.js';
 import { CLOUD_ENDORSEMENT, listCloudRunStatus, reserveCloudRun, submitCloudRun } from '../cloud/runs.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
 import { synthesizeResourcesFromFields } from '../metadata/index.js';
+import { CURRENT_ADD_EDIT_VERSION, SUPPORTED_ADD_EDIT_VERSIONS, isAddEditVersion } from '../sdk/add-edit-versions.js';
 import { lockHolderOf } from '../sdk/common.js';
 import {
   configEntryToAddEdit,
@@ -198,7 +199,11 @@ const addEditCmd = program
   )
   .option('--metadata <path>', 'Path to local XML metadata file')
   .option('--mock', 'Start a mock OData server. Its payloads are written for it unless --payloads gives them')
-  .option('--spec-version <version>', 'Specification version for report', '2.0.0');
+  .option(
+    '--spec-version <version>',
+    `Web API Add/Edit spec version: ${SUPPORTED_ADD_EDIT_VERSIONS.join(' or ')}`,
+    CURRENT_ADD_EDIT_VERSION
+  );
 
 addAuthOptions(addEditCmd);
 addOutputOptions(addEditCmd);
@@ -236,6 +241,10 @@ addEditCmd.action(
       }
       if (opts.payloads && opts.autoPayloads) {
         throw new Error('--payloads and --auto-payloads are two ways of giving the payloads. Use one.');
+      }
+      // The suite is the 2.0.0 one whatever the label says, so another label would describe a test that did not run.
+      if (!isAddEditVersion(opts.specVersion)) {
+        throw new Error(`Invalid --spec-version "${opts.specVersion}". Web API Add/Edit is ${SUPPORTED_ADD_EDIT_VERSIONS.join(' or ')}.`);
       }
       // What to test, checked before anything starts, by the same rules the run applies.
       const selection = addEditSelectionOf(opts);

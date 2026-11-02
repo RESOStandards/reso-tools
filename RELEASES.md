@@ -22,8 +22,9 @@ reso-cert add-edit --url <url> --auth-token <token> --payloads ./payloads --acti
 
 ### Only the latest minor certifies
 
-- **RESO certifies on the latest minor version within a major, for every endorsement.** A Data Dictionary or RCF run is eligible only on 2.1, and a Web API Core run only on 2.1.0. Majors stand apart, so Add/Edit 1.0.0 and 2.0.0 both remain certifiable.
+- **RESO certifies on the latest minor version within a major, for every endorsement.** A Data Dictionary or RCF run is eligible only on 2.1, and a Web API Core run only on 2.1.0.
 - **Web API Core 2.0.0 still runs, as a retest,** and its verdict says it is not eligible and names 2.1.0.
+- **Add/Edit has one version, 2.0.0.** `add-edit --spec-version` refuses any other, because the suite is 2.0.0's whatever the label says, and an SDK run labeled with another version is not eligible.
 - **2.0 still runs, as a retest.** `dd --dd-version 2.0` and RCF files that declare 2.0 run as before, and the verdict says the run is not eligible and names 2.1. 1.7 is not certified.
 - **`rcf` falls back to 2.1** when neither `--dd-version` nor the files' `@reso.context` names a version. It fell back to 2.0.
 

@@ -25,8 +25,8 @@ ran at all. The reverse is not possible: a failed run is never eligible.
 
 Only the latest minor of a major certifies, for every endorsement: Data Dictionary 2.1 and Web API
 Core 2.1.0 today. A run on an older minor, such as Data Dictionary 2.0 or Core 2.0.0, still runs, as a
-retest, and its `certification` says it is not eligible and why. Majors stand apart, so Add/Edit
-1.0.0 and 2.0.0 both certify.
+retest, and its `certification` says it is not eligible and why. Majors stand apart. Add/Edit has
+one version, 2.0.0.
 
 ## The Steps
 

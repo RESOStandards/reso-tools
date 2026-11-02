@@ -20,7 +20,8 @@ import {
   resolveAuthToken
 } from '../test-runner/index.js';
 import { persistMetadataXml } from '../test-runner/metadata.js';
-import { everyStepPassed } from './certification.js';
+import { CURRENT_ADD_EDIT_VERSION, whyAddEditVersionDoesNotCertify } from './add-edit-versions.js';
+import { allOf, everyStepPassed, versionCertifies } from './certification.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
 import { addEditReportGenerators, prepareOutputDir, writeReports } from './reports.js';
@@ -343,7 +344,7 @@ const writeComplianceReports = (config: AddEditConfig): PipelineStep<AddEditCont
   run: async (ctx, onProgress) => {
     // outputPath is prepped by runAddEditCompliance before the
     // pipeline starts (prepareOutputDir).
-    const generators = addEditReportGenerators(config.specVersion ?? '2.0.0');
+    const generators = addEditReportGenerators(config.specVersion ?? CURRENT_ADD_EDIT_VERSION);
 
     // Adapt testReport into resourceReports shape for the detailed report serializer. A run refused before it
     // tested anything still writes its reports, with no scenarios, so the reason reaches whoever reads them.
@@ -370,7 +371,7 @@ const writeComplianceReports = (config: AddEditConfig): PipelineStep<AddEditCont
       context: contextWithReports,
       // The same pure rule the pipeline applies to its returned result, over the same step list, so
       // the written report and the returned result cannot disagree.
-      certification: addEditValidForCertification(steps),
+      certification: addEditValidForCertification(config)(steps),
       duration: 0
     };
 
@@ -391,8 +392,14 @@ const writeComplianceReports = (config: AddEditConfig): PipelineStep<AddEditCont
  *
  * Exported so the rule can be tested directly. The alternative is reaching it only through a full pipeline run
  * against a live server, which would leave the rule itself unobserved.
+ *
+ * The version is the one the report is labeled with. There is one Add/Edit version, so a run labeled with any other
+ * does not certify.
  */
-export const addEditValidForCertification: ValidForCertification = steps => everyStepPassed(steps);
+export const addEditValidForCertification =
+  (config: AddEditConfig): ValidForCertification =>
+  steps =>
+    allOf(everyStepPassed(steps), versionCertifies(whyAddEditVersionDoesNotCertify(config.specVersion ?? CURRENT_ADD_EDIT_VERSION)));
 
 /** Whether auto payloads need records sampled: an update or a delete is tested, and no create makes the record. */
 const samplesRecords = (config: AddEditConfig): boolean => {
@@ -416,13 +423,13 @@ export const createAddEditPipeline = (config: AddEditConfig) =>
       runTests(config),
       writeComplianceReports(config)
     ],
-    addEditValidForCertification
+    addEditValidForCertification(config)
   );
 
 /** Run Add/Edit compliance tests with a single function call. */
 export const runAddEditCompliance = async (config: AddEditConfig, onProgress?: (progress: import('./types.js').StepProgress) => void) => {
   const pipeline = createAddEditPipeline(config);
-  const outputPath = await prepareOutputDir('web-api-add-edit', config.specVersion ?? '2.0.0', config);
+  const outputPath = await prepareOutputDir('web-api-add-edit', config.specVersion ?? CURRENT_ADD_EDIT_VERSION, config);
   const initialContext: AddEditContext = {
     serverUrl: config.server.url,
     resource: config.resource,
