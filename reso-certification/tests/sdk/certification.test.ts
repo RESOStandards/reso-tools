@@ -15,7 +15,16 @@ import { ddValidForCertification, runVariations } from '../../src/sdk/dd.js';
 import { entityEventValidForCertification } from '../../src/sdk/entity-event.js';
 import { createPipeline } from '../../src/sdk/pipeline.js';
 import { createDetailedReportGenerator } from '../../src/sdk/reports.js';
-import type { CoreConfig, DDConfig, EntityEventConfig, PipelineResult, PipelineStep, StepResult, StepStatus } from '../../src/sdk/types.js';
+import type {
+  AddEditConfig,
+  CoreConfig,
+  DDConfig,
+  EntityEventConfig,
+  PipelineResult,
+  PipelineStep,
+  StepResult,
+  StepStatus
+} from '../../src/sdk/types.js';
 
 const step = (name: string, status: StepStatus, summary?: string): StepResult => ({
   name,
@@ -228,9 +237,27 @@ describe('the EntityEvent rule', () => {
 });
 
 describe('the Add/Edit rule', () => {
+  const addEdit = (specVersion?: string): AddEditConfig =>
+    ({
+      endorsement: 'add-edit',
+      ...(specVersion ? { specVersion } : {}),
+      server: { url: 'https://x', auth: {} }
+    }) as unknown as AddEditConfig;
+
   it('is valid when every step passed and NOT valid when one was skipped', () => {
-    expect(addEditValidForCertification([step('Run Add/Edit scenarios', 'passed')])).toEqual(CERTIFIABLE);
-    expect(addEditValidForCertification([step('Run Add/Edit scenarios', 'skipped')]).valid).toBe(false);
+    expect(addEditValidForCertification(addEdit())([step('Run Add/Edit scenarios', 'passed')])).toEqual(CERTIFIABLE);
+    expect(addEditValidForCertification(addEdit())([step('Run Add/Edit scenarios', 'skipped')]).valid).toBe(false);
+  });
+
+  it('is valid on 2.0.0, the one Add/Edit version', () => {
+    expect(addEditValidForCertification(addEdit('2.0.0'))([step('Run Add/Edit scenarios', 'passed')])).toEqual(CERTIFIABLE);
+  });
+
+  // There is no Add/Edit 1.0.0. The suite is 2.0.0's whatever a report is labeled, so another label does not certify.
+  it('is NOT valid on a report labeled with any other version', () => {
+    expect(reasonsOf(addEditValidForCertification(addEdit('1.0.0'))([step('Run Add/Edit scenarios', 'passed')]))).toEqual([
+      'RESO does not certify Web API Add/Edit 1.0.0.'
+    ]);
   });
 });
 

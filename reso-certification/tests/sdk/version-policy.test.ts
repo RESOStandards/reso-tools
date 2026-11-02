@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CERTIFIABLE_ADD_EDIT_VERSIONS, SUPPORTED_ADD_EDIT_VERSIONS, isAddEditVersion } from '../../src/sdk/add-edit-versions.js';
 import { CERTIFIABLE_CORE_VERSIONS, whyCoreVersionDoesNotCertify } from '../../src/sdk/core-versions.js';
 import { latestOfEachMajor, whyVersionDoesNotCertify } from '../../src/sdk/version-policy.js';
 
@@ -42,5 +43,15 @@ describe('Web API Core versions', () => {
     expect([...CERTIFIABLE_CORE_VERSIONS]).toEqual(['2.1.0']);
     expect(whyCoreVersionDoesNotCertify('2.1.0')).toBeUndefined();
     expect(whyCoreVersionDoesNotCertify('2.0.0')).toContain('A run on 2.0.0 is a retest');
+  });
+});
+
+describe('Web API Add/Edit versions', () => {
+  // RCP-10 was ratified as 2.0.0, and there is no other version.
+  it('are 2.0.0 alone, which certifies', () => {
+    expect([...SUPPORTED_ADD_EDIT_VERSIONS]).toEqual(['2.0.0']);
+    expect([...CERTIFIABLE_ADD_EDIT_VERSIONS]).toEqual(['2.0.0']);
+    expect(isAddEditVersion('2.0.0')).toBe(true);
+    expect(isAddEditVersion('1.0.0')).toBe(false);
   });
 });
