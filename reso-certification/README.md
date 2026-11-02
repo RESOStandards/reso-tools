@@ -89,7 +89,7 @@ reso-cert entity-event --url https://api.example.com --auth-token TOKEN --mode o
 
 ### Web API Core 2.1.0
 
-Validates OData query capabilities: $filter across all data types, $select, $orderby, $top, $skip, $count, enumerations, error codes, $expand, server-driven paging and string-based enum comparisons. Core 2.0.0 remains certifiable and is selectable per run; 2.1.0 is the default.
+Validates OData query capabilities: $filter across all data types, $select, $orderby, $top, $skip, $count, enumerations, error codes, $expand, server-driven paging and string-based enum comparisons. Core 2.1.0 is the default and the version that certifies. 2.0.0 remains selectable per run, as a retest that is not eligible for certification.
 
 ```bash
 reso-cert core --url https://api.example.com --auth-token TOKEN

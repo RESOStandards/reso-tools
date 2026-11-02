@@ -17,8 +17,8 @@ import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadataWithVersion, persistMetadataXml } from '../test-runner/metadata.js';
 import { computeVariationsViaService } from '../variations/index.js';
-import { CERTIFIABLE, allOf, ddVersionCertifies, everyStepPassed, notCertifiable } from './certification.js';
-import type { DDVersion } from './dd-versions.js';
+import { CERTIFIABLE, allOf, everyStepPassed, notCertifiable, versionCertifies } from './certification.js';
+import { type DDVersion, whyDDVersionDoesNotCertify } from './dd-versions.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
 import { generateMetadataReport, normalizeReportJson } from './report-field-types.js';
@@ -711,7 +711,7 @@ export const ddValidForCertification =
   steps =>
     allOf(
       everyStepPassed(steps),
-      ddVersionCertifies(config.version),
+      versionCertifies(whyDDVersionDoesNotCertify(config.version)),
       // Relaxing strict is a legitimate thing to do while fixing a feed: the run keeps going and
       // accumulates every schema error instead of stopping at the first. What it cannot do is
       // certify, because nothing enforced what it validated. The config is closed over here rather

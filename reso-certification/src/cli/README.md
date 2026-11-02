@@ -156,7 +156,7 @@ performs canary writes), `--writable-resource <name>` (default `Property`),
 `--metadata <path>`, `--mock`. Provide one of `--url`, `--config`, or `--mock`.
 
 ### `core`
-Web API Core 2.1.0 compliance. Core 2.0.0 remains certifiable and is selectable per run.
+Web API Core 2.1.0 compliance. Core 2.0.0 remains selectable per run, as a retest. Only 2.1.0, the latest minor, certifies.
 
 ```bash
 reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2.1.0

@@ -20,9 +20,10 @@ reso-cert add-edit --url <url> --auth-token <token> --payloads ./payloads --acti
 - **The mock works out of the box.** `reso-cert add-edit --mock` writes its own payloads, and the package now ships the metadata the mock serves, which now validates.
 - **The MCP server's `run-compliance`** takes `actions`, `formats`, `payloads` and `autoPayloads` for Add/Edit.
 
-### Only the latest Data Dictionary minor certifies
+### Only the latest minor certifies
 
-- **A Data Dictionary or RCF run is eligible for certification only on 2.1,** the latest minor of Data Dictionary 2. RESO certifies on the latest minor version within a major.
+- **RESO certifies on the latest minor version within a major, for every endorsement.** A Data Dictionary or RCF run is eligible only on 2.1, and a Web API Core run only on 2.1.0. Majors stand apart, so Add/Edit 1.0.0 and 2.0.0 both remain certifiable.
+- **Web API Core 2.0.0 still runs, as a retest,** and its verdict says it is not eligible and names 2.1.0.
 - **2.0 still runs, as a retest.** `dd --dd-version 2.0` and RCF files that declare 2.0 run as before, and the verdict says the run is not eligible and names 2.1. 1.7 is not certified.
 - **`rcf` falls back to 2.1** when neither `--dd-version` nor the files' `@reso.context` names a version. It fell back to 2.0.
 

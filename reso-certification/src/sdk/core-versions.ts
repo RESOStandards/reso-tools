@@ -7,7 +7,12 @@
  *
  * `CURRENT_CORE_VERSION` is what a run defaults to when the caller doesn't specify one — the CLI's
  * `--spec-version` default, so a plain `reso-cert core --url …` certifies the current minor.
+ *
+ * `CERTIFIABLE_CORE_VERSIONS` is the latest minor of each major. A run on an older supported minor runs, as a retest,
+ * and is not eligible for certification.
  */
+
+import { latestOfEachMajor, whyVersionDoesNotCertify } from './version-policy.js';
 
 /** Core spec versions the runner supports. SOURCE OF TRUTH — the CLI, config parsing, and the scenario
  *  catalog (`scenariosForVersion`) all gate on this. */
@@ -22,6 +27,13 @@ export const CURRENT_CORE_VERSION: CoreVersion = '2.1.0';
 /** Type guard: is this exact value a supported Core version? Narrows `string` → `CoreVersion` without a cast. */
 export const isCoreVersion = (version: string): version is CoreVersion =>
   (SUPPORTED_CORE_VERSIONS as ReadonlyArray<string>).includes(version);
+
+/** Versions a provider can be certified on: the latest minor of each major, derived so a new minor moves it. */
+export const CERTIFIABLE_CORE_VERSIONS: ReadonlyArray<CoreVersion> = latestOfEachMajor(SUPPORTED_CORE_VERSIONS);
+
+/** Why a run on this Core version cannot certify, or undefined when it can. */
+export const whyCoreVersionDoesNotCertify = (version: string): string | undefined =>
+  whyVersionDoesNotCertify('Web API Core', version, CERTIFIABLE_CORE_VERSIONS);
 
 /** Split a dotted version into numeric segments; a missing or non-numeric segment reads as 0. Tolerates both
  *  two-part (`2.1`) and three-part (`2.1.0`) input so a comparison never hinges on the exact string shape. */

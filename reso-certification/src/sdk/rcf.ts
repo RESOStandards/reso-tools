@@ -13,7 +13,8 @@ import {
 } from '../cli/rcf-command.js';
 import { type RcfInputFingerprint, fingerprintRcfInput } from '../rcf/fingerprint.js';
 import { VARIATIONS_REPORT_FILENAME } from '../variations/constants.js';
-import { CERTIFIABLE, allOf, ddVersionCertifies, everyStepPassed, notCertifiable } from './certification.js';
+import { CERTIFIABLE, allOf, everyStepPassed, notCertifiable, versionCertifies } from './certification.js';
+import { whyDDVersionDoesNotCertify } from './dd-versions.js';
 import { createPipeline } from './pipeline.js';
 import { createDetailedReportGenerator, createGenericReportGenerator, writeReports } from './reports.js';
 import { INFER_RCF_REPORTS, READ_RCF_INPUT, WRITE_REPORTS } from './step-names.js';
@@ -53,7 +54,7 @@ export const rcfValidForCertification =
     const version = steps.find(step => step.name === INFER_RCF_REPORTS)?.params?.version;
     return allOf(
       everyStepPassed(steps),
-      typeof version === 'string' ? ddVersionCertifies(version) : CERTIFIABLE,
+      typeof version === 'string' ? versionCertifies(whyDDVersionDoesNotCertify(version)) : CERTIFIABLE,
       schemaValidates(config)
         ? CERTIFIABLE
         : notCertifiable(['Schema validation did not run, so no record was checked against the Data Dictionary']),
