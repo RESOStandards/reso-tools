@@ -23,11 +23,13 @@ vi.mock('../../src/variations/index.js', async importOriginal => {
 const mockedCompute = vi.mocked(computeVariationsViaService);
 
 const fixtures = resolve(dirname(fileURLToPath(import.meta.url)), '../fixtures/rcf');
-const SINGLE = resolve(fixtures, 'single-payload.json');
+// Declares 2.1, the latest minor, so a clean run certifies. The 2.0 original is the retest case.
+const SINGLE = resolve(fixtures, 'single-payload-2.1.json');
+const SINGLE_2_0 = resolve(fixtures, 'single-payload.json');
 
 const ONE_VARIATION = {
   description: 'Data Dictionary Variations Report',
-  version: '2.0',
+  version: '2.1',
   fuzziness: 0.25,
   variations: {
     fields: [{ level: 'field', resourceName: 'Property', fieldName: 'Cty', suggestions: [{ suggestedFieldName: 'City' }] }]
@@ -71,9 +73,18 @@ describe('an RCF run through the SDK', () => {
       'report.json'
     ]);
     const report = await read('report.json');
-    expect(report).toMatchObject({ description: 'RESO Common Format', version: '2.0', outcome: 'passed' });
+    expect(report).toMatchObject({ description: 'RESO Common Format', version: '2.1', outcome: 'passed' });
     expect(report).not.toHaveProperty('certification');
     expect(report.remarks).toBe('2 records in 1 file(s): 1 resources, 3 fields, 2 lookups. 0 schema error(s). 1 variation(s).');
+  });
+
+  it('does not certify a run on an older minor, which is a retest', async () => {
+    const { result } = await run({ input: SINGLE_2_0 });
+    expect(result.status).toBe('passed');
+    expect(result.certification).toEqual({
+      valid: false,
+      reasons: ['Certification is on Data Dictionary 2.1, the latest 2.x. A run on 2.0 is a retest and is not eligible for certification.']
+    });
   });
 
   it('names its steps as reports read them', async () => {

@@ -7,6 +7,7 @@
  * the failure direction this whole mechanism exists to prevent, so nothing here is a default.
  */
 
+import { whyDDVersionDoesNotCertify } from './dd-versions.js';
 import type { CertificationValidity, StepResult } from './types.js';
 
 /** The eligible verdict, so every endorsement spells it the same way. */
@@ -53,4 +54,13 @@ export const everyStepPassed = (steps: ReadonlyArray<StepResult>): Certification
 export const allOf = (...conditions: ReadonlyArray<CertificationValidity>): CertificationValidity => {
   const reasons = conditions.flatMap(condition => (condition.valid ? [] : condition.reasons));
   return reasons.length === 0 ? CERTIFIABLE : notCertifiable(reasons);
+};
+
+/**
+ * Whether a run on this Data Dictionary version can certify. RESO certifies on the latest minor of a
+ * major, so a run on an older minor is a retest: it runs, and it does not certify.
+ */
+export const ddVersionCertifies = (version: string): CertificationValidity => {
+  const reason = whyDDVersionDoesNotCertify(version);
+  return reason ? notCertifiable([reason]) : CERTIFIABLE;
 };

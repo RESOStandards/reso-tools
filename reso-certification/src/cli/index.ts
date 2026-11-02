@@ -37,7 +37,13 @@ import {
   loadConfigFile
 } from '../sdk/config.js';
 import { CURRENT_CORE_VERSION, SUPPORTED_CORE_VERSIONS, isCoreVersion } from '../sdk/core-versions.js';
-import { CERTIFIABLE_DD_VERSIONS, CURRENT_DD_VERSION, isCertifiableDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
+import {
+  CERTIFIABLE_DD_VERSIONS,
+  CURRENT_DD_VERSION,
+  TESTABLE_DD_VERSIONS,
+  isTestableDDVersion,
+  normalizeDDVersion
+} from '../sdk/dd-versions.js';
 import { fetchMetadataReportFromServer } from '../sdk/metadata-source.js';
 import { rcfRunOutcome, runRcfCompliance } from '../sdk/rcf.js';
 import { normalizeReportFieldTypes } from '../sdk/report-field-types.js';
@@ -730,7 +736,10 @@ const ddCmd = program
   .option('--config <path>', 'Path to a config file – runs every entry (mutually exclusive with --url)')
   // No Commander default here on purpose. With one, the action cannot tell `--dd-version 2.1` from
   // nothing supplied, and config mode needs that distinction to let an explicit flag win.
-  .option('--dd-version <version>', `DD version (${CERTIFIABLE_DD_VERSIONS.join(' or ')}; default ${CURRENT_DD_VERSION})`)
+  .option(
+    '--dd-version <version>',
+    `DD version (${TESTABLE_DD_VERSIONS.join(' or ')}; default ${CURRENT_DD_VERSION}). Certification is on ${CERTIFIABLE_DD_VERSIONS.join(' or ')}, the latest minor; an older one runs as a retest`
+  )
   .option('--limit <n>', "Max records to replicate per resource (default: the config entry's ddOptions.limit, else 100000)")
   // Strict is the default, so `--strict` is a no-op kept for compatibility and `--no-strict` is the
   // real switch. BOTH are declared rather than `--no-strict` alone: declaring only the negation makes
@@ -788,8 +797,10 @@ ddCmd.action(
       // belong to. When they are absent the service wrapper falls back to the CERT_AUTH_API_*
       // provider-token mint, unchanged.
       const servicesAuthToken = await mintOAuth2ClientCredentialsToken();
-      if (!isCertifiableDDVersion(ddVersion)) {
-        throw new Error(`Invalid version "${opts.ddVersion}". RESO certification requires DD ${CERTIFIABLE_DD_VERSIONS.join(' or ')}.`);
+      if (!isTestableDDVersion(ddVersion)) {
+        throw new Error(
+          `Invalid version "${opts.ddVersion}". This command runs DD ${TESTABLE_DD_VERSIONS.join(' or ')}, and certification is on ${CERTIFIABLE_DD_VERSIONS.join(' or ')}.`
+        );
       }
 
       const renderMode = resolveRenderMode(opts);

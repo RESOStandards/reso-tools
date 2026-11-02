@@ -3,10 +3,11 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it, vi } from 'vitest';
-import { type RcfResult, processRcfStream, resolveRcfExitCode, runRcf } from '../../src/cli/rcf-command.js';
+import { RCF_DEFAULT_DD_VERSION, type RcfResult, processRcfStream, resolveRcfExitCode, runRcf } from '../../src/cli/rcf-command.js';
 import type { RcfPayload } from '../../src/cli/rcf-input.js';
 import type { DdSchemaValidator } from '../../src/cli/schema-command.js';
 import { serviceError } from '../../src/sdk/common.js';
+import { isCertifiableDDVersion } from '../../src/sdk/dd-versions.js';
 import { computeVariationsViaService } from '../../src/variations/index.js';
 
 // Mock only computeVariationsViaService; the real isVariationsAuthError still runs, so the
@@ -483,5 +484,13 @@ describe('resolveRcfExitCode', () => {
 
   it('exits 0 on a clean run with records and no errors', () => {
     expect(resolveRcfExitCode(result({}))).toBe(0);
+  });
+});
+
+describe('the version rcf falls back to', () => {
+  // When neither --dd-version nor a payload's context names a version. A fallback to an older minor would make every
+  // such run a retest that cannot certify.
+  it('is a version that certifies', () => {
+    expect(isCertifiableDDVersion(RCF_DEFAULT_DD_VERSION)).toBe(true);
   });
 });

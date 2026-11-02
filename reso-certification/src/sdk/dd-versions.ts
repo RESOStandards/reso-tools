@@ -8,10 +8,14 @@
  * `dd-{ver}.json` reference files on disk.
  *
  * Distinct concerns are kept distinct, not merged:
- *   - SUPPORTED   — versions we ship reference metadata for (the SDK accepts all).
- *   - CERTIFIABLE — SUPPORTED minus DEPRECATED. The CLI enforces this; 1.7 is
- *                   deprecated for certification but still runnable via the SDK.
- *   - CURRENT     — the version new work defaults to.
+ *   - SUPPORTED   – versions we ship reference metadata for (the SDK accepts all).
+ *   - TESTABLE    – SUPPORTED minus DEPRECATED. The CLI runs these; 1.7 is
+ *                   deprecated and still runnable only via the SDK.
+ *   - CERTIFIABLE – the latest minor of each testable major. RESO certifies on
+ *                   the latest MINOR version within a given MAJOR branch, so a
+ *                   run on an older minor is a retest: it runs, and it does not
+ *                   certify.
+ *   - CURRENT     – the version new work defaults to.
  */
 
 /** Versions we ship reference metadata for. SOURCE OF TRUTH — kept in sync with
@@ -26,11 +30,35 @@ export type DDVersion = (typeof SUPPORTED_DD_VERSIONS)[number];
 export const DEPRECATED_DD_VERSIONS = ['1.7'] as const;
 export type DeprecatedDDVersion = (typeof DEPRECATED_DD_VERSIONS)[number];
 
-/** Versions a provider can be certified on: SUPPORTED minus DEPRECATED. */
-export type CertifiableDDVersion = Exclude<DDVersion, DeprecatedDDVersion>;
-export const CERTIFIABLE_DD_VERSIONS: ReadonlyArray<CertifiableDDVersion> = SUPPORTED_DD_VERSIONS.filter(
-  (v): v is CertifiableDDVersion => !(DEPRECATED_DD_VERSIONS as ReadonlyArray<string>).includes(v)
+/** Versions the CLI runs: SUPPORTED minus DEPRECATED. */
+export type TestableDDVersion = Exclude<DDVersion, DeprecatedDDVersion>;
+export const TESTABLE_DD_VERSIONS: ReadonlyArray<TestableDDVersion> = SUPPORTED_DD_VERSIONS.filter(
+  (v): v is TestableDDVersion => !(DEPRECATED_DD_VERSIONS as ReadonlyArray<string>).includes(v)
 );
+
+const majorOf = (version: string): string => version.split('.')[0] ?? '';
+const minorOf = (version: string): number => Number(version.split('.')[1]);
+
+/**
+ * Versions a provider can be certified on: the latest minor of each testable major. Derived, so a
+ * new minor's reference metadata moves certification to it without an edit here.
+ */
+export const CERTIFIABLE_DD_VERSIONS: ReadonlyArray<TestableDDVersion> = TESTABLE_DD_VERSIONS.filter(v =>
+  TESTABLE_DD_VERSIONS.every(other => majorOf(other) !== majorOf(v) || minorOf(other) <= minorOf(v))
+);
+
+/**
+ * Why a run on this version cannot certify, or undefined when it can. An older minor is a retest;
+ * a version with no certifiable minor in its major (1.7) is not certified at all.
+ */
+export const whyDDVersionDoesNotCertify = (version: string): string | undefined => {
+  const normalized = normalizeDDVersion(version);
+  if ((CERTIFIABLE_DD_VERSIONS as ReadonlyArray<string>).includes(normalized)) return undefined;
+  const latest = CERTIFIABLE_DD_VERSIONS.find(v => majorOf(v) === majorOf(normalized));
+  return latest
+    ? `Certification is on Data Dictionary ${latest}, the latest ${majorOf(latest)}.x. A run on ${normalized} is a retest and is not eligible for certification.`
+    : `RESO does not certify Data Dictionary ${normalized}.`;
+};
 
 /** The current DD version new work defaults to. */
 export const CURRENT_DD_VERSION: DDVersion = '2.1';
@@ -51,8 +79,12 @@ export const normalizeDDVersion = (version: string): string => version.split('.'
  */
 export const isDDVersion = (version: string): version is DDVersion => (SUPPORTED_DD_VERSIONS as ReadonlyArray<string>).includes(version);
 
-/** Type guard: is this exact value a certifiable DD version (supported, not deprecated)? */
-export const isCertifiableDDVersion = (version: string): version is CertifiableDDVersion =>
+/** Type guard: is this exact value a version the CLI runs (supported, not deprecated)? */
+export const isTestableDDVersion = (version: string): version is TestableDDVersion =>
+  (TESTABLE_DD_VERSIONS as ReadonlyArray<string>).includes(version);
+
+/** Type guard: is this exact value a version a provider can be certified on (the latest minor)? */
+export const isCertifiableDDVersion = (version: string): version is TestableDDVersion =>
   (CERTIFIABLE_DD_VERSIONS as ReadonlyArray<string>).includes(version);
 
 /** Patch-tolerant convenience: normalize, then test support. Boolean (not a guard). */

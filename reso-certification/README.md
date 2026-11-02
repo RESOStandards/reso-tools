@@ -104,7 +104,7 @@ reso-cert core --url https://api.example.com --auth-token TOKEN \
 
 ### Data Dictionary 2.1
 
-Validates server metadata and data availability against the RESO Data Dictionary. Fetches metadata, merges Lookup Resource data, checks for variations and replicates data using multiple strategies. Data Dictionary 2.0 remains certifiable and is selectable per run; 2.1 is the default.
+Validates server metadata and data availability against the RESO Data Dictionary. Fetches metadata, merges Lookup Resource data, checks for variations and replicates data using multiple strategies. Data Dictionary 2.1 is the default and the version that certifies. 2.0 remains selectable per run, as a retest that is not eligible for certification.
 
 ```bash
 reso-cert dd --url https://api.example.com --auth-token TOKEN
@@ -113,7 +113,7 @@ reso-cert dd --url https://api.example.com --auth-token TOKEN
 # surveys everything to fix. The run is NOT eligible for certification.
 reso-cert dd --url https://api.example.com --auth-token TOKEN --no-strict
 
-# Certify against Data Dictionary 2.0 instead of the default 2.1.
+# Retest against Data Dictionary 2.0. Certification is on 2.1, the latest minor, so this run is NOT eligible.
 reso-cert dd --url https://api.example.com --auth-token TOKEN --dd-version 2.0
 ```
 
@@ -137,7 +137,7 @@ reso-cert submit-variations-report --report ./out/variations-report.json
 ```
 
 - **Machine-friendly lookup values are accepted until Data Dictionary 3.0.** A value such as `ComingSoon` for `Coming Soon` is listed as a deprecation, not a variation.
-- **The Data Dictionary version** is `--dd-version` when given, else the version in the files' `@reso.context`, else 2.0.
+- **The Data Dictionary version** is `--dd-version` when given, else the version in the files' `@reso.context`, else 2.1.
 - **Both checks run by default.** Each record is checked against the Data Dictionary types and the names against variations, because certification needs both. `--skip-schema-validation` and `--skip-variations` turn one off for other testing, and the run is then not eligible for certification.
 - **Variations do not change the exit code.** `rcf` exits `1` on schema errors, and `2` when it could not do what was asked.
 - **The variations check uses your RESO services credentials.** `--skip-variations` runs without them.

@@ -13,7 +13,7 @@ import {
 } from '../cli/rcf-command.js';
 import { type RcfInputFingerprint, fingerprintRcfInput } from '../rcf/fingerprint.js';
 import { VARIATIONS_REPORT_FILENAME } from '../variations/constants.js';
-import { CERTIFIABLE, allOf, everyStepPassed, notCertifiable } from './certification.js';
+import { CERTIFIABLE, allOf, ddVersionCertifies, everyStepPassed, notCertifiable } from './certification.js';
 import { createPipeline } from './pipeline.js';
 import { createDetailedReportGenerator, createGenericReportGenerator, writeReports } from './reports.js';
 import { INFER_RCF_REPORTS, READ_RCF_INPUT, WRITE_REPORTS } from './step-names.js';
@@ -47,9 +47,13 @@ const schemaValidates = (config: RcfConfig): boolean => config.schemaValidate !=
  */
 export const rcfValidForCertification =
   (config: RcfConfig): ValidForCertification =>
-  steps =>
-    allOf(
+  steps => {
+    // The version the run used, as the inference step recorded it. A run that never inferred has a
+    // failed step, which everyStepPassed already refuses.
+    const version = steps.find(step => step.name === INFER_RCF_REPORTS)?.params?.version;
+    return allOf(
       everyStepPassed(steps),
+      typeof version === 'string' ? ddVersionCertifies(version) : CERTIFIABLE,
       schemaValidates(config)
         ? CERTIFIABLE
         : notCertifiable(['Schema validation did not run, so no record was checked against the Data Dictionary']),
@@ -57,6 +61,7 @@ export const rcfValidForCertification =
         ? notCertifiable(['Variations did not run, so no name was checked against the Data Dictionary'])
         : CERTIFIABLE
     );
+  };
 
 /** Why an inferred run is not a clean pass, in the order the command's exit code weighs them. */
 const failureReasons = (result: RcfResult): ReadonlyArray<string> => {
