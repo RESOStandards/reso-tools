@@ -1542,7 +1542,7 @@ const runScenario = async (
     return runEnumFamilyScenario(serverUrl, resource, scenario, params, authToken, start, op, requester);
   }
 
-  // Paging builds and walks its own URLs ($top=2 then $top=1), so it does not route through
+  // Paging builds its own URLs ($top=1, then a nextLink walk bounded by PAGING_WALK_TOP_BOUND), so it does not route through
   // buildScenarioQuery — dispatch it before the skip-gate so it is never skipped for a "missing query".
   if (scenario.category === 'paging') {
     return runPagingScenario(serverUrl, resource, params, authToken, start, requester);
