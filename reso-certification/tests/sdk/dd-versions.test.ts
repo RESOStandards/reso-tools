@@ -7,10 +7,13 @@ import {
   CURRENT_DD_VERSION,
   DEPRECATED_DD_VERSIONS,
   SUPPORTED_DD_VERSIONS,
+  TESTABLE_DD_VERSIONS,
   isCertifiableDDVersion,
   isDDVersion,
   isSupportedDDVersion,
-  normalizeDDVersion
+  isTestableDDVersion,
+  normalizeDDVersion,
+  whyDDVersionDoesNotCertify
 } from '../../src/sdk/dd-versions.js';
 
 // The versions we ship reference metadata for, read straight off reso-common's reference-metadata
@@ -30,9 +33,25 @@ describe('SUPPORTED_DD_VERSIONS is the single source of truth', () => {
 });
 
 describe('derived sets stay consistent', () => {
-  it('certifiable = supported minus deprecated', () => {
+  it('testable = supported minus deprecated', () => {
     const expected = SUPPORTED_DD_VERSIONS.filter(v => !(DEPRECATED_DD_VERSIONS as ReadonlyArray<string>).includes(v));
-    expect([...CERTIFIABLE_DD_VERSIONS].sort()).toEqual([...expected].sort());
+    expect([...TESTABLE_DD_VERSIONS].sort()).toEqual([...expected].sort());
+  });
+
+  // RESO certifies on the latest minor version within a given major branch.
+  it('certifiable = the highest testable minor of each major, and nothing else', () => {
+    const majors = [...new Set(TESTABLE_DD_VERSIONS.map(v => v.split('.')[0]))];
+    const highest = majors.map(
+      major =>
+        TESTABLE_DD_VERSIONS.filter(v => v.split('.')[0] === major)
+          .map(v => Number(v.split('.')[1]))
+          .sort((a, b) => b - a)[0]
+    );
+    expect([...CERTIFIABLE_DD_VERSIONS].sort()).toEqual(majors.map((major, i) => `${major}.${highest[i]}`).sort());
+  });
+
+  it('today that is 2.1 alone: 2.0 is a retest', () => {
+    expect([...CERTIFIABLE_DD_VERSIONS]).toEqual(['2.1']);
   });
 
   it('current is itself a supported and certifiable version', () => {
@@ -72,10 +91,33 @@ describe('guards narrow safely (no `as` casts needed)', () => {
     expect(isSupportedDDVersion('3.0')).toBe(false);
   });
 
-  it('isCertifiableDDVersion excludes deprecated 1.7', () => {
+  it('isTestableDDVersion excludes deprecated 1.7 and keeps older minors', () => {
+    expect(isTestableDDVersion('1.7')).toBe(false);
+    expect(isTestableDDVersion('2.0')).toBe(true);
+    expect(isTestableDDVersion('2.1')).toBe(true);
+  });
+
+  it('isCertifiableDDVersion is the latest minor only', () => {
     expect(isCertifiableDDVersion('1.7')).toBe(false);
-    expect(isCertifiableDDVersion('2.0')).toBe(true);
+    expect(isCertifiableDDVersion('2.0')).toBe(false);
     expect(isCertifiableDDVersion('2.1')).toBe(true);
+  });
+});
+
+describe('whyDDVersionDoesNotCertify says why, or nothing', () => {
+  it('says nothing for the latest minor, in either form', () => {
+    expect(whyDDVersionDoesNotCertify('2.1')).toBeUndefined();
+    expect(whyDDVersionDoesNotCertify('2.1.0')).toBeUndefined();
+  });
+
+  it('names the version certification is on for an older minor', () => {
+    expect(whyDDVersionDoesNotCertify('2.0')).toBe(
+      'Certification is on Data Dictionary 2.1, the latest 2.x. A run on 2.0 is a retest and is not eligible for certification.'
+    );
+  });
+
+  it('says RESO does not certify a version with no certifiable minor in its major', () => {
+    expect(whyDDVersionDoesNotCertify('1.7')).toBe('RESO does not certify Data Dictionary 1.7.');
   });
 });
 

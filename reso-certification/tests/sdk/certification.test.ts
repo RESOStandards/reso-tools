@@ -117,6 +117,20 @@ describe('the Data Dictionary rule', () => {
     expect(reasonsOf(verdict).join(' ')).toContain('--no-strict');
   });
 
+  // RESO certifies on the latest minor of a major. An older minor runs as a retest and says so.
+  it('is NOT valid on an older minor, a retest, even though every step passed', () => {
+    const verdict = ddValidForCertification({ ...strict, version: '2.0' } as DDConfig)(ddSteps('passed'));
+    expect(verdict.valid).toBe(false);
+    expect(reasonsOf(verdict)).toEqual([
+      'Certification is on Data Dictionary 2.1, the latest 2.x. A run on 2.0 is a retest and is not eligible for certification.'
+    ]);
+  });
+
+  it('is NOT valid on a version RESO does not certify', () => {
+    const verdict = ddValidForCertification({ ...strict, version: '1.7' } as DDConfig)(ddSteps('passed'));
+    expect(reasonsOf(verdict)).toEqual(['RESO does not certify Data Dictionary 1.7.']);
+  });
+
   // An absent strictMode is a default run, not a relaxed one. Getting this backwards would make
   // every ordinary run ineligible.
   it('is valid when strictMode is absent, because absent means strict', () => {

@@ -23,6 +23,9 @@ ran at all. The reverse is not possible: a failed run is never eligible.
 
 `certification` is new in this release. A report produced by an earlier version does not carry it.
 
+Only the latest minor of a Data Dictionary major certifies, 2.1 today. A Data Dictionary or RCF run
+on 2.0 still runs, as a retest, and its `certification` says it is not eligible and why.
+
 ## The Steps
 
 The step list differs per endorsement. These are the real names, as they appear in

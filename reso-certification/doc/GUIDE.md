@@ -253,7 +253,7 @@ Every run checks each record against the Data Dictionary. RCF is extensible, so 
 
 #### Which Data Dictionary Version
 
-`--dd-version` when you give it. Otherwise the version in the files' `@reso.context`, which is 2.1 in the sample, and 2.0 when neither says.
+`--dd-version` when you give it. Otherwise the version in the files' `@reso.context`, which is 2.1 in the sample, and 2.1 when neither says. Certification is on 2.1, the latest minor, so files that declare 2.0 run as a retest and are not eligible. To certify, update the version in each file's `@reso.context`, for example to `urn:reso:metadata:2.1:resource:property`.
 
 #### Exit Codes for `rcf`
 

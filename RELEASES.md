@@ -20,6 +20,12 @@ reso-cert add-edit --url <url> --auth-token <token> --payloads ./payloads --acti
 - **The mock works out of the box.** `reso-cert add-edit --mock` writes its own payloads, and the package now ships the metadata the mock serves, which now validates.
 - **The MCP server's `run-compliance`** takes `actions`, `formats`, `payloads` and `autoPayloads` for Add/Edit.
 
+### Only the latest Data Dictionary minor certifies
+
+- **A Data Dictionary or RCF run is eligible for certification only on 2.1,** the latest minor of Data Dictionary 2. RESO certifies on the latest minor version within a major.
+- **2.0 still runs, as a retest.** `dd --dd-version 2.0` and RCF files that declare 2.0 run as before, and the verdict says the run is not eligible and names 2.1. 1.7 is not certified.
+- **`rcf` falls back to 2.1** when neither `--dd-version` nor the files' `@reso.context` names a version. It fell back to 2.0.
+
 ### `rcf` writes `report.json`, and the SDK runs RESO Common Format
 
 - **`rcf` writes `report.json` and `report-detailed.json`,** like every other run, even when it fails. The summary names RESO Common Format and the data's Data Dictionary version.

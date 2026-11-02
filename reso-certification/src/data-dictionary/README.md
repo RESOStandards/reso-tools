@@ -1,10 +1,10 @@
 # Data Dictionary Compliance Testing
 
-Validates OData servers against the RESO Data Dictionary. DD 2.1 is the default; 2.0 remains selectable with `--dd-version`.
+Validates OData servers against the RESO Data Dictionary. DD 2.1 is the default and the version that certifies. 2.0 remains selectable with `--dd-version`, as a retest that is not eligible for certification.
 
 Replaces the Commander-based DD workflow entirely – metadata serialization, Lookup Resource fetching, and replication all happen natively in TypeScript, calling cert-utils inner functions directly for the replication strategies and variations checking.
 
-> **Note:** RESO no longer certifies providers on DD 1.7. The CLI accepts DD 2.0 and 2.1 only. DD 1.7 is available via the SDK for historical compatibility only.
+> **Note:** RESO no longer certifies providers on DD 1.7. The CLI runs DD 2.0 and 2.1 only, and RESO certifies on the latest minor, 2.1. DD 1.7 is available via the SDK for historical compatibility only.
 
 ## Usage
 
@@ -97,7 +97,7 @@ Tested against the RESO reference server (Docker, PostgreSQL, 153 Property recor
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--dd-version` | 2.1 | DD version: 2.0 or 2.1 |
+| `--dd-version` | 2.1 | DD version: 2.0 or 2.1. Only 2.1 certifies |
 | `--limit` | 100000 | Max records to replicate per resource |
 | `--strict` | true | Fail the run on JSON schema validation errors. On by default; variations fail a run independently of this |
 | `--no-strict` | – | Record schema validation errors without failing on them. Validation still runs. The run is **not eligible for certification** |

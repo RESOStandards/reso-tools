@@ -209,7 +209,7 @@ the repository; `.gitignore` catches the conventional directory names and not an
 
 ### `dd`
 Data Dictionary 2.1 compliance – replicates a live endpoint and validates it against the DD.
-DD 2.0 remains certifiable and is selectable per run.
+DD 2.0 remains selectable per run, as a retest. Only 2.1, the latest minor, certifies.
 
 ```bash
 reso-cert dd --url https://api.example.com --auth-token TOKEN
@@ -221,7 +221,7 @@ reso-cert dd --config ./sample-configs/dd-config.json        # multi-provider ba
 |---|---|---|
 | `--url <url>` | – | Server base URL (mutually exclusive with `--config`) |
 | `--config <path>` | – | Config file with one or more provider entries |
-| `--dd-version <v>` | `2.1` | DD version. 2.0 and 2.1 are certifiable. Anything else is refused, 1.7 included. In config-file mode the entry's version stands unless this flag is given |
+| `--dd-version <v>` | `2.1` | DD version. 2.0 and 2.1 run, and only 2.1, the latest minor, certifies, so a 2.0 run is **not eligible for certification**. Anything else is refused, 1.7 included. In config-file mode the entry's version stands unless this flag is given |
 | `--limit <n>` | `100000` | Max records replicated per resource |
 | `--strict` | on | Fail the run on JSON-schema validation errors. On by default, so this flag is only needed to be explicit. Variations fail a run independently of this setting |
 | `--no-strict` | – | Record schema-validation errors without failing on them, so a long run surveys everything to fix. Validation still runs. The run is **not eligible for certification** and says so in its verdict |

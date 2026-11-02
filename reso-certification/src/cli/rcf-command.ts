@@ -19,7 +19,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { type ReferenceMap, inferMetadataReport } from '../rcf/index.js';
-import { SUPPORTED_DD_VERSIONS, isSupportedDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
+import { CURRENT_DD_VERSION, SUPPORTED_DD_VERSIONS, isSupportedDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
 import {
   type LevelBuckets,
   type VariationsServiceReport,
@@ -38,8 +38,11 @@ const { buildMetadataMap } = requireCjs(resolve(here, '../legacy/common.js')) as
   buildMetadataMap: (r: unknown) => { metadataMap: ReferenceMap };
 };
 
-/** The Data Dictionary version an `rcf` run uses when neither `--dd-version` nor the first payload's context names one. */
-export const RCF_DEFAULT_DD_VERSION = '2.0';
+/**
+ * The Data Dictionary version an `rcf` run uses when neither `--dd-version` nor the first payload's context names one:
+ * the current version, which is the one that certifies.
+ */
+export const RCF_DEFAULT_DD_VERSION = CURRENT_DD_VERSION;
 /** Records kept per resource for inference; availability is scored over ALL records regardless. */
 const DEFAULT_SAMPLE_CAP = 5000;
 
