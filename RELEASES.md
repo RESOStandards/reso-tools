@@ -23,7 +23,7 @@ reso-cert add-edit --url <url> --auth-token <token> --payloads ./payloads --acti
 ### `rcf` writes `report.json`, and the SDK runs RESO Common Format
 
 - **`rcf` writes `report.json` and `report-detailed.json`,** like every other run, even when it fails. The summary names RESO Common Format and the data's Data Dictionary version.
-- **A run is eligible for certification only when it checked records with `--schema-validate` and checked variations.** Without either, no record or no name was checked against the Data Dictionary, and the summary says so.
+- **A run is eligible for certification only when it checked every record against the Data Dictionary and checked variations.** Both run by default. `--skip-schema-validation` and `--skip-variations` turn one off for other testing, and the run is then not eligible: no record or no name was checked against the Data Dictionary, and the summary says so. `--schema-validate` is still accepted and changes nothing.
 - **The detailed report holds a fingerprint of the files read,** so a later run can confirm it scored the same data. The same files give the same fingerprint as a `.json`, a folder or a `.zip`.
 - **The SDK exports `runRcfCompliance`.** `rcf` runs it, so a run from the SDK and one from the command are the same run. Its messages, exit codes and other files are unchanged.
 

@@ -405,7 +405,7 @@ export interface RcfConfig {
   readonly version?: string;
   /** The variations match threshold, 0 to 1. */
   readonly fuzziness?: number;
-  /** Check every record against the Data Dictionary. A run that did not is not certifiable. */
+  /** Check every record against the Data Dictionary (default true). A run that did not is not certifiable. */
   readonly schemaValidate?: boolean;
   /** Stop at the first schema error. */
   readonly strict?: boolean;

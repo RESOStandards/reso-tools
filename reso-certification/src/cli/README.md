@@ -327,12 +327,13 @@ authenticates to the Variations Service with `.env` service credentials.
 ### `rcf`
 RESO Common Format certification. An RCF provider delivers data rather than a schema, so there is no
 `$metadata` to read: `rcf` infers the metadata report and the data-availability report from the payloads,
-then runs variations against the inferred report. DD schema validation is opt-in, under
-`--schema-validate`.
+then runs variations against the inferred report. It schema-validates every record against the DD
+first. Both checks run by default, because certification needs both. `--skip-schema-validation` and
+`--skip-variations` turn one off, and the run is then not eligible for certification.
 
 ```bash
 reso-cert rcf -i ./rcf-export/ --output-dir ./out
-reso-cert rcf -i payloads.zip --schema-validate --output-dir ./out
+reso-cert rcf -i payloads.zip --skip-schema-validation --output-dir ./out   # inference only, not eligible
 reso-cert rcf -i payload.json --skip-variations --output-dir ./out   # offline, no credentials
 
 # Variations for review: name the provider, system and recipient, then submit what rcf wrote
@@ -341,8 +342,8 @@ reso-cert submit-variations-report --report ./out/variations-report.json
 ```
 
 `-i, --input <path>` (required; a `.json` file, a `.zip` or a directory of payloads or records) ·
-`--dd-version <v>` · `-f, --fuzziness <0–1>` (default `0.25`) · `--schema-validate` · `--strict`
-(fail on the first schema error, with `--schema-validate`) · `--skip-variations` ·
+`--dd-version <v>` · `-f, --fuzziness <0–1>` (default `0.25`) · `--skip-schema-validation` · `--strict`
+(fail on the first schema error) · `--skip-variations` · `--schema-validate` (accepted, the default) ·
 `-a, --additional-properties` (accepted and inert: RCF is always extensible) · `--output-dir <path>`
 (default `.`) · `--provider-uoi <uoi>` · `--provider-usi <usi>` · `--recipient-uoi <uoi>` (all three or
 none).
@@ -360,8 +361,8 @@ with the `.env` service credentials, as `find-variations` does. `--skip-variatio
 inference-only run needs none.
 
 Exit `0` pass / `1` schema errors / `2` nothing certifiable ingested or a variations pass that degraded.
-A file whose `@reso.context` cannot be read is a schema error under `--schema-validate` and a `2` without
-it, so an unreadable submission never reads as a clean pass. A variations outage leaves both reports on
+A file whose `@reso.context` cannot be read is a schema error, and a `2` under
+`--skip-schema-validation`, so an unreadable submission never reads as a clean pass. A variations outage leaves both reports on
 disk and names the reason. An auth misconfiguration is the exception: the run cannot do what was
 asked, so it fails with nothing written.
 

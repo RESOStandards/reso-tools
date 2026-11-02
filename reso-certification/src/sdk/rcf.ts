@@ -35,6 +35,12 @@ interface RcfContext {
 }
 
 /**
+ * Whether the run schema-validates. It does unless the caller turned it off: a cert tool runs the complete, strict
+ * check by default and relaxes only on request, as `runVariations` already does.
+ */
+const schemaValidates = (config: RcfConfig): boolean => config.schemaValidate !== false;
+
+/**
  * Whether an RCF run can certify: every step passed, and it checked what certification needs. A run that did not
  * schema-validate checked no record against the Data Dictionary, and one that skipped variations checked no name,
  * so neither certifies whatever else it found.
@@ -44,7 +50,7 @@ export const rcfValidForCertification =
   steps =>
     allOf(
       everyStepPassed(steps),
-      config.schemaValidate
+      schemaValidates(config)
         ? CERTIFIABLE
         : notCertifiable(['Schema validation did not run, so no record was checked against the Data Dictionary']),
       config.runVariations === false
@@ -98,7 +104,7 @@ const inferReports = (config: RcfConfig): PipelineStep<RcfContext> => ({
         version: config.version,
         fuzziness: config.fuzziness,
         strict: config.strict,
-        schemaValidate: config.schemaValidate,
+        schemaValidate: schemaValidates(config),
         generatedOn: context.generatedOn,
         runVariations: config.runVariations !== false,
         ...(bearerToken ? { bearerToken } : {}),
@@ -114,7 +120,7 @@ const inferReports = (config: RcfConfig): PipelineStep<RcfContext> => ({
         summary: reasons.length > 0 ? `${reasons.join('. ')}. ${inferred}` : inferred,
         params: {
           version: result.version,
-          schemaValidate: config.schemaValidate === true,
+          schemaValidate: schemaValidates(config),
           variations: config.runVariations !== false
         },
         counts: {

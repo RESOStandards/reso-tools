@@ -88,6 +88,14 @@ describe('an RCF run through the SDK', () => {
     expect(readStep?.params?.fingerprint).toBe((await fingerprintRcfInput(SINGLE)).sha256);
   });
 
+  it('schema-validates by default, so a run that does not say still certifies', async () => {
+    const { result, read } = await run({ schemaValidate: undefined });
+    expect(result.certification).toEqual({ valid: true });
+    expect(stepNamed(result, 'Infer RCF reports')?.params?.schemaValidate).toBe(true);
+    const report = await read('report.json');
+    expect(report.remarks).toContain('0 schema error(s)');
+  });
+
   it('does not certify a run that did not schema-validate', async () => {
     const { result, read } = await run({ schemaValidate: false });
     expect(result.status).toBe('passed');

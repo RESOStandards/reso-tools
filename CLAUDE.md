@@ -119,6 +119,14 @@ here because it applies to any repo in the org.
 - Always remove dead code when disabling a feature. If removal effort is high, ask first and open a ticket instead of leaving dead code with comments.
 - For new code, do not ignore compiler, linter, or bundler warnings. Fix them. If a build produces many warnings, summarize the classes at a high level and prompt before proceeding – do not silently accept them. Legacy code paths (e.g. `src/legacy/`) are the exception: flag them, leave them, and capture in a cleanup ticket if worth tracking.
 
+## Certification Defaults
+
+Cert tools run the correct, complete and strict check by default. Relaxing one is a flag for other testing, and a run made with it is not eligible for certification and says why. A check someone has to opt into in order to certify is the wrong way round.
+
+- **DD:** strict schema validation is the default. `--no-strict` records errors without failing on them, and `--skip-variations` skips variations. Either makes the run ineligible.
+- **RCF:** schema validation and variations both run by default. `--skip-schema-validation` or `--skip-variations` makes the run ineligible.
+- **The SDK:** an option the caller leaves out means the strict, complete behavior (`strictMode`, `schemaValidate`, `runVariations`).
+
 ## Style Conventions
 
 - Chicago Manual of Style for prose, no serial comma

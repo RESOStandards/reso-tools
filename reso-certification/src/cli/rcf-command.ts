@@ -312,8 +312,10 @@ export const submittableVariationsReport = (
 };
 
 /**
- * Run the RCF step: ingest → (optional) schema-validate → infer metadata report + data-availability
- * report → (optional) variations. `version` is taken from the input's context unless overridden.
+ * Run the RCF step: ingest → schema-validate → infer metadata report + data-availability report →
+ * variations. Both checks are switches here; the command and the SDK turn them on by default and off
+ * only on request, because certification needs both. `version` is taken from the input's context
+ * unless overridden.
  */
 export const runRcf = async (opts: {
   readonly input: string;
