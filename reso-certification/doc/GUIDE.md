@@ -230,7 +230,7 @@ The variations check uses your RESO services credentials, the `credentials.env` 
 * `data-dictionary-variations.json` – the variations, with the deprecations under `deprecations`
 * `report.json` and `report-detailed.json` – the summary and the full record of the run, as every run writes them, even when it fails. The detailed report holds a fingerprint of the files read, so a later run can confirm it scored the same data.
 
-A run is eligible for certification only when it checked records with `--schema-validate` and checked variations. What each file contains is in [Reading a Certification Run](RUN-REFERENCE.md#reso-common-format-rcf).
+A run is eligible for certification only when it checked every record against the Data Dictionary and checked variations. It does both by default. What each file contains is in [Reading a Certification Run](RUN-REFERENCE.md#reso-common-format-rcf).
 
 #### Submitting the Variations for Review
 
@@ -247,11 +247,9 @@ reso-cert submit-variations-report --report out/variations-report.json
 
 #### Checking Records Against the Data Dictionary Types
 
-```bash
-reso-cert rcf --input property.json --output-dir out --schema-validate
-```
+Every run checks each record against the Data Dictionary. RCF is extensible, so local fields and local values are accepted. A field the Data Dictionary defines has to have the right type, though: a `ListPrice` of `"three eighty-nine"` is an error. The run prints how many errors it found and exits with `1`. `--strict` stops at the first one.
 
-`--schema-validate` checks each record against the Data Dictionary. RCF is extensible, so local fields and local values are accepted. A field the Data Dictionary defines has to have the right type, though: a `ListPrice` of `"three eighty-nine"` is an error. The run prints how many errors it found and exits with `1`. `--strict` stops at the first one.
+`--skip-schema-validation` turns the check off, for a quick look at what the files contain. A run made with it is not eligible for certification, and neither is one made with `--skip-variations`. `--schema-validate` is still accepted and changes nothing.
 
 #### Which Data Dictionary Version
 
@@ -262,8 +260,8 @@ reso-cert rcf --input property.json --output-dir out --schema-validate
 | Code | Meaning |
 |---|---|
 | `0` | The files were read and checked. Variations and deprecations do not change the code, so read them in the report. |
-| `1` | Schema errors, with `--schema-validate` |
-| `2` | The run could not do what was asked: nothing certifiable was read, a file's `@reso.context` could not be read (with `--schema-validate` that is a schema error, so `1`), the three identity options were incomplete or the variations check could not run |
+| `1` | Schema errors |
+| `2` | The run could not do what was asked: nothing certifiable was read, a file's `@reso.context` could not be read under `--skip-schema-validation` (otherwise it is a schema error, so `1`), the three identity options were incomplete or the variations check could not run |
 
 ---
 

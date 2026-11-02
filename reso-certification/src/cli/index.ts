@@ -1511,10 +1511,11 @@ program
   );
 
 // ── RCF Subcommand (per-step util: RESO Common Format certification) ──
-// RCF providers deliver data, not a schema — a .json/.zip/directory of payloads or records. This
-// streams the input, optionally schema-validates it against the DD (--strict), reverse-infers a
-// DD-2.0 metadata report + a data-availability report, and runs the variations service on the
-// inferred report — the same two artifacts as a DD 2.0 run, plus the variations report.
+// RCF providers deliver data, not a schema – a .json/.zip/directory of payloads or records. This
+// streams the input, schema-validates it against the DD (unless --skip-schema-validation), reverse-
+// infers a DD-2.0 metadata report + a data-availability report, and runs the variations service on
+// the inferred report – the same two artifacts as a DD 2.0 run, plus the variations report. Both
+// checks run by default, because certification needs both. Skipping either is for other testing.
 
 program
   .command('rcf')
@@ -1526,15 +1527,19 @@ program
   .option('-f, --fuzziness <float>', `Variations fuzzy-match threshold (0–1, default ${DEFAULT_FUZZINESS})`, String(DEFAULT_FUZZINESS))
   .option('--output-dir <path>', 'Directory for the reports (created if missing)', '.')
   .option(
+    '--skip-schema-validation',
+    'Do not schema-validate the payloads against the DD before inferring. The run is NOT eligible for certification'
+  )
+  .option(
     '--schema-validate',
-    'Schema-validate each payload against the DD before inferring (RCF is taken as-is: local fields and values are accepted; a DD field must have the right type; length, precision and scale beyond the DD are warnings)'
+    'Accepted for compatibility: schema validation is the default (RCF is taken as-is: local fields and values are accepted; a DD field must have the right type; length, precision and scale beyond the DD are warnings)'
   )
   .option(
     '-a, --additional-properties',
     'Accepted for compatibility: extension is always allowed on RCF (local fields and values), so this flag has no effect here'
   )
-  .option('--strict', 'Fail fast on the first schema-validation error (with --schema-validate)')
-  .option('--skip-variations', 'Skip the variations service call (infer + reports only)')
+  .option('--strict', 'Fail fast on the first schema-validation error')
+  .option('--skip-variations', 'Do not check variations. The run is NOT eligible for certification')
   .option(
     '--provider-uoi <uoi>',
     `Your organization's UOI. With --provider-usi and --recipient-uoi, variations are also written to ${SUBMITTABLE_REPORT_FILENAME} for submit-variations-report`
@@ -1547,6 +1552,7 @@ program
       ddVersion?: string;
       fuzziness: string;
       outputDir: string;
+      skipSchemaValidation?: boolean;
       schemaValidate?: boolean;
       additionalProperties?: boolean;
       strict?: boolean;
@@ -1560,6 +1566,10 @@ program
         if (!Number.isFinite(fuzziness) || fuzziness < 0 || fuzziness > 1) {
           throw new Error(`--fuzziness must be a number in [0, 1], got '${opts.fuzziness}'`);
         }
+        if (opts.schemaValidate && opts.skipSchemaValidation) {
+          throw new Error('--schema-validate and --skip-schema-validation cannot both be given');
+        }
+        const schemaValidate = !opts.skipSchemaValidation;
         // Read before the run, so a partial identity stops it here rather than after the work is done.
         const identityRead = readRcfReportIdentity({
           providerUoi: opts.providerUoi,
@@ -1579,7 +1589,7 @@ program
           version: opts.ddVersion,
           fuzziness,
           strict: opts.strict,
-          schemaValidate: opts.schemaValidate,
+          schemaValidate,
           runVariations: !opts.skipVariations,
           ...(bearerToken ? { servicesAuthToken: bearerToken } : {}),
           ...(identityRead.identity ?? {}),
@@ -1595,7 +1605,7 @@ program
 
         const s = result.stats;
         process.stderr.write(
-          `rcf: DD${result.version} – ${s.totalRecords.toLocaleString()} records → ${s.resources} resources, ${s.fields.toLocaleString()} fields, ${s.lookups.toLocaleString()} lookups${opts.schemaValidate ? `; ${s.schemaErrors} schema error(s)` : ''}${s.variationsTotal !== undefined ? `; ${s.variationsTotal} variation(s)` : ''} → ${dir}\n`
+          `rcf: DD${result.version} – ${s.totalRecords.toLocaleString()} records → ${s.resources} resources, ${s.fields.toLocaleString()} fields, ${s.lookups.toLocaleString()} lookups${schemaValidate ? `; ${s.schemaErrors} schema error(s)` : ''}${s.variationsTotal !== undefined ? `; ${s.variationsTotal} variation(s)` : ''} → ${dir}\n`
         );
         if (result.variationsError) {
           process.stderr.write(`rcf: variations skipped (reports still written): ${result.variationsError}\n`);

@@ -127,8 +127,8 @@ RCF data arrives as files of records, with no server and no `$metadata` behind i
 # One file, a directory of files or a .zip
 reso-cert rcf --input ./rcf-export/ --output-dir ./out
 
-# Also check each record against the Data Dictionary types
-reso-cert rcf --input ./rcf-export/ --output-dir ./out --schema-validate
+# Infer the reports only, without the checks certification needs (not eligible for certification)
+reso-cert rcf --input ./rcf-export/ --output-dir ./out --skip-schema-validation --skip-variations
 
 # Write a variations report for review, then submit it
 reso-cert rcf --input ./rcf-export/ --output-dir ./out \
@@ -138,7 +138,8 @@ reso-cert submit-variations-report --report ./out/variations-report.json
 
 - **Machine-friendly lookup values are accepted until Data Dictionary 3.0.** A value such as `ComingSoon` for `Coming Soon` is listed as a deprecation, not a variation.
 - **The Data Dictionary version** is `--dd-version` when given, else the version in the files' `@reso.context`, else 2.0.
-- **Variations do not change the exit code.** `rcf` exits `1` on schema errors with `--schema-validate`, and `2` when it could not do what was asked.
+- **Both checks run by default.** Each record is checked against the Data Dictionary types and the names against variations, because certification needs both. `--skip-schema-validation` and `--skip-variations` turn one off for other testing, and the run is then not eligible for certification.
+- **Variations do not change the exit code.** `rcf` exits `1` on schema errors, and `2` when it could not do what was asked.
 - **The variations check uses your RESO services credentials.** `--skip-variations` runs without them.
 
 [**More info**](doc/GUIDE.md) – "RESO Common Format (RCF)" in the User Guide

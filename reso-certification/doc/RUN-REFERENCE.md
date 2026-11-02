@@ -96,8 +96,9 @@ to certify.
 
 `rcf` runs three steps: `Read RCF input`, `Infer RCF reports` and `Write reports`. What each does is
 under [RESO Common Format (RCF)](#reso-common-format-rcf). A run is eligible for certification only when
-every step passed, it ran with `--schema-validate` and it checked variations. Without either check, no
-record or no name was checked against the Data Dictionary.
+every step passed and it ran both checks, schema validation and variations, which it does by default.
+Without either (`--skip-schema-validation`, `--skip-variations`), no record or no name was checked
+against the Data Dictionary.
 
 ## Scenario Skips Are Not Step Skips
 
@@ -299,7 +300,7 @@ In order, `rcf`:
    with Data Dictionary fields linked to their Data Dictionary pages. It looks at up to 5,000 records
    per resource for this.
 3. **Counts availability** over every record read, however many there are.
-4. **Checks types**, only with `--schema-validate`. A Data Dictionary field must have the right type.
+4. **Checks types**, unless `--skip-schema-validation`. A Data Dictionary field must have the right type.
    Local fields and local values are accepted, because RCF is extensible.
 5. **Checks variations**, unless `--skip-variations`. A lookup value in its machine-friendly form
    (`ComingSoon` for `Coming Soon`) is accepted until Data Dictionary 3.0, so it is listed as a
@@ -387,8 +388,7 @@ the same shape as a Data Dictionary run's `variations-report.json`: the variatio
 
 ### Schema errors (RCF)
 
-With `--schema-validate`, the console reports how many there are ("1 schema error(s)") and the run exits
-with `1`. No file lists them.
+The console reports how many there are ("1 schema error(s)") and the run exits with `1`. No file lists them.
 
 ## How a Run Fails, and What You Still Get
 
