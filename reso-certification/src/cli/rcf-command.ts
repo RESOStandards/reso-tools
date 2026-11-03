@@ -380,20 +380,15 @@ export const runRcf = async (opts: {
       })
     : undefined;
 
-  // One read validates, counts availability and infers the metadata report from every record. When the shapes of
-  // mis-named expansions matched Data Dictionary resources, their records belong under those resources, so the
-  // input is read again to infer with the matches known. That second read neither validates nor counts.
-  const firstRead = createRcfInference(referenceMap);
+  // One read validates, counts availability and infers the metadata report from every record.
+  const inference = createRcfInference(referenceMap);
   const stream = await processRcfStream(readRcfPayloads(opts.input), {
     validator,
     strict: opts.strict,
-    inference: firstRead,
+    inference,
     version,
     canonicalResource
   });
-  const kinds = firstRead.resolvedKinds();
-  const inference = kinds.size === 0 ? firstRead : createRcfInference(referenceMap, kinds);
-  if (inference !== firstRead) await processRcfStream(readRcfPayloads(opts.input), { inference, version, canonicalResource });
   const metadataReport = inference.report({ version, generatedOn: opts.generatedOn });
   const dataAvailabilityReport = buildDataAvailabilityReport(stream.availability, version, opts.generatedOn);
 
