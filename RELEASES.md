@@ -36,6 +36,12 @@ reso-cert add-edit --url <url> --auth-token <token> --payloads ./payloads --acti
 - **Reading is slower.** A 31 MB file takes about 3 seconds, where it took about 1. A file whose `@reso.context` comes after its records is read twice, once to find the context and once for the records, and takes about twice as long.
 - **A file must be valid JSON, as before,** and the error now names the file. A file that gives `value`, `@reso.context` or `@odata.context` more than once is refused. Before, it was read as its last.
 
+### Security updates
+
+- **Dependencies are updated for 17 of the 18 advisories `npm audit` reported,** among them `fast-xml-parser`, which reads `$metadata`, the `express` request stack and the MCP SDK. No update was published after 2026-10-23, so none is newer than 11 days.
+- **Vitest now needs 4.1.12 or later,** and Vite is held on 6.
+- **`zod` is not updated yet.** Its fix needs zod 4 in the MCP server, which is a change of its own.
+
 ### `rcf` writes `report.json`, and the SDK runs RESO Common Format
 
 - **`rcf` writes `report.json` and `report-detailed.json`,** like every other run, even when it fails. The summary names RESO Common Format and the data's Data Dictionary version.
