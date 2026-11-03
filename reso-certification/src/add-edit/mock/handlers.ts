@@ -4,6 +4,7 @@
  * Uses an in-memory Map as a record store. Negative numeric field values
  * trigger 400 validation errors (matching the spec's known-bad payload convention).
  */
+import { randomUUID } from 'node:crypto';
 import type { Request, Response } from 'express';
 
 /** In-memory store for created/updated records, keyed by record ID. */
@@ -63,7 +64,9 @@ export const handleCreate =
       return;
     }
 
-    const key = String(Date.now());
+    // Unique per create, as the reference server's are: a timestamp repeats when two creates land in the same millisecond,
+    // and the second then overwrote the first.
+    const key = randomUUID();
     const record: Record<string, unknown> = {
       ...body,
       ListingKey: key,

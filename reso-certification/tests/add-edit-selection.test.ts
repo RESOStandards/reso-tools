@@ -130,6 +130,61 @@ describe('an update or a delete whose payload names no record', () => {
   });
 });
 
+// Josh, 2026-11-03: "we do need to remove anything that was created ... if that server also supports delete (some
+// won't) and the provider asks us to test that too". And when delete is not tested: "we need to leave it be", and "we
+// can tell them there are undeleted records".
+describe('the records a run created', () => {
+  const BOTH = ['representation', 'minimal'];
+  const statusOf = async (key: string): Promise<number> => (await fetch(`${serverUrl}/Property('${encodeURIComponent(key)}')`)).status;
+  const ALL_FILES = {
+    ...CREATE_FILES,
+    'update-succeeds.json': { ListPrice: 222222 },
+    'update-fails.json': { ListPrice: -1 },
+    'delete-succeeds.json': {},
+    'delete-fails.json': { id: '00000000-0000-0000-0000-000000000000' }
+  };
+
+  it('are all removed when delete is tested, the ones its delete test did not reach included', async () => {
+    const report = await run(await payloadsFolder(ALL_FILES), {
+      actions: ['create', 'update', 'delete'],
+      formats: { create: BOTH, update: BOTH }
+    });
+    expect(report.summary).toMatchObject({ total: 8, failed: 0 });
+    const { removed, notRemoved, left } = report.cleanup ?? { removed: [], notRemoved: [], left: [] };
+    // Two creates, one per format, so two records, and neither is still there.
+    expect(removed).toHaveLength(2);
+    expect(notRemoved).toEqual([]);
+    expect(left).toEqual([]);
+    expect(await Promise.all(removed.map(statusOf))).toEqual([404, 404]);
+    // Each was deleted by its own key, never through the collection's URL.
+    const deletes = sent.filter(line => line.startsWith('DELETE '));
+    expect(deletes.every(line => /\/Property\('[^']+'\)$/.test(line))).toBe(true);
+    expect(removed.every(key => deletes.some(line => line.includes(key)))).toBe(true);
+  });
+
+  it('are left as they are when delete is not tested, and named in the report', async () => {
+    const report = await run(await payloadsFolder(CREATE_FILES), { actions: ['create'], formats: { create: BOTH } });
+    expect(sent.some(line => line.startsWith('DELETE '))).toBe(false);
+    const { removed, left } = report.cleanup ?? { removed: [], left: [] };
+    expect(removed).toEqual([]);
+    expect(left).toHaveLength(2);
+    expect(await Promise.all(left.map(statusOf))).toEqual([200, 200]);
+  });
+
+  it('include one a create that should have failed made anyway', async () => {
+    // A server that accepts the record meant to fail creates it, and the run still removes it.
+    const report = await run(await payloadsFolder({ ...ALL_FILES, 'create-fails.json': samplePayloads('create-succeeds.json') }), {
+      actions: ['create', 'delete'],
+      formats: { create: BOTH }
+    });
+    expect(report.scenarios.find(s => s.scenario === 'create-fails')?.passed).toBe(false);
+    const { removed, left } = report.cleanup ?? { removed: [], left: [] };
+    expect(removed).toHaveLength(3);
+    expect(left).toEqual([]);
+    expect(await Promise.all(removed.map(statusOf))).toEqual([404, 404, 404]);
+  });
+});
+
 describe('the key a create gives the record it made', () => {
   const entityType = { name: 'Property', keyProperties: ['ListingKey'], properties: [] };
   const response = (status: number, headers: Record<string, string>, body: unknown = undefined) => ({
