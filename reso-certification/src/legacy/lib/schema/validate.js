@@ -68,6 +68,8 @@ const ORIGINAL_SCHEMA = 'original_schema';
  *   consistency signal, never the switch. On 'rcf' the context is the payload's model identifier and selects.
  * @param {boolean=} obj.embedded  the payload is an item embedded in a page (an $expand child): its context, when
  *   present, is checked, but an absent one is never a finding (the page carries it).
+ * @param {boolean=} obj.contextChecked  the payload is a later batch of records from one already validated: its
+ *   context and its resource were checked with the first batch, so neither is checked, counted or reported again.
  *
  * @returns Intermediate error and warning caches along with stats. Can be combined later using `combineErrors`
  */
@@ -83,7 +85,8 @@ const validate = ({
   disableKeys,
   chunk = false,
   acquisition,
-  embedded = false
+  embedded = false,
+  contextChecked = false
 } = {}) => {
   const { stats = { totalErrors: 0, totalWarnings: 0 }, errorCache = {}, warningsCache = {}, payloadErrors = {} } = errorMap;
 
@@ -128,7 +131,7 @@ const validate = ({
   // additional trailing parameters allowed), version against the run's declared version, resource against the
   // requested resource. RCF → errors; transport → warnings until DD 3.0, then errors and required.
   let contextErrorsCounted = 0;
-  if (acquisition === 'rcf' || acquisition === 'transport') {
+  if ((acquisition === 'rcf' || acquisition === 'transport') && !contextChecked) {
     const { findings } = checkResoContext({ context: payload['@reso.context'], resource: resourceName, version, mode: acquisition, embedded });
     contextErrorsCounted = findings.filter(({ severity }) => severity === 'error').length;
     findings.forEach(({ severity, message }) =>
@@ -164,6 +167,8 @@ const validate = ({
       const singleValueSchema = schema?.oneOf?.find(s => !s.properties.value);
       const multiValueSchema = schema?.oneOf?.find(s => s.properties.value);
 
+      // A later batch of a payload whose resource could not be resolved: the first batch recorded that once.
+      if (!formattedResourceName && contextChecked) return result();
       if (!formattedResourceName) {
         // The payload cannot be validated: its context could not be resolved to a resource, or it names one
         // the schema does not define. That is never a pass: the payload error is kept for callers that read it,

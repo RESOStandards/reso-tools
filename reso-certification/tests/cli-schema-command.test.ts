@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import { basename, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadSettings, resolveSettingsPath, validateSchemaPayload } from '../src/cli/schema-command.js';
+import { createDdSchemaValidator, loadSettings, resolveSettingsPath, validateSchemaPayload } from '../src/cli/schema-command.js';
 
 const require = createRequire(import.meta.url);
 const { getReferenceMetadata } = require(resolve(import.meta.dirname, '../src/etl/index.cjs'));
@@ -132,5 +132,62 @@ describe('loadSettings — the exemptions config', () => {
   it('loads the pre-baked settings (carries the 2.0 and 2.1 stanzas)', async () => {
     const cfg = await loadSettings();
     expect(Object.keys(cfg)).toEqual(expect.arrayContaining(['2.0', '2.1']));
+  });
+});
+
+// #263: rcf validates a payload in batches of its records. The batches must give the report one call gives: each
+// record is checked on its own, and the context and the resource once, with the first batch.
+describe('createDdSchemaValidator: one payload in batches', () => {
+  const records = [
+    { ListingKey: '1', ListPrice: 250000, BedroomsTotal: 3 },
+    { ListingKey: '2', ListPrice: 'not-a-number', BedroomsTotal: 'three' },
+    { ListingKey: '3', ListPrice: 'x', BedroomsTotal: 2 },
+    { ListingKey: '4', ListPrice: 1, BedroomsTotal: 'four' },
+    { ListingKey: '5', ListPrice: 2, BedroomsTotal: 5 }
+  ];
+  const batches = [records.slice(0, 2), records.slice(2, 4), records.slice(4)];
+
+  const reports = async (context: string, resource: string) => {
+    const validator = await createDdSchemaValidator({ metadataReportJson: metadata, additionalProperties: true, acquisition: 'rcf' });
+    // The report is stamped when it is combined, so the stamp is set aside.
+    const unstamped = ({ totalErrors, report }: ReturnType<typeof validator.combine>) => ({
+      totalErrors,
+      report: { ...report, generatedOn: '' }
+    });
+    const whole = unstamped(validator.combine(validator.validate({ '@reso.context': context, value: records }, resource, '2.0', {})));
+    const batched = unstamped(
+      validator.combine(
+        batches.reduce<Record<string, unknown>>(
+          (errorMap, value, i) =>
+            validator.validate({ '@reso.context': context, value }, resource, '2.0', errorMap, { contextChecked: i > 0 }),
+          {}
+        )
+      )
+    );
+    return { whole, batched };
+  };
+
+  it('gives the same report for a context with a finding and records with errors', async () => {
+    // The context names 2.1 on a 2.0 run: one context error, and four type errors in the records.
+    const { whole, batched } = await reports('urn:reso:metadata:2.1:resource:property', 'Property');
+    expect(whole.totalErrors).toBe(5);
+    expect(batched).toEqual(whole);
+  });
+
+  it('gives the same single error for a payload whose resource is not in the Data Dictionary', async () => {
+    const { whole, batched } = await reports('urn:reso:metadata:2.0:resource:widget', 'Widget');
+    expect(whole.totalErrors).toBe(1);
+    expect(batched).toEqual(whole);
+  });
+
+  it('counts the context again when later batches do not say it was checked', async () => {
+    // The control: without the flag each batch checks the context, so the batches would count it three times.
+    const validator = await createDdSchemaValidator({ metadataReportJson: metadata, additionalProperties: true, acquisition: 'rcf' });
+    const unflagged = batches.reduce<Record<string, unknown>>(
+      (errorMap, value) =>
+        validator.validate({ '@reso.context': 'urn:reso:metadata:2.1:resource:property', value }, 'Property', '2.0', errorMap),
+      {}
+    );
+    expect(validator.combine(unflagged).totalErrors).toBe(7);
   });
 });
