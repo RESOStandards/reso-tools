@@ -183,6 +183,27 @@ export interface ReportGenerator<TContext extends PipelineContext = PipelineCont
 
 // ── Remarks Serializers ──
 
+const plural = (count: number, word: string): string => `${count} ${word}${count === 1 ? '' : 's'}`;
+
+/** What became of the records an Add/Edit run created, in counts, for the remarks. */
+const cleanupRemarks = (cleanup: unknown): ReadonlyArray<string> => {
+  if (typeof cleanup !== 'object' || cleanup === null) return [];
+  const {
+    removed = [],
+    notRemoved = [],
+    left = []
+  } = cleanup as {
+    readonly removed?: ReadonlyArray<unknown>;
+    readonly notRemoved?: ReadonlyArray<unknown>;
+    readonly left?: ReadonlyArray<unknown>;
+  };
+  return [
+    ...(removed.length > 0 ? [`Removed the ${plural(removed.length, 'record')} it created`] : []),
+    ...(notRemoved.length > 0 ? [`Could not remove ${plural(notRemoved.length, 'record')} it created`] : []),
+    ...(left.length > 0 ? [`Left ${plural(left.length, 'record')} it created on the server, because delete was not tested`] : [])
+  ];
+};
+
 /** Serialize Add/Edit pipeline results into a human-readable remarks string. */
 export const serializeAddEditRemarks = (result: PipelineResult): string => {
   const testStep = result.steps.find(s => s.name === RUN_ADD_EDIT_SCENARIOS);
@@ -207,6 +228,8 @@ export const serializeAddEditRemarks = (result: PipelineResult): string => {
   const parts = [headline, ...(tested ? [`Tested ${tested}`] : [])];
   if (fieldCount > 0) parts.push(`${fieldCount} fields validated against ${resource} metadata`);
   if (testStep.params?.payloads === 'auto') parts.push('The tool wrote the payloads');
+  // Counts only: remarks reach the Cert API and its pages. The keys are in the detailed report, for the provider.
+  parts.push(...cleanupRemarks(testStep.params?.cleanup));
   if (failed > 0) {
     const errors = testStep.errors ?? [];
     if (errors.length > 0) parts.push(`Failures: ${errors.join(', ')}`);

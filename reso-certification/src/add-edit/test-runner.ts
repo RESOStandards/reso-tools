@@ -23,7 +23,15 @@ import {
   validateStatusCode,
   validateStatusCodeRange
 } from '../test-runner/index.js';
-import type { EntityType, ODataResponse, ScenarioResult, TestAssertion, TestConfig, TestReport } from '../test-runner/types.js';
+import type {
+  AddEditCleanup,
+  EntityType,
+  ODataResponse,
+  ScenarioResult,
+  TestAssertion,
+  TestConfig,
+  TestReport
+} from '../test-runner/types.js';
 import { type AddEditPayloadName, type AddEditTestPlan, PAYLOAD_FILES, payloadsFor, planAddEditTests } from './plan.js';
 import type { DeletePayload, ScenarioName } from './types.js';
 
@@ -106,7 +114,8 @@ export const runAllScenarios = async (config: TestConfig): Promise<TestReport> =
   if ('problems' in planned) throw new Error(planned.problems.join(' '));
 
   const payloads = await readPayloads(config.payloadsDir, payloadsFor(planned.plan));
-  const scenarios = await runPlan(planned.plan, config, authToken, payloads, entityType);
+  const { results: scenarios, created, removed } = await runPlan(planned.plan, config, authToken, payloads, entityType);
+  const cleanup = await cleanUp(planned.plan, config, authToken, created, removed);
 
   const passed = scenarios.filter(s => s.passed).length;
   const failed = scenarios.filter(s => !s.passed).length;
@@ -121,7 +130,8 @@ export const runAllScenarios = async (config: TestConfig): Promise<TestReport> =
       passed,
       failed,
       skipped: 0
-    }
+    },
+    cleanup
   };
 };
 
@@ -199,8 +209,10 @@ const refused = (name: ScenarioName, start: number, description: string, actual:
 
 interface ScenarioRun {
   readonly result: ScenarioResult;
-  /** The key of the record a create made, for the updates and deletes after it. */
+  /** The key of the record a create made, for the updates and deletes after it, and for the cleanup. */
   readonly createdKey?: string;
+  /** The key of a record the run created that its delete test removed, confirmed gone. */
+  readonly removedKey?: string;
 }
 
 /** Run one scenario, with the keys of the records the create tests before it made. */
@@ -241,8 +253,11 @@ const runScenario = async (
       const { result, response } = await run(config, authToken, payloadOf(payloads, 'createSucceeds'), entityType);
       return { result, createdKey: createdKeyOf(response, entityType) };
     }
-    case 'create-fails':
-      return { result: await runCreateFails(config, authToken, payloadOf(payloads, 'createFails'), entityType) };
+    case 'create-fails': {
+      // A create that should fail and made a record anyway still made one, and the cleanup removes it.
+      const { result, response } = await runCreateFails(config, authToken, payloadOf(payloads, 'createFails'), entityType);
+      return { result, createdKey: createdKeyOf(response, entityType) };
+    }
     case 'update-succeeds-representation':
       return updateWith(payloadOf(payloads, 'updateSucceeds'), payload =>
         runUpdateSucceedsRepresentation(config, authToken, payload, entityType)
@@ -265,7 +280,9 @@ const runScenario = async (
           )
         };
       }
-      return { result: await runDeleteSucceeds(config, authToken, keyOf(payload.url) ? payload : { id }, entityType) };
+      const ownRecord = keyOf(payload.url) === undefined && keyOf(payload.id) === undefined;
+      const { result, gone } = await runDeleteSucceeds(config, authToken, keyOf(payload.url) ? payload : { id }, entityType);
+      return { result, ...(ownRecord && gone && id !== undefined ? { removedKey: id } : {}) };
     }
     case 'delete-fails': {
       // A delete that should fail names a record that does not exist. It never takes a created one.
@@ -280,6 +297,13 @@ const runScenario = async (
   }
 };
 
+/** What running a plan came to: each scenario's result, the records the run created, and those its delete removed. */
+interface PlanRun {
+  readonly results: ReadonlyArray<ScenarioResult>;
+  readonly created: ReadonlyArray<string>;
+  readonly removed: ReadonlyArray<string>;
+}
+
 /** Run a plan's scenarios in order, handing each the keys of the records the creates before it made. */
 const runPlan = async (
   plan: AddEditTestPlan,
@@ -287,15 +311,44 @@ const runPlan = async (
   authToken: string,
   payloads: LoadedPayloads,
   entityType: EntityType
-): Promise<ReadonlyArray<ScenarioResult>> => {
+): Promise<PlanRun> => {
   const created: string[] = [];
+  const removed: string[] = [];
   const results: ScenarioResult[] = [];
   for (const name of plan.scenarios) {
-    const { result, createdKey } = await runScenario(name, config, authToken, payloads, entityType, created);
+    const { result, createdKey, removedKey } = await runScenario(name, config, authToken, payloads, entityType, created);
     if (createdKey !== undefined) created.push(createdKey);
+    if (removedKey !== undefined) removed.push(removedKey);
     results.push(result);
   }
-  return results;
+  return { results, created, removed };
+};
+
+/**
+ * Remove what the run created, when delete is tested: every record a create made that the delete test did not
+ * already remove, by its own key, never the collection's URL. A record already gone (404) counts as removed. When
+ * delete is not tested, nothing is deleted and the records are named as left.
+ */
+const cleanUp = async (
+  plan: AddEditTestPlan,
+  config: TestConfig,
+  authToken: string,
+  created: ReadonlyArray<string>,
+  removedByTest: ReadonlyArray<string>
+): Promise<AddEditCleanup> => {
+  const remaining = created.filter(key => !removedByTest.includes(key));
+  if (!plan.actions.includes('delete')) return { removed: [...removedByTest], notRemoved: [], left: remaining };
+  const answers = [];
+  for (const key of remaining) {
+    const response = await odataRequest({ method: 'DELETE', url: buildResourceUrl(config.serverUrl, config.resource, key), authToken });
+    answers.push({ key, status: response.status });
+  }
+  const gone = (status: number): boolean => (status >= 200 && status < 300) || status === 404;
+  return {
+    removed: [...removedByTest, ...answers.filter(answer => gone(answer.status)).map(answer => answer.key)],
+    notRemoved: answers.filter(answer => !gone(answer.status)),
+    left: []
+  };
 };
 
 // ── Create Scenarios ──
@@ -406,7 +459,7 @@ const runCreateFails = async (
   authToken: string,
   payload: Record<string, unknown>,
   entityType: EntityType
-): Promise<ScenarioResult> => {
+): Promise<{ readonly result: ScenarioResult; readonly response: ODataResponse }> => {
   const start = Date.now();
   const assertions: TestAssertion[] = [];
 
@@ -425,7 +478,7 @@ const runCreateFails = async (
   assertions.push(validateODataVersionHeader(response));
   assertions.push(...validateODataError(response, entityType));
 
-  return buildScenarioResult('create-fails', SCENARIO_TAGS['create-fails'], assertions, start);
+  return { result: buildScenarioResult('create-fails', SCENARIO_TAGS['create-fails'], assertions, start), response };
 };
 
 // ── Update Scenarios ──
@@ -570,7 +623,7 @@ const runDeleteSucceeds = async (
   authToken: string,
   deletePayload: DeletePayload,
   _entityType: EntityType
-): Promise<ScenarioResult> => {
+): Promise<{ readonly result: ScenarioResult; readonly gone: boolean }> => {
   const start = Date.now();
   const assertions: TestAssertion[] = [];
 
@@ -596,7 +649,10 @@ const runDeleteSucceeds = async (
   assertions.push(validateStatusCode(getResponse, [404]));
   assertions.push(validateODataVersionHeader(getResponse));
 
-  return buildScenarioResult('delete-succeeds', SCENARIO_TAGS['delete-succeeds'], assertions, start);
+  return {
+    result: buildScenarioResult('delete-succeeds', SCENARIO_TAGS['delete-succeeds'], assertions, start),
+    gone: getResponse.status === 404
+  };
 };
 
 /**
