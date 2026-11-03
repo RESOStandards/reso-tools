@@ -5,34 +5,36 @@ Validates OData create, update and delete against the RESO Add/Edit specificatio
 ## Usage
 
 ```bash
-# Test every action, with your own payloads
-reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./my-payloads
+# Test every action in both formats, with your own payloads
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./my-payloads \
+  --actions create,update,delete --create-formats representation,minimal --update-formats representation,minimal
 
 # Test only creates and updates, and updates only with headers-only responses
 reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./my-payloads \
   --actions create,update --update-formats minimal
 
-# Use a config file with inline payloads
+# Use a config file with inline payloads, and the actions and formats in its addEditOptions
 reso-cert add-edit --config sample-configs/add-edit-config.json
 
 # The reference server, where the tool writes the payloads
-reso-cert add-edit --url http://localhost:8080 --auth-token admin-token --auto-payloads
+reso-cert add-edit --url http://localhost:8080 --auth-token admin-token --auto-payloads \
+  --actions create,update,delete --create-formats minimal --update-formats minimal
 
 # The mock server, for offline testing. It writes its own payloads unless --payloads gives them
-reso-cert add-edit --mock
+reso-cert add-edit --mock --actions create --create-formats representation,minimal
 ```
 
 ## What a run tests
 
 Each action is a pair of tests, one that should succeed and one that should fail. Create and update each have two response formats as well: `return=representation`, where the record comes back, and `return=minimal`, headers only. Choose any of them:
 
-| Option | In a config file | Default |
+| Option | In a config file | Required |
 |---|---|---|
-| `--actions create,update,delete` | `addEditOptions.actions` | all three |
-| `--create-formats representation,minimal` | `addEditOptions.formats.create` | both |
-| `--update-formats representation,minimal` | `addEditOptions.formats.update` | both |
+| `--actions create,update,delete` | `addEditOptions.actions` | always |
+| `--create-formats representation,minimal` | `addEditOptions.formats.create` | when create is tested |
+| `--update-formats representation,minimal` | `addEditOptions.formats.update` | when update is tested |
 
-A delete has no format. The run passes when every test it ran passes, and at least one action must be chosen. The report says what was tested, for example `Tested create (minimal), update (representation, minimal)`.
+**Nothing is tested unless it is chosen.** A run that names no actions, or tests a create or an update without its formats, is refused before it writes anything, so no run creates, changes or deletes a record nobody asked for. A delete has no format. The run passes when every test it ran passes. The report says what was tested, for example `Tested create (minimal), update (representation, minimal)`.
 
 | Scenario | Action | Format | Expected |
 |---|---|---|---|

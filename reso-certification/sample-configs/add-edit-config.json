@@ -8,6 +8,10 @@
       "providerUsi": "LOCAL-SYSTEM",
       "token": "admin-token",
       "resource": "Property",
+      "addEditOptions": {
+        "actions": ["create", "update", "delete"],
+        "formats": { "create": ["representation", "minimal"], "update": ["representation", "minimal"] }
+      },
       "payloads": {
         "createSucceeds": {
           "ListPrice": 350000.0,

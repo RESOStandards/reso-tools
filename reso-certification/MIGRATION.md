@@ -68,11 +68,14 @@ reso-cert core --url https://api.example.com --auth-token TOKEN \
 docker compose --profile compliance-addedit up
 
 # After: your payloads, for the actions and formats you support
-reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./my-payloads
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./my-payloads \
+  --actions create,update,delete --create-formats representation,minimal --update-formats representation,minimal
 
 # On the reference server, the tool can write them
-reso-cert add-edit --url http://localhost:8080 --auth-token admin-token --auto-payloads
+reso-cert add-edit --url http://localhost:8080 --auth-token admin-token --auto-payloads --actions create --create-formats minimal
 ```
+
+From 0.12.0 nothing is tested unless it is chosen. 0.11.5 ran every action in both formats, and a run that names no actions is now refused before it writes anything. Name the actions, and the formats of each create or update among them, on the command line or in `addEditOptions`.
 
 ### EntityEvent (RCP-027)
 

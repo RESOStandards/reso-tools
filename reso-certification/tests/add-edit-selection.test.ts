@@ -57,7 +57,10 @@ const CREATE_FILES = {
 
 describe('an Add/Edit run tests what it is given', () => {
   it('runs only the actions it is given, needing only their payload files', async () => {
-    const report = await run(await payloadsFolder(CREATE_FILES), { actions: ['create'] });
+    const report = await run(await payloadsFolder(CREATE_FILES), {
+      actions: ['create'],
+      formats: { create: ['representation', 'minimal'] }
+    });
     expect(scenarioNames(report)).toEqual(['create-succeeds-representation', 'create-succeeds-minimal', 'create-fails']);
     expect(report.summary).toMatchObject({ total: 3, passed: 3, failed: 0 });
     expect(writes().every(line => line.startsWith('POST '))).toBe(true);
@@ -70,7 +73,12 @@ describe('an Add/Edit run tests what it is given', () => {
   });
 
   it('names a payload file the run needs and does not have', async () => {
-    await expect(run(await payloadsFolder(CREATE_FILES), { actions: ['create', 'update'] })).rejects.toThrow('has no update-succeeds.json');
+    await expect(
+      run(await payloadsFolder(CREATE_FILES), {
+        actions: ['create', 'update'],
+        formats: { create: ['representation', 'minimal'], update: ['representation', 'minimal'] }
+      })
+    ).rejects.toThrow('has no update-succeeds.json');
     expect(writes()).toEqual([]);
   });
 
@@ -90,7 +98,8 @@ describe('an update or a delete whose payload names no record', () => {
         'update-fails.json': { ListPrice: -1 },
         'delete-succeeds.json': {},
         'delete-fails.json': { id: '00000000-0000-0000-0000-000000000000' }
-      })
+      }),
+      { actions: ['create', 'update', 'delete'], formats: { create: ['representation', 'minimal'], update: ['representation', 'minimal'] } }
     );
     expect(report.summary).toMatchObject({ total: 8, failed: 0 });
     const created = sent.filter(line => line.startsWith('POST ')).length;
@@ -104,7 +113,7 @@ describe('an update or a delete whose payload names no record', () => {
   it('sends nothing when no create runs to make one, rather than writing to the whole collection', async () => {
     const report = await run(
       await payloadsFolder({ 'update-succeeds.json': { ListPrice: 222222 }, 'update-fails.json': { ListPrice: -1 } }),
-      { actions: ['update'] }
+      { actions: ['update'], formats: { update: ['representation', 'minimal'] } }
     );
     expect(report.summary).toMatchObject({ total: 3, failed: 3 });
     expect(report.scenarios[0]?.assertions[0]?.actual).toContain('names no ListingKey');
@@ -197,6 +206,7 @@ describe('a resource other than Property', () => {
         'delete-fails.json': { id: '00000000-0000-0000-0000-000000000000' }
       }),
       auth: { mode: 'token', authToken: 'test-token' },
+      actions: ['create', 'update', 'delete'],
       formats: { create: ['minimal'], update: ['minimal'] }
     });
     expect(report.summary).toMatchObject({ total: 6, failed: 0 });

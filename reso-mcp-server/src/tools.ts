@@ -280,12 +280,12 @@ export const runComplianceTool: ToolDef = {
       actions: {
         type: 'array',
         items: { type: 'string', enum: ['create', 'update', 'delete'] },
-        description: 'Add/Edit: the actions to test (default: all three)'
+        description: 'Add/Edit: the actions to test. Required for Add/Edit: nothing is tested unless it is chosen.'
       },
       formats: {
         type: 'object',
         description:
-          'Add/Edit: the responses to test by action, "representation" or "minimal", e.g. {"create": ["minimal"]}. An action left out tests both. A delete has none.'
+          'Add/Edit: the responses to test by action, "representation" or "minimal", e.g. {"create": ["minimal"]}. Required for each create or update among the actions. A delete has none.'
       },
       payloads: {
         type: 'object',

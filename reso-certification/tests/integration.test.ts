@@ -6,6 +6,12 @@ import { seedStore } from '../src/add-edit/mock/handlers.js';
 import { startMockServer, stopMockServer } from '../src/add-edit/mock/server.js';
 import { runAllScenarios } from '../src/add-edit/test-runner.js';
 
+/** Every action in both formats, chosen: a run tests nothing it is not told to (Josh, 2026-11-03). */
+const ALL_EIGHT = {
+  actions: ['create', 'update', 'delete'],
+  formats: { create: ['representation', 'minimal'], update: ['representation', 'minimal'] }
+} as const;
+
 const metadataXml = readFileSync(resolve(import.meta.dirname, '../sample-metadata.xml'), 'utf-8');
 
 const payloadsDir = resolve(import.meta.dirname, '../sample-payloads');
@@ -43,6 +49,7 @@ describe('Full scenario run against mock server', () => {
       serverUrl,
       resource: 'Property',
       payloadsDir,
+      ...ALL_EIGHT,
       auth: { mode: 'token', authToken: 'test-token' }
     });
 
@@ -75,6 +82,7 @@ describe('Full scenario run against mock server', () => {
       serverUrl,
       resource: 'Property',
       payloadsDir,
+      ...ALL_EIGHT,
       auth: {
         mode: 'client_credentials',
         clientId: 'test-client',
@@ -93,6 +101,7 @@ describe('Full scenario run against mock server', () => {
       serverUrl,
       resource: 'Property',
       payloadsDir,
+      ...ALL_EIGHT,
       auth: { mode: 'token', authToken: 'test-token' }
     });
 

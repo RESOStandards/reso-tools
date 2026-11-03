@@ -4,7 +4,12 @@ import type { ScenarioName } from './types.js';
  * What an Add/Edit run tests. RCP-010 lets a provider implement "as many or as few actions as makes sense for
  * their business case", and asks those being certified to "indicate whether they support `return=minimal` or
  * `return=representation` (or both) for each action being tested". So a run tests the actions and formats it is
- * given, and passing those is a pass. With none given it tests everything.
+ * given, and passing those is a pass.
+ *
+ * A run is given them: nothing is tested by default (Josh, 2026-11-03: running everything "could have unintended side
+ * effects, they may not expect us to try and delete something"). `planAddEditTests` requires the actions, and the
+ * formats of each create or update among them. `readAddEditSelection` reads a partial selection, such as the
+ * command line's flags over a configuration that supplies the rest, and only checks what it is given.
  */
 
 /** The actions an Add/Edit run can test, in the order it tests them: a create comes first, so a later test can use it. */
@@ -19,7 +24,7 @@ export type AddEditFormat = (typeof ADD_EDIT_FORMATS)[number];
 export const ADD_EDIT_FORMATTED_ACTIONS = ['create', 'update'] as const;
 export type AddEditFormattedAction = (typeof ADD_EDIT_FORMATTED_ACTIONS)[number];
 
-/** The formats to test, by action. An action left out tests both. */
+/** The formats to test, by action. Required for each create or update a run tests. */
 export type AddEditFormats = Readonly<Partial<Record<AddEditFormattedAction, ReadonlyArray<AddEditFormat>>>>;
 
 /** The six payloads, as the inline configuration names them. */
@@ -100,8 +105,12 @@ const formatProblems = (
       : [];
   });
 
-/** Read the actions and formats a run was given into what it tests, or the reasons it cannot. */
-export const planAddEditTests = (options: {
+/**
+ * Read a selection of actions and formats, checking only what it was given. Where it is silent, every action and
+ * both formats stand in, so flags can be checked before the configuration supplies the rest. A run is never planned
+ * from this: see `planAddEditTests`.
+ */
+export const readAddEditSelection = (options: {
   readonly actions?: ReadonlyArray<unknown>;
   readonly formats?: Readonly<Record<string, ReadonlyArray<unknown>>>;
 }): AddEditPlanResult => {
@@ -115,6 +124,31 @@ export const planAddEditTests = (options: {
     ADD_EDIT_FORMATS.filter(format => (options.formats?.[action] ?? ADD_EDIT_FORMATS).includes(format));
   const formats = { create: chosen('create'), update: chosen('update') };
   return { plan: { actions, formats, scenarios: actions.flatMap(action => scenariosFor(action, formats)) } };
+};
+
+/** What a run must be told: the actions, and the formats of each create or update among them. */
+const missingSelection = (options: {
+  readonly actions?: ReadonlyArray<unknown>;
+  readonly formats?: Readonly<Record<string, ReadonlyArray<unknown>>>;
+}): ReadonlyArray<string> => {
+  if (options.actions === undefined) {
+    return [`Choose the actions to test: ${ADD_EDIT_ACTIONS.join(', ')}. Nothing is tested unless it is chosen.`];
+  }
+  return ADD_EDIT_FORMATTED_ACTIONS.filter(action => options.actions?.includes(action) && options.formats?.[action] === undefined).map(
+    action => `Choose the ${action} responses to test: ${ADD_EDIT_FORMATS.join(', ')}.`
+  );
+};
+
+/**
+ * What a run tests, from the actions and formats it was given, or the reasons it cannot run. Nothing is tested by
+ * default: the actions are required, and the formats of each create or update among them.
+ */
+export const planAddEditTests = (options: {
+  readonly actions?: ReadonlyArray<unknown>;
+  readonly formats?: Readonly<Record<string, ReadonlyArray<unknown>>>;
+}): AddEditPlanResult => {
+  const missing = missingSelection(options);
+  return missing.length > 0 ? { problems: missing } : readAddEditSelection(options);
 };
 
 /** The payloads a plan needs: each tested action's succeeds and fails payload. */

@@ -119,10 +119,11 @@ or **stdout** (for `--output-dir -`), so they compose in a pipe.
 RCP-010 Add/Edit endorsement testing.
 
 ```bash
-reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads
-reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads --actions create,update --update-formats minimal
-reso-cert add-edit --url http://localhost:8080 --auth-token admin-token --auto-payloads   # the reference server
-reso-cert add-edit --mock                       # against a bundled mock OData server
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads \
+  --actions create,update,delete --create-formats representation,minimal --update-formats representation,minimal
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads --actions update --update-formats minimal
+reso-cert add-edit --url http://localhost:8080 --auth-token admin-token --auto-payloads --actions create --create-formats minimal   # the reference server
+reso-cert add-edit --mock --actions delete      # against a bundled mock OData server
 reso-cert add-edit --config ./configs/add-edit-config.json   # multi-provider batch
 ```
 
