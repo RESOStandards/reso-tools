@@ -1,5 +1,5 @@
 /**
- * Assemble an inferred DD-2.0 metadata report from sampled RCF records (C5 + assembly).
+ * Assemble an inferred DD-2.0 metadata report from RCF records (C5 + assembly), every record folded in as it is read.
  *
  * Ties the inference pieces together. For each observed (resource, field):
  *   - DD field (present in the injected reference map) → carry the reference
@@ -22,9 +22,9 @@
  */
 
 import type { MetadataReport, MetadataReportField, MetadataReportLookup } from '@reso-standards/reso-metadata-utils';
-import { aggregateFieldType } from './aggregate.js';
+import { type FieldTypeFold, createFieldTypeFold } from './aggregate.js';
 import { type KindMatcher, buildKindMatcher } from './kind-match.js';
-import { classifyStringField, stringFieldStats } from './local-enum-detection.js';
+import { ENUM_MAX_DISTINCT, classifyStringField } from './local-enum-detection.js';
 import { isNumericToken, isValidValue } from './values.js';
 
 const DD_WIKI_URL_TERM = 'RESO.DDWikiUrl';
@@ -56,11 +56,8 @@ export interface ReferenceField {
 
 export type ReferenceMap = Readonly<Record<string, Readonly<Record<string, ReferenceField>>>>;
 
-/** Accumulated observed values per resource → field. */
-export type PayloadCache = Record<string, Record<string, unknown[]>>;
-
 export interface InferMetadataReportInput {
-  /** Sampled records grouped by (root) resource name. Expansions are discovered by recursion. */
+  /** Records grouped by (root) resource name. Expansions are discovered by recursion. */
   readonly recordsByResource: Readonly<Record<string, ReadonlyArray<unknown>>>;
   /** Reference DD metadata map (`buildMetadataMap(getReferenceMetadata(version))`). */
   readonly referenceMap: ReferenceMap;
@@ -70,76 +67,87 @@ export interface InferMetadataReportInput {
   readonly description?: string;
 }
 
-const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+/** What a report is stamped with. */
+export interface InferredReportMeta {
+  readonly version: string;
+  readonly generatedOn: string;
+  readonly description?: string;
+}
 
-const push = (cache: PayloadCache, resource: string, field: string, value: unknown): void => {
-  cache[resource] ??= {};
-  cache[resource][field] ??= [];
-  cache[resource][field].push(value);
-};
+const DEFAULT_DESCRIPTION = 'RESO Data Dictionary Metadata Report (inferred from RESO Common Format samples)';
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /** Key a resolved expansion kind by its parent resource + field name. */
 const kindKey = (resource: string, field: string): string => `${resource} ${field}`;
 
+/**
+ * Where an observation falls in reading order: every record of the first resource the files named, then every
+ * record of the next, and within a resource in the order read. Each resource counts up within its own stride, so
+ * records that arrive interleaved across files still order as if read a resource at a time. The report's resources,
+ * fields and lookup values take that order.
+ */
+type Order = number;
+const ORDER_STRIDE = 2 ** 40;
+
+/** Remember a value at the earliest place it was seen. */
+const seeAt = (seen: Map<string, Order>, value: string, at: Order): void => {
+  const earlier = seen.get(value);
+  if (earlier === undefined || at < earlier) seen.set(value, at);
+};
+
+/** Values in the order they were first seen. */
+const inOrder = (seen: ReadonlyMap<string, Order>): ReadonlyArray<string> => [...seen].sort((a, b) => a[1] - b[1]).map(([value]) => value);
+
+/**
+ * The non-blank string values of one observation. A multi-value (collection) observation is an array, so its
+ * elements count: otherwise every value of a DD collection lookup (Appliances, ExteriorFeatures, …) would be dropped
+ * and the field would emit no lookups.
+ */
+const stringsOf = (value: unknown): ReadonlyArray<string> =>
+  (Array.isArray(value) ? value : [value]).filter((v): v is string => typeof v === 'string' && isValidValue(v));
+
+/** What the report needs of one field of one resource, gathered a value at a time. */
+interface FieldFold {
+  readonly first: Order;
+  observations: number;
+  /** A Data Dictionary lookup field's distinct values, every one of them. */
+  readonly lookupValues?: Map<string, Order>;
+  /** A local field's type, and its usable string values for telling an enumeration from free text. A field with
+   *  more distinct values than a local enumeration can have is free text, so no more are kept past that. */
+  readonly local?: { readonly type: FieldTypeFold; usable: number; readonly values: Map<string, Order> };
+}
+
+/** String values kept per field of an unknown expansion, for the enum overlap of kind matching. */
+const SHAPE_VALUE_SAMPLE = 50;
+
+/**
+ * The UNION field-shape (+ sample string values) of an UNKNOWN expansion: a nested object under a field that is NOT a
+ * DD expansion of its parent, keyed by parent + field. Union over all records, not the first, so a jagged first record
+ * can't starve the match. The sample values are the first read, per field.
+ */
+interface ShapeFold {
+  readonly first: Order;
+  readonly fields: Map<string, Order>;
+  readonly values: Map<string, { readonly first: Order; readonly byRoot: Map<number, string[]> }>;
+}
+
 interface ObservedShape {
-  readonly fields: Set<string>;
-  readonly enumVals: Map<string, string[]>;
+  readonly fields: ReadonlyArray<string>;
+  readonly enumVals: Readonly<Record<string, ReadonlyArray<string>>>;
 }
 
 /**
- * Pre-pass: collect the UNION field-shape (+ sample string values) of every UNKNOWN expansion — a
- * nested object under a field that is NOT a DD expansion of its parent — keyed by parent + field.
- * Union over all records, not the first, so a jagged first record can't starve the match.
- */
-const collectExpansionShapes = (
-  records: ReadonlyArray<unknown>,
-  resourceName: string,
-  referenceMap: ReferenceMap,
-  shapes: Map<string, ObservedShape>
-): void => {
-  for (const record of records) {
-    if (!isPlainObject(record)) continue;
-    for (const [field, value] of Object.entries(record)) {
-      if (field.startsWith('@')) continue;
-      const nested = Array.isArray(value) ? value.filter(isPlainObject) : isPlainObject(value) ? [value] : [];
-      if (nested.length === 0) continue;
-      const ref = referenceMap[resourceName]?.[field];
-      if (!ref?.isExpansion) {
-        const key = kindKey(resourceName, field);
-        const shape = shapes.get(key) ?? { fields: new Set<string>(), enumVals: new Map<string, string[]>() };
-        for (const obj of nested) {
-          for (const [k, v] of Object.entries(obj)) {
-            if (k.startsWith('@')) continue;
-            shape.fields.add(k);
-            if (typeof v === 'string' && v !== '') {
-              const arr = shape.enumVals.get(k) ?? [];
-              if (arr.length < 50) arr.push(v); // a sample is enough for enum overlap
-              shape.enumVals.set(k, arr);
-            }
-          }
-        }
-        shapes.set(key, shape);
-      }
-      const target = ref?.isExpansion ? ref.typeName || field : field; // observed-name context for collection
-      collectExpansionShapes(nested, target, referenceMap, shapes);
-    }
-  }
-};
-
-/**
- * Resolve each unknown expansion's shape to a DD resource via kind matching (conservative; unmatched
- * shapes are absent from the map → they stay local objects). The parent resource is EXCLUDED so a
- * provider flattening of the parent's own fields does not self-match.
+ * Resolve each unknown expansion's shape to a DD resource via kind matching (conservative; unmatched shapes are absent
+ * from the map → they stay local objects). The parent resource is EXCLUDED so a provider flattening of the parent's
+ * own fields does not self-match. `shapes` are in reading order.
  */
 const resolveExpansionKinds = (
-  recordsByResource: Readonly<Record<string, ReadonlyArray<unknown>>>,
-  referenceMap: ReferenceMap,
+  shapes: ReadonlyArray<readonly [string, ObservedShape]>,
   matcher: KindMatcher
 ): ReadonlyMap<string, string> => {
-  const shapes = new Map<string, ObservedShape>();
-  for (const [resource, records] of Object.entries(recordsByResource)) collectExpansionShapes(records, resource, referenceMap, shapes);
   const matchShape = (shape: ObservedShape, exclude: ReadonlyArray<string>): string | undefined =>
-    matcher.match({ fields: [...shape.fields], enumValuesByField: Object.fromEntries(shape.enumVals), exclude: [...exclude] })?.resource;
+    matcher.match({ fields: [...shape.fields], enumValuesByField: shape.enumVals, exclude: [...exclude] })?.resource;
 
   // Pass 1: preliminary resolution excluding only the observed parent (correct at depth 1).
   const prelim = new Map<string, string>();
@@ -159,11 +167,11 @@ const resolveExpansionKinds = (
     if (r) resolved.set(key, r);
   }
 
-  // Re-key by the RESOLVED parent context. Shapes are collected under OBSERVED names, but the payload
-  // cache stores fields under their resolved resource — so buildPayloadCache and assembleReport (both
-  // keyed by resolved resource name) must look a nested resolution up under the resolved parent, or a
-  // depth-≥2 rename is stored under one key and read under another and never resolves. A parent that is
-  // itself a resolved rename contributes its resolved name; a root resource is unchanged.
+  // Re-key by the RESOLVED parent context. Shapes are collected under OBSERVED names, but the fold
+  // keys fields under their resolved resource, so a nested resolution must be looked up under the
+  // resolved parent, or a depth-≥2 rename is stored under one key and read under another and never
+  // resolves. A parent that is itself a resolved rename contributes its resolved name; a root resource
+  // is unchanged.
   const byResolvedContext = new Map<string, string>();
   for (const [key, resource] of resolved) {
     const sep = key.indexOf(' ');
@@ -174,44 +182,6 @@ const resolveExpansionKinds = (
     byResolvedContext.set(kindKey(resolvedParent, field), resource);
   }
   return byResolvedContext;
-};
-
-/**
- * Accumulate observed values per (resource, field), recursing into nested objects
- * as expansions. A DD expansion's target resource comes from the reference
- * `typeName`; a mis-named expansion whose SHAPE matched a DD resource (`resolvedKinds`)
- * recurses under that resource, so its nested fields type against the DD reference; an
- * unmatched local nested object recurses under the field name. `@…` keys are skipped.
- */
-export const buildPayloadCache = (
-  records: ReadonlyArray<unknown>,
-  resourceName: string,
-  referenceMap: ReferenceMap,
-  cache: PayloadCache = {},
-  // Records seen per resource — a field observed fewer times than its resource's record count
-  // was absent from some records (jagged data), which the assembler treats as nullable.
-  recordCounts: Record<string, number> = {},
-  resolvedKinds: ReadonlyMap<string, string> = new Map()
-): PayloadCache => {
-  for (const record of records) {
-    if (!isPlainObject(record)) continue;
-    recordCounts[resourceName] = (recordCounts[resourceName] ?? 0) + 1;
-    for (const [field, value] of Object.entries(record)) {
-      if (field.startsWith('@')) continue; // OData/RESO annotations, not data fields
-      push(cache, resourceName, field, value);
-
-      const ref = referenceMap[resourceName]?.[field];
-      // resolvedKinds is keyed by the RESOLVED parent context (see resolveExpansionKinds), matching
-      // resourceName / the cache — so a nested (depth ≥2) rename resolves, not just top-level ones.
-      const target = ref?.isExpansion ? ref.typeName || field : (resolvedKinds.get(kindKey(resourceName, field)) ?? field);
-      if (Array.isArray(value) && value.some(isPlainObject)) {
-        buildPayloadCache(value.filter(isPlainObject), target, referenceMap, cache, recordCounts, resolvedKinds);
-      } else if (isPlainObject(value)) {
-        buildPayloadCache([value], target, referenceMap, cache, recordCounts, resolvedKinds);
-      }
-    }
-  }
-  return cache;
 };
 
 const ddFieldFromReference = (
@@ -231,22 +201,12 @@ const ddFieldFromReference = (
     ...(ref.isCollection ? { isCollection: true } : {}),
     ...(ref.isExpansion ? { isExpansion: true } : {}),
     // Only when the field actually emitted observed lookups — a DD enum field whose values were all
-    // null/blank in the sample carries no lookups, so claiming isEnumeration would be inconsistent
+    // null/blank carries no lookups, so claiming isEnumeration would be inconsistent
     // (nothing to re-read, an empty enum downstream). Keep isEnumeration ⟺ has-lookups.
     ...(isEnumeration ? { isEnumeration: true } : {}),
     annotations: ref.ddWikiUrl ? [{ term: DD_WIKI_URL_TERM, value: ref.ddWikiUrl }] : []
   };
 };
-
-/**
- * Distinct non-blank string observations of a field, preserving first-seen order.
- * Multi-value (collection) observations are arrays, so they are flattened first —
- * otherwise every value of a DD collection lookup (Appliances, ExteriorFeatures, …)
- * would be dropped and the field would emit no lookups.
- */
-const distinctStrings = (values: ReadonlyArray<unknown>): ReadonlyArray<string> => [
-  ...new Set(values.flatMap(v => (Array.isArray(v) ? v : [v])).filter((v): v is string => typeof v === 'string' && isValidValue(v)))
-];
 
 /**
  * Emit lookups for a DD lookup field: every observed value, annotated when it
@@ -259,8 +219,8 @@ const distinctStrings = (values: ReadonlyArray<unknown>): ReadonlyArray<string> 
  * enumeration is both correct for validation and the shape `buildMetadataMap`
  * re-reads back into `lookupValues` (keyed by the observed value).
  */
-const ddLookups = (ref: ReferenceField, values: ReadonlyArray<unknown>): MetadataReportLookup[] =>
-  distinctStrings(values).map(value => {
+const ddLookups = (ref: ReferenceField, values: ReadonlyArray<string>): MetadataReportLookup[] =>
+  values.map(value => {
     const matched = ref.lookupValues?.[value] ?? ref.legacyODataValues?.[value];
     return {
       lookupName: ref.type,
@@ -287,17 +247,17 @@ const localScalarField = (resource: string, field: string, type: string, extra: 
 const localFieldAndLookups = (
   resource: string,
   field: string,
-  values: ReadonlyArray<unknown>,
+  local: NonNullable<FieldFold['local']>,
   nullableByAbsence: boolean,
   // The DD resource a mis-named expansion's SHAPE matched, if any → becomes the field's typeName.
   inferredKind?: string
 ): { readonly field: MetadataReportField; readonly lookups: ReadonlyArray<MetadataReportLookup> } => {
-  const agg = aggregateFieldType(values);
+  const agg = local.type.result();
   const extra: Partial<MetadataReportField> = {
     ...(agg.isCollection ? { isCollection: true } : {}),
-    // typeName must equal the buildPayloadCache recursion target so the schema $ref
-    // (#/definitions/<typeName>) resolves: the field name for an unmatched local object, or the matched
-    // DD resource for a mis-named expansion (fieldName ≠ typeName is then the inferred-mismatch signal).
+    // typeName must equal the recursion target so the schema $ref (#/definitions/<typeName>)
+    // resolves: the field name for an unmatched local object, or the matched DD resource for a
+    // mis-named expansion (fieldName ≠ typeName is then the inferred-mismatch signal).
     ...(agg.isExpansion ? { isExpansion: true, typeName: inferredKind ?? field } : {}),
     ...(agg.nullable || nullableByAbsence ? { nullable: true } : {}),
     ...(agg.maxLength ? { maxLength: agg.maxLength } : {}),
@@ -305,64 +265,194 @@ const localFieldAndLookups = (
     ...(agg.precision ? { precision: agg.precision } : {})
   };
 
-  if (agg.type === 'Edm.String' && !agg.isExpansion && classifyStringField(stringFieldStats(values)) === 'enum') {
+  if (
+    agg.type === 'Edm.String' &&
+    !agg.isExpansion &&
+    classifyStringField({ total: local.usable, distinct: local.values.size }) === 'enum'
+  ) {
     const lookupName = `${resource}.${field}`;
-    const lookups = distinctStrings(values)
-      .filter(v => !isNumericToken(v))
-      .map(value => ({ lookupName, lookupValue: value, type: 'Edm.String' }));
+    const lookups = inOrder(local.values).map(value => ({ lookupName, lookupValue: value, type: 'Edm.String' }));
     return { field: localScalarField(resource, field, lookupName, extra), lookups };
   }
   return { field: localScalarField(resource, field, agg.type, extra), lookups: [] };
 };
 
-/** Assemble the DD-2.0 metadata report from an accumulated payload cache. */
-export const assembleReport = (
-  cache: PayloadCache,
-  referenceMap: ReferenceMap,
-  version: string,
-  generatedOn: string,
-  description = 'RESO Data Dictionary Metadata Report (inferred from RESO Common Format samples)',
-  recordCounts: Record<string, number> = {},
-  resolvedKinds: ReadonlyMap<string, string> = new Map()
-): MetadataReport => {
-  const fields: MetadataReportField[] = [];
-  const lookups: MetadataReportLookup[] = [];
+/** An inferred metadata report, gathered a record at a time. */
+export interface RcfInference {
+  /** Fold in one record of a resource the files name. Its expansions are folded in under their own resources. */
+  readonly add: (resource: string, record: unknown) => void;
+  /**
+   * The DD resources the shapes of mis-named expansions matched, keyed by parent and field. Empty when none matched,
+   * and the report is then final. Otherwise the records belong under those resources: read them again into an
+   * inference given these kinds, and report from that one.
+   */
+  readonly resolvedKinds: () => ReadonlyMap<string, string>;
+  readonly report: (meta: InferredReportMeta) => MetadataReport;
+}
 
-  for (const [resource, fieldMap] of Object.entries(cache)) {
-    const total = recordCounts[resource] ?? 0;
-    for (const [field, values] of Object.entries(fieldMap)) {
-      // Jagged data: a field observed fewer times than the resource's record count was absent
-      // from some records → nullable. (total 0 = counts not supplied; fall back to value-based only.)
-      const nullableByAbsence = total > 0 && values.length < total;
-      const ref = referenceMap[resource]?.[field];
-      if (ref) {
-        const fieldLookups = ref.isLookupField ? ddLookups(ref, values) : [];
-        fields.push(ddFieldFromReference(resource, field, ref, fieldLookups.length > 0, nullableByAbsence));
-        // Append element-wise, not `push(...fieldLookups)`: a spread of a very large distinct-value
-        // set would overflow the argument-count limit (cf. `maxOf` in aggregate.ts).
-        for (const l of fieldLookups) lookups.push(l);
-      } else {
-        const built = localFieldAndLookups(resource, field, values, nullableByAbsence, resolvedKinds.get(kindKey(resource, field)));
-        fields.push(built.field);
-        for (const l of built.lookups) lookups.push(l);
+/**
+ * Infer a DD-2.0 metadata report from RCF records, folding each record in as it is read so no record is held. Holds
+ * per field a count, the field's type and its distinct lookup values, so memory grows with the distinct values in the
+ * data, never with the number of records. Every record counts: there is no sample.
+ *
+ * A DD expansion recurses under its reference `typeName`; a mis-named expansion whose SHAPE matched a DD resource
+ * (`kinds`) recurses under that resource, so its nested fields type against the DD reference; an unmatched local
+ * nested object recurses under the field name. `@…` keys are skipped.
+ */
+export const createRcfInference = (referenceMap: ReferenceMap, kinds: ReadonlyMap<string, string> = new Map()): RcfInference => {
+  // Shapes decide the kinds, so they are collected only by an inference not given them.
+  const collectShapes = kinds.size === 0;
+  const roots = new Map<string, { readonly index: number; read: number }>();
+  // Records seen per resource: a field observed fewer times than its resource's record count
+  // was absent from some records (jagged data), which the assembler treats as nullable.
+  const recordCounts = new Map<string, number>();
+  const folds = new Map<string, Map<string, FieldFold>>();
+  const shapes = new Map<string, ShapeFold>();
+
+  const observe = (resource: string, field: string, value: unknown, next: () => Order): void => {
+    const byField = folds.get(resource) ?? new Map<string, FieldFold>();
+    folds.set(resource, byField);
+    const fold =
+      byField.get(field) ??
+      ((): FieldFold => {
+        const ref = referenceMap[resource]?.[field];
+        const created: FieldFold = ref
+          ? { first: next(), observations: 0, ...(ref.isLookupField ? { lookupValues: new Map<string, Order>() } : {}) }
+          : { first: next(), observations: 0, local: { type: createFieldTypeFold(), usable: 0, values: new Map<string, Order>() } };
+        byField.set(field, created);
+        return created;
+      })();
+    fold.observations += 1;
+    if (fold.lookupValues) for (const s of stringsOf(value)) seeAt(fold.lookupValues, s, next());
+    if (fold.local) {
+      const { local } = fold;
+      local.type.add(value);
+      for (const s of stringsOf(value)) {
+        if (isNumericToken(s)) continue;
+        local.usable += 1;
+        const at = next();
+        if (local.values.has(s) || local.values.size <= ENUM_MAX_DISTINCT) seeAt(local.values, s, at);
       }
     }
-  }
+  };
 
-  const resources = Object.keys(cache).map(resourceName => ({ resourceName }));
-  return { description, version, generatedOn, resources, fields, lookups, actions: [], functions: [] };
+  const collectShape = (key: string, nested: ReadonlyArray<Record<string, unknown>>, rootIndex: number, next: () => Order): void => {
+    const shape = shapes.get(key) ?? { first: next(), fields: new Map<string, Order>(), values: new Map() };
+    shapes.set(key, shape);
+    for (const obj of nested) {
+      for (const [k, v] of Object.entries(obj)) {
+        if (k.startsWith('@')) continue;
+        seeAt(shape.fields, k, next());
+        if (typeof v === 'string' && v !== '') {
+          const forField = shape.values.get(k) ?? { first: next(), byRoot: new Map<number, string[]>() };
+          shape.values.set(k, forField);
+          const sample = forField.byRoot.get(rootIndex) ?? [];
+          forField.byRoot.set(rootIndex, sample);
+          if (sample.length < SHAPE_VALUE_SAMPLE) sample.push(v); // a sample is enough for enum overlap
+        }
+      }
+    }
+  };
+
+  const visit = (records: ReadonlyArray<unknown>, resource: string, rootIndex: number, next: () => Order): void => {
+    for (const record of records) {
+      if (!isPlainObject(record)) continue;
+      recordCounts.set(resource, (recordCounts.get(resource) ?? 0) + 1);
+      for (const [field, value] of Object.entries(record)) {
+        if (field.startsWith('@')) continue; // OData/RESO annotations, not data fields
+        observe(resource, field, value, next);
+        const nested = Array.isArray(value) ? value.filter(isPlainObject) : isPlainObject(value) ? [value] : [];
+        if (nested.length === 0) continue;
+        const ref = referenceMap[resource]?.[field];
+        if (collectShapes && !ref?.isExpansion) collectShape(kindKey(resource, field), nested, rootIndex, next);
+        // kinds is keyed by the RESOLVED parent context (see resolveExpansionKinds), matching the fold, so a
+        // nested (depth ≥2) rename resolves, not just top-level ones.
+        const target = ref?.isExpansion ? ref.typeName || field : (kinds.get(kindKey(resource, field)) ?? field);
+        visit(nested, target, rootIndex, next);
+      }
+    }
+  };
+
+  const add = (resource: string, record: unknown): void => {
+    const root = roots.get(resource) ?? { index: roots.size, read: 0 };
+    roots.set(resource, root);
+    const next = (): Order => {
+      root.read += 1;
+      return root.index * ORDER_STRIDE + root.read;
+    };
+    visit([record], resource, root.index, next);
+  };
+
+  const resolvedKinds = (): ReadonlyMap<string, string> => {
+    if (!collectShapes) return kinds;
+    const observed = [...shapes]
+      .sort((a, b) => a[1].first - b[1].first)
+      .map(([key, shape]): readonly [string, ObservedShape] => [
+        key,
+        {
+          fields: inOrder(shape.fields),
+          enumVals: Object.fromEntries(
+            [...shape.values]
+              .sort((a, b) => a[1].first - b[1].first)
+              .map(([field, { byRoot }]) => [
+                field,
+                [...byRoot]
+                  .sort((a, b) => a[0] - b[0])
+                  .flatMap(([, sample]) => sample)
+                  .slice(0, SHAPE_VALUE_SAMPLE)
+              ])
+          )
+        }
+      ]);
+    return resolveExpansionKinds(observed, buildKindMatcher(referenceMap));
+  };
+
+  const report = ({ version, generatedOn, description = DEFAULT_DESCRIPTION }: InferredReportMeta): MetadataReport => {
+    const byResource = [...folds]
+      .map(([resource, byField]) => ({ resource, fields: [...byField].sort((a, b) => a[1].first - b[1].first) }))
+      .sort((a, b) => a.fields[0][1].first - b.fields[0][1].first);
+    const fields: MetadataReportField[] = [];
+    const lookups: MetadataReportLookup[] = [];
+    for (const { resource, fields: resourceFields } of byResource) {
+      const total = recordCounts.get(resource) ?? 0;
+      for (const [field, fold] of resourceFields) {
+        // Jagged data: a field observed fewer times than the resource's record count was absent
+        // from some records → nullable.
+        const nullableByAbsence = total > 0 && fold.observations < total;
+        const ref = referenceMap[resource]?.[field];
+        if (ref) {
+          const fieldLookups = fold.lookupValues ? ddLookups(ref, inOrder(fold.lookupValues)) : [];
+          fields.push(ddFieldFromReference(resource, field, ref, fieldLookups.length > 0, nullableByAbsence));
+          // Append element-wise, not `push(...fieldLookups)`: a spread of a very large distinct-value
+          // set would overflow the argument-count limit.
+          for (const l of fieldLookups) lookups.push(l);
+        } else if (fold.local) {
+          const built = localFieldAndLookups(resource, field, fold.local, nullableByAbsence, kinds.get(kindKey(resource, field)));
+          fields.push(built.field);
+          for (const l of built.lookups) lookups.push(l);
+        }
+      }
+    }
+    const resources = byResource.map(({ resource }) => ({ resourceName: resource }));
+    return { description, version, generatedOn, resources, fields, lookups, actions: [], functions: [] };
+  };
+
+  return { add, resolvedKinds, report };
 };
 
-/** Infer a DD-2.0 metadata report from sampled RCF records grouped by resource. */
+/**
+ * Infer a DD-2.0 metadata report from RCF records grouped by resource. Mis-named expansions are resolved from their
+ * shapes first, then the records are placed and described consistently: under the matched resource, with the parent
+ * field typed to it.
+ */
 export const inferMetadataReport = (input: InferMetadataReportInput): MetadataReport => {
-  const cache: PayloadCache = {};
-  const recordCounts: Record<string, number> = {};
-  // Resolve mis-named expansions to DD resources from their shape ONCE (union over all records), then
-  // place + describe them consistently: recurse under the matched resource, type the parent field to it.
-  const matcher = buildKindMatcher(input.referenceMap);
-  const resolvedKinds = resolveExpansionKinds(input.recordsByResource, input.referenceMap, matcher);
-  for (const [resource, records] of Object.entries(input.recordsByResource)) {
-    buildPayloadCache(records, resource, input.referenceMap, cache, recordCounts, resolvedKinds);
-  }
-  return assembleReport(cache, input.referenceMap, input.version, input.generatedOn, input.description, recordCounts, resolvedKinds);
+  const read = (kinds?: ReadonlyMap<string, string>): RcfInference => {
+    const inference = createRcfInference(input.referenceMap, kinds);
+    for (const [resource, records] of Object.entries(input.recordsByResource))
+      for (const record of records) inference.add(resource, record);
+    return inference;
+  };
+  const first = read();
+  const kinds = first.resolvedKinds();
+  return (kinds.size === 0 ? first : read(kinds)).report(input);
 };

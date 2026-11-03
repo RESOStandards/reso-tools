@@ -6,6 +6,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 import { RCF_DEFAULT_DD_VERSION, type RcfResult, processRcfStream, resolveRcfExitCode, runRcf } from '../../src/cli/rcf-command.js';
 import type { RcfPayload } from '../../src/cli/rcf-input.js';
 import type { DdSchemaValidator } from '../../src/cli/schema-command.js';
+import { createRcfInference } from '../../src/rcf/assemble-report.js';
 import { serviceError } from '../../src/sdk/common.js';
 import { isCertifiableDDVersion } from '../../src/sdk/dd-versions.js';
 import { computeVariationsViaService } from '../../src/variations/index.js';
@@ -25,7 +26,7 @@ async function* stream(payloads: RcfPayload[]): AsyncGenerator<RcfPayload> {
 }
 
 describe('processRcfStream', () => {
-  it('accumulates records + per-field availability across the stream', async () => {
+  it('counts records + per-field availability across the stream', async () => {
     const result = await processRcfStream(
       stream([
         { source: 'a', resource: 'Property', version: '2.0', records: [{ ListingKey: '1', City: 'X' }, { ListingKey: '2' }] },
@@ -34,18 +35,26 @@ describe('processRcfStream', () => {
     );
     expect(result.version).toBe('2.0'); // first payload that carried one
     expect(result.totalRecords).toBe(3);
-    expect(result.recordsByResource.Property).toHaveLength(3);
     expect(result.availability.Property.recordCount).toBe(3);
     expect(result.availability.Property.fields.ListingKey).toBe(3);
     expect(result.availability.Property.fields.City).toBe(2); // present in 2 of 3 records
   });
 
-  it('caps accumulated records for inference but counts availability over ALL records', async () => {
-    const records = Array.from({ length: 10 }, (_, i) => ({ ListingKey: String(i), City: 'X' }));
-    const result = await processRcfStream(stream([{ source: 'a', resource: 'Property', version: '2.0', records }]), { sampleCap: 4 });
-    expect(result.recordsByResource.Property).toHaveLength(4); // capped for inference
-    expect(result.availability.Property.recordCount).toBe(10); // all counted for availability
-    expect(result.availability.Property.fields.City).toBe(10);
+  // #263: inference reads every record, as availability does. A lookup value first seen late in a large sample is
+  // still in the inferred report, so variations checks it.
+  it('folds every record into inference, however many there are, as availability counts them', async () => {
+    const records = Array.from({ length: 12_000 }, (_, i) => ({
+      ListingKey: String(i),
+      StandardStatus: i === 11_999 ? 'Withdrawn' : 'Active'
+    }));
+    const inference = createRcfInference({
+      Property: { StandardStatus: { type: 'org.reso.metadata.enums.StandardStatus', isLookupField: true } }
+    });
+    const result = await processRcfStream(stream([{ source: 'a', resource: 'Property', version: '2.0', records }]), { inference });
+    expect(result.availability.Property.recordCount).toBe(12_000);
+    const report = inference.report({ version: '2.0', generatedOn: 'T' });
+    expect(report.lookups.map(l => l.lookupValue)).toEqual(['Active', 'Withdrawn']); // the last record's value is in
+    expect(report.fields.find(f => f.fieldName === 'ListingKey')?.nullable).toBeUndefined(); // in all 12,000
   });
 
   it('strict: throws a schemaFailure on the first payload with errors (fast-fail)', async () => {
@@ -90,17 +99,18 @@ describe('processRcfStream', () => {
     async function* records(n: number): AsyncGenerator<unknown> {
       for (let i = 0; i < n; i += 1) yield { ListingKey: String(i), City: i % 2 ? 'X' : '' };
     }
+    const inference = createRcfInference({});
     const result = await processRcfStream(
       stream([
         { source: 'a', resource: 'Property', version: '2.0', records: records(5) },
         { source: 'bad', resource: '_INVALID_', invalidContext: true, context: '{}', records: records(3) }
       ]),
-      { sampleCap: 2 }
+      { inference }
     );
     expect(result.totalRecords).toBe(5);
-    expect(result.recordsByResource.Property).toHaveLength(2);
     expect(result.availability.Property).toEqual({ recordCount: 5, fields: { ListingKey: 5, City: 2 } });
-    expect(result.recordsByResource._INVALID_).toBeUndefined();
+    // the unreadable file's records are never inferred from
+    expect(inference.report({ version: '2.0', generatedOn: 'T' }).resources).toEqual([{ resourceName: 'Property' }]);
     expect([result.invalidContextFiles, result.invalidContextRecords]).toEqual([1, 3]);
   });
 

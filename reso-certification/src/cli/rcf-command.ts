@@ -18,7 +18,7 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
-import { type ReferenceMap, inferMetadataReport } from '../rcf/index.js';
+import { type RcfInference, type ReferenceMap, createRcfInference } from '../rcf/index.js';
 import { CURRENT_DD_VERSION, SUPPORTED_DD_VERSIONS, isSupportedDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
 import {
   type LevelBuckets,
@@ -43,8 +43,6 @@ const { buildMetadataMap } = requireCjs(resolve(here, '../legacy/common.js')) as
  * the current version, which is the one that certifies.
  */
 export const RCF_DEFAULT_DD_VERSION = CURRENT_DD_VERSION;
-/** Records kept per resource for inference; availability is scored over ALL records regardless. */
-const DEFAULT_SAMPLE_CAP = 5000;
 /** Records validated per call. A payload is validated in batches so that none is ever held whole; the batches give
  *  the same findings as one call, because the validator checks each record on its own (and the context once). */
 const VALIDATION_BATCH_SIZE = 1000;
@@ -56,7 +54,6 @@ interface MutableAvailability {
 export type AvailabilityResource = Readonly<MutableAvailability>;
 
 export interface RcfStreamResult {
-  readonly recordsByResource: Record<string, unknown[]>;
   readonly availability: Record<string, AvailabilityResource>;
   readonly totalRecords: number;
   /** Files whose `@reso.context` was present but unreadable: ingested, reported by validation, never certifiable. */
@@ -73,16 +70,17 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 /**
  * Drain a payload stream. When a `validator` is supplied, schema-validate each payload — `strict`
  * throws on the first payload that fails (fast-fail); otherwise errors accumulate into one report.
- * Records accumulate per resource up to `sampleCap` (inference needs a sample, not every record);
- * per-field availability is counted over ALL records. Records are read as they arrive and validated
- * in batches, so no payload is held whole.
+ * Every record is folded into `inference` when one is supplied, and per-field availability is
+ * counted over every record. Records are read as they arrive and validated in batches, so no
+ * payload is held whole and no record is kept.
  */
 export const processRcfStream = async (
   payloads: AsyncIterable<RcfPayload>,
   opts: {
     readonly validator?: DdSchemaValidator;
     readonly strict?: boolean;
-    readonly sampleCap?: number;
+    /** Where each certifiable record is folded in to infer the metadata report. */
+    readonly inference?: RcfInference;
     /** Caller-resolved DD version — the authoritative fallback for validation (see below). */
     readonly version?: string;
     /** Maps a payload's resource (as ingested from its context, lowercase under the RCF rule) to the Data
@@ -90,11 +88,9 @@ export const processRcfStream = async (
     readonly canonicalResource?: (resource: string) => string;
   } = {}
 ): Promise<RcfStreamResult> => {
-  const recordsByResource: Record<string, unknown[]> = {};
   const availability: Record<string, MutableAvailability> = {};
   // The legacy `validate` folds into and RETURNS the accumulator, so thread its return across payloads.
   let errorMap: Record<string, unknown> = {};
-  const cap = opts.sampleCap ?? DEFAULT_SAMPLE_CAP;
   let totalRecords = 0;
   let invalidContextFiles = 0;
   let invalidContextRecords = 0;
@@ -134,11 +130,7 @@ export const processRcfStream = async (
     // the exit code sees it whether or not a validator ran), reported by validation when one runs, never counted
     // as a record or inferred from.
     const counted = payload.invalidContext ? undefined : resource;
-    if (counted !== undefined) {
-      recordsByResource[counted] ??= [];
-      availability[counted] ??= { recordCount: 0, fields: {} };
-    }
-    const acc = counted !== undefined ? recordsByResource[counted] : undefined;
+    if (counted !== undefined) availability[counted] ??= { recordCount: 0, fields: {} };
     const av = counted !== undefined ? availability[counted] : undefined;
     let payloadRecords = 0;
     for await (const record of payload.records) {
@@ -147,7 +139,7 @@ export const processRcfStream = async (
         batch.push(record);
         if (batch.length === VALIDATION_BATCH_SIZE) validateBatch();
       }
-      if (!acc || !av) continue;
+      if (counted === undefined || !av) continue;
       totalRecords += 1;
       av.recordCount += 1;
       if (isRecord(record)) {
@@ -156,7 +148,7 @@ export const processRcfStream = async (
           if (value !== null && value !== undefined && value !== '') av.fields[field] = (av.fields[field] ?? 0) + 1;
         }
       }
-      if (acc.length < cap) acc.push(record);
+      opts.inference?.add(counted, record);
     }
     // Every payload is validated at least once, an empty one included, so its context is always checked.
     if (validator && (batch.length > 0 || batchesValidated === 0)) validateBatch();
@@ -171,7 +163,6 @@ export const processRcfStream = async (
 
   const combined = opts.validator ? opts.validator.combine(errorMap) : { totalErrors: 0, report: {} };
   return {
-    recordsByResource,
     availability,
     totalRecords,
     invalidContextFiles,
@@ -351,7 +342,6 @@ export const runRcf = async (opts: {
   readonly additionalProperties?: boolean;
   readonly strict?: boolean;
   readonly schemaValidate?: boolean;
-  readonly sampleCap?: number;
   readonly generatedOn: string;
   readonly runVariations?: boolean;
   readonly bearerToken?: string;
@@ -390,20 +380,21 @@ export const runRcf = async (opts: {
       })
     : undefined;
 
+  // One read validates, counts availability and infers the metadata report from every record. When the shapes of
+  // mis-named expansions matched Data Dictionary resources, their records belong under those resources, so the
+  // input is read again to infer with the matches known. That second read neither validates nor counts.
+  const firstRead = createRcfInference(referenceMap);
   const stream = await processRcfStream(readRcfPayloads(opts.input), {
     validator,
     strict: opts.strict,
-    sampleCap: opts.sampleCap,
+    inference: firstRead,
     version,
     canonicalResource
   });
-
-  const metadataReport = inferMetadataReport({
-    recordsByResource: stream.recordsByResource,
-    referenceMap,
-    version,
-    generatedOn: opts.generatedOn
-  });
+  const kinds = firstRead.resolvedKinds();
+  const inference = kinds.size === 0 ? firstRead : createRcfInference(referenceMap, kinds);
+  if (inference !== firstRead) await processRcfStream(readRcfPayloads(opts.input), { inference, version, canonicalResource });
+  const metadataReport = inference.report({ version, generatedOn: opts.generatedOn });
   const dataAvailabilityReport = buildDataAvailabilityReport(stream.availability, version, opts.generatedOn);
 
   // Variations runs LAST and must never discard the already-computed reports. A payload-too-large

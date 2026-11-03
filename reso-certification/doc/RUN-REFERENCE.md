@@ -304,8 +304,8 @@ In order, `rcf`:
    time, so its size is not limited by memory. It must be valid JSON. A file that gives `value`,
    `@reso.context` or `@odata.context` more than once is refused, because it could be read two ways.
 2. **Infers the metadata report** from the records: every field and every lookup value they carry,
-   with Data Dictionary fields linked to their Data Dictionary pages. It looks at up to 5,000 records
-   per resource for this.
+   with Data Dictionary fields linked to their Data Dictionary pages. It reads every record for this,
+   expansions included, so a value that first appears late in a large sample is still in the report.
 3. **Counts availability** over every record read, however many there are.
 4. **Checks types**, unless `--skip-schema-validation`. A Data Dictionary field must have the right type.
    Local fields and local values are accepted, because RCF is extensible.

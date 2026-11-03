@@ -20,15 +20,15 @@ export {
   ENUM_MAX_DISTINCT,
   type StringFieldStats
 } from './local-enum-detection.js';
-export { aggregateFieldType, type AggregatedFieldType } from './aggregate.js';
+export { aggregateFieldType, createFieldTypeFold, type AggregatedFieldType, type FieldTypeFold } from './aggregate.js';
 export {
+  createRcfInference,
   inferMetadataReport,
-  assembleReport,
-  buildPayloadCache,
+  type RcfInference,
+  type InferredReportMeta,
   type ReferenceMap,
   type ReferenceField,
   type ReferenceLookupEntry,
-  type PayloadCache,
   type InferMetadataReportInput
 } from './assemble-report.js';
 export {
