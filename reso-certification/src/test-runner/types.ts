@@ -102,6 +102,20 @@ export interface ScenarioResult {
   readonly duration: number;
 }
 
+/**
+ * The records an Add/Edit run created, and what became of them. When delete is tested, the run removes every record it
+ * created (Josh, 2026-11-03: "we do need to remove anything that was created"). When it is not, it deletes nothing, since
+ * the server may not support it and the provider did not ask, and names what it left.
+ */
+export interface AddEditCleanup {
+  /** Keys the run created and removed, by its delete test or afterwards. */
+  readonly removed: ReadonlyArray<string>;
+  /** Keys it tried to remove and could not, with the status the server answered. */
+  readonly notRemoved: ReadonlyArray<{ readonly key: string; readonly status: number }>;
+  /** Keys it created and left, because delete was not tested. */
+  readonly left: ReadonlyArray<string>;
+}
+
 export interface TestReport {
   readonly serverUrl: string;
   readonly resource: string;
@@ -113,6 +127,8 @@ export interface TestReport {
     readonly failed: number;
     readonly skipped: number;
   };
+  /** Add/Edit: what became of the records the run created. EntityEvent removes its own canary and has none. */
+  readonly cleanup?: AddEditCleanup;
 }
 
 // ── HTTP Layer ──
