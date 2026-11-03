@@ -261,6 +261,9 @@ npx reso-cert add-edit \
   --url http://localhost:8080 \
   --resource Property \
   --payloads ./sample-payloads \
+  --actions create,update,delete \
+  --create-formats representation,minimal \
+  --update-formats representation,minimal \
   --auth-token test \
   --output-dir ./out \
   --spec-version 2.0.0
