@@ -8,7 +8,8 @@ set -e
 # 2. Run the reso-cert add-edit pipeline (handles health check, metadata,
 #    payload generation, test execution, and reports). This is the reference
 #    server, which has no provider to give payloads, so the tool writes them
-#    (--auto-payloads) and the run tests every action.
+#    (--auto-payloads). A run tests only what it is told to, so every action and
+#    every response format is named: the reference server supports them all.
 # ---------------------------------------------------------------------------
 
 SERVER_URL="${SERVER_URL:-http://server:8080}"
@@ -44,6 +45,9 @@ exec node dist/cli/index.js add-edit \
   --resource "$RESOURCE" \
   --auth-token "$AUTH_TOKEN" \
   --auto-payloads \
+  --actions create,update,delete \
+  --create-formats representation,minimal \
+  --update-formats representation,minimal \
   --verbose \
   --output-dir /tmp/compliance-results \
   --spec-version "${SPEC_VERSION:-2.0.0}"
