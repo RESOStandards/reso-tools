@@ -35,8 +35,9 @@ This package depends on the siblings `reso-common`, `reso-client`, `reso-metadat
 ## Getting Started
 
 ```bash
-# Add/Edit compliance, with your payloads
-reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads
+# Add/Edit compliance, with your payloads and the actions and formats you support
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads \
+  --actions create,update --create-formats minimal --update-formats representation,minimal
 
 # EntityEvent compliance
 reso-cert entity-event --url https://api.example.com --auth-token TOKEN
@@ -71,9 +72,12 @@ A Data Dictionary run authenticates twice. Besides the server credentials above,
 Validates create, update and delete, each as a test that should succeed and one that should fail, with `representation` and `minimal` responses for create and update. Test the actions and formats you support, with your payloads for each. The tool can write them instead for the reference server.
 
 ```bash
-reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads \
+  --actions create,update,delete --create-formats representation,minimal --update-formats representation,minimal
 reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads --actions create --create-formats minimal
 ```
+
+Nothing is tested unless it is chosen: name the actions, and the formats of each create or update among them.
 
 [**More info**](src/add-edit/README.md)
 

@@ -154,7 +154,8 @@ RCP-010 lets a provider implement as many or as few actions as its business need
 
 ```bash
 # Every action, both formats
-reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads
+reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads \
+  --actions create,update,delete --create-formats representation,minimal --update-formats representation,minimal
 
 # Creates only, headers-only responses
 reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads ./payloads \
@@ -329,7 +330,7 @@ A minimal file needs five things: the organization being certified, and then per
 
 **Data Dictionary, Web API Core and EntityEvent all run from that same entry**, with no additions. Every option specific to those endorsements has a default, so the file above works for all three and only the command changes.
 
-**Add/Edit is the exception.** It creates, updates and deletes records, so it has to know what a valid and an invalid record look like for the server under test. Give it `payloads` inline or point it at a directory with `payloadsDir`. Without either it will try to sample the server to build them, which often works but cannot always succeed – an update or delete payload with no key field, and no create payload to chain from, leaves it nothing to act on.
+**Add/Edit is the exception.** It creates, updates and deletes records, so it is told what to test and what to send: the actions in `addEditOptions.actions`, the formats of each create or update among them in `addEditOptions.formats`, and your payloads, inline in `payloads` or in a folder named by `payloadsDir`. A run missing any of them is refused before it writes anything. `"autoPayloads": true` has the tool write the payloads instead, for the reference server and the mock.
 
 **RESO Common Format takes no entry.** It reads files, so it takes `--input` and needs no server.
 

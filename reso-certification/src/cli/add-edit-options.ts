@@ -1,4 +1,4 @@
-import { planAddEditTests } from '../add-edit/plan.js';
+import { readAddEditSelection } from '../add-edit/plan.js';
 import type { AddEditConfig } from '../sdk/types.js';
 
 /** The command-line flags that choose what an Add/Edit run tests. */
@@ -25,7 +25,7 @@ export const addEditSelectionOf = (opts: AddEditSelectionFlags): Pick<AddEditCon
   const actions = listOption(opts.actions);
   const create = listOption(opts.createFormats);
   const update = listOption(opts.updateFormats);
-  const planned = planAddEditTests({
+  const planned = readAddEditSelection({
     ...(actions ? { actions } : {}),
     formats: { ...(create ? { create } : {}), ...(update ? { update } : {}) }
   });

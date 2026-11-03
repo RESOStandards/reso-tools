@@ -183,9 +183,12 @@ const addEditCmd = program
     '--payloads <dir>',
     'Directory holding the payloads for the actions tested: create-succeeds.json, create-fails.json, update-succeeds.json, update-fails.json, delete-succeeds.json, delete-fails.json'
   )
-  .option('--actions <list>', `The actions to test, comma-separated: ${ADD_EDIT_ACTIONS.join(', ')} (default: all)`)
-  .option('--create-formats <list>', `The create responses to test, comma-separated: ${ADD_EDIT_FORMATS.join(', ')} (default: both)`)
-  .option('--update-formats <list>', `The update responses to test, comma-separated: ${ADD_EDIT_FORMATS.join(', ')} (default: both)`)
+  .option(
+    '--actions <list>',
+    `The actions to test, comma-separated: ${ADD_EDIT_ACTIONS.join(', ')} (required, here or in the configuration)`
+  )
+  .option('--create-formats <list>', `The create responses to test, comma-separated: ${ADD_EDIT_FORMATS.join(', ')} (required with create)`)
+  .option('--update-formats <list>', `The update responses to test, comma-separated: ${ADD_EDIT_FORMATS.join(', ')} (required with update)`)
   .option(
     '--auto-payloads',
     'Write the payloads instead of reading them, for a server such as the reference server or the mock: Property only'

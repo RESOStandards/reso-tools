@@ -335,9 +335,9 @@ export interface AddEditConfig extends BaseComplianceConfig {
   readonly payloads?: InlinePayloads;
   /** Write the payloads instead of taking them from the provider. Property only. */
   readonly autoPayloads?: boolean;
-  /** The actions to test. Absent: create, update and delete. */
+  /** The actions to test. Required: nothing is tested unless it is chosen. */
   readonly actions?: ReadonlyArray<AddEditAction>;
-  /** The formats to test, by action. An action left out tests both. */
+  /** The formats to test, by action. Required for each create or update a run tests. */
   readonly formats?: AddEditFormats;
   readonly metadataPath?: string;
   readonly specVersion?: string;

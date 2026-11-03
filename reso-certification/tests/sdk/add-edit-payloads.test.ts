@@ -41,7 +41,21 @@ beforeEach(() => {
 
 let lastOutputDir = '';
 
-const runWith = async (over: Partial<AddEditConfig>): Promise<PipelineResult> => {
+/**
+ * A run is told what to test (Josh, 2026-11-03), so a test that is about something else names a selection: the
+ * actions it gives, or all three, with both formats for a create or an update among them. A test about the
+ * selection itself passes its own.
+ */
+const BOTH = ['representation', 'minimal'] as const;
+const selectionFor = (over: Partial<AddEditConfig>): Pick<AddEditConfig, 'actions' | 'formats'> => {
+  const actions = over.actions ?? ['create', 'update', 'delete'];
+  const formats =
+    over.formats ??
+    Object.fromEntries((['create', 'update'] as const).filter(action => actions.includes(action)).map(action => [action, [...BOTH]]));
+  return { actions, formats };
+};
+
+const runWith = async (over: Partial<AddEditConfig>, selection: Pick<AddEditConfig, 'actions' | 'formats'> = selectionFor(over)) => {
   const outputDir = await mkdtemp(join(tmpdir(), 'add-edit-run-'));
   lastOutputDir = outputDir;
   return runAddEditCompliance({
@@ -49,7 +63,8 @@ const runWith = async (over: Partial<AddEditConfig>): Promise<PipelineResult> =>
     server: { url: serverUrl, auth: { mode: 'token', authToken: 'test-token' } },
     resource: 'Property',
     options: { skipHealthCheck: true, outputDir },
-    ...over
+    ...over,
+    ...selection
   });
 };
 
@@ -66,6 +81,25 @@ const payloadErrors = (result: PipelineResult): string => (stepOf(result, 'Gener
 const writes = (): ReadonlyArray<string> => sent.filter(line => /^(POST|PATCH|DELETE) /.test(line));
 
 const CREATE_PAYLOADS = { createSucceeds: sample('create-succeeds.json'), createFails: sample('create-fails.json') };
+
+describe('an Add/Edit run that is not told what to test', () => {
+  // Josh, 2026-11-03: running everything "could have unintended side effects, they may not expect us to try and delete
+  // something". A run with payloads for every action still tests none of them unless it is told to.
+  it('refuses before writing anything, naming what to choose', async () => {
+    const everything = {
+      ...CREATE_PAYLOADS,
+      updateSucceeds: { ListPrice: 1 },
+      updateFails: { ListPrice: -1 },
+      deleteSucceeds: {},
+      deleteFails: { id: '00000000-0000-0000-0000-000000000000' }
+    };
+    const unchosen = await runWith({ payloads: everything }, {});
+    expect(payloadErrors(unchosen)).toContain('Choose the actions to test: create, update, delete. Nothing is tested unless it is chosen.');
+    const noFormats = await runWith({ payloads: everything }, { actions: ['create', 'delete'] });
+    expect(payloadErrors(noFormats)).toContain('Choose the create responses to test: representation, minimal.');
+    expect(writes()).toEqual([]);
+  });
+});
 
 describe('an Add/Edit run with no payloads, or with them given wrong', () => {
   it('refuses a run given no payloads, and writes nothing to the server', async () => {
