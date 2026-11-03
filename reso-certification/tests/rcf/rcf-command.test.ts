@@ -55,6 +55,55 @@ describe('processRcfStream', () => {
     ).rejects.toMatchObject({ schemaFailure: true });
   });
 
+  // #263: a payload is validated in batches, so none is held whole. The context is checked with the first batch only,
+  // so a context finding is counted once per payload however many batches it takes.
+  it('validates a payload in batches, checking its context with the first batch only', async () => {
+    const calls: Array<{ readonly records: number; readonly contextChecked: boolean; readonly context: unknown }> = [];
+    const validator: DdSchemaValidator = {
+      validate: (payload, _resource, _version, errorMap = {}, options = {}) => {
+        const batch = payload as { readonly value: unknown[]; readonly '@reso.context'?: string };
+        calls.push({ records: batch.value.length, contextChecked: options.contextChecked ?? false, context: batch['@reso.context'] });
+        return errorMap;
+      },
+      combine: () => ({ totalErrors: 0, report: {} })
+    };
+    const records = Array.from({ length: 2500 }, (_, i) => ({ ListingKey: String(i) }));
+    const context = 'urn:reso:metadata:2.0:resource:property';
+    const result = await processRcfStream(
+      stream([
+        { source: 'big', resource: 'Property', version: '2.0', context, records },
+        { source: 'empty', resource: 'Property', version: '2.0', context, records: [] }
+      ]),
+      { validator }
+    );
+    expect(calls).toEqual([
+      { records: 1000, contextChecked: false, context },
+      { records: 1000, contextChecked: true, context },
+      { records: 500, contextChecked: true, context },
+      // an empty payload is still validated once, so its context is checked
+      { records: 0, contextChecked: false, context }
+    ]);
+    expect(result.totalRecords).toBe(2500);
+  });
+
+  it('reads records from an async source, counting a payload whose context could not be read apart', async () => {
+    async function* records(n: number): AsyncGenerator<unknown> {
+      for (let i = 0; i < n; i += 1) yield { ListingKey: String(i), City: i % 2 ? 'X' : '' };
+    }
+    const result = await processRcfStream(
+      stream([
+        { source: 'a', resource: 'Property', version: '2.0', records: records(5) },
+        { source: 'bad', resource: '_INVALID_', invalidContext: true, context: '{}', records: records(3) }
+      ]),
+      { sampleCap: 2 }
+    );
+    expect(result.totalRecords).toBe(5);
+    expect(result.recordsByResource.Property).toHaveLength(2);
+    expect(result.availability.Property).toEqual({ recordCount: 5, fields: { ListingKey: 5, City: 2 } });
+    expect(result.recordsByResource._INVALID_).toBeUndefined();
+    expect([result.invalidContextFiles, result.invalidContextRecords]).toEqual([1, 3]);
+  });
+
   it('accumulate: collects the error total, does not throw', async () => {
     const validator: DdSchemaValidator = { validate: () => ({}), combine: () => ({ totalErrors: 5, report: { x: 1 } }) };
     const result = await processRcfStream(stream([{ source: 'a', resource: 'Property', version: '2.0', records: [{}] }]), { validator });

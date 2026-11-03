@@ -300,7 +300,9 @@ In order, `rcf`:
    `@reso.context` that names its resource and Data Dictionary version, such as
    `urn:reso:metadata:2.1:resource:property`. A file whose context cannot be read is not skipped, so a
    run cannot pass on the readable files alone. The run records a fingerprint of the files it read
-   (`Read RCF input`), so a later run can confirm it scored the same data.
+   (`Read RCF input`), so a later run can confirm it scored the same data. A file is read a record at a
+   time, so its size is not limited by memory. It must be valid JSON. A file that gives `value`,
+   `@reso.context` or `@odata.context` more than once is refused, because it could be read two ways.
 2. **Infers the metadata report** from the records: every field and every lookup value they carry,
    with Data Dictionary fields linked to their Data Dictionary pages. It looks at up to 5,000 records
    per resource for this.

@@ -28,6 +28,14 @@ reso-cert add-edit --url <url> --auth-token <token> --payloads ./payloads --acti
 - **2.0 still runs, as a retest.** `dd --dd-version 2.0` and RCF files that declare 2.0 run as before, and the verdict says the run is not eligible and names 2.1. 1.7 is not certified.
 - **`rcf` falls back to 2.1** when neither `--dd-version` nor the files' `@reso.context` names a version. It fell back to 2.0.
 
+### `rcf` reads a file of any size
+
+- **A file is read a record at a time.** Before, each file was read whole, and one over about 512 MB failed with `Cannot create a string longer than 0x1fffffe8 characters`, however much memory the machine had. A 707 MB file of 1.5 million records now runs in about 12 seconds with a peak of about 400 MB.
+- **Records are type-checked in batches of 1,000,** so no file is held whole for the check either.
+- **The reports are unchanged.** Inference still looks at up to 5,000 records per resource, and availability and the type check still cover every record.
+- **Reading is slower.** A 31 MB file takes about 3 seconds, where it took about 1. A file whose `@reso.context` comes after its records is read twice, once to find the context and once for the records, and takes about twice as long.
+- **A file must be valid JSON, as before,** and the error now names the file. A file that gives `value`, `@reso.context` or `@odata.context` more than once is refused. Before, it was read as its last.
+
 ### `rcf` writes `report.json`, and the SDK runs RESO Common Format
 
 - **`rcf` writes `report.json` and `report-detailed.json`,** like every other run, even when it fails. The summary names RESO Common Format and the data's Data Dictionary version.

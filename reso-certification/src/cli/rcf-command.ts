@@ -45,6 +45,9 @@ const { buildMetadataMap } = requireCjs(resolve(here, '../legacy/common.js')) as
 export const RCF_DEFAULT_DD_VERSION = CURRENT_DD_VERSION;
 /** Records kept per resource for inference; availability is scored over ALL records regardless. */
 const DEFAULT_SAMPLE_CAP = 5000;
+/** Records validated per call. A payload is validated in batches so that none is ever held whole; the batches give
+ *  the same findings as one call, because the validator checks each record on its own (and the context once). */
+const VALIDATION_BATCH_SIZE = 1000;
 
 interface MutableAvailability {
   recordCount: number;
@@ -71,7 +74,8 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
  * Drain a payload stream. When a `validator` is supplied, schema-validate each payload — `strict`
  * throws on the first payload that fails (fast-fail); otherwise errors accumulate into one report.
  * Records accumulate per resource up to `sampleCap` (inference needs a sample, not every record);
- * per-field availability is counted over ALL records.
+ * per-field availability is counted over ALL records. Records are read as they arrive and validated
+ * in batches, so no payload is held whole.
  */
 export const processRcfStream = async (
   payloads: AsyncIterable<RcfPayload>,
@@ -98,42 +102,52 @@ export const processRcfStream = async (
 
   for await (const payload of payloads) {
     capturedVersion ??= payload.version;
-    const { records } = payload;
     // The RCF context carries the resource name lowercase; the reports, the reference lookups and the
     // schema definitions are keyed by the DD name (OpenHouse, not Openhouse), so resolve it here once.
     const resource = opts.canonicalResource ? opts.canonicalResource(payload.resource) : payload.resource;
+    const { validator } = opts;
 
-    if (opts.validator) {
-      // The caller-resolved run version is authoritative (declared with --version, or peeked from the first
-      // payload): the payload's own context is checked AGAINST it (#298), so a file whose context names another
-      // version is a mismatch, not a version the run silently adopts. Only when the caller resolved none (an
-      // @odata.context collection carries no version, and the legacy validator requires one) does the payload's
-      // version stand in. Forward the raw context so its shape and version are validated too. (Its resource
-      // segment is what this command derives `resource` from, so on the rcf command a resource disagreement
-      // cannot arise; that rule is exercised by callers that request a resource independently of the payload.)
-      errorMap = opts.validator.validate(
-        { ...(payload.context !== undefined ? { '@reso.context': payload.context } : {}), value: records },
+    // The caller-resolved run version is authoritative (declared with --version, or peeked from the first
+    // payload): the payload's own context is checked AGAINST it (#298), so a file whose context names another
+    // version is a mismatch, not a version the run silently adopts. Only when the caller resolved none (an
+    // @odata.context collection carries no version, and the legacy validator requires one) does the payload's
+    // version stand in. Forward the raw context so its shape and version are validated too. (Its resource
+    // segment is what this command derives `resource` from, so on the rcf command a resource disagreement
+    // cannot arise; that rule is exercised by callers that request a resource independently of the payload.)
+    // The first batch checks the context; each later one says so, so a context finding is counted once.
+    let batch: unknown[] = [];
+    let batchesValidated = 0;
+    const validateBatch = (): void => {
+      if (!validator) return;
+      errorMap = validator.validate(
+        { ...(payload.context !== undefined ? { '@reso.context': payload.context } : {}), value: batch },
         resource,
         opts.version ?? payload.version,
-        errorMap
+        errorMap,
+        { contextChecked: batchesValidated > 0 }
       );
-      if (opts.strict && opts.validator.combine(errorMap).totalErrors > 0) {
-        throw Object.assign(new Error(`Schema validation failed (strict) at ${payload.source}.`), { schemaFailure: true });
-      }
-    }
+      batchesValidated += 1;
+      batch = [];
+    };
 
-    if (payload.invalidContext) {
-      // part of the submission but never certifiable: its own stat (so the exit code sees it whether or not a
-      // validator ran), reported by validation above when one did, never counted as a record or inferred from
-      invalidContextFiles += 1;
-      invalidContextRecords += records.length;
-      continue;
+    // A payload whose context could not be read is part of the submission but never certifiable: its own stat (so
+    // the exit code sees it whether or not a validator ran), reported by validation when one runs, never counted
+    // as a record or inferred from.
+    const counted = payload.invalidContext ? undefined : resource;
+    if (counted !== undefined) {
+      recordsByResource[counted] ??= [];
+      availability[counted] ??= { recordCount: 0, fields: {} };
     }
-    recordsByResource[resource] ??= [];
-    availability[resource] ??= { recordCount: 0, fields: {} };
-    const acc = recordsByResource[resource];
-    const av = availability[resource];
-    for (const record of records) {
+    const acc = counted !== undefined ? recordsByResource[counted] : undefined;
+    const av = counted !== undefined ? availability[counted] : undefined;
+    let payloadRecords = 0;
+    for await (const record of payload.records) {
+      payloadRecords += 1;
+      if (validator) {
+        batch.push(record);
+        if (batch.length === VALIDATION_BATCH_SIZE) validateBatch();
+      }
+      if (!acc || !av) continue;
       totalRecords += 1;
       av.recordCount += 1;
       if (isRecord(record)) {
@@ -143,6 +157,15 @@ export const processRcfStream = async (
         }
       }
       if (acc.length < cap) acc.push(record);
+    }
+    // Every payload is validated at least once, an empty one included, so its context is always checked.
+    if (validator && (batch.length > 0 || batchesValidated === 0)) validateBatch();
+    if (validator && opts.strict && validator.combine(errorMap).totalErrors > 0) {
+      throw Object.assign(new Error(`Schema validation failed (strict) at ${payload.source}.`), { schemaFailure: true });
+    }
+    if (payload.invalidContext) {
+      invalidContextFiles += 1;
+      invalidContextRecords += payloadRecords;
     }
   }
 

@@ -29,6 +29,7 @@ interface SchemaModule {
     readonly isResoDataDictionarySchema?: boolean;
     readonly errorMap?: Record<string, unknown>;
     readonly acquisition?: 'transport' | 'rcf';
+    readonly contextChecked?: boolean;
   }) => Record<string, unknown>;
   readonly combineErrors: (errorMap: Record<string, unknown>) => { readonly totalErrors?: number; readonly [k: string]: unknown };
 }
@@ -125,12 +126,17 @@ export const generateSchemaFromReport = async (opts: {
   });
 
 export interface DdSchemaValidator {
-  /** Validate one payload, folding its errors into `errorMap` (shared across a stream). */
+  /**
+   * Validate one payload, folding its errors into `errorMap` (shared across a stream). A payload too large to hold
+   * is validated in batches of its records: each later batch passes `contextChecked`, so the context and the
+   * resource are checked and counted once per payload, with the first batch.
+   */
   readonly validate: (
     jsonPayload: unknown,
     resourceName?: string,
     version?: string,
-    errorMap?: Record<string, unknown>
+    errorMap?: Record<string, unknown>,
+    options?: { readonly contextChecked?: boolean }
   ) => Record<string, unknown>;
   /** Total + combine an accumulated error map into a report. */
   readonly combine: (errorMap: Record<string, unknown>) => { readonly totalErrors: number; readonly report: Record<string, unknown> };
@@ -160,7 +166,7 @@ export const createDdSchemaValidator = async (opts: {
     additionalProperties: opts.additionalProperties ?? false
   });
   return {
-    validate: (jsonPayload, resourceName, version, errorMap = {}) =>
+    validate: (jsonPayload, resourceName, version, errorMap = {}, options = {}) =>
       mod.validate({
         jsonSchema,
         jsonPayload,
@@ -168,7 +174,8 @@ export const createDdSchemaValidator = async (opts: {
         version,
         validationConfig: opts.validationConfig ?? {},
         errorMap,
-        ...(opts.acquisition ? { acquisition: opts.acquisition } : {})
+        ...(opts.acquisition ? { acquisition: opts.acquisition } : {}),
+        ...(options.contextChecked ? { contextChecked: true } : {})
       }),
     combine: errorMap => {
       // Every validate() exit now returns its caches; the default keeps `combine` total on an untouched
