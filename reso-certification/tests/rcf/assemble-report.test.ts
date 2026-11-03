@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { MetadataReportField, MetadataReportLookup } from '@reso-standards/reso-metadata-utils';
 import { describe, expect, it } from 'vitest';
-import { type ReferenceMap, buildPayloadCache, inferMetadataReport } from '../../src/rcf/assemble-report.js';
+import { type ReferenceMap, createRcfInference, inferMetadataReport } from '../../src/rcf/assemble-report.js';
 
 // The variations service re-reads a report via the legacy buildMetadataMap; use it to prove the
 // inferred report's field↔lookup serialization round-trips (isLookupField recovered off field.type).
@@ -128,14 +128,13 @@ describe('inferMetadataReport', () => {
   });
 });
 
-describe('buildPayloadCache', () => {
-  it('accumulates values per field and recurses nested objects', () => {
-    const cache = buildPayloadCache([{ '@odata.id': 'x', A: 1, Nested: { B: 'y' } }], 'Root', {
-      Root: { Nested: { type: 'Edm.ComplexType', isExpansion: true, typeName: 'NestedType' } }
-    });
-    expect(cache.Root.A).toEqual([1]);
-    expect(cache.Root['@odata.id']).toBeUndefined(); // annotation skipped
-    expect(cache.NestedType.B).toEqual(['y']); // recursed under the reference typeName
+describe('createRcfInference', () => {
+  it('folds in each field and recurses nested objects', () => {
+    const inference = createRcfInference({ Root: { Nested: { type: 'Edm.ComplexType', isExpansion: true, typeName: 'NestedType' } } });
+    inference.add('Root', { '@odata.id': 'x', A: 1, Nested: { B: 'y' } });
+    const report = inference.report({ version: '2.0', generatedOn: 'T' });
+    expect(report.fields.map(f => `${f.resourceName}.${f.fieldName}`)).toEqual(['Root.A', 'Root.Nested', 'NestedType.B']); // annotation skipped
+    expect(field(report.fields, 'NestedType', 'B')?.type).toBe('Edm.String'); // recursed under the reference typeName
   });
 });
 
@@ -376,5 +375,80 @@ describe('inferMetadataReport — LOCAL collection (multi-value) enum', () => {
     const local = report.fields.find(f => f.fieldName === 'LocalFeatures');
     expect(local?.type).toBe('Property.LocalFeatures');
     expect(local?.isCollection).toBe(true);
+  });
+});
+
+// #263: inference folds records in as they are read, and RCF files can name resources in any order. The report must
+// be the one the same records give read a resource at a time, which is the order inference has always reported in.
+describe('createRcfInference: reading order', () => {
+  const refMap: ReferenceMap = {
+    Property: {
+      Media: { type: 'Collection(org.reso.metadata.Media)', isExpansion: true, isCollection: true, typeName: 'Media' },
+      StandardStatus: { type: 'org.reso.metadata.enums.StandardStatus', isLookupField: true }
+    },
+    Member: { Media: { type: 'Collection(org.reso.metadata.Media)', isExpansion: true, isCollection: true, typeName: 'Media' } },
+    Media: { MediaCategory: { type: 'org.reso.metadata.enums.MediaCategory', isLookupField: true } }
+  };
+  // Property's values are spread over all 60 records, so most first appear after Member's have started arriving.
+  const property = (i: number) => ({
+    StandardStatus: ['Active', 'Pending', 'Closed'][Math.floor(i / 20)],
+    LocalTag: `P${Math.floor(i / 15)}`,
+    Media: [{ MediaCategory: `Photo${Math.floor(i / 12)}`, LocalCaption: `P${Math.floor(i / 20)}` }]
+  });
+  const member = (i: number) => ({ LocalRole: `R${i % 4}`, Media: [{ MediaCategory: `Logo${i % 2}`, LocalCaption: `M${i % 3}` }] });
+  const properties = Array.from({ length: 60 }, (_, i) => property(i));
+  const members = Array.from({ length: 60 }, (_, i) => member(i));
+
+  it('gives the report of the records read a resource at a time, however they interleave', () => {
+    const grouped = inferMetadataReport({
+      recordsByResource: { Property: properties, Member: members },
+      referenceMap: refMap,
+      version: '2.0',
+      generatedOn: 'T'
+    });
+    // Member records start arriving after the first Property records, then the two alternate in runs of 1 to 4.
+    const interleaved = createRcfInference(refMap);
+    const order = Array.from({ length: 120 }, (_, k) => (k < 3 ? 'Property' : Math.floor(k / ((k % 4) + 1)) % 2 ? 'Member' : 'Property'));
+    const next = { Property: 0, Member: 0 };
+    for (const resource of order) {
+      const from =
+        next[resource as 'Property' | 'Member'] < 60
+          ? (resource as 'Property' | 'Member')
+          : resource === 'Property'
+            ? 'Member'
+            : 'Property';
+      interleaved.add(from, from === 'Property' ? properties[next.Property] : members[next.Member]);
+      next[from] += 1;
+    }
+    expect(next).toEqual({ Property: 60, Member: 60 });
+    expect(interleaved.report({ version: '2.0', generatedOn: 'T' })).toEqual(grouped);
+    // Media is reached from both, and its values take the order of the Property records, read first.
+    expect(grouped.lookups.filter(l => l.lookupName.endsWith('MediaCategory')).map(l => l.lookupValue)).toEqual([
+      'Photo0',
+      'Photo1',
+      'Photo2',
+      'Photo3',
+      'Photo4',
+      'Logo0',
+      'Logo1'
+    ]);
+  });
+
+  it('keeps a local field of 250 distinct values as an enumeration, and one of 251 as free text', () => {
+    const local = (distinct: number) =>
+      inferMetadataReport({
+        recordsByResource: { Property: Array.from({ length: distinct * 2 }, (_, i) => ({ LocalCode: `C${i % distinct}` })) },
+        referenceMap: {},
+        version: '2.0',
+        generatedOn: 'T'
+      });
+    expect(local(250).lookups).toHaveLength(250);
+    expect(
+      local(250)
+        .lookups.map(l => l.lookupValue)
+        .slice(0, 2)
+    ).toEqual(['C0', 'C1']);
+    expect(local(251).lookups).toHaveLength(0);
+    expect(local(251).fields[0].type).toBe('Edm.String');
   });
 });
