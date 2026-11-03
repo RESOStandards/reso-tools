@@ -152,7 +152,7 @@ Add/Edit creates, updates and deletes records, so it needs to know what a valid 
 
 An update or a delete that names no record, like the two above, uses one the run created. With no create to use, each one has to name its record. A run given no payloads is refused before it writes anything.
 
-To test only some actions, or only some response formats, say so in `addEditOptions`. Only those payloads are needed:
+Say which actions to test in `addEditOptions`, with the response formats of each create or update among them. Nothing is tested unless it is chosen, and only the chosen actions' payloads are needed:
 
 ```json
 "addEditOptions": {

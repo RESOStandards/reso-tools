@@ -60,9 +60,9 @@ interface ConfigAddEditOptions {
   readonly resource?: string;
   readonly specVersion?: string;
   readonly payloadsDir?: string;
-  /** The actions to test. Absent: create, update and delete. */
+  /** The actions to test. Required: nothing is tested unless it is chosen. */
   readonly actions?: ReadonlyArray<AddEditAction>;
-  /** The formats to test, by action. An action left out tests both. */
+  /** The formats to test, by action. Required for each create or update among the actions. */
   readonly formats?: AddEditFormats;
   /** Write the payloads instead of taking them from the provider. Property only. */
   readonly autoPayloads?: boolean;

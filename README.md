@@ -106,7 +106,7 @@ Test any RESO OData server from the command line:
 
 ```bash
 # Add/Edit (the reference server, so the tool writes the payloads; elsewhere give yours with --payloads)
-reso-cert add-edit --url http://localhost:8080 --auth-token TOKEN --auto-payloads
+reso-cert add-edit --url http://localhost:8080 --auth-token TOKEN --auto-payloads --actions create --create-formats minimal
 
 # EntityEvent
 reso-cert entity-event --url http://localhost:8080 --auth-token TOKEN
