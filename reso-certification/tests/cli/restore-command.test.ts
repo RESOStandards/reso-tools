@@ -68,4 +68,9 @@ describe('resolveCertApiCredential, as restore uses it', () => {
     expect(resolveCertApiCredential({ CERTIFICATION_API_KEY: 'older' })).toBe('older');
     expect(resolveCertApiCredential({})).toBeUndefined();
   });
+
+  it('reads an empty or blank value as absent, which is what restore already refused', () => {
+    expect(resolveCertApiCredential({ CLIENT_SECRET: '', CERTIFICATION_API_KEY: 'older' })).toBe('older');
+    expect(resolveCertApiCredential({ CLIENT_SECRET: '  ', CERTIFICATION_API_KEY: '' })).toBeUndefined();
+  });
 });

@@ -131,6 +131,13 @@ describe('the credential', () => {
     expect(resolveCertApiCredential({ CERTIFICATION_API_KEY: 'older' })).toBe('older');
     expect(resolveCertApiCredential({})).toBeUndefined();
   });
+
+  it('treats an empty or blank value as absent, so it never becomes a bare Bearer and never shadows the other variable', () => {
+    expect(resolveCertApiCredential({ CLIENT_SECRET: '', CERTIFICATION_API_KEY: 'older' })).toBe('older');
+    expect(resolveCertApiCredential({ CLIENT_SECRET: '   ' })).toBeUndefined();
+    expect(resolveCertApiCredential({ CERTIFICATION_API_KEY: '' })).toBeUndefined();
+    expect(resolveCertApiCredential({ CLIENT_SECRET: ' from-file\n' })).toBe('from-file');
+  });
 });
 
 describe('the warning', () => {
@@ -305,6 +312,24 @@ describe('refusals before any request', () => {
   it('refuses without a credential', async () => {
     const api = certApi();
     await expect(run(api, { env: { TOKEN_URI: `${ORIGIN}/api/v1/oauth/token` } })).rejects.toThrow(/CLIENT_SECRET/);
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it('refuses an empty credential the same way, rather than presenting a bare Bearer', async () => {
+    const api = certApi();
+    await expect(run(api, { env: env({ CLIENT_SECRET: '' }) })).rejects.toThrow(/CLIENT_SECRET/);
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it('never echoes a malformed id, and has registered the credential before refusing one', async () => {
+    const api = certApi();
+    const secretAsId = `${CREDENTIAL}==`;
+    const error: unknown = await run(api, { reportId: secretAsId }).catch((thrown: unknown) => thrown);
+    expect(error).toBeInstanceOf(Error);
+    const message = error instanceof Error ? error.message : '';
+    expect(message).toMatch(/report id/);
+    expect(message).not.toContain(CREDENTIAL);
+    expect(maskSecrets(CREDENTIAL)).not.toBe(CREDENTIAL);
     expect(api).not.toHaveBeenCalled();
   });
 

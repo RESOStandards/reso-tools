@@ -233,19 +233,26 @@ const archive = async (origin: string, authorization: string, reportId: string):
 /**
  * Archive one report, or show what archiving it would do.
  *
- * Refuses, by throwing, before any request when the id, the credential or the origin is missing or
+ * Refuses, by throwing, before any request when the credential, the id or the origin is missing or
  * malformed: those are usage, and the caller exits 2. Everything the server says comes back in the
  * result instead, for the caller to print and to turn into an exit code with `archiveExitCode`.
+ *
+ * The credential is resolved and registered with the masker before anything else is examined, and
+ * the id refusal names the rule rather than the value: an argument given in the id's place can be
+ * the credential itself (a shell slip, a pasted line from the credentials file), and a refusal that
+ * quoted it would print it.
  */
 export const runArchiveReport = async (options: ArchiveReportOptions, log: (line: string) => void): Promise<ArchiveReportResult> => {
   const env = options.env ?? process.env;
-  const reportId = options.reportId.trim();
-  if (!REPORT_ID.test(reportId)) {
-    throw new Error(`A report id is letters, digits, '-' and '_' only, got ${JSON.stringify(options.reportId)}.`);
-  }
   const credential = resolveCertApiCredential(env);
   if (credential === undefined) throw new Error(MISSING_CERT_API_CREDENTIAL);
   registerSecret(credential);
+  const reportId = options.reportId.trim();
+  if (!REPORT_ID.test(reportId)) {
+    throw new Error(
+      `A report id is letters, digits, '-' and '_' only, and the ${options.reportId.length}-character argument given is not one.`
+    );
+  }
   const origin = resolveCertApiOrigin({ ...(options.url === undefined ? {} : { url: options.url }), env });
   const authorization = `Bearer ${credential}`;
   const confirmed = options.confirm;
