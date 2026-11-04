@@ -10,9 +10,11 @@
   type coverage was achieved, the types met and the types missed. Each type counts when it is met on some field of
   some resource tested. A server that cannot meet every type is recorded as not having achieved it, and can still be
   certified.
-- **A multi-valued lookup is met with two values,** as the specification gives it, so its `has` with `and`, `any()`
-  and `all()` tests all run. A multi-valued field with two values to test is now chosen before one with a single
-  value, however standard. Before, a standard field holding one value could be chosen and those tests went untested.
+- **A multi-valued lookup is met with two values,** as the specification gives it, and its `has` with `and`, `any()`
+  and `all()` tests run on both. A field without two values to test is no longer chosen for them, however standard,
+  and the run goes to the next field. Before, a standard field holding one value could be chosen, and those tests ran
+  on that one value and passed. With no multi-valued field holding two values, the type is not met and those tests are
+  not tested.
 - **`--full-coverage` is unchanged:** with it, a missing type also fails the run.
 - **To test as Core 2.0.0 did,** which needed every type on one resource, run with `--resources Property
   --full-coverage`, and name the fields from your 2.0.0 report with `--field-overrides`. The User Guide explains what

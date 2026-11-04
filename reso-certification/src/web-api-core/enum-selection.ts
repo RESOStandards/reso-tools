@@ -153,23 +153,24 @@ export const selectEnumCandidates = (
   wantRep: (rep: EnumRepresentation) => boolean,
   overrides: FieldOverrides = NO_FIELD_OVERRIDES
 ): ReadonlyArray<EnumCandidate> => {
+  // Each slot has a condition a field must meet to be a candidate at all (Josh, 2026-11-03: "the ranking is standard
+  // first, most populated, and must have all values present"). A multi-valued field must have all of many: the two
+  // values the spec gives a multi-valued enumeration (Core §3.3), which its has + and, any() and all() tests use. With
+  // one, those tests ran on one value and passed: FBS's RentIncludes held only `None`, and InteriorFeatures held two
+  // ("we need to always try and fill in both multi values on the multi tests, otherwise go to the next field"). A
+  // single-valued field needs one value, which every candidate has.
+  const fillsItsSlot = (c: EnumCandidate): boolean => !isMultiRep(c.representation) || c.distinctValueCount >= MIN_DISCRIMINATING_VALUES;
   const candidates = properties
     .map(p => buildCandidate(p, records, enumTypes, standardMap, resource, wantRep))
-    .filter((c): c is EnumCandidate => c !== undefined);
+    .filter((c): c is EnumCandidate => c !== undefined)
+    .filter(fillsItsSlot);
 
   const hasStandardValue = (c: EnumCandidate): boolean => c.values.length > 0 && standardMap.isStandardValue(c.values[0]);
   const rank = (c: EnumCandidate): number => (c.isStandard ? 0 : 2) + (hasStandardValue(c) ? 0 : 1);
-  // A multi-valued field first needs two values, which the spec gives a multi-valued enumeration and its has + and,
-  // any() and all() tests use (Core §3.3). One with a single value cannot meet the type, so it ranks after every
-  // field that can, however standard: FBS's RentIncludes held only `None` and was picked over fields with two (Josh,
-  // 2026-11-03: "If we're trying to get two values, then the tool shouldn't have even chosen that field"). A
-  // single-valued field needs one value, so its ranking is unchanged.
-  const lacksSecondValue = (c: EnumCandidate): number =>
-    isMultiRep(c.representation) && c.distinctValueCount < MIN_DISCRIMINATING_VALUES ? 1 : 0;
-  // Then by rank: standard field + standard value (0) → standard field/local value (1) → local (2/3). Within
+  // Sort by rank: standard field + standard value (0) → standard field/local value (1) → local (2/3). Within
   // a rank, the higher fill rate wins — a fuller field is more likely to yield a non-empty result and is more
   // resistant to record drift between sampling and the live query.
-  const ranked = [...candidates].sort((a, b) => lacksSecondValue(a) - lacksSecondValue(b) || rank(a) - rank(b) || b.fillRate - a.fillRate);
+  const ranked = [...candidates].sort((a, b) => rank(a) - rank(b) || b.fillRate - a.fillRate);
   // A provider override REPLACES the ranked list for this slot rather than re-ordering it, so the ladder
   // has nothing to fall through to and a named field owns its own outcome. Only a candidate that can
   // actually exercise the operators is eligible (see MIN_DISCRIMINATING_VALUES); when no eligible candidate

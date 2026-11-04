@@ -1193,7 +1193,12 @@ export const runEnumFamilyScenario = async (
   // determinate result). We deliberately do not cap: a provider may restrict $filter to a subset of its
   // enum fields (returning 400 on the rest), so a queryable field can sit at any rank; a cap could skip it
   // and — worse — leave us reporting one of the 400s. Ranking is uncorrelated with filterability.
-  const eligible = candidates.filter(c => scenarioTargetsRep(scenario, c.representation) && opValidForRep(op, c.representation));
+  // A test that takes two values runs only on a field that fills in both; otherwise it goes to the next field (Josh,
+  // 2026-11-03), never runs on one value, as FBS's RentIncludes did with `None`.
+  const takesTwoValues = 'valueParam2' in scenario && scenario.valueParam2 !== undefined;
+  const eligible = candidates.filter(
+    c => scenarioTargetsRep(scenario, c.representation) && opValidForRep(op, c.representation) && (!takesTwoValues || c.values.length >= 2)
+  );
   if (eligible.length === 0) {
     return skipResult(
       scenario,
