@@ -162,6 +162,8 @@ const uploadRcfInput = async (
   if (run.config.endorsement !== 'rcf' || !('fingerprint' in record)) throw refusal(label, 'it is not a RESO Common Format run');
   const dir = await deps.makeTempDir();
   try {
+    // TODO(later): the reservation was made when the local run passed, before the pack. A pack over the size limit
+    // refuses here and leaves that reservation to expire unused in 24 hours.
     const packed = await deps.pack(run.config.input, join(dir, 'upload.zip'), record.fingerprint);
     if ('refused' in packed) throw refusal(label, packed.refused);
     const slot = await deps.requestSlot({
