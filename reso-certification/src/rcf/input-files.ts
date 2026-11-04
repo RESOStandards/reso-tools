@@ -6,6 +6,9 @@
  *     directory, and the `.json` entries of each `.zip` in it by the zip's path, a slash and the entry's name
  *   - a `.zip`, its `.json` entries by name, skipping `__MACOSX` and directory entries
  *
+ * A file whose path holds a control character is refused. The fingerprint's manifest gives each file one line, so a
+ * newline in a name could make one file read as two, and two different deliveries share a fingerprint.
+ *
  * The fingerprint hashes these and a cloud run's upload packs them, so the two cannot disagree about what was read.
  * Read each file's bytes before asking for the next: a zip's next entry, and a directory's next file, are opened only
  * then, so a delivery of any size never holds more than one file open.
@@ -22,11 +25,24 @@ export interface RcfInputSource {
   readonly open: () => Promise<NodeJS.ReadableStream>;
 }
 
+const isControl = (character: string): boolean => {
+  const code = character.charCodeAt(0);
+  return code < 0x20 || code === 0x7f;
+};
+
+/** The path, when no character in it could break the line the manifest gives it. */
+const manifestPath = (path: string): string => {
+  if ([...path].some(isControl)) {
+    throw new Error(`An RCF input file's name holds a control character, which its fingerprint cannot name: ${JSON.stringify(path)}`);
+  }
+  return path;
+};
+
 async function* zipSources(zipPath: string, prefix: string): AsyncGenerator<RcfInputSource> {
   const zip = await openZip(zipPath);
   try {
     for await (const entry of zipEntries(zip)) {
-      if (isReadZipEntry(entry.fileName)) yield { path: `${prefix}${entry.fileName}`, open: () => openZipEntry(zip, entry) };
+      if (isReadZipEntry(entry.fileName)) yield { path: manifestPath(`${prefix}${entry.fileName}`), open: () => openZipEntry(zip, entry) };
     }
   } finally {
     zip.close();
@@ -38,7 +54,7 @@ async function* directorySources(dir: string, prefix: string): AsyncGenerator<Rc
     const full = join(dir, name);
     const path = `${prefix}${name}`;
     if ((await stat(full)).isDirectory()) yield* directorySources(full, `${path}/`);
-    else if (extname(name) === '.json') yield { path, open: async () => createReadStream(full) };
+    else if (extname(name) === '.json') yield { path: manifestPath(path), open: async () => createReadStream(full) };
     else if (extname(name) === '.zip') yield* zipSources(full, `${path}/`);
   }
 }
@@ -48,6 +64,6 @@ export async function* rcfInputFiles(inputPath: string): AsyncGenerator<RcfInput
   const inputStat = await stat(inputPath);
   if (inputStat.isDirectory()) yield* directorySources(inputPath, '');
   else if (extname(inputPath) === '.zip') yield* zipSources(inputPath, '');
-  else if (extname(inputPath) === '.json') yield { path: basename(inputPath), open: async () => createReadStream(inputPath) };
+  else if (extname(inputPath) === '.json') yield { path: manifestPath(basename(inputPath)), open: async () => createReadStream(inputPath) };
   else throw new Error(`Unsupported RCF input (expected a .json file, .zip or a directory): ${inputPath}`);
 }

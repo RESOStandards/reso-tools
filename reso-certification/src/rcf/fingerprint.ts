@@ -14,7 +14,9 @@
  * Each file is hashed as the bytes it holds, and the fingerprint is the SHA-256 of a manifest with
  * one `<sha256>  <path>` line per file, sorted by path. So the same files give the same fingerprint
  * whether they arrive as a `.json`, a folder or a zip, and however a zip happened to be packed. A
- * changed byte, a renamed file or a file added or removed changes it.
+ * changed byte, a renamed file or a file added or removed changes it. A path holding a control
+ * character is refused (`input-files.ts`), so each line names one file and no two deliveries can
+ * share a manifest.
  */
 
 import { createHash } from 'node:crypto';
