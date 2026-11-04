@@ -292,7 +292,8 @@ describe('every request', () => {
   it('reports a redirect of the archive POST as a failure with its status, and follows nothing', async () => {
     const api = certApi({ archive: reply(307, '') });
     const { result, lines } = await run(api, { confirm: true });
-    expect(calledUrls(api).every(url => url.startsWith(ORIGIN))).toBe(true);
+    // The origin compared exactly: a prefix would also accept https://cert-api.example.org.elsewhere.example.
+    expect(calledUrls(api).every(url => new URL(url).origin === ORIGIN)).toBe(true);
     expect(result.archived).toBe(false);
     expect(result.status).toBe(307);
     expect(lines.join('\n')).toContain('307');
