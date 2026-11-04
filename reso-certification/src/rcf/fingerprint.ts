@@ -18,29 +18,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { createReadStream } from 'node:fs';
-import { readdir, stat } from 'node:fs/promises';
-import { createRequire } from 'node:module';
-import { basename, extname, join } from 'node:path';
-
-const requireCjs = createRequire(import.meta.url);
-
-// yauzl ships no type declarations; the surface used here, as in rcf-input.ts.
-interface ZipEntry {
-  readonly fileName: string;
-}
-interface ZipFile {
-  readEntry(): void;
-  openReadStream(entry: ZipEntry, cb: (err: Error | null, stream: NodeJS.ReadableStream) => void): void;
-  close(): void;
-  on(event: 'entry', cb: (entry: ZipEntry) => void): void;
-  on(event: 'end', cb: () => void): void;
-  on(event: 'error', cb: (err: Error) => void): void;
-}
-interface Yauzl {
-  open(path: string, opts: { lazyEntries: boolean }, cb: (err: Error | null, zip: ZipFile) => void): void;
-}
-const yauzl = requireCjs('yauzl') as Yauzl;
+import { rcfInputFiles } from './input-files.js';
 
 /** One file the run reads. */
 export interface RcfInputFile {
@@ -69,75 +47,11 @@ const hashStream = (stream: NodeJS.ReadableStream): Promise<{ readonly sha256: s
     stream.on('error', reject);
   });
 
-const hashFile = async (fullPath: string, path: string): Promise<RcfInputFile> => ({
-  path,
-  ...(await hashStream(createReadStream(fullPath)))
-});
-
-const isReadZipEntry = (name: string): boolean => !name.includes('__MACOSX') && !name.endsWith('/') && extname(name) === '.json';
-
-const hashZipEntries = async (zipPath: string, prefix: string): Promise<ReadonlyArray<RcfInputFile>> => {
-  const zip = await new Promise<ZipFile>((resolve, reject) =>
-    yauzl.open(zipPath, { lazyEntries: true }, (err, opened) => (err ? reject(err) : resolve(opened)))
-  );
-  try {
-    return await new Promise<ReadonlyArray<RcfInputFile>>((resolve, reject) => {
-      const files: RcfInputFile[] = [];
-      zip.on('error', reject);
-      zip.on('end', () => resolve(files));
-      zip.on('entry', entry => {
-        if (!isReadZipEntry(entry.fileName)) {
-          zip.readEntry();
-          return;
-        }
-        zip.openReadStream(entry, (err, stream) => {
-          if (err) {
-            reject(err);
-            return;
-          }
-          hashStream(stream)
-            .then(hashed => {
-              files.push({ path: `${prefix}${entry.fileName}`, ...hashed });
-              zip.readEntry();
-            })
-            .catch(reject);
-        });
-      });
-      zip.readEntry();
-    });
-  } finally {
-    zip.close();
-  }
-};
-
-const hashDirectoryEntry = async (dir: string, prefix: string, name: string): Promise<ReadonlyArray<RcfInputFile>> => {
-  const full = join(dir, name);
-  const path = `${prefix}${name}`;
-  if ((await stat(full)).isDirectory()) return hashDirectory(full, `${path}/`);
-  if (extname(name) === '.json') return [await hashFile(full, path)];
-  if (extname(name) === '.zip') return hashZipEntries(full, `${path}/`);
-  return [];
-};
-
-/** One file at a time, as `rcf` reads them, so a large delivery cannot exhaust the open-file limit. */
-const hashDirectory = async (dir: string, prefix: string): Promise<ReadonlyArray<RcfInputFile>> => {
-  const names = (await readdir(dir)).filter(name => !name.startsWith('.')).sort();
-  const files: RcfInputFile[] = [];
-  for (const name of names) files.push(...(await hashDirectoryEntry(dir, prefix, name)));
-  return files;
-};
-
 /** The fingerprint of the RCF files at `inputPath`: a `.json` file, a `.zip` or a directory. */
 export const fingerprintRcfInput = async (inputPath: string): Promise<RcfInputFingerprint> => {
-  const inputStat = await stat(inputPath);
-  const files = inputStat.isDirectory()
-    ? await hashDirectory(inputPath, '')
-    : extname(inputPath) === '.zip'
-      ? await hashZipEntries(inputPath, '')
-      : extname(inputPath) === '.json'
-        ? [await hashFile(inputPath, basename(inputPath))]
-        : undefined;
-  if (files === undefined) throw new Error(`Unsupported RCF input (expected a .json file, .zip or a directory): ${inputPath}`);
+  const files: RcfInputFile[] = [];
+  // One file at a time, as `rcf` reads them, so a large delivery cannot exhaust the open-file limit.
+  for await (const source of rcfInputFiles(inputPath)) files.push({ path: source.path, ...(await hashStream(await source.open())) });
   const sorted = [...files].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   const manifest = sorted.map(file => `${file.sha256}  ${file.path}\n`).join('');
   return {

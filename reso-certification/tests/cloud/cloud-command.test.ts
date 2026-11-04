@@ -3,13 +3,16 @@ import {
   type CloudOfferIo,
   type CloudOfferMode,
   type RanEntry,
+  type RcfCloudOfferIo,
   cloudRunHint,
   cloudRunPrerequisite,
   formatAcceptedRun,
   formatRunStatusTable,
   offerCloudRun,
+  offerRcfCloudRun,
   planCloudRequests
 } from '../../src/cli/cloud-command.js';
+import type { RcfLocalRunRecord } from '../../src/cloud/local-run.js';
 import type { AcceptedCloudRun } from '../../src/cloud/runs.js';
 import type { CoreConfig, PipelineResult } from '../../src/sdk/types.js';
 
@@ -314,5 +317,121 @@ describe('cloudRunPrerequisite', () => {
     expect(reason).not.toContain('secret-for-tests');
     expect(cloudRunPrerequisite({ ...services, TOKEN_URI: 'https://auth.example.org', CLIENT_ID: 'id' })).toContain('CLIENT_SECRET');
     expect(cloudRunPrerequisite({ ...services, CLIENT_SECRET: ' ' })).toBeDefined();
+  });
+});
+
+describe('offerRcfCloudRun', () => {
+  const FINGERPRINT = 'f'.repeat(64);
+  const record: RcfLocalRunRecord = {
+    recipientUoi: 'M00000000',
+    providerUsi: '99999',
+    fingerprint: FINGERPRINT,
+    endorsementName: 'reso-common-format',
+    endorsementVersion: '2.1',
+    softwareVersion: '0.12.0',
+    generatedOn: '2026-11-03T20:00:00.000Z',
+    outcome: 'passed',
+    certification: { valid: true },
+    remarks: ''
+  };
+  const offer = { input: '/data/rcf', providerUoi: 'T00000000', record };
+  const START = { startCloudRun: true, json: false };
+
+  const rcfIo = (over: Partial<RcfCloudOfferIo> = {}) => {
+    const said: string[] = [];
+    const order: string[] = [];
+    const io: RcfCloudOfferIo = {
+      say: text => {
+        said.push(text);
+      },
+      pack: vi.fn(async () => {
+        order.push('pack');
+        return { packed: { path: '/tmp/x/upload.zip', bytes: 2048, fingerprint: FINGERPRINT, files: 3 } };
+      }),
+      reserve: vi.fn(async () => {
+        order.push('reserve');
+        return { certificationRequestId: 'test-T00000000-1', expiresAt: '2026-11-04T20:00:00.000Z', recipients: [] };
+      }),
+      slot: vi.fn(async () => {
+        order.push('slot');
+        return { uploadId: 'up-1', url: 'https://u', fields: {}, expiresAt: 'x', maxBytes: 4096 };
+      }),
+      upload: vi.fn(async () => {
+        order.push('upload');
+      }),
+      submit: vi.fn(async () => {
+        order.push('submit');
+        return {
+          certificationRequestId: 'test-T00000000-1',
+          providerUoi: 'T00000000',
+          endorsementName: 'reso-common-format',
+          endorsementVersion: '2.1',
+          recipients: [{ recipientUoi: 'M00000000', providerUsi: '99999' }]
+        };
+      }),
+      discard: vi.fn(async () => {
+        order.push('discard');
+      }),
+      ...over
+    };
+    return { io, said, order };
+  };
+
+  it('packs, reserves, uploads and starts, in that order, naming the upload and the fingerprint, then removes the zip', async () => {
+    const { io, said, order } = rcfIo();
+    expect(await offerRcfCloudRun(offer, START, io)).toBe('started');
+    expect(order).toEqual(['pack', 'reserve', 'slot', 'upload', 'submit', 'discard']);
+    expect(io.pack).toHaveBeenCalledWith('/data/rcf', FINGERPRINT);
+    expect(io.reserve).toHaveBeenCalledWith({
+      endorsementName: 'reso-common-format',
+      endorsementVersion: '2.1',
+      providerUoi: 'T00000000',
+      targets: [{ recipientUoi: 'M00000000', providerUsi: '99999' }]
+    });
+    expect(io.slot).toHaveBeenCalledWith(
+      expect.objectContaining({ certificationRequestId: 'test-T00000000-1', fingerprint: FINGERPRINT, bytes: 2048 })
+    );
+    expect(io.submit).toHaveBeenCalledWith({
+      endorsementName: 'reso-common-format',
+      endorsementVersion: '2.1',
+      config: {
+        certificationRequestId: 'test-T00000000-1',
+        providerUoi: 'T00000000',
+        configs: [{ recipientUoi: 'M00000000', providerUsi: '99999', upload: { uploadId: 'up-1', fingerprint: FINGERPRINT } }],
+        localRuns: [record]
+      }
+    });
+    expect(said.join('\n')).toContain("Started RESO Common Format 2.1 in RESO's cloud for T00000000.");
+  });
+
+  it('reserves nothing when the pack is refused, and says why', async () => {
+    const { io, said, order } = rcfIo({
+      pack: vi.fn(async () => ({ refused: 'The data packs to 5.2 GB, over the 5.0 GB a cloud run takes. Nothing was uploaded.' }))
+    });
+    expect(await offerRcfCloudRun(offer, START, io)).toBe('failed');
+    expect(order).toEqual([]);
+    expect(said).toEqual(['Error: The data packs to 5.2 GB, over the 5.0 GB a cloud run takes. Nothing was uploaded.']);
+  });
+
+  it('starts nothing after a failed upload, and still removes the zip', async () => {
+    const { io, said, order } = rcfIo({
+      upload: vi.fn(async () => {
+        throw new Error('Uploading the files failed: 403 Forbidden');
+      })
+    });
+    expect(await offerRcfCloudRun(offer, START, io)).toBe('failed');
+    expect(order).toEqual(['pack', 'reserve', 'slot', 'discard']);
+    expect(said).toEqual(['Error: Uploading the files failed: 403 Forbidden']);
+  });
+
+  it('only hints without --start-cloud-run, and says when a run that was asked to cannot', async () => {
+    const hinted = rcfIo();
+    expect(await offerRcfCloudRun(offer, { startCloudRun: false, json: false }, hinted.io)).toBe('hinted');
+    expect(hinted.order).toEqual([]);
+    expect(hinted.said[0]).toContain('add --start-cloud-run');
+    const none = rcfIo();
+    expect(await offerRcfCloudRun(undefined, START, none.io)).toBe('none');
+    expect(none.said).toEqual(['The run did not pass and can not be certified, so no cloud run was started.']);
+    expect(await offerRcfCloudRun(undefined, { startCloudRun: false, json: false }, none.io)).toBe('none');
   });
 });

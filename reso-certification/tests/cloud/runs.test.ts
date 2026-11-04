@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CLOUD_ENDORSEMENT, configProviderUoi, listCloudRunStatus, reserveCloudRun, submitCloudRun } from '../../src/cloud/runs.js';
+import {
+  CLOUD_ENDORSEMENT,
+  configProviderUoi,
+  listCloudRunStatus,
+  requestUploadSlot,
+  reserveCloudRun,
+  submitCloudRun,
+  uploadToSlot
+} from '../../src/cloud/runs.js';
 
 /**
  * Starting a run in RESO's cloud and reading where it stands, against a stubbed service.
@@ -250,5 +258,115 @@ describe('reserveCloudRun', () => {
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply(201, { certificationRequestId: 'x' })));
     await expect(reserve()).rejects.toThrow('without a request ID and its window');
+  });
+});
+
+describe('requestUploadSlot', () => {
+  const slotBody = {
+    uploadId: 'up-0001',
+    url: 'https://uploads.example.org/bucket',
+    fields: { key: 'test/T00000000/up-0001.zip', policy: 'p', 'x-amz-signature': 's' },
+    expiresAt: '2026-11-03T23:15:00Z',
+    maxBytes: 1234
+  };
+  const ask = () =>
+    requestUploadSlot({
+      bearerToken: TOKEN,
+      certificationRequestId: 'test-T00000000-1700000000000',
+      endorsementName: CLOUD_ENDORSEMENT.resoCommonFormat,
+      endorsementVersion: '2.1',
+      recipientUoi: 'M00000000',
+      providerUsi: '99999',
+      fingerprint: 'a'.repeat(64),
+      bytes: 1234
+    });
+
+  it('asks the uploads route for a slot for the reservation, with the bearer, and returns it', async () => {
+    const fetch = vi.fn(async () => reply(200, slotBody));
+    vi.stubGlobal('fetch', fetch);
+    expect(await ask()).toEqual(slotBody);
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`${SERVICES}/v2/certification/uploads`);
+    expect((init.headers as Record<string, string>).Authorization).toBe(`Bearer ${TOKEN}`);
+    expect(JSON.parse(String(init.body))).toEqual({
+      certificationRequestId: 'test-T00000000-1700000000000',
+      endorsementName: 'reso-common-format',
+      endorsementVersion: '2.1',
+      recipientUoi: 'M00000000',
+      providerUsi: '99999',
+      fingerprint: 'a'.repeat(64),
+      bytes: 1234
+    });
+  });
+
+  it("gives the service's reason for a refusal, and refuses an answer that is not a slot", async () => {
+    vi.stubGlobal('fetch', async () => reply(400, { message: 'The reservation has expired' }));
+    await expect(ask()).rejects.toThrow(/refused: The reservation has expired/);
+    vi.stubGlobal('fetch', async () => reply(200, { uploadId: 'up-0001' }));
+    await expect(ask()).rejects.toThrow(/without an upload slot/);
+  });
+});
+
+describe('uploadToSlot', () => {
+  it("posts the slot's fields and the file, streamed, with no RESO credential", async () => {
+    const { createServer } = await import('node:http');
+    const { mkdtemp, writeFile } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const zipPath = join(await mkdtemp(join(tmpdir(), 'upload-test-')), 'upload.zip');
+    const bytes = Buffer.from(`PK-test-${'z'.repeat(5000)}`);
+    await writeFile(zipPath, bytes);
+    const received: { body: Buffer; headers: Record<string, string | string[] | undefined> }[] = [];
+    const server = createServer((request, response) => {
+      const chunks: Buffer[] = [];
+      request.on('data', (chunk: Buffer) => chunks.push(chunk));
+      request.on('end', () => {
+        received.push({ body: Buffer.concat(chunks), headers: request.headers });
+        response.statusCode = 204;
+        response.end();
+      });
+    });
+    await new Promise<void>(done => server.listen(0, '127.0.0.1', done));
+    const { port } = server.address() as { port: number };
+    try {
+      const slot = {
+        uploadId: 'up-0001',
+        url: `http://127.0.0.1:${port}/bucket`,
+        fields: { key: 'k/up-0001.zip', policy: 'p' },
+        expiresAt: 'x',
+        maxBytes: 10_000
+      };
+      await uploadToSlot(slot, zipPath);
+      const [{ body, headers }] = received;
+      expect(headers.authorization).toBeUndefined();
+      expect(String(headers['content-type'])).toMatch(/^multipart\/form-data; boundary=/);
+      const text = body.toString('latin1');
+      expect(text).toContain('name="key"\r\n\r\nk/up-0001.zip');
+      expect(text).toContain('name="policy"\r\n\r\np');
+      expect(text.indexOf('name="policy"')).toBeLessThan(text.indexOf('name="file"'));
+      expect(body.includes(bytes)).toBe(true);
+    } finally {
+      server.close();
+    }
+  });
+
+  it("says why storage refused an upload, in the storage service's words", async () => {
+    vi.stubGlobal('fetch', async () =>
+      reply(
+        400,
+        '<?xml version="1.0"?><Error><Code>EntityTooLarge</Code><Message>Your proposed upload exceeds the maximum allowed size</Message></Error>',
+        'Bad Request'
+      )
+    );
+    const { mkdtemp, writeFile } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const zipPath = join(await mkdtemp(join(tmpdir(), 'upload-test-')), 'upload.zip');
+    await writeFile(zipPath, 'PK');
+    await expect(
+      uploadToSlot({ uploadId: 'u', url: 'https://uploads.example.org/b', fields: {}, expiresAt: 'x', maxBytes: 1 }, zipPath)
+    ).rejects.toThrow(
+      /Uploading the files failed: 400 Bad Request – EntityTooLarge: Your proposed upload exceeds the maximum allowed size/
+    );
   });
 });

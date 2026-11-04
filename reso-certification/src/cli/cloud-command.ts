@@ -6,8 +6,27 @@
  * reads `--start-cloud-run`, and sends the requests through `src/cloud/runs.ts`.
  */
 
-import { type CloudConfigEntry, type LocalRunRecord, cloudEntryOf, isSuccessfulRun, localRunRecordOf } from '../cloud/local-run.js';
-import type { AcceptedCloudRun, CloudRunReservation, CloudRunStatusPage, CloudRunStatusRow } from '../cloud/runs.js';
+import {
+  type CloudConfigEntry,
+  type LocalRunRecord,
+  type RcfCloudConfigEntry,
+  type RcfLocalRunRecord,
+  cloudEntryOf,
+  isSuccessfulRun,
+  localRunRecordOf
+} from '../cloud/local-run.js';
+import type { PackRcfResult } from '../cloud/rcf-pack.js';
+import {
+  type AcceptedCloudRun,
+  CLOUD_ENDORSEMENT,
+  type CloudRunReservation,
+  type CloudRunStatusPage,
+  type CloudRunStatusRow,
+  type ReserveCloudRunInput,
+  type SubmitCloudRunInput,
+  type UploadSlot,
+  type UploadSlotInput
+} from '../cloud/runs.js';
 import type { CoreConfig, PipelineResult } from '../sdk/types.js';
 import type { EntryOutcome } from './render.js';
 import { cell, renderTable } from './table.js';
@@ -163,6 +182,91 @@ export const offerCloudRun = async (plan: CloudPlan, mode: CloudOfferMode, io: C
     }
   }, Promise.resolve([]));
   return sent.every(Boolean) ? 'started' : 'failed';
+};
+
+/** What starting a RESO Common Format run in the cloud takes from the local run that passed. */
+export interface RcfCloudOffer {
+  /** What the local run read, to pack and upload. */
+  readonly input: string;
+  readonly providerUoi: string;
+  readonly record: RcfLocalRunRecord;
+}
+
+/** The RESO Common Format offer's side effects, injected so it can be tested without a network or a large file. */
+export interface RcfCloudOfferIo {
+  readonly say: (text: string) => void;
+  readonly pack: (input: string, fingerprint: string) => Promise<PackRcfResult>;
+  readonly reserve: (input: Omit<ReserveCloudRunInput, 'bearerToken' | 'fromCli'>) => Promise<CloudRunReservation>;
+  readonly slot: (input: Omit<UploadSlotInput, 'bearerToken' | 'fromCli'>) => Promise<UploadSlot>;
+  readonly upload: (slot: UploadSlot, zipPath: string) => Promise<void>;
+  readonly submit: (input: Omit<SubmitCloudRunInput, 'bearerToken' | 'fromCli'>) => Promise<AcceptedCloudRun>;
+  /** Remove the packed zip. Called whatever happened once it exists. */
+  readonly discard: (zipPath: string) => Promise<void>;
+}
+
+/** Said at the end of a RESO Common Format run that qualifies, when `--start-cloud-run` was not given. */
+export const RCF_CLOUD_RUN_HINT =
+  "This run passed and can be certified. To start a certification run in RESO's cloud at the end of a run like this one, add --start-cloud-run.";
+
+/**
+ * Start the RESO Common Format run in RESO's cloud from a local run that passed (the upload contract, 2026-11-03):
+ * pack what the run read into one zip, then reserve, ask where to upload, upload and start, the start naming the
+ * upload and the local run's fingerprint. Packing comes first, so a delivery over the limit reserves nothing. The
+ * packed zip is removed whatever happens. Only `--start-cloud-run` starts anything.
+ */
+export const offerRcfCloudRun = async (
+  offer: RcfCloudOffer | undefined,
+  mode: CloudOfferMode,
+  io: RcfCloudOfferIo
+): Promise<CloudOfferOutcome> => {
+  if (offer === undefined) {
+    if (mode.startCloudRun) io.say('The run did not pass and can not be certified, so no cloud run was started.');
+    return 'none';
+  }
+  if (!mode.startCloudRun) {
+    io.say(RCF_CLOUD_RUN_HINT);
+    return 'hinted';
+  }
+  const { record } = offer;
+  const fail = (error: unknown): CloudOfferOutcome => {
+    io.say(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    return 'failed';
+  };
+  // A pack that throws, such as one whose files changed since the run, is a refusal like one over the limit.
+  const packed = await io
+    .pack(offer.input, record.fingerprint)
+    .catch((error: unknown): PackRcfResult => ({ refused: error instanceof Error ? error.message : String(error) }));
+  if ('refused' in packed) return fail(packed.refused);
+  const zip = packed.packed;
+  const endorsement = { endorsementName: CLOUD_ENDORSEMENT.resoCommonFormat, endorsementVersion: record.endorsementVersion };
+  const target = { recipientUoi: record.recipientUoi, providerUsi: record.providerUsi };
+  try {
+    const reservation = await io.reserve({ ...endorsement, providerUoi: offer.providerUoi, targets: [target] });
+    const slot = await io.slot({
+      ...endorsement,
+      ...target,
+      certificationRequestId: reservation.certificationRequestId,
+      fingerprint: record.fingerprint,
+      bytes: zip.bytes
+    });
+    await io.upload(slot, zip.path);
+    const entry: RcfCloudConfigEntry = { ...target, upload: { uploadId: slot.uploadId, fingerprint: record.fingerprint } };
+    const run = await io.submit({
+      ...endorsement,
+      config: {
+        certificationRequestId: reservation.certificationRequestId,
+        providerUoi: offer.providerUoi,
+        configs: [entry],
+        localRuns: [record]
+      }
+    });
+    io.say(mode.json ? JSON.stringify(run) : formatAcceptedRun(run, 'RESO Common Format'));
+    return 'started';
+  } catch (error) {
+    return fail(error);
+  } finally {
+    await io.discard(zip.path);
+  }
 };
 
 const present = (value: string | undefined): boolean => typeof value === 'string' && value.trim() !== '';

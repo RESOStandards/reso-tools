@@ -15,12 +15,14 @@
  * nothing here checks it again. A refusal comes back with the service's own reason.
  */
 
+import { openAsBlob } from 'node:fs';
 import { cliAuthRejectedMessage, cliAuthRequiredMessage, mintProviderToken, resolveServicesUrl, serviceError } from '../sdk/common.js';
 
 /** The endorsement names the request route takes. */
 export const CLOUD_ENDORSEMENT = {
   webApiCore: 'web-api-core',
-  dataDictionary: 'data-dictionary'
+  dataDictionary: 'data-dictionary',
+  resoCommonFormat: 'reso-common-format'
 } as const;
 
 export const CLOUD_RUNS_SERVICE = 'Cloud runs';
@@ -28,6 +30,7 @@ export const CLOUD_RUNS_SERVICE = 'Cloud runs';
 const REQUESTS_ROUTE = '/v2/certification/requests';
 const RESERVATIONS_ROUTE = '/v2/certification/reservations';
 const STATUS_ROUTE = '/v2/certification/requests/status';
+const UPLOADS_ROUTE = '/v2/certification/uploads';
 
 /** The most of a failure's body worth showing. Enough for any reason the service writes. */
 const MAX_DETAIL_LENGTH = 300;
@@ -39,11 +42,12 @@ interface CloudAuthInput {
   readonly fromCli?: boolean;
 }
 
-/** One recipient a reservation is for: what the cloud run will be addressed to. No credential. */
+/** One recipient a reservation is for: what the cloud run will be addressed to. No credential. A RESO Common Format
+ *  run reads uploaded files, so it names no server. */
 export interface CloudRunTarget {
   readonly recipientUoi: string;
   readonly providerUsi: string;
-  readonly serviceRootUri: string;
+  readonly serviceRootUri?: string;
 }
 
 export interface ReserveCloudRunInput extends CloudAuthInput {
@@ -217,7 +221,11 @@ export const reserveCloudRun = async (input: ReserveCloudRunInput): Promise<Clou
     headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify({
       providerUoi: input.providerUoi,
-      configs: input.targets.map(t => ({ recipientUoi: t.recipientUoi, providerUsi: t.providerUsi, serviceRootUri: t.serviceRootUri }))
+      configs: input.targets.map(t => ({
+        recipientUoi: t.recipientUoi,
+        providerUsi: t.providerUsi,
+        ...(t.serviceRootUri === undefined ? {} : { serviceRootUri: t.serviceRootUri })
+      }))
     })
   });
   if (!response.ok) throw await failure(response, input, what);
@@ -252,6 +260,90 @@ export const submitCloudRun = async (input: SubmitCloudRunInput): Promise<Accept
     throw serviceError('SERVICE_ERROR', `${what}: the service answered ${response.status} without a request id and its recipients.`);
   }
   return accepted;
+};
+
+export interface UploadSlotInput extends CloudAuthInput {
+  /** The reservation the upload is for. */
+  readonly certificationRequestId: string;
+  readonly endorsementName: string;
+  readonly endorsementVersion: string;
+  readonly recipientUoi: string;
+  readonly providerUsi: string;
+  /** The fingerprint of the files the local run read, which the upload holds. */
+  readonly fingerprint: string;
+  readonly bytes: number;
+}
+
+/** Where to upload, and until when: a presigned POST, the service's fields and the file. */
+export interface UploadSlot {
+  readonly uploadId: string;
+  readonly url: string;
+  readonly fields: Readonly<Record<string, string>>;
+  readonly expiresAt: string;
+  readonly maxBytes: number;
+}
+
+const uploadSlotOf = (body: unknown): UploadSlot | undefined => {
+  if (!isRecord(body) || !nonEmpty(body.uploadId) || !nonEmpty(body.url) || !nonEmpty(body.expiresAt) || !isRecord(body.fields)) {
+    return undefined;
+  }
+  if (typeof body.maxBytes !== 'number' || !Object.values(body.fields).every(value => typeof value === 'string')) return undefined;
+  return {
+    uploadId: body.uploadId,
+    url: body.url,
+    fields: Object.fromEntries(Object.entries(body.fields).map(([name, value]) => [name, String(value)])),
+    expiresAt: body.expiresAt,
+    maxBytes: body.maxBytes
+  };
+};
+
+/**
+ * Ask for somewhere to upload a RESO Common Format run's files, for a reservation. The service records the upload
+ * against the reservation, so it is refused unless the reservation is the caller's and still open, for that
+ * recipient and system.
+ */
+export const requestUploadSlot = async (input: UploadSlotInput): Promise<UploadSlot> => {
+  const what = `Asking where to upload the ${input.endorsementName} ${input.endorsementVersion} files`;
+  const servicesUrl = resolveServicesUrl(CLOUD_RUNS_SERVICE);
+  const token = await resolveToken(input);
+  const response = await fetch(`${servicesUrl}${UPLOADS_ROUTE}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      certificationRequestId: input.certificationRequestId,
+      endorsementName: input.endorsementName,
+      endorsementVersion: input.endorsementVersion,
+      recipientUoi: input.recipientUoi,
+      providerUsi: input.providerUsi,
+      fingerprint: input.fingerprint,
+      bytes: input.bytes
+    })
+  });
+  if (!response.ok) throw await failure(response, input, what);
+  const slot = uploadSlotOf(await response.json().catch(() => undefined));
+  if (slot === undefined) throw serviceError('SERVICE_ERROR', `${what}: the service answered ${response.status} without an upload slot.`);
+  return slot;
+};
+
+/** The text of one XML element in a storage service's error, when it has one. */
+const xmlText = (xml: string, element: string): string | undefined => xml.match(new RegExp(`<${element}>([^<]*)</${element}>`))?.[1];
+
+/**
+ * Upload a packed zip to its slot. The file streams from disk, so its size is never held in memory, and no RESO
+ * credential goes with it: the slot's own fields authorize it.
+ */
+export const uploadToSlot = async (slot: UploadSlot, zipPath: string): Promise<void> => {
+  const form = new FormData();
+  for (const [name, value] of Object.entries(slot.fields)) form.append(name, value);
+  form.append('file', await openAsBlob(zipPath, { type: 'application/zip' }), 'upload.zip');
+  const response = await fetch(slot.url, { method: 'POST', body: form });
+  if (response.ok) return;
+  const text = await response.text().catch(() => '');
+  const reason = [xmlText(text, 'Code'), xmlText(text, 'Message')].filter(Boolean).join(': ');
+  throw serviceError(
+    'SERVICE_ERROR',
+    `Uploading the files failed: ${response.status} ${response.statusText}${reason ? ` – ${reason}` : ''}`
+  );
 };
 
 const statusUrl = (servicesUrl: string, input: CloudRunStatusInput): string => {

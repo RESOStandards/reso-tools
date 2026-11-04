@@ -63,7 +63,8 @@
     "humanize-duration": "^3.33.2",
     "libxml2-wasm": "^0.7.1",
     "listr2": "^9.0.5",
-    "yauzl": "^3.3.0"
+    "yauzl": "^3.3.0",
+    "yazl": "3.3.1"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

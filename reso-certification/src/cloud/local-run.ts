@@ -11,8 +11,10 @@
  */
 
 import { coerceCoreVersion } from '../sdk/core-versions.js';
+import { serializeRcfRemarks } from '../sdk/rcf.js';
 import { SOFTWARE_VERSION, serializeCoreRemarks } from '../sdk/reports.js';
-import type { CertificationValidity, CoreConfig, PipelineResult } from '../sdk/types.js';
+import { INFER_RCF_REPORTS, READ_RCF_INPUT } from '../sdk/step-names.js';
+import type { CertificationValidity, CoreConfig, PipelineResult, RcfConfig } from '../sdk/types.js';
 import type { AuthConfig } from '../test-runner/types.js';
 import { CLOUD_ENDORSEMENT } from './runs.js';
 
@@ -119,5 +121,58 @@ export const cloudEntryOf = (config: CoreConfig, description?: string): CloudCon
       ...(config.fieldOverrides?.length ? { fieldOverrides: config.fieldOverrides } : {}),
       ...(config.fullCoverage ? { fullCoverage: true } : {})
     }
+  };
+};
+
+/** What a cloud request carries about the local RESO Common Format run for one recipient: the files it read, by their
+ *  fingerprint, where a Core record names a server. */
+export interface RcfLocalRunRecord {
+  readonly recipientUoi: string;
+  readonly providerUsi: string;
+  readonly fingerprint: string;
+  readonly endorsementName: string;
+  readonly endorsementVersion: string;
+  readonly softwareVersion: string;
+  readonly generatedOn: string;
+  readonly outcome: PipelineResult['status'];
+  readonly certification: CertificationValidity;
+  readonly remarks: string;
+}
+
+/** One entry of a RESO Common Format cloud request. The upload takes the place a server has in a Core entry, and there
+ *  is no credential: the cloud run reads the uploaded files. */
+export interface RcfCloudConfigEntry {
+  readonly description?: string;
+  readonly recipientUoi: string;
+  readonly providerUsi: string;
+  readonly upload: { readonly uploadId: string; readonly fingerprint: string };
+}
+
+/** A string a step recorded, when it recorded one. */
+const stepParam = (result: PipelineResult, step: string, param: string): string | undefined => {
+  const value = result.steps.find(s => s.name === step)?.params?.[param];
+  return nonEmpty(typeof value === 'string' ? value : undefined) ? String(value) : undefined;
+};
+
+/**
+ * The record of a RESO Common Format run, or `undefined` when it is not addressed to a provider, system and recipient
+ * or did not record the fingerprint of what it read and the Data Dictionary version it used.
+ */
+export const rcfLocalRunRecordOf = (result: PipelineResult, config: RcfConfig, now: Date = new Date()): RcfLocalRunRecord | undefined => {
+  const fingerprint = stepParam(result, READ_RCF_INPUT, 'fingerprint');
+  const version = stepParam(result, INFER_RCF_REPORTS, 'version');
+  if (!nonEmpty(config.providerUoi) || !nonEmpty(config.providerUsi) || !nonEmpty(config.recipientUoi)) return undefined;
+  if (fingerprint === undefined || version === undefined) return undefined;
+  return {
+    recipientUoi: config.recipientUoi,
+    providerUsi: config.providerUsi,
+    fingerprint,
+    endorsementName: CLOUD_ENDORSEMENT.resoCommonFormat,
+    endorsementVersion: version,
+    softwareVersion: SOFTWARE_VERSION,
+    generatedOn: now.toISOString(),
+    outcome: result.status,
+    certification: result.certification,
+    remarks: serializeRcfRemarks(result)
   };
 };

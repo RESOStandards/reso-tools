@@ -21,28 +21,9 @@
 
 import { createReadStream } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { extname, join } from 'node:path';
 import { JSONParser } from '@streamparser/json';
-
-const requireCjs = createRequire(import.meta.url);
-
-// yauzl ships no type declarations; a minimal surface for what we use.
-interface ZipEntry {
-  readonly fileName: string;
-}
-interface ZipFile {
-  readEntry(): void;
-  openReadStream(entry: ZipEntry, cb: (err: Error | null, stream: AsyncIterable<Uint8Array>) => void): void;
-  close(): void;
-  on(event: 'entry', cb: (entry: ZipEntry) => void): void;
-  on(event: 'end', cb: () => void): void;
-  on(event: 'error', cb: (err: Error) => void): void;
-}
-interface Yauzl {
-  open(path: string, opts: { lazyEntries: boolean }, cb: (err: Error | null, zip: ZipFile) => void): void;
-}
-const yauzl = requireCjs('yauzl') as Yauzl;
+import { isReadZipEntry, openZip, openZipEntry, zipEntries } from '../rcf/zip.js';
 
 /** A payload's records: an array, or records still being read from the file. */
 export type RcfRecords = AsyncIterable<unknown> | Iterable<unknown>;
@@ -256,60 +237,12 @@ async function* streamedPayload(open: OpenBytes, source: string): AsyncGenerator
   }
 }
 
-const openEntry = (zip: ZipFile, entry: ZipEntry): Promise<AsyncIterable<Uint8Array>> =>
-  new Promise((resolve, reject) => {
-    zip.openReadStream(entry, (err, stream) => (err ? reject(err) : resolve(stream)));
-  });
-
-/** Bridge yauzl's lazy `entry`/`end`/`error` events to an async generator, one entry at a time. */
-async function* zipEntries(zip: ZipFile): AsyncGenerator<ZipEntry> {
-  const queue: ZipEntry[] = [];
-  let ended = false;
-  let failed: Error | null = null;
-  let wake: (() => void) | null = null;
-  const signal = (): void => {
-    wake?.();
-    wake = null;
-  };
-
-  zip.on('entry', entry => {
-    queue.push(entry);
-    signal();
-  });
-  zip.on('end', () => {
-    ended = true;
-    signal();
-  });
-  zip.on('error', err => {
-    failed = err;
-    signal();
-  });
-
-  zip.readEntry();
-  while (true) {
-    if (failed) throw failed;
-    const next = queue.shift();
-    if (next) {
-      yield next;
-      zip.readEntry(); // request the next entry only after this one is consumed
-      continue;
-    }
-    if (ended) return;
-    await new Promise<void>(resolve => {
-      wake = resolve;
-    });
-  }
-}
-
 async function* readZip(zipPath: string): AsyncGenerator<RcfPayload> {
-  const zip = await new Promise<ZipFile>((resolve, reject) =>
-    yauzl.open(zipPath, { lazyEntries: true }, (err, z) => (err ? reject(err) : resolve(z)))
-  );
+  const zip = await openZip(zipPath);
   try {
     for await (const entry of zipEntries(zip)) {
-      if (entry.fileName.includes('__MACOSX') || entry.fileName.endsWith('/')) continue; // macOS cruft / dir entries
-      if (extname(entry.fileName) !== '.json') continue;
-      yield* streamedPayload(() => openEntry(zip, entry), entry.fileName);
+      if (!isReadZipEntry(entry.fileName)) continue; // macOS cruft, directory entries and other files
+      yield* streamedPayload(() => openZipEntry(zip, entry), entry.fileName);
     }
   } finally {
     // Release the fd even if the consumer abandons the stream early (peekVersion, strict fail-fast,
