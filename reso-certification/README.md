@@ -239,6 +239,19 @@ through one path (`startCloudRun` in the SDK). They sign in with the same `TOKEN
 `CLIENT_SECRET` from your credentials file as the Variations Service (see [Authentication](#authentication)). The
 [CLI reference](src/cli/README.md#cloud-runs) has the details.
 
+## Archiving a Report
+
+`reso-cert archive-report <reportId>` archives a certification report from the command line, the same way the
+certification site does from a report's page. It needs the `credentials.env` file downloaded from the site, shows the
+same warning the site shows, and archives only with `--confirm`:
+
+```bash
+reso-cert archive-report <reportId>              # shows the warning, archives nothing
+reso-cert archive-report <reportId> --confirm    # shows the warning, then archives
+```
+
+The [CLI reference](src/cli/README.md#archive-report) has the options and the exit codes.
+
 ## Metadata Report Utilities
 
 ### `reso-cert metadata-report adapt`

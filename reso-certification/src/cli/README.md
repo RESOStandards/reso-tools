@@ -50,8 +50,8 @@ environment a command will write to, look at the host in `TOKEN_URI`.
 | Variable | Used by | What it is |
 |---|---|---|
 | `RESO_SERVICES_URL` | `find-variations`, `rcf`, `update-variations`, the variations-review commands, the `cloud` commands | Base URL of RESO's services, the Variations Service and cloud runs. Same for every environment. |
-| `TOKEN_URI` | the same commands | OAuth2 token endpoint. **This is what selects QA versus production.** |
-| `CLIENT_ID`, `CLIENT_SECRET` | the same commands | OAuth2 client credentials the token is minted from. |
+| `TOKEN_URI` | the same commands, and `archive-report` | OAuth2 token endpoint. **This is what selects QA versus production.** `archive-report` also reads the Cert API host off it. |
+| `CLIENT_ID`, `CLIENT_SECRET` | the same commands | OAuth2 client credentials the token is minted from. `restore` and `archive-report` present `CLIENT_SECRET` to the Cert API as it is. |
 | `FT_ADMIN_SECRET` | `update-variations --fast-track` | Fast Track admin credential. A fast-track submission is refused without it, before any request is made. |
 | `CERT_AUTH_API_BASE_URL`, `CERT_AUTH_API_USERNAME`, `CERTIFICATION_API_KEY`, `CURRENT_PROVIDER_UOI` | the SDK's provider-token fallback | The second auth path, used when the OAuth2 variables are absent. |
 | `RESO_VARIATIONS_HANDLER` | the variations step of `dd`, `find-variations` and `rcf` | For a host that runs the SDK: the path of a module whose `computeVariations` computes variations in place of the Variations Service, so no service address or token is needed. Unset, the service is called as usual. See the [package README](../../README.md#computing-variations-with-your-own-module). |
@@ -88,6 +88,7 @@ different thing from the RESO service credentials above.
 | [`variations-review-status`](#variations-review-status) | Where each variations submission stands (read-only) |
 | [`cloud status`](#cloud-status) | Your cloud runs and where each stands (read-only) |
 | [`restore`](#restore) | Restore a certification server backup to a Cert API (admin) |
+| [`archive-report`](#archive-report) | Archive a certification report, with the site's warning first, and only with `--confirm` |
 
 The first four are **endorsement runners** (a full compliance pipeline against a live
 server). The rest are **per-step utilities** – each does one stage of a run in isolation,
@@ -490,6 +491,54 @@ reso-cert restore --path <backup root> --url <cert api> [--execute] [--limit n] 
   reads the backup.
 - **Exit code** `0` when everything was sent or would be, `1` when any report failed and `2` on an error
   such as a missing credential.
+
+## Certification reports
+
+### `archive-report`
+
+Archive a certification report, as the certification site does from a report's page. The command
+reads the report, shows the same warning the site shows, and archives only when `--confirm` is
+given. It is for the provider the report belongs to, or an administrator.
+
+```bash
+reso-cert archive-report <reportId>              # shows the warning, archives nothing
+reso-cert archive-report <reportId> --confirm    # shows the warning, then archives
+reso-cert archive-report <reportId> --confirm --json
+```
+
+| Option | Meaning |
+|---|---|
+| `<reportId>` | The report's id, as the certification site shows it. |
+| `--confirm` | Archive the report. Without it the warning is printed and nothing is archived. |
+| `--url <url>` | The Cert API origin, such as `https://cert-api.example.org`, without a path. Default: taken from `TOKEN_URI`. |
+| `--json` | Print one object: `reportId`, `origin`, `warning`, `report`, `confirmed`, `archived`, `status`, `message`. |
+
+- **It needs the credentials file downloaded from the certification site.** Sign in, download
+  `credentials.env`, and run the command from the directory that holds it (see
+  [Environment](#environment-env)). The file's `CLIENT_SECRET` is what the command presents, and
+  the Cert API is found through the host in its `TOKEN_URI`. A `TOKEN_URI` whose path is not the
+  token endpoint is refused rather than guessed from, and `--url` names the API instead.
+- **The warning is the site's.** The report is read first, then the provider organization's name
+  when the provider and recipient differ, and the warning is printed with those values filled in:
+
+  ```text
+  Archive Endorsement?
+
+  By proceeding, the Data Dictionary 2.0 Endorsement for Example MLS will no longer be available in the RESO Certification System.
+  You will receive a notification it's been archived.
+
+  Nothing was archived. Rerun with --confirm to proceed.
+  ```
+
+  When the organization's name cannot be read, its UOI is shown in its place and the command says
+  so. A report that cannot be read, or that does not exist, archives nothing.
+- **With `--confirm`, exactly one archive request is made,** the same one the site makes, and only
+  after the warning. The server's `201 success` is the only answer counted as archived. Anything
+  else is reported with its status and the server's message, including a `200` that carries HTML,
+  which is what the certification site's own host answers.
+- **Exit code** `0` when the report was archived, or the warning was shown without `--confirm`,
+  `1` when the server refused or the report could not be read, and `2` on a usage or configuration
+  error such as a missing credential, a missing Cert API address or a malformed id.
 
 ## Variations review (read-only)
 

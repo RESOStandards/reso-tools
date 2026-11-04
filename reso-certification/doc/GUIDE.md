@@ -475,6 +475,33 @@ Cloud runs cover Web API Core. They sign in with the `TOKEN_URI`, `CLIENT_ID` an
 
 ---
 
+## Archiving a Certification Report
+
+A report you no longer want in the RESO Certification System can be archived from the command line, the same way the
+certification site archives one from a report's page. Sign in to the site, download `credentials.env`, and run from the
+directory that holds it:
+
+```bash
+reso-cert archive-report <reportId>
+```
+
+Without `--confirm` the CLI reads the report and prints the warning the site shows, then stops:
+
+```text
+Archive Endorsement?
+
+By proceeding, the Data Dictionary 2.0 Endorsement for Example MLS will no longer be available in the RESO Certification System.
+You will receive a notification it's been archived.
+
+Nothing was archived. Rerun with --confirm to proceed.
+```
+
+With `--confirm` it prints the same warning and then archives. Only the provider the report belongs to, or an
+administrator, can archive it. `--json` prints what was read and what happened as one object, for scripts. The
+[CLI reference](../src/cli/README.md#archive-report) has the rest.
+
+---
+
 ## Choosing the Output Format
 
 The default output is a progress display with spinners – good for interactive runs where a human is watching. For everything else, there are three other formats:
