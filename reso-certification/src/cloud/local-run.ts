@@ -10,7 +10,7 @@
  * cloud run has to be the same run.
  */
 
-import type { AddEditAction, AddEditFormats } from '../add-edit/plan.js';
+import { type AddEditAction, type AddEditFormats, type AddEditTestPlan, payloadsFor, planAddEditTests } from '../add-edit/plan.js';
 import { coerceCoreVersion } from '../sdk/core-versions.js';
 import { serializeDDRemarks } from '../sdk/dd.js';
 import { serializeRcfRemarks } from '../sdk/rcf.js';
@@ -396,10 +396,17 @@ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
 const isInlinePayloads = (value: unknown): value is InlinePayloads => isRecord(value) && Object.values(value).every(isRecord);
 
 /**
+ * The payloads a plan uses, out of a set that may hold more: the local run checks only the plan's, so a stray one,
+ * for an action not tested, passes locally and would be refused by the cloud. A folder run reads only the plan's.
+ */
+const payloadsUsedBy = (plan: AddEditTestPlan, payloads: InlinePayloads): InlinePayloads =>
+  Object.fromEntries(payloadsFor(plan).flatMap(name => (payloads[name] === undefined ? [] : [[name, payloads[name]]])));
+
+/**
  * The payloads an Add/Edit run used, inline: the ones the pipeline recorded when it read them, else the ones captured
- * when it ran, else the configuration's own. A run that read a folder and recorded nothing is refused, never read
- * again: the folder may not hold what ran. Auto payloads are refused: they are written for the reference server and
- * the mock, and the cloud tests the provider's own.
+ * when it ran, else the configuration's own, each narrowed to the plan the configuration tests. A run that read a
+ * folder and recorded nothing is refused, never read again: the folder may not hold what ran. Auto payloads are
+ * refused: they are written for the reference server and the mock, and the cloud tests the provider's own.
  */
 const addEditPayloadsOf = (
   config: AddEditConfig,
@@ -407,13 +414,16 @@ const addEditPayloadsOf = (
   captured: InlinePayloads | undefined
 ): { readonly payloads: InlinePayloads } | { readonly refused: string } => {
   if (config.autoPayloads) return { refused: 'the tool wrote its payloads, and a cloud run tests the payloads you give' };
+  // The plan is a function of the configuration, so it is the plan the run was given.
+  const planned = planAddEditTests({ actions: config.actions, formats: config.formats });
+  if ('problems' in planned) return { refused: `its selection cannot be tested: ${planned.problems.join('; ')}` };
   const recorded = result.context.payloads;
-  if (isInlinePayloads(recorded)) return { payloads: recorded };
-  if (captured !== undefined) return { payloads: captured };
+  if (isInlinePayloads(recorded)) return { payloads: payloadsUsedBy(planned.plan, recorded) };
+  if (captured !== undefined) return { payloads: payloadsUsedBy(planned.plan, captured) };
   if (config.payloadsDir !== undefined) {
     return { refused: 'the run did not record the payloads it read from its folder, so what ran cannot be sent as it was. Run it again' };
   }
-  return config.payloads === undefined ? { refused: 'it gives no payloads' } : { payloads: config.payloads };
+  return config.payloads === undefined ? { refused: 'it gives no payloads' } : { payloads: payloadsUsedBy(planned.plan, config.payloads) };
 };
 
 const addEditCloudEntryOf = async (

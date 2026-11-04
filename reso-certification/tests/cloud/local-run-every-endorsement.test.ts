@@ -147,6 +147,17 @@ describe('cloudEntryOf for an Add/Edit run', () => {
     expect('payloads' in entry ? entry.payloads : undefined).toEqual(recorded);
   });
 
+  it('carries only the payloads the plan used: a create-only entry with a stray deleteFails sends createSucceeds and createFails', async () => {
+    // A form with six payload boxes can leave a stray empty one. The local run checks only the plan's payloads, so it
+    // passes; the service checks every name it is sent. The entry carries the plan's set, as a folder run records it.
+    const stray = { createSucceeds: { ListPrice: 1 }, createFails: {}, deleteFails: {} };
+    const planned = { createSucceeds: { ListPrice: 1 }, createFails: {} };
+    const payloadsOf = (entry: Awaited<ReturnType<typeof entryOf>>) => ('payloads' in entry ? entry.payloads : undefined);
+    expect(payloadsOf(await entryOf(addEditConfig({ payloads: stray })))).toEqual(planned);
+    expect(payloadsOf(await entryOf(addEditConfig(), ran(addEditConfig(), { payloads: stray })))).toEqual(planned);
+    expect(payloadsOf(await entryOf(addEditConfig(), undefined, { payloads: stray }))).toEqual(planned);
+  });
+
   describe('with a payloads folder', () => {
     const dir: { path?: string } = {};
     beforeAll(async () => {

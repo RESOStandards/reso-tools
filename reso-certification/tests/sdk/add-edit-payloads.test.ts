@@ -226,6 +226,12 @@ describe('an Add/Edit run with the provider’s payloads', () => {
     expect(result.context.payloads).toEqual(CREATE_PAYLOADS);
   });
 
+  it('records only the payloads its plan used, as a folder run does, so a stray one is not sent to the cloud', async () => {
+    const result = await runWith({ actions: ['create'], payloads: { ...CREATE_PAYLOADS, deleteFails: {} } });
+    expect(result.certification).toEqual({ valid: true });
+    expect(result.context.payloads).toEqual(CREATE_PAYLOADS);
+  });
+
   it('records the payloads it read from a folder, as they were when it read them', async () => {
     const payloadsDir = await mkdtemp(join(tmpdir(), 'add-edit-folder-'));
     await writeFile(join(payloadsDir, 'create-succeeds.json'), JSON.stringify(CREATE_PAYLOADS.createSucceeds));

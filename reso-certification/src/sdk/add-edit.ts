@@ -251,8 +251,11 @@ const generatePayloads = (config: AddEditConfig): PipelineStep<AddEditContext> =
     const needed = payloadsFor(plan);
     await Promise.all(needed.map(name => writeFile(join(outputDir, PAYLOAD_FILES[name]), JSON.stringify(payloads[name] ?? {}, null, 2))));
 
+    // The plan's payloads only, as a folder run records only the files it read: a stray one in the configuration,
+    // for an action not tested, is checked by nothing here and would be checked by the cloud.
+    const used = Object.fromEntries(needed.map(name => [name, payloads[name]]));
     return {
-      context: { ...ctx, payloadsDir: outputDir, plan, ...(config.autoPayloads ? {} : { payloads: config.payloads ?? {} }) },
+      context: { ...ctx, payloadsDir: outputDir, plan, ...(config.autoPayloads ? {} : { payloads: used }) },
       summary: `${config.autoPayloads ? 'Wrote auto' : "Wrote the configuration's"} ${needed.length} payload files for ${describePlan(plan)}`,
       artifacts: [{ label: 'Payloads', path: outputDir }],
       counts: { payloads: needed.length }
