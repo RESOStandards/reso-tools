@@ -8,11 +8,15 @@
 
 - **Every Core run records whether it met every data type,** in its detailed report as `typeCoverage`: whether full
   type coverage was achieved, the types met and the types missed. Each type counts when it is met on some field of
-  some resource tested. On Core 2.0.0 only Property counts. Certification can then show whether a run achieved it.
+  some resource tested. A server that cannot meet every type is recorded as not having achieved it, and can still be
+  certified.
 - **A multi-valued lookup is met with two values,** as the specification gives it, so its `has` with `and`, `any()`
   and `all()` tests all run. A multi-valued field with two values to test is now chosen before one with a single
   value, however standard. Before, a standard field holding one value could be chosen and those tests went untested.
 - **`--full-coverage` is unchanged:** with it, a missing type also fails the run.
+- **To test as Core 2.0.0 did,** which needed every type on one resource, run with `--resources Property
+  --full-coverage`, and name the integer, decimal, date and lookup fields from your 2.0.0 report with
+  `--field-overrides`. The User Guide explains what stays the run's own.
 
 ### Add/Edit tests the actions and formats you support
 

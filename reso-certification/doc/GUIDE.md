@@ -124,6 +124,40 @@ runs.
 See [Field Selection](../src/web-api-core/README.md#field-selection) for how the ranking works and
 when overriding it is worth doing.
 
+**Full type coverage.** The Core tests exercise six data types: integer, decimal, date, timestamp,
+single-valued lookup and multi-valued lookup. A run achieves full type coverage when each type is met
+on some field of some resource it tested. A single-valued lookup is met with one sampled value and a
+multi-valued lookup with two, as the specification gives them. Every run records whether it achieved
+full type coverage, in `report-detailed.json` as `typeCoverage`.
+
+Core 2.0.0 testing worked differently: the provider had to have every type on the same resource. Now
+the run looks across all the resources it tested. A server that cannot meet every type in its standard
+or local fields is recorded as not having achieved full type coverage, and can still be certified.
+
+To test as Core 2.0.0 did, name the resource and require full type coverage. With `--full-coverage`, a
+type that is not met fails the run. Add `--spec-version 2.0.0` to run the 2.0.0 tests themselves rather
+than 2.1.0's:
+
+```bash
+reso-cert core --url https://api.example.com --auth-token TOKEN \
+  --resources Property --full-coverage
+```
+
+For full equivalence, also name the fields your Core 2.0.0 report used, as field overrides. The integer,
+decimal, date and lookup fields can be named:
+
+```bash
+reso-cert core --url https://api.example.com --auth-token TOKEN \
+  --resources Property --full-coverage \
+  --field-overrides Property.BedroomsTotal,Property.ListPrice,Property.ListingContractDate,Property.StandardStatus,Property.InteriorFeatures
+```
+
+Three things stay the run's own. It picks the timestamp field itself, `ModificationTimestamp` first, so
+an override naming one is reported as unmatched. The key field comes from your metadata. And it samples
+the values it tests from your data, so they can differ from the values in your 2.0.0 report, and a
+multi-valued lookup you name is used only when the sample holds two of its values. In a config file,
+the settings are `coreOptions.resources`, `coreOptions.fullCoverage` and `coreOptions.fieldOverrides`.
+
 ### Data Dictionary 2.1
 
 The metadata and data shape. Validates that the server's metadata document matches the RESO Data Dictionary 2.1 specification, that every declared field maps to a known DD field (or is documented as a local extension), and that the data in each resource is type-correct and lookup-valid.

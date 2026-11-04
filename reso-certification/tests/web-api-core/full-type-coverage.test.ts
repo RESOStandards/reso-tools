@@ -11,7 +11,7 @@ import { typeCoverageOf } from '../../src/web-api-core/type-coverage.js';
 /**
  * Full type coverage (Josh, 2026-11-03): every data type the Core tests exercise, met on some field of some resource
  * tested. Every run measures it and its report says whether it was achieved, and the run reaches for it: a field that
- * cannot give a type its tests is not picked over one that can. Core 2.0.0 counts Property alone, the Commander's scope.
+ * cannot give a type its tests is not picked over one that can.
  *
  * "Met" follows the spec (Core §3.3): one sample value for a single-valued enumeration, two for a multi-valued one.
  */
@@ -41,8 +41,8 @@ describe('what meets a type', () => {
 });
 
 describe('whether a run met every type', () => {
-  it('on Core 2.1.0, takes each type from any resource tested: none has to carry all of them', () => {
-    const verdict = typeCoverageOf([without(allMet('Property'), 'multiLookup'), without(allMet('Member'), 'decimal')], '2.1.0');
+  it('takes each type from any resource tested: none has to carry all of them', () => {
+    const verdict = typeCoverageOf([without(allMet('Property'), 'multiLookup'), without(allMet('Member'), 'decimal')]);
     expect(verdict).toEqual({
       coveredTypes: ['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup'],
       missingTypes: [],
@@ -50,19 +50,16 @@ describe('whether a run met every type', () => {
     });
   });
 
-  it('on Core 2.1.0, misses a type that no resource tested met', () => {
-    const verdict = typeCoverageOf([without(allMet('Property'), 'multiLookup'), without(allMet('Member'), 'multiLookup')], '2.1.0');
+  it('misses a type that no resource tested met', () => {
+    const verdict = typeCoverageOf([without(allMet('Property'), 'multiLookup'), without(allMet('Member'), 'multiLookup')]);
     expect(verdict).toMatchObject({ missingTypes: ['multiLookup'], fullCoverage: false });
   });
 
-  it('on Core 2.0.0, counts Property alone, as the Commander tested it', () => {
-    const verdict = typeCoverageOf([without(allMet('Property'), 'multiLookup'), allMet('Member')], '2.0.0');
-    expect(verdict).toMatchObject({ missingTypes: ['multiLookup'], fullCoverage: false });
-    expect(typeCoverageOf([allMet('Property')], '2.0.0').fullCoverage).toBe(true);
-  });
-
-  it('on Core 2.0.0, misses every type when Property was not tested', () => {
-    expect(typeCoverageOf([allMet('Member')], '2.0.0')).toMatchObject({ coveredTypes: [], fullCoverage: false });
+  it('counts only the resources tested, so a run naming one resource needs every type there, as Core 2.0.0 did', () => {
+    expect(typeCoverageOf([without(allMet('Property'), 'multiLookup')])).toMatchObject({
+      missingTypes: ['multiLookup'],
+      fullCoverage: false
+    });
   });
 });
 
