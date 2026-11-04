@@ -24,6 +24,7 @@ import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { Command } from 'commander';
 import { startMockServer, stopMockServer } from '../add-edit/mock/server.js';
 import { ADD_EDIT_ACTIONS, ADD_EDIT_FORMATS } from '../add-edit/plan.js';
+import { type CloudRunConfig, whyNoCloudRunBeforeRun } from '../cloud/local-run.js';
 import { listCloudRunStatus, reserveCloudRun } from '../cloud/runs.js';
 import { startCloudRun } from '../cloud/start.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
@@ -76,6 +77,7 @@ import {
   type RanEntry,
   cloudRunPrerequisite,
   cloudTargetLabel,
+  entriesRefusedBeforeRun,
   formatRunStatusTable,
   offerCloudRuns,
   planCloudRuns
@@ -306,6 +308,9 @@ addEditCmd.action(
           };
         });
 
+        const entryRefusal = startCloudRunEntryRefusal(opts, entries);
+        if (entryRefusal !== undefined) throw new Error(entryRefusal);
+
         const outcomes = await runConfigEntries(entries, renderMode);
         results = resultsOf(outcomes);
         stopped = stoppedOf(outcomes).length;
@@ -481,6 +486,9 @@ entityEventCmd.action(
           };
         });
 
+        const entryRefusal = startCloudRunEntryRefusal(opts, entries);
+        if (entryRefusal !== undefined) throw new Error(entryRefusal);
+
         const outcomes = await runConfigEntries(entries, renderMode);
         results = resultsOf(outcomes);
         stopped = stoppedOf(outcomes).length;
@@ -581,6 +589,16 @@ const startCloudRunRefusal = (
   // A pass can be sent only with the service's address and credentials. Nothing is sent before the run passes.
   return cloudRunPrerequisite(process.env);
 };
+
+/**
+ * What `--start-cloud-run` refuses once the config file is read and before any entry runs: an entry a cloud run could
+ * never start from, because it is not addressed or asks for a run that cannot be certified or sent. The flags were
+ * checked by the command; this reads what the file set. `undefined` when every entry may go on.
+ */
+const startCloudRunEntryRefusal = (
+  opts: { readonly startCloudRun?: boolean },
+  entries: ReadonlyArray<{ readonly label: string; readonly config: CloudRunConfig }>
+): string | undefined => (opts.startCloudRun ? entriesRefusedBeforeRun(entries) : undefined);
 
 /** Each entry of a config-file run as it ran, for the cloud-run choice at the end. */
 interface RanForCloud {
@@ -757,6 +775,9 @@ coreCmd.action(
 
           return { config, label: entry.description ?? runLabel(entry, configFile.providerUoi) };
         });
+
+        const entryRefusal = startCloudRunEntryRefusal(opts, entries);
+        if (entryRefusal !== undefined) throw new Error(entryRefusal);
 
         const outcomes = await runConfigEntries(entries, renderMode);
         results = resultsOf(outcomes);
@@ -946,6 +967,9 @@ ddCmd.action(
 
           return { config, label: entry.description ?? runLabel(entry, configFile.providerUoi) };
         });
+
+        const entryRefusal = startCloudRunEntryRefusal(opts, entries);
+        if (entryRefusal !== undefined) throw new Error(entryRefusal);
 
         const outcomes = await runConfigEntries(entries, renderMode);
         results = resultsOf(outcomes);
@@ -1712,13 +1736,11 @@ program
         }
         const cloudPrerequisite = opts.startCloudRun ? cloudRunPrerequisite(process.env) : undefined;
         if (cloudPrerequisite !== undefined) throw new Error(cloudPrerequisite);
-        // The /compute token for the variations service (from .env; the service mints its own if absent).
-        const bearerToken = opts.skipVariations ? undefined : await mintOAuth2ClientCredentialsToken();
         const dir = resolve(opts.outputDir);
 
         // The pipeline the SDK runs, so a local run and a cloud run of the same files are the same run. It writes the
         // reports, report.json among them, into the output directory.
-        const rcfConfig: RcfConfig = {
+        const rcfRun: RcfConfig = {
           endorsement: 'rcf',
           input: resolve(opts.input),
           version: opts.ddVersion,
@@ -1726,10 +1748,20 @@ program
           strict: opts.strict,
           schemaValidate,
           runVariations: !opts.skipVariations,
-          ...(bearerToken ? { servicesAuthToken: bearerToken } : {}),
           ...(identityRead.identity ?? {}),
           options: { outputDir: dir }
         };
+        // A run that skips schema validation or variations cannot be certified, so it could not start a cloud run.
+        // Refused before the run, as the other flags are, so a long run is not wasted.
+        const uncertifiable = opts.startCloudRun ? whyNoCloudRunBeforeRun(rcfRun) : undefined;
+        if (uncertifiable !== undefined) {
+          throw new Error(
+            `--start-cloud-run starts from a run that can be certified and sent, and ${uncertifiable}. It does not go with --skip-schema-validation or --skip-variations.`
+          );
+        }
+        // The /compute token for the variations service (from .env; the service mints its own if absent).
+        const bearerToken = opts.skipVariations ? undefined : await mintOAuth2ClientCredentialsToken();
+        const rcfConfig: RcfConfig = { ...rcfRun, ...(bearerToken ? { servicesAuthToken: bearerToken } : {}) };
         const run = await runRcfCompliance(rcfConfig);
         const outcome = rcfRunOutcome(run);
         if (!outcome.inferred) {

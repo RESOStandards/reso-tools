@@ -11,7 +11,9 @@
  */
 
 import { type AddEditAction, type AddEditFormats, type AddEditTestPlan, payloadsFor, planAddEditTests } from '../add-edit/plan.js';
-import { coerceCoreVersion } from '../sdk/core-versions.js';
+import { CURRENT_ADD_EDIT_VERSION, whyAddEditVersionDoesNotCertify } from '../sdk/add-edit-versions.js';
+import { coerceCoreVersion, whyCoreVersionDoesNotCertify } from '../sdk/core-versions.js';
+import { whyDDVersionDoesNotCertify } from '../sdk/dd-versions.js';
 import { serializeDDRemarks } from '../sdk/dd.js';
 import { serializeRcfRemarks } from '../sdk/rcf.js';
 import { SOFTWARE_VERSION, serializeAddEditRemarks, serializeCoreRemarks, serializeEntityEventRemarks } from '../sdk/reports.js';
@@ -368,6 +370,10 @@ export interface CloudEntryOptions {
 }
 
 const NO_TARGET_REASON = 'it does not name the provider, system and recipient a cloud run is addressed to';
+const AUTO_PAYLOADS_REASON = 'the tool wrote its payloads, and a cloud run tests the payloads you give';
+const NO_PAYLOADS_REASON = 'it gives no payloads';
+const NO_RESOURCE_REASON = 'it does not name the resource it writes to';
+const CANARY_FOLDER_REASON = "it reads its canary payloads from a folder, which a run in RESO's cloud cannot reach";
 
 const refused = (reason: string): CloudEntryResult => ({ refused: reason });
 
@@ -413,7 +419,7 @@ const addEditPayloadsOf = (
   result: PipelineResult,
   captured: InlinePayloads | undefined
 ): { readonly payloads: InlinePayloads } | { readonly refused: string } => {
-  if (config.autoPayloads) return { refused: 'the tool wrote its payloads, and a cloud run tests the payloads you give' };
+  if (config.autoPayloads) return { refused: AUTO_PAYLOADS_REASON };
   // The plan is a function of the configuration, so it is the plan the run was given.
   const planned = planAddEditTests({ actions: config.actions, formats: config.formats });
   if ('problems' in planned) return { refused: `its selection cannot be tested: ${planned.problems.join('; ')}` };
@@ -423,7 +429,7 @@ const addEditPayloadsOf = (
   if (config.payloadsDir !== undefined) {
     return { refused: 'the run did not record the payloads it read from its folder, so what ran cannot be sent as it was. Run it again' };
   }
-  return config.payloads === undefined ? { refused: 'it gives no payloads' } : { payloads: payloadsUsedBy(planned.plan, config.payloads) };
+  return config.payloads === undefined ? { refused: NO_PAYLOADS_REASON } : { payloads: payloadsUsedBy(planned.plan, config.payloads) };
 };
 
 const addEditCloudEntryOf = async (
@@ -435,7 +441,7 @@ const addEditCloudEntryOf = async (
   if (base === undefined) return refused(NO_TARGET_REASON);
   const specVersion = addEditVersionOf(config, result);
   if (specVersion === undefined) return refused('it does not say which Add/Edit version it ran');
-  if (!nonEmpty(config.resource)) return refused('it does not name the resource it wrote to');
+  if (!nonEmpty(config.resource)) return refused(NO_RESOURCE_REASON);
   const payloads = addEditPayloadsOf(config, result, options.payloads);
   if ('refused' in payloads) return refused(payloads.refused);
   return {
@@ -459,9 +465,7 @@ const entityEventCloudEntryOf = (config: EntityEventConfig, result: PipelineResu
   const writableResource = entityEventWritableResourceOf(config, result);
   if (mode === undefined) return refused('it does not say whether it observed or wrote');
   if (writableResource === undefined) return refused('it does not name the resource it writes canaries to');
-  if (mode === 'full' && config.payloadsDir !== undefined) {
-    return refused("it reads its canary payloads from a folder, which a run in RESO's cloud cannot reach");
-  }
+  if (mode === 'full' && config.payloadsDir !== undefined) return refused(CANARY_FOLDER_REASON);
   return {
     entry: {
       ...base,
@@ -490,6 +494,64 @@ const rcfCloudEntryOf = (config: RcfConfig, result: PipelineResult, options: Clo
       upload: { uploadId: options.upload.uploadId, fingerprint: record.fingerprint }
     }
   };
+};
+
+const cannotCertify = (why: string | undefined): ReadonlyArray<string> => (why === undefined ? [] : [`it cannot be certified: ${why}`]);
+
+/** What a configuration asks for that its own certification rule will refuse, or the cloud will not run, read before it runs. */
+const uncertifiableBeforeRun = (config: CloudRunConfig): ReadonlyArray<string> => {
+  switch (config.endorsement) {
+    case 'core':
+      return cannotCertify(whyCoreVersionDoesNotCertify(coreVersionOf(config)));
+    case 'dd':
+      return [
+        ...cannotCertify(whyDDVersionDoesNotCertify(config.version)),
+        ...cannotCertify(
+          config.strictMode === false ? 'strict mode is off, so schema errors would be recorded and not enforced' : undefined
+        ),
+        ...cannotCertify(
+          config.runVariations === false ? 'variations would not run, so no name would be checked against the Data Dictionary' : undefined
+        )
+      ];
+    case 'add-edit':
+      return [
+        // The version the pipeline runs at when the configuration omits it, as `runAddEditCompliance` resolves it.
+        ...cannotCertify(whyAddEditVersionDoesNotCertify(config.specVersion ?? CURRENT_ADD_EDIT_VERSION)),
+        ...(config.autoPayloads ? [AUTO_PAYLOADS_REASON] : []),
+        ...(!config.autoPayloads && config.payloads === undefined && config.payloadsDir === undefined ? [NO_PAYLOADS_REASON] : []),
+        ...(nonEmpty(config.resource) ? [] : [NO_RESOURCE_REASON])
+      ];
+    case 'entity-event': {
+      // The mode the pipeline runs at when the configuration omits it, as `runEntityEventCompliance` resolves it.
+      const mode = config.mode ?? 'observe';
+      return [
+        ...cannotCertify(mode === 'observe' ? 'it would only observe, and a run that writes nothing certifies nothing' : undefined),
+        ...(mode === 'full' && config.payloadsDir !== undefined ? [CANARY_FOLDER_REASON] : [])
+      ];
+    }
+    case 'rcf':
+      return [
+        ...cannotCertify(
+          config.schemaValidate === false
+            ? 'schema validation would not run, so no record would be checked against the Data Dictionary'
+            : undefined
+        ),
+        ...cannotCertify(
+          config.runVariations === false ? 'variations would not run, so no name would be checked against the Data Dictionary' : undefined
+        )
+      ];
+  }
+};
+
+/**
+ * Why a cloud run could never start from a configuration, known before it runs: it is not addressed, or it asks for a
+ * run its own rule will not certify or the cloud will not run. Every reason is named, so the file is fixed once.
+ * `undefined` when the run may go on. What only the run can tell, whether it passes and what it records, is left to
+ * `isSuccessfulRun` and `cloudEntryOf` at the end.
+ */
+export const whyNoCloudRunBeforeRun = (config: CloudRunConfig): string | undefined => {
+  const reasons = [...(cloudTargetOf(config) === undefined ? [NO_TARGET_REASON] : []), ...uncertifiableBeforeRun(config)];
+  return reasons.length === 0 ? undefined : reasons.join('; ');
 };
 
 const anyCloudEntryOf = async (config: CloudRunConfig, result: PipelineResult, options: CloudEntryOptions): Promise<CloudEntryResult> => {

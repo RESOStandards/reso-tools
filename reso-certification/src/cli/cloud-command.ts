@@ -13,7 +13,8 @@ import {
   cloudEndorsementOf,
   cloudTargetOf,
   isSuccessfulRun,
-  localRunRecordOf
+  localRunRecordOf,
+  whyNoCloudRunBeforeRun
 } from '../cloud/local-run.js';
 import type {
   AcceptedCloudRun,
@@ -101,6 +102,26 @@ export const planCloudRuns = (entries: ReadonlyArray<RanEntry>, now: Date = new 
     };
   });
   return { groups, notOffered, offered: qualified.length };
+};
+
+/**
+ * What `--start-cloud-run` refuses before a config-file run, read from each entry: every entry a cloud run could never
+ * start from, named with why, so a long run is not spent on it. `undefined` when every entry may go on. The flags the
+ * CLI reads are checked by the command; this reads what the file set.
+ */
+export const entriesRefusedBeforeRun = (
+  entries: ReadonlyArray<{ readonly label: string; readonly config: CloudRunConfig }>
+): string | undefined => {
+  const refused = entries.flatMap(({ label, config }) => {
+    const why = whyNoCloudRunBeforeRun(config);
+    return why === undefined ? [] : [`  ✗ ${label}: ${why}`];
+  });
+  if (refused.length === 0) return undefined;
+  return [
+    '--start-cloud-run starts from entries that can be certified and sent, and these cannot:',
+    ...refused,
+    'Fix them in the config file, or run without --start-cloud-run.'
+  ].join('\n');
 };
 
 /** Said at the end of a run with entries that qualify, when `--start-cloud-run` was not given. */

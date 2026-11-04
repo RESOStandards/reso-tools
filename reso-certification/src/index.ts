@@ -167,7 +167,8 @@ export {
   cloudVersionOf,
   isSuccessfulRun,
   localRunRecordOf,
-  rcfLocalRunRecordOf
+  rcfLocalRunRecordOf,
+  whyNoCloudRunBeforeRun
 } from './cloud/local-run.js';
 export type {
   AddEditCloudConfigEntry,

@@ -5,6 +5,7 @@ import {
   type RanEntry,
   cloudRunHint,
   cloudRunPrerequisite,
+  entriesRefusedBeforeRun,
   formatAcceptedRun,
   formatRunStatusTable,
   offerCloudRuns,
@@ -327,5 +328,26 @@ describe('cloudRunPrerequisite', () => {
     expect(reason).not.toContain('secret-for-tests');
     expect(cloudRunPrerequisite({ ...services, TOKEN_URI: 'https://auth.example.org', CLIENT_ID: 'id' })).toContain('CLIENT_SECRET');
     expect(cloudRunPrerequisite({ ...services, CLIENT_SECRET: ' ' })).toBeDefined();
+  });
+});
+
+describe('entriesRefusedBeforeRun', () => {
+  const entries = [
+    { label: 'Feed one', config: coreConfig('M00000000') },
+    { label: 'Feed two', config: coreConfig('M00000001', { recipientUoi: undefined }) },
+    { label: 'Feed three', config: coreConfig('M00000002', { version: '2.0.0' }) }
+  ];
+
+  it('is nothing when every entry may start a cloud run', () => {
+    expect(entriesRefusedBeforeRun([entries[0]])).toBeUndefined();
+  });
+
+  it('names every entry that could never start one, with why, and names no credential', () => {
+    const refusal = entriesRefusedBeforeRun(entries);
+    expect(refusal).toContain('--start-cloud-run');
+    expect(refusal).toContain('Feed two: it does not name the provider, system and recipient');
+    expect(refusal).toMatch(/Feed three: it cannot be certified/);
+    expect(refusal).not.toContain('Feed one');
+    expect(refusal).not.toContain('server-token-for-tests');
   });
 });
