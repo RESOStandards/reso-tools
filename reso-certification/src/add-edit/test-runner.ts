@@ -32,6 +32,7 @@ import type {
   TestConfig,
   TestReport
 } from '../test-runner/types.js';
+import { describeCleanup } from './cleanup.js';
 import { type AddEditPayloadName, type AddEditTestPlan, PAYLOAD_FILES, payloadsFor, planAddEditTests } from './plan.js';
 import type { DeletePayload, ScenarioName } from './types.js';
 
@@ -114,7 +115,15 @@ export const runAllScenarios = async (config: TestConfig): Promise<TestReport> =
   if ('problems' in planned) throw new Error(planned.problems.join(' '));
 
   const payloads = await readPayloads(config.payloadsDir, payloadsFor(planned.plan));
-  const { results: scenarios, created, removed } = await runPlan(planned.plan, config, authToken, payloads, entityType);
+  const { results: scenarios, created, removed, stopped } = await runPlan(planned.plan, config, authToken, payloads, entityType);
+  if (stopped !== undefined) {
+    // The records it created are cleaned up before the reason it stopped is reported, so a run that ends early never
+    // leaves on the provider's server what a run that finishes would have removed.
+    const cleanup = await cleanUp(planned.plan, config, authToken, created, removed).catch(() => undefined);
+    const reason = stopped.error instanceof Error ? stopped.error.message : String(stopped.error);
+    const outcome = cleanup === undefined ? '. Removing the records it created could not finish.' : describeCleanup(cleanup);
+    throw new Error(`The run stopped at ${stopped.scenario}: ${reason}${outcome}`, { cause: stopped.error });
+  }
   const cleanup = await cleanUp(planned.plan, config, authToken, created, removed);
 
   const passed = scenarios.filter(s => s.passed).length;
@@ -166,6 +175,15 @@ const payloadOf = (payloads: LoadedPayloads, name: AddEditPayloadName): Record<s
 /** The key in an entity's URL: `Resource('key')`, with doubled quotes inside, or `Resource(123)`. */
 const ENTITY_URL_KEY = /\((?:'((?:[^']|'')*)'|([^)']*))\)\s*$/;
 
+/** A key from an entity URL, decoded. Malformed escapes name no record, so the next header is read instead. */
+const decodedKey = (key: string): string | undefined => {
+  try {
+    return decodeURIComponent(key);
+  } catch {
+    return undefined;
+  }
+};
+
 /**
  * The key a header names: from an entity URL (`OData-EntityId`, `Location`), or the key itself, which is what
  * RESO's `EntityId` carries (RCP-010's examples read `EntityId: "12345"`), quoted or not.
@@ -176,7 +194,7 @@ const keyFromHeader = (value: unknown): string | undefined => {
   const match = text.match(ENTITY_URL_KEY);
   if (match) {
     const key = match[1]?.replaceAll("''", "'") ?? match[2];
-    return key ? decodeURIComponent(key) : undefined;
+    return key ? decodedKey(key) : undefined;
   }
   const bare = text.replace(/^"(.*)"$/, '$1');
   return bare !== '' && !bare.includes('/') ? bare : undefined;
@@ -302,6 +320,8 @@ interface PlanRun {
   readonly results: ReadonlyArray<ScenarioResult>;
   readonly created: ReadonlyArray<string>;
   readonly removed: ReadonlyArray<string>;
+  /** The scenario that threw, and what it threw, when one did: the plan stops there, keeping what it created. */
+  readonly stopped?: { readonly scenario: ScenarioName; readonly error: unknown };
 }
 
 /** Run a plan's scenarios in order, handing each the keys of the records the creates before it made. */
@@ -316,10 +336,11 @@ const runPlan = async (
   const removed: string[] = [];
   const results: ScenarioResult[] = [];
   for (const name of plan.scenarios) {
-    const { result, createdKey, removedKey } = await runScenario(name, config, authToken, payloads, entityType, created);
-    if (createdKey !== undefined) created.push(createdKey);
-    if (removedKey !== undefined) removed.push(removedKey);
-    results.push(result);
+    const run = await runScenario(name, config, authToken, payloads, entityType, created).catch((error: unknown) => ({ error }));
+    if ('error' in run) return { results, created, removed, stopped: { scenario: name, error: run.error } };
+    if (run.createdKey !== undefined) created.push(run.createdKey);
+    if (run.removedKey !== undefined) removed.push(run.removedKey);
+    results.push(run.result);
   }
   return { results, created, removed };
 };

@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { describeCleanup } from '../add-edit/cleanup.js';
 import { runAllScenarios } from '../add-edit/index.js';
 import { type AddEditTestPlan, PAYLOAD_FILES, describePlan, payloadsFor, planAddEditTests } from '../add-edit/plan.js';
 import { type Payloads, payloadSourceProblems, providedPayloadProblems } from '../add-edit/run-checks.js';
@@ -14,7 +15,6 @@ import {
   resolveAuthToken
 } from '../test-runner/index.js';
 import { persistMetadataXml } from '../test-runner/metadata.js';
-import type { AddEditCleanup } from '../test-runner/types.js';
 import { CURRENT_ADD_EDIT_VERSION, whyAddEditVersionDoesNotCertify } from './add-edit-versions.js';
 import { allOf, everyStepPassed, versionCertifies } from './certification.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
@@ -294,25 +294,7 @@ const runTests = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
   }
 });
 
-/** "record" or "records", for a count. */
-const records = (count: number): string => `${count} record${count === 1 ? '' : 's'}`;
-
-/**
- * What became of the records the run created, in a clause for the step's summary: counts and keys, since the step
- * reaches the provider's own output. Empty when the run created nothing.
- */
-export const describeCleanup = (cleanup: AddEditCleanup): string => {
-  const sentences = [
-    ...(cleanup.removed.length > 0 ? [`Removed the ${records(cleanup.removed.length)} it created.`] : []),
-    ...(cleanup.notRemoved.length > 0
-      ? [`Could not remove ${cleanup.notRemoved.map(({ key, status }) => `${key} (${status})`).join(', ')}.`]
-      : []),
-    ...(cleanup.left.length > 0
-      ? [`Left ${records(cleanup.left.length)} it created, because delete was not tested: ${cleanup.left.join(', ')}.`]
-      : [])
-  ];
-  return sentences.length > 0 ? `. ${sentences.join(' ')}` : '';
-};
+export { describeCleanup } from '../add-edit/cleanup.js';
 
 /** Write generic and detailed compliance reports. */
 const writeComplianceReports = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
