@@ -3,18 +3,16 @@ import {
   type CloudOfferIo,
   type CloudOfferMode,
   type RanEntry,
-  type RcfCloudOfferIo,
   cloudRunHint,
   cloudRunPrerequisite,
   formatAcceptedRun,
   formatRunStatusTable,
-  offerCloudRun,
-  offerRcfCloudRun,
-  planCloudRequests
+  offerCloudRuns,
+  planCloudRuns
 } from '../../src/cli/cloud-command.js';
-import type { RcfLocalRunRecord } from '../../src/cloud/local-run.js';
 import type { AcceptedCloudRun } from '../../src/cloud/runs.js';
-import type { CoreConfig, PipelineResult } from '../../src/sdk/types.js';
+import { INFER_RCF_REPORTS, READ_RCF_INPUT } from '../../src/sdk/step-names.js';
+import type { CoreConfig, PipelineResult, RcfConfig } from '../../src/sdk/types.js';
 
 /**
  * The cloud-run choice at the end of a local run: only entries that passed and can be certified are offered,
@@ -50,11 +48,9 @@ const ran = (label: string, recipientUoi: string, result: PipelineResult | strin
 
 const NOW = new Date('2026-10-29T20:00:00.000Z');
 
-describe('planCloudRequests', () => {
+describe('planCloudRuns', () => {
   it('offers only the entries that passed and can be certified, and names the rest with why', () => {
-    const plan = planCloudRequests(
-      'T00000000',
-      undefined,
+    const plan = planCloudRuns(
       [
         ran('Feed one', 'M00000000', passed),
         ran('Feed two', 'M00000001', { ...passed, status: 'failed' }),
@@ -66,22 +62,22 @@ describe('planCloudRequests', () => {
     );
 
     expect(plan.offered).toBe(1);
-    expect(plan.requests).toHaveLength(1);
-    expect(plan.requests[0].labels).toEqual(['Feed one']);
-    expect(plan.requests[0].body.configs.map(c => c.recipientUoi)).toEqual(['M00000000']);
-    expect(plan.requests[0].body.localRuns.map(r => r.recipientUoi)).toEqual(['M00000000']);
+    expect(plan.groups).toHaveLength(1);
+    expect(plan.groups[0].entries.map(e => e.label)).toEqual(['Feed one']);
+    expect(plan.groups[0].entries.map(e => e.record.recipientUoi)).toEqual(['M00000000']);
     expect(plan.notOffered).toEqual([
       { label: 'Feed two', reason: 'it failed' },
       { label: 'Feed three', reason: 'it cannot be certified: a required step did not run' },
       { label: 'Feed four', reason: 'it stopped before producing a result' },
-      { label: 'Feed five', reason: 'it does not name the provider, system and recipient a cloud run is addressed to' }
+      {
+        label: 'Feed five',
+        reason: 'it does not name the provider, system and recipient a cloud run is addressed to, or did not record what it certified'
+      }
     ]);
   });
 
-  it('sends entries that ran at different versions as separate requests, with the concurrency on each', () => {
-    const plan = planCloudRequests(
-      'T00000000',
-      100,
+  it('groups entries that ran at different versions as separate requests', () => {
+    const plan = planCloudRuns(
       [
         ran('Feed one', 'M00000000', passed),
         ran('Feed two', 'M00000001', passed, { version: '2.0.0' }),
@@ -90,29 +86,34 @@ describe('planCloudRequests', () => {
       NOW
     );
 
-    expect(plan.requests.map(r => [r.endorsementVersion, r.labels])).toEqual([
-      ['2.1.0', ['Feed one', 'Feed three']],
-      ['2.0.0', ['Feed two']]
+    expect(plan.groups.map(g => [g.endorsementName, g.endorsementVersion, g.entries.map(e => e.label)])).toEqual([
+      ['web-api-core', '2.1.0', ['Feed one', 'Feed three']],
+      ['web-api-core', '2.0.0', ['Feed two']]
     ]);
-    expect(plan.requests.map(r => r.body.concurrency)).toEqual([100, 100]);
-    expect(plan.requests.every(r => r.body.providerUoi === 'T00000000')).toBe(true);
   });
 
-  it('sends the run as it ran: the credential and the options it used', () => {
-    const plan = planCloudRequests(
-      'T00000000',
-      undefined,
-      [ran('Feed one', 'M00000000', passed, { fieldOverrides: ['Office.FeedTypes'] })],
-      NOW
-    );
-    expect(plan.requests[0].body.configs[0]).toMatchObject({
-      token: 'server-token-for-tests',
-      coreOptions: { version: '2.1.0', fieldOverrides: ['Office.FeedTypes'] }
-    });
+  it('plans any endorsement: a RESO Common Format run goes by the version its run inferred', () => {
+    const rcfConfig: RcfConfig = {
+      endorsement: 'rcf',
+      input: '/data/rcf',
+      providerUoi: 'T00000000',
+      providerUsi: '99999',
+      recipientUoi: 'M00000000'
+    };
+    const rcfRun: PipelineResult = {
+      ...passed,
+      endorsement: 'rcf',
+      steps: [
+        { name: READ_RCF_INPUT, status: 'passed', duration: 1, params: { fingerprint: 'f'.repeat(64) } },
+        { name: INFER_RCF_REPORTS, status: 'passed', duration: 1, params: { version: '2.1' } }
+      ]
+    };
+    const plan = planCloudRuns([{ label: 'rcf', config: rcfConfig, outcome: { label: 'rcf', result: rcfRun } }], NOW);
+    expect(plan.groups.map(g => [g.endorsementName, g.endorsementVersion])).toEqual([['reso-common-format', '2.1']]);
   });
 });
 
-describe('offerCloudRun', () => {
+describe('offerCloudRuns', () => {
   const accepted = (version: string): AcceptedCloudRun => ({
     certificationRequestId: `test-T00000000-${version}`,
     providerUoi: 'T00000000',
@@ -120,6 +121,8 @@ describe('offerCloudRun', () => {
     endorsementVersion: version,
     recipients: [{ recipientUoi: 'M00000000', providerUsi: '99999' }]
   });
+
+  const offer = { providerUoi: 'T00000000', endorsementLabel: 'Web API Core' };
 
   const io = () => {
     const said: Array<string> = [];
@@ -136,9 +139,9 @@ describe('offerCloudRun', () => {
           recipients: []
         };
       }),
-      submit: vi.fn(async request => {
-        order.push(`submit ${request.endorsementVersion}`);
-        return accepted(request.endorsementVersion);
+      start: vi.fn(async input => {
+        order.push(`start ${input.endorsementVersion}`);
+        return [accepted(input.endorsementVersion)];
       })
     };
     return { calls, said, order };
@@ -146,20 +149,23 @@ describe('offerCloudRun', () => {
 
   const mode = (over: Partial<CloudOfferMode> = {}): CloudOfferMode => ({ startCloudRun: false, json: false, ...over });
 
-  const onePassed = planCloudRequests('T00000000', undefined, [ran('Feed one', 'M00000000', passed)], NOW);
+  const onePassed = planCloudRuns([ran('Feed one', 'M00000000', passed)], NOW);
 
-  it('with --start-cloud-run, reserves the entries that passed and starts from that reservation', async () => {
+  it('with --start-cloud-run, reserves the entries that passed and starts from that reservation, through the shared path', async () => {
     const { calls, said, order } = io();
-    await expect(offerCloudRun(onePassed, mode({ startCloudRun: true }), calls)).resolves.toBe('started');
-    expect(order).toEqual(['reserve 2.1.0', 'submit 2.1.0']);
-    expect(vi.mocked(calls.submit).mock.calls[0]?.[0].body.certificationRequestId).toBe('test-T00000000-reserved-2.1.0');
+    await expect(offerCloudRuns({ ...offer, concurrency: 4 }, onePassed, mode({ startCloudRun: true }), calls)).resolves.toBe('started');
+    expect(order).toEqual(['reserve 2.1.0', 'start 2.1.0']);
+    expect(vi.mocked(calls.reserve).mock.calls[0]?.[0].targets).toEqual([
+      { recipientUoi: 'M00000000', providerUsi: '99999', serviceRootUri: 'https://api.example.com/odata' }
+    ]);
+    const started = vi.mocked(calls.start).mock.calls[0]?.[0];
+    expect(started?.concurrency).toBe(4);
+    expect(started?.localRuns.map(r => [r.description, r.certificationRequestId])).toEqual([['Feed one', 'test-T00000000-reserved-2.1.0']]);
     expect(said.join('\n')).toContain('Request: test-T00000000-2.1.0');
   });
 
   it('starts nothing for a group whose reservation was refused, and still sends the others', async () => {
-    const twoVersions = planCloudRequests(
-      'T00000000',
-      undefined,
+    const twoVersions = planCloudRuns(
       [ran('Feed one', 'M00000000', passed), ran('Feed two', 'M00000001', passed, { version: '2.0.0' })],
       NOW
     );
@@ -172,58 +178,56 @@ describe('offerCloudRun', () => {
       })
     };
 
-    await expect(offerCloudRun(twoVersions, mode({ startCloudRun: true }), refusing)).resolves.toBe('failed');
-    expect(vi.mocked(refusing.submit).mock.calls.map(c => c[0].endorsementVersion)).toEqual(['2.0.0']);
+    await expect(offerCloudRuns(offer, twoVersions, mode({ startCloudRun: true }), refusing)).resolves.toBe('failed');
+    expect(vi.mocked(refusing.start).mock.calls.map(c => c[0].endorsementVersion)).toEqual(['2.0.0']);
     expect(said).toContain('Error: Reserving the web-api-core 2.1.0 run was refused: not allowed.');
   });
 
   it('without --start-cloud-run, says how to choose it next time and reserves and starts nothing', async () => {
     const { calls, said } = io();
-    await expect(offerCloudRun(onePassed, mode(), calls)).resolves.toBe('hinted');
+    await expect(offerCloudRuns(offer, onePassed, mode(), calls)).resolves.toBe('hinted');
     expect(calls.reserve).not.toHaveBeenCalled();
-    expect(calls.submit).not.toHaveBeenCalled();
+    expect(calls.start).not.toHaveBeenCalled();
     expect(said).toEqual([cloudRunHint(1)]);
   });
 
   it('offers nothing when no entry passed, and says so only when a start was asked for', async () => {
-    const nonePassed = planCloudRequests('T00000000', undefined, [ran('Feed one', 'M00000000', { ...passed, status: 'failed' })], NOW);
+    const nonePassed = planCloudRuns([ran('Feed one', 'M00000000', { ...passed, status: 'failed' })], NOW);
 
     const quiet = io();
-    await expect(offerCloudRun(nonePassed, mode(), quiet.calls)).resolves.toBe('none');
+    await expect(offerCloudRuns(offer, nonePassed, mode(), quiet.calls)).resolves.toBe('none');
     expect(quiet.said).toEqual([]);
 
     const asked = io();
-    await expect(offerCloudRun(nonePassed, mode({ startCloudRun: true }), asked.calls)).resolves.toBe('none');
+    await expect(offerCloudRuns(offer, nonePassed, mode({ startCloudRun: true }), asked.calls)).resolves.toBe('none');
     expect(asked.said[0]).toBe('No entry passed and can be certified, so no cloud run was started.');
     expect(asked.calls.reserve).not.toHaveBeenCalled();
-    expect(asked.calls.submit).not.toHaveBeenCalled();
+    expect(asked.calls.start).not.toHaveBeenCalled();
   });
 
-  it('reports a refused request with its reason, still sends the others, and ends as failed', async () => {
-    const twoVersions = planCloudRequests(
-      'T00000000',
-      undefined,
+  it('reports a refused start with its reason, still sends the others, and ends as failed', async () => {
+    const twoVersions = planCloudRuns(
       [ran('Feed one', 'M00000000', passed), ran('Feed two', 'M00000001', passed, { version: '2.0.0' })],
       NOW
     );
     const { calls, said } = io();
     const refusing: CloudOfferIo = {
       ...calls,
-      submit: vi.fn(async request => {
-        if (request.endorsementVersion === '2.1.0') throw new Error('Certification runs cannot be started here yet.');
-        return accepted(request.endorsementVersion);
+      start: vi.fn(async input => {
+        if (input.endorsementVersion === '2.1.0') throw new Error('Certification runs cannot be started here yet.');
+        return [accepted(input.endorsementVersion)];
       })
     };
 
-    await expect(offerCloudRun(twoVersions, mode({ startCloudRun: true }), refusing)).resolves.toBe('failed');
-    expect(refusing.submit).toHaveBeenCalledTimes(2);
+    await expect(offerCloudRuns(offer, twoVersions, mode({ startCloudRun: true }), refusing)).resolves.toBe('failed');
+    expect(refusing.start).toHaveBeenCalledTimes(2);
     expect(said).toContain('Error: Certification runs cannot be started here yet.');
     expect(said.join('\n')).toContain('Request: test-T00000000-2.0.0');
   });
 
   it('prints what was started as JSON with --output json', async () => {
     const { calls, said } = io();
-    await offerCloudRun(onePassed, mode({ startCloudRun: true, json: true }), calls);
+    await offerCloudRuns(offer, onePassed, mode({ startCloudRun: true, json: true }), calls);
     expect(JSON.parse(said[0])).toEqual(accepted('2.1.0'));
   });
 });
@@ -317,121 +321,5 @@ describe('cloudRunPrerequisite', () => {
     expect(reason).not.toContain('secret-for-tests');
     expect(cloudRunPrerequisite({ ...services, TOKEN_URI: 'https://auth.example.org', CLIENT_ID: 'id' })).toContain('CLIENT_SECRET');
     expect(cloudRunPrerequisite({ ...services, CLIENT_SECRET: ' ' })).toBeDefined();
-  });
-});
-
-describe('offerRcfCloudRun', () => {
-  const FINGERPRINT = 'f'.repeat(64);
-  const record: RcfLocalRunRecord = {
-    recipientUoi: 'M00000000',
-    providerUsi: '99999',
-    fingerprint: FINGERPRINT,
-    endorsementName: 'reso-common-format',
-    endorsementVersion: '2.1',
-    softwareVersion: '0.12.0',
-    generatedOn: '2026-11-03T20:00:00.000Z',
-    outcome: 'passed',
-    certification: { valid: true },
-    remarks: ''
-  };
-  const offer = { input: '/data/rcf', providerUoi: 'T00000000', record };
-  const START = { startCloudRun: true, json: false };
-
-  const rcfIo = (over: Partial<RcfCloudOfferIo> = {}) => {
-    const said: string[] = [];
-    const order: string[] = [];
-    const io: RcfCloudOfferIo = {
-      say: text => {
-        said.push(text);
-      },
-      pack: vi.fn(async () => {
-        order.push('pack');
-        return { packed: { path: '/tmp/x/upload.zip', bytes: 2048, fingerprint: FINGERPRINT, files: 3 } };
-      }),
-      reserve: vi.fn(async () => {
-        order.push('reserve');
-        return { certificationRequestId: 'test-T00000000-1', expiresAt: '2026-11-04T20:00:00.000Z', recipients: [] };
-      }),
-      slot: vi.fn(async () => {
-        order.push('slot');
-        return { uploadId: 'up-1', url: 'https://u', fields: {}, expiresAt: 'x', maxBytes: 4096 };
-      }),
-      upload: vi.fn(async () => {
-        order.push('upload');
-      }),
-      submit: vi.fn(async () => {
-        order.push('submit');
-        return {
-          certificationRequestId: 'test-T00000000-1',
-          providerUoi: 'T00000000',
-          endorsementName: 'reso-common-format',
-          endorsementVersion: '2.1',
-          recipients: [{ recipientUoi: 'M00000000', providerUsi: '99999' }]
-        };
-      }),
-      discard: vi.fn(async () => {
-        order.push('discard');
-      }),
-      ...over
-    };
-    return { io, said, order };
-  };
-
-  it('packs, reserves, uploads and starts, in that order, naming the upload and the fingerprint, then removes the zip', async () => {
-    const { io, said, order } = rcfIo();
-    expect(await offerRcfCloudRun(offer, START, io)).toBe('started');
-    expect(order).toEqual(['pack', 'reserve', 'slot', 'upload', 'submit', 'discard']);
-    expect(io.pack).toHaveBeenCalledWith('/data/rcf', FINGERPRINT);
-    expect(io.reserve).toHaveBeenCalledWith({
-      endorsementName: 'reso-common-format',
-      endorsementVersion: '2.1',
-      providerUoi: 'T00000000',
-      targets: [{ recipientUoi: 'M00000000', providerUsi: '99999' }]
-    });
-    expect(io.slot).toHaveBeenCalledWith(
-      expect.objectContaining({ certificationRequestId: 'test-T00000000-1', fingerprint: FINGERPRINT, bytes: 2048 })
-    );
-    expect(io.submit).toHaveBeenCalledWith({
-      endorsementName: 'reso-common-format',
-      endorsementVersion: '2.1',
-      config: {
-        certificationRequestId: 'test-T00000000-1',
-        providerUoi: 'T00000000',
-        configs: [{ recipientUoi: 'M00000000', providerUsi: '99999', upload: { uploadId: 'up-1', fingerprint: FINGERPRINT } }],
-        localRuns: [record]
-      }
-    });
-    expect(said.join('\n')).toContain("Started RESO Common Format 2.1 in RESO's cloud for T00000000.");
-  });
-
-  it('reserves nothing when the pack is refused, and says why', async () => {
-    const { io, said, order } = rcfIo({
-      pack: vi.fn(async () => ({ refused: 'The data packs to 5.2 GB, over the 5.0 GB a cloud run takes. Nothing was uploaded.' }))
-    });
-    expect(await offerRcfCloudRun(offer, START, io)).toBe('failed');
-    expect(order).toEqual([]);
-    expect(said).toEqual(['Error: The data packs to 5.2 GB, over the 5.0 GB a cloud run takes. Nothing was uploaded.']);
-  });
-
-  it('starts nothing after a failed upload, and still removes the zip', async () => {
-    const { io, said, order } = rcfIo({
-      upload: vi.fn(async () => {
-        throw new Error('Uploading the files failed: 403 Forbidden');
-      })
-    });
-    expect(await offerRcfCloudRun(offer, START, io)).toBe('failed');
-    expect(order).toEqual(['pack', 'reserve', 'slot', 'discard']);
-    expect(said).toEqual(['Error: Uploading the files failed: 403 Forbidden']);
-  });
-
-  it('only hints without --start-cloud-run, and says when a run that was asked to cannot', async () => {
-    const hinted = rcfIo();
-    expect(await offerRcfCloudRun(offer, { startCloudRun: false, json: false }, hinted.io)).toBe('hinted');
-    expect(hinted.order).toEqual([]);
-    expect(hinted.said[0]).toContain('add --start-cloud-run');
-    const none = rcfIo();
-    expect(await offerRcfCloudRun(undefined, START, none.io)).toBe('none');
-    expect(none.said).toEqual(['The run did not pass and can not be certified, so no cloud run was started.']);
-    expect(await offerRcfCloudRun(undefined, { startCloudRun: false, json: false }, none.io)).toBe('none');
   });
 });

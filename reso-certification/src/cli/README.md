@@ -140,6 +140,7 @@ reso-cert add-edit --config ./configs/add-edit-config.json   # multi-provider ba
 | `--metadata <path>` | – | Local XML metadata (for `--mock`) |
 | `--mock` | – | Start a bundled mock OData server, which writes its own payloads unless `--payloads` gives them |
 | `--spec-version <v>` | `2.0.0` | Spec version stamped into the report. Add/Edit has one version, 2.0.0 (RCP-10, ratified December 2023), so any other is refused |
+| `--start-cloud-run` | – | At the end, start a certification run in RESO's cloud for the entries that passed and can be certified, with the payloads they used. Needs `--config`. See [Cloud runs](#cloud-runs). |
 
 Provide one of `--url`, `--config`, or `--mock`, and the payloads one way: `--payloads`, a config file's `payloads` or `--auto-payloads`. With `--config`, `--actions`, the format options and `--auto-payloads` apply to every entry.
 
@@ -154,7 +155,8 @@ Adds, beyond the shared options: `--mode <observe|full>` (default `observe`; `fu
 performs canary writes), `--writable-resource <name>` (default `Property`),
 `--payloads-dir <dir>`, `--max-events <n>` (default `1000`), `--batch-size <n>`
 (`100`), `--poll-interval <ms>` (`5000`), `--poll-timeout <ms>` (`30000`),
-`--metadata <path>`, `--mock`. Provide one of `--url`, `--config`, or `--mock`.
+`--metadata <path>`, `--mock`, `--start-cloud-run` (needs `--config`; see [Cloud runs](#cloud-runs)). Provide one
+of `--url`, `--config`, or `--mock`.
 
 ### `core`
 Web API Core 2.1.0 compliance. Core 2.0.0 remains selectable per run, as a retest. Only 2.1.0, the latest minor, certifies.
@@ -230,6 +232,7 @@ reso-cert dd --config ./sample-configs/dd-config.json        # multi-provider ba
 | `--batch-expand` | – | Batch every expansion per resource into one `$expand` request |
 | `--originating-system-name <v>` | – | Append `OriginatingSystemName eq <v>` to every replication query (multi-tenant providers) |
 | `--originating-system-id <v>` | – | Append `OriginatingSystemID` instead. Used only when no name is given |
+| `--start-cloud-run` | – | At the end, start a certification run in RESO's cloud for the entries that passed and can be certified. Needs `--config`. See [Cloud runs](#cloud-runs). |
 
 Provide one of `--url` or `--config`.
 
@@ -542,7 +545,8 @@ reso-cert variations-review-status --review-status in-review   # admin: every pr
 A cloud run happens in RESO's cloud rather than on your machine, with RESO's copy of the tests. It is started
 only at the end of a local run that passed, never on its own. The cloud run is the one that certifies.
 
-**At the end of `core --config`**, when at least one entry passed and can be certified:
+**At the end of `core`, `dd`, `add-edit` or `entity-event` with `--config`**, when at least one entry passed and
+can be certified:
 
 - With `--start-cloud-run`, the CLI reserves a request ID for those entries with RESO's service and starts the
   cloud run from that reservation. Nothing is sent before a pass. A reservation can start a cloud run once,
@@ -552,7 +556,10 @@ only at the end of a local run that passed, never on its own. The cloud run is t
 
 Entries that failed, stopped or cannot be certified are listed with the reason and never sent. What is sent is
 each entry as it ran: its server, its credential and its options, including any flag that changed them, such as
-`--auth-token` or `--field-overrides`, plus a record of the local run that passed. The credentials go to RESO's
+`--auth-token` or `--field-overrides`, plus a record of the local run that passed. An Add/Edit entry carries the
+payloads the run used, inline: read again from the folder when `--payloads` gave one. The cloud tests your own
+payloads, so `--start-cloud-run` does not go with `--auto-payloads` or `--mock`, and a `dd` run with `--no-strict`
+or `--skip-variations` cannot be certified, so it does not go with those either. The credentials go to RESO's
 service with the request and are never printed. Messages go to stderr, so with `--output json` stdout stays the
 run's own JSON, and what was started is printed as JSON there too.
 
@@ -571,10 +578,10 @@ passed.
 - The files `rcf` read are packed into one zip, at a low compression level, even a single `.json`. Each file keeps
   the path it had in the input, and a zip inside a folder becomes a folder named for it. The packed zip must carry the
   fingerprint the run recorded of what it read, so a file changed since the run stops it here.
-- Over 5 GB packed, it stops and says so. Nothing is reserved or uploaded.
+- Over 5 GB packed, it stops and says so. Nothing is uploaded, and the reservation expires unused.
 - Otherwise the CLI reserves a request ID, asks RESO's service where to upload, uploads the zip and starts the cloud
   run, naming the upload and the fingerprint. The upload goes straight to storage with its own signed fields, and no
-  RESO credential goes with it. The local zip is removed afterwards, whatever happened.
+  RESO credential goes with it. The local zip and its folder are removed afterwards, whatever happened.
 
 The flags are checked before the run, as for Core, so a long run is not wasted. RESO's service switches RESO Common
 Format cloud runs on separately: until then it refuses the reservation, and the CLI prints its reason.
