@@ -153,6 +153,15 @@ describe('what a run refuses before it writes anything, told without the server'
   const NO_RECORD = { id: '00000000-0000-0000-0000-000000000000' };
   const refused: ReadonlyArray<readonly [string, Partial<AddEditConfig>]> = [
     ['no selection', { payloads: CREATE_PAYLOADS }],
+    // A service passes on what it was sent, so a selection of the wrong shape is refused in words, never thrown on.
+    [
+      'actions given as a string',
+      { actions: 'create', formats: { create: ['minimal'] }, payloads: CREATE_PAYLOADS } as unknown as Partial<AddEditConfig>
+    ],
+    [
+      'formats given as a string',
+      { actions: ['create'], formats: { create: 'minimal' }, payloads: CREATE_PAYLOADS } as unknown as Partial<AddEditConfig>
+    ],
     ['no formats for a create', { actions: ['create'], payloads: CREATE_PAYLOADS }],
     ['no payloads', { actions: ['delete'] }],
     ['payloads given two ways', { actions: ['create'], formats: { create: ['minimal'] }, payloads: CREATE_PAYLOADS, autoPayloads: true }],

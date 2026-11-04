@@ -72,6 +72,25 @@ const isAction = (value: unknown): value is AddEditAction => ADD_EDIT_ACTIONS.so
 const isFormat = (value: unknown): value is AddEditFormat => ADD_EDIT_FORMATS.some(format => format === value);
 const isFormattedAction = (value: unknown): value is AddEditFormattedAction => ADD_EDIT_FORMATTED_ACTIONS.some(action => action === value);
 
+const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/**
+ * What is wrong with a selection's shape, checked before anything reads it. A service that starts runs for others
+ * passes on what it was sent, so a selection that is not the shape its types promise is refused in words, never thrown
+ * on.
+ */
+const shapeProblems = (options: { readonly actions?: unknown; readonly formats?: unknown }): ReadonlyArray<string> => [
+  ...(options.actions === undefined || Array.isArray(options.actions) ? [] : ['The actions must be a list, such as ["create", "update"].']),
+  ...(options.formats === undefined
+    ? []
+    : isRecord(options.formats)
+      ? Object.entries(options.formats)
+          .filter(([, chosen]) => !Array.isArray(chosen))
+          .map(([action]) => `The formats for ${action} must be a list, such as ["minimal"].`)
+      : ['The formats must give a list for each create or update tested, such as {"create": ["minimal"]}.'])
+];
+
 const scenariosFor = (
   action: AddEditAction,
   formats: Readonly<Record<AddEditFormattedAction, ReadonlyArray<AddEditFormat>>>
@@ -114,6 +133,8 @@ export const readAddEditSelection = (options: {
   readonly actions?: ReadonlyArray<unknown>;
   readonly formats?: Readonly<Record<string, ReadonlyArray<unknown>>>;
 }): AddEditPlanResult => {
+  const malformed = shapeProblems(options);
+  if (malformed.length > 0) return { problems: malformed };
   const problemsWithActions = actionProblems(options.actions);
   if (problemsWithActions.length > 0) return { problems: problemsWithActions };
   // The canonical order, whatever order they were given in: a create runs first, so an update or a delete can use it.
@@ -147,6 +168,8 @@ export const planAddEditTests = (options: {
   readonly actions?: ReadonlyArray<unknown>;
   readonly formats?: Readonly<Record<string, ReadonlyArray<unknown>>>;
 }): AddEditPlanResult => {
+  const malformed = shapeProblems(options);
+  if (malformed.length > 0) return { problems: malformed };
   const missing = missingSelection(options);
   return missing.length > 0 ? { problems: missing } : readAddEditSelection(options);
 };

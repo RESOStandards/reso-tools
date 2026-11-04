@@ -90,6 +90,23 @@ describe('what an Add/Edit run tests', () => {
     );
   });
 
+  // A service that starts runs for others passes on what it was sent. A selection of the wrong shape is refused in
+  // words, so that service answers with reasons rather than an exception.
+  it.each([
+    ['actions as a string', { actions: 'create' }, 'The actions must be a list'],
+    ['actions as null', { actions: null }, 'The actions must be a list'],
+    ['actions as an object', { actions: { create: true } }, 'The actions must be a list'],
+    ['formats as a string', { actions: ['create'], formats: 'minimal' }, 'The formats must give a list'],
+    ['formats as null', { actions: ['delete'], formats: null }, 'The formats must give a list'],
+    ['formats as a list', { actions: ['create'], formats: ['minimal'] }, 'The formats must give a list'],
+    ['a format as a string', { actions: ['create'], formats: { create: 'minimal' } }, 'The formats for create must be a list'],
+    ['a format as null', { actions: ['create'], formats: { create: null } }, 'The formats for create must be a list']
+  ])('refuses %s in words, and never throws', (_label, options, reason) => {
+    const malformed = options as unknown as PlanOptions;
+    expect(problemsOf(malformed)).toContain(reason);
+    expect(selectionProblemsOf(malformed)).toContain(reason);
+  });
+
   // The command line's flags are checked before a configuration supplies the rest, so only what they give is checked.
   it('reads a partial selection, checking only what it was given', () => {
     expect(selectionProblemsOf({})).toBe('no problem');
