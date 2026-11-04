@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { cloudEntryOf, isSuccessfulRun, localRunRecordOf } from '../../src/cloud/local-run.js';
+import { cloudEntryOf, isSuccessfulRun, localRunRecordOf, rcfLocalRunRecordOf } from '../../src/cloud/local-run.js';
 import { SOFTWARE_VERSION } from '../../src/sdk/reports.js';
-import type { CoreConfig, PipelineResult } from '../../src/sdk/types.js';
+import type { CoreConfig, PipelineResult, RcfConfig } from '../../src/sdk/types.js';
 
 /**
  * What a cloud run is started from: a local run that passed and can be certified, and the configuration as it
@@ -123,5 +123,46 @@ describe('cloudEntryOf', () => {
 
   it('has nothing for a run that does not name its provider, system and recipient', () => {
     expect(cloudEntryOf(config({ providerUoi: undefined }))).toBeUndefined();
+  });
+});
+
+describe('rcfLocalRunRecordOf', () => {
+  const FINGERPRINT = 'f'.repeat(64);
+  const rcfConfig = (over: Partial<RcfConfig> = {}): RcfConfig => ({
+    endorsement: 'rcf',
+    input: '/data/rcf',
+    providerUoi: 'T00000000',
+    providerUsi: '99999',
+    recipientUoi: 'M00000000',
+    ...over
+  });
+  const rcfRun: PipelineResult = {
+    ...passed,
+    endorsement: 'rcf',
+    steps: [
+      { name: 'Read RCF input', status: 'passed', duration: 1, params: { fingerprint: FINGERPRINT } },
+      { name: 'Infer RCF reports', status: 'passed', duration: 1, params: { version: '2.1' } }
+    ]
+  };
+
+  it('records the target, the fingerprint of what was read, the Data Dictionary version and the verdict', () => {
+    expect(rcfLocalRunRecordOf(rcfRun, rcfConfig(), NOW)).toEqual({
+      recipientUoi: 'M00000000',
+      providerUsi: '99999',
+      fingerprint: FINGERPRINT,
+      endorsementName: 'reso-common-format',
+      endorsementVersion: '2.1',
+      softwareVersion: SOFTWARE_VERSION,
+      generatedOn: NOW.toISOString(),
+      outcome: 'passed',
+      certification: { valid: true },
+      remarks: expect.any(String)
+    });
+  });
+
+  it('records nothing for a run not addressed to a provider, system and recipient, or that recorded no fingerprint', () => {
+    expect(rcfLocalRunRecordOf(rcfRun, rcfConfig({ recipientUoi: undefined }), NOW)).toBeUndefined();
+    expect(rcfLocalRunRecordOf(rcfRun, rcfConfig({ providerUsi: ' ' }), NOW)).toBeUndefined();
+    expect(rcfLocalRunRecordOf({ ...rcfRun, steps: rcfRun.steps.slice(1) }, rcfConfig(), NOW)).toBeUndefined();
   });
 });

@@ -347,7 +347,7 @@ reso-cert submit-variations-report --report ./out/variations-report.json
 (fail on the first schema error) · `--skip-variations` · `--schema-validate` (accepted, the default) ·
 `-a, --additional-properties` (accepted and inert: RCF is always extensible) · `--output-dir <path>`
 (default `.`) · `--provider-uoi <uoi>` · `--provider-usi <usi>` · `--recipient-uoi <uoi>` (all three or
-none).
+none) · `--start-cloud-run` (needs all three; see [Cloud runs](#cloud-runs)).
 
 Writes `metadata-report.json` and `data-availability-report.json`, plus
 `data-dictionary-variations.json` when the variations step runs. RCF accepts a lookup value in its
@@ -564,6 +564,20 @@ the `CERT_AUTH_API_*` provider-token mint.
 
 If RESO's service refuses a request, its reason is printed and the exit code is `2`, even when every local run
 passed.
+
+**At the end of `rcf`**, with `--start-cloud-run` and the run addressed with `--provider-uoi`, `--provider-usi` and
+`--recipient-uoi`, when the run passed and can be certified:
+
+- The files `rcf` read are packed into one zip, at a low compression level, even a single `.json`. Each file keeps
+  the path it had in the input, and a zip inside a folder becomes a folder named for it. The packed zip must carry the
+  fingerprint the run recorded of what it read, so a file changed since the run stops it here.
+- Over 5 GB packed, it stops and says so. Nothing is reserved or uploaded.
+- Otherwise the CLI reserves a request ID, asks RESO's service where to upload, uploads the zip and starts the cloud
+  run, naming the upload and the fingerprint. The upload goes straight to storage with its own signed fields, and no
+  RESO credential goes with it. The local zip is removed afterwards, whatever happened.
+
+The flags are checked before the run, as for Core, so a long run is not wasted. RESO's service switches RESO Common
+Format cloud runs on separately: until then it refuses the reservation, and the CLI prints its reason.
 
 ### `cloud status`
 Your cloud runs, newest change first. One line per recipient of each run: its status, when that last

@@ -17,14 +17,17 @@
 // like RESO_SERVICES_URL populated when they destructure process.env.
 import { ENV_BOOTSTRAP } from './env-bootstrap.js';
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { Command } from 'commander';
 import { startMockServer, stopMockServer } from '../add-edit/mock/server.js';
 import { ADD_EDIT_ACTIONS, ADD_EDIT_FORMATS } from '../add-edit/plan.js';
-import { CLOUD_ENDORSEMENT, listCloudRunStatus, reserveCloudRun, submitCloudRun } from '../cloud/runs.js';
+import { isSuccessfulRun, rcfLocalRunRecordOf } from '../cloud/local-run.js';
+import { packRcfInput } from '../cloud/rcf-pack.js';
+import { CLOUD_ENDORSEMENT, listCloudRunStatus, requestUploadSlot, reserveCloudRun, submitCloudRun, uploadToSlot } from '../cloud/runs.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
 import { synthesizeResourcesFromFields } from '../metadata/index.js';
 import { CURRENT_ADD_EDIT_VERSION, SUPPORTED_ADD_EDIT_VERSIONS, isAddEditVersion } from '../sdk/add-edit-versions.js';
@@ -48,7 +51,7 @@ import {
 import { fetchMetadataReportFromServer } from '../sdk/metadata-source.js';
 import { rcfRunOutcome, runRcfCompliance } from '../sdk/rcf.js';
 import { normalizeReportFieldTypes } from '../sdk/report-field-types.js';
-import type { AddEditConfig, CoreConfig, DDConfig, EntityEventConfig, PipelineResult } from '../sdk/types.js';
+import type { AddEditConfig, CoreConfig, DDConfig, EntityEventConfig, PipelineResult, RcfConfig } from '../sdk/types.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import {
   DEFAULT_DD_VERSION,
@@ -73,9 +76,11 @@ import { mintOAuth2ClientCredentialsToken, resolveCliAuth } from './auth.js';
 import {
   type CloudOfferIo,
   type RanEntry,
+  type RcfCloudOfferIo,
   cloudRunPrerequisite,
   formatRunStatusTable,
   offerCloudRun,
+  offerRcfCloudRun,
   planCloudRequests
 } from './cloud-command.js';
 import { formatPlan, planDecisionPush } from './decisions-command.js';
@@ -526,6 +531,30 @@ const cliCloudOfferIo = (): CloudOfferIo => {
         config: request.body
       });
     }
+  };
+};
+
+/**
+ * The CLI's side of starting a RESO Common Format run in the cloud: as for Core, on stderr and with the variations
+ * commands' auth, minted once. The packed zip goes to a folder of its own under the system's temporary directory,
+ * which is removed afterwards whatever happened.
+ */
+const cliRcfCloudOfferIo = (): RcfCloudOfferIo => {
+  const held: { token?: Promise<string | undefined> } = {};
+  const auth = async (): Promise<{ readonly fromCli: true; readonly bearerToken?: string }> => {
+    held.token ??= mintOAuth2ClientCredentialsToken();
+    const bearerToken = await held.token;
+    return { fromCli: true, ...(bearerToken ? { bearerToken } : {}) };
+  };
+  return {
+    say: text => console.error(maskSecrets(text)),
+    pack: async (input, fingerprint) =>
+      packRcfInput(input, join(await mkdtemp(join(tmpdir(), 'reso-rcf-upload-')), 'upload.zip'), { fingerprint }),
+    reserve: async input => reserveCloudRun({ ...(await auth()), ...input }),
+    slot: async input => requestUploadSlot({ ...(await auth()), ...input }),
+    upload: uploadToSlot,
+    submit: async input => submitCloudRun({ ...(await auth()), ...input }),
+    discard: async zipPath => rm(dirname(zipPath), { recursive: true, force: true })
   };
 };
 
@@ -1573,6 +1602,11 @@ program
   )
   .option('--provider-usi <usi>', 'The system (USI) the data comes from')
   .option('--recipient-uoi <uoi>', 'The organization (UOI) the data is for')
+  .option(
+    '--start-cloud-run',
+    "At the end, start a certification run in RESO's cloud if this one passes and can be certified: the files it read " +
+      'are packed, uploaded and run there. Needs --provider-uoi, --provider-usi and --recipient-uoi. Without it, nothing is started'
+  )
   .action(
     async (opts: {
       input: string;
@@ -1587,6 +1621,7 @@ program
       providerUoi?: string;
       providerUsi?: string;
       recipientUoi?: string;
+      startCloudRun?: boolean;
     }) => {
       try {
         const fuzziness = Number.parseFloat(opts.fuzziness);
@@ -1604,13 +1639,22 @@ program
           recipientUoi: opts.recipientUoi
         });
         if (!identityRead.ok) throw new Error(identityRead.error);
+        // Also before the run, so a long run is not wasted: a cloud run is addressed to a provider, system and
+        // recipient, and needs the service's address and credentials. Nothing is sent before the run passes.
+        if (opts.startCloudRun && identityRead.identity === undefined) {
+          throw new Error(
+            '--start-cloud-run needs --provider-uoi, --provider-usi and --recipient-uoi: a cloud run is addressed to all three.'
+          );
+        }
+        const cloudPrerequisite = opts.startCloudRun ? cloudRunPrerequisite(process.env) : undefined;
+        if (cloudPrerequisite !== undefined) throw new Error(cloudPrerequisite);
         // The /compute token for the variations service (from .env; the service mints its own if absent).
         const bearerToken = opts.skipVariations ? undefined : await mintOAuth2ClientCredentialsToken();
         const dir = resolve(opts.outputDir);
 
         // The pipeline the SDK runs, so a local run and a cloud run of the same files are the same run. It writes the
         // reports, report.json among them, into the output directory.
-        const run = await runRcfCompliance({
+        const rcfConfig: RcfConfig = {
           endorsement: 'rcf',
           input: resolve(opts.input),
           version: opts.ddVersion,
@@ -1621,7 +1665,8 @@ program
           ...(bearerToken ? { servicesAuthToken: bearerToken } : {}),
           ...(identityRead.identity ?? {}),
           options: { outputDir: dir }
-        });
+        };
+        const run = await runRcfCompliance(rcfConfig);
         const outcome = rcfRunOutcome(run);
         if (!outcome.inferred) {
           process.stderr.write(`rcf: ${outcome.error}\n`);
@@ -1671,6 +1716,17 @@ program
         }
         // Zero-record (empty/unreadable) submissions and degraded variations runs must not read as a clean pass.
         process.exitCode = resolveRcfExitCode(result);
+
+        const record = isSuccessfulRun(run) ? rcfLocalRunRecordOf(run, rcfConfig) : undefined;
+        if (record !== undefined || opts.startCloudRun) {
+          const offer =
+            record !== undefined && identityRead.identity
+              ? { input: rcfConfig.input, providerUoi: identityRead.identity.providerUoi, record }
+              : undefined;
+          const offered = await offerRcfCloudRun(offer, { startCloudRun: opts.startCloudRun === true, json: false }, cliRcfCloudOfferIo());
+          // The local run may have passed, but what was asked for did not happen: a runtime error.
+          if (offered === 'failed') process.exitCode = 2;
+        }
       } catch (err) {
         const schemaFailure = (err as { schemaFailure?: boolean }).schemaFailure === true;
         process.stderr.write(`rcf: ${err instanceof Error ? err.message : String(err)}\n`);

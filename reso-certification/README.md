@@ -227,7 +227,10 @@ reso-cert cloud status --in-progress
   once.
 - **`reso-cert cloud status`** lists your cloud runs and where each stands, with `--json` for scripts.
 
-Cloud runs cover Web API Core. They sign in with the same `TOKEN_URI`, `CLIENT_ID` and
+`rcf --start-cloud-run` does the same for RESO Common Format: the files the run read are packed into one zip, of at
+most 5 GB, uploaded and run in RESO's cloud. It needs `--provider-uoi`, `--provider-usi` and `--recipient-uoi`.
+
+Cloud runs cover Web API Core and RESO Common Format. They sign in with the same `TOKEN_URI`, `CLIENT_ID` and
 `CLIENT_SECRET` from your credentials file as the Variations Service (see [Authentication](#authentication)). The
 [CLI reference](src/cli/README.md#cloud-runs) has the details.
 
