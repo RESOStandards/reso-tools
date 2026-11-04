@@ -2,6 +2,8 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, statSync } from 
 import { join, relative, resolve, sep } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 
+import { MISSING_CERT_API_CREDENTIAL, resolveCertApiCredential } from './cert-api-credential.js';
+
 /** A single report file found in a backup, with everything the restore needs to post it. */
 export interface BackupReport {
   /** Absolute path on disk. */
@@ -84,17 +86,6 @@ export const readBackupReport = (path: string): unknown => {
   return JSON.parse(text);
 };
 
-/**
- * The credential to present, from the environment.
- *
- * `CLIENT_SECRET` first: it is what the certification site's downloaded file carries, and it is
- * already `base64(keyId:apiKey)` - the exact bytes the server's Bearer envelope decodes - so one
- * downloaded file drives this tool with nothing to convert. `CERTIFICATION_API_KEY` is accepted
- * for an environment already set up for the older tools.
- */
-export const resolveRestoreCredential = (env: NodeJS.ProcessEnv = process.env): string | undefined =>
-  env.CLIENT_SECRET ?? env.CERTIFICATION_API_KEY;
-
 export interface RestoreOutcome {
   readonly key: string;
   readonly status: number;
@@ -166,9 +157,9 @@ const withConcurrency = async <T>(items: ReadonlyArray<T>, limit: number, run: (
  * it is pointed at and the cost of discovering that afterwards is a reindex.
  */
 export const runRestore = async (options: RestoreOptions, log: (line: string) => void): Promise<RestoreSummary> => {
-  const credential = resolveRestoreCredential();
+  const credential = resolveCertApiCredential();
   if (options.execute && !credential) {
-    throw new Error('No credential. Set CLIENT_SECRET (the value from the downloaded credentials file) or CERTIFICATION_API_KEY.');
+    throw new Error(MISSING_CERT_API_CREDENTIAL);
   }
 
   const done = readLedger(options.ledgerPath);
