@@ -91,6 +91,17 @@ const readInput = (config: RcfConfig): PipelineStep<RcfContext> => ({
       error instanceof Error ? error : new Error(String(error))
     );
     if (fingerprint instanceof Error) return { context, status: 'failed', summary: fingerprint.message, errors: [fingerprint.message] };
+    const expected = config.expectedFingerprint;
+    if (expected !== undefined && fingerprint.sha256 !== expected) {
+      const message = `The input is not what the local run read: its fingerprint is ${fingerprint.sha256}, and the local run's is ${expected}. Nothing was inferred.`;
+      return {
+        context: { ...context, fingerprint },
+        status: 'failed',
+        summary: message,
+        errors: [message],
+        params: { fingerprint: fingerprint.sha256 }
+      };
+    }
     return {
       context: { ...context, fingerprint, ...(identity.identity ? { identity: identity.identity } : {}) },
       summary: `${fingerprint.files.length} file(s), ${fingerprint.bytes.toLocaleString()} bytes`,

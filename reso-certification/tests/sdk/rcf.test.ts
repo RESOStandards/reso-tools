@@ -152,6 +152,25 @@ describe('an RCF run through the SDK', () => {
     });
   });
 
+  it('runs as usual when the input carries the fingerprint it is expected to', async () => {
+    const { result } = await run({ expectedFingerprint: (await fingerprintRcfInput(SINGLE)).sha256 });
+    expect(result.status).toBe('passed');
+    expect(result.certification.valid).toBe(true);
+  });
+
+  it('stops after reading an input that is not the one expected, before it infers anything', async () => {
+    const actual = (await fingerprintRcfInput(SINGLE)).sha256;
+    const expected = 'f'.repeat(64);
+    const { result, files } = await run({ expectedFingerprint: expected });
+    const message = `The input is not what the local run read: its fingerprint is ${actual}, and the local run's is ${expected}. Nothing was inferred.`;
+    expect(result.status).toBe('failed');
+    expect(stepNamed(result, 'Read RCF input')).toMatchObject({ status: 'failed', summary: message, params: { fingerprint: actual } });
+    expect(stepNamed(result, 'Infer RCF reports')?.status).toBe('skipped');
+    expect(mockedCompute).not.toHaveBeenCalled();
+    expect(files).toEqual(['report-detailed.json', 'report.json']);
+    expect(result.certification).toEqual({ valid: false, reasons: expect.arrayContaining([expect.stringContaining(message)]) });
+  });
+
   it('refuses a partial identity before it infers anything, and says why in its report', async () => {
     const { result, files, read } = await run({ providerUoi: 'T00000000' });
     expect(result.status).toBe('failed');

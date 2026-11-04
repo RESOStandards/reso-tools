@@ -41,7 +41,8 @@ reso-cert rcf -i ./rcf-export/ --provider-uoi <UOI> --provider-usi <USI> --recip
 - **At most 5 GB packed.** Over that, nothing is reserved or uploaded, and the CLI says the size and the limit.
 - **The upload goes straight to storage** with its own signed fields: no RESO credential goes with it, and the local zip is removed afterwards whatever happened.
 - **RESO's service switches RESO Common Format cloud runs on separately.** Until then it refuses the reservation, and the CLI prints its reason.
-- **The package exports `runRcfCompliance` and `fingerprintRcfInput` from its root,** which RESO's cloud job runs. Before, they were exported only inside the SDK module, out of reach of a program that installs the package.
+- **An RCF run can be told the fingerprint its input must have** (`expectedFingerprint`). RESO's cloud job passes the local run's, and a run of other files stops once it has read them, before it infers anything.
+- **The package exports `runRcfCompliance` and `fingerprintRcfInput` from its root,** so a program that installs it can run an RCF certification, as RESO's cloud job does, and fingerprint its input as the CLI does. Before, they were exported only inside the SDK module.
 
 ### `rcf` infers from every record
 
