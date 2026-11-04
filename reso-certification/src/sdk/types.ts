@@ -403,6 +403,11 @@ export interface RcfConfig {
   readonly input: string;
   /** The Data Dictionary version. Without it, the first payload's `@reso.context` decides. */
   readonly version?: string;
+  /**
+   * The fingerprint the input must have: a local run's, for a cloud run of the files it uploaded. The input is
+   * fingerprinted before anything else reads it, so a run of other files stops there, before it infers anything.
+   */
+  readonly expectedFingerprint?: string;
   /** The variations match threshold, 0 to 1. */
   readonly fuzziness?: number;
   /** Check every record against the Data Dictionary (default true). A run that did not is not certifiable. */
