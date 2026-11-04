@@ -3,17 +3,27 @@
  * starts runs for others can make them without loading the rest of the package. Pure: no network and no files.
  */
 
-import type { AddEditConfig } from '../sdk/types.js';
 import { type AddEditPayloadName, type AddEditTestPlan, PAYLOAD_FILES, payloadsFor, planAddEditTests } from './plan.js';
 
 // The vocabulary a caller validates against, from the same place the run reads it.
 export { ADD_EDIT_ACTIONS, ADD_EDIT_FORMATS, type AddEditAction, type AddEditFormat, type AddEditFormats } from './plan.js';
 
-/** The provider's payloads, by name. */
-export type Payloads = Readonly<Partial<Record<AddEditPayloadName, Record<string, unknown>>>>;
+/** The provider's payloads, by name. A caller may pass them as it received them: each is checked to be a record. */
+export type Payloads = Readonly<Partial<Record<AddEditPayloadName, unknown>>>;
+
+/** What a run is given, as a caller received it. Every field is checked, so none needs to be trusted. */
+export interface AddEditRunInput {
+  readonly actions?: ReadonlyArray<unknown>;
+  readonly formats?: Readonly<Record<string, ReadonlyArray<unknown>>>;
+  readonly payloads?: Payloads;
+  readonly payloadsDir?: string;
+  readonly autoPayloads?: boolean;
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const named = (value: unknown): boolean => value !== undefined && value !== null && String(value) !== '';
+/** A payload's field, when the payload is a record. */
+const fieldOf = (payload: unknown, field: string): unknown => (isRecord(payload) ? payload[field] : undefined);
 
 /**
  * What stops the provider's payloads from running as given: one the plan needs and is missing or is not a record,
@@ -29,22 +39,23 @@ export const providedPayloadProblems = (plan: AddEditTestPlan, payloads: Payload
   const unnamedUpdates =
     creates || keyField === undefined
       ? []
-      : (['updateSucceeds', 'updateFails'] as const).filter(name => needed.includes(name) && !named(payloads[name]?.[keyField]));
-  const deleteSucceeds = payloads.deleteSucceeds;
-  const deleteFails = payloads.deleteFails;
+      : (['updateSucceeds', 'updateFails'] as const).filter(name => needed.includes(name) && !named(fieldOf(payloads[name], keyField)));
+  const { deleteSucceeds, deleteFails } = payloads;
   return [
     ...unnamedUpdates.map(name => `${PAYLOAD_FILES[name]} names no ${keyField}, and no create test runs to make a record it could update`),
-    ...(needed.includes('deleteSucceeds') && !creates && !named(deleteSucceeds?.url) && !named(deleteSucceeds?.id)
+    ...(needed.includes('deleteSucceeds') && !creates && !named(fieldOf(deleteSucceeds, 'url')) && !named(fieldOf(deleteSucceeds, 'id'))
       ? ['delete-succeeds.json names no id or url, and no create test runs to make a record it could delete']
       : []),
-    ...(needed.includes('deleteFails') && !named(deleteFails?.url) && !named(deleteFails?.id)
+    ...(needed.includes('deleteFails') && !named(fieldOf(deleteFails, 'url')) && !named(fieldOf(deleteFails, 'id'))
       ? ['delete-fails.json names no id or url. It needs a record that does not exist.']
       : [])
   ];
 };
 
 /** Why the payloads cannot be had: given none, or given more than one way. */
-export const payloadSourceProblems = (config: Pick<AddEditConfig, 'payloads' | 'payloadsDir' | 'autoPayloads'>): ReadonlyArray<string> => {
+export const payloadSourceProblems = (
+  config: Pick<AddEditRunInput, 'payloads' | 'payloadsDir' | 'autoPayloads'>
+): ReadonlyArray<string> => {
   const sources = [
     config.payloadsDir ? 'a payloads folder' : '',
     config.payloads ? 'payloads in the configuration' : '',
@@ -65,9 +76,7 @@ export const payloadSourceProblems = (config: Pick<AddEditConfig, 'payloads' | '
  * from its metadata, so an update that names no record is checked when the run starts, and a payloads folder is read
  * then. A service that starts runs for others, such as RESO's cloud, refuses with this what the run would refuse.
  */
-export const addEditRunProblems = (
-  config: Pick<AddEditConfig, 'actions' | 'formats' | 'payloads' | 'payloadsDir' | 'autoPayloads'>
-): ReadonlyArray<string> => {
+export const addEditRunProblems = (config: AddEditRunInput): ReadonlyArray<string> => {
   const planned = planAddEditTests({ actions: config.actions, formats: config.formats });
   if ('problems' in planned) return planned.problems;
   const sourceProblems = payloadSourceProblems(config);
