@@ -15,8 +15,11 @@
   value, however standard. Before, a standard field holding one value could be chosen and those tests went untested.
 - **`--full-coverage` is unchanged:** with it, a missing type also fails the run.
 - **To test as Core 2.0.0 did,** which needed every type on one resource, run with `--resources Property
-  --full-coverage`, and name the integer, decimal, date and lookup fields from your 2.0.0 report with
-  `--field-overrides`. The User Guide explains what stays the run's own.
+  --full-coverage`, and name the fields from your 2.0.0 report with `--field-overrides`. The User Guide explains what
+  stays the run's own.
+- **The timestamp field can be named,** like the integer, decimal, date and lookup fields. It is still
+  `ModificationTimestamp` unless you name another, and a named one serves every timestamp test. Before, naming one was
+  reported as unmatched, so a 2.0.0 report's `TimestampField` could not be reused.
 
 ### Add/Edit tests the actions and formats you support
 

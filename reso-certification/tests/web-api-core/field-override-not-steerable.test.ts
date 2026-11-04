@@ -9,11 +9,10 @@ import type { StandardMap } from '../../src/web-api-core/standard-map.js';
  * Not every selection is overridable, and an override naming one that is not must be reported as unmatched
  * rather than silently ignored.
  *
- * Overrides apply to the Integer, Decimal, Date and enumeration families. **Timestamp selection is
- * deliberately not overridable**: it has its own ranker with semantics an override would quietly break —
- * `ModificationTimestamp` first, then DD-standard by usage, and `lt/le now()` additionally requires a field
- * carrying a PAST value. Widening overriding into it was declined on 2026-10-03, the same day an override on a
- * scalar family was found able to convert a determinate failure into a vacuous pass.
+ * Timestamp selection has its own ranker — `ModificationTimestamp` first, then DD-standard by usage — and
+ * `lt/le now()` additionally requires a field carrying a PAST value. Widening overriding into it was declined on
+ * 2026-10-03, the same day an override on a scalar family was found able to convert a determinate failure into a
+ * vacuous pass. It was allowed on 2026-11-03 with that guarded: a named timestamp field must hold a past value.
  *
  * The honesty half matters as much as the behavior. An operator who asks for something that cannot be honored
  * has to be told, and told something true: the run says the override matched no eligible candidate, which is a
@@ -70,27 +69,26 @@ const resolve = (specs: ReadonlyArray<string>) =>
     parseFieldOverrides(specs)
   );
 
-describe('timestamp selection is not overridable', () => {
-  it('does not report a datetime override as applied', async () => {
-    // ModificationTimestamp is a real field on the resource and is genuinely used by the timestamp scenarios,
-    // so "absent" and "wrong type" are both false explanations. It simply is not an overridable family.
+describe('timestamp selection is overridable, and an override cannot steer it into a vacuous pass', () => {
+  // Declined on 2026-10-03, for the vacuous pass described above. Allowed on 2026-11-03 (Josh: "we should always default
+  // to ModificationTimestamp but still let them modify") with the field required to hold a past value, so the now()
+  // comparisons always compare something (selectTimestampFields; timestamp-override.test.ts covers the refusals).
+  it('reports a datetime override as applied', async () => {
     const params = await resolve(['Property.ModificationTimestamp']);
-    expect(params.appliedFieldOverrides ?? []).not.toContain('Property.ModificationTimestamp');
+    expect(params.appliedFieldOverrides ?? []).toContain('Property.ModificationTimestamp');
   });
 
-  it('does not let a datetime override disturb timestamp selection', async () => {
+  it('naming the default changes nothing about which field is tested', async () => {
     const overridden = await resolve(['Property.ModificationTimestamp']);
     const automatic = await resolve([]);
     expect(overridden.timestampField).toBe(automatic.timestampField);
     expect(overridden.timestampFieldForNow).toBe(automatic.timestampFieldForNow);
   });
 
-  it('still honors an override on an overridable family in the same run', async () => {
-    // So the refusal is scoped to the family rather than being a blanket failure: one unoverridable spec must
-    // not suppress an overridable one beside it. This is the per-slot sparseness the whole feature rests on.
+  it('honors overrides on two families in the same run', async () => {
+    // Per-slot sparseness: one family's override never suppresses another's beside it.
     const params = await resolve(['Property.ModificationTimestamp', 'Property.ListPrice']);
-    expect(params.appliedFieldOverrides ?? []).toContain('Property.ListPrice');
-    expect(params.appliedFieldOverrides ?? []).not.toContain('Property.ModificationTimestamp');
+    expect(params.appliedFieldOverrides ?? []).toEqual(expect.arrayContaining(['Property.ListPrice', 'Property.ModificationTimestamp']));
   });
 
   it('ignores a bare field name on an overridable family too, rather than guessing the resource', async () => {

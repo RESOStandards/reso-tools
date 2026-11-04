@@ -14,7 +14,13 @@ import type { EntityType } from '../test-runner/types.js';
 import { extractNextLink } from './assertions.js';
 import type { NowFieldPastness } from './empty-verdict.js';
 import { type EnumCandidate, isMultiRep, isSingleRep, selectEnumCandidates } from './enum-selection.js';
-import { type FieldOverrides, MIN_DISCRIMINATING_VALUES, NO_FIELD_OVERRIDES, matchedOverrides } from './field-override.js';
+import {
+  type FieldOverrides,
+  MIN_DISCRIMINATING_VALUES,
+  NO_FIELD_OVERRIDES,
+  applyFieldOverrides,
+  matchedOverrides
+} from './field-override.js';
 import { rebaseNextLink } from './next-link.js';
 import { ORIGINATING_SYSTEM_ID_FIELD, ORIGINATING_SYSTEM_NAME_FIELD, originatingSystemFilterClause } from './queries.js';
 import { type ScalarCandidate, collectFieldValues, selectScalarCandidates } from './scalar-selection.js';
@@ -557,6 +563,39 @@ export const selectTimestampFieldForNow = (
   now: number = Date.now()
 ): string | undefined => rankDatetimeFields(datetimeFields, records, standardMap, resource).find(f => hasPastValue(f, records, now));
 
+/**
+ * The timestamp fields a resource's scenarios use, and the override that chose them when one did.
+ *
+ * `ModificationTimestamp` first, then DD-standard fields by usage, then local ones (`rankDatetimeFields`), and for the
+ * `lt/le now()` pair the first of those holding a past value. A provider may name another field, as the Commander's
+ * `TimestampField` allowed, so a run can be equivalent to Core 2.0.0 (Josh, 2026-11-03: "we should always default to
+ * ModificationTimestamp but still let them modify. DD tests the ModTS rule explicitly."). It is then binding: every
+ * timestamp scenario uses it, the `now()` pair included.
+ *
+ * So a named field must be able to exercise all of them: populated with two or more values, as for every overridable
+ * slot, and holding a past value. Without one, `lt now()` and `le now()` would rightly expect nothing back and pass
+ * having compared nothing, on a field the provider chose. That is the vacuous pass that kept timestamps out of
+ * overriding on 2026-10-03. Such a field is reported as unmatched, and the slot stays automatic.
+ */
+export const selectTimestampFields = (
+  datetimeFields: ReadonlyArray<string>,
+  records: ReadonlyArray<Record<string, unknown>>,
+  standardMap: StandardMap,
+  resource: string,
+  overrides: FieldOverrides = NO_FIELD_OVERRIDES,
+  now: number = Date.now()
+): { readonly timestampField?: string; readonly timestampFieldForNow?: string; readonly appliedOverrides: ReadonlyArray<string> } => {
+  const ranked = rankDatetimeFields(datetimeFields, records, standardMap, resource);
+  const canExerciseEvery = (field: string): boolean =>
+    (timestampStats(collectValues(records, field))?.distinct ?? 0) >= MIN_DISCRIMINATING_VALUES && hasPastValue(field, records, now);
+  const appliedOverrides = matchedOverrides(ranked, overrides, resource, field => field, canExerciseEvery);
+  if (appliedOverrides.length === 0) {
+    return { timestampField: ranked[0], timestampFieldForNow: ranked.find(field => hasPastValue(field, records, now)), appliedOverrides };
+  }
+  const [named] = applyFieldOverrides(ranked, overrides, resource, field => field, canExerciseEvery);
+  return { timestampField: named, timestampFieldForNow: named, appliedOverrides };
+};
+
 /** The non-gating warning for a resource whose sampled data carries no usable `ModificationTimestamp`. Core does
  *  not fail for it — a standard resource missing the field is a Data Dictionary matter, not a Core one (Josh,
  *  2026-10-01) — but the tester should hear it, because keys and timestamps are required for DD testing and the
@@ -717,6 +756,9 @@ export const resolveTestParams = async (
   // declared first, a 500 on its $filter, and all six Date scenarios failed with standard Date fields available.
   const dateCandidates = selectScalarCandidates(dateFields, records, standardMap, resource, dateStats, fieldOverrides);
 
+  // The timestamp slot: ModificationTimestamp unless the provider named another (selectTimestampFields).
+  const timestamps = selectTimestampFields(datetimeFields, records, standardMap, resource, fieldOverrides);
+
   // Record which preferences took effect on THIS resource, for the report. Union across every candidate
   // family, deduplicated, written as the operator wrote them.
   const appliedOverrides = [
@@ -725,7 +767,8 @@ export const resolveTestParams = async (
       ...matchedOverrides(multiLookupCandidates, fieldOverrides, resource, c => c.field, enumCanDiscriminate),
       ...matchedOverrides(integerCandidates, fieldOverrides, resource, c => c.field, scalarCanDiscriminate),
       ...matchedOverrides(decimalCandidates, fieldOverrides, resource, c => c.field, scalarCanDiscriminate),
-      ...matchedOverrides(dateCandidates, fieldOverrides, resource, c => c.field, scalarCanDiscriminate)
+      ...matchedOverrides(dateCandidates, fieldOverrides, resource, c => c.field, scalarCanDiscriminate),
+      ...timestamps.appliedOverrides
     ])
   ];
   const datePrimary = dateCandidates[0];
@@ -738,8 +781,7 @@ export const resolveTestParams = async (
 
   // Resolve timestamp field + value (prefer fully populated for orderby). datetimeValue = sampled MIN (feeds
   // gt/ge); the previous first-seen value was the global MAX under a `…DESC` default sort → `gt max` false-fail.
-  const timestampField = selectTimestampField(datetimeFields, records, standardMap, resource);
-  const timestampFieldForNow = selectTimestampFieldForNow(datetimeFields, records, standardMap, resource);
+  const { timestampField, timestampFieldForNow } = timestamps;
   const timestampWarning = modificationTimestampWarning(datetimeFields, records, resource, timestampField);
   const nowFieldPastness = nowFieldPastnessFor(timestampField, timestampFieldForNow, records);
   const tsStats = timestampField ? timestampStats(collectValues(records, timestampField)) : undefined;

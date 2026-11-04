@@ -28,12 +28,10 @@
  *     effective override and stays automatic. It is reported as unmatched rather than silently honored,
  *     and a typo therefore costs the operator that one override and nothing else.
  *
- * **Not every selection is overridable, and that is deliberate.** Overrides apply to the Integer, Decimal,
- * Date and enumeration families. Timestamp selection is NOT overridable: it has its own ranker
- * (`rankDatetimeFields`) with semantics an override would quietly break — `ModificationTimestamp` first, then
- * DD-standard by usage, and `lt/le now()` additionally requires a field carrying a PAST value. An override
- * naming a datetime field therefore matches nothing and is reported as unmatched. The run says so rather than
- * implying a cause it cannot know.
+ * Overrides apply to the Integer, Decimal, Date, Timestamp and enumeration families. The timestamp slot keeps its own
+ * ranker (`rankDatetimeFields`: `ModificationTimestamp` first, then DD-standard by usage) as its default, and a named
+ * datetime field replaces it, so a run can name the field a Core 2.0.0 report used (Josh, 2026-11-03). The named field
+ * then serves the `lt/le now()` pair too (`selectTimestampFields`).
  *
  * Because an override changes *what was tested*, every applied override is recorded on the test
  * parameters and travels into the compliance report. An overridden run must be visibly overridden: without
