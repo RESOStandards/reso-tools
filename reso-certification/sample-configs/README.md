@@ -123,6 +123,16 @@ Each endorsement reads an optional block. Everything in these blocks has a defau
 
 `resources` narrows the run and accepts either a comma-separated string or a list. `fullCoverage` fails the run when a data type is not met on some resource tested. Every run records whether it was.
 
+`fieldOverrides` names the field the run tests for a data type, as `Resource.Field`, in place of the one it would choose:
+
+```json
+"coreOptions": {
+  "fieldOverrides": ["Property.ListPrice", "Property.OriginalEntryTimestamp"]
+}
+```
+
+A field you name must be populated in the records the run samples, with at least two different values. A timestamp field must also hold one value in the past, because the `lt now()` and `le now()` tests use it. The run uses `ModificationTimestamp` unless you name another. A field that does not qualify is reported as unmatched, and the run chooses that data type's field itself. The [User Guide](../doc/GUIDE.md#web-api-core-210) says how to use this with `resources` and `fullCoverage` to test as Core 2.0.0 did.
+
 ### EntityEvent
 
 ```json
