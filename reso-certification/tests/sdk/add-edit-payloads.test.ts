@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { startMockServer, stopMockServer } from '../../src/add-edit/mock/server.js';
-import { runAddEditCompliance } from '../../src/sdk/add-edit.js';
+import { addEditRunProblems, runAddEditCompliance } from '../../src/sdk/add-edit.js';
 import { serializeAddEditRemarks } from '../../src/sdk/reports.js';
 import type { AddEditConfig, PipelineResult } from '../../src/sdk/types.js';
 
@@ -144,6 +144,56 @@ describe('an Add/Edit run with no payloads, or with them given wrong', () => {
     const result = await runWith({ actions: ['create', 'delete'], payloads: CREATE_PAYLOADS });
     expect(payloadErrors(result)).toContain('Missing: delete-succeeds.json, delete-fails.json');
     expect(writes()).toEqual([]);
+  });
+});
+
+// A service that starts runs for others, such as RESO's cloud, refuses what the run would refuse before it writes
+// anything, with the run's own words, so the provider hears it before the run is queued.
+describe('what a run refuses before it writes anything, told without the server', () => {
+  const NO_RECORD = { id: '00000000-0000-0000-0000-000000000000' };
+  const refused: ReadonlyArray<readonly [string, Partial<AddEditConfig>]> = [
+    ['no selection', { payloads: CREATE_PAYLOADS }],
+    ['no formats for a create', { actions: ['create'], payloads: CREATE_PAYLOADS }],
+    ['no payloads', { actions: ['delete'] }],
+    ['payloads given two ways', { actions: ['create'], formats: { create: ['minimal'] }, payloads: CREATE_PAYLOADS, autoPayloads: true }],
+    ['a missing payload', { actions: ['create', 'delete'], formats: { create: ['minimal'] }, payloads: CREATE_PAYLOADS }],
+    ['a delete-fails that names no record', { actions: ['delete'], payloads: { deleteSucceeds: { id: 'L1' }, deleteFails: {} } }],
+    [
+      'a delete that names no record and no create to make one',
+      { actions: ['delete'], payloads: { deleteSucceeds: {}, deleteFails: NO_RECORD } }
+    ]
+  ];
+
+  it.each(refused)('refuses %s, with the words the run uses', async (_label, config) => {
+    const problems = addEditRunProblems(config);
+    expect(problems.length).toBeGreaterThan(0);
+    const result = await runWith(config, { actions: config.actions, formats: config.formats } as Pick<
+      AddEditConfig,
+      'actions' | 'formats'
+    >);
+    expect(payloadErrors(result)).toBe(problems.join(' '));
+    expect(writes()).toEqual([]);
+  });
+
+  it('finds nothing in a run that will start, and leaves to the run what needs the server', () => {
+    expect(
+      addEditRunProblems({
+        actions: ['create', 'delete'],
+        formats: { create: ['representation'] },
+        payloads: { ...CREATE_PAYLOADS, deleteSucceeds: {}, deleteFails: NO_RECORD }
+      })
+    ).toEqual([]);
+    // Which field names an update's record comes from the server's metadata, so the run checks it when it starts.
+    expect(
+      addEditRunProblems({
+        actions: ['update'],
+        formats: { update: ['minimal'] },
+        payloads: { updateSucceeds: { ListPrice: 1 }, updateFails: { ListPrice: -1 } }
+      })
+    ).toEqual([]);
+    // A payloads folder is read when the run starts, and auto payloads are written then.
+    expect(addEditRunProblems({ actions: ['delete'], payloadsDir: './payloads' })).toEqual([]);
+    expect(addEditRunProblems({ actions: ['delete'], autoPayloads: true })).toEqual([]);
   });
 });
 

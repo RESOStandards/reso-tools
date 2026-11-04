@@ -109,6 +109,7 @@ export {
 export {
   runComplianceTests,
   runAddEditCompliance,
+  addEditRunProblems,
   runEntityEventCompliance,
   runCoreCompliance,
   createPipeline,

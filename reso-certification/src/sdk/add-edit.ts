@@ -234,6 +234,38 @@ const providedPayloadProblems = (plan: AddEditTestPlan, payloads: Payloads, keyF
   ];
 };
 
+/** Why the payloads cannot be had: given none, or given more than one way. */
+const payloadSourceProblems = (config: Pick<AddEditConfig, 'payloads' | 'payloadsDir' | 'autoPayloads'>): ReadonlyArray<string> => {
+  const sources = [
+    config.payloadsDir ? 'a payloads folder' : '',
+    config.payloads ? 'payloads in the configuration' : '',
+    config.autoPayloads ? 'auto payloads' : ''
+  ].filter(Boolean);
+  if (sources.length > 1) return [`Give the payloads one way, not ${sources.join(' and ')}`];
+  if (sources.length === 0) {
+    return [
+      'Add/Edit needs the payloads to test with: a payloads folder, or payloads in the configuration. Auto payloads are for the reference server and the mock.'
+    ];
+  }
+  return [];
+};
+
+/**
+ * Why a run of these actions, formats and payloads would be refused before it writes anything, as far as can be told
+ * without the server; empty when nothing stops it. The run checks the same things first. A server's key field comes
+ * from its metadata, so an update that names no record is checked when the run starts, and a payloads folder is read
+ * then. A service that starts runs for others, such as RESO's cloud, refuses with this what the run would refuse.
+ */
+export const addEditRunProblems = (
+  config: Pick<AddEditConfig, 'actions' | 'formats' | 'payloads' | 'payloadsDir' | 'autoPayloads'>
+): ReadonlyArray<string> => {
+  const planned = planAddEditTests({ actions: config.actions, formats: config.formats });
+  if ('problems' in planned) return planned.problems;
+  const sourceProblems = payloadSourceProblems(config);
+  if (sourceProblems.length > 0) return sourceProblems;
+  return config.payloads ? providedPayloadProblems(planned.plan, config.payloads, undefined) : [];
+};
+
 /**
  * Get the payloads ready: the provider's, from a folder or the configuration, or auto ones when asked for. A run
  * given none, or given them two ways, is refused before anything is written.
@@ -247,17 +279,8 @@ const generatePayloads = (config: AddEditConfig): PipelineStep<AddEditContext> =
     if ('problems' in planned) return fail(planned.problems);
     const { plan } = planned;
 
-    const sources = [
-      config.payloadsDir ? 'a payloads folder' : '',
-      config.payloads ? 'payloads in the configuration' : '',
-      config.autoPayloads ? 'auto payloads' : ''
-    ].filter(Boolean);
-    if (sources.length > 1) return fail([`Give the payloads one way, not ${sources.join(' and ')}`]);
-    if (sources.length === 0) {
-      return fail([
-        'Add/Edit needs the payloads to test with: a payloads folder, or payloads in the configuration. Auto payloads are for the reference server and the mock.'
-      ]);
-    }
+    const sourceProblems = payloadSourceProblems(config);
+    if (sourceProblems.length > 0) return fail(sourceProblems);
 
     const keyField = ctx.entityType?.keyProperties[0];
 
