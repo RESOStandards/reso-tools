@@ -253,6 +253,75 @@ describe('report.json states ineligibility, and only then', () => {
   });
 });
 
+/**
+ * A Core report.json names what the Commander's did and the certification site renders: the OData version, the
+ * authentication method and the eleven parameters. Every other endorsement's keys stay exactly as pinned above.
+ */
+describe('a Core report.json names the OData version, the authentication method and the parameters', () => {
+  const SECRET = 'sentinel-secret-3';
+  const property = {
+    resource: 'Property',
+    params: { keyField: 'ListingKey', skippedTypes: [] },
+    scenarios: [
+      {
+        tag: 'filter-int-eq',
+        name: 'filter-int-eq',
+        passed: true,
+        skipped: false,
+        requestUrl: `https://api.example.test/Property?$filter=${encodeURIComponent('BedroomsTotal eq 3')}`,
+        assertions: [],
+        duration: 0
+      }
+    ]
+  };
+  const coreResult = makeResult({ context: { odataVersion: '4.01', resourceReports: [property] } });
+  const summary = (auth?: Parameters<typeof coreReportGenerators>[1]) =>
+    coreReportGenerators('2.1.0', auth)
+      .find(g => g.filename === 'report.json')!
+      .generate(coreResult);
+
+  it('adds the three keys after the generic ones, and nothing else', () => {
+    const report = summary({ mode: 'token', authToken: SECRET });
+    expect(Object.keys(report)).toEqual([
+      'description',
+      'version',
+      'softwareVersion',
+      'generatedOn',
+      'remarks',
+      'outcome',
+      'odataVersion',
+      'authentication',
+      'parameters'
+    ]);
+    expect(report.odataVersion).toBe('4.01');
+    expect(report.authentication).toEqual(['bearer token']);
+    expect(report.parameters).toEqual([
+      { name: 'Resource', value: 'Property' },
+      { name: 'Key Field', value: 'ListingKey' },
+      { name: 'Integer Field', value: 'BedroomsTotal' }
+    ]);
+  });
+
+  it('names the method, never the credential', () => {
+    const bearer = JSON.stringify(summary({ mode: 'token', authToken: SECRET }));
+    const client = JSON.stringify(
+      summary({ mode: 'client_credentials', clientId: 'c', clientSecret: SECRET, tokenUrl: 'https://auth.example.test' })
+    );
+    expect(bearer).not.toContain(SECRET);
+    expect(client).not.toContain(SECRET);
+    expect(JSON.parse(client).authentication).toEqual(['client credentials']);
+  });
+
+  it('leaves out what the run did not establish, rather than write it empty', () => {
+    const report = coreReportGenerators('2.1.0')
+      .find(g => g.filename === 'report.json')!
+      .generate(makeResult());
+    expect('odataVersion' in report).toBe(false);
+    expect('authentication' in report).toBe(false);
+    expect('parameters' in report).toBe(false);
+  });
+});
+
 describe('createDetailedReportGenerator', () => {
   it('extends generic with outcome, steps, and duration', () => {
     const generator = createDetailedReportGenerator('Web API Add/Edit', '2.0.0', () => 'remarks');
