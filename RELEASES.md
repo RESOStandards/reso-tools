@@ -35,6 +35,20 @@
   `http` `CERT_AUTH_API_BASE_URL` as every other service address is; and the line that reports an entry that stopped
   before producing a result is masked like every other line the CLI prints.
 
+
+### Archiving a report from the CLI
+
+- **`reso-cert archive-report <reportId>`** archives a certification report the way the certification site does, with
+  the same API call and the same warning. Without `--confirm` it reads the report, prints the site's warning with the
+  report's values filled in and archives nothing. With `--confirm` it archives. `--json` prints one object for scripts.
+- **The credentials file downloaded from the certification site is all it needs.** `CLIENT_SECRET` is the credential
+  (`CERTIFICATION_API_KEY` is accepted for older setups), and the Cert API's address comes from `TOKEN_URI`, or from
+  `--url`. Files downloaded between 2025-04-03 and 2026-10-20 name the token endpoint `undefined/api/v1/oauth/token`.
+  The command refuses that host by name, so download a fresh file or pass `--url`.
+- **It never claims an archive it cannot see.** Only a `201 success` counts. On any other answer it reads the report
+  again and says whether it is still listed or gone, so nobody reruns blindly. It never follows a redirect, refuses a
+  report id it could not send intact, and never prints the credential. `restore` now shares its credential resolver.
+
 ### Web API Core records full type coverage
 
 - **Every Core run records whether it met every data type,** in its detailed report as `typeCoverage`: whether full
