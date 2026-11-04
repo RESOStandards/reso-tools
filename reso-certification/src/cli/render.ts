@@ -17,6 +17,7 @@ import {
 import { runComplianceTests } from '../sdk/index.js';
 import { RUN_ADD_EDIT_SCENARIOS, RUN_CORE_SCENARIOS, RUN_ENTITY_EVENT_SCENARIOS } from '../sdk/step-names.js';
 import type { ComplianceConfig, CoreProgressDetail, CoreResourcePhase, PipelineResult, StepProgress, StepStatus } from '../sdk/types.js';
+import { maskSecrets } from './secrets.js';
 
 /** Rendering mode derived from CLI flags. */
 export type RenderMode = 'default' | 'verbose' | 'silent';
@@ -575,7 +576,8 @@ export const runConfigEntries = async (
   if (stopped.length > 0) {
     // On stderr, whatever the render mode: the exit code alone would not say which entries or why.
     console.error(`Stopped before producing a result (${stopped.length} of ${settled.length}):`);
-    for (const s of stopped) console.error(`  \u2717 ${s.label}: ${s.error}`);
+    // The error is whatever stopped the run, which can quote a request: masked, as every other line the CLI prints.
+    for (const s of stopped) console.error(maskSecrets(`  \u2717 ${s.label}: ${s.error}`));
   }
   return settled;
 };
