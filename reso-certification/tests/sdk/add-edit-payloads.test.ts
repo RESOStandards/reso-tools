@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { startMockServer, stopMockServer } from '../../src/add-edit/mock/server.js';
+import { CURRENT_ADD_EDIT_VERSION } from '../../src/sdk/add-edit-versions.js';
 import { addEditRunProblems, runAddEditCompliance } from '../../src/sdk/add-edit.js';
 import { serializeAddEditRemarks } from '../../src/sdk/reports.js';
 import type { AddEditConfig, PipelineResult } from '../../src/sdk/types.js';
@@ -213,6 +214,11 @@ describe('an Add/Edit run with the provider’s payloads', () => {
     expect(result.certification).toEqual({ valid: true });
     expect(serializeAddEditRemarks(result)).toContain('Tested create (representation, minimal)');
     expect(writes().every(line => line.startsWith('POST '))).toBe(true);
+  });
+
+  it('records the version it ran at when the configuration omitted it, so a cloud record agrees with the run', async () => {
+    const result = await runWith({ actions: ['create'], payloads: CREATE_PAYLOADS, specVersion: undefined });
+    expect(result.context.specVersion).toBe(CURRENT_ADD_EDIT_VERSION);
   });
 });
 

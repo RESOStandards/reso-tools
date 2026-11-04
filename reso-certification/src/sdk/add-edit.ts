@@ -28,6 +28,8 @@ import type { BaseTestContext } from './types.js';
 
 interface AddEditContext extends BaseTestContext {
   readonly resource: string;
+  /** The Add/Edit version the run tests at, resolved once when it starts, so the result records what ran. */
+  readonly specVersion: string;
   readonly entityType?: { readonly keyProperties: ReadonlyArray<string> };
   /** What the run tests, once its payloads are ready. */
   readonly plan?: AddEditTestPlan;
@@ -387,10 +389,12 @@ export const createAddEditPipeline = (config: AddEditConfig) =>
 /** Run Add/Edit compliance tests with a single function call. */
 export const runAddEditCompliance = async (config: AddEditConfig, onProgress?: (progress: import('./types.js').StepProgress) => void) => {
   const pipeline = createAddEditPipeline(config);
-  const outputPath = await prepareOutputDir('web-api-add-edit', config.specVersion ?? CURRENT_ADD_EDIT_VERSION, config);
+  const specVersion = config.specVersion ?? CURRENT_ADD_EDIT_VERSION;
+  const outputPath = await prepareOutputDir('web-api-add-edit', specVersion, config);
   const initialContext: AddEditContext = {
     serverUrl: config.server.url,
     resource: config.resource,
+    specVersion,
     outputPath
   };
 
