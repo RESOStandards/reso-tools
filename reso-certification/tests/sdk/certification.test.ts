@@ -147,6 +147,18 @@ describe('the Data Dictionary rule', () => {
     expect(ddValidForCertification({ ...strict, strictMode: true } as DDConfig)(ddSteps('passed'))).toEqual(CERTIFIABLE);
   });
 
+  // A sample limit is for local testing: the run measured part of the feed. Only a limit the configuration set
+  // counts. The default the SDK applies when none is set is not a limit the run chose, so an absent limit is an
+  // ordinary run, and the CLI leaves it absent rather than filling the default in.
+  it('is NOT valid when the run set a sample limit, even though every step passed, and valid when none was set', () => {
+    const verdict = ddValidForCertification({ ...strict, limit: 5000 } as DDConfig)(ddSteps('passed'));
+    expect(verdict.valid).toBe(false);
+    expect(reasonsOf(verdict)).toEqual([
+      "The run used a sample limit of 5000 records per resource, from --limit or the config entry's ddOptions.limit. A limit is for local testing, so this run is not eligible for certification and no cloud run can start from it. Remove the limit and run it again."
+    ]);
+    expect(ddValidForCertification({ ...strict, limit: undefined } as DDConfig)(ddSteps('passed'))).toEqual(CERTIFIABLE);
+  });
+
   // Both reasons survive: an operator fixing one should not have to re-run to discover the next.
   it('keeps the step reason AND the strict reason when both apply', () => {
     const verdict = ddValidForCertification(relaxed)(ddSteps('skipped'));

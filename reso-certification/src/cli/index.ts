@@ -17,17 +17,16 @@
 // like RESO_SERVICES_URL populated when they destructure process.env.
 import { ENV_BOOTSTRAP } from './env-bootstrap.js';
 
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { Command } from 'commander';
 import { startMockServer, stopMockServer } from '../add-edit/mock/server.js';
 import { ADD_EDIT_ACTIONS, ADD_EDIT_FORMATS } from '../add-edit/plan.js';
-import { isSuccessfulRun, rcfLocalRunRecordOf } from '../cloud/local-run.js';
-import { packRcfInput } from '../cloud/rcf-pack.js';
-import { CLOUD_ENDORSEMENT, listCloudRunStatus, requestUploadSlot, reserveCloudRun, submitCloudRun, uploadToSlot } from '../cloud/runs.js';
+import { type CloudRunConfig, whyNoCloudRunBeforeRun } from '../cloud/local-run.js';
+import { listCloudRunStatus, reserveCloudRun } from '../cloud/runs.js';
+import { startCloudRun } from '../cloud/start.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
 import { synthesizeResourcesFromFields } from '../metadata/index.js';
 import { CURRENT_ADD_EDIT_VERSION, SUPPORTED_ADD_EDIT_VERSIONS, isAddEditVersion } from '../sdk/add-edit-versions.js';
@@ -72,16 +71,18 @@ import {
 import { submitVariationsReportViaService } from '../variations/submit.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { addEditSelectionOf } from './add-edit-options.js';
+import { type ArchiveReportResult, archiveExitCode, runArchiveReport } from './archive-report-command.js';
 import { mintOAuth2ClientCredentialsToken, resolveCliAuth } from './auth.js';
 import {
   type CloudOfferIo,
   type RanEntry,
-  type RcfCloudOfferIo,
   cloudRunPrerequisite,
+  cloudTargetLabel,
+  ddFlagsRefusedBeforeRun,
+  entriesRefusedBeforeRun,
   formatRunStatusTable,
-  offerCloudRun,
-  offerRcfCloudRun,
-  planCloudRequests
+  offerCloudRuns,
+  planCloudRuns
 } from './cloud-command.js';
 import { formatPlan, planDecisionPush } from './decisions-command.js';
 import { overrideRenameNotice, removedPreferFields } from './deprecations.js';
@@ -211,6 +212,11 @@ const addEditCmd = program
     '--spec-version <version>',
     `Web API Add/Edit spec version: ${SUPPORTED_ADD_EDIT_VERSIONS.join(' or ')}`,
     CURRENT_ADD_EDIT_VERSION
+  )
+  .option(
+    '--start-cloud-run',
+    "At the end, start a certification run in RESO's cloud for the entries that passed and can be certified, with the " +
+      'payloads they used. Needs --config. Without it, nothing is started'
   );
 
 addAuthOptions(addEditCmd);
@@ -236,6 +242,7 @@ addEditCmd.action(
     createFormats?: string;
     updateFormats?: string;
     autoPayloads?: boolean;
+    startCloudRun?: boolean;
   }) => {
     let mockServer: Awaited<ReturnType<typeof startMockServer>> | null = null;
 
@@ -249,6 +256,12 @@ addEditCmd.action(
       }
       if (opts.payloads && opts.autoPayloads) {
         throw new Error('--payloads and --auto-payloads are two ways of giving the payloads. Use one.');
+      }
+      const cloudRefusal = startCloudRunRefusal(opts);
+      if (cloudRefusal !== undefined) throw new Error(cloudRefusal);
+      // The cloud tests the provider's own payloads, so a run with written ones could not start one.
+      if (opts.startCloudRun && (opts.autoPayloads || opts.mock)) {
+        throw new Error('--start-cloud-run tests the payloads you give, so it does not go with --auto-payloads or --mock.');
       }
       // The suite is the 2.0.0 one whatever the label says, so another label would describe a test that did not run.
       if (!isAddEditVersion(opts.specVersion)) {
@@ -269,10 +282,13 @@ addEditCmd.action(
 
       let results: ReadonlyArray<PipelineResult>;
       let stopped = 0;
+      let ranForCloud: RanForCloud | undefined;
 
       if (opts.config) {
         // Config file mode
         const configFile = await loadConfigFile(resolve(opts.config));
+        const uoiRefusal = startCloudRunRefusal(opts, configFile.providerUoi);
+        if (uoiRefusal !== undefined) throw new Error(uoiRefusal);
         const authFlags = { authToken: opts.authToken, clientId: opts.clientId, clientSecret: opts.clientSecret, tokenUrl: opts.tokenUrl };
 
         const entries = configFile.configs.map(entry => {
@@ -294,9 +310,17 @@ addEditCmd.action(
           };
         });
 
+        const entryRefusal = startCloudRunEntryRefusal(opts, entries);
+        if (entryRefusal !== undefined) throw new Error(entryRefusal);
+
         const outcomes = await runConfigEntries(entries, renderMode);
         results = resultsOf(outcomes);
         stopped = stoppedOf(outcomes).length;
+        ranForCloud = {
+          providerUoi: configFile.providerUoi,
+          ...(configFile.concurrency === undefined ? {} : { concurrency: configFile.concurrency }),
+          ran: entries.map((entry, index) => ({ label: entry.label, config: entry.config, outcome: outcomes[index] }))
+        };
       } else {
         // Direct mode
         const serverUrl = mockServer?.url ?? opts.url!;
@@ -333,6 +357,10 @@ addEditCmd.action(
       }
 
       process.exitCode = resolveExitCode(results, stopped);
+
+      if (ranForCloud !== undefined) {
+        await offerAtEnd({ ...ranForCloud, endorsementLabel: 'Add/Edit' }, ranForCloud.ran, opts);
+      }
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : String(error));
       process.exitCode = 2;
@@ -359,7 +387,12 @@ const entityEventCmd = program
   .option('--poll-interval <ms>', 'Time between incremental sync checks (ms) (default: 5000)')
   .option('--poll-timeout <ms>', 'Max time to wait for new events (ms) (default: 30000)')
   .option('--metadata <path>', 'Path to local XML metadata file')
-  .option('--mock', 'Start a mock OData server');
+  .option('--mock', 'Start a mock OData server')
+  .option(
+    '--start-cloud-run',
+    "At the end, start a certification run in RESO's cloud for the entries that passed and can be certified. " +
+      'Needs --config. Without it, nothing is started'
+  );
 
 addAuthOptions(entityEventCmd);
 addOutputOptions(entityEventCmd);
@@ -381,6 +414,7 @@ entityEventCmd.action(
     pollTimeout: string;
     metadata?: string;
     mock?: boolean;
+    startCloudRun?: boolean;
     verbose?: boolean;
     output: string;
     outputDir?: string;
@@ -394,6 +428,11 @@ entityEventCmd.action(
       }
       if (!opts.url && !opts.config && !opts.mock) {
         throw new Error('Provide --url, --config or --mock.');
+      }
+      const cloudRefusal = startCloudRunRefusal(opts);
+      if (cloudRefusal !== undefined) throw new Error(cloudRefusal);
+      if (opts.startCloudRun && opts.mock) {
+        throw new Error('--start-cloud-run certifies your server, so it does not go with --mock.');
       }
 
       // Flags apply only when given: a config entry's entityEventOptions block is the next source, then the defaults.
@@ -419,10 +458,13 @@ entityEventCmd.action(
 
       let results: ReadonlyArray<PipelineResult>;
       let stopped = 0;
+      let ranForCloud: RanForCloud | undefined;
 
       if (opts.config) {
         // Config file mode
         const configFile = await loadConfigFile(resolve(opts.config));
+        const uoiRefusal = startCloudRunRefusal(opts, configFile.providerUoi);
+        if (uoiRefusal !== undefined) throw new Error(uoiRefusal);
         const authFlags = { authToken: opts.authToken, clientId: opts.clientId, clientSecret: opts.clientSecret, tokenUrl: opts.tokenUrl };
 
         const entries = configFile.configs.map(entry => {
@@ -446,9 +488,17 @@ entityEventCmd.action(
           };
         });
 
+        const entryRefusal = startCloudRunEntryRefusal(opts, entries);
+        if (entryRefusal !== undefined) throw new Error(entryRefusal);
+
         const outcomes = await runConfigEntries(entries, renderMode);
         results = resultsOf(outcomes);
         stopped = stoppedOf(outcomes).length;
+        ranForCloud = {
+          providerUoi: configFile.providerUoi,
+          ...(configFile.concurrency === undefined ? {} : { concurrency: configFile.concurrency }),
+          ran: entries.map((entry, index) => ({ label: entry.label, config: entry.config, outcome: outcomes[index] }))
+        };
       } else {
         // Direct mode
         const serverUrl = mockServer?.url ?? opts.url!;
@@ -485,6 +535,10 @@ entityEventCmd.action(
       }
 
       process.exitCode = resolveExitCode(results, stopped);
+
+      if (ranForCloud !== undefined) {
+        await offerAtEnd({ ...ranForCloud, endorsementLabel: 'EntityEvent' }, ranForCloud.ran, opts);
+      }
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : String(error));
       process.exitCode = 2;
@@ -496,11 +550,12 @@ entityEventCmd.action(
   }
 );
 
-// ── Web API Core Subcommand ──
+// ── Cloud runs: the CLI's side of the choice at the end of a local run ──
 
 /**
- * The CLI's side of the cloud-run choice. It reports on stderr, so stdout stays the run's own output, and sends
- * with the variations commands' auth, minted once and only if something is sent.
+ * The CLI's side of the cloud-run choice, for every endorsement. It reports on stderr, so stdout stays the run's
+ * own output, and sends with the variations commands' auth, minted once and only if something is sent. The start
+ * itself is `startCloudRun`, the path the desktop shares.
  */
 const cliCloudOfferIo = (): CloudOfferIo => {
   const held: { token?: Promise<string | undefined> } = {};
@@ -508,55 +563,70 @@ const cliCloudOfferIo = (): CloudOfferIo => {
     held.token ??= mintOAuth2ClientCredentialsToken();
     return held.token;
   };
-  return {
-    say: text => console.error(maskSecrets(text)),
-    reserve: async request => {
-      const bearerToken = await token();
-      return reserveCloudRun({
-        fromCli: true,
-        ...(bearerToken ? { bearerToken } : {}),
-        endorsementName: CLOUD_ENDORSEMENT.webApiCore,
-        endorsementVersion: request.endorsementVersion,
-        providerUoi: request.body.providerUoi,
-        targets: request.body.configs
-      });
-    },
-    submit: async request => {
-      const bearerToken = await token();
-      return submitCloudRun({
-        fromCli: true,
-        ...(bearerToken ? { bearerToken } : {}),
-        endorsementName: CLOUD_ENDORSEMENT.webApiCore,
-        endorsementVersion: request.endorsementVersion,
-        config: request.body
-      });
-    }
-  };
-};
-
-/**
- * The CLI's side of starting a RESO Common Format run in the cloud: as for Core, on stderr and with the variations
- * commands' auth, minted once. The packed zip goes to a folder of its own under the system's temporary directory,
- * which is removed afterwards whatever happened.
- */
-const cliRcfCloudOfferIo = (): RcfCloudOfferIo => {
-  const held: { token?: Promise<string | undefined> } = {};
   const auth = async (): Promise<{ readonly fromCli: true; readonly bearerToken?: string }> => {
-    held.token ??= mintOAuth2ClientCredentialsToken();
-    const bearerToken = await held.token;
+    const bearerToken = await token();
     return { fromCli: true, ...(bearerToken ? { bearerToken } : {}) };
   };
   return {
     say: text => console.error(maskSecrets(text)),
-    pack: async (input, fingerprint) =>
-      packRcfInput(input, join(await mkdtemp(join(tmpdir(), 'reso-rcf-upload-')), 'upload.zip'), { fingerprint }),
     reserve: async input => reserveCloudRun({ ...(await auth()), ...input }),
-    slot: async input => requestUploadSlot({ ...(await auth()), ...input }),
-    upload: uploadToSlot,
-    submit: async input => submitCloudRun({ ...(await auth()), ...input }),
-    discard: async zipPath => rm(dirname(zipPath), { recursive: true, force: true })
+    start: async input => {
+      const servicesAuthToken = await token();
+      return startCloudRun({ ...input, fromCli: true, ...(servicesAuthToken ? { servicesAuthToken } : {}) });
+    }
   };
 };
+
+/** What `--start-cloud-run` refuses before any run, so a long run is not wasted. `undefined` when it may go on. */
+const startCloudRunRefusal = (
+  opts: { readonly startCloudRun?: boolean; readonly config?: string },
+  providerUoi?: string
+): string | undefined => {
+  if (!opts.startCloudRun) return undefined;
+  // A cloud run is addressed to the provider, system and recipient a config file names, and `--url` names none of them.
+  if (!opts.config) return '--start-cloud-run needs --config, which names the provider, system and recipient a cloud run is addressed to.';
+  if (providerUoi !== undefined && isGeneratedLocalUoi(providerUoi)) {
+    return '--start-cloud-run needs the config file to name its providerUoi, the organization a cloud run certifies.';
+  }
+  // A pass can be sent only with the service's address and credentials. Nothing is sent before the run passes.
+  return cloudRunPrerequisite(process.env);
+};
+
+/**
+ * What `--start-cloud-run` refuses once the config file is read and before any entry runs: an entry a cloud run could
+ * never start from, because it is not addressed or asks for a run that cannot be certified or sent. The flags were
+ * checked by the command; this reads what the file set. `undefined` when every entry may go on.
+ */
+const startCloudRunEntryRefusal = (
+  opts: { readonly startCloudRun?: boolean },
+  entries: ReadonlyArray<{ readonly label: string; readonly config: CloudRunConfig }>
+): string | undefined => (opts.startCloudRun ? entriesRefusedBeforeRun(entries) : undefined);
+
+/** Each entry of a config-file run as it ran, for the cloud-run choice at the end. */
+interface RanForCloud {
+  readonly providerUoi: string;
+  readonly concurrency?: number;
+  readonly ran: ReadonlyArray<RanEntry>;
+}
+
+/** The choice at the end of a config-file run, for any endorsement. A failed start is a runtime error. */
+const offerAtEnd = async (
+  offer: { readonly providerUoi: string; readonly concurrency?: number; readonly endorsementLabel: string },
+  ran: ReadonlyArray<RanEntry>,
+  mode: { readonly startCloudRun?: boolean; readonly output?: string }
+): Promise<void> => {
+  const plan = planCloudRuns(ran);
+  const offered = await offerCloudRuns(
+    offer,
+    plan,
+    { startCloudRun: mode.startCloudRun === true, json: mode.output === 'json' },
+    cliCloudOfferIo()
+  );
+  // The local runs may have passed, but what was asked for did not happen: a runtime error.
+  if (offered === 'failed') process.exitCode = 2;
+};
+
+// ── Web API Core Subcommand ──
 
 const coreCmd = program
   .command('core')
@@ -575,7 +645,10 @@ const coreCmd = program
     '--enum-mode <mode>',
     "Enum mode: auto, string, collections or isflags (default: the config entry's coreOptions.enumMode, else auto-detect)"
   )
-  .option('--full-coverage', 'Fail if any data type category has no coverage across all resources')
+  .option(
+    '--full-coverage',
+    'Fail if any data type is met on no resource tested. Without it, the detailed report still records whether full type coverage was achieved'
+  )
   .option(
     '--save-payloads <dir>',
     'Write every request and response to <dir>, one JSON file each. Off unless given. Contains provider data; credentials are never written'
@@ -629,15 +702,8 @@ coreCmd.action(
       if (!opts.url && !opts.config) {
         throw new Error('Provide --url or --config.');
       }
-      // Refused before anything runs: a cloud run is addressed to the provider, system and recipient a config
-      // file names, and `--url` names none of them.
-      if (opts.startCloudRun && !opts.config) {
-        throw new Error('--start-cloud-run needs --config, which names the provider, system and recipient a cloud run is addressed to.');
-      }
-      // Also before the run, so a long run is not wasted: a pass can be sent only with the service's address and
-      // credentials. Nothing is sent before the run passes.
-      const cloudPrerequisite = opts.startCloudRun ? cloudRunPrerequisite(process.env) : undefined;
-      if (cloudPrerequisite !== undefined) throw new Error(cloudPrerequisite);
+      const cloudRefusal = startCloudRunRefusal(opts);
+      if (cloudRefusal !== undefined) throw new Error(cloudRefusal);
 
       if (!isCoreVersion(opts.specVersion)) {
         throw new Error(`Invalid --spec-version "${opts.specVersion}". Must be one of: ${SUPPORTED_CORE_VERSIONS.join(', ')}.`);
@@ -671,15 +737,14 @@ coreCmd.action(
       let results: ReadonlyArray<PipelineResult>;
       let stopped = 0;
       // Each entry as it ran, for the cloud-run choice at the end. Config-file mode only.
-      let ranForCloud: { readonly providerUoi: string; readonly concurrency?: number; readonly ran: ReadonlyArray<RanEntry> } | undefined;
+      let ranForCloud: RanForCloud | undefined;
 
       if (opts.config) {
         // Config-file mode — run every entry. The entry supplies server/auth/version/OSN (reso-certification-utils
         // format); CLI flags apply run-level knobs (resources / enum-mode / coverage) and can override auth/OSN.
         const configFile = await loadConfigFile(resolve(opts.config));
-        if (opts.startCloudRun && isGeneratedLocalUoi(configFile.providerUoi)) {
-          throw new Error('--start-cloud-run needs the config file to name its providerUoi, the organization a cloud run certifies.');
-        }
+        const uoiRefusal = startCloudRunRefusal(opts, configFile.providerUoi);
+        if (uoiRefusal !== undefined) throw new Error(uoiRefusal);
         // A config still carrying the removed key gets the same explanation the flag gets. Its value is not
         // forwarded: rerouting it would hand the old key the new binding behavior, which is not what its
         // author asked for. Deduplicated across entries so a multi-recipient config says it once.
@@ -712,6 +777,9 @@ coreCmd.action(
 
           return { config, label: entry.description ?? runLabel(entry, configFile.providerUoi) };
         });
+
+        const entryRefusal = startCloudRunEntryRefusal(opts, entries);
+        if (entryRefusal !== undefined) throw new Error(entryRefusal);
 
         const outcomes = await runConfigEntries(entries, renderMode);
         results = resultsOf(outcomes);
@@ -756,14 +824,7 @@ coreCmd.action(
       process.exitCode = resolveExitCode(results, stopped);
 
       if (ranForCloud !== undefined) {
-        const plan = planCloudRequests(ranForCloud.providerUoi, ranForCloud.concurrency, ranForCloud.ran);
-        const offered = await offerCloudRun(
-          plan,
-          { startCloudRun: opts.startCloudRun === true, json: opts.output === 'json' },
-          cliCloudOfferIo()
-        );
-        // The local runs may have passed, but what was asked for did not happen: a runtime error.
-        if (offered === 'failed') process.exitCode = 2;
+        await offerAtEnd({ ...ranForCloud, endorsementLabel: 'Web API Core' }, ranForCloud.ran, opts);
       }
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : String(error));
@@ -785,7 +846,11 @@ const ddCmd = program
     '--dd-version <version>',
     `DD version (${TESTABLE_DD_VERSIONS.join(' or ')}; default ${CURRENT_DD_VERSION}). Certification is on ${CERTIFIABLE_DD_VERSIONS.join(' or ')}, the latest minor; an older one runs as a retest`
   )
-  .option('--limit <n>', "Max records to replicate per resource (default: the config entry's ddOptions.limit, else 100000)")
+  .option(
+    '--limit <n>',
+    'Max records to replicate per resource, a sample limit for local testing: a run with one is NOT eligible for certification ' +
+      "and starts no cloud run (default: the config entry's ddOptions.limit, else 100000)"
+  )
   // Strict is the default, so `--strict` is a no-op kept for compatibility and `--no-strict` is the
   // real switch. BOTH are declared rather than `--no-strict` alone: declaring only the negation makes
   // Commander default `opts.strict` to true, which would destroy the same absent-vs-explicit
@@ -802,6 +867,11 @@ const ddCmd = program
   .option(
     '--originating-system-id <v>',
     'Append OriginatingSystemID eq <v> to every replication query (used when no name; OSN takes precedence)'
+  )
+  .option(
+    '--start-cloud-run',
+    "At the end, start a certification run in RESO's cloud for the entries that passed and can be certified. " +
+      'Needs --config. Without it, nothing is started'
   );
 
 addAuthOptions(ddCmd);
@@ -812,12 +882,13 @@ ddCmd.action(
     url?: string;
     config?: string;
     ddVersion?: string;
-    limit: string;
+    limit?: string;
     strict?: boolean;
     skipVariations?: boolean;
     batchExpand?: boolean;
     originatingSystemName?: string;
     originatingSystemId?: string;
+    startCloudRun?: boolean;
     authToken?: string;
     clientId?: string;
     clientSecret?: string;
@@ -833,6 +904,12 @@ ddCmd.action(
       if (!opts.url && !opts.config) {
         throw new Error('Provide --url or --config.');
       }
+      const cloudRefusal = startCloudRunRefusal(opts);
+      if (cloudRefusal !== undefined) throw new Error(cloudRefusal);
+      // A run that is not strict, skips variations or samples with --limit cannot be certified, so it could not
+      // start a cloud run. Refused from the flags before the config file is read.
+      const flagRefusal = opts.startCloudRun ? ddFlagsRefusedBeforeRun(opts) : undefined;
+      if (flagRefusal !== undefined) throw new Error(flagRefusal);
 
       const ddVersion = normalizeDDVersion(opts.ddVersion ?? CURRENT_DD_VERSION);
 
@@ -852,6 +929,7 @@ ddCmd.action(
 
       let results: ReadonlyArray<PipelineResult>;
       let stopped = 0;
+      let ranForCloud: RanForCloud | undefined;
 
       if (opts.config) {
         // Config-file mode — run every entry. The entry supplies server/auth/version/OSN (reso-certification-utils
@@ -862,6 +940,8 @@ ddCmd.action(
         // and the flag used to be accepted and discarded here -- the only evidence being the version in the
         // output path.
         const configFile = await loadConfigFile(resolve(opts.config));
+        const uoiRefusal = startCloudRunRefusal(opts, configFile.providerUoi);
+        if (uoiRefusal !== undefined) throw new Error(uoiRefusal);
         const authFlags = { authToken: opts.authToken, clientId: opts.clientId, clientSecret: opts.clientSecret, tokenUrl: opts.tokenUrl };
 
         const entries = configFile.configs.map(entry => {
@@ -874,7 +954,11 @@ ddCmd.action(
             fromCli: true,
             ...(servicesAuthToken ? { servicesAuthToken } : {}),
             server: { ...baseConfig.server, auth },
-            limit: opts.limit !== undefined ? Number(opts.limit) : (baseConfig.limit ?? 100000),
+            // Only set when the flag was passed; the entry's own ddOptions.limit stands otherwise, and with
+            // neither the SDK applies its default (100000). A limit is a sample for local testing, so the SDK
+            // tells one that was set from the default by its presence: filling the default in here made every
+            // entry carry a limit, which the verdict, the cloud path and the service refuse.
+            ...(opts.limit !== undefined ? { limit: Number(opts.limit) } : {}),
             // Tested against undefined, not for truthiness: `--no-strict` sets this to `false`, which a
             // truthiness test drops, so the flag would be accepted on the command line and then
             // silently ignored in config mode. Absent still means absent, letting the config entry's
@@ -892,9 +976,17 @@ ddCmd.action(
           return { config, label: entry.description ?? runLabel(entry, configFile.providerUoi) };
         });
 
+        const entryRefusal = startCloudRunEntryRefusal(opts, entries);
+        if (entryRefusal !== undefined) throw new Error(entryRefusal);
+
         const outcomes = await runConfigEntries(entries, renderMode);
         results = resultsOf(outcomes);
         stopped = stoppedOf(outcomes).length;
+        ranForCloud = {
+          providerUoi: configFile.providerUoi,
+          ...(configFile.concurrency === undefined ? {} : { concurrency: configFile.concurrency }),
+          ran: entries.map((entry, index) => ({ label: entry.label, config: entry.config, outcome: outcomes[index] }))
+        };
       } else {
         const auth = resolveCliAuth({
           authToken: opts.authToken,
@@ -909,7 +1001,8 @@ ddCmd.action(
           ...(servicesAuthToken ? { servicesAuthToken } : {}),
           server: { url: opts.url!, auth },
           version: ddVersion,
-          limit: opts.limit !== undefined ? Number(opts.limit) : 100000,
+          // As in config mode: set only from the flag, so the SDK can tell a sample limit from its default.
+          ...(opts.limit !== undefined ? { limit: Number(opts.limit) } : {}),
           strictMode: opts.strict,
           ...(opts.skipVariations ? { runVariations: false } : {}),
           batchExpand: opts.batchExpand,
@@ -929,6 +1022,10 @@ ddCmd.action(
       }
 
       process.exitCode = resolveExitCode(results, stopped);
+
+      if (ranForCloud !== undefined) {
+        await offerAtEnd({ ...ranForCloud, endorsementLabel: 'Data Dictionary' }, ranForCloud.ran, opts);
+      }
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : String(error));
       process.exitCode = 2;
@@ -1648,13 +1745,11 @@ program
         }
         const cloudPrerequisite = opts.startCloudRun ? cloudRunPrerequisite(process.env) : undefined;
         if (cloudPrerequisite !== undefined) throw new Error(cloudPrerequisite);
-        // The /compute token for the variations service (from .env; the service mints its own if absent).
-        const bearerToken = opts.skipVariations ? undefined : await mintOAuth2ClientCredentialsToken();
         const dir = resolve(opts.outputDir);
 
         // The pipeline the SDK runs, so a local run and a cloud run of the same files are the same run. It writes the
         // reports, report.json among them, into the output directory.
-        const rcfConfig: RcfConfig = {
+        const rcfRun: RcfConfig = {
           endorsement: 'rcf',
           input: resolve(opts.input),
           version: opts.ddVersion,
@@ -1662,10 +1757,20 @@ program
           strict: opts.strict,
           schemaValidate,
           runVariations: !opts.skipVariations,
-          ...(bearerToken ? { servicesAuthToken: bearerToken } : {}),
           ...(identityRead.identity ?? {}),
           options: { outputDir: dir }
         };
+        // A run that skips schema validation or variations cannot be certified, so it could not start a cloud run.
+        // Refused before the run, as the other flags are, so a long run is not wasted.
+        const uncertifiable = opts.startCloudRun ? whyNoCloudRunBeforeRun(rcfRun) : undefined;
+        if (uncertifiable !== undefined) {
+          throw new Error(
+            `--start-cloud-run starts from a run that can be certified and sent, and ${uncertifiable}. It does not go with --skip-schema-validation or --skip-variations.`
+          );
+        }
+        // The /compute token for the variations service (from .env; the service mints its own if absent).
+        const bearerToken = opts.skipVariations ? undefined : await mintOAuth2ClientCredentialsToken();
+        const rcfConfig: RcfConfig = { ...rcfRun, ...(bearerToken ? { servicesAuthToken: bearerToken } : {}) };
         const run = await runRcfCompliance(rcfConfig);
         const outcome = rcfRunOutcome(run);
         if (!outcome.inferred) {
@@ -1717,15 +1822,15 @@ program
         // Zero-record (empty/unreadable) submissions and degraded variations runs must not read as a clean pass.
         process.exitCode = resolveRcfExitCode(result);
 
-        const record = isSuccessfulRun(run) ? rcfLocalRunRecordOf(run, rcfConfig) : undefined;
-        if (record !== undefined || opts.startCloudRun) {
-          const offer =
-            record !== undefined && identityRead.identity
-              ? { input: rcfConfig.input, providerUoi: identityRead.identity.providerUoi, record }
-              : undefined;
-          const offered = await offerRcfCloudRun(offer, { startCloudRun: opts.startCloudRun === true, json: false }, cliRcfCloudOfferIo());
-          // The local run may have passed, but what was asked for did not happen: a runtime error.
-          if (offered === 'failed') process.exitCode = 2;
+        // The choice at the end, as for every other endorsement: the files the run read are packed, uploaded and
+        // run in RESO's cloud by `startCloudRun`. Only a run addressed to a provider, system and recipient is offered.
+        if (identityRead.identity) {
+          const label = cloudTargetLabel(rcfConfig) ?? 'rcf';
+          await offerAtEnd(
+            { providerUoi: identityRead.identity.providerUoi, endorsementLabel: 'RESO Common Format' },
+            [{ label, config: rcfConfig, outcome: { label, result: run } }],
+            opts
+          );
         }
       } catch (err) {
         const schemaFailure = (err as { schemaFailure?: boolean }).schemaFailure === true;
@@ -1999,5 +2104,32 @@ program
       }
     }
   );
+
+// Archiving a report, as the certification site does: the same warning first, the same POST after,
+// with the credential the site's downloaded credentials file carries. The Cert API is found through
+// TOKEN_URI in that file, or named with --url. Nothing is archived without --confirm.
+program
+  .command('archive-report')
+  .description('Archive a certification report, with the warning the certification site shows. Archives only with --confirm.')
+  .argument('<reportId>', 'The id of the report to archive, as the certification site shows it')
+  .option('--confirm', 'Archive the report. Without it the warning is printed and nothing is archived.')
+  .option('--url <url>', 'The Cert API origin. Default: taken from TOKEN_URI in the credentials file.')
+  .option('--json', 'Print one JSON object with what was read and what happened, for scripts')
+  .action(async (reportId: string, opts: { confirm?: boolean; url?: string; json?: boolean }) => {
+    try {
+      const say = (line: string): void => {
+        if (!opts.json) console.log(maskSecrets(line));
+      };
+      const result: ArchiveReportResult = await runArchiveReport(
+        { reportId, confirm: Boolean(opts.confirm), ...(opts.url === undefined ? {} : { url: opts.url }) },
+        say
+      );
+      if (opts.json) console.log(maskSecrets(JSON.stringify(result, null, 2)));
+      process.exitCode = archiveExitCode(result);
+    } catch (error) {
+      console.error('Error:', maskSecrets(error instanceof Error ? error.message : String(error)));
+      process.exitCode = 2;
+    }
+  });
 
 program.parse();

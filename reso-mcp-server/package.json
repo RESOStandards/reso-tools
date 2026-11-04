@@ -26,7 +26,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@reso-standards/odata-expression-parser": "^0.1.0",
-    "@reso-standards/reso-certification": "^0.11.0",
+    "@reso-standards/reso-certification": "^0.12.0",
     "@reso-standards/reso-client": "^0.2.0",
     "@reso-standards/reso-metadata-utils": "^0.1.0",
     "@reso-standards/reso-validation": "^0.1.0",

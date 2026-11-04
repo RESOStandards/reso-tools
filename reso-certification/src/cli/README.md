@@ -38,7 +38,9 @@ A variable already set in the real environment is **never** overwritten by the f
 prints which file it read and the **names** of the variables it set, never their values. A value whose name
 ends in `SECRET`, `PASSWORD` or `API_KEY` is masked in everything the CLI prints.
 
-**Which environment a run touches is decided by `TOKEN_URI`, and by nothing else.**
+**Which environment a run touches is decided by `TOKEN_URI`, and by nothing else.** The one
+exception is `archive-report --url`, which names the Cert API host directly and presents the
+file's `CLIENT_SECRET` to it, so a `--url` is checked by the person typing it.
 `RESO_SERVICES_URL` is the **same value for every environment**, so reading it tells you nothing
 about which one you are pointed at. The environment is fixed when the token is minted: authenticating
 against the QA certification host produces a token carrying `qa`, the production host produces one
@@ -50,10 +52,10 @@ environment a command will write to, look at the host in `TOKEN_URI`.
 | Variable | Used by | What it is |
 |---|---|---|
 | `RESO_SERVICES_URL` | `find-variations`, `rcf`, `update-variations`, the variations-review commands, the `cloud` commands | Base URL of RESO's services, the Variations Service and cloud runs. Same for every environment. |
-| `TOKEN_URI` | the same commands | OAuth2 token endpoint. **This is what selects QA versus production.** |
-| `CLIENT_ID`, `CLIENT_SECRET` | the same commands | OAuth2 client credentials the token is minted from. |
+| `TOKEN_URI` | the same commands, and `archive-report` | OAuth2 token endpoint. **This is what selects QA versus production.** `archive-report` also reads the Cert API host off it. |
+| `CLIENT_ID`, `CLIENT_SECRET` | the same commands, `restore` and `archive-report` | OAuth2 client credentials the token is minted from. `restore` and `archive-report` present `CLIENT_SECRET` to the Cert API as it is. |
 | `FT_ADMIN_SECRET` | `update-variations --fast-track` | Fast Track admin credential. A fast-track submission is refused without it, before any request is made. |
-| `CERT_AUTH_API_BASE_URL`, `CERT_AUTH_API_USERNAME`, `CERTIFICATION_API_KEY`, `CURRENT_PROVIDER_UOI` | the SDK's provider-token fallback | The second auth path, used when the OAuth2 variables are absent. |
+| `CERT_AUTH_API_BASE_URL`, `CERT_AUTH_API_USERNAME`, `CERTIFICATION_API_KEY`, `CURRENT_PROVIDER_UOI` | the SDK's provider-token fallback, and `CERTIFICATION_API_KEY` by `restore` and `archive-report` when `CLIENT_SECRET` is absent | The second auth path, used when the OAuth2 variables are absent. |
 | `RESO_VARIATIONS_HANDLER` | the variations step of `dd`, `find-variations` and `rcf` | For a host that runs the SDK: the path of a module whose `computeVariations` computes variations in place of the Variations Service, so no service address or token is needed. Unset, the service is called as usual. See the [package README](../../README.md#computing-variations-with-your-own-module). |
 
 **Two auth paths, in that order.** A command first tries an OAuth2 client-credentials token from
@@ -88,6 +90,7 @@ different thing from the RESO service credentials above.
 | [`variations-review-status`](#variations-review-status) | Where each variations submission stands (read-only) |
 | [`cloud status`](#cloud-status) | Your cloud runs and where each stands (read-only) |
 | [`restore`](#restore) | Restore a certification server backup to a Cert API (admin) |
+| [`archive-report`](#archive-report) | Archive a certification report, with the site's warning first, and only with `--confirm` |
 
 The first four are **endorsement runners** (a full compliance pipeline against a live
 server). The rest are **per-step utilities** – each does one stage of a run in isolation,
@@ -140,6 +143,7 @@ reso-cert add-edit --config ./configs/add-edit-config.json   # multi-provider ba
 | `--metadata <path>` | – | Local XML metadata (for `--mock`) |
 | `--mock` | – | Start a bundled mock OData server, which writes its own payloads unless `--payloads` gives them |
 | `--spec-version <v>` | `2.0.0` | Spec version stamped into the report. Add/Edit has one version, 2.0.0 (RCP-10, ratified December 2023), so any other is refused |
+| `--start-cloud-run` | – | At the end, start a certification run in RESO's cloud for the entries that passed and can be certified, with the payloads they used. Needs `--config`. See [Cloud runs](#cloud-runs). |
 
 Provide one of `--url`, `--config`, or `--mock`, and the payloads one way: `--payloads`, a config file's `payloads` or `--auto-payloads`. With `--config`, `--actions`, the format options and `--auto-payloads` apply to every entry.
 
@@ -154,7 +158,8 @@ Adds, beyond the shared options: `--mode <observe|full>` (default `observe`; `fu
 performs canary writes), `--writable-resource <name>` (default `Property`),
 `--payloads-dir <dir>`, `--max-events <n>` (default `1000`), `--batch-size <n>`
 (`100`), `--poll-interval <ms>` (`5000`), `--poll-timeout <ms>` (`30000`),
-`--metadata <path>`, `--mock`. Provide one of `--url`, `--config`, or `--mock`.
+`--metadata <path>`, `--mock`, `--start-cloud-run` (needs `--config`; see [Cloud runs](#cloud-runs)). Provide one
+of `--url`, `--config`, or `--mock`.
 
 ### `core`
 Web API Core 2.1.0 compliance. Core 2.0.0 remains selectable per run, as a retest. Only 2.1.0, the latest minor, certifies.
@@ -223,13 +228,14 @@ reso-cert dd --config ./sample-configs/dd-config.json        # multi-provider ba
 | `--url <url>` | – | Server base URL (mutually exclusive with `--config`) |
 | `--config <path>` | – | Config file with one or more provider entries |
 | `--dd-version <v>` | `2.1` | DD version. 2.0 and 2.1 run, and only 2.1, the latest minor, certifies, so a 2.0 run is **not eligible for certification**. Anything else is refused, 1.7 included. In config-file mode the entry's version stands unless this flag is given |
-| `--limit <n>` | `100000` | Max records replicated per resource |
+| `--limit <n>` | `100000` | Max records replicated per resource, a sample limit for local testing. A run with one is **not eligible for certification** and starts no cloud run |
 | `--strict` | on | Fail the run on JSON-schema validation errors. On by default, so this flag is only needed to be explicit. Variations fail a run independently of this setting |
 | `--no-strict` | – | Record schema-validation errors without failing on them, so a long run surveys everything to fix. Validation still runs. The run is **not eligible for certification** and says so in its verdict |
 | `--skip-variations` | – | Do not check variations. The run is **not** eligible for certification |
 | `--batch-expand` | – | Batch every expansion per resource into one `$expand` request |
 | `--originating-system-name <v>` | – | Append `OriginatingSystemName eq <v>` to every replication query (multi-tenant providers) |
 | `--originating-system-id <v>` | – | Append `OriginatingSystemID` instead. Used only when no name is given |
+| `--start-cloud-run` | – | At the end, start a certification run in RESO's cloud for the entries that passed and can be certified. Needs `--config`. See [Cloud runs](#cloud-runs). |
 
 Provide one of `--url` or `--config`.
 
@@ -247,6 +253,11 @@ step, and the run summary prints a `Not eligible for certification` line. The ru
 unaffected – it still describes what happened while the run executed. An absent
 `RESO_SERVICES_URL` is never treated as a skip; that still fails the run, so a misconfigured machine
 cannot quietly stop checking variations.
+
+A sample limit, from `--limit` or a config entry's `ddOptions.limit`, is for local testing: the run
+measures part of the feed, so its verdict says it is not eligible for certification, and
+`--start-cloud-run` refuses it before anything runs, so remove the limit to start a cloud run. With
+neither set the run reads the default, which is what a certification run reads.
 
 ## Per-step utilities
 
@@ -488,6 +499,64 @@ reso-cert restore --path <backup root> --url <cert api> [--execute] [--limit n] 
 - **Exit code** `0` when everything was sent or would be, `1` when any report failed and `2` on an error
   such as a missing credential.
 
+## Certification reports
+
+### `archive-report`
+
+Archive a certification report, as the certification site does from a report's page. The command
+reads the report, shows the same warning the site shows, and archives only when `--confirm` is
+given. It is for the provider the report belongs to, or an administrator.
+
+```bash
+reso-cert archive-report <reportId>              # shows the warning, archives nothing
+reso-cert archive-report <reportId> --confirm    # shows the warning, then archives
+reso-cert archive-report <reportId> --confirm --json
+```
+
+| Option | Meaning |
+|---|---|
+| `<reportId>` | The report's id, as the certification site shows it. |
+| `--confirm` | Archive the report. Without it the warning is printed and nothing is archived. |
+| `--url <url>` | The Cert API origin, such as `https://cert-api.example.org`, without a path. Default: taken from `TOKEN_URI`. The API is expected at an origin's root: an API mounted under a path prefix cannot be named, by `--url` or by `TOKEN_URI`. A host without a dot that is not loopback, such as the `undefined` older credentials files carried, is refused. |
+| `--json` | Print one object: `reportId`, `origin`, `warning`, `report`, `confirmed`, `archived`, `status`, `reread`, `message`. `archived` is true only when the server confirmed with `201 success`. `reread` is present after any other archive answer (see below). `message` is the server's words after an archive request, and before one it is the line the command printed. |
+
+- **It needs the credentials file downloaded from the certification site.** Sign in, download
+  `credentials.env`, and run the command from the directory that holds it (see
+  [Environment](#environment-env)). The file's `CLIENT_SECRET`, or `CERTIFICATION_API_KEY` when
+  that is absent, is what the command presents, and the Cert API is found through the host in its
+  `TOKEN_URI`. A `TOKEN_URI` whose path is not the token endpoint, or whose host cannot be the API,
+  is refused rather than guessed from, and `--url` names the API instead.
+- **The warning is the site's.** The report is read first, then the provider organization's name
+  when the provider and recipient differ, and the warning is printed with those values filled in:
+
+  ```text
+  Archive Endorsement?
+
+  By proceeding, the Data Dictionary 2.0 Endorsement for Example MLS will no longer be available in the RESO Certification System.
+  You will receive a notification it's been archived.
+
+  Nothing was archived. Rerun with --confirm to proceed.
+  ```
+
+  When the organization's name cannot be read, its UOI is shown in its place and the command says
+  so. A report that cannot be read, or that does not exist, archives nothing.
+- **With `--confirm`, exactly one archive request is made,** the same one the site makes, and only
+  after the warning. The server's `201 success` is the only answer counted as archived. Any other
+  answer is reported as "The server did not confirm the archive" with its status and the server's
+  message, including a `200` that carries HTML, which is what the certification site's own host
+  answers. The report is then **read again**, because the server removes a report before it sends
+  the notification and answers only after, so an answer that is not `201` does not say whether the
+  report is still there. The second read is reported in the next line and in `--json` as `reread`:
+  `listed` means it was not archived, `gone` means the server removed it but something after the
+  removal failed, so check the certification site for it rather than rerunning the command, and
+  `unreadable` means the second read failed and nothing is known.
+- **A redirect is never followed.** A `3xx` from the Cert API is reported with its status like any
+  other answer, so the archive request is never replayed to a host that was not named.
+- **Exit code** `0` when the server confirmed the archive, or the warning was shown without
+  `--confirm`, `1` when the server did not confirm it or the report could not be read, and `2` on a
+  usage or configuration error such as a missing credential, a missing Cert API address or a
+  malformed id.
+
 ## Variations review (read-only)
 
 Both read the same routes the web client's review page uses, with the same auth as
@@ -542,7 +611,8 @@ reso-cert variations-review-status --review-status in-review   # admin: every pr
 A cloud run happens in RESO's cloud rather than on your machine, with RESO's copy of the tests. It is started
 only at the end of a local run that passed, never on its own. The cloud run is the one that certifies.
 
-**At the end of `core --config`**, when at least one entry passed and can be certified:
+**At the end of `core`, `dd`, `add-edit` or `entity-event` with `--config`**, when at least one entry passed and
+can be certified:
 
 - With `--start-cloud-run`, the CLI reserves a request ID for those entries with RESO's service and starts the
   cloud run from that reservation. Nothing is sent before a pass. A reservation can start a cloud run once,
@@ -552,7 +622,14 @@ only at the end of a local run that passed, never on its own. The cloud run is t
 
 Entries that failed, stopped or cannot be certified are listed with the reason and never sent. What is sent is
 each entry as it ran: its server, its credential and its options, including any flag that changed them, such as
-`--auth-token` or `--field-overrides`, plus a record of the local run that passed. The credentials go to RESO's
+`--auth-token` or `--field-overrides`, plus a record of the local run that passed. An Add/Edit entry carries the
+payloads the run used, inline, as the run recorded them when it read its folder or its configuration, and only
+those of the actions it tested. A run that recorded none is refused, never re-read. The cloud tests your own
+payloads, so `--start-cloud-run` does not go with `--auto-payloads` or `--mock`, and a `dd` run with `--no-strict`
+or `--skip-variations` cannot be certified, so it does not go with those either. Each config entry is read before
+the run as well: one a cloud run could never start from, because it names no provider, system or recipient, runs a
+version RESO does not certify, turns strict mode off, writes its own payloads or gives none, only observes, or
+reads its canaries from a folder, is refused before any entry runs, with every reason. The credentials go to RESO's
 service with the request and are never printed. Messages go to stderr, so with `--output json` stdout stays the
 run's own JSON, and what was started is printed as JSON there too.
 
@@ -571,12 +648,13 @@ passed.
 - The files `rcf` read are packed into one zip, at a low compression level, even a single `.json`. Each file keeps
   the path it had in the input, and a zip inside a folder becomes a folder named for it. The packed zip must carry the
   fingerprint the run recorded of what it read, so a file changed since the run stops it here.
-- Over 5 GB packed, it stops and says so. Nothing is reserved or uploaded.
+- Over 5 GB packed, it stops and says so. Nothing is uploaded, and the reservation expires unused.
 - Otherwise the CLI reserves a request ID, asks RESO's service where to upload, uploads the zip and starts the cloud
   run, naming the upload and the fingerprint. The upload goes straight to storage with its own signed fields, and no
-  RESO credential goes with it. The local zip is removed afterwards, whatever happened.
+  RESO credential goes with it. The local zip and its folder are removed afterwards, whatever happened.
 
-The flags are checked before the run, as for Core, so a long run is not wasted. RESO's service switches RESO Common
+The flags are checked before the run, as for Core, so a long run is not wasted: a run with `--skip-schema-validation`
+or `--skip-variations` cannot be certified, so `--start-cloud-run` does not go with either. RESO's service switches RESO Common
 Format cloud runs on separately: until then it refuses the reservation, and the CLI prints its reason.
 
 ### `cloud status`

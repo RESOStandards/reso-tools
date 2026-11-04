@@ -71,8 +71,10 @@ export const cliAuthRejectedMessage = (what: string): string =>
 export const mintProviderToken = async (): Promise<string | undefined> => {
   const { CERT_AUTH_API_BASE_URL, CURRENT_PROVIDER_UOI, CERT_AUTH_API_USERNAME, CERTIFICATION_API_KEY } = process.env;
   if (!CERT_AUTH_API_BASE_URL || !CERT_AUTH_API_USERNAME || !CERTIFICATION_API_KEY) return undefined;
-  const url = `${CERT_AUTH_API_BASE_URL}/${CURRENT_PROVIDER_UOI}?username=${CERT_AUTH_API_USERNAME}`;
   try {
+    // The API key goes with this request, so the address is made https as every other RESO service address is.
+    const base = ensureHttps(CERT_AUTH_API_BASE_URL, 'CERT_AUTH_API_BASE_URL');
+    const url = `${base}/${CURRENT_PROVIDER_UOI}?username=${CERT_AUTH_API_USERNAME}`;
     const res = await fetch(url, { method: 'POST', headers: { Authorization: `ApiKey ${CERTIFICATION_API_KEY}` } });
     if (!res.ok) return undefined;
     const { token } = (await res.json()) as { token?: string };

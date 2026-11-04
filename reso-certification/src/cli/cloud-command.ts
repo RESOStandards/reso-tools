@@ -2,39 +2,37 @@
  * Cloud runs on the CLI: the choice at the end of a successful local run, and `cloud status`.
  *
  * A provider starts a run in RESO's cloud only from a local run that passed and can be certified, never on its
- * own. The plan and the formatters are pure and tested on their own. The Commander wiring in `index.ts` asks, or
- * reads `--start-cloud-run`, and sends the requests through `src/cloud/runs.ts`.
+ * own. The plan and the formatters are pure and tested on their own. The Commander wiring in `index.ts` reads
+ * `--start-cloud-run` on every endorsement and starts the run through `src/cloud/start.ts`, the path the desktop
+ * shares.
  */
 
 import {
-  type CloudConfigEntry,
-  type LocalRunRecord,
-  type RcfCloudConfigEntry,
-  type RcfLocalRunRecord,
-  cloudEntryOf,
+  type AnyLocalRunRecord,
+  type CloudRunConfig,
+  cloudEndorsementOf,
+  cloudTargetOf,
   isSuccessfulRun,
-  localRunRecordOf
+  localRunRecordOf,
+  whyNoCloudRunBeforeRun
 } from '../cloud/local-run.js';
-import type { PackRcfResult } from '../cloud/rcf-pack.js';
-import {
-  type AcceptedCloudRun,
-  CLOUD_ENDORSEMENT,
-  type CloudRunReservation,
-  type CloudRunStatusPage,
-  type CloudRunStatusRow,
-  type ReserveCloudRunInput,
-  type SubmitCloudRunInput,
-  type UploadSlot,
-  type UploadSlotInput
+import type {
+  AcceptedCloudRun,
+  CloudEndorsementName,
+  CloudRunReservation,
+  CloudRunStatusPage,
+  CloudRunStatusRow,
+  ReserveCloudRunInput
 } from '../cloud/runs.js';
-import type { CoreConfig, PipelineResult } from '../sdk/types.js';
+import { type StartCloudRunInput, whyNotSuccessful } from '../cloud/start.js';
+import type { PipelineResult } from '../sdk/types.js';
 import type { EntryOutcome } from './render.js';
 import { cell, renderTable } from './table.js';
 
-/** One config entry as it ran: its label, the configuration that ran and its outcome. */
+/** One config entry as it ran: its label, the configuration that ran and its outcome. Any of the five endorsements. */
 export interface RanEntry {
   readonly label: string;
-  readonly config: CoreConfig;
+  readonly config: CloudRunConfig;
   readonly outcome: EntryOutcome;
 }
 
@@ -44,82 +42,106 @@ export interface NotOffered {
   readonly reason: string;
 }
 
-/** The body of one cloud request: the entries to run and the local run each one passed. */
-export interface CloudRequestBody {
-  /** The reservation the cloud run starts from, made once these entries passed. */
-  readonly certificationRequestId?: string;
-  readonly providerUoi: string;
-  readonly concurrency?: number;
-  readonly configs: ReadonlyArray<CloudConfigEntry>;
-  readonly localRuns: ReadonlyArray<LocalRunRecord>;
-}
-
-/** One request to send. A request names one version, so entries that ran at different versions go separately. */
-export interface PlannedCloudRequest {
+/** The entries that passed and can start a cloud run, grouped as the requests they will go in. */
+export interface OfferedGroup {
+  readonly endorsementName: CloudEndorsementName;
   readonly endorsementVersion: string;
-  readonly labels: ReadonlyArray<string>;
-  readonly body: CloudRequestBody;
+  readonly entries: ReadonlyArray<{
+    readonly label: string;
+    readonly config: CloudRunConfig;
+    readonly result: PipelineResult;
+    readonly record: AnyLocalRunRecord;
+  }>;
 }
 
 export interface CloudPlan {
-  readonly requests: ReadonlyArray<PlannedCloudRequest>;
+  readonly groups: ReadonlyArray<OfferedGroup>;
   readonly notOffered: ReadonlyArray<NotOffered>;
   /** How many entries passed and can start a cloud run. */
   readonly offered: number;
 }
 
-/** Why a run did not succeed, in words a person can act on. Only for display: `isSuccessfulRun` decides. */
-const whyNotSuccessful = (result: PipelineResult): string => {
-  if (result.status === 'incomplete') return 'it did not finish';
-  if (result.status !== 'passed') return 'it failed';
-  return result.certification.valid ? 'it did not pass' : `it cannot be certified: ${result.certification.reasons.join('; ')}`;
-};
-
-const NO_TARGET = 'it does not name the provider, system and recipient a cloud run is addressed to';
+const NO_TARGET = 'it does not name the provider, system and recipient a cloud run is addressed to, or did not record what it certified';
 
 type Classified =
-  | { readonly offered: true; readonly label: string; readonly entry: CloudConfigEntry; readonly record: LocalRunRecord }
+  | {
+      readonly offered: true;
+      readonly label: string;
+      readonly config: CloudRunConfig;
+      readonly result: PipelineResult;
+      readonly record: AnyLocalRunRecord;
+    }
   | { readonly offered: false; readonly label: string; readonly reason: string };
 
 const classify = ({ label, config, outcome }: RanEntry, now: Date): Classified => {
   if ('error' in outcome) return { offered: false, label, reason: 'it stopped before producing a result' };
   if (!isSuccessfulRun(outcome.result)) return { offered: false, label, reason: whyNotSuccessful(outcome.result) };
-  const entry = cloudEntryOf(config, label);
   const record = localRunRecordOf(outcome.result, config, now);
-  return entry === undefined || record === undefined
+  return record === undefined
     ? { offered: false, label, reason: NO_TARGET }
-    : { offered: true, label, entry, record };
+    : { offered: true, label, config, result: outcome.result, record };
 };
 
 /**
- * The cloud requests a set of local runs can start. Only an entry that passed and can be certified is offered.
- * Every other entry is named with its reason, and nothing is sent for it.
+ * The cloud runs a set of local runs can start. Only an entry that passed and can be certified is offered. Every
+ * other entry is named with its reason, and nothing is sent for it. A request names one endorsement and version, so
+ * entries that ran at different versions go separately.
  */
-export const planCloudRequests = (
-  providerUoi: string,
-  concurrency: number | undefined,
-  entries: ReadonlyArray<RanEntry>,
-  now: Date = new Date()
-): CloudPlan => {
+export const planCloudRuns = (entries: ReadonlyArray<RanEntry>, now: Date = new Date()): CloudPlan => {
   const classified = entries.map(e => classify(e, now));
   const qualified = classified.flatMap(c => (c.offered ? [c] : []));
   const notOffered = classified.flatMap(c => (c.offered ? [] : [{ label: c.label, reason: c.reason }]));
-
-  const versions = [...new Set(qualified.map(q => q.record.endorsementVersion))];
-  const requests = versions.map(endorsementVersion => {
-    const group = qualified.filter(q => q.record.endorsementVersion === endorsementVersion);
+  const keys = [...new Set(qualified.map(q => `${q.record.endorsementName} ${q.record.endorsementVersion}`))];
+  const groups = keys.map(key => {
+    const entries = qualified.filter(q => `${q.record.endorsementName} ${q.record.endorsementVersion}` === key);
+    const first = entries[0];
     return {
-      endorsementVersion,
-      labels: group.map(q => q.label),
-      body: {
-        providerUoi,
-        ...(concurrency === undefined ? {} : { concurrency }),
-        configs: group.map(q => q.entry),
-        localRuns: group.map(q => q.record)
-      }
+      endorsementName: cloudEndorsementOf(first.config),
+      endorsementVersion: first.record.endorsementVersion,
+      entries: entries.map(({ label, config, result, record }) => ({ label, config, result, record }))
     };
   });
-  return { requests, notOffered, offered: qualified.length };
+  return { groups, notOffered, offered: qualified.length };
+};
+
+/**
+ * What `--start-cloud-run` refuses before a config-file run, read from each entry: every entry a cloud run could never
+ * start from, named with why, so a long run is not spent on it. `undefined` when every entry may go on. The flags the
+ * CLI reads are checked by the command; this reads what the file set.
+ */
+export const entriesRefusedBeforeRun = (
+  entries: ReadonlyArray<{ readonly label: string; readonly config: CloudRunConfig }>
+): string | undefined => {
+  const refused = entries.flatMap(({ label, config }) => {
+    const why = whyNoCloudRunBeforeRun(config);
+    return why === undefined ? [] : [`  ✗ ${label}: ${why}`];
+  });
+  if (refused.length === 0) return undefined;
+  return [
+    '--start-cloud-run starts from entries that can be certified and sent, and these cannot:',
+    ...refused,
+    'Fix them in the config file, or run without --start-cloud-run.'
+  ].join('\n');
+};
+
+/**
+ * What `--start-cloud-run` refuses on `dd` from the flags alone, before the config file is read: a flag that makes
+ * the run uncertifiable. `--limit` is a sample limit for local testing, so a run with one starts no cloud run
+ * whatever the file says, and the refusal names the flag rather than the file. The entry's own `ddOptions.limit` is
+ * read by `entriesRefusedBeforeRun` once the file is.
+ */
+export const ddFlagsRefusedBeforeRun = (flags: {
+  readonly strict?: boolean;
+  readonly skipVariations?: boolean;
+  readonly limit?: string;
+}): string | undefined => {
+  if (flags.strict === false || flags.skipVariations) {
+    return '--start-cloud-run starts from a run that can be certified, which a run with --no-strict or --skip-variations is not.';
+  }
+  if (flags.limit !== undefined) {
+    return '--start-cloud-run starts from a run that can be certified, and a run with --limit uses a sample limit, which is for local testing and cannot be certified. Remove --limit to start a cloud run.';
+  }
+  return undefined;
 };
 
 /** Said at the end of a run with entries that qualify, when `--start-cloud-run` was not given. */
@@ -141,21 +163,41 @@ export interface CloudOfferMode {
 export interface CloudOfferIo {
   readonly say: (text: string) => void;
   /** Reserve a request ID for the entries that passed. Called only once they have. */
-  readonly reserve: (request: PlannedCloudRequest) => Promise<CloudRunReservation>;
-  readonly submit: (request: PlannedCloudRequest) => Promise<AcceptedCloudRun>;
+  readonly reserve: (input: Omit<ReserveCloudRunInput, 'bearerToken' | 'fromCli'>) => Promise<CloudRunReservation>;
+  /** Start the cloud run from that reservation: `startCloudRun`, with the CLI's auth. */
+  readonly start: (input: Omit<StartCloudRunInput, 'servicesAuthToken' | 'fromCli'>) => Promise<ReadonlyArray<AcceptedCloudRun>>;
 }
 
 export type CloudOfferOutcome = 'none' | 'hinted' | 'started' | 'failed';
 
+/** What a run of these entries is for, and how many of the provider's recipients the service may run at once. */
+export interface CloudOffer {
+  readonly providerUoi: string;
+  readonly concurrency?: number;
+  /** What the endorsement is called in what the CLI prints. */
+  readonly endorsementLabel: string;
+}
+
+const targetOf = (record: AnyLocalRunRecord) => ({
+  recipientUoi: record.recipientUoi,
+  providerUsi: record.providerUsi,
+  ...('serviceRootUri' in record ? { serviceRootUri: record.serviceRootUri } : {})
+});
+
 /**
- * Present the choice at the end of a run. Only `--start-cloud-run` starts anything. Without it, a run with
- * entries that qualify says how to choose it next time, and nothing waits for input.
+ * Present the choice at the end of a run, for any endorsement. Only `--start-cloud-run` starts anything. Without
+ * it, a run with entries that qualify says how to choose it next time, and nothing waits for input.
  *
  * With it, the entries that passed are reserved, never before they pass, and the cloud run starts from that
- * reservation. A reservation or a start the service refuses is reported with its reason, and the other groups
- * are still sent.
+ * reservation through `startCloudRun`. A reservation or a start the service refuses is reported with its reason,
+ * and the other groups are still sent.
  */
-export const offerCloudRun = async (plan: CloudPlan, mode: CloudOfferMode, io: CloudOfferIo): Promise<CloudOfferOutcome> => {
+export const offerCloudRuns = async (
+  offer: CloudOffer,
+  plan: CloudPlan,
+  mode: CloudOfferMode,
+  io: CloudOfferIo
+): Promise<CloudOfferOutcome> => {
   if (plan.offered === 0) {
     if (mode.startCloudRun) {
       io.say('No entry passed and can be certified, so no cloud run was started.');
@@ -169,12 +211,28 @@ export const offerCloudRun = async (plan: CloudPlan, mode: CloudOfferMode, io: C
   }
   if (plan.notOffered.length > 0) io.say(formatNotOffered(plan.notOffered));
 
-  const sent = await plan.requests.reduce<Promise<ReadonlyArray<boolean>>>(async (done, request) => {
+  const sent = await plan.groups.reduce<Promise<ReadonlyArray<boolean>>>(async (done, group) => {
     const previous = await done;
     try {
-      const reservation = await io.reserve(request);
-      const run = await io.submit({ ...request, body: { ...request.body, certificationRequestId: reservation.certificationRequestId } });
-      io.say(mode.json ? JSON.stringify(run) : formatAcceptedRun(run, 'Web API Core'));
+      const reservation = await io.reserve({
+        endorsementName: group.endorsementName,
+        endorsementVersion: group.endorsementVersion,
+        providerUoi: offer.providerUoi,
+        targets: group.entries.map(e => targetOf(e.record))
+      });
+      const runs = await io.start({
+        endorsementName: group.endorsementName,
+        endorsementVersion: group.endorsementVersion,
+        providerUoi: offer.providerUoi,
+        ...(offer.concurrency === undefined ? {} : { concurrency: offer.concurrency }),
+        localRuns: group.entries.map(e => ({
+          config: e.config,
+          result: e.result,
+          certificationRequestId: reservation.certificationRequestId,
+          description: e.label
+        }))
+      });
+      for (const run of runs) io.say(mode.json ? JSON.stringify(run) : formatAcceptedRun(run, offer.endorsementLabel));
       return [...previous, true];
     } catch (error) {
       io.say(`Error: ${error instanceof Error ? error.message : String(error)}`);
@@ -184,89 +242,10 @@ export const offerCloudRun = async (plan: CloudPlan, mode: CloudOfferMode, io: C
   return sent.every(Boolean) ? 'started' : 'failed';
 };
 
-/** What starting a RESO Common Format run in the cloud takes from the local run that passed. */
-export interface RcfCloudOffer {
-  /** What the local run read, to pack and upload. */
-  readonly input: string;
-  readonly providerUoi: string;
-  readonly record: RcfLocalRunRecord;
-}
-
-/** The RESO Common Format offer's side effects, injected so it can be tested without a network or a large file. */
-export interface RcfCloudOfferIo {
-  readonly say: (text: string) => void;
-  readonly pack: (input: string, fingerprint: string) => Promise<PackRcfResult>;
-  readonly reserve: (input: Omit<ReserveCloudRunInput, 'bearerToken' | 'fromCli'>) => Promise<CloudRunReservation>;
-  readonly slot: (input: Omit<UploadSlotInput, 'bearerToken' | 'fromCli'>) => Promise<UploadSlot>;
-  readonly upload: (slot: UploadSlot, zipPath: string) => Promise<void>;
-  readonly submit: (input: Omit<SubmitCloudRunInput, 'bearerToken' | 'fromCli'>) => Promise<AcceptedCloudRun>;
-  /** Remove the packed zip. Called whatever happened once it exists. */
-  readonly discard: (zipPath: string) => Promise<void>;
-}
-
-/** Said at the end of a RESO Common Format run that qualifies, when `--start-cloud-run` was not given. */
-export const RCF_CLOUD_RUN_HINT =
-  "This run passed and can be certified. To start a certification run in RESO's cloud at the end of a run like this one, add --start-cloud-run.";
-
-/**
- * Start the RESO Common Format run in RESO's cloud from a local run that passed (the upload contract, 2026-11-03):
- * pack what the run read into one zip, then reserve, ask where to upload, upload and start, the start naming the
- * upload and the local run's fingerprint. Packing comes first, so a delivery over the limit reserves nothing. The
- * packed zip is removed whatever happens. Only `--start-cloud-run` starts anything.
- */
-export const offerRcfCloudRun = async (
-  offer: RcfCloudOffer | undefined,
-  mode: CloudOfferMode,
-  io: RcfCloudOfferIo
-): Promise<CloudOfferOutcome> => {
-  if (offer === undefined) {
-    if (mode.startCloudRun) io.say('The run did not pass and can not be certified, so no cloud run was started.');
-    return 'none';
-  }
-  if (!mode.startCloudRun) {
-    io.say(RCF_CLOUD_RUN_HINT);
-    return 'hinted';
-  }
-  const { record } = offer;
-  const fail = (error: unknown): CloudOfferOutcome => {
-    io.say(`Error: ${error instanceof Error ? error.message : String(error)}`);
-    return 'failed';
-  };
-  // A pack that throws, such as one whose files changed since the run, is a refusal like one over the limit.
-  const packed = await io
-    .pack(offer.input, record.fingerprint)
-    .catch((error: unknown): PackRcfResult => ({ refused: error instanceof Error ? error.message : String(error) }));
-  if ('refused' in packed) return fail(packed.refused);
-  const zip = packed.packed;
-  const endorsement = { endorsementName: CLOUD_ENDORSEMENT.resoCommonFormat, endorsementVersion: record.endorsementVersion };
-  const target = { recipientUoi: record.recipientUoi, providerUsi: record.providerUsi };
-  try {
-    const reservation = await io.reserve({ ...endorsement, providerUoi: offer.providerUoi, targets: [target] });
-    const slot = await io.slot({
-      ...endorsement,
-      ...target,
-      certificationRequestId: reservation.certificationRequestId,
-      fingerprint: record.fingerprint,
-      bytes: zip.bytes
-    });
-    await io.upload(slot, zip.path);
-    const entry: RcfCloudConfigEntry = { ...target, upload: { uploadId: slot.uploadId, fingerprint: record.fingerprint } };
-    const run = await io.submit({
-      ...endorsement,
-      config: {
-        certificationRequestId: reservation.certificationRequestId,
-        providerUoi: offer.providerUoi,
-        configs: [entry],
-        localRuns: [record]
-      }
-    });
-    io.say(mode.json ? JSON.stringify(run) : formatAcceptedRun(run, 'RESO Common Format'));
-    return 'started';
-  } catch (error) {
-    return fail(error);
-  } finally {
-    await io.discard(zip.path);
-  }
+/** The identifiers a run names, for the label of an entry run without a configuration file. */
+export const cloudTargetLabel = (config: CloudRunConfig): string | undefined => {
+  const target = cloudTargetOf(config);
+  return target === undefined ? undefined : `${target.recipientUoi}, system ${target.providerUsi}`;
 };
 
 const present = (value: string | undefined): boolean => typeof value === 'string' && value.trim() !== '';

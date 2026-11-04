@@ -21,16 +21,23 @@ import { collectValidationErrors, formatValidationSummary, validateMetadata } fr
 import { createPipeline } from './pipeline.js';
 import { addEditReportGenerators, prepareOutputDir, writeReports } from './reports.js';
 import { FETCH_METADATA, GENERATE_PAYLOADS, RUN_ADD_EDIT_SCENARIOS } from './step-names.js';
-import type { AddEditConfig, PipelineStep, ValidForCertification } from './types.js';
+import type { AddEditConfig, InlinePayloads, PipelineStep, ValidForCertification } from './types.js';
 import type { BaseTestContext } from './types.js';
 
 // ── Pipeline Context ──
 
 interface AddEditContext extends BaseTestContext {
   readonly resource: string;
+  /** The Add/Edit version the run tests at, resolved once when it starts, so the result records what ran. */
+  readonly specVersion: string;
   readonly entityType?: { readonly keyProperties: ReadonlyArray<string> };
   /** What the run tests, once its payloads are ready. */
   readonly plan?: AddEditTestPlan;
+  /**
+   * The provider's payloads as the run read them, from its folder or its configuration, so a cloud entry built later
+   * carries what ran and never a file that changed since. Auto payloads are not recorded: the cloud refuses them.
+   */
+  readonly payloads?: InlinePayloads;
   readonly sampleKeys?: ReadonlyArray<string>;
   readonly payloadsDir?: string;
   readonly testReport?: unknown;
@@ -215,12 +222,15 @@ const generatePayloads = (config: AddEditConfig): PipelineStep<AddEditContext> =
 
     // A folder the provider wrote: checked as it is, then used where it is.
     if (config.payloadsDir) {
-      const payloads = await readPayloads(config.payloadsDir, payloadsFor(plan)).catch((error: unknown) => error);
-      if (payloads instanceof Error) return fail([payloads.message]);
-      const problems = providedPayloadProblems(plan, payloads as Payloads, keyField);
+      const read: Awaited<ReturnType<typeof readPayloads>> | Error = await readPayloads(config.payloadsDir, payloadsFor(plan)).catch(
+        (error: unknown) => (error instanceof Error ? error : new Error(String(error)))
+      );
+      if (read instanceof Error) return fail([read.message]);
+      const problems = providedPayloadProblems(plan, read, keyField);
       if (problems.length > 0) return fail(problems);
       return {
-        context: { ...ctx, payloadsDir: config.payloadsDir, plan },
+        // The files as read, kept with the result, so a cloud entry carries what ran and never the folder as it is later.
+        context: { ...ctx, payloadsDir: config.payloadsDir, plan, payloads: read },
         summary: `Using the payloads in ${config.payloadsDir} for ${describePlan(plan)}`
       };
     }
@@ -241,8 +251,11 @@ const generatePayloads = (config: AddEditConfig): PipelineStep<AddEditContext> =
     const needed = payloadsFor(plan);
     await Promise.all(needed.map(name => writeFile(join(outputDir, PAYLOAD_FILES[name]), JSON.stringify(payloads[name] ?? {}, null, 2))));
 
+    // The plan's payloads only, as a folder run records only the files it read: a stray one in the configuration,
+    // for an action not tested, is checked by nothing here and would be checked by the cloud.
+    const used = Object.fromEntries(needed.map(name => [name, payloads[name]]));
     return {
-      context: { ...ctx, payloadsDir: outputDir, plan },
+      context: { ...ctx, payloadsDir: outputDir, plan, ...(config.autoPayloads ? {} : { payloads: used }) },
       summary: `${config.autoPayloads ? 'Wrote auto' : "Wrote the configuration's"} ${needed.length} payload files for ${describePlan(plan)}`,
       artifacts: [{ label: 'Payloads', path: outputDir }],
       counts: { payloads: needed.length }
@@ -387,10 +400,12 @@ export const createAddEditPipeline = (config: AddEditConfig) =>
 /** Run Add/Edit compliance tests with a single function call. */
 export const runAddEditCompliance = async (config: AddEditConfig, onProgress?: (progress: import('./types.js').StepProgress) => void) => {
   const pipeline = createAddEditPipeline(config);
-  const outputPath = await prepareOutputDir('web-api-add-edit', config.specVersion ?? CURRENT_ADD_EDIT_VERSION, config);
+  const specVersion = config.specVersion ?? CURRENT_ADD_EDIT_VERSION;
+  const outputPath = await prepareOutputDir('web-api-add-edit', specVersion, config);
   const initialContext: AddEditContext = {
     serverUrl: config.server.url,
     resource: config.resource,
+    specVersion,
     outputPath
   };
 

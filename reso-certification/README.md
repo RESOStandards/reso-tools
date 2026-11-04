@@ -212,6 +212,9 @@ A cloud run starts only at the end of a local run that passed. Run locally with 
 
 ```bash
 reso-cert core --config providers.json --start-cloud-run
+reso-cert dd --config providers.json --start-cloud-run
+reso-cert add-edit --config providers.json --start-cloud-run
+reso-cert entity-event --config providers.json --start-cloud-run
 reso-cert cloud status --in-progress
 ```
 
@@ -219,7 +222,8 @@ reso-cert cloud status --in-progress
   pass, the CLI reserves a request ID for them with RESO's service, then starts the cloud run from it. Nothing is
   sent before a pass.
 - **Each entry is sent as it ran**, including any flag that changed it, such as `--auth-token` or
-  `--field-overrides`, with a record of the local run that passed.
+  `--field-overrides`, with a record of the local run that passed. An Add/Edit entry carries the payloads the run
+  used, inline, even when it read them from a folder: the cloud reaches no folder and writes no payloads of its own.
 - **Without `--start-cloud-run`, nothing is sent.** A run with entries that could go prints how to send them next
   time. With it, the CLI checks for RESO's service address and credentials before the run, so a long run is not
   wasted.
@@ -230,9 +234,23 @@ reso-cert cloud status --in-progress
 `rcf --start-cloud-run` does the same for RESO Common Format: the files the run read are packed into one zip, of at
 most 5 GB, uploaded and run in RESO's cloud. It needs `--provider-uoi`, `--provider-usi` and `--recipient-uoi`.
 
-Cloud runs cover Web API Core and RESO Common Format. They sign in with the same `TOKEN_URI`, `CLIENT_ID` and
+Cloud runs cover every endorsement: Data Dictionary, Web API Core, Add/Edit, EntityEvent and RESO Common Format,
+through one path (`startCloudRun` in the SDK). They sign in with the same `TOKEN_URI`, `CLIENT_ID` and
 `CLIENT_SECRET` from your credentials file as the Variations Service (see [Authentication](#authentication)). The
 [CLI reference](src/cli/README.md#cloud-runs) has the details.
+
+## Archiving a Report
+
+`reso-cert archive-report <reportId>` archives a certification report from the command line, the same way the
+certification site does from a report's page. It needs the `credentials.env` file downloaded from the site, shows the
+same warning the site shows, and archives only with `--confirm`:
+
+```bash
+reso-cert archive-report <reportId>              # shows the warning, archives nothing
+reso-cert archive-report <reportId> --confirm    # shows the warning, then archives
+```
+
+The [CLI reference](src/cli/README.md#archive-report) has the options and the exit codes.
 
 ## Metadata Report Utilities
 
@@ -407,7 +425,7 @@ compliance profile.
 ```bash
 npm install
 npm run build
-npm test        # ~1,904 tests
+npm test        # ~2,240 tests
 npm run dev     # Watch mode
 ```
 
