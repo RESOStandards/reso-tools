@@ -61,7 +61,7 @@ const WARNING_TITLE = 'Archive Endorsement?';
 const WARNING_TAIL = 'will no longer be available in the RESO Certification System.';
 const WARNING_NOTIFICATION = "You will receive a notification it's been archived.";
 
-/** The only body that means the archive happened, with the status the controller sends it with. */
+/** The only body that means the archive happened, with the status the controller sends it with. Compared with surrounding whitespace removed, which carries nothing. */
 const ARCHIVED_STATUS = 201;
 const ARCHIVED_BODY = 'success';
 
@@ -175,9 +175,24 @@ interface Answer {
   readonly error?: string;
 }
 
+/**
+ * A failed request in words: the error's message, then the cause's when there is one. Node's fetch
+ * says only `fetch failed` and puts the reason, a refused connection or an unknown host, on `cause`.
+ */
+const errorText = (error: unknown): string => {
+  if (!(error instanceof Error)) return String(error);
+  const cause = error.cause instanceof Error ? error.cause.message : undefined;
+  return cause === undefined ? error.message : `${error.message} (${cause})`;
+};
+
+/**
+ * One request. A redirect is never followed: the archive POST would otherwise be replayed to a
+ * host the operator did not name, and that host's answer counted. A 3xx comes back as itself and
+ * is reported with its status like any other answer that is not the one expected.
+ */
 const request = async (url: string, init: RequestInit): Promise<Answer> => {
   try {
-    const response = await fetch(url, init);
+    const response = await fetch(url, { ...init, redirect: 'manual' });
     const text = await response.text();
     const json = ((): unknown => {
       try {
@@ -188,7 +203,7 @@ const request = async (url: string, init: RequestInit): Promise<Answer> => {
     })();
     return { status: response.status, text, json };
   } catch (error) {
-    return { status: 0, text: '', json: undefined, error: error instanceof Error ? error.message : String(error) };
+    return { status: 0, text: '', json: undefined, error: errorText(error) };
   }
 };
 
@@ -224,9 +239,15 @@ const readReport = async (origin: string, authorization: string, reportId: strin
   if (answer.error !== undefined || answer.status !== 200) {
     return { failure: describe('The report could not be read', answer), status: answer.status };
   }
-  if (!Array.isArray(answer.json)) {
+  if (answer.json === undefined) {
     return {
       failure: `The report could not be read: the server answered ${answer.status} with a body that is not JSON. Is the address the Cert API rather than the certification site?`,
+      status: answer.status
+    };
+  }
+  if (!Array.isArray(answer.json)) {
+    return {
+      failure: `The report could not be read: the server answered ${answer.status} with a body that is not a list of reports.`,
       status: answer.status
     };
   }
@@ -314,7 +335,7 @@ export const runArchiveReport = async (options: ArchiveReportOptions, log: (line
   }
 
   const answer = await archive(origin, authorization, reportId);
-  const archived = answer.status === ARCHIVED_STATUS && answer.text === ARCHIVED_BODY;
+  const archived = answer.status === ARCHIVED_STATUS && answer.text.trim() === ARCHIVED_BODY;
   log('');
   log(
     archived

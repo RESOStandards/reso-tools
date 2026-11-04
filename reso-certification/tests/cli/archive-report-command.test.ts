@@ -253,12 +253,48 @@ describe('with --confirm', () => {
     expect(archiveExitCode(result)).toBe(1);
   });
 
+  it('counts a 201 "success" with trailing whitespace as archived, since whitespace carries nothing', async () => {
+    const api = certApi({ archive: reply(201, 'success\n') });
+    const { result } = await run(api, { confirm: true });
+    expect(result.archived).toBe(true);
+    expect(archiveExitCode(result)).toBe(0);
+  });
+
   it('treats a 201 whose body is not "success" as a failure', async () => {
     const api = certApi({ archive: reply(201, HTML) });
     const { result } = await run(api, { confirm: true });
     expect(api).toHaveBeenCalledTimes(3);
     expect(result.archived).toBe(false);
     expect(result.status).toBe(201);
+    expect(archiveExitCode(result)).toBe(1);
+  });
+});
+
+describe('every request', () => {
+  it('never follows a redirect, so an archive POST is not replayed to a host the operator did not name', async () => {
+    const api = certApi();
+    await run(api, { confirm: true });
+    expect(api.mock.calls.map(call => call[1].redirect)).toEqual(['manual', 'manual', 'manual']);
+  });
+
+  it('reports a redirect of the archive POST as a failure with its status, and makes no further request', async () => {
+    const api = certApi({ archive: reply(307, '') });
+    const { result, lines } = await run(api, { confirm: true });
+    expect(api).toHaveBeenCalledTimes(3);
+    expect(result.archived).toBe(false);
+    expect(result.status).toBe(307);
+    expect(lines.join('\n')).toContain('307');
+    expect(archiveExitCode(result)).toBe(1);
+  });
+
+  it('names the cause when the request itself fails, not only "fetch failed"', async () => {
+    const api = vi.fn(async () => {
+      throw Object.assign(new TypeError('fetch failed'), { cause: new Error('getaddrinfo ENOTFOUND cert-api.example.org') });
+    });
+    const { result } = await run(api, { confirm: true });
+    expect(result.status).toBe(0);
+    expect(result.message).toContain('fetch failed');
+    expect(result.message).toContain('ENOTFOUND');
     expect(archiveExitCode(result)).toBe(1);
   });
 });
@@ -289,6 +325,16 @@ describe('when the report cannot be read', () => {
     expect(api).toHaveBeenCalledTimes(1);
     expect(result.archived).toBe(false);
     expect(result.message).toMatch(/not JSON/);
+    expect(archiveExitCode(result)).toBe(1);
+  });
+
+  it('archives nothing when the read answers JSON that is not a list, and says so rather than "not JSON"', async () => {
+    const api = certApi({ report: reply(200, { message: 'not a list' }) });
+    const { result } = await run(api, { confirm: true });
+    expect(api).toHaveBeenCalledTimes(1);
+    expect(result.archived).toBe(false);
+    expect(result.message).toMatch(/not a list of reports/);
+    expect(result.message).not.toMatch(/not JSON/);
     expect(archiveExitCode(result)).toBe(1);
   });
 
