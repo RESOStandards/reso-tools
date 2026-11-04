@@ -3,7 +3,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import type { Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { seedStore } from '../src/add-edit/mock/handlers.js';
 import { startMockServer, stopMockServer } from '../src/add-edit/mock/server.js';
 import { createdKeyOf, runAllScenarios } from '../src/add-edit/test-runner.js';
@@ -185,6 +185,45 @@ describe('the records a run created', () => {
   });
 });
 
+// A run that stops early, on a network failure or anything else a test throws, still removes what it created when
+// delete is tested, and says so with the reason it stopped. Before, the records it had made stayed on the server.
+describe('a run that stops before its end', () => {
+  it('removes the records it created before reporting why it stopped', async () => {
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      if (init?.method === 'PATCH') throw new TypeError('the connection was reset');
+      return realFetch(input, init);
+    });
+    const files = {
+      ...CREATE_FILES,
+      'update-succeeds.json': { ListPrice: 222222 },
+      'update-fails.json': { ListPrice: -1 },
+      'delete-succeeds.json': {},
+      'delete-fails.json': { id: '00000000-0000-0000-0000-000000000000' }
+    };
+    try {
+      const stopped = await run(await payloadsFolder(files), {
+        actions: ['create', 'update', 'delete'],
+        formats: { create: ['minimal'], update: ['minimal'] }
+      }).then(
+        () => undefined,
+        (error: unknown) => error
+      );
+      expect(stopped).toBeInstanceOf(Error);
+      const message = (stopped as Error).message;
+      expect(message).toContain('The run stopped at update-succeeds-minimal');
+      expect(message).toContain('Removed the 1 record it created.');
+      const created = sent.find(line => line.startsWith('POST '));
+      expect(created).toBeDefined();
+      const deleted = sent.filter(line => line.startsWith('DELETE '));
+      expect(deleted).toHaveLength(1);
+      expect(deleted[0]).toMatch(/\/Property\('[^']+'\)$/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe('the key a create gives the record it made', () => {
   const entityType = { name: 'Property', keyProperties: ['ListingKey'], properties: [] };
   const response = (status: number, headers: Record<string, string>, body: unknown = undefined) => ({
@@ -208,6 +247,21 @@ describe('the key a create gives the record it made', () => {
   it('is read from an entity URL when that is what the header holds', () => {
     expect(createdKeyOf(response(204, { location: "http://localhost/Property('O''Brien%20Way')" }), entityType)).toBe("O'Brien Way");
     expect(createdKeyOf(response(204, { 'odata-entityid': 'https://api.example.test/Property(123)' }), entityType)).toBe('123');
+  });
+
+  // A header whose escapes are malformed names no record. It is not thrown on, which stopped the run before its
+  // cleanup, and the next header is read instead.
+  it('is read from the next header when one cannot be decoded', () => {
+    expect(createdKeyOf(response(204, { location: "http://localhost/Property('%E0')" }), entityType)).toBeUndefined();
+    expect(
+      createdKeyOf(
+        response(204, {
+          'odata-entityid': "https://api.example.test/Property('%E0')",
+          location: "https://api.example.test/Property('L-2')"
+        }),
+        entityType
+      )
+    ).toBe('L-2');
   });
 
   it('is nothing for a create that did not succeed', () => {
