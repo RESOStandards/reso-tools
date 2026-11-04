@@ -54,6 +54,25 @@ const zipEntries = (path: string): Promise<ReadonlyArray<readonly [string, Buffe
     })
   );
 
+interface ZipWriter {
+  addBuffer(body: Buffer, name: string): void;
+  end(): void;
+  readonly outputStream: NodeJS.ReadableStream;
+}
+const yazl = createRequire(import.meta.url)('yazl') as { ZipFile: new () => ZipWriter };
+
+/** A zip holding these entries, written as given: the writer does not refuse a control character in a name. */
+const zipOf = (files: ReadonlyArray<readonly [string, string]>): Promise<Buffer> =>
+  new Promise((resolvePromise, reject) => {
+    const zip = new yazl.ZipFile();
+    for (const [name, body] of files) zip.addBuffer(Buffer.from(body), name);
+    zip.end();
+    const chunks: Buffer[] = [];
+    zip.outputStream.on('data', (chunk: Buffer) => chunks.push(chunk));
+    zip.outputStream.on('end', () => resolvePromise(Buffer.concat(chunks)));
+    zip.outputStream.on('error', reject);
+  });
+
 const folderOf = async (files: ReadonlyArray<readonly [string, Buffer | string]>): Promise<string> => {
   const dir = await mkdtemp(join(tmpdir(), 'rcf-fingerprint-'));
   for (const [name, body] of files) {
@@ -142,6 +161,30 @@ describe('the fingerprint of the files rcf reads', () => {
       ])
     );
     expect(second.sha256).toBe(first.sha256);
+  });
+
+  // The manifest gives each file one line. A newline in a name could read as a second line, and one file named
+  // `a.json\n<sha256 of b>  b.json` would share a fingerprint with the two files a.json and b.json.
+  it('refuses a file whose name holds a control character, so no two deliveries share a manifest', async () => {
+    const a = '{"value":[1]}';
+    const b = '{"value":[2]}';
+    const smuggled = `a.json\n${sha256(b)}  b.json`;
+    const honest = await fingerprintRcfInput(
+      await folderOf([
+        ['a.json', a],
+        ['b.json', b]
+      ])
+    );
+
+    const folder = await folderOf([[smuggled, a]]);
+    await expect(fingerprintRcfInput(folder)).rejects.toThrow('control character');
+
+    const zip = join(await mkdtemp(join(tmpdir(), 'rcf-fingerprint-')), 'smuggled.zip');
+    await writeFile(zip, await zipOf([[smuggled, a]]));
+    await expect(fingerprintRcfInput(zip)).rejects.toThrow('control character');
+
+    // The honest delivery is unchanged by the refusal: its fingerprint is still the manifest of its two files.
+    expect(honest.sha256).toBe(sha256(`${sha256(a)}  a.json\n${sha256(b)}  b.json\n`));
   });
 
   it('refuses an input rcf cannot read', async () => {
