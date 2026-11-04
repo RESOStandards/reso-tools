@@ -350,6 +350,55 @@ describe('uploadToSlot', () => {
     }
   });
 
+  it('refuses an address that is not https, before anything is sent', async () => {
+    const sent = vi.fn();
+    vi.stubGlobal('fetch', sent);
+    const { mkdtemp, writeFile } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const zipPath = join(await mkdtemp(join(tmpdir(), 'upload-test-')), 'upload.zip');
+    await writeFile(zipPath, 'PK');
+    const slot = (url: string) => ({ uploadId: 'u', url, fields: {}, expiresAt: 'x', maxBytes: 1 });
+    await expect(uploadToSlot(slot('http://uploads.example.org/b'), zipPath)).rejects.toThrow(
+      'Uploading the files was refused: the upload address http://uploads.example.org is not https.'
+    );
+    await expect(uploadToSlot(slot('ftp://uploads.example.org/b'), zipPath)).rejects.toThrow('is not https');
+    await expect(uploadToSlot(slot('not an address'), zipPath)).rejects.toThrow('no usable upload address');
+    expect(sent).not.toHaveBeenCalled();
+  });
+
+  it('refuses a redirect, and never posts the data on to where it points', async () => {
+    const { createServer } = await import('node:http');
+    const { mkdtemp, writeFile } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const zipPath = join(await mkdtemp(join(tmpdir(), 'upload-test-')), 'upload.zip');
+    await writeFile(zipPath, 'PK-redirected');
+    const reachedElsewhere: string[] = [];
+    const server = createServer((request, response) => {
+      request.resume();
+      request.on('end', () => {
+        if (request.url === '/elsewhere') {
+          reachedElsewhere.push(request.method ?? '');
+          response.statusCode = 204;
+        } else {
+          response.statusCode = 307;
+          response.setHeader('location', '/elsewhere');
+        }
+        response.end();
+      });
+    });
+    await new Promise<void>(done => server.listen(0, '127.0.0.1', done));
+    const { port } = server.address() as { port: number };
+    try {
+      const slot = { uploadId: 'u', url: `http://127.0.0.1:${port}/bucket`, fields: {}, expiresAt: 'x', maxBytes: 100 };
+      await expect(uploadToSlot(slot, zipPath)).rejects.toThrow('answered 307, a redirect, which is never followed');
+      expect(reachedElsewhere).toEqual([]);
+    } finally {
+      server.close();
+    }
+  });
+
   it("says why storage refused an upload, in the storage service's words", async () => {
     vi.stubGlobal('fetch', async () =>
       reply(

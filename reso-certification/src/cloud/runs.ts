@@ -16,7 +16,14 @@
  */
 
 import { openAsBlob } from 'node:fs';
-import { cliAuthRejectedMessage, cliAuthRequiredMessage, mintProviderToken, resolveServicesUrl, serviceError } from '../sdk/common.js';
+import {
+  cliAuthRejectedMessage,
+  cliAuthRequiredMessage,
+  isLoopbackHost,
+  mintProviderToken,
+  resolveServicesUrl,
+  serviceError
+} from '../sdk/common.js';
 
 /** The endorsement names the request route takes. */
 export const CLOUD_ENDORSEMENT = {
@@ -329,14 +336,36 @@ export const requestUploadSlot = async (input: UploadSlotInput): Promise<UploadS
 const xmlText = (xml: string, element: string): string | undefined => xml.match(new RegExp(`<${element}>([^<]*)</${element}>`))?.[1];
 
 /**
+ * Where an upload may go: an https address, or a loopback one, which never leaves the machine. The address comes from
+ * the service, so anything else means something is wrong, and it is refused rather than upgraded.
+ */
+const uploadAddressProblem = (raw: string): string | undefined => {
+  if (!URL.canParse(raw)) return 'the service gave no usable upload address';
+  const url = new URL(raw);
+  if (url.protocol === 'https:' || (url.protocol === 'http:' && isLoopbackHost(url.hostname))) return undefined;
+  return `the upload address ${url.protocol}//${url.host} is not https`;
+};
+
+const isRedirect = (status: number): boolean => status >= 300 && status < 400;
+
+/**
  * Upload a packed zip to its slot. The file streams from disk, so its size is never held in memory, and no RESO
- * credential goes with it: the slot's own fields authorize it.
+ * credential goes with it: the slot's own fields authorize it. It goes only over https, and only to the address the
+ * slot names: a redirect is refused, never followed, so the provider's data is never posted on to somewhere else.
  */
 export const uploadToSlot = async (slot: UploadSlot, zipPath: string): Promise<void> => {
+  const problem = uploadAddressProblem(slot.url);
+  if (problem !== undefined) throw serviceError('SERVICE_ERROR', `Uploading the files was refused: ${problem}.`);
   const form = new FormData();
   for (const [name, value] of Object.entries(slot.fields)) form.append(name, value);
   form.append('file', await openAsBlob(zipPath, { type: 'application/zip' }), 'upload.zip');
-  const response = await fetch(slot.url, { method: 'POST', body: form });
+  const response = await fetch(slot.url, { method: 'POST', body: form, redirect: 'manual' });
+  if (isRedirect(response.status)) {
+    throw serviceError(
+      'SERVICE_ERROR',
+      `Uploading the files was refused: the upload address answered ${response.status}, a redirect, which is never followed.`
+    );
+  }
   if (response.ok) return;
   const text = await response.text().catch(() => '');
   const reason = [xmlText(text, 'Code'), xmlText(text, 'Message')].filter(Boolean).join(': ');
