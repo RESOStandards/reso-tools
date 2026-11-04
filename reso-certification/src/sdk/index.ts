@@ -18,7 +18,8 @@ export type {
 } from './types.js';
 
 export { createPipeline } from './pipeline.js';
-export { runAddEditCompliance, createAddEditPipeline, addEditRunProblems } from './add-edit.js';
+export { runAddEditCompliance, createAddEditPipeline } from './add-edit.js';
+export { addEditRunProblems } from '../add-edit/run-checks.js';
 export { runEntityEventCompliance, createEntityEventPipeline } from './entity-event.js';
 export { runCoreCompliance, createCorePipeline } from './core.js';
 export { runDDCompliance, createDDPipeline } from './dd.js';

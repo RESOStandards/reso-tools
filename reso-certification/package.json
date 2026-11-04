@@ -18,6 +18,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./add-edit-run-checks": {
+      "types": "./dist/add-edit/run-checks.d.ts",
+      "import": "./dist/add-edit/run-checks.js"
     }
   },
   "bin": {
