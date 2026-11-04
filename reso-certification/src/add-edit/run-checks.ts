@@ -6,6 +6,9 @@
 import type { AddEditConfig } from '../sdk/types.js';
 import { type AddEditPayloadName, type AddEditTestPlan, PAYLOAD_FILES, payloadsFor, planAddEditTests } from './plan.js';
 
+// The vocabulary a caller validates against, from the same place the run reads it.
+export { ADD_EDIT_ACTIONS, ADD_EDIT_FORMATS, type AddEditAction, type AddEditFormat, type AddEditFormats } from './plan.js';
+
 /** The provider's payloads, by name. */
 export type Payloads = Readonly<Partial<Record<AddEditPayloadName, Record<string, unknown>>>>;
 
