@@ -108,6 +108,8 @@ export {
 
 export {
   runComplianceTests,
+  runRcfCompliance,
+  fingerprintRcfInput,
   runAddEditCompliance,
   addEditRunProblems,
   runEntityEventCompliance,
@@ -116,12 +118,15 @@ export {
   writeReports
 } from './sdk/index.js';
 
+export type { RcfInputFingerprint } from './rcf/fingerprint.js';
+
 // The versions a caller gets when it names none, so another host defaults to what the CLI does.
 export { CURRENT_CORE_VERSION } from './sdk/core-versions.js';
 export { CURRENT_DD_VERSION } from './sdk/dd-versions.js';
 
 export type {
   ComplianceConfig,
+  RcfConfig,
   AddEditConfig,
   CoreConfig,
   DDConfig,
