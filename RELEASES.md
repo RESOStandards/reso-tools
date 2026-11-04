@@ -90,6 +90,17 @@ RESO Common Format has no `$metadata`, so the metadata report that certification
 - **Dependencies are updated for 17 of the 18 advisories `npm audit` reported,** among them `fast-xml-parser`, which reads `$metadata`, the `express` request stack and the MCP SDK. No update was published after 2026-10-23, so none is newer than 11 days.
 - **Vitest now needs 4.1.12 or later,** and Vite is held on 6.
 - **`zod` is not updated yet.** Its fix needs zod 4 in the MCP server, which is a change of its own.
+- **`rcf` refuses a file whose name holds a control character,** such as a newline. The fingerprint names each file on
+  its own line, so such a name could have given two different deliveries the same fingerprint. Every other delivery
+  keeps the fingerprint it had.
+- **A cloud run's upload goes only over https, and never follows a redirect,** so the files reach only the address
+  RESO's service gave.
+- **`rcf` refuses one record, or one other top-level member, larger than 64 MiB.** Each is held whole while it is
+  read. The number of records is still unbounded.
+- **An Add/Edit run that stops early still removes the records it created** when delete is tested, and says what
+  became of them with the reason it stopped. A key header it cannot decode no longer stops the run.
+- **`addEditRunProblems` answers a selection of the wrong shape with reasons,** such as actions given as a string,
+  where it threw before.
 
 ### `rcf` writes `report.json`, and the SDK runs RESO Common Format
 
