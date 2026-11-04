@@ -38,7 +38,9 @@ A variable already set in the real environment is **never** overwritten by the f
 prints which file it read and the **names** of the variables it set, never their values. A value whose name
 ends in `SECRET`, `PASSWORD` or `API_KEY` is masked in everything the CLI prints.
 
-**Which environment a run touches is decided by `TOKEN_URI`, and by nothing else.**
+**Which environment a run touches is decided by `TOKEN_URI`, and by nothing else.** The one
+exception is `archive-report --url`, which names the Cert API host directly and presents the
+file's `CLIENT_SECRET` to it, so a `--url` is checked by the person typing it.
 `RESO_SERVICES_URL` is the **same value for every environment**, so reading it tells you nothing
 about which one you are pointed at. The environment is fixed when the token is minted: authenticating
 against the QA certification host produces a token carrying `qa`, the production host produces one
@@ -510,7 +512,7 @@ reso-cert archive-report <reportId> --confirm --json
 |---|---|
 | `<reportId>` | The report's id, as the certification site shows it. |
 | `--confirm` | Archive the report. Without it the warning is printed and nothing is archived. |
-| `--url <url>` | The Cert API origin, such as `https://cert-api.example.org`, without a path. Default: taken from `TOKEN_URI`. |
+| `--url <url>` | The Cert API origin, such as `https://cert-api.example.org`, without a path. Default: taken from `TOKEN_URI`. The API is expected at an origin's root: an API mounted under a path prefix cannot be named, by `--url` or by `TOKEN_URI`. A host without a dot that is not loopback, such as the `undefined` older credentials files carried, is refused. |
 | `--json` | Print one object: `reportId`, `origin`, `warning`, `report`, `confirmed`, `archived`, `status`, `message`. |
 
 - **It needs the credentials file downloaded from the certification site.** Sign in, download

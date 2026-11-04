@@ -11,7 +11,7 @@
  * finds nothing stops the command before the archive. A value that cannot be read is never guessed.
  */
 
-import { ensureHttps } from '../sdk/common.js';
+import { ensureHttps, isLoopbackHost } from '../sdk/common.js';
 import { MISSING_CERT_API_CREDENTIAL, resolveCertApiCredential } from './cert-api-credential.js';
 import { registerSecret } from './secrets.js';
 
@@ -84,45 +84,71 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 const stringOf = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined);
 
 /**
+ * True for a host the Cert API can be on: loopback, or a name with a dot in it.
+ *
+ * The credentials file the certification site produced from 2025-04-03 to 2026-10-20 carried
+ * `TOKEN_URI=undefined/api/v1/oauth/token`, a lookup that missed. Prefixed with a scheme that is the
+ * host `undefined`, and a request to it would carry the credential to a DNS lookup for that name.
+ * A bare single-label name is never where the API is, so it is refused before any request.
+ */
+const isApiHost = (hostname: string): boolean => isLoopbackHost(hostname) || hostname.includes('.');
+
+/**
  * The Cert API origin a `TOKEN_URI` names, or undefined.
  *
- * Only when the path is exactly the token endpoint. The file's own comment records that older files
- * were built from the site host, where `/api/v1` answers the single-page app with a 200, so a value
- * with any other path says nothing reliable about where the API is.
+ * Only when the host can be an API host and the path is exactly the token endpoint. The file's own
+ * comment records that older files were built from the site host, where `/api/v1` answers the
+ * single-page app with a 200, so a value with any other path says nothing reliable about where the
+ * API is.
  */
 export const certApiOriginFromTokenUri = (tokenUri: string): string | undefined => {
   try {
     const parsed = new URL(tokenUri.trim());
-    return TOKEN_PATHS.has(parsed.pathname) ? parsed.origin : undefined;
+    return isApiHost(parsed.hostname) && TOKEN_PATHS.has(parsed.pathname) ? parsed.origin : undefined;
   } catch {
     return undefined;
   }
+};
+
+/** Why a parsed `TOKEN_URI` does not name the API, for the refusal. */
+const tokenUriRefusal = (tokenUri: string): string => {
+  const hostname = ((): string | undefined => {
+    try {
+      return new URL(tokenUri).hostname;
+    } catch {
+      return undefined;
+    }
+  })();
+  return hostname !== undefined && !isApiHost(hostname)
+    ? `TOKEN_URI names the host ${JSON.stringify(hostname)}, which cannot be the Cert API, so the API address cannot be taken from it. Pass --url.`
+    : 'TOKEN_URI does not name the Cert API token endpoint (/api/v1/oauth/token), so the API address cannot be taken from it. Pass --url.';
 };
 
 /**
  * The Cert API origin: `--url` when given, else from `TOKEN_URI`, either way as https.
  *
  * A `--url` with a path is refused rather than trimmed: a `TOKEN_URI` pasted here would otherwise
- * silently become a different address.
+ * silently become a different address. The API is expected at an origin's root.
  */
 export const resolveCertApiOrigin = (input: { readonly url?: string; readonly env: NodeJS.ProcessEnv }): string => {
   if (input.url !== undefined) {
     const secured = ensureHttps(input.url, '--url');
     const parsed = new URL(secured);
+    if (!isApiHost(parsed.hostname)) {
+      throw new Error(`--url names the host ${JSON.stringify(parsed.hostname)}, which cannot be the Cert API.`);
+    }
     if (parsed.pathname !== '/' || parsed.search !== '' || parsed.hash !== '') {
       throw new Error(`--url must be the Cert API origin without a path, such as ${parsed.origin}.`);
     }
     return parsed.origin;
   }
   const tokenUri = input.env.TOKEN_URI;
-  const origin = tokenUri === undefined ? undefined : certApiOriginFromTokenUri(ensureHttps(tokenUri, 'TOKEN_URI'));
-  if (origin === undefined) {
-    throw new Error(
-      tokenUri === undefined
-        ? 'No Cert API address. Pass --url, or run where the downloaded credentials file (TOKEN_URI) can be read.'
-        : 'TOKEN_URI does not name the Cert API token endpoint (/api/v1/oauth/token), so the API address cannot be taken from it. Pass --url.'
-    );
+  if (tokenUri === undefined) {
+    throw new Error('No Cert API address. Pass --url, or run where the downloaded credentials file (TOKEN_URI) can be read.');
   }
+  const secured = ensureHttps(tokenUri, 'TOKEN_URI');
+  const origin = certApiOriginFromTokenUri(secured);
+  if (origin === undefined) throw new Error(tokenUriRefusal(secured));
   return origin;
 };
 

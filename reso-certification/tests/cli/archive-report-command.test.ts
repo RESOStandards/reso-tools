@@ -107,6 +107,19 @@ describe('the Cert API origin', () => {
     expect(() => resolveCertApiOrigin({ env: env({ TOKEN_URI: `${ORIGIN}/oauth/token` }) })).toThrow(/--url/);
   });
 
+  it('refuses a host that cannot be an API host, such as the "undefined" older credentials files carried', () => {
+    expect(certApiOriginFromTokenUri('https://undefined/api/v1/oauth/token')).toBeUndefined();
+    expect(() => resolveCertApiOrigin({ env: env({ TOKEN_URI: 'undefined/api/v1/oauth/token' }) })).toThrow(/host.*--url/s);
+    expect(() => resolveCertApiOrigin({ env: env({ TOKEN_URI: 'undefined/api/v1/oauth2/token' }) })).toThrow(/host.*--url/s);
+    expect(() => resolveCertApiOrigin({ url: 'undefined', env: env() })).toThrow(/host/);
+    expect(() => resolveCertApiOrigin({ url: 'https://cert-api', env: env() })).toThrow(/host/);
+  });
+
+  it('still accepts a loopback host, where a local Cert API runs', () => {
+    expect(resolveCertApiOrigin({ env: env({ TOKEN_URI: 'http://localhost:3000/api/v1/oauth/token' }) })).toBe('http://localhost:3000');
+    expect(resolveCertApiOrigin({ url: 'http://127.0.0.1:3000', env: env() })).toBe('http://127.0.0.1:3000');
+  });
+
   it('refuses when TOKEN_URI is absent and no --url is given', () => {
     expect(() => resolveCertApiOrigin({ env: { CLIENT_SECRET: CREDENTIAL } })).toThrow(/--url/);
   });
@@ -336,6 +349,12 @@ describe('refusals before any request', () => {
   it('refuses without an origin', async () => {
     const api = certApi();
     await expect(run(api, { env: { CLIENT_SECRET: CREDENTIAL } })).rejects.toThrow(/--url/);
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it('refuses the TOKEN_URI older credentials files carried, so the credential never goes to a host named undefined', async () => {
+    const api = certApi();
+    await expect(run(api, { env: env({ TOKEN_URI: 'undefined/api/v1/oauth/token' }) })).rejects.toThrow(/--url/);
     expect(api).not.toHaveBeenCalled();
   });
 
