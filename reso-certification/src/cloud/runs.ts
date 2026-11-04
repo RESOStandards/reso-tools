@@ -69,9 +69,14 @@ export interface ReserveCloudRunInput extends CloudAuthInput {
   readonly targets: ReadonlyArray<CloudRunTarget>;
 }
 
-/** A request ID reserved for a local run, and until when a cloud run can start from it. */
+/**
+ * A request ID reserved for a local run, when the service recorded it and until when a cloud run can start from it.
+ * Both times are the service's clock, as it answered them: a start is judged against them, never against the clock
+ * of the machine that ran locally.
+ */
 export interface CloudRunReservation {
   readonly certificationRequestId: string;
+  readonly reservedAt: string;
   readonly expiresAt: string;
   readonly recipients: ReadonlyArray<CloudRunRecipient>;
 }
@@ -205,22 +210,23 @@ const acceptedRunOf = (body: unknown): AcceptedCloudRun | undefined => {
   };
 };
 
+/** The reservation as the service answered it. One without its request ID or either end of its window is none. */
 const reservationOf = (body: unknown): CloudRunReservation | undefined => {
-  if (!isRecord(body) || !nonEmpty(body.certificationRequestId) || !nonEmpty(body.expiresAt) || !Array.isArray(body.recipients)) {
-    return undefined;
-  }
+  if (!isRecord(body) || !nonEmpty(body.certificationRequestId) || !Array.isArray(body.recipients)) return undefined;
+  if (!nonEmpty(body.reservedAt) || !nonEmpty(body.expiresAt)) return undefined;
   if (!body.recipients.every(isRecipient)) return undefined;
   return {
     certificationRequestId: body.certificationRequestId,
+    reservedAt: body.reservedAt,
     expiresAt: body.expiresAt,
     recipients: body.recipients.map(r => ({ recipientUoi: r.recipientUoi, providerUsi: r.providerUsi }))
   };
 };
 
 /**
- * Reserve a request ID as a local run starts. Only the targets are sent: the recipient, the system and the
- * server each entry will test. The cloud run is started from the ID once the run has passed, within the window
- * the service gives (`expiresAt`).
+ * Reserve a request ID for a local run that passed. Only the targets are sent: the recipient, the system and the
+ * server each entry tested. The cloud run is started from the ID within the window the service gives
+ * (`reservedAt` to `expiresAt`, on its clock).
  */
 export const reserveCloudRun = async (input: ReserveCloudRunInput): Promise<CloudRunReservation> => {
   const what = `Reserving the ${input.endorsementName} ${input.endorsementVersion} run`;

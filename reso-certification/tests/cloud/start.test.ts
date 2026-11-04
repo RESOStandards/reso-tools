@@ -233,7 +233,7 @@ describe('startCloudRun', () => {
 
 describe('reserveForLocalRun', () => {
   it('reserves the target of a run that passed, with the server for a Core run and none for a RESO Common Format run', async () => {
-    const reserve = vi.fn(async () => ({ certificationRequestId: 'test-T00000000-9', expiresAt: 'x', recipients: [] }));
+    const reserve = vi.fn(async () => ({ certificationRequestId: 'test-T00000000-9', reservedAt: 'x', expiresAt: 'x', recipients: [] }));
     const resolveCliToken = vi.fn(async () => 'cli-token-for-tests');
     await reserveForLocalRun({ config: coreConfig(), result: passed, fromCli: true }, { reserve, resolveCliToken });
     expect(reserve.mock.calls[0]?.[0]).toEqual({
@@ -257,7 +257,7 @@ describe('reserveForLocalRun', () => {
   });
 
   it('reserves nothing for a run that did not pass or is not addressed', async () => {
-    const reserve = vi.fn(async () => ({ certificationRequestId: 'x', expiresAt: 'x', recipients: [] }));
+    const reserve = vi.fn(async () => ({ certificationRequestId: 'x', reservedAt: 'x', expiresAt: 'x', recipients: [] }));
     await expect(reserveForLocalRun({ config: coreConfig(), result: { ...passed, status: 'failed' } }, { reserve })).rejects.toThrow(
       /it failed/
     );

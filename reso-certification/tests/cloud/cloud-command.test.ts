@@ -135,6 +135,7 @@ describe('offerCloudRuns', () => {
         order.push(`reserve ${request.endorsementVersion}`);
         return {
           certificationRequestId: `test-T00000000-reserved-${request.endorsementVersion}`,
+          reservedAt: '2026-10-29T20:00:00.000Z',
           expiresAt: '2026-10-30T20:00:00.000Z',
           recipients: []
         };
@@ -174,7 +175,12 @@ describe('offerCloudRuns', () => {
       ...calls,
       reserve: vi.fn(async request => {
         if (request.endorsementVersion === '2.1.0') throw new Error('Reserving the web-api-core 2.1.0 run was refused: not allowed.');
-        return { certificationRequestId: 'test-T00000000-reserved-2.0.0', expiresAt: '2026-10-30T20:00:00.000Z', recipients: [] };
+        return {
+          certificationRequestId: 'test-T00000000-reserved-2.0.0',
+          reservedAt: '2026-10-29T20:00:00.000Z',
+          expiresAt: '2026-10-30T20:00:00.000Z',
+          recipients: []
+        };
       })
     };
 

@@ -242,6 +242,7 @@ describe('reserveCloudRun', () => {
 
     await expect(reserve()).resolves.toEqual({
       certificationRequestId: reservation.certificationRequestId,
+      reservedAt: reservation.reservedAt,
       expiresAt: reservation.expiresAt,
       recipients: reservation.recipients
     });
@@ -257,6 +258,15 @@ describe('reserveCloudRun', () => {
     await expect(reserve()).rejects.toThrow('Reserving the web-api-core 2.1.0 run was refused: Entry 1 has no providerUsi.');
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply(201, { certificationRequestId: 'x' })));
+    await expect(reserve()).rejects.toThrow('without a request ID and its window');
+  });
+
+  it("refuses an answer without the service's reservation time, and never fills it in", async () => {
+    const { reservedAt: _omitted, ...withoutReservedAt } = reservation;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply(201, withoutReservedAt)));
+    await expect(reserve()).rejects.toThrow('without a request ID and its window');
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply(201, { ...reservation, reservedAt: '' })));
     await expect(reserve()).rejects.toThrow('without a request ID and its window');
   });
 });
