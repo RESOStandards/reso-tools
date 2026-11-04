@@ -100,12 +100,22 @@ type JsonEvent =
 const BYTE_ORDER_MARK_FIRST_BYTE = 0xef;
 
 /**
+ * The most one record, or one other top-level member, may take in a file. Each is held whole while it is read, so this
+ * bounds what one item can cost in memory, however the file was made. The number of records is not bounded.
+ */
+export const MAX_ITEM_BYTES = 64 * 1024 * 1024;
+
+/**
  * Parse a file as a stream (`@streamparser/json`; never hand-rolled), yielding each element of the top-level `value`
  * array as it completes and each other top-level property whole. An element is let go of once it is yielded, so a
  * `value` array of any length is never held. The parse is as strict as `JSON.parse`: trailing content, a truncated
  * file and a byte order mark are refused, as `JSON.parse` refuses them.
  */
-async function* jsonEvents(bytes: AsyncIterable<Uint8Array>, source: string): AsyncGenerator<JsonEvent> {
+export async function* jsonEvents(
+  bytes: AsyncIterable<Uint8Array>,
+  source: string,
+  maxItemBytes: number = MAX_ITEM_BYTES
+): AsyncGenerator<JsonEvent> {
   const parser = new JSONParser({ paths: ['$.*', '$.value.*'], keepStack: false });
   const ready: JsonEvent[] = [];
   parser.onValue = ({ value, key, parent, stack }) => {
@@ -125,6 +135,9 @@ async function* jsonEvents(bytes: AsyncIterable<Uint8Array>, source: string): As
   };
   const fail = (err: unknown): Error => new Error(`${source} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
   let started = false;
+  // The bytes read since a record or member last completed: what the item being read has taken so far, to within one
+  // chunk, since an item can complete partway through one.
+  let unfinished = 0;
   for await (const chunk of bytes) {
     if (chunk.length === 0) continue;
     // The parser skips a UTF-8 byte order mark. JSON.parse, which read these files before, refuses one, and so does this.
@@ -134,6 +147,12 @@ async function* jsonEvents(bytes: AsyncIterable<Uint8Array>, source: string): As
       parser.write(chunk);
     } catch (err) {
       throw fail(err);
+    }
+    unfinished = ready.length > 0 ? 0 : unfinished + chunk.length;
+    if (unfinished > maxItemBytes) {
+      throw new Error(
+        `${source} holds a record or top-level member larger than ${maxItemBytes.toLocaleString('en-US')} bytes. Each is held whole while it is read, so one that large is refused.`
+      );
     }
     yield* ready.splice(0);
   }
