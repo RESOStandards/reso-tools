@@ -653,6 +653,10 @@ passed.
   run, naming the upload and the fingerprint. The upload goes straight to storage with its own signed fields, and no
   RESO credential goes with it. The local zip and its folder are removed afterwards, whatever happened.
 
+```bash
+reso-cert rcf --input ./rcf-files --provider-uoi <UOI> --provider-usi <USI> --recipient-uoi <UOI> --start-cloud-run
+```
+
 The flags are checked before the run, as for Core, so a long run is not wasted: a run with `--skip-schema-validation`
 or `--skip-variations` cannot be certified, so `--start-cloud-run` does not go with either. RESO's service switches RESO Common
 Format cloud runs on separately: until then it refuses the reservation, and the CLI prints its reason.

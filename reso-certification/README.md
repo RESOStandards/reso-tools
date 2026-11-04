@@ -3,12 +3,12 @@
 Compliance testing toolkit for RESO OData servers. Run certification tests from the command line, integrate them into your CI pipeline or call the SDK directly from your application.
 
 - **Endorsements** ready to use: Add/Edit, EntityEvent, Web API Core, Data Dictionary and RESO Common Format (RCF)
-- **Pure TypeScript** – built on [`reso-client`](../reso-client/) for OData and [`reso-validation`](../reso-validation/) for field validation
+- **Pure TypeScript** – built on [`reso-client`](https://tools.reso.org/packages/reso-client/) for OData and [`reso-validation`](https://tools.reso.org/packages/reso-validation/) for field validation
 - **Auto-configuring** – samples live server data to build test parameters, auto-detects enum mode from metadata
 - **SDK-first** – the CLI, Desktop Client and MCP server all call the same SDK functions with progress callbacks
 - **Flexible auth** – bearer tokens, OAuth2 Client Credentials, `.env` files or environment variables
 
-> **[User Guide](doc/GUIDE.md)** – a task-oriented walk-through with realistic examples.
+> **[User Guide](https://tools.reso.org/guides/reso-certification/)** – a task-oriented walk-through with realistic examples.
 
 ## Install
 
@@ -52,7 +52,7 @@ reso-cert dd --url https://api.example.com --auth-token TOKEN
 reso-cert rcf --input ./rcf-export/ --output-dir ./out
 ```
 
-> **[Full CLI reference](src/cli/README.md)** – every command and option, including the per-step utilities (`metadata`, `schema`, `replicate`, `find-variations`) and the `update-variations` admin command.
+> **[Full CLI reference](https://tools.reso.org/packages/reso-certification/cli/)** – every command and option, including the per-step utilities (`metadata`, `schema`, `replicate`, `find-variations`) and the `update-variations` admin command.
 
 ## Authentication
 
@@ -60,7 +60,7 @@ Auth is resolved automatically from the first available source:
 
 1. **CLI flags**: `--auth-token` or `--client-id`/`--client-secret`/`--token-url`
 2. **Config file**: `--config path/to/config.json` (per-entry auth)
-3. **A credentials file**: `credentials.env`, as the certification site hands it out, or a `.env`. The CLI reads the first one it finds at startup, from the places the [CLI reference](src/cli/README.md#environment-env) lists.
+3. **A credentials file**: `credentials.env`, as the certification site hands it out, or a `.env`. The CLI reads the first one it finds at startup, from the places the [CLI reference](https://tools.reso.org/packages/reso-certification/cli/#environment-env) lists.
 4. **Environment variables**: `RESO_AUTH_TOKEN` or `RESO_CLIENT_ID`/`RESO_CLIENT_SECRET`/`RESO_TOKEN_URI`
 
 A Data Dictionary run authenticates twice. Besides the server credentials above, it reaches the Variations Service, which reads `RESO_SERVICES_URL`, `TOKEN_URI`, `CLIENT_ID` and `CLIENT_SECRET` from the credentials file or the environment. A missing `RESO_SERVICES_URL` fails the run at the variations step rather than skipping it, so a misconfigured machine cannot quietly stop checking variations. `--skip-variations` runs without them. That run is not eligible for certification.
@@ -79,7 +79,7 @@ reso-cert add-edit --url https://api.example.com --auth-token TOKEN --payloads .
 
 Nothing is tested unless it is chosen: name the actions, and the formats of each create or update among them.
 
-[**More info**](src/add-edit/README.md)
+[**More info**](https://tools.reso.org/packages/reso-certification/add-edit/)
 
 ### EntityEvent (RCP-027)
 
@@ -89,7 +89,7 @@ Validates EntityEvent change tracking in observe mode (read-only) or full mode (
 reso-cert entity-event --url https://api.example.com --auth-token TOKEN --mode observe
 ```
 
-[**More info**](src/entity-event/README.md)
+[**More info**](https://tools.reso.org/packages/reso-certification/entity-event/)
 
 ### Web API Core 2.1.0
 
@@ -104,7 +104,7 @@ reso-cert core --url https://api.example.com --auth-token TOKEN \
   --field-overrides Property.ListPrice,Office.FeedTypes
 ```
 
-[**More info**](src/web-api-core/README.md)
+[**More info**](https://tools.reso.org/packages/reso-certification/web-api-core/)
 
 ### Data Dictionary 2.1
 
@@ -121,7 +121,7 @@ reso-cert dd --url https://api.example.com --auth-token TOKEN --no-strict
 reso-cert dd --url https://api.example.com --auth-token TOKEN --dd-version 2.0
 ```
 
-[**More info**](src/data-dictionary/README.md)
+[**More info**](https://tools.reso.org/packages/reso-certification/data-dictionary/)
 
 ### RESO Common Format (RCF)
 
@@ -146,7 +146,7 @@ reso-cert submit-variations-report --report ./out/variations-report.json
 - **Variations do not change the exit code.** `rcf` exits `1` on schema errors, and `2` when it could not do what was asked.
 - **The variations check uses your RESO services credentials.** `--skip-variations` runs without them.
 
-[**More info**](doc/GUIDE.md) – "RESO Common Format (RCF)" in the User Guide
+[**More info**](https://tools.reso.org/guides/reso-certification/) – "RESO Common Format (RCF)" in the User Guide
 
 ## Output
 
@@ -202,7 +202,7 @@ All three identifiers appear in the output path as `{providerUoi}-{providerUsi}/
 
 `OriginatingSystemName` and `OriginatingSystemID` scope a feed carrying more than one originating system. **Data Dictionary and Web API Core read them; Add/Edit and EntityEvent ignore them.** Either may sit at entry level or inside that endorsement's options block, where the block wins, and Name takes precedence over ID when both are present.
 
-See [`sample-configs/`](sample-configs/README.md) for a downloadable sample per endorsement and the full field reference.
+See [`sample-configs/`](https://github.com/RESOStandards/reso-tools/blob/main/reso-certification/sample-configs/README.md) for a downloadable sample per endorsement and the full field reference.
 
 ## Cloud Runs
 
@@ -215,6 +215,7 @@ reso-cert core --config providers.json --start-cloud-run
 reso-cert dd --config providers.json --start-cloud-run
 reso-cert add-edit --config providers.json --start-cloud-run
 reso-cert entity-event --config providers.json --start-cloud-run
+reso-cert rcf --input ./rcf-files --provider-uoi <UOI> --provider-usi <USI> --recipient-uoi <UOI> --start-cloud-run
 reso-cert cloud status --in-progress
 ```
 
@@ -237,7 +238,7 @@ most 5 GB, uploaded and run in RESO's cloud. It needs `--provider-uoi`, `--provi
 Cloud runs cover every endorsement: Data Dictionary, Web API Core, Add/Edit, EntityEvent and RESO Common Format,
 through one path (`startCloudRun` in the SDK). They sign in with the same `TOKEN_URI`, `CLIENT_ID` and
 `CLIENT_SECRET` from your credentials file as the Variations Service (see [Authentication](#authentication)). The
-[CLI reference](src/cli/README.md#cloud-runs) has the details.
+[CLI reference](https://tools.reso.org/packages/reso-certification/cli/#cloud-runs) has the details.
 
 ## Archiving a Report
 
@@ -250,13 +251,13 @@ reso-cert archive-report <reportId>              # shows the warning, archives n
 reso-cert archive-report <reportId> --confirm    # shows the warning, then archives
 ```
 
-The [CLI reference](src/cli/README.md#archive-report) has the options and the exit codes.
+The [CLI reference](https://tools.reso.org/packages/reso-certification/cli/#archive-report) has the options and the exit codes.
 
 ## Metadata Report Utilities
 
 ### `reso-cert metadata-report adapt`
 
-Synthesize the top-level `resources[]` block on a DD 2.0 or 2.1 metadata report so it can be loaded by tools that expect a DD 2.2-shaped report (notably the [Reference Server](../reso-reference-server/)). Idempotent – DD 2.2+ reports pass through unchanged.
+Synthesize the top-level `resources[]` block on a DD 2.0 or 2.1 metadata report so it can be loaded by tools that expect a DD 2.2-shaped report (notably the [Reference Server](https://tools.reso.org/packages/reso-reference-server/)). Idempotent – DD 2.2+ reports pass through unchanged.
 
 ```bash
 reso-cert metadata-report adapt \
@@ -340,7 +341,7 @@ The variable is an explicit switch. Without it the SDK calls the HTTP service ex
 Tagged releases publish a public image, so most uses are a pull rather than a build:
 
 ```bash
-docker pull ghcr.io/resostandards/reso-tools/reso-cert:v0.11.1   # or :latest
+docker pull ghcr.io/resostandards/reso-tools/reso-cert:latest   # or pin a release: :v<version>
 ```
 
 It is `linux/amd64`. On Apple silicon Docker runs it emulated, which works and is slower.
@@ -392,7 +393,7 @@ Mount the config read-only. It carries the provider's token.
 
 ### Compliance tests against the reference server
 
-Run compliance tests against the [RESO Reference Server](../reso-reference-server/):
+Run compliance tests against the [RESO Reference Server](https://tools.reso.org/packages/reso-reference-server/):
 
 ```bash
 cd ../reso-reference-server

@@ -2,7 +2,7 @@
 
 OData 4.01 client SDK for TypeScript. Provides URI building, CRUD helpers, CSDL metadata parsing and validation, query option validation, and response parsing.
 
-> **[User Guide](doc/GUIDE.md)** – a task-oriented walk-through with realistic examples.
+> **[User Guide](https://tools.reso.org/guides/reso-client/)** – a task-oriented walk-through with realistic examples.
 
 ## Install
 
@@ -219,7 +219,7 @@ await queryEntities(client, "Property", {
 ### CSDL Metadata Parsing
 
 Parse and validate EDMX/CSDL XML metadata documents. The parser, validator and `Csdl*` types
-live in [`@reso-standards/reso-metadata-utils`](../reso-metadata-utils); reso-client provides the
+live in [`@reso-standards/reso-metadata-utils`](https://tools.reso.org/packages/reso-metadata-utils/); reso-client provides the
 metadata fetchers.
 
 ```typescript
@@ -301,7 +301,7 @@ const allEntities = await followAllPages(client, firstResponse);
 
 ### Filter Parser (Re-exported)
 
-The `parseFilter` function and AST types from [`@reso-standards/odata-expression-parser`](../odata-expression-parser/) are re-exported for convenience.
+The `parseFilter` function and AST types from [`@reso-standards/odata-expression-parser`](https://tools.reso.org/packages/odata-expression-parser/) are re-exported for convenience.
 
 ```typescript
 import { parseFilter } from "@reso-standards/reso-client";
@@ -311,15 +311,15 @@ const ast = parseFilter("ListPrice gt 200000 and City eq 'Austin'");
 
 ## Examples
 
-Runnable examples are in the [examples/](examples/) directory. Each requires the reference server running at `http://localhost:8080`.
+Runnable examples are in the [examples/](https://github.com/RESOStandards/reso-tools/tree/main/reso-client/examples) directory. Each requires the reference server running at `http://localhost:8080`.
 
 | Example | Description |
 |---------|-------------|
-| [fetch-property.ts](examples/fetch-property.ts) | Read a Property by key |
-| [query-with-filter.ts](examples/query-with-filter.ts) | Query with `$filter`, `$select`, `$orderby`, `$top` |
-| [create-and-update.ts](examples/create-and-update.ts) | Create a Property, update it, read it back |
-| [validate-metadata.ts](examples/validate-metadata.ts) | Fetch and validate CSDL metadata |
-| [oauth-flow.ts](examples/oauth-flow.ts) | OAuth2 Client Credentials flow |
+| [fetch-property.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/examples/fetch-property.ts) | Read a Property by key |
+| [query-with-filter.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/examples/query-with-filter.ts) | Query with `$filter`, `$select`, `$orderby`, `$top` |
+| [create-and-update.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/examples/create-and-update.ts) | Create a Property, update it, read it back |
+| [validate-metadata.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/examples/validate-metadata.ts) | Fetch and validate CSDL metadata |
+| [oauth-flow.ts](https://github.com/RESOStandards/reso-tools/blob/main/reso-client/examples/oauth-flow.ts) | OAuth2 Client Credentials flow |
 
 ```bash
 # Start the reference server first

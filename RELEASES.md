@@ -16,6 +16,16 @@
   write.
 - Without these settings nothing changes.
 
+### Documentation
+
+- **README links go to tools.reso.org.** npm shows a package's README as it is written, so its relative links
+  opened the raw files on GitHub. Every published package's README now links the HTML pages directly: the user
+  guides, the package and CLI references, and their sections. Code examples and sample configs still link GitHub.
+- **The Cloud Runs examples include RESO Common Format:** `reso-cert rcf --input <files> --provider-uoi <UOI>
+  --provider-usi <USI> --recipient-uoi <UOI> --start-cloud-run`, in the README and the CLI reference.
+- **The Docker example pulls `:latest`** and shows a pinned release as `:v<version>`, instead of naming an old
+  release.
+
 ---
 
 ## Certification 0.12.0 – 2026-11-04
