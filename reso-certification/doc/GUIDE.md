@@ -100,6 +100,11 @@ field.
 service will not filter on the field you named, that test fails rather than quietly certifying on a
 different field – which is the point of naming it, and the difference from how this behaved in 0.11.0.
 
+Integer, decimal, date, timestamp and lookup fields can be named. The timestamp field defaults to
+`ModificationTimestamp`, and a named one serves every timestamp test, the `lt now()` and `le now()`
+ones included. So it must hold a value in the past, or those two would compare nothing, and a named
+field without one is reported as unmatched.
+
 It is a sparse override rather than a switch, which is the easy thing to get wrong. Naming a field
 replaces automatic selection **for its data type on that resource**, and for an enumeration for its
 own **representation**; every other type, representation and resource is still chosen automatically.
@@ -143,19 +148,18 @@ reso-cert core --url https://api.example.com --auth-token TOKEN \
   --resources Property --full-coverage
 ```
 
-For full equivalence, also name the fields your Core 2.0.0 report used, as field overrides. The integer,
-decimal, date and lookup fields can be named:
+For full equivalence, also name the fields your Core 2.0.0 report used, as field overrides:
 
 ```bash
 reso-cert core --url https://api.example.com --auth-token TOKEN \
   --resources Property --full-coverage \
-  --field-overrides Property.BedroomsTotal,Property.ListPrice,Property.ListingContractDate,Property.StandardStatus,Property.InteriorFeatures
+  --field-overrides Property.BedroomsTotal,Property.ListPrice,Property.ListingContractDate,Property.ModificationTimestamp,Property.StandardStatus,Property.InteriorFeatures
 ```
 
-Three things stay the run's own. It picks the timestamp field itself, `ModificationTimestamp` first, so
-an override naming one is reported as unmatched. The key field comes from your metadata. And it samples
-the values it tests from your data, so they can differ from the values in your 2.0.0 report, and a
-multi-valued lookup you name is used only when the sample holds two of its values. In a config file,
+The timestamp field is `ModificationTimestamp` unless you name another. Two things stay the run's own.
+The key field comes from your metadata. And the run samples the values it tests from your data, so
+they can differ from the values in your 2.0.0 report, and a field you name is used only when the
+sample holds at least two of its values, one of them in the past for a timestamp field. In a config file,
 the settings are `coreOptions.resources`, `coreOptions.fullCoverage` and `coreOptions.fieldOverrides`.
 
 ### Data Dictionary 2.1

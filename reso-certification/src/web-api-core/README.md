@@ -166,8 +166,8 @@ standard. A server that cannot meet every type in its standard or local fields i
 type coverage, and can still be certified.
 
 Core 2.0.0 needed every type on one resource. To test as it did, run with `--resources Property --full-coverage`, and
-name the integer, decimal, date and lookup fields from your 2.0.0 report with `--field-overrides`. The timestamp field,
-the key field and the values tested stay the run's own (see the [User Guide](../../doc/GUIDE.md#web-api-core-210)).
+name the fields from your 2.0.0 report with `--field-overrides`. The key field and the values tested stay the run's own
+(see the [User Guide](../../doc/GUIDE.md#web-api-core-210)).
 
 - **Every run** records whether full type coverage was achieved, in `report-detailed.json` as `typeCoverage`
   (`achieved`, `coveredTypes`, `missingTypes`), and in the run's summary. A run passes as long as no scenario fails.
