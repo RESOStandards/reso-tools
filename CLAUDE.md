@@ -21,7 +21,7 @@ The browser UI, Electron desktop shell, CORS proxy and test-data generator moved
 ## Common Commands
 
 ```bash
-npm test                    # Run all tests (3,332 across 8 packages)
+npm test                    # Run all tests (3,340 across 8 packages)
 npm run test:server         # Run server tests only
 npm run test:validation     # Run validation tests only
 npm run lint                # Biome lint check

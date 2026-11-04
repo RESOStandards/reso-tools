@@ -2,7 +2,7 @@
 
 ---
 
-## Certification 0.12.0 – 2026-11-03
+## Certification 0.12.0 – 2026-11-04
 
 ### Cloud runs for every endorsement
 

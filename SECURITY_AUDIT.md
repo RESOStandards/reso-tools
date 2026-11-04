@@ -4,7 +4,7 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
-## Certification 0.12.0 Security Notes – 2026-11-03
+## Certification 0.12.0 Security Notes – 2026-11-04
 
 Pre-publish review of `@reso-standards/reso-certification` 0.12.0, covering every change since 0.11.5: cloud runs from `rcf` and Core, the Add/Edit actions and formats a provider chooses, the streaming RCF reader and its fingerprint, and the Core report fields. No high or medium finding. The five low findings are fixed in #420, and the three informational items are fixed on the branch that adds cloud runs for every endorsement.
 
