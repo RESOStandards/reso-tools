@@ -660,7 +660,7 @@ const replicateAndValidate = (config: DDConfig): PipelineStep<DDContext> => ({
 });
 
 /** Serialize DD pipeline results into a human-readable remarks string. */
-const serializeDDRemarks = (result: PipelineResult): string => {
+export const serializeDDRemarks = (result: PipelineResult): string => {
   const metaStep = result.steps.find(s => s.name === 'Generate metadata report');
   const parts: string[] = [];
   if (metaStep?.counts) {

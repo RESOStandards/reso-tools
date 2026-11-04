@@ -29,8 +29,13 @@ import {
 export const CLOUD_ENDORSEMENT = {
   webApiCore: 'web-api-core',
   dataDictionary: 'data-dictionary',
+  addEdit: 'add-edit',
+  entityEvent: 'entity-event',
   resoCommonFormat: 'reso-common-format'
 } as const;
+
+/** One of the endorsement names the request route takes. */
+export type CloudEndorsementName = (typeof CLOUD_ENDORSEMENT)[keyof typeof CLOUD_ENDORSEMENT];
 
 export const CLOUD_RUNS_SERVICE = 'Cloud runs';
 
