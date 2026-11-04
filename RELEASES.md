@@ -29,6 +29,12 @@
   `localRunRecordOf(result, config)` now build the entry and the record for any of the five endorsements, in the
   shape the service reads. All of these, with `reserveCloudRun`, `requestUploadSlot`, `uploadToSlot`,
   `packRcfInput` and `isSuccessfulRun`, are exported from the package root.
+- **A Data Dictionary sample limit is for local testing, and no public tool sends one to the cloud.** A `dd` run
+  with `--limit` or an entry's `ddOptions.limit` still runs, and its verdict now says it used a sample limit and
+  is not eligible for certification. `--start-cloud-run` refuses the flag before the config file is read and a
+  limited entry before any entry runs, and `cloudEntryOf` and `reserveForLocalRun` refuse a limited run in the
+  same words, so nothing with a limit is reserved or sent. The CLI no longer fills in the default limit itself, which
+  had made every entry carry one; with neither set the SDK reads its default, as before.
 - **The packed RESO Common Format zip is removed however the start ends,** the pack refused, the upload failed or
   the start refused (the 0.12.0 audit's informational item).
 - **Two more 0.12.0 audit items:** the provider-token mint sends the API key only over https, upgrading a bare or

@@ -228,7 +228,7 @@ reso-cert dd --config ./sample-configs/dd-config.json        # multi-provider ba
 | `--url <url>` | – | Server base URL (mutually exclusive with `--config`) |
 | `--config <path>` | – | Config file with one or more provider entries |
 | `--dd-version <v>` | `2.1` | DD version. 2.0 and 2.1 run, and only 2.1, the latest minor, certifies, so a 2.0 run is **not eligible for certification**. Anything else is refused, 1.7 included. In config-file mode the entry's version stands unless this flag is given |
-| `--limit <n>` | `100000` | Max records replicated per resource |
+| `--limit <n>` | `100000` | Max records replicated per resource, a sample limit for local testing. A run with one is **not eligible for certification** and starts no cloud run |
 | `--strict` | on | Fail the run on JSON-schema validation errors. On by default, so this flag is only needed to be explicit. Variations fail a run independently of this setting |
 | `--no-strict` | – | Record schema-validation errors without failing on them, so a long run surveys everything to fix. Validation still runs. The run is **not eligible for certification** and says so in its verdict |
 | `--skip-variations` | – | Do not check variations. The run is **not** eligible for certification |
@@ -253,6 +253,11 @@ step, and the run summary prints a `Not eligible for certification` line. The ru
 unaffected – it still describes what happened while the run executed. An absent
 `RESO_SERVICES_URL` is never treated as a skip; that still fails the run, so a misconfigured machine
 cannot quietly stop checking variations.
+
+A sample limit, from `--limit` or a config entry's `ddOptions.limit`, is for local testing: the run
+measures part of the feed, so its verdict says it is not eligible for certification, and
+`--start-cloud-run` refuses it before anything runs, so remove the limit to start a cloud run. With
+neither set the run reads the default, which is what a certification run reads.
 
 ## Per-step utilities
 
