@@ -686,9 +686,9 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // never folded into totalFailed or the verdict.
     const totalWarnings = resourceReports.reduce((sum, r) => sum + (r.summary.warnings ?? 0), 0);
 
-    // Full type coverage: each type met on some resource tested (Property alone on Core 2.0.0). Every run records it;
-    // it decides the outcome only in --full-coverage mode.
-    const { coveredTypes, missingTypes, fullCoverage } = typeCoverageOf(resourceReports, coerceCoreVersion(version));
+    // Full type coverage: each type met on some resource tested. Every run records it; it decides the outcome only in
+    // --full-coverage mode.
+    const { coveredTypes, missingTypes, fullCoverage } = typeCoverageOf(resourceReports);
 
     // In --full-coverage mode, fail if any types are missing
     const requireFullCoverage = config.fullCoverage ?? false;
