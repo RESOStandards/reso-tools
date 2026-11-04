@@ -124,6 +124,26 @@ export const entriesRefusedBeforeRun = (
   ].join('\n');
 };
 
+/**
+ * What `--start-cloud-run` refuses on `dd` from the flags alone, before the config file is read: a flag that makes
+ * the run uncertifiable. `--limit` is a sample limit for local testing, so a run with one starts no cloud run
+ * whatever the file says, and the refusal names the flag rather than the file. The entry's own `ddOptions.limit` is
+ * read by `entriesRefusedBeforeRun` once the file is.
+ */
+export const ddFlagsRefusedBeforeRun = (flags: {
+  readonly strict?: boolean;
+  readonly skipVariations?: boolean;
+  readonly limit?: string;
+}): string | undefined => {
+  if (flags.strict === false || flags.skipVariations) {
+    return '--start-cloud-run starts from a run that can be certified, which a run with --no-strict or --skip-variations is not.';
+  }
+  if (flags.limit !== undefined) {
+    return '--start-cloud-run starts from a run that can be certified, and a run with --limit uses a sample limit, which is for local testing and cannot be certified. Remove --limit to start a cloud run.';
+  }
+  return undefined;
+};
+
 /** Said at the end of a run with entries that qualify, when `--start-cloud-run` was not given. */
 export const cloudRunHint = (offered: number): string =>
   `${offered} passed and can be certified. To start a certification run in RESO's cloud at the end of a run like this one, add --start-cloud-run.`;

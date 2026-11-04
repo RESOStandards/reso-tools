@@ -99,7 +99,7 @@ describe('cloudEntryOf and localRunRecordOf with a result of another endorsement
 describe('cloudEntryOf for a Data Dictionary run', () => {
   it('carries the server, the credential, the scope and the ddOptions the run used', async () => {
     await expect(
-      entryOf(ddConfig({ limit: 500, strictMode: true, batchExpand: true, requestDelay: 0, originatingSystemName: 'OSN' }), undefined, {
+      entryOf(ddConfig({ strictMode: true, batchExpand: true, requestDelay: 0, originatingSystemName: 'OSN' }), undefined, {
         description: 'Feed'
       })
     ).resolves.toEqual({
@@ -109,8 +109,17 @@ describe('cloudEntryOf for a Data Dictionary run', () => {
       providerUsi: '99999',
       token: 'server-token-for-tests',
       originatingSystemName: 'OSN',
-      ddOptions: { version: '2.1', limit: 500, strictMode: true, batchExpand: true, requestDelay: 0 }
+      ddOptions: { version: '2.1', strictMode: true, batchExpand: true, requestDelay: 0 }
     });
+  });
+
+  // The sample limit is for local testing: the run measured part of the feed, so it certifies nothing, and none
+  // of the public tools sends one. Refused here in words, so no entry with a limit is built, let alone sent.
+  it('refuses a run that set a sample limit, in words, so no entry with one is sent', async () => {
+    const why = await refusalOf(ddConfig({ limit: 500 }));
+    expect(why).toMatch(/cannot be certified.*sample limit of 500 records per resource/);
+    expect(why).toMatch(/local testing/);
+    expect(why).toMatch(/Remove the limit/);
   });
 
   it('carries the strict mode as it was set, so the service sees a run that turned it off', async () => {

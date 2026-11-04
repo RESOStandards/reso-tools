@@ -308,12 +308,11 @@ export const rcfLocalRunRecordOf = (result: PipelineResult, config: RcfConfig, n
 
 // ── Every endorsement: the entry and the record of any local run ──
 
-/** One entry of a Data Dictionary cloud request. The sample limit and strict mode travel in `ddOptions`, as a config
- *  file carries them. */
+/** One entry of a Data Dictionary cloud request. The strict mode travels in `ddOptions`, as a config file carries
+ *  it. A sample limit never does: a run that set one is refused before an entry is built (`ddSampleLimitRefusal`). */
 export interface DDCloudConfigEntry extends ServerCloudConfigEntry {
   readonly ddOptions: {
     readonly version: string;
-    readonly limit?: number;
     readonly strictMode?: boolean;
     readonly batchExpand?: boolean;
     readonly requestDelay?: number;
@@ -377,15 +376,28 @@ const CANARY_FOLDER_REASON = "it reads its canary payloads from a folder, which 
 
 const refused = (reason: string): CloudEntryResult => ({ refused: reason });
 
+/**
+ * Why a Data Dictionary configuration that set a sample limit can start no cloud run, or `undefined` when it set
+ * none. The limit is for local testing: the run measures part of the feed, so it cannot be certified, and none of
+ * the public tools sends one. Only a limit the configuration set counts: `limit` is undefined when neither `--limit`
+ * nor the entry's `ddOptions.limit` set one, and the pipeline applies its own default then. Read before the run, when
+ * the entry is built and when a run is reserved, so the same words refuse it everywhere.
+ */
+export const ddSampleLimitRefusal = (config: CloudRunConfig): string | undefined =>
+  config.endorsement === 'dd' && config.limit !== undefined
+    ? `it cannot be certified: it uses a sample limit of ${config.limit} records per resource, which is for local testing. Remove the limit to start a cloud run`
+    : undefined;
+
 const ddCloudEntryOf = (config: DDConfig, description: string | undefined): CloudEntryResult => {
   const base = serverEntryOf(config, description);
   if (base === undefined) return refused(NO_TARGET_REASON);
+  const limited = ddSampleLimitRefusal(config);
+  if (limited !== undefined) return refused(limited);
   return {
     entry: {
       ...base,
       ddOptions: {
         version: config.version,
-        ...(config.limit === undefined ? {} : { limit: config.limit }),
         ...(config.strictMode === undefined ? {} : { strictMode: config.strictMode }),
         ...(config.batchExpand ? { batchExpand: true } : {}),
         ...(config.requestDelay === undefined ? {} : { requestDelay: config.requestDelay }),
@@ -503,7 +515,8 @@ const uncertifiableBeforeRun = (config: CloudRunConfig): ReadonlyArray<string> =
   switch (config.endorsement) {
     case 'core':
       return cannotCertify(whyCoreVersionDoesNotCertify(coreVersionOf(config)));
-    case 'dd':
+    case 'dd': {
+      const limited = ddSampleLimitRefusal(config);
       return [
         ...cannotCertify(whyDDVersionDoesNotCertify(config.version)),
         ...cannotCertify(
@@ -511,8 +524,10 @@ const uncertifiableBeforeRun = (config: CloudRunConfig): ReadonlyArray<string> =
         ),
         ...cannotCertify(
           config.runVariations === false ? 'variations would not run, so no name would be checked against the Data Dictionary' : undefined
-        )
+        ),
+        ...(limited === undefined ? [] : [limited])
       ];
+    }
     case 'add-edit':
       return [
         // The version the pipeline runs at when the configuration omits it, as `runAddEditCompliance` resolves it.

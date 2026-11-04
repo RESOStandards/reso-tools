@@ -5,6 +5,7 @@ import {
   type RanEntry,
   cloudRunHint,
   cloudRunPrerequisite,
+  ddFlagsRefusedBeforeRun,
   entriesRefusedBeforeRun,
   formatAcceptedRun,
   formatRunStatusTable,
@@ -13,7 +14,7 @@ import {
 } from '../../src/cli/cloud-command.js';
 import type { AcceptedCloudRun } from '../../src/cloud/runs.js';
 import { INFER_RCF_REPORTS, READ_RCF_INPUT } from '../../src/sdk/step-names.js';
-import type { CoreConfig, PipelineResult, RcfConfig } from '../../src/sdk/types.js';
+import type { CoreConfig, DDConfig, PipelineResult, RcfConfig } from '../../src/sdk/types.js';
 
 /**
  * The cloud-run choice at the end of a local run: only entries that passed and can be certified are offered,
@@ -56,7 +57,7 @@ describe('planCloudRuns', () => {
         ran('Feed one', 'M00000000', passed),
         ran('Feed two', 'M00000001', { ...passed, status: 'failed' }),
         ran('Feed three', 'M00000002', { ...passed, certification: { valid: false, reasons: ['a required step did not run'] } }),
-        ran('Feed four', 'M00000003', 'ENOTDIR: not a directory'),
+        ran('Feed four', 'M00000000', 'ENOTDIR: not a directory'),
         ran('Feed five', 'M00000004', passed, { recipientUoi: undefined })
       ],
       NOW
@@ -349,5 +350,50 @@ describe('entriesRefusedBeforeRun', () => {
     expect(refusal).toMatch(/Feed three: it cannot be certified/);
     expect(refusal).not.toContain('Feed one');
     expect(refusal).not.toContain('server-token-for-tests');
+  });
+
+  // A config entry's `ddOptions.limit` reaches the configuration as `limit`. The limit is for local testing, so the
+  // entry is refused before any entry runs, by name; one that leaves the limit to the default goes on.
+  it('refuses a Data Dictionary entry whose ddOptions.limit sets a sample limit, by name, before any entry runs', () => {
+    const dd = (over: Partial<DDConfig> = {}): DDConfig => ({
+      endorsement: 'dd',
+      server: coreConfig('M00000000').server,
+      version: '2.1',
+      providerUoi: 'T00000000',
+      providerUsi: '99999',
+      recipientUoi: 'M00000000',
+      ...over
+    });
+    const refusal = entriesRefusedBeforeRun([
+      { label: 'Feed four', config: dd({ limit: 250 }) },
+      { label: 'Feed five', config: dd() }
+    ]);
+    expect(refusal).toMatch(/Feed four: it cannot be certified: .*sample limit of 250 records per resource/);
+    expect(refusal).toMatch(/local testing/);
+    expect(refusal).not.toContain('Feed five');
+    expect(entriesRefusedBeforeRun([{ label: 'Feed five', config: dd() }])).toBeUndefined();
+  });
+});
+
+describe('ddFlagsRefusedBeforeRun', () => {
+  it('is nothing when the flags leave the run certifiable', () => {
+    expect(ddFlagsRefusedBeforeRun({})).toBeUndefined();
+    expect(ddFlagsRefusedBeforeRun({ strict: true })).toBeUndefined();
+  });
+
+  it('refuses --no-strict and --skip-variations, which make the run uncertifiable', () => {
+    expect(ddFlagsRefusedBeforeRun({ strict: false })).toMatch(/--no-strict/);
+    expect(ddFlagsRefusedBeforeRun({ skipVariations: true })).toMatch(/--skip-variations/);
+  });
+
+  // `--limit` is for local testing. Refused from the flag before the config file is read, so a long run is not
+  // spent on it, and in words that name the flag rather than the file.
+  it('refuses --limit, a sample limit for local testing, before any entry runs', () => {
+    const why = ddFlagsRefusedBeforeRun({ limit: '500' });
+    expect(why).toMatch(/--limit/);
+    expect(why).toMatch(/local testing/);
+    expect(why).toMatch(/cannot be certified/);
+    expect(why).toMatch(/Remove --limit/);
+    expect(why).not.toContain('config file');
   });
 });

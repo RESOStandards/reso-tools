@@ -7,7 +7,7 @@ import {
   startCloudRun
 } from '../../src/cloud/start.js';
 import { INFER_RCF_REPORTS, READ_RCF_INPUT } from '../../src/sdk/step-names.js';
-import type { CoreConfig, PipelineResult, RcfConfig } from '../../src/sdk/types.js';
+import type { CoreConfig, DDConfig, PipelineResult, RcfConfig } from '../../src/sdk/types.js';
 
 /**
  * The one path a cloud run starts through: every run checked before anything is sent, RESO Common Format files
@@ -264,6 +264,25 @@ describe('reserveForLocalRun', () => {
     await expect(
       reserveForLocalRun({ config: coreConfig('M00000000', { providerUoi: undefined }), result: passed }, { reserve })
     ).rejects.toThrow(/provider, system and recipient/);
+    expect(reserve).not.toHaveBeenCalled();
+  });
+
+  // The sample limit is for local testing. Refused from the configuration, so a result that calls a limited run
+  // certifiable, from another engine or by hand, reserves nothing either.
+  it('reserves nothing for a Data Dictionary run that set a sample limit, whatever its result says', async () => {
+    const reserve = vi.fn(async () => ({ certificationRequestId: 'x', reservedAt: 'x', expiresAt: 'x', recipients: [] }));
+    const limited: DDConfig = {
+      endorsement: 'dd',
+      server: coreConfig().server,
+      version: '2.1',
+      providerUoi: 'T00000000',
+      providerUsi: '99999',
+      recipientUoi: 'M00000000',
+      limit: 1
+    };
+    await expect(reserveForLocalRun({ config: limited, result: { ...passed, endorsement: 'dd' } }, { reserve })).rejects.toThrow(
+      /sample limit of 1 records per resource.*local testing/
+    );
     expect(reserve).not.toHaveBeenCalled();
   });
 });

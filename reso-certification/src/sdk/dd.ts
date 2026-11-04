@@ -721,7 +721,16 @@ export const ddValidForCertification =
         ? notCertifiable([
             'Strict mode was disabled with --no-strict. Schema validation errors were recorded but not enforced, so this run is not eligible for certification.'
           ])
-        : CERTIFIABLE
+        : CERTIFIABLE,
+      // A sample limit is for local testing: the run measured part of the feed, so it certifies nothing. Only a
+      // limit the configuration set counts. `config.limit` is undefined when neither `--limit` nor the entry's
+      // `ddOptions.limit` set one, and `buildReplicationSettings` applies `DEFAULT_LIMIT` then; the CLI leaves it
+      // unset rather than filling the default in, which is how the two are told apart here.
+      config.limit === undefined
+        ? CERTIFIABLE
+        : notCertifiable([
+            `The run used a sample limit of ${config.limit} records per resource, from --limit or the config entry's ddOptions.limit. A limit is for local testing, so this run is not eligible for certification and no cloud run can start from it. Remove the limit and run it again.`
+          ])
     );
 
 /**

@@ -78,6 +78,7 @@ import {
   type RanEntry,
   cloudRunPrerequisite,
   cloudTargetLabel,
+  ddFlagsRefusedBeforeRun,
   entriesRefusedBeforeRun,
   formatRunStatusTable,
   offerCloudRuns,
@@ -845,7 +846,11 @@ const ddCmd = program
     '--dd-version <version>',
     `DD version (${TESTABLE_DD_VERSIONS.join(' or ')}; default ${CURRENT_DD_VERSION}). Certification is on ${CERTIFIABLE_DD_VERSIONS.join(' or ')}, the latest minor; an older one runs as a retest`
   )
-  .option('--limit <n>', "Max records to replicate per resource (default: the config entry's ddOptions.limit, else 100000)")
+  .option(
+    '--limit <n>',
+    'Max records to replicate per resource, a sample limit for local testing: a run with one is NOT eligible for certification ' +
+      "and starts no cloud run (default: the config entry's ddOptions.limit, else 100000)"
+  )
   // Strict is the default, so `--strict` is a no-op kept for compatibility and `--no-strict` is the
   // real switch. BOTH are declared rather than `--no-strict` alone: declaring only the negation makes
   // Commander default `opts.strict` to true, which would destroy the same absent-vs-explicit
@@ -877,7 +882,7 @@ ddCmd.action(
     url?: string;
     config?: string;
     ddVersion?: string;
-    limit: string;
+    limit?: string;
     strict?: boolean;
     skipVariations?: boolean;
     batchExpand?: boolean;
@@ -901,12 +906,10 @@ ddCmd.action(
       }
       const cloudRefusal = startCloudRunRefusal(opts);
       if (cloudRefusal !== undefined) throw new Error(cloudRefusal);
-      // A run that is not strict or skips variations cannot be certified, so it could not start a cloud run.
-      if (opts.startCloudRun && (opts.strict === false || opts.skipVariations)) {
-        throw new Error(
-          '--start-cloud-run starts from a run that can be certified, which a run with --no-strict or --skip-variations is not.'
-        );
-      }
+      // A run that is not strict, skips variations or samples with --limit cannot be certified, so it could not
+      // start a cloud run. Refused from the flags before the config file is read.
+      const flagRefusal = opts.startCloudRun ? ddFlagsRefusedBeforeRun(opts) : undefined;
+      if (flagRefusal !== undefined) throw new Error(flagRefusal);
 
       const ddVersion = normalizeDDVersion(opts.ddVersion ?? CURRENT_DD_VERSION);
 
@@ -951,7 +954,11 @@ ddCmd.action(
             fromCli: true,
             ...(servicesAuthToken ? { servicesAuthToken } : {}),
             server: { ...baseConfig.server, auth },
-            limit: opts.limit !== undefined ? Number(opts.limit) : (baseConfig.limit ?? 100000),
+            // Only set when the flag was passed; the entry's own ddOptions.limit stands otherwise, and with
+            // neither the SDK applies its default (100000). A limit is a sample for local testing, so the SDK
+            // tells one that was set from the default by its presence: filling the default in here made every
+            // entry carry a limit, which the verdict, the cloud path and the service refuse.
+            ...(opts.limit !== undefined ? { limit: Number(opts.limit) } : {}),
             // Tested against undefined, not for truthiness: `--no-strict` sets this to `false`, which a
             // truthiness test drops, so the flag would be accepted on the command line and then
             // silently ignored in config mode. Absent still means absent, letting the config entry's
@@ -994,7 +1001,8 @@ ddCmd.action(
           ...(servicesAuthToken ? { servicesAuthToken } : {}),
           server: { url: opts.url!, auth },
           version: ddVersion,
-          limit: opts.limit !== undefined ? Number(opts.limit) : 100000,
+          // As in config mode: set only from the flag, so the SDK can tell a sample limit from its default.
+          ...(opts.limit !== undefined ? { limit: Number(opts.limit) } : {}),
           strictMode: opts.strict,
           ...(opts.skipVariations ? { runVariations: false } : {}),
           batchExpand: opts.batchExpand,
