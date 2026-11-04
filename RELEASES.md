@@ -2,6 +2,31 @@
 
 ---
 
+## Unreleased
+
+### Cloud runs for every endorsement
+
+- **`--start-cloud-run` on `dd`, `add-edit` and `entity-event`,** as on `core` and `rcf`: at the end of a config-file
+  run, the entries that passed and can be certified are reserved with RESO's service and run in its cloud. The same
+  checks run before the run starts, so a long run is not wasted: `--config`, a named `providerUoi`, the service's
+  address and credentials, and nothing that makes the run uncertifiable (`--no-strict`, `--skip-variations`,
+  `--auto-payloads`, `--mock`).
+- **An Add/Edit cloud run is the same run.** The entry carries the payloads the local run used, inline, read again
+  from the folder it read them from when it used one. A run that wrote its own payloads is refused.
+- **One path for the CLI and the desktop.** `startCloudRun` takes the local runs of one endorsement and version for
+  one provider, each with the reservation made when it passed, checks each (a pass that can be certified, the
+  endorsement, version and provider asked for), packs and uploads a RESO Common Format run's files, and submits
+  one request per reservation. It takes an explicit `servicesAuthToken` and otherwise resolves the CLI's own.
+  `reserveForLocalRun` reserves at the end of a passing run. `cloudEntryOf(config, result)` and
+  `localRunRecordOf(result, config)` now build the entry and the record for any of the five endorsements, in the
+  shape the service reads. All of these, with `reserveCloudRun`, `requestUploadSlot`, `uploadToSlot`,
+  `packRcfInput` and `isSuccessfulRun`, are exported from the package root.
+- **The packed RESO Common Format zip is removed however the start ends,** the pack refused, the upload failed or
+  the start refused (the 0.12.0 audit's informational item).
+- **Two more 0.12.0 audit items:** the provider-token mint sends the API key only over https, upgrading a bare or
+  `http` `CERT_AUTH_API_BASE_URL` as every other service address is; and the line that reports an entry that stopped
+  before producing a result is masked like every other line the CLI prints.
+
 ## Certification 0.12.0 – 2026-11-03
 
 ### Web API Core records full type coverage
