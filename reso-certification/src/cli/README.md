@@ -53,9 +53,9 @@ environment a command will write to, look at the host in `TOKEN_URI`.
 |---|---|---|
 | `RESO_SERVICES_URL` | `find-variations`, `rcf`, `update-variations`, the variations-review commands, the `cloud` commands | Base URL of RESO's services, the Variations Service and cloud runs. Same for every environment. |
 | `TOKEN_URI` | the same commands, and `archive-report` | OAuth2 token endpoint. **This is what selects QA versus production.** `archive-report` also reads the Cert API host off it. |
-| `CLIENT_ID`, `CLIENT_SECRET` | the same commands | OAuth2 client credentials the token is minted from. `restore` and `archive-report` present `CLIENT_SECRET` to the Cert API as it is. |
+| `CLIENT_ID`, `CLIENT_SECRET` | the same commands, `restore` and `archive-report` | OAuth2 client credentials the token is minted from. `restore` and `archive-report` present `CLIENT_SECRET` to the Cert API as it is. |
 | `FT_ADMIN_SECRET` | `update-variations --fast-track` | Fast Track admin credential. A fast-track submission is refused without it, before any request is made. |
-| `CERT_AUTH_API_BASE_URL`, `CERT_AUTH_API_USERNAME`, `CERTIFICATION_API_KEY`, `CURRENT_PROVIDER_UOI` | the SDK's provider-token fallback | The second auth path, used when the OAuth2 variables are absent. |
+| `CERT_AUTH_API_BASE_URL`, `CERT_AUTH_API_USERNAME`, `CERTIFICATION_API_KEY`, `CURRENT_PROVIDER_UOI` | the SDK's provider-token fallback, and `CERTIFICATION_API_KEY` by `restore` and `archive-report` when `CLIENT_SECRET` is absent | The second auth path, used when the OAuth2 variables are absent. |
 | `RESO_VARIATIONS_HANDLER` | the variations step of `dd`, `find-variations` and `rcf` | For a host that runs the SDK: the path of a module whose `computeVariations` computes variations in place of the Variations Service, so no service address or token is needed. Unset, the service is called as usual. See the [package README](../../README.md#computing-variations-with-your-own-module). |
 
 **Two auth paths, in that order.** A command first tries an OAuth2 client-credentials token from
@@ -513,13 +513,14 @@ reso-cert archive-report <reportId> --confirm --json
 | `<reportId>` | The report's id, as the certification site shows it. |
 | `--confirm` | Archive the report. Without it the warning is printed and nothing is archived. |
 | `--url <url>` | The Cert API origin, such as `https://cert-api.example.org`, without a path. Default: taken from `TOKEN_URI`. The API is expected at an origin's root: an API mounted under a path prefix cannot be named, by `--url` or by `TOKEN_URI`. A host without a dot that is not loopback, such as the `undefined` older credentials files carried, is refused. |
-| `--json` | Print one object: `reportId`, `origin`, `warning`, `report`, `confirmed`, `archived`, `status`, `message`. |
+| `--json` | Print one object: `reportId`, `origin`, `warning`, `report`, `confirmed`, `archived`, `status`, `reread`, `message`. `archived` is true only when the server confirmed with `201 success`. `reread` is present after any other archive answer (see below). `message` is the server's words after an archive request, and before one it is the line the command printed. |
 
 - **It needs the credentials file downloaded from the certification site.** Sign in, download
   `credentials.env`, and run the command from the directory that holds it (see
-  [Environment](#environment-env)). The file's `CLIENT_SECRET` is what the command presents, and
-  the Cert API is found through the host in its `TOKEN_URI`. A `TOKEN_URI` whose path is not the
-  token endpoint is refused rather than guessed from, and `--url` names the API instead.
+  [Environment](#environment-env)). The file's `CLIENT_SECRET`, or `CERTIFICATION_API_KEY` when
+  that is absent, is what the command presents, and the Cert API is found through the host in its
+  `TOKEN_URI`. A `TOKEN_URI` whose path is not the token endpoint, or whose host cannot be the API,
+  is refused rather than guessed from, and `--url` names the API instead.
 - **The warning is the site's.** The report is read first, then the provider organization's name
   when the provider and recipient differ, and the warning is printed with those values filled in:
 
@@ -535,12 +536,21 @@ reso-cert archive-report <reportId> --confirm --json
   When the organization's name cannot be read, its UOI is shown in its place and the command says
   so. A report that cannot be read, or that does not exist, archives nothing.
 - **With `--confirm`, exactly one archive request is made,** the same one the site makes, and only
-  after the warning. The server's `201 success` is the only answer counted as archived. Anything
-  else is reported with its status and the server's message, including a `200` that carries HTML,
-  which is what the certification site's own host answers.
-- **Exit code** `0` when the report was archived, or the warning was shown without `--confirm`,
-  `1` when the server refused or the report could not be read, and `2` on a usage or configuration
-  error such as a missing credential, a missing Cert API address or a malformed id.
+  after the warning. The server's `201 success` is the only answer counted as archived. Any other
+  answer is reported as "The server did not confirm the archive" with its status and the server's
+  message, including a `200` that carries HTML, which is what the certification site's own host
+  answers. The report is then **read again**, because the server removes a report before it sends
+  the notification and answers only after, so an answer that is not `201` does not say whether the
+  report is still there. The second read is reported in the next line and in `--json` as `reread`:
+  `listed` means it was not archived, `gone` means the server removed it but something after the
+  removal failed, so check the certification site for it rather than rerunning the command, and
+  `unreadable` means the second read failed and nothing is known.
+- **A redirect is never followed.** A `3xx` from the Cert API is reported with its status like any
+  other answer, so the archive request is never replayed to a host that was not named.
+- **Exit code** `0` when the server confirmed the archive, or the warning was shown without
+  `--confirm`, `1` when the server did not confirm it or the report could not be read, and `2` on a
+  usage or configuration error such as a missing credential, a missing Cert API address or a
+  malformed id.
 
 ## Variations review (read-only)
 

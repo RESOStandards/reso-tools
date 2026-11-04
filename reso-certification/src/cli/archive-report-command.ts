@@ -46,11 +46,29 @@ export interface ArchiveReportResult {
   readonly warning?: string;
   readonly report?: ReportSummary;
   readonly confirmed: boolean;
+  /** True only when the server confirmed the archive with `201 success`. */
   readonly archived: boolean;
-  /** The status of the last answer received, or 0 when the request itself failed. */
+  /** The status of the archive answer, or of the read that stopped the command, or 0 when the request itself failed. */
   readonly status?: number;
+  /**
+   * After an archive answer other than `201 success`, the report read again: `gone` when it is no
+   * longer listed, `listed` when it still is, `unreadable` when the second read failed. Absent when
+   * no archive was attempted or the server confirmed it.
+   */
+  readonly reread?: Reread;
+  /** The server's words after an archive request; before one, the line the command printed. */
   readonly message: string;
 }
+
+/**
+ * What a second read of the report found. The server deletes the report before it sends the
+ * notification and only then answers 201, and the notification can fail, so an answer that is not
+ * 201 does not say whether the report is still there. Only reading it again does.
+ */
+export type Reread = 'gone' | 'listed' | 'unreadable';
+const REREAD_GONE: Reread = 'gone';
+const REREAD_LISTED: Reread = 'listed';
+const REREAD_UNREADABLE: Reread = 'unreadable';
 
 /** The report type the site names by the dictionary rather than by its description. */
 const DATA_DICTIONARY_TYPE = 'data_dictionary';
@@ -78,6 +96,10 @@ const MESSAGE_LIMIT = 300;
 const REPORT_ID = /^[A-Za-z0-9_-]+$/;
 
 export const NOTHING_ARCHIVED = 'Nothing was archived. Rerun with --confirm to proceed.';
+
+/** Said after a second read finds the report gone without the server having confirmed the archive. */
+const REMOVED_UNCONFIRMED =
+  'Whether its archive record or only the notification failed is not known from here. Check the certification site for it rather than rerunning this command.';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -227,7 +249,8 @@ const summaryOf = (record: Record<string, unknown>): ReportSummary => ({
   recipientUoi: stringOf(record.recipientUoi)
 });
 
-type ReportRead = { readonly report: ReportSummary } | { readonly failure: string; readonly status: number };
+/** `absent` marks the one failure that is the server's own answer: a list that does not hold the id. */
+type ReportRead = { readonly report: ReportSummary } | { readonly failure: string; readonly status: number; readonly absent?: true };
 
 /** The report, as the site reads one: `filter/list` with the one id. */
 const readReport = async (origin: string, authorization: string, reportId: string): Promise<ReportRead> => {
@@ -253,8 +276,33 @@ const readReport = async (origin: string, authorization: string, reportId: strin
   }
   const found = answer.json.find((row): row is Record<string, unknown> => isRecord(row) && row.id === reportId);
   return found === undefined
-    ? { failure: `No report with id ${reportId} was found.`, status: answer.status }
+    ? { failure: `No report with id ${reportId} was found.`, status: answer.status, absent: true }
     : { report: summaryOf(found) };
+};
+
+/**
+ * The report read again, after an archive answer that was not `201 success`, and what that read
+ * says in one line. A report the server lists is not archived. One it no longer lists was removed,
+ * as an archive does, but the server did not say what failed after the removal, its archive record
+ * or only the notification, so that is said rather than guessed. A failed read says nothing.
+ */
+const rereadAfter = async (
+  origin: string,
+  authorization: string,
+  reportId: string
+): Promise<{ readonly reread: Reread; readonly line: string }> => {
+  const read = await readReport(origin, authorization, reportId);
+  if ('report' in read) {
+    return { reread: REREAD_LISTED, line: `Read again, report ${reportId} is still listed, so it was not archived.` };
+  }
+  if (read.absent === true) {
+    const removed = `Read again, report ${reportId} is no longer listed: the server removed it, as an archive does, but did not confirm the archive.`;
+    return { reread: REREAD_GONE, line: `${removed} ${REMOVED_UNCONFIRMED}` };
+  }
+  return {
+    reread: REREAD_UNREADABLE,
+    line: `Read again, the report could not be read (${read.failure}), so whether it was archived is not known. Check the certification site.`
+  };
 };
 
 type NameRead = { readonly name: string } | { readonly unavailable: string };
@@ -337,10 +385,22 @@ export const runArchiveReport = async (options: ArchiveReportOptions, log: (line
   const answer = await archive(origin, authorization, reportId);
   const archived = answer.status === ARCHIVED_STATUS && answer.text.trim() === ARCHIVED_BODY;
   log('');
-  log(
-    archived
-      ? `Archived report ${reportId} (${answer.status} ${answer.text}).`
-      : describe(`The server did not archive report ${reportId}`, answer)
-  );
-  return { reportId, origin, warning, report, confirmed, archived, status: answer.status, message: messageOf(answer) };
+  if (archived) {
+    log(`Archived report ${reportId} (${answer.status} ${answer.text.trim()}).`);
+    return { reportId, origin, warning, report, confirmed, archived, status: answer.status, message: messageOf(answer) };
+  }
+  log(describe(`The server did not confirm the archive of report ${reportId}`, answer));
+  const after = await rereadAfter(origin, authorization, reportId);
+  log(after.line);
+  return {
+    reportId,
+    origin,
+    warning,
+    report,
+    confirmed,
+    archived,
+    status: answer.status,
+    reread: after.reread,
+    message: messageOf(answer)
+  };
 };

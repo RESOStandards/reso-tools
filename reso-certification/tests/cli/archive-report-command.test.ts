@@ -59,14 +59,26 @@ const reply = (status: number, body: unknown) => ({
 
 const HTML = '<!doctype html><html><body>app shell</body></html>';
 
-/** A Cert API that answers the three routes the command uses, with overrides per route. */
-const certApi = (answers: { readonly report?: unknown; readonly organization?: unknown; readonly archive?: unknown } = {}) =>
-  vi.fn(async (url: string) => {
-    if (url.includes('/certification_reports/filter/list')) return answers.report ?? reply(200, [ddReport]);
+/**
+ * A Cert API that answers the three routes the command uses, with overrides per route. `reread` is
+ * the answer to a second read of the report, the one the command makes after an archive answer that
+ * was not `201 success`; it defaults to the first read's answer, the report still listed.
+ */
+const certApi = (
+  answers: { readonly report?: unknown; readonly organization?: unknown; readonly archive?: unknown; readonly reread?: unknown } = {}
+) => {
+  let reads = 0;
+  return vi.fn(async (url: string) => {
+    if (url.includes('/certification_reports/filter/list')) {
+      reads += 1;
+      const first = answers.report ?? reply(200, [ddReport]);
+      return reads === 1 ? first : (answers.reread ?? first);
+    }
     if (url.includes('/organization?')) return answers.organization ?? reply(200, organization);
     if (url.includes('/certification_reports/archive/')) return answers.archive ?? reply(201, 'success');
     throw new Error(`unexpected request ${url}`);
   });
+};
 
 const run = async (
   fetchMock: ReturnType<typeof vi.fn>,
@@ -225,7 +237,7 @@ describe('with --confirm', () => {
     expect(archiveExitCode(result)).toBe(0);
   });
 
-  it('encodes the report id in the archive path', async () => {
+  it('refuses an id that would need escaping in the path, before any request', async () => {
     const api = certApi();
     await expect(run(api, { confirm: true, reportId: 'a/b' })).rejects.toThrow(/report id/);
     expect(api).not.toHaveBeenCalled();
@@ -238,7 +250,7 @@ describe('with --confirm', () => {
   ])('fails with the status and the server message on %s', async (status, body) => {
     const api = certApi({ archive: reply(status, body) });
     const { result } = await run(api, { confirm: true });
-    expect(api).toHaveBeenCalledTimes(3);
+    expect(api).toHaveBeenCalledTimes(4);
     expect(result.archived).toBe(false);
     expect(result.status).toBe(status);
     expect(result.message).toBe(typeof body === 'string' ? body : body.message);
@@ -263,7 +275,7 @@ describe('with --confirm', () => {
   it('treats a 201 whose body is not "success" as a failure', async () => {
     const api = certApi({ archive: reply(201, HTML) });
     const { result } = await run(api, { confirm: true });
-    expect(api).toHaveBeenCalledTimes(3);
+    expect(api).toHaveBeenCalledTimes(4);
     expect(result.archived).toBe(false);
     expect(result.status).toBe(201);
     expect(archiveExitCode(result)).toBe(1);
@@ -277,10 +289,10 @@ describe('every request', () => {
     expect(api.mock.calls.map(call => call[1].redirect)).toEqual(['manual', 'manual', 'manual']);
   });
 
-  it('reports a redirect of the archive POST as a failure with its status, and makes no further request', async () => {
+  it('reports a redirect of the archive POST as a failure with its status, and follows nothing', async () => {
     const api = certApi({ archive: reply(307, '') });
     const { result, lines } = await run(api, { confirm: true });
-    expect(api).toHaveBeenCalledTimes(3);
+    expect(calledUrls(api).every(url => url.startsWith(ORIGIN))).toBe(true);
     expect(result.archived).toBe(false);
     expect(result.status).toBe(307);
     expect(lines.join('\n')).toContain('307');
@@ -296,6 +308,56 @@ describe('every request', () => {
     expect(result.message).toContain('fetch failed');
     expect(result.message).toContain('ENOTFOUND');
     expect(archiveExitCode(result)).toBe(1);
+  });
+});
+
+describe('after an archive answer that is not 201 success', () => {
+  const LIST = `${ORIGIN}/api/v1/certification_reports/filter/list`;
+  const ORGANIZATION = `${ORIGIN}/api/v1/organization?uoi=${PROVIDER}`;
+  const ARCHIVE = `${ORIGIN}/api/v1/certification_reports/archive/${REPORT_ID}`;
+
+  it('reads the report again and, when it is gone, says the server removed it without confirming, exit 1', async () => {
+    const api = certApi({ archive: reply(404, { message: 'archiveReport Controller API: Invalid UOI' }), reread: reply(200, []) });
+    const { result, lines } = await run(api, { confirm: true });
+    expect(calledUrls(api)).toEqual([LIST, ORGANIZATION, ARCHIVE, LIST]);
+    expect(result).toMatchObject({ archived: false, status: 404, reread: 'gone', message: 'archiveReport Controller API: Invalid UOI' });
+    const text = lines.join('\n');
+    expect(text).toContain('did not confirm the archive');
+    expect(text).toContain('no longer listed');
+    expect(text).not.toContain('did not archive');
+    expect(archiveExitCode(result)).toBe(1);
+  });
+
+  it('reads the report again and, when it is still listed, says it was not archived', async () => {
+    const api = certApi({ archive: reply(401, { message: 'Unauthorized' }) });
+    const { result, lines } = await run(api, { confirm: true });
+    expect(calledUrls(api)).toEqual([LIST, ORGANIZATION, ARCHIVE, LIST]);
+    expect(result).toMatchObject({ archived: false, status: 401, reread: 'listed', message: 'Unauthorized' });
+    expect(lines.join('\n')).toContain('still listed');
+    expect(archiveExitCode(result)).toBe(1);
+  });
+
+  it('says so when the second read fails, and claims nothing about what the server holds', async () => {
+    const api = certApi({ archive: reply(500, { message: 'boom' }), reread: reply(503, { message: 'down' }) });
+    const { result, lines } = await run(api, { confirm: true });
+    expect(api).toHaveBeenCalledTimes(4);
+    expect(result).toMatchObject({ archived: false, status: 500, reread: 'unreadable', message: 'boom' });
+    expect(lines.join('\n')).toMatch(/not known/);
+    expect(archiveExitCode(result)).toBe(1);
+  });
+
+  it('does not count a second read that answers something other than a list as the report being gone', async () => {
+    const api = certApi({ archive: reply(502, 'Bad Gateway'), reread: reply(200, HTML) });
+    const { result } = await run(api, { confirm: true });
+    expect(result.reread).toBe('unreadable');
+    expect(archiveExitCode(result)).toBe(1);
+  });
+
+  it('reads nothing again after 201 success', async () => {
+    const api = certApi();
+    const { result } = await run(api, { confirm: true });
+    expect(calledUrls(api)).toEqual([LIST, ORGANIZATION, ARCHIVE]);
+    expect(result.reread).toBeUndefined();
   });
 });
 
