@@ -575,7 +575,10 @@ const coreCmd = program
     '--enum-mode <mode>',
     "Enum mode: auto, string, collections or isflags (default: the config entry's coreOptions.enumMode, else auto-detect)"
   )
-  .option('--full-coverage', 'Fail if any data type category has no coverage across all resources')
+  .option(
+    '--full-coverage',
+    'Fail if any data type is met on no resource tested. Without it, the detailed report still records whether full type coverage was achieved'
+  )
   .option(
     '--save-payloads <dir>',
     'Write every request and response to <dir>, one JSON file each. Off unless given. Contains provider data; credentials are never written'

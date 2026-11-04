@@ -4,6 +4,40 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
+## Certification 0.12.0 Security Notes – 2026-11-03
+
+Pre-publish review of `@reso-standards/reso-certification` 0.12.0, covering every change since 0.11.5: cloud runs from `rcf` and Core, the Add/Edit actions and formats a provider chooses, the streaming RCF reader and its fingerprint, and the Core report fields. No high or medium finding. The five low findings are fixed in #420.
+
+### Findings Addressed
+
+- **RCF fingerprint and a newline in a file name** (Low → Fixed, #420): the fingerprint's manifest gives each file one `<sha256>  <path>` line, so one file whose name held a newline and a second manifest line fingerprinted the same as two different files. Reproduced as a folder, a zip and a zip packed for a cloud run. A path holding a control character is now refused. The manifest's format is unchanged, so every other delivery keeps its fingerprint.
+- **Add/Edit run checks threw on a malformed selection** (Low → Fixed, #420): `addEditRunProblems`, exported for services that start runs for others, threw a `TypeError` on actions or formats of the wrong shape. It now answers with reasons.
+- **Cloud upload address** (Low → Fixed, #420): the upload went to whatever address the upload slot named and followed redirects, so a 307 or 308 posted the files again to the redirect target. It now goes only over https, or to a loopback address, and a redirect is refused.
+- **One large RCF record held whole** (Low → Fixed, #420): the reader streams the `value` array but holds each record and each other top-level member whole. A 40 MB record raised the heap by about 83 MB. One item over 64 MiB is now refused. The record count stays unbounded.
+- **Add/Edit cleanup skipped on an early stop** (Low → Fixed, #420): a key header with a malformed escape threw a `URIError` that stopped the run before its cleanup, leaving the records its earlier creates had made. Any other throw did the same. Such a header now names no record, and a run that stops early cleans up before it reports why.
+
+### Noted Risks (Pending / Accepted)
+
+- **Temporary folder left on a failed pack** (Informational → Pending): when packing for `--start-cloud-run` fails, its temporary folder (mode 0700) is left, possibly holding a partial zip.
+- **Provider token address not checked for https** (Informational → Pending): `mintProviderToken` sends the API key to `CERT_AUTH_API_BASE_URL` as given, where the other service addresses pass through `ensureHttps`.
+- **One error path unmasked** (Informational → Pending): the CLI prints a stopped entry's error without `maskSecrets`, unlike the other new error paths. No message that leaks was found.
+- **Folder input follows symbolic links** (Informational → Accepted): a linked `.json` outside the folder is read and uploaded. The folder is the operator's own, and a link loop fails rather than hangs.
+- **Zip entry names without the UTF-8 flag** (Informational → Accepted): such names are decoded as CP437, so a zip from a tool that does not set the flag can fingerprint differently from the same files in a folder when a name is not ASCII. No security effect.
+
+### Checked and Clean
+
+- **Credentials:** the upload carries no RESO credential, nothing echoes a token or secret, and the Core report names the authentication method only.
+- **Paths:** the reader never writes zip entries, and absolute, `..` and backslash names are refused on read and on write.
+- **Injection:** no shell, `eval` or dynamic import of input. OData literals are quoted, and path segments and queries are encoded.
+- **Supply chain:** the new dependencies `yazl` 3.3.1 and `@streamparser/json` 0.0.26 are pinned exactly, MIT licensed and free of install scripts. `npm audit` reports no vulnerabilities.
+- **Package contents:** `npm pack --dry-run` lists only the `files` allowlist: no tests, fixtures, environment files or run output.
+
+### Method
+
+Review of every change since 0.11.5: `npm audit`, `npm pack --dry-run` with a scan of the packed files, the test suite and a reproduction of each finding against the built package.
+
+---
+
 ## v1.0.0 Security Notes – 2026-07-15
 
 Pre-publish adversarial review of the six public npm packages ahead of the npm publish and public/private split (#220). All six are clean on the security-critical axes – zero known vulnerabilities, no secrets in shipped code, no dangerous runtime patterns. The findings below are publish hygiene and packaging mechanics.

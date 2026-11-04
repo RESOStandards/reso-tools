@@ -2,7 +2,7 @@
 
 ---
 
-## Unreleased
+## Certification 0.12.0 – 2026-11-03
 
 ### Web API Core records full type coverage
 
