@@ -88,12 +88,12 @@ describe('the multi-valued lookup a run tests', () => {
   const select = (properties: ReadonlyArray<EntityProperty>, wantRep: typeof isMultiRep) =>
     selectEnumCandidates(properties, records, enumTypes, buildStandardMapFrom(dd), 'Property', wantRep).map(c => c.field);
 
-  it('is one with two values to test, before a standard field with one', () => {
-    expect(select([lookup('RentIncludes', true), lookup('LocalAmenities', true)], isMultiRep)).toEqual(['LocalAmenities', 'RentIncludes']);
+  it('is one with both values to test, and never a field with one, however standard', () => {
+    expect(select([lookup('RentIncludes', true), lookup('LocalAmenities', true)], isMultiRep)).toEqual(['LocalAmenities']);
   });
 
-  it('is still the one-value field when no field has two, so its other tests still run', () => {
-    expect(select([lookup('RentIncludes', true)], isMultiRep)).toEqual(['RentIncludes']);
+  it('is none when no field has both values: the type is not met, and its tests are not tested rather than run on one', () => {
+    expect(select([lookup('RentIncludes', true)], isMultiRep)).toEqual([]);
   });
 
   it('leaves the single-valued ranking as it was: one value is all a single-valued lookup needs', () => {

@@ -161,8 +161,8 @@ Office:     integer ✓  decimal -  date -  timestamp ✓  singleLookup ✓  mul
 
 Full type coverage means each of the six types is met on some field of some resource tested. No resource has to carry
 all six. A single-valued lookup is met with one sampled value and a multi-valued lookup with two, as the specification
-gives them, so a multi-valued field with two values to test is chosen before one with a single value, however
-standard. A server that cannot meet every type in its standard or local fields is recorded as not having achieved full
+gives them. A multi-valued field without two values to test is not chosen for those tests, however standard: the run
+goes to the next field, and with none left the type is not met. A server that cannot meet every type in its standard or local fields is recorded as not having achieved full
 type coverage, and can still be certified.
 
 Core 2.0.0 needed every type on one resource. To test as it did, run with `--resources Property --full-coverage`, and
