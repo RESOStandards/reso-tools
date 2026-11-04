@@ -10,8 +10,7 @@
  * cloud run has to be the same run.
  */
 
-import { type AddEditAction, type AddEditFormats, type AddEditTestPlan, payloadsFor } from '../add-edit/plan.js';
-import { readPayloads } from '../add-edit/test-runner.js';
+import type { AddEditAction, AddEditFormats } from '../add-edit/plan.js';
 import { coerceCoreVersion } from '../sdk/core-versions.js';
 import { serializeDDRemarks } from '../sdk/dd.js';
 import { serializeRcfRemarks } from '../sdk/rcf.js';
@@ -86,6 +85,15 @@ export interface CloudConfigEntry extends ServerCloudConfigEntry {
 
 /** The run passed and its own verdict says it can be certified. Nothing else starts a cloud run. */
 export const isSuccessfulRun = (result: PipelineResult): boolean => result.status === 'passed' && result.certification.valid;
+
+/**
+ * Why a result is not the run of a configuration: every pipeline writes its own endorsement on its result, and a
+ * result of another endorsement is another run, whatever it passed. `undefined` when they pair.
+ */
+export const pairingRefusal = (config: CloudRunConfig, result: PipelineResult): string | undefined =>
+  result.endorsement === config.endorsement
+    ? undefined
+    : `it is the result of a ${result.endorsement} run, and its configuration is for ${config.endorsement}`;
 
 const nonEmpty = (value: string | undefined): value is string => typeof value === 'string' && value.trim() !== '';
 
@@ -353,9 +361,8 @@ export interface CloudEntryOptions {
   /** RESO Common Format only: the upload the files went to. The entry names it in place of a server. */
   readonly upload?: { readonly uploadId: string };
   /**
-   * Add/Edit only: the payloads the run used, captured when it ran. Given, they go in the entry as they are, so a
-   * submit hours later sends what ran. Not given, the run's folder is read again, as the CLI does at the end of its
-   * own run.
+   * Add/Edit only: the payloads the run used, captured when it ran, for a result from an engine that did not record
+   * them itself. A result that recorded them is sent as recorded, and this is not read.
    */
   readonly payloads?: InlinePayloads;
 }
@@ -382,31 +389,31 @@ const ddCloudEntryOf = (config: DDConfig, description: string | undefined): Clou
   };
 };
 
-const isPlan = (value: unknown): value is AddEditTestPlan =>
-  typeof value === 'object' && value !== null && Array.isArray((value as { readonly actions?: unknown }).actions);
+const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** Payloads as a run records them: an object whose every entry is itself an object, one per payload name. */
+const isInlinePayloads = (value: unknown): value is InlinePayloads => isRecord(value) && Object.values(value).every(isRecord);
 
 /**
- * The payloads an Add/Edit run used, inline: the ones captured when it ran, the configuration's, or the files it read
- * from its folder, which the cloud cannot reach. The plan the run recorded says which files it read. Auto payloads
- * are refused: they are written for the reference server and the mock, and the cloud tests the provider's own.
+ * The payloads an Add/Edit run used, inline: the ones the pipeline recorded when it read them, else the ones captured
+ * when it ran, else the configuration's own. A run that read a folder and recorded nothing is refused, never read
+ * again: the folder may not hold what ran. Auto payloads are refused: they are written for the reference server and
+ * the mock, and the cloud tests the provider's own.
  */
-const addEditPayloadsOf = async (
+const addEditPayloadsOf = (
   config: AddEditConfig,
   result: PipelineResult,
   captured: InlinePayloads | undefined
-): Promise<{ readonly payloads: InlinePayloads } | { readonly refused: string }> => {
+): { readonly payloads: InlinePayloads } | { readonly refused: string } => {
   if (config.autoPayloads) return { refused: 'the tool wrote its payloads, and a cloud run tests the payloads you give' };
+  const recorded = result.context.payloads;
+  if (isInlinePayloads(recorded)) return { payloads: recorded };
   if (captured !== undefined) return { payloads: captured };
-  if (config.payloadsDir === undefined) {
-    return config.payloads === undefined ? { refused: 'it gives no payloads' } : { payloads: config.payloads };
+  if (config.payloadsDir !== undefined) {
+    return { refused: 'the run did not record the payloads it read from its folder, so what ran cannot be sent as it was. Run it again' };
   }
-  const plan = result.context.plan;
-  if (!isPlan(plan)) return { refused: 'the run did not record which payload files it read' };
-  try {
-    return { payloads: await readPayloads(config.payloadsDir, payloadsFor(plan)) };
-  } catch (error) {
-    return { refused: `its payloads could not be read again: ${error instanceof Error ? error.message : String(error)}` };
-  }
+  return config.payloads === undefined ? { refused: 'it gives no payloads' } : { payloads: config.payloads };
 };
 
 const addEditCloudEntryOf = async (
@@ -419,7 +426,7 @@ const addEditCloudEntryOf = async (
   const specVersion = addEditVersionOf(config, result);
   if (specVersion === undefined) return refused('it does not say which Add/Edit version it ran');
   if (!nonEmpty(config.resource)) return refused('it does not name the resource it wrote to');
-  const payloads = await addEditPayloadsOf(config, result, options.payloads);
+  const payloads = addEditPayloadsOf(config, result, options.payloads);
   if ('refused' in payloads) return refused(payloads.refused);
   return {
     entry: {
@@ -476,6 +483,8 @@ const rcfCloudEntryOf = (config: RcfConfig, result: PipelineResult, options: Clo
 };
 
 const anyCloudEntryOf = async (config: CloudRunConfig, result: PipelineResult, options: CloudEntryOptions): Promise<CloudEntryResult> => {
+  const mismatch = pairingRefusal(config, result);
+  if (mismatch !== undefined) return refused(mismatch);
   switch (config.endorsement) {
     case 'core': {
       const entry = coreCloudEntryOf(config, options.description);
@@ -520,14 +529,16 @@ export const cloudEntryOf: CloudEntryOf = ((config: CloudRunConfig, second?: str
 export type LocalRunRecordFor<C extends CloudRunConfig> = C extends RcfConfig ? RcfLocalRunRecord : LocalRunRecord;
 
 /**
- * The record of any local run, or `undefined` when the run is not addressed to a provider, system and recipient or
- * did not say what it certified. Web API Core and RESO Common Format records are as they were in 0.12.0.
+ * The record of any local run, or `undefined` when the result is not the run of this configuration, the run is not
+ * addressed to a provider, system and recipient, or it did not say what it certified. Web API Core and RESO Common
+ * Format records are as they were in 0.12.0.
  */
 export const localRunRecordOf = <C extends CloudRunConfig>(
   result: PipelineResult,
   config: C,
   now: Date = new Date()
 ): LocalRunRecordFor<C> | undefined => {
+  if (pairingRefusal(config, result) !== undefined) return undefined;
   // The conditional return type narrows per endorsement; the assertion carries the union across it.
   const record: AnyLocalRunRecord | undefined =
     config.endorsement === 'rcf' ? rcfLocalRunRecordOf(result, config, now) : serverLocalRunRecordOf(result, config, now);

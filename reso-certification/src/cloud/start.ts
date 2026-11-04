@@ -21,7 +21,8 @@ import {
   cloudEntryOf,
   cloudTargetOf,
   isSuccessfulRun,
-  localRunRecordOf
+  localRunRecordOf,
+  pairingRefusal
 } from './local-run.js';
 import { type PackRcfResult, packRcfInput } from './rcf-pack.js';
 import {
@@ -128,6 +129,10 @@ const check = (input: StartCloudRunInput, run: CloudLocalRun, index: number): Ch
     throw refusal(label, 'it has no reservation. A cloud run starts from the request ID reserved when the local run passed');
   }
   if (!isSuccessfulRun(run.result)) throw refusal(label, whyNotSuccessful(run.result));
+  // The result has to be the run of the configuration it is paired with, or the record and the entry describe
+  // different runs.
+  const mismatch = pairingRefusal(run.config, run.result);
+  if (mismatch !== undefined) throw refusal(label, mismatch);
   const endorsementName = cloudEndorsementOf(run.config);
   if (endorsementName !== input.endorsementName) {
     throw refusal(label, `it is a ${endorsementName} run, and this start is for ${input.endorsementName}`);

@@ -11,8 +11,10 @@
   checks run before the run starts, so a long run is not wasted: `--config`, a named `providerUoi`, the service's
   address and credentials, and nothing that makes the run uncertifiable (`--no-strict`, `--skip-variations`,
   `--auto-payloads`, `--mock`).
-- **An Add/Edit cloud run is the same run.** The entry carries the payloads the local run used, inline, read again
-  from the folder it read them from when it used one. A run that wrote its own payloads is refused.
+- **An Add/Edit cloud run is the same run.** The pipeline records the payloads it read, from its folder or its
+  configuration, and the entry carries that record inline. A folder is never read again at submit time, so a file
+  that changed after the local pass does not reach the cloud; a run that recorded nothing is refused, as is a run
+  that wrote its own payloads. A result is refused when it is not the run of the configuration it is paired with.
 - **One path for the CLI and the desktop.** `startCloudRun` takes the local runs of one endorsement and version for
   one provider, each with the reservation made when it passed, checks each (a pass that can be certified, the
   endorsement, version and provider asked for), packs and uploads a RESO Common Format run's files, and submits

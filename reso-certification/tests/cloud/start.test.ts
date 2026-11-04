@@ -158,6 +158,10 @@ describe('startCloudRun', () => {
       { ...core, endorsementName: 'data-dictionary', endorsementVersion: '2.1' },
       /is a web-api-core run, and this start is for data-dictionary/
     );
+    await refuses(
+      { ...core, localRuns: [run({ result: { ...passed, endorsement: 'dd' } })] },
+      /result of a dd run, and its configuration is for core/
+    );
     await refuses({ ...core, endorsementVersion: '2.0.0' }, /ran web-api-core 2.1.0, and this start is for 2.0.0/);
     await refuses({ ...core, providerUoi: 'T00000001' }, /not addressed from provider T00000001/);
     await refuses(
