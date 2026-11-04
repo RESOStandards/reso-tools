@@ -71,6 +71,7 @@ import {
 import { submitVariationsReportViaService } from '../variations/submit.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { addEditSelectionOf } from './add-edit-options.js';
+import { type ArchiveReportResult, archiveExitCode, runArchiveReport } from './archive-report-command.js';
 import { mintOAuth2ClientCredentialsToken, resolveCliAuth } from './auth.js';
 import {
   type CloudOfferIo,
@@ -2095,5 +2096,32 @@ program
       }
     }
   );
+
+// Archiving a report, as the certification site does: the same warning first, the same POST after,
+// with the credential the site's downloaded credentials file carries. The Cert API is found through
+// TOKEN_URI in that file, or named with --url. Nothing is archived without --confirm.
+program
+  .command('archive-report')
+  .description('Archive a certification report, with the warning the certification site shows. Archives only with --confirm.')
+  .argument('<reportId>', 'The id of the report to archive, as the certification site shows it')
+  .option('--confirm', 'Archive the report. Without it the warning is printed and nothing is archived.')
+  .option('--url <url>', 'The Cert API origin. Default: taken from TOKEN_URI in the credentials file.')
+  .option('--json', 'Print one JSON object with what was read and what happened, for scripts')
+  .action(async (reportId: string, opts: { confirm?: boolean; url?: string; json?: boolean }) => {
+    try {
+      const say = (line: string): void => {
+        if (!opts.json) console.log(maskSecrets(line));
+      };
+      const result: ArchiveReportResult = await runArchiveReport(
+        { reportId, confirm: Boolean(opts.confirm), ...(opts.url === undefined ? {} : { url: opts.url }) },
+        say
+      );
+      if (opts.json) console.log(maskSecrets(JSON.stringify(result, null, 2)));
+      process.exitCode = archiveExitCode(result);
+    } catch (error) {
+      console.error('Error:', maskSecrets(error instanceof Error ? error.message : String(error)));
+      process.exitCode = 2;
+    }
+  });
 
 program.parse();
