@@ -100,6 +100,36 @@ export const cloudTargetOf = (
 /** The Core version a run used, normalized as `runCoreCompliance` normalizes it when the run starts. */
 const coreVersionOf = (config: CoreConfig): string => coerceCoreVersion(config.version);
 
+/** A string the run recorded in its context, when it recorded one. */
+const recordedString = (result: PipelineResult, key: string): string | undefined => {
+  const value = result.context[key];
+  return typeof value === 'string' && nonEmpty(value) ? value : undefined;
+};
+
+/**
+ * The Add/Edit version a run used: what `runAddEditCompliance` resolved and recorded in the result, so a run whose
+ * configuration omitted it and ran at the engine's default is recorded at that default. Before a result records it,
+ * the configuration's own. `undefined` when neither says.
+ */
+const addEditVersionOf = (config: AddEditConfig, result: PipelineResult): string | undefined =>
+  recordedString(result, 'specVersion') ?? (nonEmpty(config.specVersion) ? config.specVersion : undefined);
+
+const isEntityEventMode = (value: unknown): value is 'observe' | 'full' => value === 'observe' || value === 'full';
+
+/**
+ * The mode an EntityEvent run used: what `runEntityEventCompliance` resolved and recorded in the result, so a run
+ * whose configuration omitted it and observed at the engine's default is recorded as observing. Before a result
+ * records it, the configuration's own.
+ */
+const entityEventModeOf = (config: EntityEventConfig, result: PipelineResult): 'observe' | 'full' | undefined => {
+  const recorded = result.context.mode;
+  return isEntityEventMode(recorded) ? recorded : config.mode;
+};
+
+/** The resource an EntityEvent run wrote its canaries to, as the run recorded it, else as configured. */
+const entityEventWritableResourceOf = (config: EntityEventConfig, result: PipelineResult): string | undefined =>
+  recordedString(result, 'writableResource') ?? (nonEmpty(config.writableResource) ? config.writableResource : undefined);
+
 /** The endorsement name the request route takes for a configuration. */
 export const cloudEndorsementOf = (config: CloudRunConfig): CloudEndorsementName => {
   switch (config.endorsement) {
@@ -127,7 +157,7 @@ export const cloudVersionOf = (config: CloudRunConfig, result: PipelineResult): 
     case 'dd':
       return config.version;
     case 'add-edit':
-      return nonEmpty(config.specVersion) ? config.specVersion : undefined;
+      return addEditVersionOf(config, result);
     case 'entity-event':
       return ENTITY_EVENT_VERSION;
     case 'rcf':
@@ -322,6 +352,12 @@ export interface CloudEntryOptions {
   readonly description?: string;
   /** RESO Common Format only: the upload the files went to. The entry names it in place of a server. */
   readonly upload?: { readonly uploadId: string };
+  /**
+   * Add/Edit only: the payloads the run used, captured when it ran. Given, they go in the entry as they are, so a
+   * submit hours later sends what ran. Not given, the run's folder is read again, as the CLI does at the end of its
+   * own run.
+   */
+  readonly payloads?: InlinePayloads;
 }
 
 const NO_TARGET_REASON = 'it does not name the provider, system and recipient a cloud run is addressed to';
@@ -350,15 +386,17 @@ const isPlan = (value: unknown): value is AddEditTestPlan =>
   typeof value === 'object' && value !== null && Array.isArray((value as { readonly actions?: unknown }).actions);
 
 /**
- * The payloads an Add/Edit run used, inline: the configuration's, or the files it read from its folder, which the
- * cloud cannot reach. The plan the run recorded says which files it read. Auto payloads are refused: they are
- * written for the reference server and the mock, and the cloud tests the provider's own.
+ * The payloads an Add/Edit run used, inline: the ones captured when it ran, the configuration's, or the files it read
+ * from its folder, which the cloud cannot reach. The plan the run recorded says which files it read. Auto payloads
+ * are refused: they are written for the reference server and the mock, and the cloud tests the provider's own.
  */
 const addEditPayloadsOf = async (
   config: AddEditConfig,
-  result: PipelineResult
+  result: PipelineResult,
+  captured: InlinePayloads | undefined
 ): Promise<{ readonly payloads: InlinePayloads } | { readonly refused: string }> => {
   if (config.autoPayloads) return { refused: 'the tool wrote its payloads, and a cloud run tests the payloads you give' };
+  if (captured !== undefined) return { payloads: captured };
   if (config.payloadsDir === undefined) {
     return config.payloads === undefined ? { refused: 'it gives no payloads' } : { payloads: config.payloads };
   }
@@ -374,20 +412,21 @@ const addEditPayloadsOf = async (
 const addEditCloudEntryOf = async (
   config: AddEditConfig,
   result: PipelineResult,
-  description: string | undefined
+  options: CloudEntryOptions
 ): Promise<CloudEntryResult> => {
-  const base = serverEntryOf(config, description);
+  const base = serverEntryOf(config, options.description);
   if (base === undefined) return refused(NO_TARGET_REASON);
-  if (!nonEmpty(config.specVersion)) return refused('it does not say which Add/Edit version it ran');
+  const specVersion = addEditVersionOf(config, result);
+  if (specVersion === undefined) return refused('it does not say which Add/Edit version it ran');
   if (!nonEmpty(config.resource)) return refused('it does not name the resource it wrote to');
-  const payloads = await addEditPayloadsOf(config, result);
+  const payloads = await addEditPayloadsOf(config, result, options.payloads);
   if ('refused' in payloads) return refused(payloads.refused);
   return {
     entry: {
       ...base,
       payloads: payloads.payloads,
       addEditOptions: {
-        specVersion: config.specVersion,
+        specVersion,
         resource: config.resource,
         ...(config.actions === undefined ? {} : { actions: config.actions }),
         ...(config.formats === undefined ? {} : { formats: config.formats })
@@ -396,20 +435,22 @@ const addEditCloudEntryOf = async (
   };
 };
 
-const entityEventCloudEntryOf = (config: EntityEventConfig, description: string | undefined): CloudEntryResult => {
+const entityEventCloudEntryOf = (config: EntityEventConfig, result: PipelineResult, description: string | undefined): CloudEntryResult => {
   const base = serverEntryOf(config, description);
   if (base === undefined) return refused(NO_TARGET_REASON);
-  if (config.mode === undefined) return refused('it does not say whether it observed or wrote');
-  if (!nonEmpty(config.writableResource)) return refused('it does not name the resource it writes canaries to');
-  if (config.mode === 'full' && config.payloadsDir !== undefined) {
+  const mode = entityEventModeOf(config, result);
+  const writableResource = entityEventWritableResourceOf(config, result);
+  if (mode === undefined) return refused('it does not say whether it observed or wrote');
+  if (writableResource === undefined) return refused('it does not name the resource it writes canaries to');
+  if (mode === 'full' && config.payloadsDir !== undefined) {
     return refused("it reads its canary payloads from a folder, which a run in RESO's cloud cannot reach");
   }
   return {
     entry: {
       ...base,
       entityEventOptions: {
-        mode: config.mode,
-        writableResource: config.writableResource,
+        mode,
+        writableResource,
         ...(config.maxEvents === undefined ? {} : { maxEvents: config.maxEvents }),
         ...(config.pollInterval === undefined ? {} : { pollInterval: config.pollInterval }),
         ...(config.pollTimeout === undefined ? {} : { pollTimeout: config.pollTimeout })
@@ -443,9 +484,9 @@ const anyCloudEntryOf = async (config: CloudRunConfig, result: PipelineResult, o
     case 'dd':
       return ddCloudEntryOf(config, options.description);
     case 'add-edit':
-      return addEditCloudEntryOf(config, result, options.description);
+      return addEditCloudEntryOf(config, result, options);
     case 'entity-event':
-      return entityEventCloudEntryOf(config, options.description);
+      return entityEventCloudEntryOf(config, result, options.description);
     case 'rcf':
       return rcfCloudEntryOf(config, result, options);
   }

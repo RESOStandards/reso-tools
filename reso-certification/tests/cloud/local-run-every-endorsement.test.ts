@@ -60,7 +60,12 @@ describe('cloudEndorsementOf and cloudVersionOf', () => {
     ]);
   });
 
-  it('fills in no Add/Edit version', () => {
+  it('reads the Add/Edit version the run recorded when the configuration omitted it, as the pipeline resolved it', () => {
+    const ran: PipelineResult = { ...passed, context: { specVersion: '2.0.0' } };
+    expect(cloudVersionOf(addEditConfig({ specVersion: undefined }), ran)).toBe('2.0.0');
+  });
+
+  it('fills in no Add/Edit version when neither the run nor the configuration says', () => {
     expect(cloudVersionOf(addEditConfig({ specVersion: undefined }), passed)).toBeUndefined();
   });
 });
@@ -104,6 +109,11 @@ describe('cloudEntryOf for an Add/Edit run', () => {
     });
   });
 
+  it('carries the version the run recorded when the configuration omitted it', async () => {
+    const entry = await entryOf(addEditConfig({ specVersion: undefined }), { ...passed, context: { specVersion: '2.0.0' } });
+    expect('addEditOptions' in entry ? entry.addEditOptions.specVersion : undefined).toBe('2.0.0');
+  });
+
   describe('with a payloads folder', () => {
     const dir: { path?: string } = {};
     beforeAll(async () => {
@@ -123,6 +133,24 @@ describe('cloudEntryOf for an Add/Edit run', () => {
         createSucceeds: { ListPrice: 2 },
         createFails: { ListPrice: 'no' }
       });
+    });
+
+    it('sends the payloads captured when the run ran, given, instead of reading the folder again', async () => {
+      const captured = { createSucceeds: { ListPrice: 3 }, createFails: { ListPrice: 'still no' } };
+      const entry = await entryOf(addEditConfig({ payloads: undefined, payloadsDir: '/no/such/folder' }), passed, { payloads: captured });
+      expect('payloads' in entry ? entry.payloads : undefined).toEqual(captured);
+    });
+
+    it("sends the captured payloads over the configuration's inline ones, since the captured ones are what ran", async () => {
+      const captured = { createSucceeds: { ListPrice: 4 }, createFails: {} };
+      const entry = await entryOf(addEditConfig(), passed, { payloads: captured });
+      expect('payloads' in entry ? entry.payloads : undefined).toEqual(captured);
+    });
+
+    it('still refuses auto payloads when payloads were captured', async () => {
+      await expect(refusalOf(addEditConfig({ autoPayloads: true }), passed, { payloads: { createSucceeds: {} } })).resolves.toMatch(
+        /payloads you give/
+      );
     });
 
     it('refuses when the run did not record which files it read, rather than guessing', async () => {
@@ -156,6 +184,17 @@ describe('cloudEntryOf for an EntityEvent run', () => {
       token: 'server-token-for-tests',
       entityEventOptions: { mode: 'full', writableResource: 'Property', maxEvents: 500, pollTimeout: 60000 }
     });
+  });
+
+  it('reads the mode and the canary resource the run recorded when the configuration omitted them', async () => {
+    const ran: PipelineResult = { ...passed, context: { mode: 'observe', writableResource: 'Property' } };
+    const entry = await entryOf(entityEventConfig({ mode: undefined, writableResource: undefined, maxEvents: undefined }), ran);
+    expect('entityEventOptions' in entry ? entry.entityEventOptions : undefined).toEqual({ mode: 'observe', writableResource: 'Property' });
+  });
+
+  it('refuses a run whose mode neither the run nor the configuration says', async () => {
+    await expect(refusalOf(entityEventConfig({ mode: undefined }))).resolves.toMatch(/observed or wrote/);
+    await expect(refusalOf(entityEventConfig({ writableResource: undefined }))).resolves.toMatch(/canaries/);
   });
 
   it('refuses a full-mode run that read its canary payloads from a folder', async () => {
@@ -204,5 +243,10 @@ describe('localRunRecordOf for every endorsement', () => {
 
   it('is nothing for an Add/Edit run that did not say its version', () => {
     expect(localRunRecordOf(passed, addEditConfig({ specVersion: undefined }), NOW)).toBeUndefined();
+  });
+
+  it('records the version an Add/Edit run recorded when the configuration omitted it', () => {
+    const ran: PipelineResult = { ...passed, context: { specVersion: '2.0.0' } };
+    expect(localRunRecordOf(ran, addEditConfig({ specVersion: undefined }), NOW)).toMatchObject({ endorsementVersion: '2.0.0' });
   });
 });
