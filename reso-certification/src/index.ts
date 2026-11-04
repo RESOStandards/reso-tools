@@ -151,16 +151,59 @@ export type {
 
 // ── Cloud runs (start a run in RESO's cloud; read where each stands) ──
 
-export { CLOUD_ENDORSEMENT, listCloudRunStatus, submitCloudRun } from './cloud/runs.js';
-export { cloudEntryOf, cloudTargetOf, isSuccessfulRun, localRunRecordOf } from './cloud/local-run.js';
-export type { CloudConfigEntry, LocalRunRecord } from './cloud/local-run.js';
+export {
+  CLOUD_ENDORSEMENT,
+  listCloudRunStatus,
+  requestUploadSlot,
+  reserveCloudRun,
+  submitCloudRun,
+  uploadToSlot
+} from './cloud/runs.js';
+export {
+  ENTITY_EVENT_VERSION,
+  cloudEndorsementOf,
+  cloudEntryOf,
+  cloudTargetOf,
+  cloudVersionOf,
+  isSuccessfulRun,
+  localRunRecordOf,
+  rcfLocalRunRecordOf
+} from './cloud/local-run.js';
+export type {
+  AddEditCloudConfigEntry,
+  AnyCloudConfigEntry,
+  AnyLocalRunRecord,
+  CloudConfigEntry,
+  CloudEntryOf,
+  CloudEntryOptions,
+  CloudEntryResult,
+  CloudRunConfig,
+  DDCloudConfigEntry,
+  EntityEventCloudConfigEntry,
+  LocalRunRecord,
+  LocalRunRecordFor,
+  RcfCloudConfigEntry,
+  RcfLocalRunRecord,
+  ServerCloudConfigEntry,
+  ServerCloudRunConfig
+} from './cloud/local-run.js';
+export { RCF_UPLOAD_MAX_BYTES, packRcfInput } from './cloud/rcf-pack.js';
+export type { PackRcfResult, PackedRcfInput } from './cloud/rcf-pack.js';
+export { reserveForLocalRun, startCloudRun, whyNotSuccessful } from './cloud/start.js';
+export type { CloudLocalRun, ReserveForLocalRunInput, StartCloudRunDeps, StartCloudRunInput } from './cloud/start.js';
 export type {
   AcceptedCloudRun,
+  CloudEndorsementName,
   CloudRunRecipient,
+  CloudRunReservation,
   CloudRunStatusInput,
   CloudRunStatusPage,
   CloudRunStatusRow,
-  SubmitCloudRunInput
+  CloudRunTarget,
+  ReserveCloudRunInput,
+  SubmitCloudRunInput,
+  UploadSlot,
+  UploadSlotInput
 } from './cloud/runs.js';
 
 // ── Metadata source (--from-server: fetch $metadata from a live endpoint + serialize) ──
