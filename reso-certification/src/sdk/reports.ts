@@ -339,6 +339,11 @@ export const createDetailedReportGenerator = (
     // carries `requested`, `applied` and (when they differ) `unmatched` and `malformed` — the presence of
     // the key means an override was GIVEN, never that one took effect; `applied` is what answers that.
     const fieldOverrides = ctx.fieldOverrides as { readonly requested: ReadonlyArray<string> } | undefined;
+    // Web API Core: whether every data type was met, so a certification can say "Full Type Coverage Achieved" or "Could
+    // Not Be Achieved" (Josh, 2026-11-03). Here and not in `report.json`, whose key set the Cert API pins.
+    const coverageMatrix = ctx.coverageMatrix as
+      | { readonly coveredTypes: ReadonlyArray<string>; readonly missingTypes: ReadonlyArray<string>; readonly fullCoverage: boolean }
+      | undefined;
 
     return {
       description,
@@ -346,6 +351,15 @@ export const createDetailedReportGenerator = (
       softwareVersion: SOFTWARE_VERSION,
       generatedOn: new Date().toISOString(),
       ...(fieldOverrides && fieldOverrides.requested.length > 0 ? { fieldOverrides } : {}),
+      ...(coverageMatrix
+        ? {
+            typeCoverage: {
+              achieved: coverageMatrix.fullCoverage,
+              coveredTypes: coverageMatrix.coveredTypes,
+              missingTypes: coverageMatrix.missingTypes
+            }
+          }
+        : {}),
       remarks: serializeRemarks(result),
       outcome: result.status,
       /**

@@ -62,6 +62,31 @@ describe('Core end-to-end guardrails (mock server + report-file assertions)', ()
     expect(await readReportOutcome(result.context.outputPath)).toBe('failed');
   });
 
+  it('records whether full type coverage was achieved, with the types met and missed, in the detailed report', async () => {
+    mock = installCoreMockServer(BASE);
+
+    const result = await runCoreCompliance(makeConfig(outputDir));
+    const detailed = JSON.parse(await readFile(join(result.context.outputPath, 'report-detailed.json'), 'utf-8'));
+    const matrix = result.context.coverageMatrix as { coveredTypes: string[]; missingTypes: string[]; fullCoverage: boolean };
+
+    expect(detailed.typeCoverage).toEqual({
+      achieved: matrix.fullCoverage,
+      coveredTypes: matrix.coveredTypes,
+      missingTypes: matrix.missingTypes
+    });
+    expect([...detailed.typeCoverage.coveredTypes, ...detailed.typeCoverage.missingTypes].sort()).toEqual([
+      'date',
+      'decimal',
+      'integer',
+      'multiLookup',
+      'singleLookup',
+      'timestamp'
+    ]);
+    // report.json keeps the key set the Cert API takes; the coverage travels in the detailed report it keeps.
+    const summary = JSON.parse(await readFile(join(result.context.outputPath, 'report.json'), 'utf-8'));
+    expect(summary).not.toHaveProperty('typeCoverage');
+  });
+
   it('run deadline spent → verdict AND report outcome are INCOMPLETE, and a partial report is still written', async () => {
     mock = installCoreMockServer(BASE);
 

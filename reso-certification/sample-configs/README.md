@@ -121,7 +121,7 @@ Each endorsement reads an optional block. Everything in these blocks has a defau
 }
 ```
 
-`resources` narrows the run and accepts either a comma-separated string or a list. `fullCoverage` tests every eligible field rather than a representative sample.
+`resources` narrows the run and accepts either a comma-separated string or a list. `fullCoverage` fails the run when a data type is not met on some resource tested. Every run records whether it was.
 
 ### EntityEvent
 
