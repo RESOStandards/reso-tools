@@ -28,6 +28,7 @@ import {
   runProviderScenarios,
   summarizeScenarios
 } from '../web-api-core/test-runner.js';
+import { typeCoverageOf } from '../web-api-core/type-coverage.js';
 import { allOf, everyStepPassed, versionCertifies } from './certification.js';
 import { coerceCoreVersion, isCore21OrLater, whyCoreVersionDoesNotCertify } from './core-versions.js';
 import { createExpandSchemaValidator, isEnumerationIgnored, loadValidationConfig } from './expand-schema.js';
@@ -685,11 +686,9 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // never folded into totalFailed or the verdict.
     const totalWarnings = resourceReports.reduce((sum, r) => sum + (r.summary.warnings ?? 0), 0);
 
-    // Compute union coverage across all resources
-    const allTypes = ['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup'];
-    const coveredTypes = allTypes.filter(type => resourceReports.some(r => r.coverage.some(c => c.type === type && c.hasData)));
-    const missingTypes = allTypes.filter(t => !coveredTypes.includes(t));
-    const fullCoverage = missingTypes.length === 0;
+    // Full type coverage: each type met on some resource tested (Property alone on Core 2.0.0). Every run records it;
+    // it decides the outcome only in --full-coverage mode.
+    const { coveredTypes, missingTypes, fullCoverage } = typeCoverageOf(resourceReports, coerceCoreVersion(version));
 
     // In --full-coverage mode, fail if any types are missing
     const requireFullCoverage = config.fullCoverage ?? false;

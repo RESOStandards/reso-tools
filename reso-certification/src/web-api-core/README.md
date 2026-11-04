@@ -159,8 +159,14 @@ Member:     integer ✓  decimal -  date -  timestamp ✓  singleLookup ✓  mul
 Office:     integer ✓  decimal -  date -  timestamp ✓  singleLookup ✓  multiLookup -
 ```
 
-- **Default mode**: Pass as long as no scenarios fail. Skipped scenarios due to missing types are noted in the report.
-- **`--full-coverage`**: Fail if any data type category has zero coverage across all tested resources. Use this when full compliance verification is required.
+Full type coverage means each of the six types is met on some field of some resource tested. No resource has to carry
+all six. On Core 2.0.0 only Property counts, as the Commander tested it. A single-valued lookup is met with one sampled
+value and a multi-valued lookup with two, as the specification gives them, so a multi-valued field with two values to
+test is chosen before one with a single value, however standard.
+
+- **Every run** records whether full type coverage was achieved, in `report-detailed.json` as `typeCoverage`
+  (`achieved`, `coveredTypes`, `missingTypes`), and in the run's summary. A run passes as long as no scenario fails.
+- **`--full-coverage`**: a missing type fails the run too.
 
 ## Report Format
 

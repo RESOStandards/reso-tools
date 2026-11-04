@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+### Web API Core records full type coverage
+
+- **Every Core run records whether it met every data type,** in its detailed report as `typeCoverage`: whether full
+  type coverage was achieved, the types met and the types missed. Each type counts when it is met on some field of
+  some resource tested. On Core 2.0.0 only Property counts. Certification can then show whether a run achieved it.
+- **A multi-valued lookup is met with two values,** as the specification gives it, so its `has` with `and`, `any()`
+  and `all()` tests all run. A multi-valued field with two values to test is now chosen before one with a single
+  value, however standard. Before, a standard field holding one value could be chosen and those tests went untested.
+- **`--full-coverage` is unchanged:** with it, a missing type also fails the run.
+
 ### Add/Edit tests the actions and formats you support
 
 RCP-010 lets a provider implement as many or as few actions as its business needs. `add-edit` now tests the ones you choose, and passing those is a pass:

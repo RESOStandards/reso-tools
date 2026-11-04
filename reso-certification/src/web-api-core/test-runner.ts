@@ -170,13 +170,14 @@ export const isInOperatorSkippedForVersion = (scenario: CoreScenario, detectedOD
  *  RESO-first candidate — which is the field certified in the ordinary case. When a server rejects `$filter` on
  *  it, the scenario is certified on an alternate instead, and the field actually queried is the one named in that
  *  scenario's `requestUrl`. The enum slots have always behaved this way; since #315 the scalar slots do too. */
-const buildCoverage = (params: TestParams): ReadonlyArray<TypeCoverage> => [
+export const buildCoverage = (params: TestParams): ReadonlyArray<TypeCoverage> => [
   { type: 'integer', field: params.integerField, hasData: params.integerValueLow != null },
   { type: 'decimal', field: params.decimalField, hasData: params.decimalValueLow != null },
   { type: 'date', field: params.dateField, hasData: params.dateValue != null },
   { type: 'timestamp', field: params.timestampField, hasData: params.datetimeValue != null },
   { type: 'singleLookup', field: params.singleLookupField, hasData: params.singleLookupValue != null },
-  { type: 'multiLookup', field: params.multiLookupField, hasData: params.multiLookupValue1 != null }
+  // Two values, as the spec gives a multi-valued enumeration two (Core §3.3): has + and, any() and all() need both.
+  { type: 'multiLookup', field: params.multiLookupField, hasData: params.multiLookupValue1 != null && params.multiLookupValue2 != null }
 ];
 
 // ── Enum-family gating + candidate retry ──
