@@ -111,6 +111,7 @@ export {
   runRcfCompliance,
   fingerprintRcfInput,
   runAddEditCompliance,
+  addEditRunProblems,
   runEntityEventCompliance,
   runCoreCompliance,
   createPipeline,

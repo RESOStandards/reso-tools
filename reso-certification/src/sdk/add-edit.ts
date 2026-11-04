@@ -1,14 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runAllScenarios } from '../add-edit/index.js';
-import {
-  type AddEditPayloadName,
-  type AddEditTestPlan,
-  PAYLOAD_FILES,
-  describePlan,
-  payloadsFor,
-  planAddEditTests
-} from '../add-edit/plan.js';
+import { type AddEditTestPlan, PAYLOAD_FILES, describePlan, payloadsFor, planAddEditTests } from '../add-edit/plan.js';
+import { type Payloads, payloadSourceProblems, providedPayloadProblems } from '../add-edit/run-checks.js';
 import { readPayloads } from '../add-edit/test-runner.js';
 import {
   buildResourceUrl,
@@ -185,11 +179,6 @@ const AUTO_PAYLOADS = {
   updateFails: { ListPrice: -1.0 }
 } as const;
 
-type Payloads = Readonly<Partial<Record<AddEditPayloadName, Record<string, unknown>>>>;
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
-const named = (value: unknown): boolean => value !== undefined && value !== null && String(value) !== '';
-
 /**
  * What auto mode writes for a plan. An update or a delete takes a sampled record when there is one, else none, and
  * the run then uses the record its create test made.
@@ -207,34 +196,6 @@ const autoPayloadsFor = (plan: AddEditTestPlan, keyField: string | undefined, sa
 };
 
 /**
- * What stops the provider's payloads from running as given: one the plan needs and is missing or is not a record,
- * or an update or a delete that names no record when no create test runs to make one.
- */
-const providedPayloadProblems = (plan: AddEditTestPlan, payloads: Payloads, keyField: string | undefined): ReadonlyArray<string> => {
-  const needed = payloadsFor(plan);
-  const missing = needed.filter(name => !isRecord(payloads[name]));
-  if (missing.length > 0) {
-    return [`Each action tested needs its succeeds and its fails payload. Missing: ${missing.map(name => PAYLOAD_FILES[name]).join(', ')}`];
-  }
-  const creates = plan.actions.includes('create');
-  const unnamedUpdates =
-    creates || keyField === undefined
-      ? []
-      : (['updateSucceeds', 'updateFails'] as const).filter(name => needed.includes(name) && !named(payloads[name]?.[keyField]));
-  const deleteSucceeds = payloads.deleteSucceeds;
-  const deleteFails = payloads.deleteFails;
-  return [
-    ...unnamedUpdates.map(name => `${PAYLOAD_FILES[name]} names no ${keyField}, and no create test runs to make a record it could update`),
-    ...(needed.includes('deleteSucceeds') && !creates && !named(deleteSucceeds?.url) && !named(deleteSucceeds?.id)
-      ? ['delete-succeeds.json names no id or url, and no create test runs to make a record it could delete']
-      : []),
-    ...(needed.includes('deleteFails') && !named(deleteFails?.url) && !named(deleteFails?.id)
-      ? ['delete-fails.json names no id or url. It needs a record that does not exist.']
-      : [])
-  ];
-};
-
-/**
  * Get the payloads ready: the provider's, from a folder or the configuration, or auto ones when asked for. A run
  * given none, or given them two ways, is refused before anything is written.
  */
@@ -247,17 +208,8 @@ const generatePayloads = (config: AddEditConfig): PipelineStep<AddEditContext> =
     if ('problems' in planned) return fail(planned.problems);
     const { plan } = planned;
 
-    const sources = [
-      config.payloadsDir ? 'a payloads folder' : '',
-      config.payloads ? 'payloads in the configuration' : '',
-      config.autoPayloads ? 'auto payloads' : ''
-    ].filter(Boolean);
-    if (sources.length > 1) return fail([`Give the payloads one way, not ${sources.join(' and ')}`]);
-    if (sources.length === 0) {
-      return fail([
-        'Add/Edit needs the payloads to test with: a payloads folder, or payloads in the configuration. Auto payloads are for the reference server and the mock.'
-      ]);
-    }
+    const sourceProblems = payloadSourceProblems(config);
+    if (sourceProblems.length > 0) return fail(sourceProblems);
 
     const keyField = ctx.entityType?.keyProperties[0];
 
@@ -478,3 +430,5 @@ export const runAddEditFromConfigFile = async (configPath: string, onProgress?: 
 
   return results;
 };
+
+export { addEditRunProblems } from '../add-edit/run-checks.js';
