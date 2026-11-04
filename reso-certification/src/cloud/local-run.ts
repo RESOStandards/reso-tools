@@ -577,7 +577,7 @@ const anyCloudEntryOf = async (config: CloudRunConfig, result: PipelineResult, o
  * The cloud entry for one local run, in the shape the service reads for its endorsement.
  *
  * Two forms. The Web API Core form, `cloudEntryOf(config, description?)`, is synchronous and answers the entry or
- * `undefined`, as it did in 0.12.0. The general form, `cloudEntryOf(config, result, options?)`, takes any of the five
+ * `undefined`, as its first callers use it. The general form, `cloudEntryOf(config, result, options?)`, takes any of the five
  * configurations and the run's result, and answers the entry or the reason there is none. It is asynchronous because
  * an Add/Edit entry inlines the payload files the run read.
  */
@@ -603,7 +603,7 @@ export type LocalRunRecordFor<C extends CloudRunConfig> = C extends RcfConfig ? 
 /**
  * The record of any local run, or `undefined` when the result is not the run of this configuration, the run is not
  * addressed to a provider, system and recipient, or it did not say what it certified. Web API Core and RESO Common
- * Format records are as they were in 0.12.0.
+ * Format records are as the Core and `rcf` commands first built them.
  */
 export const localRunRecordOf = <C extends CloudRunConfig>(
   result: PipelineResult,

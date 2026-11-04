@@ -412,7 +412,7 @@ compliance profile.
 ```bash
 npm install
 npm run build
-npm test        # ~2,130 tests
+npm test        # ~2,180 tests
 npm run dev     # Watch mode
 ```
 

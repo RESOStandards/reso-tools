@@ -557,9 +557,13 @@ can be certified:
 Entries that failed, stopped or cannot be certified are listed with the reason and never sent. What is sent is
 each entry as it ran: its server, its credential and its options, including any flag that changed them, such as
 `--auth-token` or `--field-overrides`, plus a record of the local run that passed. An Add/Edit entry carries the
-payloads the run used, inline: read again from the folder when `--payloads` gave one. The cloud tests your own
+payloads the run used, inline, as the run recorded them when it read its folder or its configuration, and only
+those of the actions it tested. A run that recorded none is refused, never re-read. The cloud tests your own
 payloads, so `--start-cloud-run` does not go with `--auto-payloads` or `--mock`, and a `dd` run with `--no-strict`
-or `--skip-variations` cannot be certified, so it does not go with those either. The credentials go to RESO's
+or `--skip-variations` cannot be certified, so it does not go with those either. Each config entry is read before
+the run as well: one a cloud run could never start from, because it names no provider, system or recipient, runs a
+version RESO does not certify, turns strict mode off, writes its own payloads or gives none, only observes, or
+reads its canaries from a folder, is refused before any entry runs, with every reason. The credentials go to RESO's
 service with the request and are never printed. Messages go to stderr, so with `--output json` stdout stays the
 run's own JSON, and what was started is printed as JSON there too.
 
@@ -583,7 +587,8 @@ passed.
   run, naming the upload and the fingerprint. The upload goes straight to storage with its own signed fields, and no
   RESO credential goes with it. The local zip and its folder are removed afterwards, whatever happened.
 
-The flags are checked before the run, as for Core, so a long run is not wasted. RESO's service switches RESO Common
+The flags are checked before the run, as for Core, so a long run is not wasted: a run with `--skip-schema-validation`
+or `--skip-variations` cannot be certified, so `--start-cloud-run` does not go with either. RESO's service switches RESO Common
 Format cloud runs on separately: until then it refuses the reservation, and the CLI prints its reason.
 
 ### `cloud status`

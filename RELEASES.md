@@ -2,7 +2,7 @@
 
 ---
 
-## Unreleased
+## Certification 0.12.0 – 2026-11-03
 
 ### Cloud runs for every endorsement
 
@@ -10,11 +10,17 @@
   run, the entries that passed and can be certified are reserved with RESO's service and run in its cloud. The same
   checks run before the run starts, so a long run is not wasted: `--config`, a named `providerUoi`, the service's
   address and credentials, and nothing that makes the run uncertifiable (`--no-strict`, `--skip-variations`,
-  `--auto-payloads`, `--mock`).
+  `--auto-payloads`, `--mock`, and for `rcf` `--skip-schema-validation` and `--skip-variations`).
+- **Each config entry is read before the run too.** An entry a cloud run could never start from is refused before
+  any entry runs, named with every reason: no provider, system or recipient, a version RESO does not certify, a `dd`
+  entry with `strictMode` off, an `add-edit` entry with `autoPayloads` or no payloads, an `entity-event` entry that
+  only observes or reads its canaries from a folder. What only the run can tell is still decided at the end.
 - **An Add/Edit cloud run is the same run.** The pipeline records the payloads it read, from its folder or its
-  configuration, and the entry carries that record inline. A folder is never read again at submit time, so a file
-  that changed after the local pass does not reach the cloud; a run that recorded nothing is refused, as is a run
-  that wrote its own payloads. A result is refused when it is not the run of the configuration it is paired with.
+  configuration, and the entry carries that record inline: only the payloads of the actions the run tested, as a
+  folder run reads only those files, so a stray payload for an action not tested is not sent and not refused by the
+  cloud after the local pass. A folder is never read again at submit time, so a file that changed after the local
+  pass does not reach the cloud; a run that recorded nothing is refused, as is a run that wrote its own payloads. A
+  result is refused when it is not the run of the configuration it is paired with.
 - **One path for the CLI and the desktop.** `startCloudRun` takes the local runs of one endorsement and version for
   one provider, each with the reservation made when it passed, checks each (a pass that can be certified, the
   endorsement, version and provider asked for), packs and uploads a RESO Common Format run's files, and submits
@@ -28,8 +34,6 @@
 - **Two more 0.12.0 audit items:** the provider-token mint sends the API key only over https, upgrading a bare or
   `http` `CERT_AUTH_API_BASE_URL` as every other service address is; and the line that reports an entry that stopped
   before producing a result is masked like every other line the CLI prints.
-
-## Certification 0.12.0 – 2026-11-03
 
 ### Web API Core records full type coverage
 
@@ -89,7 +93,7 @@ reso-cert rcf -i ./rcf-export/ --provider-uoi <UOI> --provider-usi <USI> --recip
 - **At the end of a run that passed and can be certified,** the files it read are packed into one zip, uploaded and run in RESO's cloud. Without `--start-cloud-run` nothing is sent, and a run that could go says how.
 - **One zip, even from a single `.json`,** at a low compression level. Each file keeps the path it had, and a zip inside a folder becomes a folder named for it.
 - **The cloud run checks the upload against the local run.** The packed zip must carry the fingerprint the run recorded of what it read, so a file changed since the run stops it before anything is sent.
-- **At most 5 GB packed.** Over that, nothing is reserved or uploaded, and the CLI says the size and the limit.
+- **At most 5 GB packed.** Over that, nothing is uploaded, the reservation made at the pass expires unused, and the CLI says the size and the limit.
 - **The upload goes straight to storage** with its own signed fields: no RESO credential goes with it, and the local zip is removed afterwards whatever happened.
 - **RESO's service switches RESO Common Format cloud runs on separately.** Until then it refuses the reservation, and the CLI prints its reason.
 - **An RCF run can be told the fingerprint its input must have** (`expectedFingerprint`). RESO's cloud job passes the local run's, and a run of other files stops once it has read them, before it infers anything.
