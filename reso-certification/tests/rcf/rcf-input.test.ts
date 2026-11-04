@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { type RcfPayload, readRcfPayloads } from '../../src/cli/rcf-input.js';
+import { MAX_ITEM_BYTES, type RcfPayload, jsonEvents, readRcfPayloads } from '../../src/cli/rcf-input.js';
 
 const fixtures = resolve(dirname(fileURLToPath(import.meta.url)), '../fixtures/rcf');
 
@@ -146,5 +146,44 @@ describe('readRcfPayloads reads each file as JSON.parse did', () => {
       return records;
     };
     await expect(read(payloads[0])).rejects.toThrow(/records of .*a\.json can be read once, before the next payload is asked for/);
+  });
+});
+
+/** A file's bytes in chunks of `size`, as a stream delivers them. */
+async function* chunked(text: string, size: number): AsyncGenerator<Uint8Array> {
+  const bytes = Buffer.from(text);
+  for (let at = 0; at < bytes.length; at += size) yield bytes.subarray(at, at + size);
+}
+
+const eventsOf = async (text: string, cap: number) => {
+  const events: Array<{ readonly kind: string }> = [];
+  for await (const event of jsonEvents(chunked(text, 16), 'f.json', cap)) events.push(event);
+  return events;
+};
+
+// One record, or one other top-level member, is held whole while it is read. A file made to hold a very large one
+// would cost that much memory, so each is bounded. The number of records is not.
+describe('one record or member is bounded, and the number of records is not', () => {
+  const CONTEXT = 'urn:reso:metadata:2.0:resource:property';
+
+  it('refuses a record larger than the bound, naming the file', async () => {
+    const text = JSON.stringify({ '@reso.context': CONTEXT, value: [{ ListingKey: 'x'.repeat(500) }] });
+    await expect(eventsOf(text, 200)).rejects.toThrow('f.json holds a record or top-level member larger than 200 bytes');
+  });
+
+  it('refuses a top-level member larger than the bound', async () => {
+    const text = JSON.stringify({ '@reso.context': CONTEXT, note: 'y'.repeat(500), value: [] });
+    await expect(eventsOf(text, 200)).rejects.toThrow('larger than 200 bytes');
+  });
+
+  it('reads any number of records under the bound, though together they pass it many times over', async () => {
+    const records = Array.from({ length: 200 }, (_, index) => ({ ListingKey: `L${index}` }));
+    const text = JSON.stringify({ '@reso.context': CONTEXT, value: records });
+    expect(text.length).toBeGreaterThan(20 * 200);
+    expect((await eventsOf(text, 200)).filter(event => event.kind === 'record')).toHaveLength(200);
+  });
+
+  it('is 64 MiB unless a test says otherwise', () => {
+    expect(MAX_ITEM_BYTES).toBe(64 * 1024 * 1024);
   });
 });
