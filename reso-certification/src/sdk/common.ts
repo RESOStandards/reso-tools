@@ -130,7 +130,7 @@ const CLEARTEXT_HOSTS: ReadonlySet<string> = new Set(['localhost', '[::1]']);
 const LOOPBACK_IPV4 = /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 
 /** True when an address is loopback, so a credential on it never leaves the machine. */
-const isLoopbackHost = (hostname: string): boolean => CLEARTEXT_HOSTS.has(hostname) || LOOPBACK_IPV4.test(hostname);
+export const isLoopbackHost = (hostname: string): boolean => CLEARTEXT_HOSTS.has(hostname) || LOOPBACK_IPV4.test(hostname);
 
 export const ensureHttps = (raw: string, variableName = 'URL'): string => {
   const value = raw.trim();
