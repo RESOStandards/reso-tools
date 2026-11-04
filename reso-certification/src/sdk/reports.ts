@@ -2,7 +2,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { optionalOutcome } from '../web-api-core/test-runner.js';
+import type { AuthConfig } from '../test-runner/types.js';
+import { coreAuthentication, coreReportParameters } from '../web-api-core/report-parameters.js';
+import { type ResourceTestReport, optionalOutcome } from '../web-api-core/test-runner.js';
 import { FETCH_METADATA, GENERATE_PAYLOADS, RUN_ADD_EDIT_SCENARIOS, RUN_CORE_SCENARIOS, RUN_ENTITY_EVENT_SCENARIOS } from './step-names.js';
 import type { BaseComplianceConfig, PipelineContext, PipelineResult, ProgressCallback } from './types.js';
 
@@ -283,7 +285,9 @@ export const serializeCoreRemarks = (result: PipelineResult): string => {
 export const createGenericReportGenerator = (
   description: string,
   version: string,
-  serializeRemarks: (result: PipelineResult) => string
+  serializeRemarks: (result: PipelineResult) => string,
+  /** Fields one endorsement adds to its `report.json`, each a key the Cert API's report route accepts. */
+  extraFields: (result: PipelineResult) => Record<string, unknown> = () => ({})
 ): ReportGenerator => ({
   name: 'Generic',
   filename: 'report.json',
@@ -297,7 +301,8 @@ export const createGenericReportGenerator = (
     generatedOn: new Date().toISOString(),
     remarks: serializeRemarks(result),
     outcome: result.status,
-    ...(result.certification.valid ? {} : { certification: result.certification })
+    ...(result.certification.valid ? {} : { certification: result.certification }),
+    ...extraFields(result)
   })
 });
 
@@ -469,8 +474,25 @@ export const entityEventReportGenerators = (version: string): ReadonlyArray<Repo
   createDetailedReportGenerator('EntityEvent (RCP-027)', version, serializeEntityEventRemarks)
 ];
 
+/**
+ * What a Core `report.json` names that the Commander's did and the certification site renders: the OData version the
+ * server declared, the authentication method (never the credential), and the eleven parameters, each the field a test
+ * actually queried (`coreReportParameters`). Each is left out when the run did not establish it.
+ */
+const coreReportFields =
+  (auth: AuthConfig | undefined) =>
+  (result: PipelineResult): Record<string, unknown> => {
+    const ctx = result.context as Record<string, unknown>;
+    const parameters = coreReportParameters((ctx.resourceReports as ReadonlyArray<ResourceTestReport> | undefined) ?? []);
+    return {
+      ...(typeof ctx.odataVersion === 'string' ? { odataVersion: ctx.odataVersion } : {}),
+      ...(auth === undefined ? {} : { authentication: coreAuthentication(auth) }),
+      ...(parameters.length > 0 ? { parameters } : {})
+    };
+  };
+
 /** Report generators for Web API Core endorsement. */
-export const coreReportGenerators = (version: string): ReadonlyArray<ReportGenerator> => [
-  createGenericReportGenerator('Web API Server Core', version, serializeCoreRemarks),
+export const coreReportGenerators = (version: string, auth?: AuthConfig): ReadonlyArray<ReportGenerator> => [
+  createGenericReportGenerator('Web API Server Core', version, serializeCoreRemarks, coreReportFields(auth)),
   createDetailedReportGenerator('Web API Server Core', version, serializeCoreRemarks)
 ];

@@ -759,6 +759,8 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         ...ctx,
         resourceReports,
         coverageMatrix: { coveredTypes, missingTypes, fullCoverage },
+        // The OData version the server declared, which the Core report names as the Commander's did.
+        ...(provider.odataVersion === undefined ? {} : { odataVersion: provider.odataVersion }),
         // Only when the run was actually overridden, so an automatic report carries no empty key. Reporting the
         // REQUESTED spec alone would be worse than reporting nothing: an override naming a field that never
         // qualified changes nothing, and a report that echoed the request would make that run indistinguishable
@@ -790,7 +792,7 @@ const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> =
     // outputPath is prepped (built + archived + mkdir'd) by
     // runCoreCompliance before the pipeline starts so the fetch step
     // can persist metadata.xml. Reuse it here instead of rebuilding.
-    const generators = coreReportGenerators(coerceCoreVersion(config.version));
+    const generators = coreReportGenerators(coerceCoreVersion(config.version), config.server.auth);
 
     const resourceReports = (ctx.resourceReports as ReadonlyArray<ResourceTestReport>) ?? [];
     const totalFailed = resourceReports.reduce((sum, r) => sum + r.summary.failed, 0);

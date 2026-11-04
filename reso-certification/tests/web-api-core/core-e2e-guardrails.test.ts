@@ -87,6 +87,24 @@ describe('Core end-to-end guardrails (mock server + report-file assertions)', ()
     expect(summary).not.toHaveProperty('typeCoverage');
   });
 
+  it('writes the OData version, the authentication method and the parameters into report.json, never the token', async () => {
+    mock = installCoreMockServer(BASE);
+    // Stands for a credential, so a report that wrote one is caught by its value.
+    const token = '<sentinel_token>';
+
+    const result = await runCoreCompliance(makeConfig(outputDir, { server: { url: BASE, auth: { mode: 'token', authToken: token } } }));
+    const written = await readFile(join(result.context.outputPath, 'report.json'), 'utf-8');
+    const summary = JSON.parse(written);
+
+    expect(summary.odataVersion).toBe('4.01');
+    expect(summary.authentication).toEqual(['bearer token']);
+    expect(summary.parameters.slice(0, 2)).toEqual([
+      { name: 'Resource', value: 'Property' },
+      { name: 'Key Field', value: 'ListingKey' }
+    ]);
+    expect(written).not.toContain(token);
+  });
+
   it('run deadline spent → verdict AND report outcome are INCOMPLETE, and a partial report is still written', async () => {
     mock = installCoreMockServer(BASE);
 

@@ -22,6 +22,11 @@
 - **The timestamp field can be named,** like the integer, decimal, date and lookup fields. It is still
   `ModificationTimestamp` unless you name another, and a named one serves every timestamp test. Before, naming one was
   reported as unmatched, so a 2.0.0 report's `TimestampField` could not be reused.
+- **A Core `report.json` names what was tested,** as Commander reports did: the OData version the server declared,
+  the authentication method (`bearer token` or `client credentials`, never the credential) and the eleven parameters,
+  from `Resource` to `Timestamp Field`. Each parameter is the field a test actually queried, read from its request,
+  so a field the run moved past is never named. Property is named when it was tested, otherwise the first resource
+  tested. A type no test ran on is left out.
 
 ### Add/Edit tests the actions and formats you support
 
