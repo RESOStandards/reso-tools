@@ -192,6 +192,34 @@ export { RCF_UPLOAD_MAX_BYTES, packRcfInput } from './cloud/rcf-pack.js';
 export type { PackRcfResult, PackedRcfInput } from './cloud/rcf-pack.js';
 export { reserveForLocalRun, startCloudRun, whyNotSuccessful } from './cloud/start.js';
 export type { CloudLocalRun, ReserveForLocalRunInput, StartCloudRunDeps, StartCloudRunInput } from './cloud/start.js';
+
+// ── Live updates on cloud runs (follow them as they change, instead of polling) ──
+
+export {
+  CLOUD_UPDATES_HEARTBEAT,
+  CLOUD_UPDATES_PROTOCOL,
+  CLOUD_UPDATE_KIND,
+  DEFAULT_CLOUD_UPDATES_POLICY,
+  backoffDelayMs,
+  isCloudUpdateEvent,
+  parseCloudUpdate,
+  subscribeToCloudUpdates
+} from './cloud/updates.js';
+export type {
+  CloudTokenProvider,
+  CloudUpdateEvent,
+  CloudUpdateKind,
+  CloudUpdatesPolicy,
+  CloudUpdatesSocket,
+  CloudUpdatesSocketFactory,
+  CloudUpdatesState,
+  CloudUpdatesStateDetail,
+  CloudUpdatesStats,
+  CloudUpdatesSubscription,
+  SubscribeToCloudUpdatesOptions
+} from './cloud/updates.js';
+export { bearerTokenProvider, cliCredentialsTokenProvider, sessionTokenProvider } from './cloud/update-tokens.js';
+export { CLOUD_UPDATES_URL_VARIABLE, ensureSecureWebSocketUrl, resolveCloudUpdatesUrl } from './sdk/common.js';
 export type {
   AcceptedCloudRun,
   CloudEndorsementName,
