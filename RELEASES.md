@@ -64,6 +64,11 @@
   --provider-usi <USI> --recipient-uoi <UOI> --start-cloud-run`, in the README and the CLI reference.
 - **The Docker example pulls `:latest`** and shows a pinned release as `:v<version>`, instead of naming an old
   release.
+- **The user guide explains the variations report:** what an entry carries, each kind of variation with an example,
+  where a suggestion comes from, must-fix and warning, and how to resolve an entry or ask RESO to review it.
+- **Dead links on tools.reso.org are fixed,** in the certification guide, its CLI and Web API Core pages, the client
+  guide and two package READMEs. A link to a section of another page stayed relative and led nowhere. The site's build
+  now carries the section through when it rewrites a link.
 
 ---
 
