@@ -36,4 +36,4 @@ import dd21 from '@reso-standards/reso-common/reference-metadata/dd-2.1.json' wi
 
 ## License
 
-Real Estate Standards Organization End-user License Agreement (EULA). By using this package you agree to the RESO EULA: https://www.reso.org/eula/. See [LICENSE](./LICENSE).
+Real Estate Standards Organization End-user License Agreement (EULA). By using this package you agree to the RESO EULA: https://www.reso.org/eula/. See [LICENSE](https://github.com/RESOStandards/reso-tools/blob/main/reso-common/LICENSE).

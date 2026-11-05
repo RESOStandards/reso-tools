@@ -93,4 +93,4 @@ npm test
 
 ## License
 
-See [LICENSE](./LICENSE) – the RESO End-user License Agreement.
+See [LICENSE](https://github.com/RESOStandards/reso-tools/blob/main/reso-metadata-utils/LICENSE) – the RESO End-user License Agreement.

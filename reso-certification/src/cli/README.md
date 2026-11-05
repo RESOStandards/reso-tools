@@ -2,7 +2,7 @@
 
 The unified command-line entry point for RESO certification compliance testing.
 This is the complete command reference; for a quick start and the SDK API see the
-[package README](../../README.md).
+[package README](https://tools.reso.org/packages/reso-certification/).
 
 ```bash
 # from a built checkout
@@ -57,7 +57,7 @@ environment a command will write to, look at the host in `TOKEN_URI`.
 | `CLIENT_ID`, `CLIENT_SECRET` | the same commands, `restore` and `archive-report` | OAuth2 client credentials the token is minted from. `restore` and `archive-report` present `CLIENT_SECRET` to the Cert API as it is. |
 | `FT_ADMIN_SECRET` | `update-variations --fast-track` | Fast Track admin credential. A fast-track submission is refused without it, before any request is made. |
 | `CERT_AUTH_API_BASE_URL`, `CERT_AUTH_API_USERNAME`, `CERTIFICATION_API_KEY`, `CURRENT_PROVIDER_UOI` | the SDK's provider-token fallback, and `CERTIFICATION_API_KEY` by `restore` and `archive-report` when `CLIENT_SECRET` is absent | The second auth path, used when the OAuth2 variables are absent. |
-| `RESO_VARIATIONS_HANDLER` | the variations step of `dd`, `find-variations` and `rcf` | For a host that runs the SDK: the path of a module whose `computeVariations` computes variations in place of the Variations Service, so no service address or token is needed. Unset, the service is called as usual. See the [package README](../../README.md#computing-variations-with-your-own-module). |
+| `RESO_VARIATIONS_HANDLER` | the variations step of `dd`, `find-variations` and `rcf` | For a host that runs the SDK: the path of a module whose `computeVariations` computes variations in place of the Variations Service, so no service address or token is needed. Unset, the service is called as usual. See the [package README](https://tools.reso.org/packages/reso-certification/#computing-variations-with-your-own-module). |
 
 **Two auth paths, in that order.** A command first tries an OAuth2 client-credentials token from
 `TOKEN_URI` / `CLIENT_ID` / `CLIENT_SECRET`. If those are not configured it falls back to minting a
@@ -720,7 +720,7 @@ signs in the same way, minting a fresh token each time it connects.
 `add-edit`, `entity-event`, `core` and `dd` accept `--config <path>` instead of `--url` to run a batch
 of providers from one file (each entry carries its own server URL, UOIs, and optional
 per-entry overrides). See the sample configs under
-[`sample-configs/`](../../sample-configs/).
+[`sample-configs/`](https://github.com/RESOStandards/reso-tools/tree/main/reso-certification/sample-configs).
 
 An optional top-level `concurrency` says how many recipients your API can be tested against at once. The CLI
 runs its entries one at a time either way, and a [cloud run](#cloud-runs) sends it to RESO's cloud. It must be a
