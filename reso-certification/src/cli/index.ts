@@ -27,10 +27,12 @@ import { ADD_EDIT_ACTIONS, ADD_EDIT_FORMATS } from '../add-edit/plan.js';
 import { type CloudRunConfig, whyNoCloudRunBeforeRun } from '../cloud/local-run.js';
 import { listCloudRunStatus, reserveCloudRun } from '../cloud/runs.js';
 import { startCloudRun } from '../cloud/start.js';
+import { cliCredentialsTokenProvider } from '../cloud/update-tokens.js';
+import { subscribeToCloudUpdates } from '../cloud/updates.js';
 import { startMockEntityEventServer, stopMockEntityEventServer } from '../entity-event/mock/server.js';
 import { synthesizeResourcesFromFields } from '../metadata/index.js';
 import { CURRENT_ADD_EDIT_VERSION, SUPPORTED_ADD_EDIT_VERSIONS, isAddEditVersion } from '../sdk/add-edit-versions.js';
-import { lockHolderOf } from '../sdk/common.js';
+import { lockHolderOf, resolveCloudUpdatesUrl } from '../sdk/common.js';
 import {
   configEntryToAddEdit,
   configEntryToCore,
@@ -84,6 +86,7 @@ import {
   offerCloudRuns,
   planCloudRuns
 } from './cloud-command.js';
+import { STATUS_READ_LIMIT, cloudWatchPrerequisite, runCloudWatch } from './cloud-watch.js';
 import { formatPlan, planDecisionPush } from './decisions-command.js';
 import { overrideRenameNotice, removedPreferFields } from './deprecations.js';
 import { runMetadataStep } from './metadata-command.js';
@@ -1207,7 +1210,7 @@ program
 // OAuth2 client_credentials token from .env (TOKEN_URI / CLIENT_ID / CLIENT_SECRET), falling back to the
 // CERT_AUTH_API_* provider-token mint.
 
-const cloudCmd = program.command('cloud').description("Certification runs in RESO's cloud: see where each stands");
+const cloudCmd = program.command('cloud').description("Certification runs in RESO's cloud: see where each stands, or follow them live");
 
 cloudCmd
   .command('status')
@@ -1242,6 +1245,66 @@ cloudCmd
       process.exitCode = 2;
     }
   });
+
+/** Collects a repeatable option's values, in the order given. No default, so the help shows none. */
+const repeatable = (value: string, previous: ReadonlyArray<string> | undefined): ReadonlyArray<string> => [...(previous ?? []), value];
+
+// `cloud watch` follows runs over RESO's live updates (a WebSocket) instead of polling. The token comes from the same
+// chain as `cloud status`, minted again on every connect so a reconnect never presents an expired one.
+cloudCmd
+  .command('watch')
+  .description('Follow your cloud runs live as they change, one line per update with a running tally – read-only')
+  .option('--request <id>', 'Only this request; repeat for more', repeatable)
+  .option('--endorsement <name>', 'Only this endorsement, for example data-dictionary; repeat for more', repeatable)
+  .option('--env <name>', 'The environment your credentials are for: local, qa, staging or production (default: read from your runs)')
+  .option('--until-done', 'Exit once every watched request has finished: 0 if all passed, 1 if any failed or errored')
+  .option('--json', 'Print each update as the service sent it, one JSON object per line')
+  .action(
+    async (opts: {
+      request?: ReadonlyArray<string>;
+      endorsement?: ReadonlyArray<string>;
+      env?: string;
+      untilDone?: boolean;
+      json?: boolean;
+    }) => {
+      try {
+        const prerequisite = cloudWatchPrerequisite(process.env);
+        if (prerequisite !== undefined) throw new Error(prerequisite);
+        const endpoint = resolveCloudUpdatesUrl();
+        const credentials = cliCredentialsTokenProvider();
+        process.exitCode = await runCloudWatch(
+          {
+            requestIds: opts.request ?? [],
+            endorsements: opts.endorsement ?? [],
+            ...(opts.env === undefined ? {} : { environmentName: opts.env }),
+            untilDone: opts.untilDone === true,
+            json: opts.json === true
+          },
+          {
+            readStatus: async () => {
+              const bearerToken = await credentials();
+              return listCloudRunStatus({ fromCli: true, ...(bearerToken ? { bearerToken } : {}), limit: STATUS_READ_LIMIT });
+            },
+            subscribe: input => subscribeToCloudUpdates({ endpoint, token: credentials, ...input }),
+            write: text => {
+              process.stdout.write(maskSecrets(text));
+            },
+            warn: line => console.error(maskSecrets(line)),
+            isTty: process.stdout.isTTY === true,
+            onInterrupt: handler => {
+              process.once('SIGINT', handler);
+              return () => {
+                process.off('SIGINT', handler);
+              };
+            }
+          }
+        );
+      } catch (error) {
+        console.error('Error:', maskSecrets(error instanceof Error ? error.message : String(error)));
+        process.exitCode = 2;
+      }
+    }
+  );
 
 // ── Metadata Report subcommand group ──
 //
