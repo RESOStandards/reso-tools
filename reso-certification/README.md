@@ -217,6 +217,7 @@ reso-cert add-edit --config providers.json --start-cloud-run
 reso-cert entity-event --config providers.json --start-cloud-run
 reso-cert rcf --input ./rcf-files --provider-uoi <UOI> --provider-usi <USI> --recipient-uoi <UOI> --start-cloud-run
 reso-cert cloud status --in-progress
+reso-cert cloud watch --until-done --request <requestId> --request <requestId>
 ```
 
 - **Only entries that passed and can be certified are sent.** The others are listed with the reason. When entries
@@ -231,14 +232,22 @@ reso-cert cloud status --in-progress
 - **`concurrency`** at the top of the config file tells RESO's cloud how many recipients your API can take at
   once.
 - **`reso-cert cloud status`** lists your cloud runs and where each stands, with `--json` for scripts.
+- **`reso-cert cloud watch`** follows your runs live as RESO's service pushes each change, so nothing polls. It is the
+  way to follow many runs: one line per update and a running tally. With `--until-done` it exits once every watched
+  request has finished, `0` when all passed and `1` when any failed or errored. It needs `RESO_CLOUD_UPDATES_URL`, the
+  address of RESO's live updates. The [User Guide](https://tools.reso.org/guides/reso-certification/#following-many-runs)
+  walks through it.
 
 `rcf --start-cloud-run` does the same for RESO Common Format: the files the run read are packed into one zip, of at
 most 5 GB, uploaded and run in RESO's cloud. It needs `--provider-uoi`, `--provider-usi` and `--recipient-uoi`.
 
 Cloud runs cover every endorsement: Data Dictionary, Web API Core, Add/Edit, EntityEvent and RESO Common Format,
 through one path (`startCloudRun` in the SDK). They sign in with the same `TOKEN_URI`, `CLIENT_ID` and
-`CLIENT_SECRET` from your credentials file as the Variations Service (see [Authentication](#authentication)). The
-[CLI reference](https://tools.reso.org/packages/reso-certification/cli/#cloud-runs) has the details.
+`CLIENT_SECRET` from your credentials file as the Variations Service (see [Authentication](#authentication)). An app
+follows its runs through the same updates as `cloud watch` with `subscribeToCloudUpdates` in the SDK, which reconnects
+on its own and hands over only well-formed updates. The
+[CLI reference](https://tools.reso.org/packages/reso-certification/cli/#cloud-runs) has the details, and
+[`cloud watch`](https://tools.reso.org/packages/reso-certification/cli/#cloud-watch) its options.
 
 ## Archiving a Report
 

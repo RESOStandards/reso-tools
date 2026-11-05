@@ -471,7 +471,36 @@ reso-cert cloud status --since 2026-10-29T00:00:00Z --json
 
 There is one line per recipient of each run: its status (`scheduled`, `running`, `passed`, `failed` or `error`), when that last changed, the report once one is published, and the error or the step it is on.
 
-Cloud runs cover Web API Core. They sign in with the `TOKEN_URI`, `CLIENT_ID` and `CLIENT_SECRET` from your credentials file, the same as the variations commands. If RESO's service refuses a request, the CLI prints its reason and exits `2`.
+Cloud runs cover every endorsement: Data Dictionary, Web API Core, Add/Edit, EntityEvent and RESO Common Format. They sign in with the `TOKEN_URI`, `CLIENT_ID` and `CLIENT_SECRET` from your credentials file, the same as the variations commands. If RESO's service refuses a request, the CLI prints its reason and exits `2`.
+
+### Following Many Runs
+
+With many runs going, watch them instead of asking again and again. `reso-cert cloud watch` takes the updates RESO's service pushes as each run changes:
+
+```bash
+reso-cert cloud watch
+```
+
+```
+Watching your cloud runs in qa. Ctrl-C to stop.
+2026-11-04T18:05:00  running    qa-T00000000-1700000000001  M00000123, system 50000  data-dictionary 2.1
+2026-11-04T18:09:12  passed     qa-T00000000-1700000000001  M00000123, system 50000  data-dictionary 2.1  report 0000report01
+0 scheduled · 3 running · 12 passed · 1 failed · 0 error
+```
+
+Each update is one line. The last line is a running tally of the runs watched, rewritten in place on a terminal. When the output goes to a file or a pipe, the tally is printed at the start and at the end instead, so a log stays clean.
+
+To wait on particular runs, name their requests and add `--until-done`. The watch exits once every one has finished, with `0` when all passed and `1` when any failed or errored, so a script can start many runs and then wait on all of them:
+
+```bash
+reso-cert cloud watch --request qa-T00000000-1700000000001 --request qa-T00000000-1700000000002 --until-done
+```
+
+Without `--request`, `--until-done` waits on the runs in progress when the watch started. `--endorsement data-dictionary` narrows the watch to one endorsement, and `--json` prints each update as the service sent it, one JSON object per line.
+
+The watch reads where your runs stand once when it starts, so a run that finished before then is counted. If the connection drops, it reconnects and reads once more for what changed meanwhile. If it cannot reconnect, it says so and exits `2`, and `reso-cert cloud status` still shows where everything stands.
+
+It needs one more line in your credentials file or environment, `RESO_CLOUD_UPDATES_URL`, the address of RESO's live updates. The [CLI reference](../src/cli/README.md#cloud-watch) has every option.
 
 ---
 

@@ -16,6 +16,30 @@
   write.
 - Without these settings nothing changes.
 
+### Following cloud runs live (certification 0.12.1)
+
+- **`reso-cert cloud watch`** follows your cloud runs as RESO's service pushes each change, instead of polling. It is
+  the way to follow many runs: one line per update and a running tally (scheduled, running, passed, failed, error),
+  rewritten in place on a terminal and printed at the start and the end on a pipe, so logs stay clean.
+  `--request <id>` (repeatable) and `--endorsement <name>` narrow it, `--env <name>` names the environment your
+  credentials are for (read from your runs when left out) and `--json` prints each update as the service sent it.
+- **`--until-done`** exits once every watched request has finished, `0` when all passed and `1` when any failed or
+  errored, so a script can start many runs and wait on all of them with one command. Ctrl-C before then exits `130`.
+- **The status is read once at the start,** so runs that finished before the watch began are counted, and once more
+  after a dropped connection, for what changed while it was down. If the connection cannot be restored, the watch
+  says so, suggests `reso-cert cloud status` and exits `2`. It never falls back to polling.
+- **`RESO_CLOUD_UPDATES_URL`** is the address of RESO's live updates, set beside `RESO_SERVICES_URL` in the
+  credentials file or the environment. It is made `wss` unless it is on your own machine. `cloud watch` signs in as
+  `cloud status` does and mints a fresh token each time it connects.
+- **For apps, `subscribeToCloudUpdates`** in the SDK is the same stream. It carries the token in the WebSocket
+  subprotocol, never in the address, and asks for it again on every connect so a refreshed token is used. It reconnects
+  with capped exponential backoff and jitter, sends a heartbeat inside the service's idle limit, replaces the
+  connection before the service's two-hour limit without a gap, and stops on `close()`. Every message is checked
+  against the update contract, `parseCloudUpdate` and `isCloudUpdateEvent`, which are exported too, and anything else
+  is dropped and counted rather than thrown. `sessionTokenProvider`, `cliCredentialsTokenProvider` and
+  `bearerTokenProvider` supply the token for a signed-in session, the CLI's credentials and a bearer the caller holds.
+- **The user guide's cloud section names every endorsement.** It still said cloud runs covered Web API Core only.
+
 ### Documentation
 
 - **README links go to tools.reso.org.** npm shows a package's README as it is written, so its relative links

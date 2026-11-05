@@ -52,6 +52,7 @@ environment a command will write to, look at the host in `TOKEN_URI`.
 | Variable | Used by | What it is |
 |---|---|---|
 | `RESO_SERVICES_URL` | `find-variations`, `rcf`, `update-variations`, the variations-review commands, the `cloud` commands | Base URL of RESO's services, the Variations Service and cloud runs. Same for every environment. |
+| `RESO_CLOUD_UPDATES_URL` | `cloud watch` | Address of RESO's live updates on cloud runs, a `wss://` address. A bare host is read as `wss`, and a `ws` address is upgraded unless it is on your own machine. |
 | `TOKEN_URI` | the same commands, and `archive-report` | OAuth2 token endpoint. **This is what selects QA versus production.** `archive-report` also reads the Cert API host off it. |
 | `CLIENT_ID`, `CLIENT_SECRET` | the same commands, `restore` and `archive-report` | OAuth2 client credentials the token is minted from. `restore` and `archive-report` present `CLIENT_SECRET` to the Cert API as it is. |
 | `FT_ADMIN_SECRET` | `update-variations --fast-track` | Fast Track admin credential. A fast-track submission is refused without it, before any request is made. |
@@ -89,6 +90,7 @@ different thing from the RESO service credentials above.
 | [`list-variation-reviews`](#list-variation-reviews) | The variations in review – yours as a provider, the whole pool as an admin (read-only) |
 | [`variations-review-status`](#variations-review-status) | Where each variations submission stands (read-only) |
 | [`cloud status`](#cloud-status) | Your cloud runs and where each stands (read-only) |
+| [`cloud watch`](#cloud-watch) | Follow your cloud runs live, and wait on many with `--until-done` (read-only) |
 | [`restore`](#restore) | Restore a certification server backup to a Cert API (admin) |
 | [`archive-report`](#archive-report) | Archive a certification report, with the site's warning first, and only with `--confirm` |
 
@@ -673,6 +675,45 @@ reso-cert cloud status --since 2026-10-29T00:00:00Z --status failed,error
 `--since <time>` (an ISO timestamp or epoch milliseconds) · `--status <list>` (any of `scheduled`,
 `running`, `passed`, `failed` and `error`) · `--in-progress` (`scheduled` or `running`; not with
 `--status`) · `--limit <n>` · `--json` (the rows exactly as the service returned them).
+
+### `cloud watch`
+Your cloud runs as they change, pushed by RESO's service, so there is nothing to poll. This is the way to follow
+many runs at once. One line per update: when, the status, the request, the recipient, the endorsement and the report
+once one is published. Under the lines, a running tally of the runs watched:
+
+```
+2026-11-04T18:05:00  passed     qa-T00000000-1700000000001  M00000123, system 50000  data-dictionary 2.1  report 0000report01
+0 scheduled · 3 running · 12 passed · 1 failed · 0 error · 5 of 8 requests finished
+```
+
+On a terminal the tally stays on one line and is rewritten in place. When stdout is a pipe or a file, it is printed
+once at the start and once at the end, so a log holds only the update lines between them.
+
+```bash
+reso-cert cloud watch
+reso-cert cloud watch --request qa-T00000000-1700000000001 --request qa-T00000000-1700000000002 --until-done
+reso-cert cloud watch --endorsement data-dictionary --json
+```
+
+- **What is watched.** With `--request`, those requests, from the start whatever their state. Without it, the runs in
+  progress when the watch starts and any run started after. `--endorsement` narrows either.
+- **`--until-done`** exits once every watched request has finished: `0` when all passed, `1` when any failed or
+  errored. Without `--request` it waits on the runs in progress when it started, and exits at once when there are
+  none. A script can start many runs and wait on all of them with one command.
+- **The status is read once at the start,** so runs that finished before the watch began are counted. After that the
+  updates are relied on. If the connection drops, the watch reconnects and reads the status once more, for what
+  changed while it was down.
+- **If it cannot stay connected,** it says so, suggests `reso-cert cloud status` and exits `2`. It never falls back to
+  polling.
+- **Ctrl-C** stops it. That is exit `0`, or `130` with `--until-done` before the runs finished.
+
+`--request <id>` (repeat for more) · `--endorsement <name>` (`data-dictionary`, `web-api-core`, `add-edit`,
+`entity-event` or `reso-common-format`; repeat for more) · `--env <name>` (the environment your credentials are for:
+`local`, `qa`, `staging` or `production`; read from your runs when left out, and refused when they disagree) ·
+`--until-done` · `--json` (each update as the service sent it, one JSON object per line, with the tally on stderr).
+
+It needs `RESO_CLOUD_UPDATES_URL` besides what `cloud status` needs, and checks for all of it before connecting. It
+signs in the same way, minting a fresh token each time it connects.
 
 ## Config-file mode
 
