@@ -6,11 +6,12 @@
  * 2.0.0) is sampled and run exactly as today. The overriding rule is anti-false-PASS.
  */
 
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PROVIDER_WIDE_LABEL, runCoreCompliance } from '../../src/sdk/core.js';
+import { NO_RECORDS_TESTED } from '../../src/sdk/certification.js';
+import { NO_RESOURCE_RECORDS, PROVIDER_WIDE_LABEL, runCoreCompliance } from '../../src/sdk/core.js';
 import type { CoreConfig } from '../../src/sdk/types.js';
 import type { ResourceTestReport } from '../../src/web-api-core/test-runner.js';
 
@@ -145,6 +146,26 @@ describe('Core 2.1.0 declared-but-not-served carve-out (end-to-end)', () => {
     // The proof: masking issued NO sampling request for Media, but Property (served) WAS sampled.
     expect(sampledResources(mock.calls)).not.toContain('Media');
     expect(sampledResources(mock.calls)).toContain('Property');
+  });
+
+  // No certification passes on zero records (Josh, 2026-11-04). An empty optional resource is Not Applicable, so a run
+  // on optional resources alone used to pass having tested nothing.
+  it('2.1.0: a run whose only resource returned no records FAILS, and cannot certify, though the resource is Not Applicable', async () => {
+    mock = installMock({
+      edmx: buildEdmx([['Media', 'MediaKey']], [['Media', 'Media']]),
+      serviceDoc: serviceDoc(['Media']),
+      notFound: new Set(['Media'])
+    });
+
+    const result = await runCoreCompliance(makeConfig(outputDir, { version: '2.1.0', resources: ['Media'] }));
+
+    expect(reportFor(result, 'Media')?.scenarios[0].tag).toBe('resource-not-applicable');
+    const scenarios = result.steps.find(s => s.name === 'Run Core scenarios');
+    expect(scenarios?.status).toBe('failed');
+    expect(scenarios?.errors).toContain(NO_RESOURCE_RECORDS);
+    expect(result.status).toBe('failed');
+    expect(result.certification.valid ? [] : result.certification.reasons).toContain(NO_RECORDS_TESTED);
+    expect(JSON.parse(await readFile(join(result.context.outputPath, 'report-detailed.json'), 'utf-8')).outcome).toBe('failed');
   });
 
   it('2.1.0: a REQUIRED resource absent on BOTH surfaces → one clean FAIL, NO sampling request', async () => {

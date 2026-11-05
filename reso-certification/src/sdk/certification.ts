@@ -56,6 +56,36 @@ export const allOf = (...conditions: ReadonlyArray<CertificationValidity>): Cert
 };
 
 /**
+ * The count a step reports for the records it tested: received from the server (Data Dictionary), sampled from it (Web
+ * API Core), read from the input (RESO Common Format), written and accepted (Add/Edit) or validated from its events
+ * (EntityEvent). A step that tests records reports it whether it passed or failed.
+ */
+export const RECORDS_TESTED = 'recordsTested';
+
+/** Why a run that tested no records cannot certify, in the words the provider sees. */
+export const NO_RECORDS_TESTED =
+  'No records were tested, so this system could not be certified. Certification needs at least one record from the system to check.';
+
+/** Why a run that never counted what it tested cannot certify. */
+export const RECORDS_NOT_REPORTED = 'The run did not report testing any records, so this system could not be certified.';
+
+/**
+ * At least one record was tested (Josh, 2026-11-04: "no Cert should work with 0 records across the board").
+ *
+ * Every endorsement composes this into its own rule. A run that tested nothing checked nothing, however clean its steps
+ * look: a Data Dictionary run that received no records passed every step before this existed. No step reporting a
+ * count is a refusal, never read as zero or as fine, and a count that is not a number is not a record.
+ */
+export const testedAtLeastOneRecord = (steps: ReadonlyArray<StepResult>): CertificationValidity => {
+  const reported = steps.flatMap(step => {
+    const count = step.counts?.[RECORDS_TESTED];
+    return count === undefined ? [] : [count];
+  });
+  if (reported.length === 0) return notCertifiable([RECORDS_NOT_REPORTED]);
+  return reported.reduce((total, count) => total + count, 0) > 0 ? CERTIFIABLE : notCertifiable([NO_RECORDS_TESTED]);
+};
+
+/**
  * Whether the version a run used can certify, from that standard's own reason (see `version-policy.ts`). RESO certifies
  * on the latest minor of a major, so a run on an older minor is a retest: it runs, and it does not certify.
  */

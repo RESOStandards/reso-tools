@@ -4,6 +4,21 @@
 
 ## Unreleased
 
+### No certification on zero records (certification 0.12.1)
+
+- **A run that tests no records cannot be certified, for any endorsement.** Its certification verdict says so in plain
+  words: "No records were tested, so this system could not be certified." A run that never reports how many records it
+  tested is refused too, rather than assumed fine.
+- **Data Dictionary:** "Replicate and validate" fails when the server returned no records for any resource. Before
+  this, a run that received nothing could pass every step.
+- **Web API Core:** the scenarios step fails when no resource returned any records. An empty required resource already
+  failed, but a run on optional resources alone, each Not Applicable, could pass having tested nothing.
+- **Add/Edit** fails when no record was created, updated or deleted, and **EntityEvent** fails when no event was
+  validated. **RESO Common Format** already failed a run that read no records.
+- **Every record-testing step reports `recordsTested`** in its counts, whether it passed or failed. The Data
+  Dictionary's count comes from the records replication received across every strategy. Its step no longer reports
+  the last strategy's progress statistics, which nothing read.
+
 ### The reference server can serve your own resources, read-only
 
 - **`RESOURCES`** chooses the resources a deployment serves, by name. Define them in the metadata file and list them

@@ -13,7 +13,15 @@ import {
 } from '../cli/rcf-command.js';
 import { type RcfInputFingerprint, fingerprintRcfInput } from '../rcf/fingerprint.js';
 import { VARIATIONS_REPORT_FILENAME } from '../variations/constants.js';
-import { CERTIFIABLE, allOf, everyStepPassed, notCertifiable, versionCertifies } from './certification.js';
+import {
+  CERTIFIABLE,
+  RECORDS_TESTED,
+  allOf,
+  everyStepPassed,
+  notCertifiable,
+  testedAtLeastOneRecord,
+  versionCertifies
+} from './certification.js';
 import { whyDDVersionDoesNotCertify } from './dd-versions.js';
 import { createPipeline } from './pipeline.js';
 import { createDetailedReportGenerator, createGenericReportGenerator, writeReports } from './reports.js';
@@ -54,6 +62,7 @@ export const rcfValidForCertification =
     const version = steps.find(step => step.name === INFER_RCF_REPORTS)?.params?.version;
     return allOf(
       everyStepPassed(steps),
+      testedAtLeastOneRecord(steps),
       typeof version === 'string' ? versionCertifies(whyDDVersionDoesNotCertify(version)) : CERTIFIABLE,
       schemaValidates(config)
         ? CERTIFIABLE
@@ -142,6 +151,7 @@ const inferReports = (config: RcfConfig): PipelineStep<RcfContext> => ({
         },
         counts: {
           records: s.totalRecords,
+          [RECORDS_TESTED]: s.totalRecords,
           resources: s.resources,
           fields: s.fields,
           lookups: s.lookups,

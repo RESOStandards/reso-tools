@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describeCleanup } from '../add-edit/cleanup.js';
 import { runAllScenarios } from '../add-edit/index.js';
-import { type AddEditTestPlan, PAYLOAD_FILES, describePlan, payloadsFor, planAddEditTests } from '../add-edit/plan.js';
+import { type AddEditTestPlan, PAYLOAD_FILES, SUCCEEDS_SCENARIOS, describePlan, payloadsFor, planAddEditTests } from '../add-edit/plan.js';
 import { type Payloads, payloadSourceProblems, providedPayloadProblems } from '../add-edit/run-checks.js';
 import { readPayloads } from '../add-edit/test-runner.js';
 import {
@@ -15,8 +15,9 @@ import {
   resolveAuthToken
 } from '../test-runner/index.js';
 import { persistMetadataXml } from '../test-runner/metadata.js';
+import type { ScenarioResult } from '../test-runner/types.js';
 import { CURRENT_ADD_EDIT_VERSION, whyAddEditVersionDoesNotCertify } from './add-edit-versions.js';
-import { allOf, everyStepPassed, versionCertifies } from './certification.js';
+import { RECORDS_TESTED, allOf, everyStepPassed, testedAtLeastOneRecord, versionCertifies } from './certification.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
 import { addEditReportGenerators, prepareOutputDir, writeReports } from './reports.js';
@@ -263,6 +264,14 @@ const generatePayloads = (config: AddEditConfig): PipelineStep<AddEditContext> =
   }
 });
 
+/** The records a run acted on: each succeeds scenario that passed created, updated or deleted one. */
+export const recordsWrittenBy = (scenarios: ReadonlyArray<Pick<ScenarioResult, 'scenario' | 'passed'>>): number =>
+  scenarios.filter(s => s.passed && SUCCEEDS_SCENARIOS.some(name => name === s.scenario)).length;
+
+/** Why an Add/Edit run that acted on no record failed, in the words the provider sees. */
+export const NO_RECORDS_WRITTEN =
+  'No record was created, updated or deleted, so nothing was tested. A system can only be certified on records it accepts.';
+
 /**
  * Run the scenarios the plan names. A failed step does not stop the ones after it, so this one runs nothing when
  * the payloads were not made ready: the server is never written to with payloads that were refused.
@@ -286,14 +295,18 @@ const runTests = (config: AddEditConfig): PipelineStep<AddEditContext> => ({
     });
 
     const { passed, failed } = testReport.summary;
-    const status = failed > 0 ? ('failed' as const) : ('passed' as const);
+    // A run that acted on no record tested nothing, so it fails (Josh, 2026-11-04: "no Cert should work with 0 records
+    // across the board").
+    const recordsWritten = recordsWrittenBy(testReport.scenarios);
+    const status = failed > 0 || recordsWritten === 0 ? ('failed' as const) : ('passed' as const);
     const cleanup = testReport.cleanup ?? { removed: [], notRemoved: [], left: [] };
 
     return {
       context: { ...ctx, testReport },
       status,
-      summary: `${passed} passed, ${failed} failed (${testReport.scenarios.length} scenarios)${describeCleanup(cleanup)}`,
-      counts: { total: testReport.scenarios.length, passed, failed },
+      summary: `${recordsWritten === 0 ? `${NO_RECORDS_WRITTEN} ` : ''}${passed} passed, ${failed} failed (${testReport.scenarios.length} scenarios)${describeCleanup(cleanup)}`,
+      counts: { total: testReport.scenarios.length, passed, failed, [RECORDS_TESTED]: recordsWritten },
+      ...(recordsWritten === 0 ? { errors: [NO_RECORDS_WRITTEN] } : {}),
       // What was tested, for the reports (RCP-010: "Certification reports will show which actions … were tested"), and
       // what became of the records the run created, by key, for the provider's detailed report.
       params: {
@@ -370,7 +383,11 @@ const writeComplianceReports = (config: AddEditConfig): PipelineStep<AddEditCont
 export const addEditValidForCertification =
   (config: AddEditConfig): ValidForCertification =>
   steps =>
-    allOf(everyStepPassed(steps), versionCertifies(whyAddEditVersionDoesNotCertify(config.specVersion ?? CURRENT_ADD_EDIT_VERSION)));
+    allOf(
+      everyStepPassed(steps),
+      testedAtLeastOneRecord(steps),
+      versionCertifies(whyAddEditVersionDoesNotCertify(config.specVersion ?? CURRENT_ADD_EDIT_VERSION))
+    );
 
 /** Whether auto payloads need records sampled: an update or a delete is tested, and no create makes the record. */
 const samplesRecords = (config: AddEditConfig): boolean => {

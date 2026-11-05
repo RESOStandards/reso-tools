@@ -4,7 +4,7 @@ import { runAllEntityEventScenarios } from '../entity-event/test-runner.js';
 import type { EntityEventConfig as EERunnerConfig } from '../entity-event/types.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, persistMetadataXml } from '../test-runner/metadata.js';
-import { CERTIFIABLE, allOf, everyStepPassed, notCertifiable } from './certification.js';
+import { CERTIFIABLE, RECORDS_TESTED, allOf, everyStepPassed, notCertifiable, testedAtLeastOneRecord } from './certification.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
 import { entityEventReportGenerators, prepareOutputDir, writeReports } from './reports.js';
@@ -152,6 +152,10 @@ const generatePayloads = (config: EntityEventConfig): PipelineStep<EntityEventCo
   }
 });
 
+/** Why an EntityEvent run that validated no events failed, in the words the provider sees. */
+export const NO_EVENTS_VALIDATED =
+  'No events were validated, so no record was checked against the metadata. A system can only be certified on records it serves.';
+
 /** Run all EntityEvent compliance scenarios. */
 const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> => ({
   name: RUN_ENTITY_EVENT_SCENARIOS,
@@ -173,18 +177,23 @@ const runTests = (config: EntityEventConfig): PipelineStep<EntityEventContext> =
       onProgress({ step: RUN_ENTITY_EVENT_SCENARIOS, status: 'running', message });
     });
     const { passed, failed } = testReport.summary;
-    const status = failed > 0 ? ('failed' as const) : ('passed' as const);
+    // Each validated event is a record read back and checked against the metadata. A run that validated none tested
+    // nothing, so it fails (Josh, 2026-11-04: "no Cert should work with 0 records across the board").
+    const { eventsValidated } = testReport.dataValidation;
+    const status = failed > 0 || eventsValidated === 0 ? ('failed' as const) : ('passed' as const);
 
     return {
       context: { ...ctx, testReport },
       status,
-      summary: `${passed} passed, ${failed} failed (${testReport.scenarios.length} scenarios, ${testReport.mode} mode). ${testReport.dataValidation.eventsValidated} events validated`,
+      summary: `${eventsValidated === 0 ? `${NO_EVENTS_VALIDATED} ` : ''}${passed} passed, ${failed} failed (${testReport.scenarios.length} scenarios, ${testReport.mode} mode). ${eventsValidated} events validated`,
       counts: {
         total: testReport.scenarios.length,
         passed,
         failed,
-        eventsValidated: testReport.dataValidation.eventsValidated
-      }
+        eventsValidated,
+        [RECORDS_TESTED]: eventsValidated
+      },
+      ...(eventsValidated === 0 ? { errors: [NO_EVENTS_VALIDATED] } : {})
     };
   }
 });
@@ -258,7 +267,8 @@ export const entityEventValidForCertification =
       config.mode === 'observe'
         ? notCertifiable(['observe mode – the run exercised no writes, so there is nothing to certify'])
         : CERTIFIABLE,
-      everyStepPassed(steps)
+      everyStepPassed(steps),
+      testedAtLeastOneRecord(steps)
     );
 
 /** Create the EntityEvent compliance test pipeline. */
