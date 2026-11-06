@@ -471,6 +471,10 @@ export type { ServerConfig, DbBackend, EnumMode } from './config.js';
 export { TARGET_RESOURCES } from './metadata/types.js';
 export { reconcileLookups } from './metadata/lookup-reconciler.js';
 export type { DataAccessLayer, ResourceContext } from './db/data-access.js';
+// The DAL takes a ResourceContext for every call, so a host writing through it needs to build one from the same metadata
+// file the server loaded: for example a job that loads records into a production instance's database.
+export { loadMetadata } from './metadata/loader.js';
+export { buildResourceContext } from './metadata/resource-context.js';
 
 // CLI entry point — only runs when executed directly (not when imported as library).
 // Check argv only (not import.meta.url) to avoid false positives when bundled.
