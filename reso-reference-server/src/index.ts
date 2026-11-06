@@ -18,6 +18,7 @@ import { generateOpenApiSpec } from './metadata/openapi-generator.js';
 import { resolveBaseUrl } from './odata/base-url.js';
 import { createODataRouter } from './odata/router.js';
 import { describeProxyFailure, proxyFailureLogLine } from './proxy-failure.js';
+import { MAX_PROXY_REDIRECTS, createProxyPolicy, isRedirect, parseServiceRoots, redirectedMethod } from './proxy-policy.js';
 
 /** Options for creating the server app. */
 export interface CreateAppOptions {
@@ -35,6 +36,13 @@ export interface AppInstance {
   readonly dal: DataAccessLayer;
   /** Call to clean up resources (close DB handles, stop timers). */
   readonly cleanup: () => void;
+  /**
+   * Allow `/api/proxy` to forward to a service root while the server runs, as an embedding host does for each server it
+   * connects to. Checked like ALLOWED_SERVICE_ROOTS; a bad root throws.
+   */
+  readonly allowServiceRoot: (root: string) => void;
+  /** Stop allowing a service root, as when the host's connection to it is removed. */
+  readonly forgetServiceRoot: (root: string) => void;
 }
 
 /** Creates the RESO Reference Server Express app without starting it. */
@@ -45,6 +53,12 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
   console.log(`  Enum mode: ${config.enumMode}`);
   console.log(`  EntityEvent: ${config.entityEvent ? 'enabled' : 'disabled'}`);
   console.log(`  Metadata: ${config.metadataPath}`);
+
+  // Where /api/proxy may forward to, checked now so a bad root stops the server at start (reso-tools #424).
+  const proxyPolicy = createProxyPolicy(parseServiceRoots(config.allowedServiceRoots, 'ALLOWED_SERVICE_ROOTS'), config.allowAnyServiceRoot);
+  if (proxyPolicy.allowsAny) {
+    console.warn("  WARNING: ALLOW_ANY_SERVICE_ROOT=true: /api/proxy forwards to any http(s) URL, with the caller's credentials.");
+  }
 
   // Load metadata
   const metadata = await loadMetadata(config.metadataPath);
@@ -352,15 +366,12 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
         return;
       }
 
-      // Validate URL to prevent SSRF against private networks
-      try {
-        const parsed = new URL(targetUrl);
-        if (!['http:', 'https:'].includes(parsed.protocol)) {
-          res.status(400).json({ error: 'Only http and https URLs are allowed' });
-          return;
-        }
-      } catch {
-        res.status(400).json({ error: 'Invalid URL' });
+      // Forward only under a service root this proxy allows (reso-tools #424).
+      const decision = proxyPolicy.decide(targetUrl);
+      if (!decision.allowed) {
+        res
+          .status(decision.reason === 'Invalid URL' || decision.reason.startsWith('Only http') ? 400 : 403)
+          .json({ error: decision.reason });
         return;
       }
 
@@ -380,16 +391,41 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
         headers['Content-Type'] = req.headers['content-type'];
       }
 
-      try {
-        const upstream = await fetch(targetUrl, {
-          method: req.method,
-          headers,
-          body: ['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method)
-            ? req.headers['content-type']?.includes('application/x-www-form-urlencoded')
-              ? new URLSearchParams(req.body as Record<string, string>).toString()
-              : JSON.stringify(req.body)
-            : undefined
+      const requestBody = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method)
+        ? req.headers['content-type']?.includes('application/x-www-form-urlencoded')
+          ? new URLSearchParams(req.body as Record<string, string>).toString()
+          : JSON.stringify(req.body)
+        : undefined;
+      const firstOrigin = decision.url.origin;
+      const { Authorization: _credentials, ...withoutCredentials } = headers;
+
+      // Redirects are taken one hop at a time, each checked as a new request, and credentials go only to the origin the
+      // caller asked for: a server cannot redirect them anywhere else.
+      type Hop = { readonly response: Response } | { readonly refused: string };
+      const follow = async (url: URL, method: string, body: string | undefined, hop: number): Promise<Hop> => {
+        const response = await fetch(url, {
+          method,
+          headers: url.origin === firstOrigin ? headers : withoutCredentials,
+          body,
+          redirect: 'manual'
         });
+        const location = response.headers.get('location');
+        if (!isRedirect(response.status) || !location) return { response };
+        if (hop >= MAX_PROXY_REDIRECTS) return { refused: `More than ${MAX_PROXY_REDIRECTS} redirects` };
+        const next = proxyPolicy.decide(new URL(location, url).href);
+        if (!next.allowed) return { refused: `The server redirected to a target this proxy does not forward to: ${next.reason}` };
+        const nextMethod = redirectedMethod(response.status, method);
+        return follow(next.url, nextMethod, nextMethod === 'GET' || nextMethod === 'HEAD' ? undefined : body, hop + 1);
+      };
+
+      try {
+        const outcome = await follow(decision.url, req.method, requestBody, 0);
+        if ('refused' in outcome) {
+          res.set('Cache-Control', 'no-store');
+          res.status(502).json({ error: outcome.refused });
+          return;
+        }
+        const upstream = outcome.response;
 
         // Prevent browser from caching proxy responses (avoids stale 304s)
         res.set('Cache-Control', 'no-store');
@@ -444,7 +480,13 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
     cleanupFn();
   };
 
-  return { app, dal, cleanup };
+  return {
+    app,
+    dal,
+    cleanup,
+    allowServiceRoot: root => proxyPolicy.allow(root),
+    forgetServiceRoot: root => proxyPolicy.forget(root)
+  };
 };
 
 /** Starts the server on the configured port. Returns the HTTP server instance. */
