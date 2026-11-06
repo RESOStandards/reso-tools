@@ -93,7 +93,7 @@ describe('reading the settings', () => {
 
 describe('a production instance behind a gateway', () => {
   it('serves only the listed resources, with no write routes and none of the development routes', async () => {
-    // A production instance leaves the database as it finds it, so set one up first, as the sync job does.
+    // A production instance leaves the database as it finds it, so set one up first, as a separate setup step would.
     const dir = await mkdtemp(join(tmpdir(), 'ref-server-production-'));
     const path = join(dir, 'production.db');
     await serve({ resources: ['OUID'] }, path);
