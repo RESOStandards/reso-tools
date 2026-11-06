@@ -24,7 +24,7 @@ import {
 } from './certification.js';
 import { whyDDVersionDoesNotCertify } from './dd-versions.js';
 import { createPipeline } from './pipeline.js';
-import { createDetailedReportGenerator, createGenericReportGenerator, writeReports } from './reports.js';
+import { createDetailedReportGenerator, createGenericReportGenerator, withSoftwareVersion, writeReports } from './reports.js';
 import { INFER_RCF_REPORTS, READ_RCF_INPUT, WRITE_REPORTS } from './step-names.js';
 import type { PipelineResult, PipelineStep, ProgressCallback, RcfConfig, StepResult, ValidForCertification } from './types.js';
 
@@ -220,8 +220,8 @@ const writeRcfReports = (config: RcfConfig): PipelineStep<RcfContext> => ({
     const submittable = rcf ? submittableVariationsReport(rcf, context.identity, context.generatedOn) : undefined;
     const inferred: ReadonlyArray<readonly [string, unknown]> = rcf
       ? [
-          ['metadata-report.json', rcf.metadataReport],
-          ['data-availability-report.json', rcf.dataAvailabilityReport],
+          ['metadata-report.json', withSoftwareVersion(rcf.metadataReport)],
+          ['data-availability-report.json', withSoftwareVersion(rcf.dataAvailabilityReport)],
           ...(rcf.variations ? [[VARIATIONS_REPORT_FILENAME, rcf.variations] as const] : []),
           ...(submittable ? [[SUBMITTABLE_REPORT_FILENAME, submittable] as const] : [])
         ]

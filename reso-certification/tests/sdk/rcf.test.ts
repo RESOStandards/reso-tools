@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fingerprintRcfInput } from '../../src/rcf/fingerprint.js';
 import { serviceError } from '../../src/sdk/common.js';
 import { runRcfCompliance } from '../../src/sdk/rcf.js';
+import { SOFTWARE_VERSION } from '../../src/sdk/reports.js';
 import type { RcfConfig } from '../../src/sdk/types.js';
 import { computeVariationsViaService } from '../../src/variations/index.js';
 
@@ -75,6 +76,9 @@ describe('an RCF run through the SDK', () => {
     const report = await read('report.json');
     expect(report).toMatchObject({ description: 'RESO Common Format', version: '2.1', outcome: 'passed' });
     expect(report).not.toHaveProperty('certification');
+    // The two inferred reports go to the Cert API as a Data Dictionary result's do, and name the software that wrote them.
+    expect((await read('metadata-report.json')).softwareVersion).toBe(SOFTWARE_VERSION);
+    expect((await read('data-availability-report.json')).softwareVersion).toBe(SOFTWARE_VERSION);
     expect(report.remarks).toBe('2 records in 1 file(s): 1 resources, 3 fields, 2 lookups. 0 schema error(s). 1 variation(s).');
   });
 

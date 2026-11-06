@@ -19,6 +19,13 @@
   Dictionary's count comes from the records replication received across every strategy. Its step no longer reports
   the last strategy's progress statistics, which nothing read.
 
+### Every report names the software that wrote it (certification 0.12.1)
+
+- **`metadata-report.json` and `data-availability-report.json` carry `softwareVersion`,** as `report.json` and
+  `report-detailed.json` already did. These two are what a Data Dictionary or RESO Common Format result sends to the
+  Cert API, so every stored result now says which release of the tools produced it. `metadata-report.raw.json`,
+  `reso-cert metadata --report` and `reso-cert replicate` carry it too.
+
 ### The reference server can serve your own resources, read-only
 
 - **`RESOURCES`** chooses the resources a deployment serves, by name. Define them in the metadata file and list them

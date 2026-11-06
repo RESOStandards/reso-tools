@@ -50,6 +50,16 @@ export const SOFTWARE_VERSION: string =
     ? __RESO_CERT_SDK_VERSION__
     : resolveSoftwareVersion(new URL('../../package.json', import.meta.url));
 
+/**
+ * A report file stamped with the software that wrote it, as `report.json` always is. The metadata and availability
+ * reports go to the Cert API as a Data Dictionary result and feed the industry aggregates, which trace a value the
+ * parser missed back to the code that missed it through this field.
+ */
+export const withSoftwareVersion = <T extends object>(report: T): T & { readonly softwareVersion: string } => ({
+  ...report,
+  softwareVersion: SOFTWARE_VERSION
+});
+
 // ── Output Path Builder ──
 
 const DEFAULT_RESULTS_PATH = '.reso-cert';

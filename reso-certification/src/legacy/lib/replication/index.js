@@ -86,6 +86,9 @@ const replicate = async ({
   originatingSystemName,
   originatingSystemId,
   REPLICATION_STATE_SERVICE = createReplicationStateServiceInstance(),
+  // The software that wrote the reports, stamped into the availability report. The caller passes it; absent, the
+  // report carries none rather than a guess.
+  softwareVersion,
   shouldSaveResults = false,
   batchExpand = false,
   throwOnError = false,
@@ -417,6 +420,7 @@ const replicate = async ({
         await writeAnalyticsReports({
           outputPath,
           version,
+          softwareVersion,
           serviceRootUri,
           replicationStateService: REPLICATION_STATE_SERVICE
         });

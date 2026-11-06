@@ -52,6 +52,7 @@ import {
 import { fetchMetadataReportFromServer } from '../sdk/metadata-source.js';
 import { rcfRunOutcome, runRcfCompliance } from '../sdk/rcf.js';
 import { normalizeReportFieldTypes } from '../sdk/report-field-types.js';
+import { withSoftwareVersion } from '../sdk/reports.js';
 import type { AddEditConfig, CoreConfig, DDConfig, EntityEventConfig, PipelineResult, RcfConfig } from '../sdk/types.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import {
@@ -1475,7 +1476,7 @@ program
       process.stderr.write(`metadata: ${result.summary}\n`);
       for (const err of result.errors) process.stderr.write(`  - ${err}\n`);
       if (opts.report && result.report) {
-        const dest = await writeArtifact(opts.outputDir, 'metadata-report.json', result.report);
+        const dest = await writeArtifact(opts.outputDir, 'metadata-report.json', withSoftwareVersion(result.report));
         const { resources, fields, lookups } = result.report;
         process.stderr.write(
           `metadata: report → ${dest} (${resources.length} resources, ${fields.length.toLocaleString()} fields, ${lookups.length.toLocaleString()} lookups)\n`

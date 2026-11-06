@@ -30,7 +30,14 @@ import { type DDVersion, whyDDVersionDoesNotCertify } from './dd-versions.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
 import { generateMetadataReport, normalizeReportJson } from './report-field-types.js';
-import { createDetailedReportGenerator, createGenericReportGenerator, prepareOutputDir, writeReports } from './reports.js';
+import {
+  SOFTWARE_VERSION,
+  createDetailedReportGenerator,
+  createGenericReportGenerator,
+  prepareOutputDir,
+  withSoftwareVersion,
+  writeReports
+} from './reports.js';
 import type { BaseTestContext, DDConfig, PipelineStep, StepOutput, StepResult, TestFunction, ValidForCertification } from './types.js';
 import type { PipelineResult } from './types.js';
 
@@ -129,7 +136,8 @@ const resolveAuth = (config: DDConfig): PipelineStep<DDContext> => ({
   }
 });
 
-const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
+/** Exported so the files it writes can be tested. */
+export const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Generate metadata report',
   run: async (ctx, onProgress) => {
     // outputPath is prepped by runDDCompliance before the pipeline
@@ -191,7 +199,7 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
     // snapshot as metadata-report.raw.json; with no Lookup Resource the two would be
     // byte-identical, so raw is written only when it differs.
     const metadataReportPath = join(ctx.outputPath, 'metadata-report.json');
-    await writeFile(metadataReportPath, JSON.stringify(report, null, 2));
+    await writeFile(metadataReportPath, JSON.stringify(withSoftwareVersion(report), null, 2));
 
     if (lookupResourceAvailable && rawRecords) {
       // Write raw lookup resource data
@@ -200,7 +208,7 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
       await writeFile(join(ctx.outputPath, 'lookup-resource-lookup-metadata.json'), JSON.stringify(lookupDump, null, 2));
 
       // Pre-merge metadata report (provenance): the base before the Lookup Resource merge.
-      await writeFile(join(ctx.outputPath, 'metadata-report.raw.json'), JSON.stringify(baseReport, null, 2));
+      await writeFile(join(ctx.outputPath, 'metadata-report.raw.json'), JSON.stringify(withSoftwareVersion(baseReport), null, 2));
     }
 
     const lookupMsg = lookupResourceAvailable
@@ -424,6 +432,7 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
   strictMode: config.strictMode ?? true,
   pathToMetadataReportJson: ctx.metadataReportPath,
   REPLICATION_STATE_SERVICE: ctx.replicationStateService,
+  softwareVersion: SOFTWARE_VERSION,
   fromCli: true,
   limit: config.limit ?? DEFAULT_LIMIT,
   // Deliberately NOT tied to strictMode. Validating and enforcing are different decisions: relaxing
