@@ -451,7 +451,8 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
 export const startServer = (app: express.Express, config: ServerConfig): Server =>
   app.listen(config.port, () => {
     console.log(`\nRESO Reference Server running at ${config.baseUrl}`);
-    console.log(`  API docs: ${config.baseUrl}/api-docs`);
+    // A production instance serves no Swagger UI, so it does not advertise one.
+    if (!config.productionInstance) console.log(`  API docs: ${config.baseUrl}/api-docs`);
     console.log(`  Metadata: ${config.baseUrl}/$metadata`);
     console.log(`  Health:   ${config.baseUrl}/health`);
   });
