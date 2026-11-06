@@ -51,10 +51,9 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
   console.log(`Loaded RESO metadata v${metadata.version}: ${metadata.fields.length} fields, ${metadata.lookups.length} lookups`);
 
   // Build active resource list — include Lookup in string enum mode, EntityEvent when enabled
+  // Once each: RESOURCES may already name Lookup or EntityEvent.
   const activeResources: ReadonlyArray<string> = [
-    ...config.resources,
-    ...(config.enumMode === 'string' ? ['Lookup'] : []),
-    ...(config.entityEvent ? ['EntityEvent'] : [])
+    ...new Set([...config.resources, ...(config.enumMode === 'string' ? ['Lookup'] : []), ...(config.entityEvent ? ['EntityEvent'] : [])])
   ];
 
   // Read-only resources should not have POST/PATCH/DELETE routes. READ_ONLY makes every resource read-only.
@@ -69,6 +68,13 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
       fields: getFieldsForResource(metadata, resource)
     }))
     .filter(spec => spec.fields.length > 0);
+
+  // The resources actually served: those listed that have fields in the metadata. The service document, $metadata, the
+  // routes and their navigation bindings all use this, so none of them can name a resource the others skipped.
+  const servedResources: ReadonlyArray<string> = resourceSpecs.map(spec => spec.resourceName);
+  for (const resource of activeResources.filter(name => !servedResources.includes(name))) {
+    console.log(`  Not serving ${resource}: the metadata defines no fields for it.`);
+  }
 
   // Create data access layer based on configured backend
   let dal: DataAccessLayer;
@@ -193,10 +199,10 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
   const authConfig = loadAuthConfig();
 
   // Generate EDMX metadata
-  const edmxXml = generateEdmx(metadata, activeResources, config.enumMode);
+  const edmxXml = generateEdmx(metadata, servedResources, config.enumMode);
 
   // Generate OpenAPI spec
-  const openApiSpec = generateOpenApiSpec(metadata, activeResources, config.baseUrl);
+  const openApiSpec = generateOpenApiSpec(metadata, servedResources, config.baseUrl);
 
   // Build Express app
   const app = express();
@@ -238,7 +244,7 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
     }
     res.json({
       '@odata.context': `${resolveBaseUrl(req, config.baseUrlOverride)}/$metadata`,
-      value: activeResources.map(name => ({
+      value: servedResources.map(name => ({
         name,
         kind: 'EntitySet',
         url: name
@@ -253,7 +259,7 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
   // to resource paths (Accept: text/html). API requests (Accept: application/json) fall through to OData.
   if (options.uiDistPath && !config.productionInstance) {
     const spaIndexPath = resolve(options.uiDistPath, 'index.html');
-    const resourceSet = new Set(activeResources);
+    const resourceSet = new Set(servedResources);
     app.use((req, res, next) => {
       if (req.method !== 'GET') return next();
       const segment = req.path.split('/')[1];
@@ -268,7 +274,7 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
   }
 
   // OData CRUD + collection routes (using DAL instead of direct pool access)
-  const odataRouter = createODataRouter(metadata, dal, config.baseUrlOverride, activeResources, readOnlyResources);
+  const odataRouter = createODataRouter(metadata, dal, config.baseUrlOverride, servedResources, readOnlyResources);
   app.use(odataRouter);
 
   // Everything below up to the health check is the development tooling, not the OData service: a production instance leaves it out.

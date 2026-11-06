@@ -132,6 +132,21 @@ describe('a production instance behind a gateway', () => {
     for (const response of await Promise.all(tooling)) expect(response.status).toBe(404);
   });
 
+  it('lists only the resources it actually serves', async () => {
+    const { base } = await serve({ resources: ['OUID', 'NoSuchResource'] });
+    const service = (await (await fetch(`${base}/`, { headers: json })).json()) as { value: ReadonlyArray<{ name: string }> };
+    expect(service.value.map(entry => entry.name)).not.toContain('NoSuchResource');
+    expect((await fetch(`${base}/NoSuchResource`, { headers: json })).status).toBe(404);
+  });
+
+  it('serves Lookup once, whether or not RESOURCES names it', async () => {
+    const { base } = await serve({ resources: ['OUID', 'Lookup'] });
+    const metadata = await (await fetch(`${base}/$metadata`)).text();
+    expect(metadata.match(/EntitySet Name="Lookup"/g)).toHaveLength(1);
+    const service = (await (await fetch(`${base}/`, { headers: json })).json()) as { value: ReadonlyArray<{ name: string }> };
+    expect(service.value.filter(entry => entry.name === 'Lookup')).toHaveLength(1);
+  });
+
   it('leaves writes and the development routes on when the settings are not given', async () => {
     const { base } = await serve({ resources: ['OUID'] });
     expect((await fetch(`${base}/api/metadata/fields?resource=OUID`, { headers: json })).status).toBe(200);
