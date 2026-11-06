@@ -15,7 +15,6 @@ import { generateEdmx } from './metadata/edmx-generator.js';
 import { getFieldsForResource, getKeyFieldForResource, getLookupsForType, isEnumType, loadMetadata } from './metadata/loader.js';
 import { seedLookups } from './metadata/lookup-seeder.js';
 import { generateOpenApiSpec } from './metadata/openapi-generator.js';
-import { TARGET_RESOURCES } from './metadata/types.js';
 import { resolveBaseUrl } from './odata/base-url.js';
 import { createODataRouter } from './odata/router.js';
 import { describeProxyFailure, proxyFailureLogLine } from './proxy-failure.js';
@@ -53,16 +52,15 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
 
   // Build active resource list — include Lookup in string enum mode, EntityEvent when enabled
   const activeResources: ReadonlyArray<string> = [
-    ...TARGET_RESOURCES,
+    ...config.resources,
     ...(config.enumMode === 'string' ? ['Lookup'] : []),
     ...(config.entityEvent ? ['EntityEvent'] : [])
   ];
 
-  // Read-only resources should not have POST/PATCH/DELETE routes
-  const readOnlyResources: ReadonlySet<string> = new Set([
-    ...(config.enumMode === 'string' ? ['Lookup'] : []),
-    ...(config.entityEvent ? ['EntityEvent'] : [])
-  ]);
+  // Read-only resources should not have POST/PATCH/DELETE routes. READ_ONLY makes every resource read-only.
+  const readOnlyResources: ReadonlySet<string> = config.readOnly
+    ? new Set(activeResources)
+    : new Set([...(config.enumMode === 'string' ? ['Lookup'] : []), ...(config.entityEvent ? ['EntityEvent'] : [])]);
 
   const resourceSpecs = activeResources
     .map(resource => ({
@@ -92,9 +90,13 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
       keyField: spec.keyField,
       hasResourceRecordKey: spec.fields.some(f => f.fieldName === 'ResourceRecordKey')
     }));
-    console.log(`Initializing MongoDB collections and indexes for ${mongoSpecs.length} resources...`);
-    await initializeMongoCollections(db, mongoSpecs);
-    console.log('MongoDB initialization complete.');
+    if (!config.productionInstance) {
+      console.log(`Initializing MongoDB collections and indexes for ${mongoSpecs.length} resources...`);
+      await initializeMongoCollections(db, mongoSpecs);
+      console.log('MongoDB initialization complete.');
+    } else {
+      console.log('MongoDB setup skipped (production instance).');
+    }
 
     dal = createMongoDal(db);
     cleanupFn = () => {
@@ -116,11 +118,15 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
     const { generateSqliteSchema } = await import('./db/sqlite-schema-generator.js');
 
     const sqliteDb = createSqliteDb(config.sqliteDbPath);
-    const ddl = generateSqliteSchema(resourceSpecs);
-    for (const stmt of ddl) {
-      sqliteDb.exec(stmt);
+    if (!config.productionInstance) {
+      const ddl = generateSqliteSchema(resourceSpecs);
+      for (const stmt of ddl) {
+        sqliteDb.exec(stmt);
+      }
+      console.log(`SQLite schema initialized (${ddl.length} statements).`);
+    } else {
+      console.log('SQLite schema setup skipped (production instance).');
     }
-    console.log(`SQLite schema initialized (${ddl.length} statements).`);
 
     dal = createSqliteDal(sqliteDb);
     cleanupFn = () => {
@@ -143,10 +149,14 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
     const { runMigrations } = await import('./db/migrate.js');
 
     const pool = createPool(config.databaseUrl);
-    const ddl = generateSchema(resourceSpecs);
-    console.log(`Running migrations for ${resourceSpecs.length} resources...`);
-    await runMigrations(pool, ddl);
-    console.log('Database migrations complete.');
+    if (!config.productionInstance) {
+      const ddl = generateSchema(resourceSpecs);
+      console.log(`Running migrations for ${resourceSpecs.length} resources...`);
+      await runMigrations(pool, ddl);
+      console.log('Database migrations complete.');
+    } else {
+      console.log('Database migrations skipped (production instance).');
+    }
 
     dal = createPostgresDal(pool);
     cleanupFn = () => {
@@ -171,8 +181,8 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
     console.log(`EntityEvent compaction scheduled every ${config.compactionIntervalMs}ms.`);
   }
 
-  // Auto-seed Lookup resource from metadata in string enum mode
-  if (config.enumMode === 'string') {
+  // Auto-seed Lookup resource from metadata in string enum mode, except on a production instance, whose database is set up separately
+  if (config.enumMode === 'string' && !config.productionInstance) {
     const seeded = await seedLookups(dal, metadata);
     if (seeded > 0) {
       console.log(`Seeded ${seeded} Lookup records from metadata.`);
@@ -237,11 +247,11 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
   });
 
   // OAuth2 mock token endpoint
-  app.use(createMockOAuthRouter());
+  if (!config.productionInstance) app.use(createMockOAuthRouter());
 
   // SPA routing: when a UI is available, serve index.html for browser navigations
   // to resource paths (Accept: text/html). API requests (Accept: application/json) fall through to OData.
-  if (options.uiDistPath) {
+  if (options.uiDistPath && !config.productionInstance) {
     const spaIndexPath = resolve(options.uiDistPath, 'index.html');
     const resourceSet = new Set(activeResources);
     app.use((req, res, next) => {
@@ -261,138 +271,141 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
   const odataRouter = createODataRouter(metadata, dal, config.baseUrlOverride, activeResources, readOnlyResources);
   app.use(odataRouter);
 
-  // Admin endpoints (data generator, etc.)
-  const adminRouter = createAdminRouter(metadata, dal, authConfig, readOnlyResources);
-  app.use(adminRouter);
+  // Everything below up to the health check is the development tooling, not the OData service: a production instance leaves it out.
+  if (!config.productionInstance) {
+    // Admin endpoints (data generator, etc.)
+    const adminRouter = createAdminRouter(metadata, dal, authConfig, readOnlyResources, activeResources);
+    app.use(adminRouter);
 
-  // Swagger UI
-  app.use(createSwaggerRouter(openApiSpec));
+    // Swagger UI
+    app.use(createSwaggerRouter(openApiSpec));
 
-  // Static file serving (mock images for UI media carousel)
-  const publicDir = resolve(config.serverRoot, '../public');
-  app.use(express.static(publicDir));
+    // Static file serving (mock images for UI media carousel)
+    const publicDir = resolve(config.serverRoot, '../public');
+    app.use(express.static(publicDir));
 
-  // UI config endpoint — serves summary field configuration for the UI
-  const uiConfigPath = resolve(config.serverRoot, './ui-config.json');
-  const uiConfig = JSON.parse(await readFile(uiConfigPath, 'utf-8'));
-  app.get('/ui-config', (_req, res) => {
-    res.json(uiConfig);
-  });
+    // UI config endpoint — serves summary field configuration for the UI
+    const uiConfigPath = resolve(config.serverRoot, './ui-config.json');
+    const uiConfig = JSON.parse(await readFile(uiConfigPath, 'utf-8'));
+    app.get('/ui-config', (_req, res) => {
+      res.json(uiConfig);
+    });
 
-  // Field groups endpoint — serves RESO Data Dictionary field groupings for the UI
-  const fieldGroupsPath = resolve(config.serverRoot, './field-groups.json');
-  const fieldGroups = JSON.parse(await readFile(fieldGroupsPath, 'utf-8'));
-  app.get('/field-groups', (_req, res) => {
-    res.json(fieldGroups);
-  });
+    // Field groups endpoint — serves RESO Data Dictionary field groupings for the UI
+    const fieldGroupsPath = resolve(config.serverRoot, './field-groups.json');
+    const fieldGroups = JSON.parse(await readFile(fieldGroupsPath, 'utf-8'));
+    app.get('/field-groups', (_req, res) => {
+      res.json(fieldGroups);
+    });
 
-  // Metadata JSON API — lightweight JSON alternatives to EDMX XML for UI consumption
-  app.get('/api/metadata/fields', (req, res) => {
-    const resource = req.query.resource as string | undefined;
-    if (!resource) {
-      res.status(400).json({ error: 'Missing required query parameter: resource' });
-      return;
-    }
-    const fields = getFieldsForResource(metadata, resource);
-    res.json(fields);
-  });
-
-  app.get('/api/metadata/lookups', (req, res) => {
-    const type = req.query.type as string | undefined;
-    if (!type) {
-      res.status(400).json({ error: 'Missing required query parameter: type' });
-      return;
-    }
-    const lookups = getLookupsForType(metadata, type);
-    res.json(lookups);
-  });
-
-  app.get('/api/metadata/lookups-for-resource', (req, res) => {
-    const resource = req.query.resource as string | undefined;
-    if (!resource) {
-      res.status(400).json({ error: 'Missing required query parameter: resource' });
-      return;
-    }
-    const fields = getFieldsForResource(metadata, resource);
-    const enumFields = fields.filter(f => isEnumType(f.type));
-    const result: Record<string, unknown> = {};
-    for (const field of enumFields) {
-      const lookupName = field.type;
-      if (!result[lookupName]) {
-        result[lookupName] = getLookupsForType(metadata, lookupName);
-      }
-    }
-    res.json(result);
-  });
-
-  // Proxy endpoint — forwards requests to external OData servers to avoid browser CORS restrictions.
-  // Usage: GET /api/proxy?url=<encoded-external-url>  (optional Authorization header forwarded)
-  app.all('/api/proxy', async (req, res) => {
-    const targetUrl = req.query.url as string | undefined;
-    if (!targetUrl) {
-      res.status(400).json({ error: 'Missing required query parameter: url' });
-      return;
-    }
-
-    // Validate URL to prevent SSRF against private networks
-    try {
-      const parsed = new URL(targetUrl);
-      if (!['http:', 'https:'].includes(parsed.protocol)) {
-        res.status(400).json({ error: 'Only http and https URLs are allowed' });
+    // Metadata JSON API — lightweight JSON alternatives to EDMX XML for UI consumption
+    app.get('/api/metadata/fields', (req, res) => {
+      const resource = req.query.resource as string | undefined;
+      if (!resource) {
+        res.status(400).json({ error: 'Missing required query parameter: resource' });
         return;
       }
-    } catch {
-      res.status(400).json({ error: 'Invalid URL' });
-      return;
-    }
+      const fields = getFieldsForResource(metadata, resource);
+      res.json(fields);
+    });
 
-    // Forward the request to the external server — pass through OData-Version if provided, don't force a version
-    // Strip conditional caching headers so upstream always returns a full response (not 304)
-    const headers: Record<string, string> = {
-      Accept: req.headers.accept ?? 'application/json'
-    };
-    const odataVersion = req.headers['odata-version'];
-    if (typeof odataVersion === 'string') {
-      headers['OData-Version'] = odataVersion;
-    }
-    if (req.headers.authorization) {
-      headers.Authorization = req.headers.authorization;
-    }
-    if (req.headers['content-type']) {
-      headers['Content-Type'] = req.headers['content-type'];
-    }
+    app.get('/api/metadata/lookups', (req, res) => {
+      const type = req.query.type as string | undefined;
+      if (!type) {
+        res.status(400).json({ error: 'Missing required query parameter: type' });
+        return;
+      }
+      const lookups = getLookupsForType(metadata, type);
+      res.json(lookups);
+    });
 
-    try {
-      const upstream = await fetch(targetUrl, {
-        method: req.method,
-        headers,
-        body: ['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method)
-          ? req.headers['content-type']?.includes('application/x-www-form-urlencoded')
-            ? new URLSearchParams(req.body as Record<string, string>).toString()
-            : JSON.stringify(req.body)
-          : undefined
-      });
+    app.get('/api/metadata/lookups-for-resource', (req, res) => {
+      const resource = req.query.resource as string | undefined;
+      if (!resource) {
+        res.status(400).json({ error: 'Missing required query parameter: resource' });
+        return;
+      }
+      const fields = getFieldsForResource(metadata, resource);
+      const enumFields = fields.filter(f => isEnumType(f.type));
+      const result: Record<string, unknown> = {};
+      for (const field of enumFields) {
+        const lookupName = field.type;
+        if (!result[lookupName]) {
+          result[lookupName] = getLookupsForType(metadata, lookupName);
+        }
+      }
+      res.json(result);
+    });
 
-      // Prevent browser from caching proxy responses (avoids stale 304s)
-      res.set('Cache-Control', 'no-store');
+    // Proxy endpoint — forwards requests to external OData servers to avoid browser CORS restrictions.
+    // Usage: GET /api/proxy?url=<encoded-external-url>  (optional Authorization header forwarded)
+    app.all('/api/proxy', async (req, res) => {
+      const targetUrl = req.query.url as string | undefined;
+      if (!targetUrl) {
+        res.status(400).json({ error: 'Missing required query parameter: url' });
+        return;
+      }
 
-      // Forward status and key headers
-      res.status(upstream.status);
-      const contentType = upstream.headers.get('content-type');
-      if (contentType) res.set('Content-Type', contentType);
-      const upstreamOdataVersion = upstream.headers.get('odata-version');
-      if (upstreamOdataVersion) res.set('OData-Version', upstreamOdataVersion);
+      // Validate URL to prevent SSRF against private networks
+      try {
+        const parsed = new URL(targetUrl);
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          res.status(400).json({ error: 'Only http and https URLs are allowed' });
+          return;
+        }
+      } catch {
+        res.status(400).json({ error: 'Invalid URL' });
+        return;
+      }
 
-      const body = await upstream.text();
-      res.send(body);
-    } catch (err) {
-      // The upstream could not be reached at all. Log why, and tell the client why: Node's fetch
-      // only says "fetch failed" and keeps the real reason in its cause (see proxy-failure.ts).
-      const failure = describeProxyFailure(err);
-      console.error(proxyFailureLogLine(req.method, targetUrl, failure));
-      res.status(502).json(failure);
-    }
-  });
+      // Forward the request to the external server — pass through OData-Version if provided, don't force a version
+      // Strip conditional caching headers so upstream always returns a full response (not 304)
+      const headers: Record<string, string> = {
+        Accept: req.headers.accept ?? 'application/json'
+      };
+      const odataVersion = req.headers['odata-version'];
+      if (typeof odataVersion === 'string') {
+        headers['OData-Version'] = odataVersion;
+      }
+      if (req.headers.authorization) {
+        headers.Authorization = req.headers.authorization;
+      }
+      if (req.headers['content-type']) {
+        headers['Content-Type'] = req.headers['content-type'];
+      }
+
+      try {
+        const upstream = await fetch(targetUrl, {
+          method: req.method,
+          headers,
+          body: ['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method)
+            ? req.headers['content-type']?.includes('application/x-www-form-urlencoded')
+              ? new URLSearchParams(req.body as Record<string, string>).toString()
+              : JSON.stringify(req.body)
+            : undefined
+        });
+
+        // Prevent browser from caching proxy responses (avoids stale 304s)
+        res.set('Cache-Control', 'no-store');
+
+        // Forward status and key headers
+        res.status(upstream.status);
+        const contentType = upstream.headers.get('content-type');
+        if (contentType) res.set('Content-Type', contentType);
+        const upstreamOdataVersion = upstream.headers.get('odata-version');
+        if (upstreamOdataVersion) res.set('OData-Version', upstreamOdataVersion);
+
+        const body = await upstream.text();
+        res.send(body);
+      } catch (err) {
+        // The upstream could not be reached at all. Log why, and tell the client why: Node's fetch
+        // only says "fetch failed" and keeps the real reason in its cause (see proxy-failure.ts).
+        const failure = describeProxyFailure(err);
+        console.error(proxyFailureLogLine(req.method, targetUrl, failure));
+        res.status(502).json(failure);
+      }
+    });
+  }
 
   // Health check
   app.get('/health', (_req, res) => {
@@ -404,7 +417,7 @@ export const createApp = async (options: CreateAppOptions): Promise<AppInstance>
   // express 5 syntax (`/{*path}`) which silently never matched, so
   // SPA routes outside the resource-aware middleware above (like
   // /cert/orgs/:uoi) returned the express default 404.
-  if (options.uiDistPath) {
+  if (options.uiDistPath && !config.productionInstance) {
     app.use(express.static(options.uiDistPath));
     const uiIndexPath = resolve(options.uiDistPath, 'index.html');
     app.get('*', async (req, res) => {

@@ -3,6 +3,7 @@ import type { AuthTokenConfig } from '../auth/config.js';
 import { requireAuth } from '../auth/middleware.js';
 import type { DataAccessLayer } from '../db/data-access.js';
 import type { ResoMetadata } from '../metadata/types.js';
+import { TARGET_RESOURCES } from '../metadata/types.js';
 import { createDataResetHandler } from './reset.js';
 import { createSeedHandler } from './seed.js';
 
@@ -17,13 +18,14 @@ export const createAdminRouter = (
   metadata: ResoMetadata,
   dal: DataAccessLayer,
   authConfig: AuthTokenConfig,
-  readOnlyResources: ReadonlySet<string> = new Set()
+  readOnlyResources: ReadonlySet<string> = new Set(),
+  resources: ReadonlyArray<string> = TARGET_RESOURCES
 ): Router => {
   const router = Router();
   const adminAuth = requireAuth('admin', authConfig);
 
   router.post('/admin/seed', adminAuth, createSeedHandler(metadata, dal));
-  router.delete('/admin/data-generator/reset', adminAuth, createDataResetHandler(metadata, dal, readOnlyResources));
+  router.delete('/admin/data-generator/reset', adminAuth, createDataResetHandler(metadata, dal, readOnlyResources, resources));
 
   return router;
 };
