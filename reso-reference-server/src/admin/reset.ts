@@ -9,7 +9,12 @@ import { TARGET_RESOURCES } from '../metadata/types.js';
  * Preserves schema — only removes records from entity tables. Generator-free.
  */
 export const createDataResetHandler =
-  (metadata: ResoMetadata, dal: DataAccessLayer, readOnlyResources: ReadonlySet<string> = new Set()): RequestHandler =>
+  (
+    metadata: ResoMetadata,
+    dal: DataAccessLayer,
+    readOnlyResources: ReadonlySet<string> = new Set(),
+    resources: ReadonlyArray<string> = TARGET_RESOURCES
+  ): RequestHandler =>
   async (_req, res) => {
     if (!dal.truncateResource) {
       res.status(501).json({
@@ -22,21 +27,21 @@ export const createDataResetHandler =
       const results: Array<{ resource: string; deleted: number }> = [];
 
       // Delete in reverse dependency order (children first)
-      const childResources = TARGET_RESOURCES.filter(r =>
-        [
-          'Media',
-          'OpenHouse',
-          'Showing',
-          'PropertyRooms',
-          'PropertyGreenVerification',
-          'PropertyPowerProduction',
-          'PropertyUnitTypes',
-          'TeamMembers'
-        ].includes(r)
-      ).filter(r => !readOnlyResources.has(r));
-      const parentResources = TARGET_RESOURCES.filter(r => !childResources.includes(r) && r !== 'Lookup').filter(
-        r => !readOnlyResources.has(r)
-      );
+      const childResources = resources
+        .filter(r =>
+          [
+            'Media',
+            'OpenHouse',
+            'Showing',
+            'PropertyRooms',
+            'PropertyGreenVerification',
+            'PropertyPowerProduction',
+            'PropertyUnitTypes',
+            'TeamMembers'
+          ].includes(r)
+        )
+        .filter(r => !readOnlyResources.has(r));
+      const parentResources = resources.filter(r => !childResources.includes(r) && r !== 'Lookup').filter(r => !readOnlyResources.has(r));
 
       for (const resource of [...childResources, ...parentResources]) {
         const ctx = buildResourceContext(metadata, resource);

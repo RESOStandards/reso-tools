@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import type { EnumMode } from '@reso-standards/reso-common';
+import { TARGET_RESOURCES } from './metadata/types.js';
 
 /** Database backend type. */
 export type DbBackend = 'postgres' | 'mongodb' | 'sqlite';
@@ -29,7 +30,39 @@ export interface ServerConfig {
   readonly baseUrlOverride?: string;
   /** Root directory for resolving server assets (ui-config.json, field-groups.json, public/). */
   readonly serverRoot: string;
+  /**
+   * The resources served, by Data Dictionary resource name (`RESOURCES`, comma-separated). Defaults to
+   * {@link TARGET_RESOURCES}. A listed resource with no fields in the metadata is skipped, as before, so a deployment
+   * serving its own resources (`RESOURCES=OUID,System`) lists them here and defines them in its metadata file.
+   */
+  readonly resources: ReadonlyArray<string>;
+  /** `READ_ONLY=true`: no create, update or delete route on any resource. */
+  readonly readOnly: boolean;
+  /**
+   * `PRODUCTION_INSTANCE=true`: this server is a production instance serving real data, not the self-contained reference
+   * server. Two things follow. It mounts only the OData service (the service document, `$metadata`, the resource routes)
+   * and `/health`: no admin routes, mock OAuth endpoint, outbound proxy, Swagger UI, UI endpoints, metadata JSON API or
+   * static files. And it leaves the database as it finds it: no table, index or collection setup and no Lookup seeding at
+   * start, because a production database is set up and migrated separately, so the server can run with a login that
+   * cannot write. Whether it accepts changes is `READ_ONLY`, a separate choice.
+   */
+  readonly productionInstance: boolean;
 }
+
+/** `RESOURCES` as a list. Unset means the default; set but naming nothing is a mistake, not "serve nothing". */
+const parseResources = (raw: string | undefined): ReadonlyArray<string> | undefined => {
+  if (raw === undefined) return undefined;
+  const names = [
+    ...new Set(
+      raw
+        .split(',')
+        .map(name => name.trim())
+        .filter(name => name.length > 0)
+    )
+  ];
+  if (names.length === 0) throw new Error('RESOURCES is set but names no resources. Unset it to serve the default resources.');
+  return names;
+};
 
 /** Reads configuration from environment variables, with optional programmatic overrides. */
 export const loadConfig = (overrides?: Partial<ServerConfig>): ServerConfig => {
@@ -50,6 +83,9 @@ export const loadConfig = (overrides?: Partial<ServerConfig>): ServerConfig => {
   // Default serverRoot: when running from dist/, resolve to src/ where asset files live
   const defaultRoot = import.meta.dirname.endsWith('/dist') ? resolve(import.meta.dirname, '../src') : import.meta.dirname;
   const serverRoot = overrides?.serverRoot ?? defaultRoot;
+  const resources = overrides?.resources ?? parseResources(process.env.RESOURCES) ?? TARGET_RESOURCES;
+  const readOnly = overrides?.readOnly ?? process.env.READ_ONLY === 'true';
+  const productionInstance = overrides?.productionInstance ?? process.env.PRODUCTION_INSTANCE === 'true';
 
   if (dbBackend !== 'postgres' && dbBackend !== 'mongodb' && dbBackend !== 'sqlite') {
     throw new Error(`Invalid DB_BACKEND: ${dbBackend}. Must be "postgres", "mongodb", or "sqlite".`);
@@ -72,6 +108,9 @@ export const loadConfig = (overrides?: Partial<ServerConfig>): ServerConfig => {
     metadataPath,
     baseUrl,
     ...(baseUrlOverride !== undefined && { baseUrlOverride }),
-    serverRoot
+    serverRoot,
+    resources,
+    readOnly,
+    productionInstance
   };
 };

@@ -2,6 +2,22 @@
 
 ---
 
+## Unreleased
+
+### The reference server can serve your own resources, read-only
+
+- **`RESOURCES`** chooses the resources a deployment serves, by name. Define them in the metadata file and list them
+  here, and the server serves exactly those, with `$metadata` and the service document to match.
+- **`READ_ONLY=true`** removes every create, update and delete route.
+- **`PRODUCTION_INSTANCE=true`** marks a production instance serving real data rather than the self-contained
+  reference server. It serves only the OData service and `/health` (no Swagger UI, mock token endpoint, admin routes,
+  outbound proxy, UI endpoints or static files), and it leaves the database as it finds it: no table setup or Lookup
+  seeding at start, since a production database is set up separately and the server can then use a login that cannot
+  write.
+- Without these settings nothing changes.
+
+---
+
 ## Certification 0.12.0 – 2026-11-04
 
 ### Cloud runs for every endorsement

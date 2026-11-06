@@ -180,6 +180,19 @@ The server implements OData 4.01 features required by the RESO Web API Add/Edit 
 | POST | `/admin/seed` | Load the committed static seed data set (idempotent) |
 | DELETE | `/admin/data-generator/reset` | Truncate all resource data (schema preserved) |
 
+## Serving Your Own Resources, Read-Only
+
+Three settings let a deployment serve a chosen set of resources and nothing else:
+
+| Setting | Effect |
+|---------|--------|
+| `RESOURCES` | The resources served, by name, comma-separated (for example `RESOURCES=OUID`). Defaults to the resources listed above. A listed resource needs fields in the metadata file (`METADATA_PATH`) to be served. |
+| `READ_ONLY=true` | No `POST`, `PATCH` or `DELETE` route on any resource. |
+| `PRODUCTION_INSTANCE=true` | A production instance serving real data rather than the self-contained reference server. It serves only the service document, `/$metadata`, the resource routes and `/health` (no Swagger UI, mock OAuth token endpoint, admin routes, outbound proxy, UI endpoints or static files), and it leaves the database as it finds it: no table, index or collection setup and no Lookup seeding at start, because a production database is set up and migrated separately. |
+
+`READ_ONLY` is separate from `PRODUCTION_INSTANCE`, so a production instance can accept changes later. Without these
+settings the server behaves as before: a self-contained reference server that sets up its own database.
+
 ## Enumeration Modes
 
 The server supports two enumeration representations via `ENUM_MODE` environment variable:
