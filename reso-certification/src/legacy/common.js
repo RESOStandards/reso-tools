@@ -522,8 +522,10 @@ const parseBooleanValue = item => {
   return false;
 };
 
+/** New replication state for one run, initialized. Never shared with another run. */
 const createReplicationStateServiceInstance = () => {
-  const replicationStateService = require('./lib/replication/services/state');
+  const { createReplicationState } = require('./lib/replication/services/state');
+  const replicationStateService = createReplicationState();
   replicationStateService.init();
   return replicationStateService;
 };
