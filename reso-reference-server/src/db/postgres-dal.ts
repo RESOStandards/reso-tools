@@ -22,6 +22,7 @@ import { MAX_EXPAND_DEPTH } from './data-access.js';
 import { applyExpandSelect } from './expand-select.js';
 import { filterToSql } from './filter-to-sql.js';
 import { deserializeRow } from './queries.js';
+import { stableOrderBy, withKeyLast } from './stable-order.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -482,14 +483,11 @@ export const createPostgresDal = (pool: pg.Pool): DataAccessLayer => {
       paramIndex += filterResult.values.length;
     }
 
-    // Build ORDER BY (references parent alias columns)
-    let orderByClause = '';
-    if (options?.$orderby) {
-      const parsed = parseOrderBy(options.$orderby, ctx.fields, parentAlias);
-      if (parsed) {
-        orderByClause = `ORDER BY ${parsed}`;
-      }
-    }
+    // A fixed order for every page: the client's order, then the key, which is unique (stable-order.ts).
+    const orderByClause = stableOrderBy(
+      options?.$orderby ? parseOrderBy(options.$orderby, ctx.fields, parentAlias) : '',
+      `${parentAlias}."${ctx.keyField}"`
+    );
 
     // Build LIMIT/OFFSET
     let limitClause = '';
@@ -541,25 +539,20 @@ export const createPostgresDal = (pool: pg.Pool): DataAccessLayer => {
         outerJoinClauses.push(buildExpandJoin(ctx.resource, `${parentAlias}.${ctx.keyField}`, cteAlias, binding, navAlias));
       }
 
-      // Outer ORDER BY references CTE columns for deterministic grouping order
-      let outerOrderBy = '';
-      if (options?.$orderby) {
-        const outerParts = options.$orderby
-          .split(',')
-          .map(part => {
-            const trimmed = part.trim();
-            const [field, ...rest] = trimmed.split(/\s+/);
-            if (!field || !ctx.fields.some(f => f.fieldName === field)) return undefined;
-            const dir = rest[0]?.toLowerCase();
-            return `${cteAlias}."${parentAlias}.${field}" ${dir === 'desc' ? 'DESC' : 'ASC'}`;
-          })
-          .filter((clause): clause is string => clause !== undefined);
-        if (outerParts.length > 0) outerOrderBy = `ORDER BY ${outerParts.join(', ')}`;
-      }
-      if (!outerOrderBy) {
-        // Default: order by key for deterministic grouping
-        outerOrderBy = `ORDER BY ${cteAlias}."${parentAlias}.${ctx.keyField}"`;
-      }
+      // The outer query keeps the page's order: the client's columns, then the key (stable-order.ts).
+      const outerParts = options?.$orderby
+        ? options.$orderby
+            .split(',')
+            .map(part => {
+              const trimmed = part.trim();
+              const [field, ...rest] = trimmed.split(/\s+/);
+              if (!field || !ctx.fields.some(f => f.fieldName === field)) return undefined;
+              const dir = rest[0]?.toLowerCase();
+              return `${cteAlias}."${parentAlias}.${field}" ${dir === 'desc' ? 'DESC' : 'ASC'}`;
+            })
+            .filter((clause): clause is string => clause !== undefined)
+        : [];
+      const outerOrderBy = `ORDER BY ${withKeyLast(outerParts, `${cteAlias}."${parentAlias}.${ctx.keyField}"`).join(', ')}`;
 
       const outerSql = [
         `SELECT ${[...outerParentCols, ...outerNavCols].join(', ')}${outerCountCol}`,

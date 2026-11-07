@@ -10,9 +10,13 @@ const ENUM_PREFIX = 'org.reso.metadata.enums.';
 const stripEnumPrefix = (lookupName: string): string =>
   lookupName.startsWith(ENUM_PREFIX) ? lookupName.slice(ENUM_PREFIX.length) : lookupName;
 
-/** Extracts the StandardName annotation value from a lookup entry. */
+/** Extracts the StandardName annotation value from a lookup entry. Only a standard value has one. */
 const getStandardName = (lookup: ResoLookup): string | undefined =>
   lookup.annotations?.find(a => a.term === 'RESO.OData.Metadata.StandardName')?.value;
+
+/** Extracts the LegacyODataValue annotation: the value's OData name, when the metadata gives one. */
+const getLegacyODataValue = (lookup: ResoLookup): string | undefined =>
+  lookup.annotations?.find(a => a.term === 'RESO.OData.Metadata.LegacyODataValue')?.value;
 
 /** Generates a deterministic LookupKey using SHA-256 hash of LookupName:LookupValue. */
 const generateLookupKey = (lookupName: string, lookupValue: string): string =>
@@ -25,10 +29,15 @@ const generateLookupKey = (lookupName: string, lookupValue: string): string =>
  * Each record contains:
  * - LookupKey: SHA-256 hash of "{LookupName}:{LookupValue}"
  * - LookupName: Short name (e.g., "StandardStatus")
- * - LookupValue: Human-friendly display name from StandardName annotation
- * - StandardLookupValue: Same as LookupValue for DD-standard entries
- * - LegacyODataValue: Original CamelCase lookupValue from metadata
+ * - LookupValue: Human-friendly display name: the StandardName annotation, else the lookupValue
+ * - StandardLookupValue: the StandardName for a standard value; null for a local one, which has no StandardName
+ * - LegacyODataValue: the LegacyODataValue annotation, else the lookupValue
  * - ModificationTimestamp: Metadata generation timestamp
+ *
+ * A local value is written as a provider's local Lookup Resource row reads as metadata (reso-certification
+ * `metadata/lookup-resource.ts`): the display value as the lookupValue, its OData name as the LegacyODataValue, and no
+ * StandardName. Before, every value was given a StandardLookupValue and the lookupValue as its OData name, so a local
+ * value read as standard and its OData name had spaces in it.
  */
 export const buildLookupRecords = (metadata: ResoMetadata): ReadonlyArray<Record<string, unknown>> => {
   const timestamp = metadata.generatedOn ?? new Date().toISOString();
@@ -42,8 +51,8 @@ export const buildLookupRecords = (metadata: ResoMetadata): ReadonlyArray<Record
       LookupKey: generateLookupKey(shortName, humanFriendlyValue),
       LookupName: shortName,
       LookupValue: humanFriendlyValue,
-      StandardLookupValue: humanFriendlyValue,
-      LegacyODataValue: lookup.lookupValue,
+      StandardLookupValue: standardName ?? null,
+      LegacyODataValue: getLegacyODataValue(lookup) ?? lookup.lookupValue,
       ModificationTimestamp: timestamp
     };
   });

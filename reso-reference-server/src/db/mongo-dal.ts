@@ -266,21 +266,21 @@ export const createMongoDal = (db: Db): DataAccessLayer => {
     // Always apply projection (at minimum to suppress _id)
     cursor = cursor.project(projection);
 
-    // $orderby — validate field names and build sort spec
-    if (options?.$orderby) {
-      const fieldNames = new Set(ctx.fields.map(f => f.fieldName));
-      const sort: Record<string, 1 | -1> = {};
-      for (const part of options.$orderby.split(',')) {
-        const [fieldName, dir] = part.trim().split(/\s+/);
-        if (fieldName) {
-          if (!fieldNames.has(fieldName)) {
-            throw new Error(`Unknown field in $orderby: ${fieldName}`);
-          }
-          sort[fieldName] = dir?.toLowerCase() === 'desc' ? -1 : 1;
+    // $orderby — validate field names and build sort spec. The key is always the last sort field, and the only one when
+    // $orderby is absent, so every page sees the rows in the same order (stable-order.ts).
+    const fieldNames = new Set(ctx.fields.map(f => f.fieldName));
+    const sort: Record<string, 1 | -1> = {};
+    for (const part of options?.$orderby?.split(',') ?? []) {
+      const [fieldName, dir] = part.trim().split(/\s+/);
+      if (fieldName) {
+        if (!fieldNames.has(fieldName)) {
+          throw new Error(`Unknown field in $orderby: ${fieldName}`);
         }
+        sort[fieldName] = dir?.toLowerCase() === 'desc' ? -1 : 1;
       }
-      cursor = cursor.sort(sort);
     }
+    if (!(ctx.keyField in sort)) sort[ctx.keyField] = 1;
+    cursor = cursor.sort(sort);
 
     // $skip / $top — pagination applies to parent cursor (naturally correct)
     if (options?.$skip !== undefined) cursor = cursor.skip(options.$skip);
