@@ -471,6 +471,9 @@ export type { ServerConfig, DbBackend, EnumMode } from './config.js';
 // ResoMetadata / ResoField / ResoLookup types.
 export { TARGET_RESOURCES } from './metadata/types.js';
 export { reconcileLookups } from './metadata/lookup-reconciler.js';
+// The Lookup rows the metadata defines, as the seeder writes them: for a production instance's own sync, which keeps
+// its Lookup rows in line with the metadata after the first seeding (the seeder fills only an empty table).
+export { buildLookupRecords } from './metadata/lookup-seeder.js';
 export type { DataAccessLayer, ResourceContext } from './db/data-access.js';
 // The DAL takes a ResourceContext for every call, so a host writing through it needs to build one from the same metadata
 // file the server loaded: for example a job that loads records into a production instance's database.
