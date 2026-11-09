@@ -4,6 +4,29 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
+## Certification 0.12.1 Security Notes – 2026-11-09
+
+Pre-publish review of `@reso-standards/reso-certification` 0.12.1, covering every change since 0.12.0: following cloud runs live (`reso-cert cloud watch` and `subscribeToCloudUpdates`), refusing certification for a run that tested no records, the `softwareVersion` stamp on reports, and documentation.
+
+### Findings Addressed
+
+- None. The review found nothing to fix.
+
+### Checked and Clean
+
+- **Live updates address:** `RESO_CLOUD_UPDATES_URL` is made `wss` before anything is sent, loopback excepted. A connection with no usable `wss` address is not attempted.
+- **Live updates token:** the token travels as the second WebSocket subprotocol value, never in the address, and is asked for again on every connect. A token with characters a subprotocol cannot carry is refused rather than sent. Messages about giving up never carry it.
+- **Live updates messages:** the client closes a connection whose service does not echo the subprotocol. Every message is checked against the v1 update contract (`parseCloudUpdate`, `isCloudUpdateEvent`), and anything else, or an event for another environment, is dropped and counted, never thrown or acted on.
+- **Reports:** `softwareVersion` is the package's own version string. No credential, path or host is added.
+- **Supply chain:** no dependency changed since 0.12.0. `npm audit` for the package reports no vulnerabilities.
+- **Package contents:** `npm pack --dry-run` lists 550 files under the `files` allowlist (`dist`, the license, the README, the sample metadata and the schemas): no tests, fixtures, environment files or run output.
+
+### Method
+
+Review of every change since 0.12.0 against the built package: `npm audit`, `npm pack --dry-run` with a scan of the listed files, the full test suite (3,415 tests across 8 packages, 2,307 in this package), lint and typecheck.
+
+---
+
 ## Certification 0.12.0 Security Notes – 2026-11-04
 
 Pre-publish review of `@reso-standards/reso-certification` 0.12.0, covering every change since 0.11.5: cloud runs from `rcf` and Core, the Add/Edit actions and formats a provider chooses, the streaming RCF reader and its fingerprint, and the Core report fields. No high or medium finding. The five low findings are fixed in #420, and the three informational items are fixed on the branch that adds cloud runs for every endorsement.

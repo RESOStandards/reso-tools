@@ -4,7 +4,23 @@
 
 ## Unreleased
 
-### No certification on zero records (certification 0.12.1)
+### The reference server can serve your own resources, read-only
+
+- **`RESOURCES`** chooses the resources a deployment serves, by name. Define them in the metadata file and list them
+  here, and the server serves exactly those, with `$metadata` and the service document to match.
+- **`READ_ONLY=true`** removes every create, update and delete route.
+- **`PRODUCTION_INSTANCE=true`** marks a production instance serving real data rather than the self-contained
+  reference server. It serves only the OData service and `/health` (no Swagger UI, mock token endpoint, admin routes,
+  outbound proxy, UI endpoints or static files), and it leaves the database as it finds it: no table setup or Lookup
+  seeding at start, since a production database is set up separately and the server can then use a login that cannot
+  write.
+- Without these settings nothing changes.
+
+---
+
+## Certification 0.12.1 – 2026-11-09
+
+### No certification on zero records
 
 - **A run that tests no records cannot be certified, for any endorsement.** Its certification verdict says so in plain
   words: "No records were tested, so this system could not be certified." A run that never reports how many records it
@@ -19,26 +35,14 @@
   Dictionary's count comes from the records replication received across every strategy. Its step no longer reports
   the last strategy's progress statistics, which nothing read.
 
-### Every report names the software that wrote it (certification 0.12.1)
+### Every report names the software that wrote it
 
 - **`metadata-report.json` and `data-availability-report.json` carry `softwareVersion`,** as `report.json` and
   `report-detailed.json` already did. These two are what a Data Dictionary or RESO Common Format result sends to the
   Cert API, so every stored result now says which release of the tools produced it. `metadata-report.raw.json`,
   `reso-cert metadata --report` and `reso-cert replicate` carry it too.
 
-### The reference server can serve your own resources, read-only
-
-- **`RESOURCES`** chooses the resources a deployment serves, by name. Define them in the metadata file and list them
-  here, and the server serves exactly those, with `$metadata` and the service document to match.
-- **`READ_ONLY=true`** removes every create, update and delete route.
-- **`PRODUCTION_INSTANCE=true`** marks a production instance serving real data rather than the self-contained
-  reference server. It serves only the OData service and `/health` (no Swagger UI, mock token endpoint, admin routes,
-  outbound proxy, UI endpoints or static files), and it leaves the database as it finds it: no table setup or Lookup
-  seeding at start, since a production database is set up separately and the server can then use a login that cannot
-  write.
-- Without these settings nothing changes.
-
-### Following cloud runs live (certification 0.12.1)
+### Following cloud runs live
 
 - **`reso-cert cloud watch`** follows your cloud runs as RESO's service pushes each change, instead of polling. It is
   the way to follow many runs: one line per update and a running tally (scheduled, running, passed, failed, error),
