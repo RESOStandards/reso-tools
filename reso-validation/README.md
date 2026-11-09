@@ -2,7 +2,7 @@
 
 Isomorphic TypeScript validation library for RESO Data Dictionary records. Validates field types, lengths and ranges against metadata, plus resource-specific business rules with cross-field constraints. Zero external dependencies.
 
-> **[User Guide](doc/GUIDE.md)** – a task-oriented walk-through with realistic examples.
+> **[User Guide](https://tools.reso.org/guides/reso-validation/)** – a task-oriented walk-through with realistic examples.
 
 ## Install
 

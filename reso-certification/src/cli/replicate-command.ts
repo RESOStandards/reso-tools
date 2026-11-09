@@ -16,6 +16,7 @@
 import { resolve } from 'node:path';
 import { CURRENT_DD_VERSION, normalizeDDVersion } from '../sdk/dd-versions.js';
 import type { DDVersion } from '../sdk/dd-versions.js';
+import { SOFTWARE_VERSION } from '../sdk/reports.js';
 
 // @ts-expect-error — legacy CJS
 import certUtilsCommon from '../legacy/common.js';
@@ -131,6 +132,7 @@ export const runReplicate = async (opts: ReplicateOptions): Promise<ReplicateRes
     maxPageSize: opts.maxPageSize,
     limit: opts.limit,
     outputPath: opts.outputPath,
+    softwareVersion: SOFTWARE_VERSION,
     // the Data Dictionary form (2.1, not 2.1.0): the schema exemptions and the reference metadata are keyed by it
     version: normalizeDDVersion(opts.version ?? DEFAULT_DD_VERSION),
     jsonSchemaValidation: opts.jsonSchemaValidation ?? false,

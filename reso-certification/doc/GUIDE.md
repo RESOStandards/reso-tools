@@ -126,7 +126,7 @@ runs.
 > explanation and are ignored rather than being rerouted, because the new behavior is binding and is
 > not what a 0.11.0 user asked for.
 
-See [Field Selection](../src/web-api-core/README.md#field-selection) for how the ranking works and
+See [Field Selection](https://tools.reso.org/packages/reso-certification/web-api-core/#field-selection) for how the ranking works and
 when overriding it is worth doing.
 
 **Full type coverage.** The Core tests exercise six data types: integer, decimal, date, timestamp,
@@ -164,7 +164,7 @@ the settings are `coreOptions.resources`, `coreOptions.fullCoverage` and `coreOp
 
 ### Data Dictionary 2.1
 
-The metadata and data shape. Validates that the server's metadata document matches the RESO Data Dictionary 2.1 specification, that every declared field maps to a known DD field (or is documented as a local extension), and that the data in each resource is type-correct and lookup-valid.
+The metadata and data shape. Validates that the server's metadata document matches the RESO Data Dictionary 2.1 specification, that no local name is a near-miss of a standard one, and that the data in each resource is type-correct and lookup-valid.
 
 ```bash
 reso-cert dd --url https://api.example.com --auth-token TOKEN
@@ -178,7 +178,7 @@ The DD flow does several things in sequence:
 
 1. **Fetches the metadata** and parses it into a structured report
 2. **Merges the Lookup Resource data** so the metadata report knows what every enumerated field can hold
-3. **Checks for variations** – fields, lookups and enum values that look like local extensions of the standard DD
+3. **Checks for variations** – local resources, fields, lookup values and expansions whose names look like near-misses of a standard one (see [Reading a Variations Report](#reading-a-variations-report))
 4. **Replicates a sample of data** using one of several strategies (full, top-of-file, modification timestamp window)
 5. **Validates the replicated records** against the merged metadata
 
@@ -254,7 +254,7 @@ rcf: to submit these variations for review, run again with --provider-uoi, --pro
 
 What it found:
 
-* **One variation.** `BedroomTotal` is one letter away from the standard field `BedroomsTotal`, so it is reported as a near-miss with `BedroomsTotal` as the suggestion. A variation is something to change, or to explain in a review.
+* **One variation.** `BedroomTotal` is one letter away from the standard field `BedroomsTotal`, so it is reported as a near-miss with `BedroomsTotal` as the suggestion. A variation is something to change, or to explain in a review (see [Reading a Variations Report](#reading-a-variations-report)).
 * **Two values in their machine-friendly form.** RCF accepts a lookup value written either way: `Coming Soon` or `ComingSoon`. The machine-friendly form is accepted until Data Dictionary 3.0, so `ComingSoon` and `ResidentialLease` are not variations. They are listed as deprecations, each with the standard value it stands for, so they can be changed before 3.0 arrives.
 * `Coming Soon` on the second record is already the standard value and raises nothing.
 
@@ -302,6 +302,104 @@ Every run checks each record against the Data Dictionary. RCF is extensible, so 
 | `1` | Schema errors |
 | `2` | The run could not do what was asked: nothing certifiable was read, a file's `@reso.context` could not be read under `--skip-schema-validation` (otherwise it is a schema error, so `1`), the three identity options were incomplete or the variations check could not run |
 
+## Reading a Variations Report
+
+A variation is a name in your data that has no exact match in the Data Dictionary but looks like it was meant to be one. A field called `BedroomTotal` when the standard field is `BedroomsTotal` is one. So is the value `Built In Gas Oven` when the standard value is `Built-In Gas Oven`. The variations report lists each one with the standard element RESO suggests it is, and each one needs a decision. Either change your data to use the standard element, or ask RESO to review the suggestion.
+
+In a Data Dictionary run, any variation fails the **Check variations** step, so the run cannot be certified until every one is resolved. An RCF run lists its variations without failing on them.
+
+### Where to Find It
+
+* A Data Dictionary run writes `variations-report.json` beside its other reports, and only when it found variations.
+* `find-variations` and `rcf` write `data-dictionary-variations.json`. It holds the same kind of entries, and `rcf` adds the values it found in their machine-friendly form under `deprecations` (see [RESO Common Format](#reso-common-format-rcf)).
+* The RESO desktop app shows the same report on its Variations Review screen, which is also where you ask for a review.
+
+### What an Entry Says
+
+The report opens with what produced it: `version`, `providerUoi`, `providerUsi`, `recipientUoi`, `generatedOn` and `fuzziness`. Then come the entries, grouped by kind. Each entry names your element, lists what RESO suggests it is and carries an `enforcement` tag:
+
+```json
+{
+  "level": "field",
+  "resourceName": "Property",
+  "fieldName": "BedroomTotal",
+  "suggestions": [
+    {
+      "suggestedResourceName": "Property",
+      "suggestedFieldName": "BedroomsTotal",
+      "ddWikiUrl": "https://dd.reso.org/DD2.1/Property/BedroomsTotal/",
+      "distance": 1,
+      "maxDistance": 3,
+      "strategy": "Edit Distance",
+      "closeMatch": true
+    }
+  ],
+  "enforcement": "must-fix"
+}
+```
+
+* **`ddWikiUrl`** opens the suggested element's definition. Read it before deciding. The question is whether your element holds what the definition describes.
+* **`strategy`** says where the suggestion came from (see [Where a Suggestion Comes From](#where-a-suggestion-comes-from)).
+* **`distance` and `maxDistance`** appear on an Edit Distance suggestion: how many characters differ, and how many the match allows.
+* **`closeMatch` and `exactMatch`** mark the near-certain cases, below.
+* **`enforcement`** is `must-fix` or `warning` (see [Must-Fix and Warning](#must-fix-and-warning)).
+
+### The Kinds of Variation
+
+| Kind | What it is | Example | Suggestion |
+|---|---|---|---|
+| `resources` | A resource whose name is close to a standard resource | `OpenHouses` | `OpenHouse` |
+| `fields` | A field whose name is close to a standard field of the same resource | `BedroomTotal` on `Property` | `BedroomsTotal` |
+| `lookups` | A value of an enumerated field that is close to a standard value | `Built In Gas Oven` in `Appliances` | `Built-In Gas Oven` |
+| `expansions` | An expansion, the kind of property read with `$expand`, whose name is close to a standard expansion | `ListAgents` on `Property` | `ListAgent` |
+| `complexTypes` | Part of the report's shape. Nothing is reported here today | – | – |
+
+A field is compared only with standard fields and an expansion only with standard expansions, so a plain field is never suggested as an expansion or the other way around. A lookup entry carries `lookupValue` beside its `fieldName`. Its suggestion is usually a standard value of the same field. A Fast Track suggestion can name a value of a different field, or more than one element.
+
+### Where a Suggestion Comes From
+
+| `strategy` | Source |
+|---|---|
+| `Substring` | One name contains the other, ignoring case and special characters. `XYZ_ListPrice` contains `ListPrice`. |
+| `Edit Distance` | The names differ by a few characters, up to the match sensitivity in `fuzziness`. At `0.25` that is a quarter of the name's length. |
+| `Fast Track` | The RESO Fast Track Subgroup, which decides how nonstandard elements map to the Data Dictionary |
+| `Admin Review` | RESO staff |
+
+Names of three characters or fewer are not matched by machine. Machine matching works like a spelling checker. It finds near-misses, and some of them are false positives, which is what a review is for.
+
+**Close and exact matches must be resolved.** A suggestion marked `exactMatch` differs from the standard name only by case, spaces or special characters, like `Built In Gas Oven` and `Built-In Gas Oven`. One marked `closeMatch` is within one character, like `BedroomTotal` and `BedroomsTotal`. Disagreeing with one of these usually means something in the Data Dictionary needs a workgroup's attention, so say so when you ask for a review.
+
+### Must-Fix and Warning
+
+* **`must-fix`** – a suggested element is part of the Data Dictionary version you are certifying on. Nearly every entry is this.
+* **`warning`** – every suggestion on the entry points at an element that becomes standard only in a later major version.
+
+A Data Dictionary run fails on every entry in the report, whichever tag it carries.
+
+### What to Do About Each Entry
+
+Open the suggested element's definition from `ddWikiUrl`, then decide which of these it is:
+
+1. **Your element is the standard one.** Change your data to use the standard name or value, and run the test again. Serve `BedroomsTotal` rather than `BedroomTotal`, and send `Built-In Gas Oven` rather than `Built In Gas Oven`.
+2. **Your value is a more specific kind of the standard one.** The Data Dictionary defines a fireplace `Insert` as "a device inserted into an existing masonry or prefabricated fireplace", so a `Catalytic Insert` is an `Insert`. Map it to `Insert` until the Data Dictionary adds the more specific value. On a field served as a string through the Lookup Resource, nothing is lost: keep `Catalytic Insert` as the `LookupValue` and give `Insert` as its `StandardLookupValue`. Check the definition rather than the name. A value the definition does not describe is not that value, which is the next case.
+3. **The suggestion is wrong.** A price per acre is not a list price, so `XYZ_ListPricePerAcre` suggested as `ListPrice` is a false positive. Ask RESO to review it, and say what your element holds. Once RESO staff ignore a suggestion, it is not raised again, and your element is treated as local.
+4. **It belongs in the standard, but not as suggested.** Send it to Fast Track. The subgroup can confirm the suggestion, offer a different or an additional one, or ignore the element. A Fast Track suggestion can be disputed too, and the dispute goes back to the subgroup.
+
+### Asking for a Review
+
+In the desktop app, open the run's Variations Review. For each entry you are not changing, choose **Ignore** for a false positive or **Fast Track** for the subgroup, and add a comment saying what your element holds. Then choose **Submit Review**. RESO staff make the decision, and the app lets you know when they do.
+
+From the command line, the report a run wrote starts a review, and `variations-review-status` shows where each of your submissions stands:
+
+```bash
+reso-cert submit-variations-report --report out/.../variations-report.json
+reso-cert variations-review-status
+```
+
+To give a choice and a comment for each entry without the desktop app, `submit-variation-decisions` takes them from a sheet. The [CLI reference](https://tools.reso.org/packages/reso-certification/cli/#submit-variation-decisions) has the details.
+
+For a question about a suggestion, write to RESO at certification@reso.org with the entry exactly as the report shows it.
+
 ---
 
 ## Authentication
@@ -310,7 +408,7 @@ The cert runner supports every auth shape a real RESO server might use. Auth is 
 
 1. **CLI flags** – `--auth-token` for bearer, or `--client-id` plus `--client-secret` plus `--token-url` for OAuth2 client credentials
 2. **Config file** – `--config path/to/config.json` lets each entry in the file specify its own auth
-3. **A credentials file** – `credentials.env`, as the certification site hands it out, or a `.env`. The CLI reads the first one it finds at startup, from the places the [CLI reference](../src/cli/README.md#environment-env) lists
+3. **A credentials file** – `credentials.env`, as the certification site hands it out, or a `.env`. The CLI reads the first one it finds at startup, from the places the [CLI reference](https://tools.reso.org/packages/reso-certification/cli/#environment-env) lists
 4. **Environment variables** – `RESO_AUTH_TOKEN` for bearer, or `RESO_CLIENT_ID` plus `RESO_CLIENT_SECRET` plus `RESO_TOKEN_URI` for client credentials
 
 All four resolvers know about the same set of variables, so a config file in production can be replaced by environment variables in CI without changing the command. The same flag names work everywhere.
@@ -406,7 +504,7 @@ What lands in that directory, file by file and endorsement by endorsement, is in
 
 ### Samples
 
-A downloadable sample for each endorsement, with the full field reference, is in [`sample-configs/`](../sample-configs/README.md).
+A downloadable sample for each endorsement, with the full field reference, is in [`sample-configs/`](https://github.com/RESOStandards/reso-tools/tree/main/reso-certification/sample-configs).
 
 ---
 
@@ -471,7 +569,36 @@ reso-cert cloud status --since 2026-10-29T00:00:00Z --json
 
 There is one line per recipient of each run: its status (`scheduled`, `running`, `passed`, `failed` or `error`), when that last changed, the report once one is published, and the error or the step it is on.
 
-Cloud runs cover Web API Core. They sign in with the `TOKEN_URI`, `CLIENT_ID` and `CLIENT_SECRET` from your credentials file, the same as the variations commands. If RESO's service refuses a request, the CLI prints its reason and exits `2`.
+Cloud runs cover every endorsement: Data Dictionary, Web API Core, Add/Edit, EntityEvent and RESO Common Format. They sign in with the `TOKEN_URI`, `CLIENT_ID` and `CLIENT_SECRET` from your credentials file, the same as the variations commands. If RESO's service refuses a request, the CLI prints its reason and exits `2`.
+
+### Following Many Runs
+
+With many runs going, watch them instead of asking again and again. `reso-cert cloud watch` takes the updates RESO's service pushes as each run changes:
+
+```bash
+reso-cert cloud watch
+```
+
+```
+Watching your cloud runs in qa. Ctrl-C to stop.
+2026-11-04T18:05:00  running    qa-T00000000-1700000000001  M00000123, system 50000  data-dictionary 2.1
+2026-11-04T18:09:12  passed     qa-T00000000-1700000000001  M00000123, system 50000  data-dictionary 2.1  report 0000report01
+0 scheduled · 3 running · 12 passed · 1 failed · 0 error
+```
+
+Each update is one line. The last line is a running tally of the runs watched, rewritten in place on a terminal. When the output goes to a file or a pipe, the tally is printed at the start and at the end instead, so a log stays clean.
+
+To wait on particular runs, name their requests and add `--until-done`. The watch exits once every one has finished, with `0` when all passed and `1` when any failed or errored, so a script can start many runs and then wait on all of them:
+
+```bash
+reso-cert cloud watch --request qa-T00000000-1700000000001 --request qa-T00000000-1700000000002 --until-done
+```
+
+Without `--request`, `--until-done` waits on the runs in progress when the watch started. `--endorsement data-dictionary` narrows the watch to one endorsement, and `--json` prints each update as the service sent it, one JSON object per line.
+
+The watch reads where your runs stand once when it starts, so a run that finished before then is counted. If the connection drops, it reconnects and reads once more for what changed meanwhile. If it cannot reconnect, it says so and exits `2`, and `reso-cert cloud status` still shows where everything stands.
+
+It needs one more line in your credentials file or environment, `RESO_CLOUD_UPDATES_URL`, the address of RESO's live updates. The [CLI reference](https://tools.reso.org/packages/reso-certification/cli/#cloud-watch) has every option.
 
 ---
 
@@ -498,7 +625,7 @@ Nothing was archived. Rerun with --confirm to proceed.
 
 With `--confirm` it prints the same warning and then archives. Only the provider the report belongs to, or an
 administrator, can archive it. `--json` prints what was read and what happened as one object, for scripts. The
-[CLI reference](../src/cli/README.md#archive-report) has the rest.
+[CLI reference](https://tools.reso.org/packages/reso-certification/cli/#archive-report) has the rest.
 
 ---
 
@@ -637,7 +764,7 @@ This is the workflow that makes the "load any cert metadata report into a local 
 
 ## Running Cert in Docker
 
-Two different things run in Docker, and they are worth telling apart. To run the certification CLI against a real provider from an image built out of this repository rather than from npm, see [the certification image](../README.md#the-certification-image) – that section also covers the `--user` and output-directory handling a bind mount needs.
+Two different things run in Docker, and they are worth telling apart. To run the certification CLI against a real provider from an image built out of this repository rather than from npm, see [the certification image](https://tools.reso.org/packages/reso-certification/#the-certification-image) – that section also covers the `--user` and output-directory handling a bind mount needs.
 
 The cert flows are *also* wired up as Docker Compose profiles inside the **[RESO Reference Server](../reso-reference-server/)**, so you can run them against a freshly seeded reference server with one command:
 

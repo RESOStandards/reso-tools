@@ -824,7 +824,7 @@ const writeSchemaValidationWarningsReport = async ({ outputPath, errorMap = {} }
  *
  * @param {Object} params
  */
-const writeAnalyticsReports = async ({ outputPath, version, serviceRootUri, replicationStateService: REPLICATION_STATE_SERVICE }) => {
+const writeAnalyticsReports = async ({ outputPath, version, softwareVersion, serviceRootUri, replicationStateService: REPLICATION_STATE_SERVICE }) => {
   try {
     const generatedOn = new Date().toISOString();
 
@@ -929,6 +929,7 @@ const writeAnalyticsReports = async ({ outputPath, version, serviceRootUri, repl
       JSON.stringify({
         description: 'RESO Data Availability Report',
         version,
+        ...(softwareVersion ? { softwareVersion } : {}),
         generatedOn,
         ...consolidateResults({
           resourceAvailabilityMap: REPLICATION_STATE_SERVICE.getResourceAvailabilityMap(),

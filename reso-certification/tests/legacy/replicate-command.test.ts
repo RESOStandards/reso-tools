@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { REPLICATION_STRATEGY_VALUES, runReplicate } from '../../src/cli/replicate-command.js';
+import { SOFTWARE_VERSION } from '../../src/sdk/reports.js';
 import { startReplicationMockServer } from './replication-mock-server.js';
 
 const RESOURCE = 'Property';
@@ -153,6 +154,29 @@ describe('runReplicate — --strict propagates a schema-validation failure (no f
     expect(written).toContain('data-availability-report.json');
     expect(written).not.toContain('data-availability-schema-validation-warnings.json');
     expect(written).not.toContain('data-availability-schema-validation-errors.json');
+  });
+
+  // The industry aggregates read availability reports, and a value the parser missed is traced back to the code that
+  // missed it through this field. report.json has always carried it; the availability report did not.
+  it('stamps the availability report with the software that wrote it', async () => {
+    const server = await startReplicationMockServer({ resource: RESOURCE, records: distinctRecords });
+    cleanups.push(server.close);
+    const outputPath = await mkdtemp(join(tmpdir(), 'replicate-version-'));
+    cleanups.push(() => rm(outputPath, { recursive: true, force: true }));
+    const reportPath = join(outputPath, 'metadata-report.json');
+    await writeFile(reportPath, JSON.stringify(minimalReport));
+
+    await runReplicate({
+      serviceRootUri: server.url,
+      strategy: 'TopAndSkip',
+      bearerToken: 'test-token',
+      metadataReportPath: reportPath,
+      outputPath,
+      version: '2.0',
+      secondsDelayBetweenRequests: 0
+    });
+    const availability = JSON.parse(await readFile(join(outputPath, 'data-availability-report.json'), 'utf-8'));
+    expect(availability.softwareVersion).toBe(SOFTWARE_VERSION);
   });
 
   it('a run whose only findings are warnings writes the warnings file beside the analytics reports (the call site, end to end)', async () => {

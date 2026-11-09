@@ -179,3 +179,45 @@ export const resolveServicesUrl = (service = 'Variations Service'): string => {
   }
   return ensureHttps(raw, 'RESO_SERVICES_URL');
 };
+
+/**
+ * The variable that holds the address of RESO's live cloud-run updates, a WebSocket API. It sits beside
+ * `RESO_SERVICES_URL` and is set the same way, from the credentials file or the environment.
+ */
+export const CLOUD_UPDATES_URL_VARIABLE = 'RESO_CLOUD_UPDATES_URL';
+
+/** A WebSocket scheme for each scheme an address may be written with. Anything else is refused. */
+const WEBSOCKET_SCHEMES: Readonly<Record<string, string>> = { 'ws:': 'ws:', 'wss:': 'wss:', 'http:': 'ws:', 'https:': 'wss:' };
+
+/**
+ * Make a WebSocket address `wss://`, as `ensureHttps` does for https: a bearer travels on the connection, so it is
+ * never sent in the clear. A bare host gets `wss`, an `https` or `http` address becomes `wss` or `ws`, a `ws` address
+ * is upgraded unless it is loopback, and any other scheme is refused and named. A trailing slash is dropped.
+ */
+export const ensureSecureWebSocketUrl = (raw: string, variableName = 'URL'): string => {
+  const value = raw.trim();
+  if (!value) throw serviceError('SERVICE_ERROR', `${variableName} is empty.`);
+  const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value) ? value : `wss://${value.replace(/^\/\//, '')}`;
+  const scheme = withScheme.slice(0, withScheme.indexOf(':') + 1).toLowerCase();
+  const mapped = WEBSOCKET_SCHEMES[scheme];
+  if (mapped === undefined) {
+    throw serviceError(
+      'SERVICE_ERROR',
+      `${variableName} ${JSON.stringify(raw)} uses the ${scheme.replace(':', '')} scheme; a wss address is required.`
+    );
+  }
+  const candidate = `${mapped}${withScheme.slice(scheme.length)}`;
+  const parsed = URL.canParse(candidate) ? new URL(candidate) : undefined;
+  if (!parsed) throw serviceError('SERVICE_ERROR', `${variableName} ${JSON.stringify(raw)} is not a usable address.`);
+  const secure = isLoopbackHost(parsed.hostname) ? parsed : new URL(`wss:${parsed.href.slice(parsed.protocol.length)}`);
+  return secure.toString().replace(/\/+$/, '');
+};
+
+/** The address of RESO's live cloud-run updates from the environment, as wss. */
+export const resolveCloudUpdatesUrl = (service = 'Cloud run updates'): string => {
+  const raw = process.env[CLOUD_UPDATES_URL_VARIABLE];
+  if (!raw || !raw.trim()) {
+    throw serviceError('SERVICE_ERROR', `${service}: ${CLOUD_UPDATES_URL_VARIABLE} is not set.`);
+  }
+  return ensureSecureWebSocketUrl(raw, CLOUD_UPDATES_URL_VARIABLE);
+};

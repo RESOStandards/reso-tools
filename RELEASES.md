@@ -18,6 +18,71 @@
 
 ---
 
+## Certification 0.12.1 – 2026-11-09
+
+### No certification on zero records
+
+- **A run that tests no records cannot be certified, for any endorsement.** Its certification verdict says so in plain
+  words: "No records were tested, so this system could not be certified." A run that never reports how many records it
+  tested is refused too, rather than assumed fine.
+- **Data Dictionary:** "Replicate and validate" fails when the server returned no records for any resource. Before
+  this, a run that received nothing could pass every step.
+- **Web API Core:** the scenarios step fails when no resource returned any records. An empty required resource already
+  failed, but a run on optional resources alone, each Not Applicable, could pass having tested nothing.
+- **Add/Edit** fails when no record was created, updated or deleted, and **EntityEvent** fails when no event was
+  validated. **RESO Common Format** already failed a run that read no records.
+- **Every record-testing step reports `recordsTested`** in its counts, whether it passed or failed. The Data
+  Dictionary's count comes from the records replication received across every strategy. Its step no longer reports
+  the last strategy's progress statistics, which nothing read.
+
+### Every report names the software that wrote it
+
+- **`metadata-report.json` and `data-availability-report.json` carry `softwareVersion`,** as `report.json` and
+  `report-detailed.json` already did. These two are what a Data Dictionary or RESO Common Format result sends to the
+  Cert API, so every stored result now says which release of the tools produced it. `metadata-report.raw.json`,
+  `reso-cert metadata --report` and `reso-cert replicate` carry it too.
+
+### Following cloud runs live
+
+- **`reso-cert cloud watch`** follows your cloud runs as RESO's service pushes each change, instead of polling. It is
+  the way to follow many runs: one line per update and a running tally (scheduled, running, passed, failed, error),
+  rewritten in place on a terminal and printed at the start and the end on a pipe, so logs stay clean.
+  `--request <id>` (repeatable) and `--endorsement <name>` narrow it, `--env <name>` names the environment your
+  credentials are for (read from your runs when left out) and `--json` prints each update as the service sent it.
+- **`--until-done`** exits once every watched request has finished, `0` when all passed and `1` when any failed or
+  errored, so a script can start many runs and wait on all of them with one command. Ctrl-C before then exits `130`.
+- **The status is read once at the start,** so runs that finished before the watch began are counted, and once more
+  after a dropped connection, for what changed while it was down. If the connection cannot be restored, the watch
+  says so, suggests `reso-cert cloud status` and exits `2`. It never falls back to polling.
+- **`RESO_CLOUD_UPDATES_URL`** is the address of RESO's live updates, set beside `RESO_SERVICES_URL` in the
+  credentials file or the environment. It is made `wss` unless it is on your own machine. `cloud watch` signs in as
+  `cloud status` does and mints a fresh token each time it connects.
+- **For apps, `subscribeToCloudUpdates`** in the SDK is the same stream. It carries the token in the WebSocket
+  subprotocol, never in the address, and asks for it again on every connect so a refreshed token is used. It reconnects
+  with capped exponential backoff and jitter, sends a heartbeat inside the service's idle limit, replaces the
+  connection before the service's two-hour limit without a gap, and stops on `close()`. Every message is checked
+  against the update contract, `parseCloudUpdate` and `isCloudUpdateEvent`, which are exported too, and anything else
+  is dropped and counted rather than thrown. `sessionTokenProvider`, `cliCredentialsTokenProvider` and
+  `bearerTokenProvider` supply the token for a signed-in session, the CLI's credentials and a bearer the caller holds.
+- **The user guide's cloud section names every endorsement.** It still said cloud runs covered Web API Core only.
+
+### Documentation
+
+- **README links go to tools.reso.org.** npm shows a package's README as it is written, so its relative links
+  opened the raw files on GitHub. Every published package's README now links the HTML pages directly: the user
+  guides, the package and CLI references, and their sections. Code examples and sample configs still link GitHub.
+- **The Cloud Runs examples include RESO Common Format:** `reso-cert rcf --input <files> --provider-uoi <UOI>
+  --provider-usi <USI> --recipient-uoi <UOI> --start-cloud-run`, in the README and the CLI reference.
+- **The Docker example pulls `:latest`** and shows a pinned release as `:v<version>`, instead of naming an old
+  release.
+- **The user guide explains the variations report:** what an entry carries, each kind of variation with an example,
+  where a suggestion comes from, must-fix and warning, and how to resolve an entry or ask RESO to review it.
+- **Dead links on tools.reso.org are fixed,** in the certification guide, its CLI and Web API Core pages, the client
+  guide and two package READMEs. A link to a section of another page stayed relative and led nowhere. The site's build
+  now carries the section through when it rewrites a link.
+
+---
+
 ## Certification 0.12.0 – 2026-11-04
 
 ### Cloud runs for every endorsement

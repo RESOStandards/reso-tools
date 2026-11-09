@@ -2,7 +2,7 @@
 
 A metadata-driven OData 4.01 reference server for the [RESO Data Dictionary](https://www.reso.org/data-dictionary/). Reads the RESO JSON metadata format and dynamically generates PostgreSQL tables, OData CRUD endpoints, EDMX metadata and OpenAPI documentation.
 
-> **[User Guide](doc/GUIDE.md)** – a task-oriented walk-through with realistic examples.
+> **[User Guide](https://tools.reso.org/guides/reso-reference-server/)** – a task-oriented walk-through with realistic examples.
 
 > **Use it as a package.** Also published to npm as `@reso-standards/reso-reference-server` – import `createApp`, `startServer` and `loadConfig` to embed a RESO OData server in your own Node process (handy for test harnesses). Running the server directly from the package (`npx`, no clone or Docker) is tracked in [#238](https://github.com/RESOStandards/reso-tools/issues/238).
 
@@ -212,11 +212,11 @@ Both modes pass all Web API Core 2.1.0 compliance tests.
 
 ## Compliance Testing
 
-The server includes Docker-based compliance testing against the [`@reso-standards/reso-certification`](../reso-certification/) test runner. Tests run against seeded data and validate OData protocol compliance, metadata structure, field mappings and query behavior.
+The server includes Docker-based compliance testing against the [`@reso-standards/reso-certification`](https://tools.reso.org/packages/reso-certification/) test runner. Tests run against seeded data and validate OData protocol compliance, metadata structure, field mappings and query behavior.
 
 ### Web API Core 2.1.0
 
-Validates OData query operations (`$filter`, `$select`, `$orderby`, `$top`, `$skip`, `$count`, `$expand`), response formats, metadata and service document compliance. Uses the `reso-cert core` pipeline from [`@reso-standards/reso-certification`](../reso-certification/).
+Validates OData query operations (`$filter`, `$select`, `$orderby`, `$top`, `$skip`, `$count`, `$expand`), response formats, metadata and service document compliance. Uses the `reso-cert core` pipeline from [`@reso-standards/reso-certification`](https://tools.reso.org/packages/reso-certification/).
 
 **Current status: 219 passed, 0 failed, 112 skipped out of 331 required tests** (plus 12 of the 18 optional tests passed)
 
@@ -241,7 +241,7 @@ The run samples live server data to pick field values for each data type (intege
 
 ### Data Dictionary 2.0
 
-Validates metadata compliance, field mappings and data availability against the RESO Data Dictionary 2.0 specification. Uses the `reso-cert dd` pipeline from [`@reso-standards/reso-certification`](../reso-certification/).
+Validates metadata compliance, field mappings and data availability against the RESO Data Dictionary 2.0 specification. Uses the `reso-cert dd` pipeline from [`@reso-standards/reso-certification`](https://tools.reso.org/packages/reso-certification/).
 
 The profile runs with `--skip-variations`, because continuous integration has no Variations Service to reach. The variations step is reported as skipped, so the run is recorded as not eligible for certification.
 
@@ -260,7 +260,7 @@ docker compose --profile sqlite --profile compliance-dd-sqlite up --build --exit
 
 ### Web API Add/Edit (RCP-010)
 
-Validates Create, Update and Delete operations with representation and minimal response modes. Uses the custom [`@reso-standards/reso-certification`](../reso-certification/) test runner.
+Validates Create, Update and Delete operations with representation and minimal response modes. Uses the custom [`@reso-standards/reso-certification`](https://tools.reso.org/packages/reso-certification/) test runner.
 
 **Current status: 8 passed, 0 failed**
 
@@ -286,7 +286,7 @@ The `--output-dir` flag writes the report tree: `report.json` carries the machin
 
 ### EntityEvent (RCP-027)
 
-Validates EntityEvent change tracking in full mode, which exercises the feed with canary writes rather than observing it read-only. Uses the `reso-cert entity-event` pipeline from [`@reso-standards/reso-certification`](../reso-certification/).
+Validates EntityEvent change tracking in full mode, which exercises the feed with canary writes rather than observing it read-only. Uses the `reso-cert entity-event` pipeline from [`@reso-standards/reso-certification`](https://tools.reso.org/packages/reso-certification/).
 
 **Current status: 12 of 12 scenarios passed**
 

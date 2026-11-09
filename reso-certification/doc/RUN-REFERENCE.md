@@ -242,6 +242,8 @@ sensitivity produced it even if the surrounding job record is lost.
 Not to be confused with `data-dictionary-variations.json`, which `find-variations` and `rcf` write. A
 Data Dictionary run never writes that name.
 
+What each entry means and what to do about it is in [Reading a Variations Report](GUIDE.md#reading-a-variations-report).
+
 ### `data-availability-report.json`
 
 What the replicated sample actually contained, which is a different question from what the metadata

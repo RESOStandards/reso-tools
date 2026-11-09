@@ -52,6 +52,12 @@ const SUCCEEDS_SCENARIO: Readonly<Record<AddEditFormattedAction, Readonly<Record
   update: { representation: 'update-succeeds-representation', minimal: 'update-succeeds-minimal' }
 };
 
+/** The scenarios that should succeed. Each one that passes acted on a record the server accepted: created, updated or deleted it. */
+export const SUCCEEDS_SCENARIOS: ReadonlyArray<ScenarioName> = [
+  ...ADD_EDIT_FORMATTED_ACTIONS.flatMap(action => ADD_EDIT_FORMATS.map(format => SUCCEEDS_SCENARIO[action][format])),
+  'delete-succeeds'
+];
+
 const FAILS_SCENARIO: Readonly<Record<AddEditAction, ScenarioName>> = {
   create: 'create-fails',
   update: 'update-fails',

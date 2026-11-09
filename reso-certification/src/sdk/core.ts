@@ -29,7 +29,7 @@ import {
   summarizeScenarios
 } from '../web-api-core/test-runner.js';
 import { typeCoverageOf } from '../web-api-core/type-coverage.js';
-import { allOf, everyStepPassed, versionCertifies } from './certification.js';
+import { RECORDS_TESTED, allOf, everyStepPassed, testedAtLeastOneRecord, versionCertifies } from './certification.js';
 import { coerceCoreVersion, isCore21OrLater, whyCoreVersionDoesNotCertify } from './core-versions.js';
 import { createExpandSchemaValidator, isEnumerationIgnored, loadValidationConfig } from './expand-schema.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
@@ -278,6 +278,10 @@ export const notServedNotApplicableReport = (resource: string): ResourceTestRepo
   coverage: [],
   summary: { total: 1, passed: 0, failed: 0, skipped: 1, optional: { passed: 0, notSupported: 0, notTested: 0 } }
 });
+
+/** Why a Web API Core run that sampled no records failed, in the words the provider sees. */
+export const NO_RESOURCE_RECORDS =
+  'No resource returned any records, so no scenario was tested on a record. A system can only be certified on records it serves.';
 
 /**
  * The Core run verdict from the aggregate counts — the single source of truth for the run's
@@ -697,7 +701,14 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // definitive and outranks an incomplete (deadline-truncated) run, which outranks passed.
     // A run that ran out of time is `incomplete` only if it observed no real failure.
     const deadlineReached = resourceReports.some(r => r.deadlineReached);
-    const status = coreVerdict({ totalFailed, coverageFailed, deadlineReached });
+    // The records sampled across every resource. At zero nothing was tested on a record, so a run that otherwise
+    // completed fails (Josh, 2026-11-04: "no Cert should work with 0 records across the board"). An empty required
+    // resource already fails on its own, but a run on optional resources alone could pass on none. A run the deadline
+    // cut short stays incomplete, and the certification rule refuses it either way. The report writer reads this
+    // step's failure as a failed prior step, so the report and the step still agree.
+    const recordsSampled = resourceReports.reduce((sum, r) => sum + (r.params.sampleRecordCount ?? 0), 0);
+    const noRecords = recordsSampled === 0 && !deadlineReached;
+    const status = noRecords ? ('failed' as const) : coreVerdict({ totalFailed, coverageFailed, deadlineReached });
 
     // An override that matched no candidate on any resource changed nothing. Say so out loud rather than
     // letting the operator assume the run was overridden: a field only becomes eligible once it has a sampled
@@ -769,7 +780,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         ...(overrideSummary ? { fieldOverrides: overrideSummary } : {})
       },
       status,
-      summary: `${incompleteMsg}${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped${totalWarnings > 0 ? `, ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}` : ''}${optTotal > 0 ? `; optional: ${optPassed} passed, ${optNotSupported} not supported, ${optNotTested} not tested` : ''} (${totalScenarios} scenarios across ${resourceReports.length} resources). ${coverageMsg}${modeMsg}${overrideMsg ? `. ${overrideMsg}` : ''}`,
+      summary: `${noRecords ? `${NO_RESOURCE_RECORDS} ` : ''}${incompleteMsg}${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped${totalWarnings > 0 ? `, ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}` : ''}${optTotal > 0 ? `; optional: ${optPassed} passed, ${optNotSupported} not supported, ${optNotTested} not tested` : ''} (${totalScenarios} scenarios across ${resourceReports.length} resources). ${coverageMsg}${modeMsg}${overrideMsg ? `. ${overrideMsg}` : ''}`,
       counts: {
         total: totalScenarios,
         passed: totalPassed,
@@ -779,9 +790,17 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         optionalPassed: optPassed,
         optionalNotSupported: optNotSupported,
         optionalNotTested: optNotTested,
-        resources: resourceReports.length
+        resources: resourceReports.length,
+        [RECORDS_TESTED]: recordsSampled
       },
-      ...(coverageFailed ? { errors: [`Full coverage required but missing types: ${missingTypes.join(', ')}`] } : {})
+      ...(coverageFailed || noRecords
+        ? {
+            errors: [
+              ...(noRecords ? [NO_RESOURCE_RECORDS] : []),
+              ...(coverageFailed ? [`Full coverage required but missing types: ${missingTypes.join(', ')}`] : [])
+            ]
+          }
+        : {})
     };
   }
 });
@@ -859,7 +878,11 @@ const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> =
 export const coreValidForCertification =
   (config: CoreConfig): ValidForCertification =>
   steps =>
-    allOf(everyStepPassed(steps), versionCertifies(whyCoreVersionDoesNotCertify(coerceCoreVersion(config.version))));
+    allOf(
+      everyStepPassed(steps),
+      testedAtLeastOneRecord(steps),
+      versionCertifies(whyCoreVersionDoesNotCertify(coerceCoreVersion(config.version)))
+    );
 
 /** Create the Web API Core compliance test pipeline. */
 export const createCorePipeline = (config: CoreConfig) => {

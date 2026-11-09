@@ -17,12 +17,27 @@ import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadataWithVersion, persistMetadataXml } from '../test-runner/metadata.js';
 import { computeVariationsViaService } from '../variations/index.js';
-import { CERTIFIABLE, allOf, everyStepPassed, notCertifiable, versionCertifies } from './certification.js';
+import {
+  CERTIFIABLE,
+  RECORDS_TESTED,
+  allOf,
+  everyStepPassed,
+  notCertifiable,
+  testedAtLeastOneRecord,
+  versionCertifies
+} from './certification.js';
 import { type DDVersion, whyDDVersionDoesNotCertify } from './dd-versions.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
 import { generateMetadataReport, normalizeReportJson } from './report-field-types.js';
-import { createDetailedReportGenerator, createGenericReportGenerator, prepareOutputDir, writeReports } from './reports.js';
+import {
+  SOFTWARE_VERSION,
+  createDetailedReportGenerator,
+  createGenericReportGenerator,
+  prepareOutputDir,
+  withSoftwareVersion,
+  writeReports
+} from './reports.js';
 import type { BaseTestContext, DDConfig, PipelineStep, StepOutput, StepResult, TestFunction, ValidForCertification } from './types.js';
 import type { PipelineResult } from './types.js';
 
@@ -121,7 +136,8 @@ const resolveAuth = (config: DDConfig): PipelineStep<DDContext> => ({
   }
 });
 
-const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
+/** Exported so the files it writes can be tested. */
+export const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Generate metadata report',
   run: async (ctx, onProgress) => {
     // outputPath is prepped by runDDCompliance before the pipeline
@@ -183,7 +199,7 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
     // snapshot as metadata-report.raw.json; with no Lookup Resource the two would be
     // byte-identical, so raw is written only when it differs.
     const metadataReportPath = join(ctx.outputPath, 'metadata-report.json');
-    await writeFile(metadataReportPath, JSON.stringify(report, null, 2));
+    await writeFile(metadataReportPath, JSON.stringify(withSoftwareVersion(report), null, 2));
 
     if (lookupResourceAvailable && rawRecords) {
       // Write raw lookup resource data
@@ -192,7 +208,7 @@ const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => ({
       await writeFile(join(ctx.outputPath, 'lookup-resource-lookup-metadata.json'), JSON.stringify(lookupDump, null, 2));
 
       // Pre-merge metadata report (provenance): the base before the Lookup Resource merge.
-      await writeFile(join(ctx.outputPath, 'metadata-report.raw.json'), JSON.stringify(baseReport, null, 2));
+      await writeFile(join(ctx.outputPath, 'metadata-report.raw.json'), JSON.stringify(withSoftwareVersion(baseReport), null, 2));
     }
 
     const lookupMsg = lookupResourceAvailable
@@ -416,6 +432,7 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
   strictMode: config.strictMode ?? true,
   pathToMetadataReportJson: ctx.metadataReportPath,
   REPLICATION_STATE_SERVICE: ctx.replicationStateService,
+  softwareVersion: SOFTWARE_VERSION,
   fromCli: true,
   limit: config.limit ?? DEFAULT_LIMIT,
   // Deliberately NOT tied to strictMode. Validating and enforcing are different decisions: relaxing
@@ -494,23 +511,12 @@ const formatReplicationProgress = (info: Record<string, unknown>, currentStrateg
   });
 };
 
-/** Build the onProgress adapter and a stats collector for a replication run. */
-const replicationProgressAdapter = (onProgress: import('./types.js').ProgressCallback, currentStrategy: string) => {
-  let lastInfo: Record<string, unknown> = {};
-  return {
-    callback: (info: Record<string, unknown>) => {
-      lastInfo = info;
-      onProgress({ step: 'sub:replicate', status: 'running', message: formatReplicationProgress(info, currentStrategy) });
-    },
-    getLastStats: () => ({
-      totalRecordsFetched: Number(lastInfo.totalRecordsFetched ?? 0),
-      meanResponseMs: Number(lastInfo.meanResponseMs ?? 0),
-      throughput: Number(lastInfo.throughput ?? 0),
-      anomalyCount: Number(lastInfo.anomalyCount ?? 0),
-      totalRequests: Number(lastInfo.totalRequests ?? 0)
-    })
-  };
-};
+/** Build the onProgress adapter for a replication run. */
+const replicationProgressAdapter = (onProgress: import('./types.js').ProgressCallback, currentStrategy: string) => ({
+  callback: (info: Record<string, unknown>) => {
+    onProgress({ step: 'sub:replicate', status: 'running', message: formatReplicationProgress(info, currentStrategy) });
+  }
+});
 
 /** The file the replicator writes its schema validation findings to; named in the failure message so an
  *  operator is pointed at the detail rather than shown it. Not re-exported by the legacy module. */
@@ -529,6 +535,51 @@ const schemaValidationFailureOf = (err: unknown): SchemaValidationFailure | unde
 };
 
 const plural = (n: number, word: string): string => `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`;
+
+/** The replicator's log of responses, read from its state service. Anything else reads as no responses. */
+const responsesOf = (service: unknown): ReadonlyArray<unknown> => {
+  if (typeof service !== 'object' || service === null || !('getResponses' in service)) return [];
+  if (typeof service.getResponses !== 'function') return [];
+  const responses: unknown = service.getResponses();
+  return Array.isArray(responses) ? responses : [];
+};
+
+/** One logged response's record count, or zero when it carries none. */
+const recordCountOf = (response: unknown): number => {
+  if (typeof response !== 'object' || response === null || !('recordCount' in response)) return 0;
+  const count = response.recordCount;
+  return typeof count === 'number' && Number.isFinite(count) ? count : 0;
+};
+
+/**
+ * The records replication received, across every strategy, from the replicator's own log. A page with no records is
+ * never logged, so this counts the records the run tested. The progress callback's total is not used: it is debounced,
+ * and it is the last strategy's alone.
+ */
+const recordsReceived = (ctx: Readonly<DDContext>): number =>
+  responsesOf(ctx.replicationStateService).reduce<number>((total, response) => total + recordCountOf(response), 0);
+
+/** Why a Data Dictionary run that received no records failed, in the words the provider sees. */
+export const NO_RECORDS_RECEIVED =
+  'The server returned no records for any resource, so there was nothing to check against the Data Dictionary. A system can only be certified on records it serves.';
+
+/**
+ * Fail the replication step when it received no records (Josh, 2026-11-04: "no Cert should work with 0 records across
+ * the board"). A Data Dictionary 2.1 cloud run made one request, received nothing, and passed every step. Exported so
+ * the check can be tested without a server.
+ */
+export const checkRecordsReceived: TestFunction<DDContext> = async ctx => {
+  const received = recordsReceived(ctx);
+  return received > 0
+    ? { context: ctx as DDContext, summary: `${plural(received, 'record')} received`, counts: { [RECORDS_TESTED]: received } }
+    : {
+        context: ctx as DDContext,
+        status: 'failed',
+        summary: NO_RECORDS_RECEIVED,
+        errors: [NO_RECORDS_RECEIVED],
+        counts: { [RECORDS_TESTED]: 0 }
+      };
+};
 
 /**
  * Run a replication strategy, reporting a strict-mode schema failure as a failed step rather than
@@ -549,8 +600,7 @@ const plural = (n: number, word: string): string => `${n.toLocaleString()} ${wor
 const replicateReportingSchemaFailures = async (
   ctx: Readonly<DDContext>,
   settings: Parameters<typeof replicate>[0],
-  summary: string,
-  getCounts: () => Record<string, number> | undefined
+  summary: string
 ): Promise<StepOutput<DDContext>> => {
   try {
     await replicate(settings);
@@ -567,10 +617,12 @@ const replicateReportingSchemaFailures = async (
       // reading the server at the moment it stopped rather than why it stopped.
       status: 'failed',
       summary: message,
-      errors: [`${message} – ${counted.join(' and ')} recorded in ${SCHEMA_VALIDATION_ERRORS_FILENAME}. Strategy: ${summary}.`]
+      errors: [`${message} – ${counted.join(' and ')} recorded in ${SCHEMA_VALIDATION_ERRORS_FILENAME}. Strategy: ${summary}.`],
+      // The records it received before stopping were tested, and a failed step reports them like a passing one.
+      counts: { [RECORDS_TESTED]: recordsReceived(ctx) }
     };
   }
-  return { context: ctx as DDContext, summary, counts: getCounts() };
+  return { context: ctx as DDContext, summary };
 };
 
 const replicateTimestampDesc =
@@ -589,8 +641,7 @@ const replicateTimestampDesc =
         strategy: REPLICATION_STRATEGIES.TIMESTAMP_DESC,
         onProgress: progress.callback
       },
-      `Timestamp Descending with $top=${pageSize}`,
-      () => progress.getLastStats()
+      `Timestamp Descending with $top=${pageSize}`
     );
   };
 
@@ -606,8 +657,7 @@ const replicateNextLink =
         strategy: REPLICATION_STRATEGIES.NEXT_LINK,
         onProgress: progress.callback
       },
-      `NextLink with maxPageSize=${DEFAULT_PAGE_SIZE_V20}`,
-      () => progress.getLastStats()
+      `NextLink with maxPageSize=${DEFAULT_PAGE_SIZE_V20}`
     );
   };
 
@@ -626,13 +676,12 @@ const replicateNextLinkFiltered =
         orderby: 'ModificationTimestamp asc',
         onProgress: progress.callback
       },
-      `NextLink (modified-since filter, ${DEFAULT_YEARS_BACK}yr lookback)`,
-      () => progress.getLastStats()
+      `NextLink (modified-since filter, ${DEFAULT_YEARS_BACK}yr lookback)`
     );
   };
 
-/** Build the replication step with all strategies as test functions. */
-const replicateAndValidate = (config: DDConfig): PipelineStep<DDContext> => ({
+/** Build the replication step with all strategies as test functions. Exported so a test can see it ends with the record check. */
+export const replicateAndValidate = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Replicate and validate',
   // Init must run first (sequential), then replication strategies can run
   // in parallel if enabled. Default is sequential to avoid overloading servers.
@@ -650,11 +699,13 @@ const replicateAndValidate = (config: DDConfig): PipelineStep<DDContext> => ({
             const results = await Promise.all(fns.map(fn => fn(ctx, onProgress)));
             const summaries = results.map(r => r.summary).filter(Boolean);
             return { context: ctx, summary: summaries.join('; ') };
-          }
+          },
+          checkRecordsReceived
         ]
       : [
           replicateTimestampDesc(config),
-          ...(config.version !== '1.7' ? [replicateNextLink(config), replicateNextLinkFiltered(config)] : [])
+          ...(config.version !== '1.7' ? [replicateNextLink(config), replicateNextLinkFiltered(config)] : []),
+          checkRecordsReceived
         ])
   ]
 });
@@ -711,6 +762,7 @@ export const ddValidForCertification =
   steps =>
     allOf(
       everyStepPassed(steps),
+      testedAtLeastOneRecord(steps),
       versionCertifies(whyDDVersionDoesNotCertify(config.version)),
       // Relaxing strict is a legitimate thing to do while fixing a feed: the run keeps going and
       // accumulates every schema error instead of stopping at the first. What it cannot do is

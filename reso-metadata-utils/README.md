@@ -1,6 +1,6 @@
 # @reso-standards/reso-metadata-utils
 
-RESO OData metadata processing utilities: CSDL parsing, validation, EDMX → metadata-report serialization and live metadata fetching. This is the dependency-requiring side of the RESO metadata split ([reso-tools #221](https://github.com/RESOStandards/reso-tools)) – a sibling to [`@reso-standards/reso-common`](../reso-common/), which holds the zero-dependency metadata model and EDMX generation. Nothing here imports reso-common; the two are meant to be used together.
+RESO OData metadata processing utilities: CSDL parsing, validation, EDMX → metadata-report serialization and live metadata fetching. This is the dependency-requiring side of the RESO metadata split ([reso-tools #221](https://github.com/RESOStandards/reso-tools)) – a sibling to [`@reso-standards/reso-common`](https://tools.reso.org/packages/reso-common/), which holds the zero-dependency metadata model and EDMX generation. Nothing here imports reso-common; the two are meant to be used together.
 
 Its one runtime dependency is [`fast-xml-parser`](https://www.npmjs.com/package/fast-xml-parser).
 
@@ -93,4 +93,4 @@ npm test
 
 ## License
 
-See [LICENSE](./LICENSE) – the RESO End-user License Agreement.
+See [LICENSE](https://github.com/RESOStandards/reso-tools/blob/main/reso-metadata-utils/LICENSE) – the RESO End-user License Agreement.

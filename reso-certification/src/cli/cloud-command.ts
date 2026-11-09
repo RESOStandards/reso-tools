@@ -248,16 +248,21 @@ export const cloudTargetLabel = (config: CloudRunConfig): string | undefined => 
   return target === undefined ? undefined : `${target.recipientUoi}, system ${target.providerUsi}`;
 };
 
-const present = (value: string | undefined): boolean => typeof value === 'string' && value.trim() !== '';
+export const present = (value: string | undefined): boolean => typeof value === 'string' && value.trim() !== '';
+
+/** True when one complete set of RESO credentials is there: the OAuth2 client credentials, or the CERT_AUTH_API_* set. */
+export const hasCloudCredentials = (env: Readonly<Record<string, string | undefined>>): boolean => {
+  const clientCredentials = present(env.TOKEN_URI) && present(env.CLIENT_ID) && present(env.CLIENT_SECRET);
+  const providerToken = present(env.CERT_AUTH_API_BASE_URL) && present(env.CERT_AUTH_API_USERNAME) && present(env.CERTIFICATION_API_KEY);
+  return clientCredentials || providerToken;
+};
 
 /**
  * Why `--start-cloud-run` cannot send a pass, checked before the run so a long run is not wasted: RESO's service
  * address and one set of credentials have to be there. Names only, never values. `undefined` when all is set.
  */
 export const cloudRunPrerequisite = (env: Readonly<Record<string, string | undefined>>): string | undefined => {
-  const clientCredentials = present(env.TOKEN_URI) && present(env.CLIENT_ID) && present(env.CLIENT_SECRET);
-  const providerToken = present(env.CERT_AUTH_API_BASE_URL) && present(env.CERT_AUTH_API_USERNAME) && present(env.CERTIFICATION_API_KEY);
-  if (present(env.RESO_SERVICES_URL) && (clientCredentials || providerToken)) return undefined;
+  if (present(env.RESO_SERVICES_URL) && hasCloudCredentials(env)) return undefined;
   return (
     "--start-cloud-run sends a pass to RESO's service, so it needs RESO_SERVICES_URL and either TOKEN_URI, CLIENT_ID " +
     'and CLIENT_SECRET or the CERT_AUTH_API_* set, from your credentials file or the environment.'

@@ -178,7 +178,7 @@ const buildDataAvailabilityReport = (
   availability: Record<string, AvailabilityResource>,
   version: string,
   generatedOn: string
-): unknown => ({
+): Readonly<Record<string, unknown>> => ({
   description: 'RESO Data Availability Report (inferred from RESO Common Format samples)',
   version,
   generatedOn,
@@ -209,7 +209,7 @@ const peekVersion = async (input: string): Promise<string | undefined> => {
 export interface RcfResult {
   readonly version: string;
   readonly metadataReport: MetadataReport;
-  readonly dataAvailabilityReport: unknown;
+  readonly dataAvailabilityReport: Readonly<Record<string, unknown>>;
   readonly variations?: VariationsServiceReport;
   /** Set when variations was requested but degraded (non-auth service failure); reports still produced. */
   readonly variationsError?: string;

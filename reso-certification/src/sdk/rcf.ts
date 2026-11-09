@@ -13,10 +13,18 @@ import {
 } from '../cli/rcf-command.js';
 import { type RcfInputFingerprint, fingerprintRcfInput } from '../rcf/fingerprint.js';
 import { VARIATIONS_REPORT_FILENAME } from '../variations/constants.js';
-import { CERTIFIABLE, allOf, everyStepPassed, notCertifiable, versionCertifies } from './certification.js';
+import {
+  CERTIFIABLE,
+  RECORDS_TESTED,
+  allOf,
+  everyStepPassed,
+  notCertifiable,
+  testedAtLeastOneRecord,
+  versionCertifies
+} from './certification.js';
 import { whyDDVersionDoesNotCertify } from './dd-versions.js';
 import { createPipeline } from './pipeline.js';
-import { createDetailedReportGenerator, createGenericReportGenerator, writeReports } from './reports.js';
+import { createDetailedReportGenerator, createGenericReportGenerator, withSoftwareVersion, writeReports } from './reports.js';
 import { INFER_RCF_REPORTS, READ_RCF_INPUT, WRITE_REPORTS } from './step-names.js';
 import type { PipelineResult, PipelineStep, ProgressCallback, RcfConfig, StepResult, ValidForCertification } from './types.js';
 
@@ -54,6 +62,7 @@ export const rcfValidForCertification =
     const version = steps.find(step => step.name === INFER_RCF_REPORTS)?.params?.version;
     return allOf(
       everyStepPassed(steps),
+      testedAtLeastOneRecord(steps),
       typeof version === 'string' ? versionCertifies(whyDDVersionDoesNotCertify(version)) : CERTIFIABLE,
       schemaValidates(config)
         ? CERTIFIABLE
@@ -142,6 +151,7 @@ const inferReports = (config: RcfConfig): PipelineStep<RcfContext> => ({
         },
         counts: {
           records: s.totalRecords,
+          [RECORDS_TESTED]: s.totalRecords,
           resources: s.resources,
           fields: s.fields,
           lookups: s.lookups,
@@ -210,8 +220,8 @@ const writeRcfReports = (config: RcfConfig): PipelineStep<RcfContext> => ({
     const submittable = rcf ? submittableVariationsReport(rcf, context.identity, context.generatedOn) : undefined;
     const inferred: ReadonlyArray<readonly [string, unknown]> = rcf
       ? [
-          ['metadata-report.json', rcf.metadataReport],
-          ['data-availability-report.json', rcf.dataAvailabilityReport],
+          ['metadata-report.json', withSoftwareVersion(rcf.metadataReport)],
+          ['data-availability-report.json', withSoftwareVersion(rcf.dataAvailabilityReport)],
           ...(rcf.variations ? [[VARIATIONS_REPORT_FILENAME, rcf.variations] as const] : []),
           ...(submittable ? [[SUBMITTABLE_REPORT_FILENAME, submittable] as const] : [])
         ]

@@ -8,13 +8,30 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { addEditValidForCertification } from '../../src/sdk/add-edit.js';
-import { CERTIFIABLE, allOf, everyStepPassed, notCertifiable } from '../../src/sdk/certification.js';
+import { addEditValidForCertification, recordsWrittenBy } from '../../src/sdk/add-edit.js';
+import {
+  CERTIFIABLE,
+  NO_RECORDS_TESTED,
+  RECORDS_NOT_REPORTED,
+  RECORDS_TESTED,
+  allOf,
+  everyStepPassed,
+  notCertifiable,
+  testedAtLeastOneRecord
+} from '../../src/sdk/certification.js';
 import { coreValidForCertification } from '../../src/sdk/core.js';
-import { ddValidForCertification, runVariations } from '../../src/sdk/dd.js';
+import {
+  NO_RECORDS_RECEIVED,
+  checkRecordsReceived,
+  ddValidForCertification,
+  replicateAndValidate,
+  runVariations
+} from '../../src/sdk/dd.js';
 import { entityEventValidForCertification } from '../../src/sdk/entity-event.js';
 import { createPipeline } from '../../src/sdk/pipeline.js';
+import { rcfValidForCertification } from '../../src/sdk/rcf.js';
 import { createDetailedReportGenerator } from '../../src/sdk/reports.js';
+import { INFER_RCF_REPORTS, RUN_ADD_EDIT_SCENARIOS, RUN_CORE_SCENARIOS, RUN_ENTITY_EVENT_SCENARIOS } from '../../src/sdk/step-names.js';
 import type {
   AddEditConfig,
   CoreConfig,
@@ -22,8 +39,10 @@ import type {
   EntityEventConfig,
   PipelineResult,
   PipelineStep,
+  RcfConfig,
   StepResult,
-  StepStatus
+  StepStatus,
+  ValidForCertification
 } from '../../src/sdk/types.js';
 
 const step = (name: string, status: StepStatus, summary?: string): StepResult => ({
@@ -33,6 +52,9 @@ const step = (name: string, status: StepStatus, summary?: string): StepResult =>
   duration: 1,
   ...(summary ? { summary } : {})
 });
+
+/** The same step, reporting that it tested `records` records. A clean run has to, so every clean fixture below does. */
+const tested = (result: StepResult, records = 1): StepResult => ({ ...result, counts: { ...result.counts, [RECORDS_TESTED]: records } });
 
 const reasonsOf = (verdict: ReturnType<typeof everyStepPassed>): ReadonlyArray<string> => (verdict.valid ? [] : verdict.reasons);
 
@@ -98,7 +120,7 @@ describe('the Data Dictionary rule', () => {
     step('Generate metadata report', 'passed'),
     step('Validate DD metadata', 'passed'),
     step('Check variations', variationsStatus),
-    step('Replicate and validate', 'passed'),
+    tested(step('Replicate and validate', 'passed')),
     step('Write reports', 'passed')
   ];
 
@@ -188,7 +210,7 @@ describe('the Data Dictionary rule', () => {
 describe('the Web API Core rule', () => {
   const core = (version?: string): CoreConfig =>
     ({ endorsement: 'core', ...(version ? { version } : {}), server: { url: 'https://x', auth: {} } }) as unknown as CoreConfig;
-  const passed = [step('Resolve authentication', 'passed'), step('Run Core scenarios', 'passed')];
+  const passed = [step('Resolve authentication', 'passed'), tested(step('Run Core scenarios', 'passed'))];
 
   // Core routinely reports large skip counts — "219 passed, 0 failed, 112 skipped" — but those are
   // SCENARIO-level and live in the step's counts while the step itself passes. Remove this and a
@@ -199,7 +221,7 @@ describe('the Web API Core rule', () => {
       endorsement: 'core',
       status: 'passed',
       duration: 1,
-      counts: { passed: 219, failed: 0, skipped: 112 }
+      counts: { passed: 219, failed: 0, skipped: 112, [RECORDS_TESTED]: 2400 }
     };
 
     expect(coreValidForCertification(core('2.1.0'))([step('Resolve authentication', 'passed'), scenariosStep])).toEqual(CERTIFIABLE);
@@ -227,7 +249,11 @@ describe('the EntityEvent rule', () => {
     }) as EntityEventConfig;
 
   it('is valid for a full run in which every step passed', () => {
-    const steps = [step('Fetch metadata', 'passed'), step('Generate payloads', 'passed'), step('Run EntityEvent scenarios', 'passed')];
+    const steps = [
+      step('Fetch metadata', 'passed'),
+      step('Generate payloads', 'passed'),
+      tested(step('Run EntityEvent scenarios', 'passed'))
+    ];
     expect(entityEventValidForCertification(config('full'))(steps)).toEqual(CERTIFIABLE);
   });
 
@@ -257,19 +283,146 @@ describe('the Add/Edit rule', () => {
     }) as unknown as AddEditConfig;
 
   it('is valid when every step passed and NOT valid when one was skipped', () => {
-    expect(addEditValidForCertification(addEdit())([step('Run Add/Edit scenarios', 'passed')])).toEqual(CERTIFIABLE);
-    expect(addEditValidForCertification(addEdit())([step('Run Add/Edit scenarios', 'skipped')]).valid).toBe(false);
+    expect(addEditValidForCertification(addEdit())([tested(step('Run Add/Edit scenarios', 'passed'))])).toEqual(CERTIFIABLE);
+    expect(addEditValidForCertification(addEdit())([tested(step('Run Add/Edit scenarios', 'skipped'))]).valid).toBe(false);
   });
 
   it('is valid on 2.0.0, the one Add/Edit version', () => {
-    expect(addEditValidForCertification(addEdit('2.0.0'))([step('Run Add/Edit scenarios', 'passed')])).toEqual(CERTIFIABLE);
+    expect(addEditValidForCertification(addEdit('2.0.0'))([tested(step('Run Add/Edit scenarios', 'passed'))])).toEqual(CERTIFIABLE);
   });
 
   // There is no Add/Edit 1.0.0. The suite is 2.0.0's whatever a report is labeled, so another label does not certify.
   it('is NOT valid on a report labeled with any other version', () => {
-    expect(reasonsOf(addEditValidForCertification(addEdit('1.0.0'))([step('Run Add/Edit scenarios', 'passed')]))).toEqual([
+    expect(reasonsOf(addEditValidForCertification(addEdit('1.0.0'))([tested(step('Run Add/Edit scenarios', 'passed'))]))).toEqual([
       'RESO does not certify Web API Add/Edit 1.0.0.'
     ]);
+  });
+});
+
+/**
+ * No certification passes on zero records (Josh, 2026-11-04: "no Cert should work with 0 records across the board").
+ *
+ * Found on a Data Dictionary 2.1 cloud run that made one request, received no records and passed every step, because
+ * nothing in the Data Dictionary run counted what it received. Web API Core failed an empty REQUIRED resource, but a
+ * run on optional resources alone could still pass on none.
+ */
+describe('a run that tested no records', () => {
+  it('is certifiable when a step tested records, counting every step that reports them', () => {
+    expect(testedAtLeastOneRecord([tested(step('a', 'passed'), 0), tested(step('b', 'passed'), 3)])).toEqual(CERTIFIABLE);
+  });
+
+  it('is NOT certifiable at zero, and says why in words a provider can act on', () => {
+    expect(reasonsOf(testedAtLeastOneRecord([tested(step('a', 'passed'), 0)]))).toEqual([NO_RECORDS_TESTED]);
+  });
+
+  // A missing count is a refusal. Read as zero it would say the wrong thing, and read as fine it would certify a run
+  // nobody counted, which is the case this rule exists for.
+  it('is NOT certifiable when no step reported a count', () => {
+    expect(reasonsOf(testedAtLeastOneRecord([step('a', 'passed')]))).toEqual([RECORDS_NOT_REPORTED]);
+  });
+
+  it('is NOT certifiable when the count is not a number', () => {
+    expect(reasonsOf(testedAtLeastOneRecord([tested(step('a', 'passed'), Number.NaN)]))).toEqual([NO_RECORDS_TESTED]);
+  });
+
+  // Every endorsement composes the rule into its own. A new endorsement that left it out would fail here, once it is
+  // added to this table.
+  const testing = (name: string, records?: number): StepResult => {
+    const ran = { ...step(name, 'passed'), ...(name === INFER_RCF_REPORTS ? { params: { version: '2.1' } } : {}) };
+    return records === undefined ? ran : tested(ran, records);
+  };
+  const endorsements: ReadonlyArray<readonly [string, ValidForCertification, string]> = [
+    [
+      'Data Dictionary',
+      ddValidForCertification({ endorsement: 'dd', version: '2.1', server: { url: 'https://x', auth: {} } } as unknown as DDConfig),
+      'Replicate and validate'
+    ],
+    [
+      'Web API Core',
+      coreValidForCertification({ endorsement: 'core', server: { url: 'https://x', auth: {} } } as unknown as CoreConfig),
+      RUN_CORE_SCENARIOS
+    ],
+    ['RESO Common Format', rcfValidForCertification({ endorsement: 'rcf', version: '2.1' } as unknown as RcfConfig), INFER_RCF_REPORTS],
+    [
+      'Add/Edit',
+      addEditValidForCertification({ endorsement: 'add-edit', server: { url: 'https://x', auth: {} } } as unknown as AddEditConfig),
+      RUN_ADD_EDIT_SCENARIOS
+    ],
+    [
+      'EntityEvent',
+      entityEventValidForCertification({
+        endorsement: 'entity-event',
+        mode: 'full',
+        server: { url: 'https://x', auth: { mode: 'bearer', token: 't' } }
+      } as EntityEventConfig),
+      RUN_ENTITY_EVENT_SCENARIOS
+    ]
+  ];
+
+  it.each(endorsements)('%s certifies a clean run that tested records, and refuses the same run at zero or uncounted', (_, rule, name) => {
+    const run = (records?: number) => [step('Resolve authentication', 'passed'), testing(name, records)];
+    expect(rule(run(5))).toEqual(CERTIFIABLE);
+    expect(reasonsOf(rule(run(0)))).toEqual([NO_RECORDS_TESTED]);
+    expect(reasonsOf(rule(run()))).toEqual([RECORDS_NOT_REPORTED]);
+  });
+});
+
+/** Add/Edit counts the records its succeeds scenarios acted on. Counted wrong, every Add/Edit run would fail at zero. */
+describe('the records an Add/Edit run wrote', () => {
+  it('counts each succeeds scenario that passed, and nothing else', () => {
+    expect(
+      recordsWrittenBy([
+        { scenario: 'create-succeeds-representation', passed: true },
+        { scenario: 'create-succeeds-minimal', passed: true },
+        { scenario: 'update-succeeds-minimal', passed: false },
+        { scenario: 'create-fails', passed: true },
+        { scenario: 'delete-succeeds', passed: true },
+        { scenario: 'delete-fails', passed: true }
+      ])
+    ).toBe(3);
+  });
+
+  it('is zero when only the scenarios that should fail ran, or none did', () => {
+    expect(recordsWrittenBy([{ scenario: 'update-fails', passed: true }])).toBe(0);
+    expect(recordsWrittenBy([])).toBe(0);
+  });
+});
+
+/** The Data Dictionary step that counts what replication received, from the replicator's own log of responses. */
+describe('the Data Dictionary record check', () => {
+  const ctx = (replicationStateService?: unknown) =>
+    ({
+      serverUrl: 'https://example.org',
+      outputPath: '/tmp/none',
+      version: '2.1',
+      ...(replicationStateService === undefined ? {} : { replicationStateService })
+    }) as unknown as Parameters<typeof checkRecordsReceived>[0];
+  const received = (...recordCounts: ReadonlyArray<number>) => ({ getResponses: () => recordCounts.map(recordCount => ({ recordCount })) });
+
+  it('passes and counts every record received, across every strategy', async () => {
+    const output = await checkRecordsReceived(ctx(received(2, 3)), () => {});
+    expect(output.status ?? 'passed').toBe('passed');
+    expect(output.counts?.[RECORDS_TESTED]).toBe(5);
+  });
+
+  // The case that was found: one request, no records, and every step passed.
+  it('fails when the server returned no records, and says so plainly', async () => {
+    const output = await checkRecordsReceived(ctx(received()), () => {});
+    expect(output.status).toBe('failed');
+    expect(output.summary).toBe(NO_RECORDS_RECEIVED);
+    expect(output.counts?.[RECORDS_TESTED]).toBe(0);
+  });
+
+  // The check only counts if the step runs it, last, after every strategy, whichever way the strategies run.
+  it.each([false, true])('ends the replication step, with parallelReplicate %s', parallelReplicate => {
+    const config = { endorsement: 'dd', version: '2.1', parallelReplicate, server: { url: 'https://x', auth: {} } } as unknown as DDConfig;
+    expect(replicateAndValidate(config).functions?.at(-1)).toBe(checkRecordsReceived);
+  });
+
+  it('fails when there is no record of replication at all, rather than assuming it went fine', async () => {
+    const output = await checkRecordsReceived(ctx(), () => {});
+    expect(output.status).toBe('failed');
+    expect(output.counts?.[RECORDS_TESTED]).toBe(0);
   });
 });
 
