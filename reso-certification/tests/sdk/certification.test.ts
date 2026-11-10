@@ -172,13 +172,29 @@ describe('the Data Dictionary rule', () => {
   // A sample limit is for local testing: the run measured part of the feed. Only a limit the configuration set
   // counts. The default the SDK applies when none is set is not a limit the run chose, so an absent limit is an
   // ordinary run, and the CLI leaves it absent rather than filling the default in.
-  it('is NOT valid when the run set a sample limit, even though every step passed, and valid when none was set', () => {
+  it('is NOT valid when the run set a sample limit below the default, even though every step passed, and valid when none was set', () => {
     const verdict = ddValidForCertification({ ...strict, limit: 5000 } as DDConfig)(ddSteps('passed'));
     expect(verdict.valid).toBe(false);
     expect(reasonsOf(verdict)).toEqual([
-      "The run used a sample limit of 5000 records per resource, from --limit or the config entry's ddOptions.limit. A limit is for local testing, so this run is not eligible for certification and no cloud run can start from it. Remove the limit and run it again."
+      "The run used a sample limit of 5000 records per resource, from --limit or the config entry's ddOptions.limit, below the 100,000 that certification samples. A smaller sample is for local testing, so this run is not eligible for certification and no cloud run can start from it. Remove the limit, or raise it to 100,000 or more, and run it again."
     ]);
     expect(ddValidForCertification({ ...strict, limit: undefined } as DDConfig)(ddSteps('passed'))).toEqual(CERTIFIABLE);
+  });
+
+  // RESO samples up to 100,000 records per resource, and providers asked to go higher for a more accurate sample
+  // (Josh, 2026-11-09: "we let them go higher, just not lower unless they don't have records"). A limit at or above
+  // the default is that larger sample and certifies; a server with fewer records gives all it has either way.
+  it('is valid when the run set a sample limit at or above the default of 100,000', () => {
+    expect(ddValidForCertification({ ...strict, limit: 100000 } as DDConfig)(ddSteps('passed'))).toEqual(CERTIFIABLE);
+    expect(ddValidForCertification({ ...strict, limit: 250000 } as DDConfig)(ddSteps('passed'))).toEqual(CERTIFIABLE);
+    expect(ddValidForCertification({ ...strict, limit: 99999 } as DDConfig)(ddSteps('passed')).valid).toBe(false);
+  });
+
+  // Fail closed: a limit that is not a whole number cannot be shown to be at or above the default.
+  it('is NOT valid when the sample limit is not a whole number', () => {
+    for (const limit of [Number.NaN, Number.POSITIVE_INFINITY, 150000.5, -1, 0]) {
+      expect(ddValidForCertification({ ...strict, limit } as DDConfig)(ddSteps('passed')).valid).toBe(false);
+    }
   });
 
   // Both reasons survive: an operator fixing one should not have to re-run to discover the next.

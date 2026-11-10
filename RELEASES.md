@@ -4,6 +4,17 @@
 
 ## Unreleased
 
+### Data Dictionary: a larger sample certifies
+
+- **Certification samples up to 100,000 records per resource, and a provider may raise that for a more accurate
+  sample.** A run with `--limit` or a config entry's `ddOptions.limit` of 100,000 or more is now eligible for
+  certification, and a cloud run started from it samples the same number. Before this, any limit, larger ones
+  included, made the run ineligible.
+- **A limit below 100,000 is unchanged:** it is for local testing, its verdict says the run is not eligible, and it
+  starts no cloud run. A server with fewer than 100,000 records in a resource still gives all it has, which
+  certifies as before.
+- A limit that is not a whole number counts as below 100,000.
+
 ### The reference server can serve your own resources, read-only
 
 - **`RESOURCES`** chooses the resources a deployment serves, by name. Define them in the metadata file and list them
