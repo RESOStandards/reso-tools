@@ -16,7 +16,6 @@ import {
   resolveCertApiOrigin,
   runArchiveReport
 } from '../../src/cli/archive-report-command.js';
-import { resolveCertApiCredential } from '../../src/cli/cert-api-credential.js';
 import { __clearSecretsForTest, maskSecrets } from '../../src/cli/secrets.js';
 
 const ORIGIN = 'https://cert-api.example.org';
@@ -25,9 +24,11 @@ const REPORT_ID = 'AbC123_-xyz';
 const PROVIDER = 'T00000001';
 const RECIPIENT = 'M00000002';
 
+// The origin from TOKEN_URI, and a bearer token given directly, so these tests stay on archiving. Minting a
+// token from client credentials, and where CLIENT_SECRET may go, are tested in cert-api-credential.test.ts.
 const env = (overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv => ({
   TOKEN_URI: `${ORIGIN}/api/v1/oauth/token`,
-  CLIENT_SECRET: CREDENTIAL,
+  CERT_API_TOKEN: CREDENTIAL,
   ...overrides
 });
 
@@ -147,21 +148,6 @@ describe('the Cert API origin', () => {
 
   it('refuses a --url that carries a path, rather than trimming it', () => {
     expect(() => resolveCertApiOrigin({ url: `${ORIGIN}/api/v1`, env: env() })).toThrow(/without a path/);
-  });
-});
-
-describe('the credential', () => {
-  it('is CLIENT_SECRET first, then CERTIFICATION_API_KEY, as restore resolves it', () => {
-    expect(resolveCertApiCredential({ CLIENT_SECRET: 'from-file', CERTIFICATION_API_KEY: 'older' })).toBe('from-file');
-    expect(resolveCertApiCredential({ CERTIFICATION_API_KEY: 'older' })).toBe('older');
-    expect(resolveCertApiCredential({})).toBeUndefined();
-  });
-
-  it('treats an empty or blank value as absent, so it never becomes a bare Bearer and never shadows the other variable', () => {
-    expect(resolveCertApiCredential({ CLIENT_SECRET: '', CERTIFICATION_API_KEY: 'older' })).toBe('older');
-    expect(resolveCertApiCredential({ CLIENT_SECRET: '   ' })).toBeUndefined();
-    expect(resolveCertApiCredential({ CERTIFICATION_API_KEY: '' })).toBeUndefined();
-    expect(resolveCertApiCredential({ CLIENT_SECRET: ' from-file\n' })).toBe('from-file');
   });
 });
 
@@ -439,7 +425,7 @@ describe('refusals before any request', () => {
 
   it('refuses an empty credential the same way, rather than presenting a bare Bearer', async () => {
     const api = certApi();
-    await expect(run(api, { env: env({ CLIENT_SECRET: '' }) })).rejects.toThrow(/CLIENT_SECRET/);
+    await expect(run(api, { env: env({ CERT_API_TOKEN: '' }) })).rejects.toThrow(/CLIENT_SECRET/);
     expect(api).not.toHaveBeenCalled();
   });
 
