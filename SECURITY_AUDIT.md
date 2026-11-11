@@ -4,6 +4,27 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
+## Certification 0.12.2 Security Notes – 2026-11-10
+
+Pre-publish review of `@reso-standards/reso-certification` 0.12.2, covering every change since 0.12.1: a Data Dictionary sample limit of 100,000 or more now certifies, and a cloud run started from such a run carries the limit.
+
+### Findings Addressed
+
+- None. The review found nothing to fix.
+
+### Checked and Clean
+
+- **The limit rule fails closed:** one function decides it (`isDDLimitBelowDefault`), and the verdict, the `--limit` refusal and the cloud run refusal all call it. Anything other than a whole number of 100,000 or more counts as below the default: zero, negatives, fractions, NaN and Infinity, and a `--limit` that is not a number.
+- **The cloud entry:** the limit travels as `ddOptions.limit`, a number the configuration already held. No credential, path or host is added.
+- **Supply chain:** no dependency changed since 0.12.1. `npm audit` reports one low-severity advisory published on 2026-11-10, GHSA-474x-hrwr-fgx4 in `fast-xml-parser` 5.11.2 (fixed in 5.12.0). By its own description it "needs the non-default stopNodes option", and neither XML parser in this package or in `reso-metadata-utils` sets `stopNodes`, so it does not reach either. The update to 5.12.0 follows separately.
+- **Package contents:** `npm pack --dry-run` lists 554 files under the `files` allowlist (`dist`, the license, the README, the sample metadata and the schemas): no tests, fixtures, environment files or run output. The four added since 0.12.1 are the new `dd-sample-limit` module's build output.
+
+### Method
+
+Review of every change since 0.12.1 against the built package: `npm audit`, `npm pack --dry-run` with a scan of the listed files, the full test suite (3,431 tests across 8 packages, 2,312 in this package), lint and typecheck.
+
+---
+
 ## Certification 0.12.1 Security Notes – 2026-11-09
 
 Pre-publish review of `@reso-standards/reso-certification` 0.12.1, covering every change since 0.12.0: following cloud runs live (`reso-cert cloud watch` and `subscribeToCloudUpdates`), refusing certification for a run that tested no records, the `softwareVersion` stamp on reports, and documentation.
