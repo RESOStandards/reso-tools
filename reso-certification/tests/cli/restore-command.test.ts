@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 
-import { resolveCertApiCredential } from '../../src/cli/cert-api-credential.js';
 import { deriveReportType, findBackupReports, readBackupReport } from '../../src/cli/restore-command.js';
 
 const backupFixture = (): string => {
@@ -56,21 +55,5 @@ describe('deriveReportType', () => {
   it('refuses a directory that names no endorsement, such as an archived record', () => {
     expect(deriveReportType('archived-1.7', '1.7')).toBeUndefined();
     expect(deriveReportType('nodashes', '1.7')).toBeUndefined();
-  });
-});
-
-describe('resolveCertApiCredential, as restore uses it', () => {
-  it('prefers the value the downloaded credentials file carries', () => {
-    expect(resolveCertApiCredential({ CLIENT_SECRET: 'from-file', CERTIFICATION_API_KEY: 'older' })).toBe('from-file');
-  });
-
-  it('falls back to the older variable, and is undefined with neither', () => {
-    expect(resolveCertApiCredential({ CERTIFICATION_API_KEY: 'older' })).toBe('older');
-    expect(resolveCertApiCredential({})).toBeUndefined();
-  });
-
-  it('reads an empty or blank value as absent, which is what restore already refused', () => {
-    expect(resolveCertApiCredential({ CLIENT_SECRET: '', CERTIFICATION_API_KEY: 'older' })).toBe('older');
-    expect(resolveCertApiCredential({ CLIENT_SECRET: '  ', CERTIFICATION_API_KEY: '' })).toBeUndefined();
   });
 });

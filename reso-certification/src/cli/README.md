@@ -54,9 +54,10 @@ environment a command will write to, look at the host in `TOKEN_URI`.
 | `RESO_SERVICES_URL` | `find-variations`, `rcf`, `update-variations`, the variations-review commands, the `cloud` commands | Base URL of RESO's services, the Variations Service and cloud runs. Same for every environment. |
 | `RESO_CLOUD_UPDATES_URL` | `cloud watch` | Address of RESO's live updates on cloud runs, a `wss://` address. A bare host is read as `wss`, and a `ws` address is upgraded unless it is on your own machine. |
 | `TOKEN_URI` | the same commands, and `archive-report` | OAuth2 token endpoint. **This is what selects QA versus production.** `archive-report` also reads the Cert API host off it. |
-| `CLIENT_ID`, `CLIENT_SECRET` | the same commands, `restore` and `archive-report` | OAuth2 client credentials the token is minted from. `restore` and `archive-report` present `CLIENT_SECRET` to the Cert API as it is. |
+| `CLIENT_ID`, `CLIENT_SECRET` | the same commands, `restore` and `archive-report` | OAuth2 client credentials the token is minted from. `restore` and `archive-report` send `CLIENT_SECRET` only to the token endpoint of the Cert API they call, and present the token it returns. |
+| `CERT_API_TOKEN` | `restore` and `archive-report` | A bearer token for the Cert API, used as it is instead of minting one. Set it in the environment or the `.env`; there is no flag, so it never lands in shell history. |
 | `FT_ADMIN_SECRET` | `update-variations --fast-track` | Fast Track admin credential. A fast-track submission is refused without it, before any request is made. |
-| `CERT_AUTH_API_BASE_URL`, `CERT_AUTH_API_USERNAME`, `CERTIFICATION_API_KEY`, `CURRENT_PROVIDER_UOI` | the SDK's provider-token fallback, and `CERTIFICATION_API_KEY` by `restore` and `archive-report` when `CLIENT_SECRET` is absent | The second auth path, used when the OAuth2 variables are absent. |
+| `CERT_AUTH_API_BASE_URL`, `CERT_AUTH_API_USERNAME`, `CERTIFICATION_API_KEY`, `CURRENT_PROVIDER_UOI` | the SDK's provider-token fallback, and `CERTIFICATION_API_KEY` by `restore` and `archive-report` when neither `CERT_API_TOKEN` nor the client credentials are set | The second auth path, used when the OAuth2 variables are absent. |
 | `RESO_VARIATIONS_HANDLER` | the variations step of `dd`, `find-variations` and `rcf` | For a host that runs the SDK: the path of a module whose `computeVariations` computes variations in place of the Variations Service, so no service address or token is needed. Unset, the service is called as usual. See the [package README](https://tools.reso.org/packages/reso-certification/#computing-variations-with-your-own-module). |
 
 **Two auth paths, in that order.** A command first tries an OAuth2 client-credentials token from
@@ -91,7 +92,7 @@ different thing from the RESO service credentials above.
 | [`variations-review-status`](#variations-review-status) | Where each variations submission stands (read-only) |
 | [`cloud status`](#cloud-status) | Your cloud runs and where each stands (read-only) |
 | [`cloud watch`](#cloud-watch) | Follow your cloud runs live, and wait on many with `--until-done` (read-only) |
-| [`restore`](#restore) | Restore a certification server backup to a Cert API (admin) |
+| [`restore`](#restore) | Restore to a Cert API: a run's stored results, published as the run would have, or a certification server backup (admin) |
 | [`archive-report`](#archive-report) | Archive a certification report, with the site's warning first, and only with `--confirm` |
 
 The first four are **endorsement runners** (a full compliance pipeline against a live
@@ -474,34 +475,61 @@ than half-applied, so you never have to work out which rows landed.
 
 ### `restore`
 
-Restore a certification server backup to a Cert API: walk the backup, decompress each report and post it
-to the restore endpoint, then print what was found and what was sent.
+Restore to a Cert API from a local directory. What the directory holds decides what is restored:
+
+- **A run's stored results** are published as the run itself would have published them.
+- **A certification server backup** is walked, and each report is posted to the restore endpoint as it is.
+
+Both start as a dry run that prints what would be sent, and send nothing without `--execute`.
 
 ```bash
-reso-cert restore --path <backup root> --url <cert api> [--execute] [--limit n] [--derive-missing-type]
+reso-cert restore --path <dir> [--url <cert api>] [--execute] [--notify-provider] [--limit n]
 ```
 
 | Option | Meaning |
 |---|---|
-| `--path <dir>` | The backup root, the directory holding the endorsement-type folders. Required. |
-| `--url <url>` | Base URL of the Cert API. Required. |
+| `--path <dir>` | A stored run, or any directory above stored runs; or a backup root. Required. |
+| `--url <url>` | The Cert API origin. Without it, the origin of `TOKEN_URI` in the credentials file. |
 | `--execute` | Actually send. Without it the command is a dry run and nothing is posted. |
-| `--limit <n>` | Stop after this many reports, for a smoke test. |
-| `--concurrency <n>` | Reports in flight at once. Default 4. |
-| `--ledger <path>` | Where restored reports are recorded. Default `.restore-ledger` in the backup root. |
-| `--derive-missing-type` | Supply a missing report type, only where the directory and the report's own version agree. |
+| `--notify-provider` | Stored runs: email each provider the passed notice, once both of its reports are on file. |
+| `--limit <n>` | Stop after this many runs or reports, for a smoke test. |
+| `--ledger <path>` | Where restored runs or reports are recorded. Default `.restore-ledger` in `--path`. |
+| `--concurrency <n>` | Backups: reports in flight at once. Default 4. |
+| `--derive-missing-type` | Backups: supply a missing report type, only where the directory and the report's own version agree. |
 
-- **A rerun resumes.** Every report that lands is recorded in the ledger, and a later run skips it.
+**A stored run** is a results directory kept in the layout the results store uses:
+
+```
+<endorsement>-<version>/<providerUoi>-<providerUsi>/<recipientUoi>/<run>/
+    metadata-report.json  data-availability-report.json  report.json  ...
+```
+
+- **Whose run it is comes from that path,** never from a flag that could disagree with it. A directory that
+  holds a run's files without the layout is skipped and named.
+- **Only a Data Dictionary run that passed and is certifiable** is published, as `report.json` records it. A
+  failed result posted over a provider's standing passed report would replace it, so a failed run is
+  refused. A certified or revoked report is never replaced by the API.
+- **It publishes as the run would have:** the metadata report, cut to the keys the report route accepts, then
+  the availability report against the report id that post returned. The provider is emailed only with
+  `--notify-provider`, after both reports are on file.
+
+**A backup** is the root holding the endorsement-type folders.
+
 - **Archived reports are recognized by where they sit.** The backup keeps them under their own
   `archived/` tree, and there is no flag that could mark a live report archived.
 - **A report written before the type field existed is refused by the server** unless
   `--derive-missing-type` supplies the type. It is supplied only when the endorsement directory's version
   matches the version inside the report. One source alone would be a guess.
-- **The credential is `CLIENT_SECRET`,** as the downloaded credentials file carries it, or
-  `CERTIFICATION_API_KEY`. A dry run needs neither. With neither, an `--execute` run stops before it
-  reads the backup.
-- **Exit code** `0` when everything was sent or would be, `1` when any report failed and `2` on an error
-  such as a missing credential.
+
+For both:
+
+- **A rerun resumes.** Every run or report that lands is recorded in the ledger, and a later run skips it.
+- **The credential comes from the credentials file.** The command exchanges `CLIENT_ID` and `CLIENT_SECRET`
+  at the Cert API's own token endpoint (`TOKEN_URI`) and presents the token it gets back. `CLIENT_SECRET`
+  is sent nowhere else, and a `TOKEN_URI` on another host than the Cert API is refused before any request.
+  `CERT_API_TOKEN` gives a bearer token directly instead. A dry run needs no credential.
+- **Exit code** `0` when everything was sent or would be, `1` when any run or report failed or was refused,
+  and `2` on an error such as a missing credential.
 
 ## Certification reports
 

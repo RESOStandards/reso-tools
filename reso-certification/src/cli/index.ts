@@ -17,6 +17,7 @@
 // like RESO_SERVICES_URL populated when they destructure process.env.
 import { ENV_BOOTSTRAP } from './env-bootstrap.js';
 
+import { appendFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
@@ -76,6 +77,7 @@ import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { addEditSelectionOf } from './add-edit-options.js';
 import { type ArchiveReportResult, archiveExitCode, runArchiveReport } from './archive-report-command.js';
 import { mintOAuth2ClientCredentialsToken, resolveCliAuth } from './auth.js';
+import { resolveCertApiAuthorization, resolveCertApiOrigin } from './cert-api-credential.js';
 import {
   type CloudOfferIo,
   type RanEntry,
@@ -100,7 +102,8 @@ import {
 } from './rcf-command.js';
 import { resolveRenderMode, resultsOf, runConfigEntries, runWithProgress, stoppedOf } from './render.js';
 import { REPLICATION_STRATEGY_VALUES, runReplicate } from './replicate-command.js';
-import { runRestore } from './restore-command.js';
+import { readLedger, runRestore } from './restore-command.js';
+import { findStoredRuns, runRunRestore } from './restore-runs.js';
 import { formatResultJson } from './result-json.js';
 import { generateSchemaFromReport, loadSettings, validateSchemaPayload } from './schema-command.js';
 import { maskSecrets } from './secrets.js';
@@ -2099,19 +2102,24 @@ program
 
 program
   .command('restore')
-  .description('Restore a certification server backup to a Cert API instance')
-  .requiredOption('--path <dir>', 'Backup root, the directory holding the endorsement-type folders')
-  .requiredOption('--url <url>', 'Base URL of the Cert API')
+  .description("Restore to a Cert API: a run's stored results, published as the run would have, or a certification server backup")
+  .requiredOption(
+    '--path <dir>',
+    'A stored run, or any directory above stored runs (<endorsement>-<version>/<providerUoi>-<providerUsi>/<recipientUoi>/<run>); or a backup root holding endorsement-type folders'
+  )
+  .option('--url <url>', 'Cert API origin. Without it, the origin of TOKEN_URI in the credentials file')
   .option('--execute', 'Actually send. Without it this is a dry run and nothing is posted.')
-  .option('--limit <n>', 'Stop after this many reports, for a smoke test')
-  .option('--concurrency <n>', 'Reports in flight at once', '4')
+  .option('--notify-provider', 'Stored runs: email each provider the passed notice once both reports are on file')
+  .option('--limit <n>', 'Stop after this many runs or reports, for a smoke test')
+  .option('--concurrency <n>', 'Backups: reports in flight at once', '4')
   .option('--ledger <path>', 'Where restored keys are recorded so a re-run resumes')
-  .option('--derive-missing-type', 'Supply a missing report type where the directory and the document version agree')
+  .option('--derive-missing-type', 'Backups: supply a missing report type where the directory and the document version agree')
   .action(
     async (opts: {
       path: string;
-      url: string;
+      url?: string;
       execute?: boolean;
+      notifyProvider?: boolean;
       limit?: string;
       concurrency: string;
       ledger?: string;
@@ -2126,16 +2134,65 @@ program
         if (!Number.isInteger(concurrency) || concurrency <= 0) {
           throw new Error(`--concurrency must be a positive integer, got '${opts.concurrency}'`);
         }
+        const origin = resolveCertApiOrigin({ ...(opts.url === undefined ? {} : { url: opts.url }), env: process.env });
+        // CLIENT_SECRET only ever goes to this origin's token endpoint; every post carries the token it returns.
+        const authorize = (): Promise<string> => resolveCertApiAuthorization({ env: process.env, origin });
+        const ledgerPath = opts.ledger ?? `${opts.path.replace(/\/+$/, '')}/.restore-ledger`;
+        const execute = Boolean(opts.execute);
+
+        const stored = findStoredRuns(opts.path);
+        if (stored.runs.length > 0 || stored.unplaced.length > 0) {
+          const { outcomes, unplaced } = await runRunRestore(
+            {
+              path: opts.path,
+              origin,
+              execute,
+              notifyProvider: Boolean(opts.notifyProvider),
+              done: readLedger(ledgerPath),
+              record: key => appendFileSync(ledgerPath, `${key}\n`),
+              authorize,
+              ...(limit === undefined ? {} : { limit })
+            },
+            (line: string) => console.error(line)
+          );
+          console.log(execute ? 'Restore of stored runs' : 'DRY RUN - nothing was sent');
+          console.log(`  Cert API       : ${origin}`);
+          console.log(`  provider email : ${opts.notifyProvider ? 'yes, once both reports are on file' : 'no'}`);
+          for (const outcome of outcomes) {
+            const { endorsement, version, providerUoi, providerUsi, recipientUoi } = outcome.identity;
+            const who = `${endorsement} ${version}, provider ${providerUoi} (${providerUsi}), recipient ${recipientUoi}`;
+            const what =
+              outcome.status === 'published'
+                ? `published as report ${outcome.reportId}`
+                : outcome.status === 'would-publish'
+                  ? 'would publish'
+                  : outcome.status === 'already-done'
+                    ? 'already restored (in the ledger)'
+                    : `${outcome.status}: ${outcome.reason}`;
+            console.log(`\n  ${outcome.key}\n    ${who}\n    ${what}`);
+            if (outcome.droppedKeys && outcome.droppedKeys.length > 0) {
+              console.log(`    left out of the metadata post, which the API refuses: ${outcome.droppedKeys.join(', ')}`);
+            }
+          }
+          for (const path of unplaced) {
+            console.error(
+              `\n  skipped ${path}: it holds a run's files but not the stored layout, so whose run it is cannot be read from its path`
+            );
+          }
+          if (outcomes.some(o => o.status === 'failed' || o.status === 'refused') || unplaced.length > 0) process.exitCode = 1;
+          return;
+        }
 
         const summary = await runRestore(
           {
             path: opts.path,
-            url: opts.url,
-            execute: Boolean(opts.execute),
+            url: origin,
+            execute,
             ...(limit === undefined ? {} : { limit }),
             concurrency,
             deriveMissingType: Boolean(opts.deriveMissingType),
-            ledgerPath: opts.ledger ?? `${opts.path.replace(/\/+$/, '')}/.restore-ledger`
+            ledgerPath,
+            authorize
           },
           (line: string) => console.error(line)
         );
