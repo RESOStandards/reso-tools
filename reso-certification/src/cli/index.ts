@@ -852,8 +852,9 @@ const ddCmd = program
   )
   .option(
     '--limit <n>',
-    'Max records to replicate per resource, a sample limit for local testing: a run with one is NOT eligible for certification ' +
-      "and starts no cloud run (default: the config entry's ddOptions.limit, else 100000)"
+    'Max records to replicate per resource. Certification samples up to 100000; a higher limit is a larger sample and certifies. ' +
+      'A limit below 100000 is for local testing: the run is NOT eligible for certification and starts no cloud run ' +
+      "(default: the config entry's ddOptions.limit, else 100000)"
   )
   // Strict is the default, so `--strict` is a no-op kept for compatibility and `--no-strict` is the
   // real switch. BOTH are declared rather than `--no-strict` alone: declaring only the negation makes
@@ -959,9 +960,9 @@ ddCmd.action(
             ...(servicesAuthToken ? { servicesAuthToken } : {}),
             server: { ...baseConfig.server, auth },
             // Only set when the flag was passed; the entry's own ddOptions.limit stands otherwise, and with
-            // neither the SDK applies its default (100000). A limit is a sample for local testing, so the SDK
-            // tells one that was set from the default by its presence: filling the default in here made every
-            // entry carry a limit, which the verdict, the cloud path and the service refuse.
+            // neither the SDK applies its default (100000). A limit below the default is a sample for local
+            // testing, so the SDK tells one that was set from the default by its presence: filling the default in
+            // here made every entry carry a limit, which the verdict and the cloud path judge (dd-sample-limit.ts).
             ...(opts.limit !== undefined ? { limit: Number(opts.limit) } : {}),
             // Tested against undefined, not for truthiness: `--no-strict` sets this to `false`, which a
             // truthiness test drops, so the flag would be accepted on the command line and then

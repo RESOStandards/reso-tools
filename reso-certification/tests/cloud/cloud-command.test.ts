@@ -396,4 +396,12 @@ describe('ddFlagsRefusedBeforeRun', () => {
     expect(why).toMatch(/Remove --limit/);
     expect(why).not.toContain('config file');
   });
+
+  // A limit at or above the default is a larger sample, which certifies, so it may start a cloud run.
+  it('lets --limit at or above the default of 100,000 go on, and refuses one that is not a whole number', () => {
+    expect(ddFlagsRefusedBeforeRun({ limit: '100000' })).toBeUndefined();
+    expect(ddFlagsRefusedBeforeRun({ limit: '250000' })).toBeUndefined();
+    expect(ddFlagsRefusedBeforeRun({ limit: '99999' })).toMatch(/--limit/);
+    expect(ddFlagsRefusedBeforeRun({ limit: 'lots' })).toMatch(/--limit/);
+  });
 });

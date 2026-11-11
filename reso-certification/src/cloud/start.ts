@@ -266,8 +266,8 @@ export const reserveForLocalRun = async (
   const reserve = overrides.reserve ?? reserveCloudRun;
   const label = labelOf({ ...input, certificationRequestId: '' }, 0);
   if (!isSuccessfulRun(input.result)) throw refusal(label, whyNotSuccessful(input.result));
-  // Read from the configuration, not the verdict: a result that calls a limited run certifiable, from another
-  // engine or by hand, reserves nothing either. The limit is for local testing.
+  // Read from the configuration, not the verdict: a result that calls a run limited below the default certifiable,
+  // from another engine or by hand, reserves nothing either. A limit below the default is for local testing.
   const limited = ddSampleLimitRefusal(input.config);
   if (limited !== undefined) throw refusal(label, limited);
   const record = localRunRecordOf(input.result, input.config);

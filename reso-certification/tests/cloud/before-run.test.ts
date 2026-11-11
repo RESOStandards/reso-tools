@@ -67,6 +67,12 @@ describe('whyNoCloudRunBeforeRun', () => {
     expect(whyNoCloudRunBeforeRun(dd({ limit: undefined }))).toBeUndefined();
   });
 
+  it('lets a Data Dictionary entry go on with a sample limit at or above the default, a larger sample', () => {
+    expect(whyNoCloudRunBeforeRun(dd({ limit: 100000 }))).toBeUndefined();
+    expect(whyNoCloudRunBeforeRun(dd({ limit: 250000 }))).toBeUndefined();
+    expect(whyNoCloudRunBeforeRun(dd({ limit: 99999 }))).toMatch(/sample limit of 99999 records per resource/);
+  });
+
   it('refuses a version RESO does not certify, for the endorsements that have one', () => {
     expect(whyNoCloudRunBeforeRun(dd({ version: '1.7' }))).toMatch(/cannot be certified/);
     // Core 2.0.0 is supported and runs as a retest: certification is on the latest 2.x.

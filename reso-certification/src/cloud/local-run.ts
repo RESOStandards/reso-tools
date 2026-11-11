@@ -13,6 +13,7 @@
 import { type AddEditAction, type AddEditFormats, type AddEditTestPlan, payloadsFor, planAddEditTests } from '../add-edit/plan.js';
 import { CURRENT_ADD_EDIT_VERSION, whyAddEditVersionDoesNotCertify } from '../sdk/add-edit-versions.js';
 import { coerceCoreVersion, whyCoreVersionDoesNotCertify } from '../sdk/core-versions.js';
+import { DD_DEFAULT_SAMPLE_LIMIT_TEXT, isDDLimitBelowDefault } from '../sdk/dd-sample-limit.js';
 import { whyDDVersionDoesNotCertify } from '../sdk/dd-versions.js';
 import { serializeDDRemarks } from '../sdk/dd.js';
 import { serializeRcfRemarks } from '../sdk/rcf.js';
@@ -377,15 +378,17 @@ const CANARY_FOLDER_REASON = "it reads its canary payloads from a folder, which 
 const refused = (reason: string): CloudEntryResult => ({ refused: reason });
 
 /**
- * Why a Data Dictionary configuration that set a sample limit can start no cloud run, or `undefined` when it set
- * none. The limit is for local testing: the run measures part of the feed, so it cannot be certified, and none of
- * the public tools sends one. Only a limit the configuration set counts: `limit` is undefined when neither `--limit`
- * nor the entry's `ddOptions.limit` set one, and the pipeline applies its own default then. Read before the run, when
- * the entry is built and when a run is reserved, so the same words refuse it everywhere.
+ * Why a Data Dictionary configuration that set a sample limit below the default can start no cloud run, or
+ * `undefined` when it set none or one at or above the default. A smaller sample is for local testing: the run
+ * measures less than certification samples, so it cannot be certified. A limit at or above the default is a larger
+ * sample, which certifies, and the entry carries it (see `dd-sample-limit.ts`). Only a limit the configuration set
+ * counts: `limit` is undefined when neither `--limit` nor the entry's `ddOptions.limit` set one, and the pipeline
+ * applies its own default then. Read before the run, when the entry is built and when a run is reserved, so the same
+ * words refuse it everywhere.
  */
 export const ddSampleLimitRefusal = (config: CloudRunConfig): string | undefined =>
-  config.endorsement === 'dd' && config.limit !== undefined
-    ? `it cannot be certified: it uses a sample limit of ${config.limit} records per resource, which is for local testing. Remove the limit to start a cloud run`
+  config.endorsement === 'dd' && isDDLimitBelowDefault(config.limit)
+    ? `it cannot be certified: it uses a sample limit of ${config.limit} records per resource, below the ${DD_DEFAULT_SAMPLE_LIMIT_TEXT} that certification samples, which is for local testing. Remove the limit, or raise it to ${DD_DEFAULT_SAMPLE_LIMIT_TEXT} or more, to start a cloud run`
     : undefined;
 
 const ddCloudEntryOf = (config: DDConfig, description: string | undefined): CloudEntryResult => {
@@ -399,6 +402,9 @@ const ddCloudEntryOf = (config: DDConfig, description: string | undefined): Clou
       ddOptions: {
         version: config.version,
         ...(config.strictMode === undefined ? {} : { strictMode: config.strictMode }),
+        // Only a limit at or above the default reaches here (`ddSampleLimitRefusal` above), and the cloud run samples
+        // what the local run did rather than falling back to the default.
+        ...(config.limit === undefined ? {} : { limit: config.limit }),
         ...(config.batchExpand ? { batchExpand: true } : {}),
         ...(config.requestDelay === undefined ? {} : { requestDelay: config.requestDelay }),
         ...(config.rateLimitWait === undefined ? {} : { rateLimitWait: config.rateLimitWait })

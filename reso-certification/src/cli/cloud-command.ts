@@ -25,6 +25,7 @@ import type {
   ReserveCloudRunInput
 } from '../cloud/runs.js';
 import { type StartCloudRunInput, whyNotSuccessful } from '../cloud/start.js';
+import { DD_DEFAULT_SAMPLE_LIMIT_TEXT, isDDLimitBelowDefault } from '../sdk/dd-sample-limit.js';
 import type { PipelineResult } from '../sdk/types.js';
 import type { EntryOutcome } from './render.js';
 import { cell, renderTable } from './table.js';
@@ -126,9 +127,10 @@ export const entriesRefusedBeforeRun = (
 
 /**
  * What `--start-cloud-run` refuses on `dd` from the flags alone, before the config file is read: a flag that makes
- * the run uncertifiable. `--limit` is a sample limit for local testing, so a run with one starts no cloud run
- * whatever the file says, and the refusal names the flag rather than the file. The entry's own `ddOptions.limit` is
- * read by `entriesRefusedBeforeRun` once the file is.
+ * the run uncertifiable. `--limit` below the default is a smaller sample, for local testing, so a run with one starts
+ * no cloud run whatever the file says, and the refusal names the flag rather than the file. One at or above the
+ * default is a larger sample, which certifies (see `dd-sample-limit.ts`). The entry's own `ddOptions.limit` is read
+ * by `entriesRefusedBeforeRun` once the file is.
  */
 export const ddFlagsRefusedBeforeRun = (flags: {
   readonly strict?: boolean;
@@ -138,8 +140,8 @@ export const ddFlagsRefusedBeforeRun = (flags: {
   if (flags.strict === false || flags.skipVariations) {
     return '--start-cloud-run starts from a run that can be certified, which a run with --no-strict or --skip-variations is not.';
   }
-  if (flags.limit !== undefined) {
-    return '--start-cloud-run starts from a run that can be certified, and a run with --limit uses a sample limit, which is for local testing and cannot be certified. Remove --limit to start a cloud run.';
+  if (flags.limit !== undefined && isDDLimitBelowDefault(Number(flags.limit))) {
+    return `--start-cloud-run starts from a run that can be certified, and a run with --limit below ${DD_DEFAULT_SAMPLE_LIMIT_TEXT} uses a smaller sample than certification takes, which is for local testing and cannot be certified. Remove --limit, or raise it to ${DD_DEFAULT_SAMPLE_LIMIT_TEXT} or more, to start a cloud run.`;
   }
   return undefined;
 };

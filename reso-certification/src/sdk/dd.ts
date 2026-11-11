@@ -26,6 +26,7 @@ import {
   testedAtLeastOneRecord,
   versionCertifies
 } from './certification.js';
+import { DD_DEFAULT_SAMPLE_LIMIT, DD_DEFAULT_SAMPLE_LIMIT_TEXT, isDDLimitBelowDefault } from './dd-sample-limit.js';
 import { type DDVersion, whyDDVersionDoesNotCertify } from './dd-versions.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
@@ -59,7 +60,7 @@ const { getReferenceMetadata } = certUtilsEtl as { getReferenceMetadata: (versio
 
 // ── Constants ──
 
-const DEFAULT_LIMIT = 100000;
+const DEFAULT_LIMIT = DD_DEFAULT_SAMPLE_LIMIT;
 const DEFAULT_PAGE_SIZE_V17 = 100;
 const DEFAULT_PAGE_SIZE_V20 = 1000;
 const DEFAULT_YEARS_BACK = 3;
@@ -774,15 +775,16 @@ export const ddValidForCertification =
             'Strict mode was disabled with --no-strict. Schema validation errors were recorded but not enforced, so this run is not eligible for certification.'
           ])
         : CERTIFIABLE,
-      // A sample limit is for local testing: the run measured part of the feed, so it certifies nothing. Only a
-      // limit the configuration set counts. `config.limit` is undefined when neither `--limit` nor the entry's
-      // `ddOptions.limit` set one, and `buildReplicationSettings` applies `DEFAULT_LIMIT` then; the CLI leaves it
-      // unset rather than filling the default in, which is how the two are told apart here.
-      config.limit === undefined
-        ? CERTIFIABLE
-        : notCertifiable([
-            `The run used a sample limit of ${config.limit} records per resource, from --limit or the config entry's ddOptions.limit. A limit is for local testing, so this run is not eligible for certification and no cloud run can start from it. Remove the limit and run it again.`
+      // A sample limit below the default is for local testing: the run measured less than certification samples, so
+      // it certifies nothing. A limit at or above the default is a larger sample, which certifies (see
+      // `dd-sample-limit.ts`). Only a limit the configuration set counts. `config.limit` is undefined when neither
+      // `--limit` nor the entry's `ddOptions.limit` set one, and `buildReplicationSettings` applies `DEFAULT_LIMIT`
+      // then; the CLI leaves it unset rather than filling the default in, which is how the two are told apart here.
+      isDDLimitBelowDefault(config.limit)
+        ? notCertifiable([
+            `The run used a sample limit of ${config.limit} records per resource, from --limit or the config entry's ddOptions.limit, below the ${DD_DEFAULT_SAMPLE_LIMIT_TEXT} that certification samples. A smaller sample is for local testing, so this run is not eligible for certification and no cloud run can start from it. Remove the limit, or raise it to ${DD_DEFAULT_SAMPLE_LIMIT_TEXT} or more, and run it again.`
           ])
+        : CERTIFIABLE
     );
 
 /**

@@ -122,6 +122,13 @@ describe('cloudEntryOf for a Data Dictionary run', () => {
     expect(why).toMatch(/Remove the limit/);
   });
 
+  // A limit at or above the default is a larger sample, which certifies. The entry carries it, so the cloud run
+  // samples what the local run did rather than falling back to the default.
+  it('carries a sample limit at or above the default into the entry', async () => {
+    const entry = await entryOf(ddConfig({ limit: 250000 }));
+    expect('ddOptions' in entry ? entry.ddOptions : undefined).toEqual({ version: '2.1', limit: 250000 });
+  });
+
   it('carries the strict mode as it was set, so the service sees a run that turned it off', async () => {
     const entry = await entryOf(ddConfig({ strictMode: false }));
     expect('ddOptions' in entry ? entry.ddOptions : undefined).toEqual({ version: '2.1', strictMode: false });
