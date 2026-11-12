@@ -32,7 +32,21 @@
 
 ---
 
-## Certification 0.12.2 – 2026-11-11
+## Documentation release – odata-expression-parser 0.1.2 · reso-validation 0.1.2
+
+Documentation only. The JavaScript in both packages is the same as in 0.1.0.
+
+### The npm pages for these two packages are still 0.1.0
+
+The documentation patch of 2026-10-14 bumped both packages to 0.1.1, but neither version reached npm:
+their publish was refused because neither package had a trusted publisher yet. Both npm pages still
+show the 0.1.0 README from July, which says the package is not on npm, tells the reader to link it
+locally and links to sibling folders and a guide that do not resolve on npm.
+
+0.1.2 carries the current README for each. It installs from npm and links to the package and guide
+pages on tools.reso.org. 0.1.1 is skipped on npm.
+
+---
 
 ### Data Dictionary: a larger sample certifies
 
