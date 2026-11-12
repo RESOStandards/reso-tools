@@ -4,19 +4,6 @@
 
 ## Unreleased
 
-### RESO staff can apply review answers from a sheet, as a merge
-
-- **`reso-cert apply-variation-decisions`** applies a sheet of actions and comments (the one
-  `list-variation-reviews --csv` writes) to a variations report that is already under review. Only the items the sheet
-  names change; every other item, comment and decision on the review stays as it was.
-- Every row must name an item on the review, or nothing is sent. `--dry-run` lists each item that would change, the
-  decision it replaces and whether a comment goes with it.
-- Running it twice is safe: an item already as the sheet says is left alone, and a comment already on its thread is not
-  sent again. After the save the review is read back and each item checked.
-- It reads the review pool as well as the report. When an item's report shows the sheet's decision but its pool row does
-  not (a comment-only save elsewhere can clear the pool row), the item is sent again to put the pool row right, and the
-  plan says so.
-
 ### The reference server can serve your own resources, read-only
 
 - **`RESOURCES`** chooses the resources a deployment serves, by name. Define them in the metadata file and list them
@@ -42,6 +29,29 @@
   forwarded to.
 - **Keeping the earlier behavior:** `ALLOW_ANY_SERVICE_ROOT=true` forwards to any http(s) URL as before, with a warning
   at every start.
+
+---
+
+## Certification 0.12.3 – 2026-11-12
+
+### RESO staff can apply review answers from a sheet, as a merge
+
+- **`reso-cert apply-variation-decisions`** applies a sheet of actions and comments (the one
+  `list-variation-reviews --csv` writes) to a variations report that is already under review. Only the items the sheet
+  names change; every other item, comment and decision on the review stays as it was.
+- Every row must name an item on the review, or nothing is sent. `--dry-run` lists each item that would change, the
+  decision it replaces and whether a comment goes with it.
+- Running it twice is safe: an item already as the sheet says is left alone, and a comment already on its thread is not
+  sent again. After the save the review is read back and each item checked.
+- It reads the review pool as well as the report. When an item's report shows the sheet's decision but its pool row does
+  not (a comment-only save elsewhere can clear the pool row), the item is sent again to put the pool row right, and the
+  plan says so.
+
+### Dependencies
+
+- **`fast-xml-parser` 5.12.0** (from 5.11.2), which fixes
+  [GHSA-474x-hrwr-fgx4](https://github.com/advisories/GHSA-474x-hrwr-fgx4), a low-severity advisory: quadratic CPU use
+  while scanning unterminated stop-node tags.
 
 ---
 

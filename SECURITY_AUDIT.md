@@ -4,6 +4,46 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
+## Certification 0.12.3 Security Notes – 2026-11-12
+
+Pre-publish review of `@reso-standards/reso-certification` 0.12.3, covering every change since 0.12.2: the
+`apply-variation-decisions` command, which applies a sheet of RESO's actions and comments to a variations review
+already open, its check of the review pool, and `fast-xml-parser` 5.12.0.
+
+### Findings Addressed
+
+- **`fast-xml-parser` 5.11.2** carried [GHSA-474x-hrwr-fgx4](https://github.com/advisories/GHSA-474x-hrwr-fgx4)
+  (low): quadratic CPU use while scanning unterminated stop-node tags. 5.12.0 fixes it. The lockfile change moves
+  `fast-xml-parser` and `fast-xml-builder` only, and adds or removes no package.
+
+### Checked and Clean
+
+- **Where the token goes:** the command mints its token with the existing client credentials exchange and sends it
+  only to `RESO_SERVICES_URL`, which accepts HTTPS, or plain HTTP on a loopback address only.
+- **What it reads and writes:** it reads the review (`GET` on the report) and the review pool (`GET` on the review
+  items), and writes with one `POST`: a merge that names only the items on the sheet and never asks to replace the
+  review. Every row must match an item on the review or nothing is sent. `--dry-run` sends nothing.
+- **A locked review is left alone:** when someone holds the review, the command says who and stops. Nothing is
+  retried.
+- **Output:** the command prints the names of the variables it read from `.env`, never their values.
+- **Package contents:** `npm pack --dry-run` lists 566 files under the `files` allowlist, eight more than 0.12.2 (the
+  compiled `apply` modules): no tests, fixtures, environment files or credentials.
+- **Supply chain:** `npm audit --omit=dev` across the repository still reports `zod`
+  ([GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5), high) and `@hono/node-server`
+  ([GHSA-qv5m-9pm6-hqp3](https://github.com/advisories/GHSA-qv5m-9pm6-hqp3),
+  [GHSA-jpvv-r467-5p4w](https://github.com/advisories/GHSA-jpvv-r467-5p4w), moderate). Both reach the repository only
+  through the MCP server's `@modelcontextprotocol/sdk`; neither is a dependency of this package or of the desktop
+  app. They are fixed with the MCP server's update, where `zod` moves to a new major version.
+
+### Method
+
+Review of every change since 0.12.2 against the built package: `npm audit`, `npm pack --dry-run` with a scan of the
+listed files, the full test suite (3,498 tests across 8 packages, 2,365 in this package), and the command run end to
+end against a local instance of the certification services: a dry run, a save, a re-run that changed nothing, and a
+review-pool row put right after a comment-only save had cleared it.
+
+---
+
 ## Certification 0.12.2 Security Notes – 2026-11-11
 
 Pre-publish review of `@reso-standards/reso-certification` 0.12.2, covering every change since 0.12.1: a Data Dictionary sample limit of 100,000 or more now certifies, and a cloud run started from such a run carries the limit; `restore` publishes a run's stored results; `restore` and `archive-report` exchange `CLIENT_SECRET` for a token instead of presenting it; and the token exchange and `restore` no longer follow an HTTP redirect.
