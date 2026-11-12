@@ -20,7 +20,11 @@
  * - A COMMENT ALREADY ON THE THREAD IS NOT SENT AGAIN. The service appends every comment it receives, so the
  *   same sheet applied twice would say everything twice.
  *
- * After a save, the report is read back and every applied row is checked against it.
+ * The pool row is read as well as the report. They can disagree: a comment-only save from elsewhere clears the
+ * pool row's requested action while the report keeps the flag. A row whose report already shows its decision is
+ * still sent when its pool row says something else, so a re-run repairs the pool instead of skipping the row.
+ *
+ * After a save, the report and the pool are read back and every applied row is checked against both.
  */
 
 import {
@@ -33,6 +37,7 @@ import {
 } from '../sdk/common.js';
 import type { LockHolderInfo } from '../sdk/common.js';
 import { SHEET_ACTIONS, type SheetAction } from './decisions.js';
+import { type VariationReviewItem, listVariationReviewItemsViaService } from './review.js';
 
 const REPORT_ROUTE = '/v2/certification/variations-reports';
 
@@ -109,6 +114,13 @@ const storedFlags = (change: StoredChange): Flags => ({
 const actionOf = (flags: Flags): SheetAction | undefined =>
   flags.flaggedForFastTrack ? 'submit-to-ft' : flags.remove ? 'remove' : flags.ignore ? 'ignore' : undefined;
 
+/**
+ * The pool row's requested action for a decision, derived as the service derives it from the flags it receives:
+ * Fast Track first, then remove, then ignore.
+ */
+const requestedActionOf = (flags: Flags): string | undefined =>
+  flags.flaggedForFastTrack ? 'fast-track' : flags.remove ? 'remove' : flags.ignore ? 'ignore' : undefined;
+
 const sameFlags = (a: Flags, b: Flags): boolean =>
   a.ignore === b.ignore && a.flaggedForFastTrack === b.flaggedForFastTrack && a.remove === b.remove;
 
@@ -121,6 +133,36 @@ const keyOf = (item: { readonly resourceName?: string; readonly fieldName?: stri
 const labelOf = (item: { readonly resourceName?: string; readonly fieldName?: string; readonly lookupValue?: string }): string =>
   [item.resourceName, item.fieldName, item.lookupValue].filter(Boolean).join('.');
 
+/**
+ * This report's pool rows, as element key to requested action (null for none). A row belongs to the report when
+ * its submission names the same provider, system and recipient, and the same DD version where the row records one.
+ * An element with no row here is not in review for this report.
+ */
+export const poolActionsFor = (items: ReadonlyArray<VariationReviewItem>, c: ReportCoordinates): ReadonlyMap<string, string | null> =>
+  new Map(
+    items.flatMap(item => {
+      const mine = item.provenance.find(
+        p =>
+          p.providerUoi === c.providerUoi &&
+          p.providerUsi === c.providerUsi &&
+          p.recipientUoi === c.recipientUoi &&
+          (p.ddVersion === undefined || p.ddVersion === c.version)
+      );
+      return mine
+        ? [
+            [
+              keyOf({
+                resourceName: item.resourceName,
+                fieldName: item.fieldName ?? undefined,
+                lookupValue: item.lookupValue ?? undefined
+              }),
+              mine.requestedAction ?? null
+            ] as const
+          ]
+        : [];
+    })
+  );
+
 /** One item the save will send, and what it changes. */
 export interface PlannedItem {
   readonly element: string;
@@ -130,6 +172,8 @@ export interface PlannedItem {
   readonly replaces?: SheetAction;
   /** The comment added to its thread. */
   readonly comment?: string;
+  /** The requested action the pool row had, when the item is sent to bring the pool row back in line with the report. */
+  readonly repairsPool?: string;
   /** The change as it goes on the wire. */
   readonly change: Readonly<Record<string, unknown>>;
 }
@@ -159,6 +203,8 @@ export const planApply = (input: {
   readonly rows: ReadonlyArray<ApplyRow>;
   readonly providerUoi: string;
   readonly now: string;
+  /** This report's pool rows (`poolActionsFor`). Omitted, the plan is made from the report alone. */
+  readonly pooled?: ReadonlyMap<string, string | null>;
 }): ApplyPlan => {
   const storedByKey = new Map(input.stored.changes.map(change => [keyOf(change), change]));
   const rowCounts = input.rows.reduce((acc, row) => acc.set(keyOf(row), (acc.get(keyOf(row)) ?? 0) + 1), new Map<string, number>());
@@ -182,7 +228,9 @@ export const planApply = (input: {
       comment !== undefined && (stored.conversations ?? []).some(c => c.from === RESO_COMMENT_AUTHOR && c.message?.trim() === comment);
     const newComment = comment !== undefined && !alreadySaid ? comment : undefined;
     const decisionChanges = !sameFlags(before, after);
-    if (!decisionChanges && newComment === undefined) {
+    const pooledAction = input.pooled?.has(keyOf(row)) ? (input.pooled.get(keyOf(row)) ?? undefined) : undefined;
+    const poolDisagrees = input.pooled?.has(keyOf(row)) === true && pooledAction !== requestedActionOf(after);
+    if (!decisionChanges && newComment === undefined && !poolDisagrees) {
       return {
         kind: 'unchanged',
         note: `${label}: already ${actionOf(after) ?? 'without a decision'}${comment ? ', and the comment is already on the thread' : ''}`
@@ -203,6 +251,7 @@ export const planApply = (input: {
         ...(ends ? { action: ends } : {}),
         ...(decisionChanges && had ? { replaces: had } : {}),
         ...(newComment ? { comment: newComment } : {}),
+        ...(poolDisagrees ? { repairsPool: pooledAction ?? 'none' } : {}),
         change: {
           resourceName: row.resourceName,
           ...(row.fieldName ? { fieldName: row.fieldName } : {}),
@@ -243,6 +292,17 @@ export const verifyApplied = (plan: ApplyPlan, after: StoredReport): ReadonlyArr
     return problems.length ? [`${item.element}: ${problems.join('; ')}`] : [];
   });
 };
+
+/** Items whose pool row, after the save, does not carry the requested action the sent flags give. */
+export const verifyPool = (plan: ApplyPlan, pooledAfter: ReadonlyMap<string, string | null>): ReadonlyArray<string> =>
+  plan.items.flatMap(item => {
+    const sent = item.change as StoredChange;
+    const key = keyOf(sent);
+    if (!pooledAfter.has(key)) return [`${item.element}: not in the review pool`];
+    const expected = requestedActionOf(storedFlags(sent));
+    const actual = pooledAfter.get(key) ?? undefined;
+    return actual === expected ? [] : [`${item.element}: the pool row requests ${actual ?? 'nothing'}, not ${expected ?? 'nothing'}`];
+  });
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
@@ -325,11 +385,20 @@ export const applyVariationDecisionsViaService = async (
 ): Promise<ApplyResult> => {
   const what = 'Applying the decisions';
   const stored = await readStoredReportViaService(input);
+  const readPool = async (): Promise<ReadonlyMap<string, string | null>> =>
+    poolActionsFor(
+      await listVariationReviewItemsViaService({
+        ...(input.bearerToken ? { bearerToken: input.bearerToken } : {}),
+        ...(input.fromCli ? { fromCli: input.fromCli } : {})
+      }),
+      input.coordinates
+    );
   const plan = planApply({
     stored,
     rows: input.rows,
     providerUoi: input.coordinates.providerUoi,
-    now: input.now ?? new Date().toISOString()
+    now: input.now ?? new Date().toISOString(),
+    pooled: await readPool()
   });
   if (input.dryRun || plan.errors.length > 0 || plan.items.length === 0) return { plan, sent: false, mismatches: [] };
 
@@ -367,5 +436,5 @@ export const applyVariationDecisionsViaService = async (
   }
 
   const after = await readStoredReportViaService(input);
-  return { plan, sent: true, mismatches: verifyApplied(plan, after) };
+  return { plan, sent: true, mismatches: [...verifyApplied(plan, after), ...verifyPool(plan, await readPool())] };
 };

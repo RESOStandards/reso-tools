@@ -2,7 +2,7 @@
  * `apply-variation-decisions`: a decisions sheet applied to a report already under review, as a merge.
  *
  * The planner is pure and tested whole. The service call is tested against a stubbed fetch for what it sends:
- * a read, then one delta save (never `replaceReviewRows`), then a read back that is checked.
+ * the report and the pool read, then one delta save (never `replaceReviewRows`), then both read back and checked.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -14,8 +14,11 @@ import {
   type StoredReport,
   applyVariationDecisionsViaService,
   planApply,
-  verifyApplied
+  poolActionsFor,
+  verifyApplied,
+  verifyPool
 } from '../../src/variations/apply.js';
+import type { VariationReviewItem } from '../../src/variations/review.js';
 
 const PROVIDER = 'T00000000';
 const NOW = '2026-11-12T20:00:00.000Z';
@@ -46,8 +49,35 @@ const STORED: StoredReport = {
   ]
 };
 
-const plan = (rows: Parameters<typeof planApply>[0]['rows'], stored: StoredReport = STORED) =>
-  planApply({ stored, rows, providerUoi: PROVIDER, now: NOW });
+const plan = (rows: Parameters<typeof planApply>[0]['rows'], stored: StoredReport = STORED, pooled?: ReadonlyMap<string, string | null>) =>
+  planApply({ stored, rows, providerUoi: PROVIDER, now: NOW, ...(pooled ? { pooled } : {}) });
+
+const COORDINATES = { version: '2.1', providerUoi: PROVIDER, providerUsi: 'USI-TEST', recipientUoi: 'M00000000' };
+
+/** A pool item for one element, with a submission per recipient given. */
+const poolItem = (
+  element: { readonly fieldName?: string; readonly lookupValue?: string },
+  submissions: ReadonlyArray<{ readonly recipientUoi: string; readonly requestedAction?: string | null; readonly ddVersion?: string }>
+): VariationReviewItem => ({
+  variationKey: 'k',
+  resourceName: 'Property',
+  fieldName: element.fieldName ?? null,
+  lookupValue: element.lookupValue ?? null,
+  status: 'in-review',
+  provenance: submissions.map(s => ({
+    providerUoi: PROVIDER,
+    providerUsi: 'USI-TEST',
+    submittedAt: NOW,
+    environmentName: 'production',
+    ...s
+  }))
+});
+
+const GRILL = { fieldName: 'Appliances', lookupValue: 'Local Grill' };
+const IGNORED_GRILL: StoredReport = {
+  changes: [{ resourceName: 'Property', ...GRILL, ignore: true, conversations: [{ from: RESO_COMMENT_AUTHOR, message: 'Ignored.' }] }]
+};
+const GRILL_ROW = { resourceName: 'Property', ...GRILL, action: 'ignore', comment: 'Ignored.' };
 
 describe('planApply', () => {
   it('sends each named item with every flag, and its comment from RESO to the provider', () => {
@@ -161,6 +191,54 @@ describe('planApply', () => {
       plan([{ resourceName: 'Property', fieldName: 'Appliances', lookupValue: 'Local Grill', comment: 'Same words.' }], providerSaid).items
     ).toHaveLength(1);
   });
+
+  it('sends a row the report already shows when its pool row says otherwise, so a re-run repairs the pool', () => {
+    const pooled = poolActionsFor([poolItem(GRILL, [{ recipientUoi: 'M00000000', requestedAction: null }])], COORDINATES);
+    const p = plan([GRILL_ROW], IGNORED_GRILL, pooled);
+    expect(p.unchanged).toEqual([]);
+    expect(p.items).toHaveLength(1);
+    expect(p.items[0]).toMatchObject({ element: 'Property.Appliances.Local Grill', action: 'ignore', repairsPool: 'none' });
+    expect(p.items[0]).not.toHaveProperty('comment');
+    expect(p.items[0]?.change).toMatchObject({ ignore: true, flaggedForFastTrack: false, remove: false });
+  });
+
+  it('leaves a row alone when the report and its pool row both already show it', () => {
+    const pooled = poolActionsFor([poolItem(GRILL, [{ recipientUoi: 'M00000000', requestedAction: 'ignore' }])], COORDINATES);
+    expect(plan([GRILL_ROW], IGNORED_GRILL, pooled).items).toEqual([]);
+  });
+
+  it("reads only this report's pool row, not another recipient's or another DD version's", () => {
+    const pooled = poolActionsFor(
+      [
+        poolItem(GRILL, [
+          { recipientUoi: 'OTHER-RECIPIENT', requestedAction: null },
+          { recipientUoi: 'M00000000', requestedAction: 'ignore' }
+        ]),
+        poolItem({ fieldName: 'Heating', lookupValue: 'Local Heat' }, [
+          { recipientUoi: 'M00000000', requestedAction: null, ddVersion: '2.0' }
+        ])
+      ],
+      COORDINATES
+    );
+    expect([...pooled]).toEqual([['Property\u001fAppliances\u001fLocal Grill', 'ignore']]);
+    expect(plan([GRILL_ROW], IGNORED_GRILL, pooled).items).toEqual([]);
+  });
+
+  it('does not send a row for an element that has no pool row', () => {
+    expect(plan([GRILL_ROW], IGNORED_GRILL, new Map()).items).toEqual([]);
+  });
+});
+
+describe('verifyPool', () => {
+  const p = plan([GRILL_ROW]);
+  const key = 'Property\u001fAppliances\u001fLocal Grill';
+  it('is empty when the pool row requests what was sent', () => {
+    expect(verifyPool(p, new Map([[key, 'ignore']]))).toEqual([]);
+  });
+  it('names an item whose pool row did not take the decision, or has none', () => {
+    expect(verifyPool(p, new Map([[key, null]]))).toEqual(['Property.Appliances.Local Grill: the pool row requests nothing, not ignore']);
+    expect(verifyPool(p, new Map())).toEqual(['Property.Appliances.Local Grill: not in the review pool']);
+  });
 });
 
 describe('verifyApplied', () => {
@@ -191,6 +269,13 @@ describe('the plan as printed', () => {
   it('summarizes by decision', () => {
     expect(summarizeApplyPlan(p)).toBe('3 item(s) to change (2 ignore, 1 no decision), with 2 comment(s).');
   });
+  it('says how many items only repair the pool, and marks them', () => {
+    const repair = plan([GRILL_ROW], IGNORED_GRILL, new Map([['Property\u001fAppliances\u001fLocal Grill', null]]));
+    expect(summarizeApplyPlan(repair)).toBe(
+      '1 item(s) to change (1 ignore), with 0 comment(s); 1 of them to bring the review pool back in line with the report.'
+    );
+    expect(formatApplyItems(repair)).toBe('  ignore  Property.Appliances.Local Grill  (pool row had none)');
+  });
   it('lists each item with what it replaces and whether it carries a comment', () => {
     expect(formatApplyItems(p).split('\n')).toEqual([
       '  ignore       Property.Appliances.Local Grill  + comment',
@@ -201,7 +286,8 @@ describe('the plan as printed', () => {
 });
 
 describe('applyVariationDecisionsViaService', () => {
-  const COORDINATES = { version: '2.1', providerUoi: PROVIDER, providerUsi: '90001', recipientUoi: 'M00000000' };
+  const POOL_BEFORE = { items: [poolItem(GRILL, [{ recipientUoi: 'M00000000', requestedAction: null }])] };
+  const POOL_AFTER = { items: [poolItem(GRILL, [{ recipientUoi: 'M00000000', requestedAction: 'ignore' }])] };
   const ROWS = [{ resourceName: 'Property', fieldName: 'Appliances', lookupValue: 'Local Grill', action: 'ignore', comment: 'Ignored.' }];
   const ok = (body: unknown, status = 200) =>
     ({
@@ -233,8 +319,8 @@ describe('applyVariationDecisionsViaService', () => {
     vi.stubGlobal('fetch', fetchMock);
   };
 
-  it('on a dry run, reads the report and sends nothing', async () => {
-    stub([ok(STORED)]);
+  it('on a dry run, reads the report and the pool and sends nothing', async () => {
+    stub([ok(STORED), ok(POOL_BEFORE)]);
     const result = await applyVariationDecisionsViaService({
       coordinates: COORDINATES,
       rows: ROWS,
@@ -244,18 +330,19 @@ describe('applyVariationDecisionsViaService', () => {
     });
     expect(result.sent).toBe(false);
     expect(result.plan.items).toHaveLength(1);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      'https://services.example.org/v2/certification/variations-reports/2.1/T00000000/90001/M00000000/current'
+      'https://services.example.org/v2/certification/variations-reports/2.1/T00000000/USI-TEST/M00000000/current'
     );
+    expect(String(fetchMock.mock.calls[1]?.[0])).toBe('https://services.example.org/v2/certification/variations-review-items');
   });
 
-  it('sends one delta, never a replace, and checks the read-back', async () => {
-    stub([ok(STORED), ok({ variationsReportId: 'r' }), ok(AFTER)]);
+  it('sends one delta, never a replace, and checks the read-back of the report and the pool', async () => {
+    stub([ok(STORED), ok(POOL_BEFORE), ok({ variationsReportId: 'r' }), ok(AFTER), ok(POOL_AFTER)]);
     const result = await applyVariationDecisionsViaService({ coordinates: COORDINATES, rows: ROWS, bearerToken: 'tok', now: NOW });
     expect(result).toMatchObject({ sent: true, mismatches: [] });
-    const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe('https://services.example.org/v2/certification/variations-reports/2.1/T00000000/90001/M00000000');
+    const [url, init] = fetchMock.mock.calls[2] as [string, RequestInit];
+    expect(url).toBe('https://services.example.org/v2/certification/variations-reports/2.1/T00000000/USI-TEST/M00000000');
     expect(init.method).toBe('POST');
     const body = JSON.parse(String(init.body));
     expect(body).not.toHaveProperty('replaceReviewRows');
@@ -263,8 +350,14 @@ describe('applyVariationDecisionsViaService', () => {
     expect(body.changes).toEqual(result.plan.items.map(i => i.change));
   });
 
+  it('reports a pool row that did not take the decision', async () => {
+    stub([ok(STORED), ok(POOL_BEFORE), ok({ variationsReportId: 'r' }), ok(AFTER), ok(POOL_BEFORE)]);
+    const result = await applyVariationDecisionsViaService({ coordinates: COORDINATES, rows: ROWS, bearerToken: 'tok', now: NOW });
+    expect(result.mismatches).toEqual(['Property.Appliances.Local Grill: the pool row requests nothing, not ignore']);
+  });
+
   it('sends nothing when a row is unusable', async () => {
-    stub([ok(STORED)]);
+    stub([ok(STORED), ok(POOL_BEFORE)]);
     const result = await applyVariationDecisionsViaService({
       coordinates: COORDINATES,
       rows: [...ROWS, { resourceName: 'Property', fieldName: 'Nope', comment: 'x' }],
@@ -273,12 +366,12 @@ describe('applyVariationDecisionsViaService', () => {
     });
     expect(result.sent).toBe(false);
     expect(result.plan.errors).toHaveLength(1);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('names who holds the lock when the save is refused', async () => {
     const lock = { displayName: 'A Reviewer', email: 'reviewer@example.org', expiresAt: '2026-11-12T21:00:00Z' };
-    stub([ok(STORED), ok({ lock }, 409)]);
+    stub([ok(STORED), ok(POOL_BEFORE), ok({ lock }, 409)]);
     const error = await applyVariationDecisionsViaService({ coordinates: COORDINATES, rows: ROWS, bearerToken: 'tok', now: NOW }).catch(
       e => e
     );
