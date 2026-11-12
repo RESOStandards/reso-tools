@@ -16,6 +16,21 @@
   write.
 - Without these settings nothing changes.
 
+---
+
+## Certification 0.12.2 – 2026-11-11
+
+### Data Dictionary: a larger sample certifies
+
+- **Certification samples up to 100,000 records per resource, and a provider may raise that for a more accurate
+  sample.** A run with `--limit` or a config entry's `ddOptions.limit` of 100,000 or more is now eligible for
+  certification, and a cloud run started from it samples the same number. Before this, any limit, larger ones
+  included, made the run ineligible.
+- **A limit below 100,000 is unchanged:** it is for local testing, its verdict says the run is not eligible, and it
+  starts no cloud run. A server with fewer than 100,000 records in a resource still gives all it has, which
+  certifies as before.
+- A limit that is not a whole number counts as below 100,000.
+
 ### `restore` publishes a run's stored results, and sends `CLIENT_SECRET` only to the token endpoint
 
 - **`reso-cert restore --path <dir>` restores a run's stored results** as well as a certification server backup,
@@ -29,21 +44,6 @@
 - **`restore` and `archive-report` no longer present `CLIENT_SECRET` as a credential.** They exchange `CLIENT_ID`
   and `CLIENT_SECRET` at the token endpoint of the Cert API they call and present the token it returns, and refuse a
   `TOKEN_URI` on any other host before a request. `CERT_API_TOKEN` gives a bearer token directly instead.
-
----
-
-## Certification 0.12.2 – 2026-11-10
-
-### Data Dictionary: a larger sample certifies
-
-- **Certification samples up to 100,000 records per resource, and a provider may raise that for a more accurate
-  sample.** A run with `--limit` or a config entry's `ddOptions.limit` of 100,000 or more is now eligible for
-  certification, and a cloud run started from it samples the same number. Before this, any limit, larger ones
-  included, made the run ineligible.
-- **A limit below 100,000 is unchanged:** it is for local testing, its verdict says the run is not eligible, and it
-  starts no cloud run. A server with fewer than 100,000 records in a resource still gives all it has, which
-  certifies as before.
-- A limit that is not a whole number counts as below 100,000.
 
 ---
 

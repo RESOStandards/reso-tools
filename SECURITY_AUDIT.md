@@ -4,24 +4,30 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
-## Certification 0.12.2 Security Notes – 2026-11-10
+## Certification 0.12.2 Security Notes – 2026-11-11
 
-Pre-publish review of `@reso-standards/reso-certification` 0.12.2, covering every change since 0.12.1: a Data Dictionary sample limit of 100,000 or more now certifies, and a cloud run started from such a run carries the limit.
+Pre-publish review of `@reso-standards/reso-certification` 0.12.2, covering every change since 0.12.1: a Data Dictionary sample limit of 100,000 or more now certifies, and a cloud run started from such a run carries the limit; `restore` publishes a run's stored results; and `restore` and `archive-report` exchange `CLIENT_SECRET` for a token instead of presenting it.
 
 ### Findings Addressed
 
-- None. The review found nothing to fix.
+- **`CLIENT_SECRET` was presented as a credential.** In 0.12.1, `restore` and `archive-report` sent it to the Cert API as the credential on their requests. They now exchange it at the token endpoint of the Cert API they call and present the token that returns, so the secret goes on one request only.
 
 ### Checked and Clean
 
 - **The limit rule fails closed:** one function decides it (`isDDLimitBelowDefault`), and the verdict, the `--limit` refusal and the cloud run refusal all call it. Anything other than a whole number of 100,000 or more counts as below the default: zero, negatives, fractions, NaN and Infinity, and a `--limit` that is not a number.
 - **The cloud entry:** the limit travels as `ddOptions.limit`, a number the configuration already held. No credential, path or host is added.
 - **Supply chain:** no dependency changed since 0.12.1. `npm audit` reports one low-severity advisory published on 2026-11-10, GHSA-474x-hrwr-fgx4 in `fast-xml-parser` 5.11.2 (fixed in 5.12.0). By its own description it "needs the non-default stopNodes option", and neither XML parser in this package or in `reso-metadata-utils` sets `stopNodes`, so it does not reach either. The update to 5.12.0 follows separately.
-- **Package contents:** `npm pack --dry-run` lists 554 files under the `files` allowlist (`dist`, the license, the README, the sample metadata and the schemas): no tests, fixtures, environment files or run output. The four added since 0.12.1 are the new `dd-sample-limit` module's build output.
+- **Where `CLIENT_SECRET` goes:** one function sends it (`exchangeClientCredentials`), over HTTPS only, and the Cert API commands call it only when `TOKEN_URI` is the token endpoint of the Cert API the command calls. A `TOKEN_URI` on another host, or on a host that cannot be the API (a single-label name such as `undefined`, which older credentials files carried), is refused before any request, and `CLIENT_SECRET` without `TOKEN_URI` and `CLIENT_ID` is refused rather than sent. Every Cert API secret in the environment is registered for masking before the command does anything else.
+- **What `restore` publishes:** only a Data Dictionary run that passed and is certifiable, so a failed result cannot replace a provider's standing passed report. The provider and recipient come from the stored directory layout, never from a flag.
+- **Package contents:** `npm pack --dry-run` lists 558 files under the `files` allowlist (`dist`, the license, the README, the sample metadata and the schemas): no tests, fixtures, environment files or run output. The eight added since 0.12.1 are the build output of the new `dd-sample-limit` and `restore-runs` modules.
+
+### Open, Unchanged in This Release
+
+- **Requests to the Cert API follow an HTTP redirect,** as they did in 0.12.1, except `archive-report`'s POST, which never follows one. For the token exchange that means a redirect from the token endpoint would carry the form, secret included, to the redirect's target. Only the Cert API's own token endpoint, over HTTPS, can send that redirect. Refusing redirects follows separately, once the token endpoint's paths are confirmed not to redirect, since refusing one there would otherwise stop every token exchange.
 
 ### Method
 
-Review of every change since 0.12.1 against the built package: `npm audit`, `npm pack --dry-run` with a scan of the listed files, the full test suite (3,431 tests across 8 packages, 2,312 in this package), lint and typecheck.
+Review of every change since 0.12.1 against the built package: `npm audit`, `npm pack --dry-run` with a scan of the listed files, the full test suite (3,452 tests across 8 packages, 2,333 in this package), lint and typecheck.
 
 ---
 
