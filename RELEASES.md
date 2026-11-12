@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+### RESO staff can apply review answers from a sheet, as a merge
+
+- **`reso-cert apply-variation-decisions`** applies a sheet of actions and comments (the one
+  `list-variation-reviews --csv` writes) to a variations report that is already under review. Only the items the sheet
+  names change; every other item, comment and decision on the review stays as it was.
+- Every row must name an item on the review, or nothing is sent. `--dry-run` lists each item that would change, the
+  decision it replaces and whether a comment goes with it.
+- Running it twice is safe: an item already as the sheet says is left alone, and a comment already on its thread is not
+  sent again. After the save the review is read back and each item checked.
+
 ### The reference server can serve your own resources, read-only
 
 - **`RESOURCES`** chooses the resources a deployment serves, by name. Define them in the metadata file and list them

@@ -88,6 +88,7 @@ different thing from the RESO service credentials above.
 | [`update-variations`](#update-variations) | Submit reviewed variation suggestions (admin) |
 | [`submit-variations-report`](#submit-variations-report) | Send a DD or rcf run's variations report to start or refresh a review |
 | [`submit-variation-decisions`](#submit-variation-decisions) | Mark a report from a sheet of actions and comments, and submit it |
+| [`apply-variation-decisions`](#apply-variation-decisions) | RESO staff: apply a sheet of actions and comments to a review already open, as a merge |
 | [`list-variation-reviews`](#list-variation-reviews) | The variations in review – yours as a provider, the whole pool as an admin (read-only) |
 | [`variations-review-status`](#variations-review-status) | Where each variations submission stands (read-only) |
 | [`cloud status`](#cloud-status) | Your cloud runs and where each stands (read-only) |
@@ -472,6 +473,35 @@ is refused, because nothing would be submitted.
 
 One push carries the whole sheet. If any row is unusable the report is returned unchanged rather
 than half-applied, so you never have to work out which rows landed.
+
+### `apply-variation-decisions`
+For RESO staff. Apply a sheet of actions and comments to a variations report that is **already
+under review**, as a merge: only the items the sheet names change, and every other item, comment
+and decision on the review stays as it was. `submit-variation-decisions` is the other half: it
+marks the report a run wrote and submits it, which starts or replaces the review.
+
+```bash
+reso-cert list-variation-reviews --status pending --csv > review.csv
+# fill in Action and Comment on the rows you decided
+reso-cert apply-variation-decisions --provider-uoi <uoi> --provider-usi <usi> --recipient-uoi <uoi> \
+  [--dd-version 2.1] --decisions review.csv --dry-run
+reso-cert apply-variation-decisions --provider-uoi <uoi> --provider-usi <usi> --recipient-uoi <uoi> \
+  [--dd-version 2.1] --decisions review.csv
+```
+
+The review is read first, and every row must name an item on it, by its values exactly as the
+review holds them. If any row is unusable nothing is sent. The dry run prints each item that would
+change, with the decision it replaces and whether a comment goes with it, and sends nothing.
+
+`Action` takes `ignore`, `remove` or `submit-to-ft`. A row with only a `Comment` keeps the item's
+decision. Comments are written as RESO's, to the provider the review is about.
+
+**Running it twice is safe.** An item already as the sheet says is left alone, and a comment
+already on its thread is not sent again, so a second run reports nothing to change.
+
+After the save, the review is read back and each item is checked: the command says so if any item
+does not show what was sent. A review someone is working on (a lock) is not changed; the command
+names who holds it.
 
 ### `restore`
 
