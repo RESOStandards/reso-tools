@@ -16,7 +16,8 @@ export const formatApplyItems = (plan: ApplyPlan): string => {
   return plan.items
     .map(item => {
       const was = item.replaces ? ` (was ${DECISION_LABEL[item.replaces] ?? item.replaces})` : '';
-      return `  ${decisionOf(item).padEnd(width)}  ${item.element}${was}${item.comment ? '  + comment' : ''}`;
+      const pool = item.repairsPool ? `  (pool row had ${item.repairsPool})` : '';
+      return `  ${decisionOf(item).padEnd(width)}  ${item.element}${was}${item.comment ? '  + comment' : ''}${pool}`;
     })
     .join('\n');
 };
@@ -29,5 +30,6 @@ export const summarizeApplyPlan = (plan: ApplyPlan): string => {
     .filter(([, count]) => count > 0)
     .map(([label, count]) => `${count} ${label}`)
     .join(', ');
-  return `${plan.items.length} item(s) to change (${decisions}), with ${comments} comment(s).`;
+  const repairs = plan.items.filter(item => item.repairsPool).length;
+  return `${plan.items.length} item(s) to change (${decisions}), with ${comments} comment(s)${repairs ? `; ${repairs} of them to bring the review pool back in line with the report` : ''}.`;
 };

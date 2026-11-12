@@ -27,6 +27,8 @@ export interface VariationReviewProvenance {
   readonly submittedByProviderUoi?: string;
   readonly submittedByDisplayName?: string;
   readonly endorsementId?: string;
+  /** The Data Dictionary version of the report the row came from. */
+  readonly ddVersion?: string;
   readonly requestedAction?: string | null;
   readonly lastEditorUoi?: string;
   readonly lastEditorDisplayName?: string;

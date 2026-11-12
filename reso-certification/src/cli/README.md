@@ -499,8 +499,12 @@ decision. Comments are written as RESO's, to the provider the review is about.
 **Running it twice is safe.** An item already as the sheet says is left alone, and a comment
 already on its thread is not sent again, so a second run reports nothing to change.
 
-After the save, the review is read back and each item is checked: the command says so if any item
-does not show what was sent. A review someone is working on (a lock) is not changed; the command
+**The review pool is read too.** An item whose report already shows the sheet's decision is sent
+again when its row in the review pool does not, because a comment-only save elsewhere can clear the
+pool row while the report keeps the flag. The dry run marks such an item `(pool row had …)`.
+
+After the save, the report and the pool are read back and each item is checked: the command says so
+if any item does not show what was sent. A review someone is working on (a lock) is not changed; the command
 names who holds it.
 
 ### `restore`

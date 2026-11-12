@@ -13,6 +13,9 @@
   decision it replaces and whether a comment goes with it.
 - Running it twice is safe: an item already as the sheet says is left alone, and a comment already on its thread is not
   sent again. After the save the review is read back and each item checked.
+- It reads the review pool as well as the report. When an item's report shows the sheet's decision but its pool row does
+  not (a comment-only save elsewhere can clear the pool row), the item is sent again to put the pool row right, and the
+  plan says so.
 
 ### The reference server can serve your own resources, read-only
 

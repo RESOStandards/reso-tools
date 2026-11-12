@@ -2176,7 +2176,7 @@ program
           process.exitCode = 2;
           return;
         }
-        console.log('Saved as one merge, and read back: every item shows what was sent.');
+        console.log('Saved as one merge, and read back: every item shows what was sent, in the report and in the review pool.');
       } catch (error) {
         const code = (error as { code?: string }).code;
         console.error(error instanceof Error ? error.message : String(error));
