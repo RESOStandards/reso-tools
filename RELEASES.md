@@ -16,6 +16,20 @@
   write.
 - Without these settings nothing changes.
 
+### The reference server's proxy forwards only to service roots it allows
+
+**Behavior change:** `/api/proxy` now forwards nothing until it is told where it may.
+
+- **Standalone:** `ALLOWED_SERVICE_ROOTS` lists the service roots it may forward to. A request is forwarded when its
+  origin matches a root and its path is under the root's path.
+- **Embedded:** a host such as the desktop allows each server it connects to while it runs (`allowServiceRoot`,
+  `forgetServiceRoot`).
+- **Credentials and redirects:** the caller's credentials go only to the server asked for. A redirect is checked like a
+  new request, and never carries the credentials to another origin. Link-local and cloud-metadata addresses are never
+  forwarded to.
+- **Keeping the earlier behavior:** `ALLOW_ANY_SERVICE_ROOT=true` forwards to any http(s) URL as before, with a warning
+  at every start.
+
 ---
 
 ## Certification 0.12.2 – 2026-11-11

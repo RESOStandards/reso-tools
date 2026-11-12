@@ -47,6 +47,16 @@ export interface ServerConfig {
    * cannot write. Whether it accepts changes is `READ_ONLY`, a separate choice.
    */
   readonly productionInstance: boolean;
+  /**
+   * The service roots `/api/proxy` may forward to (`ALLOWED_SERVICE_ROOTS`, comma-separated), checked at start. An embedding
+   * host can allow more while the server runs. With none, the proxy forwards nothing.
+   */
+  readonly allowedServiceRoots: ReadonlyArray<string>;
+  /**
+   * `ALLOW_ANY_SERVICE_ROOT=true`: the proxy forwards to any http(s) URL, as it did before allowed roots existed. For
+   * compatibility only; it is logged as a warning at every start, and link-local and metadata addresses stay refused.
+   */
+  readonly allowAnyServiceRoot: boolean;
 }
 
 /** `RESOURCES` as a list. Unset means the default; set but naming nothing is a mistake, not "serve nothing". */
@@ -86,6 +96,13 @@ export const loadConfig = (overrides?: Partial<ServerConfig>): ServerConfig => {
   const resources = overrides?.resources ?? parseResources(process.env.RESOURCES) ?? TARGET_RESOURCES;
   const readOnly = overrides?.readOnly ?? process.env.READ_ONLY === 'true';
   const productionInstance = overrides?.productionInstance ?? process.env.PRODUCTION_INSTANCE === 'true';
+  const allowedServiceRoots =
+    overrides?.allowedServiceRoots ??
+    (process.env.ALLOWED_SERVICE_ROOTS ?? '')
+      .split(',')
+      .map(root => root.trim())
+      .filter(root => root.length > 0);
+  const allowAnyServiceRoot = overrides?.allowAnyServiceRoot ?? process.env.ALLOW_ANY_SERVICE_ROOT === 'true';
 
   if (dbBackend !== 'postgres' && dbBackend !== 'mongodb' && dbBackend !== 'sqlite') {
     throw new Error(`Invalid DB_BACKEND: ${dbBackend}. Must be "postgres", "mongodb", or "sqlite".`);
@@ -111,6 +128,8 @@ export const loadConfig = (overrides?: Partial<ServerConfig>): ServerConfig => {
     serverRoot,
     resources,
     readOnly,
-    productionInstance
+    productionInstance,
+    allowedServiceRoots,
+    allowAnyServiceRoot
   };
 };

@@ -193,6 +193,25 @@ Three settings let a deployment serve a chosen set of resources and nothing else
 `READ_ONLY` is separate from `PRODUCTION_INSTANCE`, so a production instance can accept changes later. Without these
 settings the server behaves as before: a self-contained reference server that sets up its own database.
 
+## The Outbound Proxy
+
+`/api/proxy?url=<target>` lets a browser UI call another server's API, which the browser cannot do directly (CORS). It
+forwards a request only to a service root the server allows, and sends the caller's credentials only there:
+
+- **`ALLOWED_SERVICE_ROOTS`**: the service roots it may forward to, comma-separated, for example
+  `ALLOWED_SERVICE_ROOTS=https://api.example.com/odata,http://localhost:8080`. A request is forwarded when its origin
+  matches a root and its path is the root's path or below it. Each root is checked at start, and a bad one stops the
+  server with a message naming it.
+- **An embedding host** can allow roots while the server runs: `createApp` returns `allowServiceRoot(root)` and
+  `forgetServiceRoot(root)`, as the desktop does for each server it connects to.
+- **Redirects** are followed one hop at a time, each checked as a new request. The credentials go only to the origin the
+  caller asked for.
+- **Link-local and cloud-metadata addresses** are never forwarded to.
+- **With no roots allowed, the proxy forwards nothing.** `ALLOW_ANY_SERVICE_ROOT=true` restores the earlier behavior of
+  forwarding to any http(s) URL. It is meant for compatibility only, and is logged as a warning at every start.
+
+A production instance (`PRODUCTION_INSTANCE=true`) does not mount the proxy.
+
 ## Enumeration Modes
 
 The server supports two enumeration representations via `ENUM_MODE` environment variable:
