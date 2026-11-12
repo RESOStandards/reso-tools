@@ -254,6 +254,8 @@ jobs:
             "reso-certification:@reso-standards/reso-certification"
             "reso-reference-server:@reso-standards/reso-reference-server"
             "reso-mcp-server:@reso-standards/reso-mcp-server"
+            # An app, not a package: its source is private, so the folder holds only its guide and README.
+            "reso-desktop-client:RESO Desktop"
           )
 
           GH_BLOB="https://github.com/RESOStandards/reso-tools/blob/main"
@@ -363,11 +365,16 @@ jobs:
             title=$(extract_title "$guide" "$pkg_name")
             out_file=".github/pages/_guides/${pkg_dir}.md"
 
+            # A package page exists only for a published package; an app's guide has none to link to, and
+            # the line is left out rather than left empty, since Liquid reads an empty string as true.
+            package_line=""
+            [ -f "${pkg_dir}/package.json" ] && package_line="package_url: \"/packages/${pkg_dir}/\""
+
             cat > "$out_file" <<FRONT
           ---
           title: "${title}"
           package: "${pkg_name}"
-          package_url: "/packages/${pkg_dir}/"
+          ${package_line}
           layout: guide
           permalink: "/guides/${pkg_dir}/"
           ---

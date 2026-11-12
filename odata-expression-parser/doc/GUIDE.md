@@ -433,5 +433,8 @@ That is the same idea behind `validateQueryOptions` in **[`@reso-standards/reso-
 
 * **[Package README](../)** – full API surface, supported features, and AST node type table
 * **[Source on GitHub](https://github.com/RESOStandards/reso-tools/tree/main/odata-expression-parser)**
-* **[GitHub source](https://github.com/RESOStandards/reso-tools/tree/main/odata-expression-parser)**
 * **[OData 4.01 Part 2: URL Conventions](https://docs.oasis-open.org/odata/odata/v4.01/odata-v4.01-part2-url-conventions.html)** – the spec that defines the grammar this parser implements
+
+---
+
+For questions or to join RESO, contact support+reso-tools@reso.org.
