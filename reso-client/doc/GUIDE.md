@@ -473,7 +473,7 @@ node --env-file=.env npx tsx reso-client/examples/oauth-flow.ts
 
 ## Where to Next
 
-* **Querying a server interactively** – the **[RESO desktop app](https://tools.reso.org/#clients)** uses this SDK under the hood and gives you a point-and-click UI for exploring any RESO server.
+* **Querying a server interactively** – the **[RESO desktop app](../reso-desktop-client/)** uses this SDK under the hood and gives you a point-and-click UI for exploring any RESO server.
 * **Validating records before send** – pair this guide with the **[reso-validation](../reso-validation/)** library to check field types and enums before round-tripping a record to the server.
 * **Standing up a test server** – the **[RESO Reference Server](../reso-reference-server/)** is a full RESO-compliant OData server you can run locally with Docker or SQLite. Every example in this guide runs against it.
 * **Running compliance tests** – once your server works with the SDK, the **[RESO Certification](../reso-certification/)** CLI runs the same tests RESO uses for official certification.
@@ -482,5 +482,8 @@ node --env-file=.env npx tsx reso-client/examples/oauth-flow.ts
 
 * **[Package README](../)** – full API surface and type reference
 * **[Source on GitHub](https://github.com/RESOStandards/reso-tools/tree/main/reso-client)**
-* **[GitHub source](https://github.com/RESOStandards/reso-tools/tree/main/reso-client)**
 * **[OData 4.01 Part 1: Protocol](https://docs.oasis-open.org/odata/odata/v4.01/odata-v4.01-part1-protocol.html)** – the underlying spec
+
+---
+
+For questions or to join RESO, contact support+reso-tools@reso.org.

@@ -241,6 +241,25 @@ The adapter is idempotent – running it on a report that already has a `resourc
 
 ---
 
+## Read-Only and Production Instances
+
+These settings are on `main` and arrive with the release after 0.8.5:
+
+* **`RESOURCES`** – serve only the resources you name, with `$metadata` and the service document to match.
+* **`READ_ONLY=true`** – no create, update or delete routes on any resource.
+* **`PRODUCTION_INSTANCE=true`** – a production instance serving real data: only the OData service and `/health`, and
+  the database is left as the server finds it.
+
+The **[package README](../)** has the details.
+
+### The Proxy
+
+`/api/proxy` lets a browser UI call another server's API, which a browser cannot do directly. From the release after
+0.8.5 it forwards only to the service roots you allow with `ALLOWED_SERVICE_ROOTS`, and the caller's credentials go
+only to the server asked for. `ALLOW_ANY_SERVICE_ROOT=true` keeps the earlier behavior, with a warning at every start.
+A host that embeds the server, such as the **[RESO desktop app](../reso-desktop-client/)**, allows each server it
+connects to.
+
 ## Authentication
 
 The server ships with a **mock OAuth2 endpoint** at `/oauth/token` that accepts any client credentials and returns a bearer token. This is intentional – the reference server is meant for development and testing, not production, and the auth mechanism exists so consumers can exercise the OAuth2 round trip end to end without needing a real identity provider.
@@ -379,7 +398,7 @@ All four cert flows run against any of the three database backends. The MongoDB 
 ## Where to Next
 
 * **Filling the server with data** – the seed dataset above is committed to this repository. The generator that produced it is not part of this repository. Members can fill a server with records using the Data Generator in the [RESO desktop app](https://github.com/RESOStandards/reso-tools/releases/latest).
-* **Querying the server interactively** – the desktop certification app, distributed from [Releases](https://github.com/RESOStandards/reso-tools/releases/latest), bundles a browser UI over this server. It is built around the **[RESO Client SDK](../reso-client/)**, which connects to any RESO server, including this one.
+* **Querying the server interactively** – the **[RESO desktop app](../reso-desktop-client/)**, distributed from [Releases](https://github.com/RESOStandards/reso-tools/releases/latest), bundles a browser UI over this server. It is built around the **[RESO Client SDK](../reso-client/)**, which connects to any RESO server, including this one.
 * **Validating records** – the **[reso-validation](../reso-validation/)** library runs on every Add/Edit write against the reference server. It is also a stand-alone library you can use in your own application to check records before sending them.
 * **Running the cert tools as code** – the **[RESO Certification](../reso-certification/)** package gives you a CLI and an SDK for running every cert flow programmatically, not just through Docker. Useful for CI pipelines and for embedding cert testing inside other tools.
 * **Connecting an AI agent** – the **[RESO MCP Server](../reso-mcp-server/)** exposes this exact server through the Model Context Protocol so any MCP-aware AI host (Claude Code, Claude Desktop, Cursor, others) can read, query and write through a real RESO server. The MCP guide walks through the full Add/Edit and EntityEvent flows against this reference server with verbatim tool calls.
@@ -391,4 +410,8 @@ All four cert flows run against any of the three database backends. The MongoDB 
 * **[OData 4.01 Part 1: Protocol](https://docs.oasis-open.org/odata/odata/v4.01/odata-v4.01-part1-protocol.html)** – the spec the server implements
 * **[RESO Data Dictionary](https://www.reso.org/data-dictionary/)** – the schema the server is built around
 * **[RCP-010 Add/Edit Endorsement](https://github.com/RESOStandards/transport/blob/main/proposals/web-api-add-edit.md)** – the spec for the Create/Update/Delete behavior
-* **[RCP-027 EntityEvent](https://github.com/RESOStandards/transport/blob/main/proposals/entity-event.md)** – the spec for the change-tracking feed
+* **[RCP-027 EntityEvent](https://github.com/RESOStandards/transport/blob/main/proposals/entity-events.md)** – the spec for the change-tracking feed
+
+---
+
+For questions or to join RESO, contact support+reso-tools@reso.org.

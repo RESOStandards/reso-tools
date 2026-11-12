@@ -192,6 +192,11 @@ The DD flow does several things in sequence:
 4. **Replicates a sample of data** using one of several strategies (full, top-of-file, modification timestamp window)
 5. **Validates the replicated records** against the merged metadata
 
+A certification run samples up to 100,000 records per resource, and a provider may raise that with `--limit` (or
+`ddOptions.limit` in a config file) for a more accurate sample. A limit below 100,000 is for local testing: the run says
+it is not eligible for certification, and it starts no cloud run. A resource with fewer records than the limit gives all
+it has, which certifies as before.
+
 The output is a per-resource report showing what passed, what failed and where the variations are. Strict mode governs schema validation and nothing else: it is on by default, and it fails the run when a replicated record does not validate against the merged metadata. `--no-strict` keeps the run going and records every error instead of stopping at the first, which is how you survey a feed in one pass – at the cost of the run's eligibility, since nothing enforced what it validated. Variations are separate and fail a run whether or not strict is on.
 
 ### Add/Edit (RCP-010)
@@ -723,7 +728,7 @@ const passed = results.filter((r) => r.result.status === 'passed').length;
 console.log(`${passed} of ${results.length} endorsements passed`);
 ```
 
-This is exactly how the **[RESO Desktop Client](https://github.com/RESOStandards/reso-tools/releases/latest)**'s certification UI runs cert in the background while a user watches the progress in real time.
+This is exactly how the **[RESO desktop app](../reso-desktop-client/)**'s certification UI runs cert in the background while a user watches the progress in real time.
 
 ### Using Config Files
 
@@ -838,3 +843,7 @@ Use code `1` to gate a release, code `2` to alert someone that the test infrastr
 * **[RESO Web API Core](https://github.com/RESOStandards/web-api-commander)** – the canonical reference for what Web API Core compliance covers
 * **[RESO Data Dictionary](https://dd.reso.org/)** – the published Data Dictionary the DD cert flow validates against
 * **[DD reference metadata](https://github.com/RESOStandards/reso-tools/tree/main/reso-common/reference-metadata)** – the exact projection of that Dictionary a run compares to, one file per version
+
+---
+
+For questions or to join RESO, contact support+reso-tools@reso.org.
