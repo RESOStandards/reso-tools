@@ -39,7 +39,7 @@ RESO emails you a code; enter it to finish.
 
 <!-- screenshot: sign-in.png -->
 
-For questions or to join RESO, contact support+reso-tools@reso.org.
+For questions or to join RESO, contact support+tools@reso.org.
 
 ## The Dashboard
 

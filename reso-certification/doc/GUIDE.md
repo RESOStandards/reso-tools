@@ -846,4 +846,4 @@ Use code `1` to gate a release, code `2` to alert someone that the test infrastr
 
 ---
 
-For questions or to join RESO, contact support+reso-tools@reso.org.
+For questions or to join RESO, contact support+tools@reso.org.

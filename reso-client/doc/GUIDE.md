@@ -486,4 +486,4 @@ node --env-file=.env npx tsx reso-client/examples/oauth-flow.ts
 
 ---
 
-For questions or to join RESO, contact support+reso-tools@reso.org.
+For questions or to join RESO, contact support+tools@reso.org.
