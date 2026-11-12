@@ -437,4 +437,4 @@ That is the same idea behind `validateQueryOptions` in **[`@reso-standards/reso-
 
 ---
 
-For questions or to join RESO, contact support+reso-tools@reso.org.
+For questions or to join RESO, contact support+tools@reso.org.

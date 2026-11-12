@@ -414,4 +414,4 @@ All four cert flows run against any of the three database backends. The MongoDB 
 
 ---
 
-For questions or to join RESO, contact support+reso-tools@reso.org.
+For questions or to join RESO, contact support+tools@reso.org.

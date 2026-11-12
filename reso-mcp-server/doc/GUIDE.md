@@ -565,4 +565,4 @@ Every number above came from a real query against a seeded sample server, not a 
 
 ---
 
-For questions or to join RESO, contact support+reso-tools@reso.org.
+For questions or to join RESO, contact support+tools@reso.org.

@@ -233,4 +233,4 @@ For more on the design, the v1/v2/v3 progression and the dependencies on grammar
 
 ---
 
-For questions or to join RESO, contact support+reso-tools@reso.org.
+For questions or to join RESO, contact support+tools@reso.org.
