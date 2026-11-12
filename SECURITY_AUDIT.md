@@ -6,11 +6,12 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ## Certification 0.12.2 Security Notes – 2026-11-11
 
-Pre-publish review of `@reso-standards/reso-certification` 0.12.2, covering every change since 0.12.1: a Data Dictionary sample limit of 100,000 or more now certifies, and a cloud run started from such a run carries the limit; `restore` publishes a run's stored results; and `restore` and `archive-report` exchange `CLIENT_SECRET` for a token instead of presenting it.
+Pre-publish review of `@reso-standards/reso-certification` 0.12.2, covering every change since 0.12.1: a Data Dictionary sample limit of 100,000 or more now certifies, and a cloud run started from such a run carries the limit; `restore` publishes a run's stored results; `restore` and `archive-report` exchange `CLIENT_SECRET` for a token instead of presenting it; and the token exchange and `restore` no longer follow an HTTP redirect.
 
 ### Findings Addressed
 
 - **`CLIENT_SECRET` was presented as a credential.** In 0.12.1, `restore` and `archive-report` sent it to the Cert API as the credential on their requests. They now exchange it at the token endpoint of the Cert API they call and present the token that returns, so the secret goes on one request only.
+- **A redirect from the token endpoint was followed, secret included.** In 0.12.1 the client credentials exchange, which every command that mints a token uses, followed an HTTP redirect. A 307 or 308 keeps the method and the body, so a redirect would have carried `CLIENT_ID` and `CLIENT_SECRET` to whatever host it named. The exchange and `restore`'s posts now refuse a redirect and report it, as `archive-report` already did. Neither token path a credentials file names (`/api/v1/oauth/token`, and `/api/v1/oauth2/token` in older files) redirects, so no working exchange depended on following one.
 
 ### Checked and Clean
 
@@ -21,13 +22,9 @@ Pre-publish review of `@reso-standards/reso-certification` 0.12.2, covering ever
 - **What `restore` publishes:** only a Data Dictionary run that passed and is certifiable, so a failed result cannot replace a provider's standing passed report. The provider and recipient come from the stored directory layout, never from a flag.
 - **Package contents:** `npm pack --dry-run` lists 558 files under the `files` allowlist (`dist`, the license, the README, the sample metadata and the schemas): no tests, fixtures, environment files or run output. The eight added since 0.12.1 are the build output of the new `dd-sample-limit` and `restore-runs` modules.
 
-### Open, Unchanged in This Release
-
-- **Requests to the Cert API follow an HTTP redirect,** as they did in 0.12.1, except `archive-report`'s POST, which never follows one. For the token exchange that means a redirect from the token endpoint would carry the form, secret included, to the redirect's target. Only the Cert API's own token endpoint, over HTTPS, can send that redirect. Refusing redirects follows separately, once the token endpoint's paths are confirmed not to redirect, since refusing one there would otherwise stop every token exchange.
-
 ### Method
 
-Review of every change since 0.12.1 against the built package: `npm audit`, `npm pack --dry-run` with a scan of the listed files, the full test suite (3,452 tests across 8 packages, 2,333 in this package), lint and typecheck.
+Review of every change since 0.12.1 against the built package: `npm audit`, `npm pack --dry-run` with a scan of the listed files, the full test suite (3,458 tests across 8 packages, 2,339 in this package), lint and typecheck.
 
 ---
 

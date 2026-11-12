@@ -250,9 +250,13 @@ export const runRunRestore = async (
     };
   })();
 
+  // A redirect is never followed: each request carries the credential, and a 307 or 308 would replay it, body
+  // and all, to whatever host the redirect names. A 3xx comes back as itself and is reported as a failure.
+  const send = (url: string, init: RequestInit): Promise<Response> => fetchFn(url, { ...init, redirect: 'manual' });
+
   const publish = async (run: StoredRun, reportType: string, body: unknown, availability: unknown): Promise<string> => {
     const json = { Authorization: await authorization(), 'Content-Type': 'application/json' };
-    const created = await fetchFn(`${options.origin}/api/v1/certification_reports/${reportType}/${encodeURIComponent(run.providerUoi)}`, {
+    const created = await send(`${options.origin}/api/v1/certification_reports/${reportType}/${encodeURIComponent(run.providerUoi)}`, {
       method: 'POST',
       headers: { ...json, recipientUoi: run.recipientUoi, providerUsi: run.providerUsi, [SEND_NOTIFICATION_HEADER]: 'false' },
       body: JSON.stringify(body)
@@ -262,7 +266,7 @@ export const runRunRestore = async (
     const reportId = isRecord(createdBody) && typeof createdBody.id === 'string' ? createdBody.id : undefined;
     if (reportId === undefined) throw new Error('Metadata report post succeeded but returned no report id');
 
-    const posted = await fetchFn(`${options.origin}/api/v1/payload/data_availability/${encodeURIComponent(reportId)}`, {
+    const posted = await send(`${options.origin}/api/v1/payload/data_availability/${encodeURIComponent(reportId)}`, {
       method: 'POST',
       headers: json,
       body: JSON.stringify(availability)
@@ -272,7 +276,7 @@ export const runRunRestore = async (
     options.record(run.key);
 
     if (options.notifyProvider) {
-      const notified = await fetchFn(`${options.origin}${NOTIFY_PROVIDER_PATH}`, {
+      const notified = await send(`${options.origin}${NOTIFY_PROVIDER_PATH}`, {
         method: 'POST',
         headers: json,
         body: JSON.stringify({ id: reportId })

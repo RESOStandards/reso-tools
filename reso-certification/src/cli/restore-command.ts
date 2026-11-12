@@ -126,13 +126,17 @@ export interface RestoreSummary {
  * `authorization` is the whole header value, a bearer token the caller resolved. The response body is read
  * for its message only - it is an error message, and the point of reading it is to say WHY a report was
  * refused rather than just that it was.
+ *
+ * A redirect is never followed, so the credential and the report go only to the server named. A 3xx comes
+ * back as itself and counts as a failure.
  */
 const postReport = async (url: string, authorization: string, report: unknown): Promise<Omit<RestoreOutcome, 'key'>> => {
   try {
     const response = await fetch(`${url.replace(/\/+$/, '')}/api/v1/restore`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: authorization },
-      body: JSON.stringify(report)
+      body: JSON.stringify(report),
+      redirect: 'manual'
     });
     const text = await response.text();
     return { status: response.status, message: text.slice(0, 300) };

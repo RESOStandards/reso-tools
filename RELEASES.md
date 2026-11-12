@@ -44,6 +44,9 @@
 - **`restore` and `archive-report` no longer present `CLIENT_SECRET` as a credential.** They exchange `CLIENT_ID`
   and `CLIENT_SECRET` at the token endpoint of the Cert API they call and present the token it returns, and refuse a
   `TOKEN_URI` on any other host before a request. `CERT_API_TOKEN` gives a bearer token directly instead.
+- **A token request never follows a redirect.** The client credentials exchange, used by every command that mints a
+  token, and `restore`'s posts now refuse an HTTP redirect and report it, so `CLIENT_SECRET` and the credential go only
+  to the host named. `archive-report` already did.
 
 ---
 

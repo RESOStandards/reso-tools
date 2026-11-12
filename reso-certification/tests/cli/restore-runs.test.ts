@@ -254,6 +254,25 @@ describe('runRunRestore', () => {
     expect(recorded).toEqual([]);
   });
 
+  it('never follows a redirect: every request it sends says so', async () => {
+    const root = freshRoot();
+    storedRun(root);
+    const api = certApi();
+    await restore(root, { execute: true, notifyProvider: true, fetchFn: api });
+    expect(api.mock.calls.map(call => call[1].redirect)).toEqual(['manual', 'manual', 'manual']);
+  });
+
+  it('reports a redirect of the metadata post as a failure, with its status, and records nothing', async () => {
+    const root = freshRoot();
+    storedRun(root);
+    const api = certApi({ create: reply(307, '') });
+    const { result, recorded } = await restore(root, { execute: true, fetchFn: api });
+    expect(result.outcomes.map(o => o.status)).toEqual(['failed']);
+    expect(result.outcomes[0]?.reason).toMatch(/HTTP 307/);
+    expect(api).toHaveBeenCalledTimes(1);
+    expect(recorded).toEqual([]);
+  });
+
   it('asks for the credential once, however many runs it sends', async () => {
     const root = freshRoot();
     storedRun(root, { run: 'run-1' });
