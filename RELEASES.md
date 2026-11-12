@@ -4,17 +4,6 @@
 
 ## Unreleased
 
-### Data Dictionary: a larger sample certifies
-
-- **Certification samples up to 100,000 records per resource, and a provider may raise that for a more accurate
-  sample.** A run with `--limit` or a config entry's `ddOptions.limit` of 100,000 or more is now eligible for
-  certification, and a cloud run started from it samples the same number. Before this, any limit, larger ones
-  included, made the run ineligible.
-- **A limit below 100,000 is unchanged:** it is for local testing, its verdict says the run is not eligible, and it
-  starts no cloud run. A server with fewer than 100,000 records in a resource still gives all it has, which
-  certifies as before.
-- A limit that is not a whole number counts as below 100,000.
-
 ### The reference server can serve your own resources, read-only
 
 - **`RESOURCES`** chooses the resources a deployment serves, by name. Define them in the metadata file and list them
@@ -26,6 +15,38 @@
   seeding at start, since a production database is set up separately and the server can then use a login that cannot
   write.
 - Without these settings nothing changes.
+
+---
+
+## Certification 0.12.2 – 2026-11-11
+
+### Data Dictionary: a larger sample certifies
+
+- **Certification samples up to 100,000 records per resource, and a provider may raise that for a more accurate
+  sample.** A run with `--limit` or a config entry's `ddOptions.limit` of 100,000 or more is now eligible for
+  certification, and a cloud run started from it samples the same number. Before this, any limit, larger ones
+  included, made the run ineligible.
+- **A limit below 100,000 is unchanged:** it is for local testing, its verdict says the run is not eligible, and it
+  starts no cloud run. A server with fewer than 100,000 records in a resource still gives all it has, which
+  certifies as before.
+- A limit that is not a whole number counts as below 100,000.
+
+### `restore` publishes a run's stored results, and sends `CLIENT_SECRET` only to the token endpoint
+
+- **`reso-cert restore --path <dir>` restores a run's stored results** as well as a certification server backup,
+  chosen by what the directory holds. A stored run is published as the run would have published it: the metadata
+  report, then the availability report against the report id that post returned. Whose run it is comes from the
+  stored layout, `<endorsement>-<version>/<providerUoi>-<providerUsi>/<recipientUoi>/<run>/`.
+- **Only a Data Dictionary run that passed and is certifiable is published.** A failed run is refused: posted over a
+  provider's standing passed report, it would replace it.
+- **`--notify-provider`** emails each provider the passed notice once both of its reports are on file. `--url` is
+  now optional and taken from `TOKEN_URI` when absent, as `archive-report` already did.
+- **`restore` and `archive-report` no longer present `CLIENT_SECRET` as a credential.** They exchange `CLIENT_ID`
+  and `CLIENT_SECRET` at the token endpoint of the Cert API they call and present the token it returns, and refuse a
+  `TOKEN_URI` on any other host before a request. `CERT_API_TOKEN` gives a bearer token directly instead.
+- **A token request never follows a redirect.** The client credentials exchange, used by every command that mints a
+  token, and `restore`'s posts now refuse an HTTP redirect and report it, so `CLIENT_SECRET` and the credential go only
+  to the host named. `archive-report` already did.
 
 ---
 

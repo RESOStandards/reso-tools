@@ -1,11 +1,10 @@
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { resolveCertApiCredential } from '../../src/cli/cert-api-credential.js';
-import { deriveReportType, findBackupReports, readBackupReport } from '../../src/cli/restore-command.js';
+import { deriveReportType, findBackupReports, readBackupReport, runRestore } from '../../src/cli/restore-command.js';
 
 const backupFixture = (): string => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'reso-backup-')));
@@ -59,18 +58,41 @@ describe('deriveReportType', () => {
   });
 });
 
-describe('resolveCertApiCredential, as restore uses it', () => {
-  it('prefers the value the downloaded credentials file carries', () => {
-    expect(resolveCertApiCredential({ CLIENT_SECRET: 'from-file', CERTIFICATION_API_KEY: 'older' })).toBe('from-file');
+describe('runRestore', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  it('falls back to the older variable, and is undefined with neither', () => {
-    expect(resolveCertApiCredential({ CERTIFICATION_API_KEY: 'older' })).toBe('older');
-    expect(resolveCertApiCredential({})).toBeUndefined();
+  /** Restore the fixture backup against a stubbed server, returning the requests, the summary and the ledger. */
+  const restoreWith = async (answer: () => Response) => {
+    const api = vi.fn(async (_url: string, _init: RequestInit) => answer());
+    vi.stubGlobal('fetch', api);
+    const ledgerPath = join(realpathSync(mkdtempSync(join(tmpdir(), 'reso-ledger-'))), 'restored.txt');
+    const summary = await runRestore(
+      {
+        path: backupFixture(),
+        url: 'https://cert-api.example.org',
+        execute: true,
+        concurrency: 1,
+        ledgerPath,
+        deriveMissingType: false,
+        authorize: async () => 'Bearer minted-token'
+      },
+      () => undefined
+    );
+    return { api, summary, ledger: existsSync(ledgerPath) ? readFileSync(ledgerPath, 'utf8') : '' };
+  };
+
+  it('never follows a redirect: every post says so', async () => {
+    const { api, summary } = await restoreWith(() => new Response('{}', { status: 200 }));
+    expect(summary.succeeded).toBe(2);
+    expect(api.mock.calls.map(call => call[1].redirect)).toEqual(['manual', 'manual']);
   });
 
-  it('reads an empty or blank value as absent, which is what restore already refused', () => {
-    expect(resolveCertApiCredential({ CLIENT_SECRET: '', CERTIFICATION_API_KEY: 'older' })).toBe('older');
-    expect(resolveCertApiCredential({ CLIENT_SECRET: '  ', CERTIFICATION_API_KEY: '' })).toBeUndefined();
+  it('counts a redirected post as a failure and records nothing in the ledger', async () => {
+    const { summary, ledger } = await restoreWith(() => new Response('', { status: 307 }));
+    expect(summary.succeeded).toBe(0);
+    expect(summary.failures.map(failure => failure.status)).toEqual([307, 307]);
+    expect(ledger).toBe('');
   });
 });

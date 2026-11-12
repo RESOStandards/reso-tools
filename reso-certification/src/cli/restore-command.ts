@@ -2,8 +2,6 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, statSync } from 
 import { join, relative, resolve, sep } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 
-import { MISSING_CERT_API_CREDENTIAL, resolveCertApiCredential } from './cert-api-credential.js';
-
 /** A single report file found in a backup, with everything the restore needs to post it. */
 export interface BackupReport {
   /** Absolute path on disk. */
@@ -93,7 +91,7 @@ export interface RestoreOutcome {
 }
 
 /** Read the ledger, which holds one already-restored key per line. */
-const readLedger = (path: string): ReadonlySet<string> =>
+export const readLedger = (path: string): ReadonlySet<string> =>
   existsSync(path) ? new Set(readFileSync(path, 'utf8').split('\n').filter(Boolean)) : new Set();
 
 export interface RestoreOptions {
@@ -105,6 +103,8 @@ export interface RestoreOptions {
   readonly ledgerPath: string;
   /** Supply a missing `type` where the directory and the document's own version agree. */
   readonly deriveMissingType: boolean;
+  /** The `Authorization` header value. Only called with `execute`, so a dry run needs no credential. */
+  readonly authorize: () => Promise<string>;
 }
 
 export interface RestoreSummary {
@@ -123,16 +123,20 @@ export interface RestoreSummary {
 /**
  * Post one report to the server's restore endpoint.
  *
- * The credential is sent as a Bearer. The response body is read for its message only - it is an
- * error message, and the point of reading it is to say WHY a report was refused rather than just
- * that it was.
+ * `authorization` is the whole header value, a bearer token the caller resolved. The response body is read
+ * for its message only - it is an error message, and the point of reading it is to say WHY a report was
+ * refused rather than just that it was.
+ *
+ * A redirect is never followed, so the credential and the report go only to the server named. A 3xx comes
+ * back as itself and counts as a failure.
  */
-const postReport = async (url: string, credential: string, report: unknown): Promise<Omit<RestoreOutcome, 'key'>> => {
+const postReport = async (url: string, authorization: string, report: unknown): Promise<Omit<RestoreOutcome, 'key'>> => {
   try {
     const response = await fetch(`${url.replace(/\/+$/, '')}/api/v1/restore`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${credential}` },
-      body: JSON.stringify(report)
+      headers: { 'Content-Type': 'application/json', Authorization: authorization },
+      body: JSON.stringify(report),
+      redirect: 'manual'
     });
     const text = await response.text();
     return { status: response.status, message: text.slice(0, 300) };
@@ -157,11 +161,6 @@ const withConcurrency = async <T>(items: ReadonlyArray<T>, limit: number, run: (
  * it is pointed at and the cost of discovering that afterwards is a reindex.
  */
 export const runRestore = async (options: RestoreOptions, log: (line: string) => void): Promise<RestoreSummary> => {
-  const credential = resolveCertApiCredential();
-  if (options.execute && !credential) {
-    throw new Error(MISSING_CERT_API_CREDENTIAL);
-  }
-
   const done = readLedger(options.ledgerPath);
   const all = findBackupReports(options.path);
   const pending = all.filter(report => !done.has(report.key));
@@ -206,8 +205,9 @@ export const runRestore = async (options: RestoreOptions, log: (line: string) =>
     };
   }
 
+  const authorization = await options.authorize();
   await withConcurrency(selected, options.concurrency, async report => {
-    const outcome = await postReport(options.url, credential as string, bodyFor(report));
+    const outcome = await postReport(options.url, authorization, bodyFor(report));
     if (outcome.status >= 200 && outcome.status < 300) {
       succeeded += 1;
       appendFileSync(options.ledgerPath, `${report.key}\n`);

@@ -12,7 +12,30 @@ let server: Server;
 let tokenUri: string;
 let origin: string;
 
+// A second host. The token endpoint can redirect here, and nothing may ever arrive.
+let elsewhere: Server;
+let elsewhereTokenUri: string;
+const elsewhereReceived: string[] = [];
+
+const listen = (app: express.Express): Promise<{ readonly server: Server; readonly origin: string }> =>
+  new Promise(resolve => {
+    const started = app.listen(0, '127.0.0.1', () => {
+      const address = started.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      resolve({ server: started, origin: `http://127.0.0.1:${port}` });
+    });
+  });
+
 beforeAll(async () => {
+  const other = express();
+  other.use((req, res) => {
+    elsewhereReceived.push(`${req.method} ${req.url}`);
+    res.json({ access_token: 'token-from-elsewhere-0001' });
+  });
+  const started = await listen(other);
+  elsewhere = started.server;
+  elsewhereTokenUri = `${started.origin}/api/v1/oauth/token`;
+
   const app = express();
   app.use(express.urlencoded({ extended: false }));
 
@@ -32,6 +55,10 @@ beforeAll(async () => {
         return;
       case 'html':
         res.status(502).type('html').send('<html><body><h1>502 Bad Gateway</h1><script>x()</script></body></html>');
+        return;
+      case 'redirects':
+        // A 307 keeps the method and the body, so a client that follows it sends the secret on.
+        res.redirect(307, elsewhereTokenUri);
         return;
       case 'echoes-secret':
         res.status(400).json({ error: 'invalid_request', error_description: `bad secret ${CLIENT_SECRET}` });
@@ -53,9 +80,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await new Promise<void>((resolve, reject) => {
-    server.close(err => (err ? reject(err) : resolve()));
-  });
+  for (const started of [server, elsewhere]) {
+    await new Promise<void>((resolve, reject) => {
+      started.close(err => (err ? reject(err) : resolve()));
+    });
+  }
 });
 
 const ENV_KEYS = ['TOKEN_URI', 'CLIENT_ID', 'CLIENT_SECRET'] as const;
@@ -133,6 +162,13 @@ describe('describeMintRefusal', () => {
     ).toEqual(['OAuth2 token mint failed: HTTP 500 Internal Server Error from https://h (server_error: Unable to issue a token).']);
   });
 
+  it('says a redirect is refused, without credential advice', () => {
+    expect(describeMintRefusal(307, 'Temporary Redirect', 'https://h', undefined)).toEqual([
+      'OAuth2 token mint failed: HTTP 307 Temporary Redirect from https://h.',
+      '  A redirect from the token endpoint is never followed, since the request carries the client secret. Check that TOKEN_URI is the token endpoint itself.'
+    ]);
+  });
+
   it('prints the status alone when the body gave no reason', () => {
     expect(describeMintRefusal(502, 'Bad Gateway', 'https://h', undefined)).toEqual([
       'OAuth2 token mint failed: HTTP 502 Bad Gateway from https://h.'
@@ -167,6 +203,16 @@ describe('mintOAuth2ClientCredentialsToken', () => {
     const { token, printed } = await mintAs('html');
     expect(token).toBeUndefined();
     expect(printed).toBe(`OAuth2 token mint failed: HTTP 502 Bad Gateway from ${origin}.`);
+  });
+
+  it('never follows a redirect, so the secret is not sent on to another host', async () => {
+    elsewhereReceived.length = 0;
+    const { token, printed } = await mintAs('redirects');
+    expect(token).toBeUndefined();
+    expect(elsewhereReceived).toEqual([]);
+    expect(printed).toContain(`OAuth2 token mint failed: HTTP 307 Temporary Redirect from ${origin}.`);
+    expect(printed).toContain('A redirect from the token endpoint is never followed');
+    expect(printed).not.toContain(CLIENT_SECRET);
   });
 
   it('masks the client secret if the server echoes it back', async () => {

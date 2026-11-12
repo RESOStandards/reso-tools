@@ -11,9 +11,9 @@
  * finds nothing stops the command before the archive. A value that cannot be read is never guessed.
  */
 
-import { ensureHttps, isLoopbackHost } from '../sdk/common.js';
-import { MISSING_CERT_API_CREDENTIAL, resolveCertApiCredential } from './cert-api-credential.js';
-import { registerSecret } from './secrets.js';
+import { registerCertApiSecrets, resolveCertApiAuthorization, resolveCertApiOrigin } from './cert-api-credential.js';
+
+export { certApiOriginFromTokenUri, resolveCertApiOrigin } from './cert-api-credential.js';
 
 /** The report fields the warning and the summary use. Every one optional: the server, not the CLI, fills them. */
 export interface ReportSummary {
@@ -83,9 +83,6 @@ const WARNING_NOTIFICATION = "You will receive a notification it's been archived
 const ARCHIVED_STATUS = 201;
 const ARCHIVED_BODY = 'success';
 
-/** The token endpoint paths the downloaded credentials file can name. `/oauth2` is the legacy prefix. */
-const TOKEN_PATHS: ReadonlySet<string> = new Set(['/api/v1/oauth/token', '/api/v1/oauth2/token']);
-
 /** As many characters of a server message as are repeated, as `restore` does. */
 const MESSAGE_LIMIT = 300;
 
@@ -104,75 +101,6 @@ const REMOVED_UNCONFIRMED =
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const stringOf = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined);
-
-/**
- * True for a host the Cert API can be on: loopback, or a name with a dot in it.
- *
- * The credentials file the certification site produced from 2025-04-03 to 2026-10-20 carried
- * `TOKEN_URI=undefined/api/v1/oauth/token`, a lookup that missed. Prefixed with a scheme that is the
- * host `undefined`, and a request to it would carry the credential to a DNS lookup for that name.
- * A bare single-label name is never where the API is, so it is refused before any request.
- */
-const isApiHost = (hostname: string): boolean => isLoopbackHost(hostname) || hostname.includes('.');
-
-/**
- * The Cert API origin a `TOKEN_URI` names, or undefined.
- *
- * Only when the host can be an API host and the path is exactly the token endpoint. The file's own
- * comment records that older files were built from the site host, where `/api/v1` answers the
- * single-page app with a 200, so a value with any other path says nothing reliable about where the
- * API is.
- */
-export const certApiOriginFromTokenUri = (tokenUri: string): string | undefined => {
-  try {
-    const parsed = new URL(tokenUri.trim());
-    return isApiHost(parsed.hostname) && TOKEN_PATHS.has(parsed.pathname) ? parsed.origin : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
-/** Why a parsed `TOKEN_URI` does not name the API, for the refusal. */
-const tokenUriRefusal = (tokenUri: string): string => {
-  const hostname = ((): string | undefined => {
-    try {
-      return new URL(tokenUri).hostname;
-    } catch {
-      return undefined;
-    }
-  })();
-  return hostname !== undefined && !isApiHost(hostname)
-    ? `TOKEN_URI names the host ${JSON.stringify(hostname)}, which cannot be the Cert API, so the API address cannot be taken from it. Pass --url.`
-    : 'TOKEN_URI does not name the Cert API token endpoint (/api/v1/oauth/token), so the API address cannot be taken from it. Pass --url.';
-};
-
-/**
- * The Cert API origin: `--url` when given, else from `TOKEN_URI`, either way as https.
- *
- * A `--url` with a path is refused rather than trimmed: a `TOKEN_URI` pasted here would otherwise
- * silently become a different address. The API is expected at an origin's root.
- */
-export const resolveCertApiOrigin = (input: { readonly url?: string; readonly env: NodeJS.ProcessEnv }): string => {
-  if (input.url !== undefined) {
-    const secured = ensureHttps(input.url, '--url');
-    const parsed = new URL(secured);
-    if (!isApiHost(parsed.hostname)) {
-      throw new Error(`--url names the host ${JSON.stringify(parsed.hostname)}, which cannot be the Cert API.`);
-    }
-    if (parsed.pathname !== '/' || parsed.search !== '' || parsed.hash !== '') {
-      throw new Error(`--url must be the Cert API origin without a path, such as ${parsed.origin}.`);
-    }
-    return parsed.origin;
-  }
-  const tokenUri = input.env.TOKEN_URI;
-  if (tokenUri === undefined) {
-    throw new Error('No Cert API address. Pass --url, or run where the downloaded credentials file (TOKEN_URI) can be read.');
-  }
-  const secured = ensureHttps(tokenUri, 'TOKEN_URI');
-  const origin = certApiOriginFromTokenUri(secured);
-  if (origin === undefined) throw new Error(tokenUriRefusal(secured));
-  return origin;
-};
 
 /** The site's warning, with the report's values filled in. The provider is named only when it differs from the recipient. */
 export const archiveWarning = (report: ReportSummary, providerName: string | undefined): string => {
@@ -339,9 +267,7 @@ const archive = async (origin: string, authorization: string, reportId: string):
  */
 export const runArchiveReport = async (options: ArchiveReportOptions, log: (line: string) => void): Promise<ArchiveReportResult> => {
   const env = options.env ?? process.env;
-  const credential = resolveCertApiCredential(env);
-  if (credential === undefined) throw new Error(MISSING_CERT_API_CREDENTIAL);
-  registerSecret(credential);
+  registerCertApiSecrets(env);
   const reportId = options.reportId.trim();
   if (!REPORT_ID.test(reportId)) {
     throw new Error(
@@ -349,7 +275,7 @@ export const runArchiveReport = async (options: ArchiveReportOptions, log: (line
     );
   }
   const origin = resolveCertApiOrigin({ ...(options.url === undefined ? {} : { url: options.url }), env });
-  const authorization = `Bearer ${credential}`;
+  const authorization = await resolveCertApiAuthorization({ env, origin });
   const confirmed = options.confirm;
 
   const read = await readReport(origin, authorization, reportId);

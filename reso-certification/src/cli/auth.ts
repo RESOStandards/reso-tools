@@ -79,6 +79,12 @@ export const describeMintRefusal = (
 ): ReadonlyArray<string> => {
   const reason = fields ? ` (${fields.error}${fields.description ? `: ${fields.description}` : ''})` : '';
   const headline = `OAuth2 token mint failed: HTTP ${status}${statusText ? ` ${statusText}` : ''} from ${origin}${reason}.`;
+  if (status >= 300 && status < 400) {
+    return [
+      headline,
+      '  A redirect from the token endpoint is never followed, since the request carries the client secret. Check that TOKEN_URI is the token endpoint itself.'
+    ];
+  }
   if (!fields || !CREDENTIAL_REFUSALS.has(fields.error)) return [headline];
   return [
     headline,
@@ -106,12 +112,29 @@ const originOf = (url: string): string => {
  * token (variations service, future provider-services endpoints, etc.).
  */
 export const mintOAuth2ClientCredentialsToken = async (): Promise<string | undefined> => {
-  // Credentials travel on this one, so it is never allowed to be plain HTTP.
-  const tokenUriRaw = process.env.TOKEN_URI;
-  const tokenUri = tokenUriRaw ? ensureHttps(tokenUriRaw, 'TOKEN_URI') : undefined;
+  const tokenUri = process.env.TOKEN_URI;
   const clientId = process.env.CLIENT_ID;
   const clientSecret = process.env.CLIENT_SECRET;
   if (!tokenUri || !clientId || !clientSecret) return undefined;
+  return exchangeClientCredentials({ tokenUri, clientId, clientSecret });
+};
+
+/**
+ * The one OAuth2 client credentials exchange in the CLI: post the three values to `tokenUri` as a form and
+ * return the `access_token`, or undefined when the endpoint refuses (the reason is printed, the secret never).
+ * The only request that carries `clientSecret`.
+ *
+ * A redirect is never followed. A 307 or 308 keeps the method and the body, so following one would send the
+ * secret to whatever host the redirect names. A 3xx comes back as itself and is reported as a refusal.
+ */
+export const exchangeClientCredentials = async (input: {
+  readonly tokenUri: string;
+  readonly clientId: string;
+  readonly clientSecret: string;
+}): Promise<string | undefined> => {
+  // Credentials travel on this one, so it is never allowed to be plain HTTP.
+  const tokenUri = ensureHttps(input.tokenUri, 'TOKEN_URI');
+  const { clientId, clientSecret } = input;
   // Registered where it is used: this path reads the secret from the environment, so the chokepoint
   // in resolveCliAuth never sees it.
   registerSecret(clientSecret);
@@ -125,7 +148,8 @@ export const mintOAuth2ClientCredentialsToken = async (): Promise<string | undef
     const res = await fetch(tokenUri, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString()
+      body: params.toString(),
+      redirect: 'manual'
     });
     if (!res.ok) {
       const body: unknown = await res.json().catch(() => undefined);
