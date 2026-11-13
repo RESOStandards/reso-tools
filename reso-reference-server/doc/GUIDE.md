@@ -378,7 +378,7 @@ All four cert flows run against any of the three database backends. The MongoDB 
 
 ## Where to Next
 
-* **Filling the server with data** – the seed dataset above is committed to this repository. The generator that produced it moved to the private `reso-tools-private` repository in the v1.0.0 split, along with the browser UI and the CORS proxy.
+* **Filling the server with data** – the seed dataset above is committed to this repository. The generator that produced it is not part of this repository. Members can fill a server with records using the Data Generator in the [RESO desktop app](https://github.com/RESOStandards/reso-tools/releases/latest).
 * **Querying the server interactively** – the desktop certification app, distributed from [Releases](https://github.com/RESOStandards/reso-tools/releases/latest), bundles a browser UI over this server. It is built around the **[RESO Client SDK](../reso-client/)**, which connects to any RESO server, including this one.
 * **Validating records** – the **[reso-validation](../reso-validation/)** library runs on every Add/Edit write against the reference server. It is also a stand-alone library you can use in your own application to check records before sending them.
 * **Running the cert tools as code** – the **[RESO Certification](../reso-certification/)** package gives you a CLI and an SDK for running every cert flow programmatically, not just through Docker. Useful for CI pipelines and for embedding cert testing inside other tools.

@@ -22,8 +22,8 @@ const desktopExport = (overrides: Record<string, unknown> = {}) => ({
       id: '6b1c4d1e-0000-4000-8000-000000000001',
       description: 'Desktop export',
       serviceRootUri: 'https://api.example.com/odata',
-      recipientUoi: 'M00000554',
-      providerUsi: '50039',
+      recipientUoi: 'M00000000',
+      providerUsi: '99999',
       auth: { mode: 'client_credentials', clientId: 'cid', clientSecret: 'csec', tokenUrl: 'https://auth.example.com/token', scope: 'api' },
       endorsements: ['dd', 'core', 'add-edit', 'entity-event'],
       ddOptions: {
@@ -152,8 +152,8 @@ describe('OriginatingSystemName / ID resolution per endorsement', () => {
         {
           id: 'x',
           serviceRootUri: 'https://api.example.com/odata',
-          recipientUoi: 'M00000554',
-          providerUsi: '50039',
+          recipientUoi: 'M00000000',
+          providerUsi: '99999',
           originatingSystemName: 'RIS',
           clientCredentials: { clientId: 'cid', clientSecret: 'csec', tokenUri: 'https://auth.example.com/token' },
           ddOptions: { version: '2.1' },

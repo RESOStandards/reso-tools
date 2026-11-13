@@ -34,8 +34,8 @@ Configuration files for each endorsement, ready to copy and fill in.
     {
       "description": "Production feed",
       "serviceRootUri": "https://api.example.com/odata",
-      "recipientUoi": "M00000554",
-      "providerUsi": "50039",
+      "recipientUoi": "M00000000",
+      "providerUsi": "99999",
       "token": "your-bearer-token"
     }
   ]
@@ -86,8 +86,8 @@ These scope a feed that carries records from more than one originating system, s
 ```json
 {
   "serviceRootUri": "https://api.example.com/odata",
-  "recipientUoi": "M00000554",
-  "providerUsi": "50039",
+  "recipientUoi": "M00000000",
+  "providerUsi": "99999",
   "token": "your-bearer-token",
   "originatingSystemName": "MYSYSTEM"
 }

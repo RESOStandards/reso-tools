@@ -1,7 +1,7 @@
 /**
  * Cloud certification runs: starting one, and reading where each stands.
  *
- * Three routes on reso-services-v2, the ones the desktop calls, so the CLI and the UI share them:
+ * Three routes on RESO's services, the ones the desktop calls, so the CLI and the UI share them:
  *  - `POST /v2/certification/reservations/{endorsementName}/{endorsementVersion}/{providerUoi}` reserves a
  *    request ID as a local run starts, so the service records when it started. It takes the targets only, never
  *    a credential.

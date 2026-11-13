@@ -462,8 +462,8 @@ A minimal file needs five things: the organization being certified, and then per
     {
       "description": "Production feed",
       "serviceRootUri": "https://api.example.com/odata",
-      "recipientUoi": "M00000554",
-      "providerUsi": "50039",
+      "recipientUoi": "M00000000",
+      "providerUsi": "99999",
       "token": "your-bearer-token"
     }
   ]
@@ -491,8 +491,8 @@ Three rules are worth knowing, because each is easy to get wrong:
 ```json
 {
   "serviceRootUri": "https://api.example.com/odata",
-  "recipientUoi": "M00000554",
-  "providerUsi": "50039",
+  "recipientUoi": "M00000000",
+  "providerUsi": "99999",
   "token": "your-bearer-token",
   "originatingSystemName": "MYSYSTEM"
 }

@@ -3,8 +3,8 @@
  *
  * POSTs a metadata report to the cert-backend `/compute` endpoint and returns
  * the variations report. This replaces the local `findVariations` matcher: the
- * canonical + in-review blend and the machine matching now run server-side
- * (reso-services-v2). Both clients call this one function —
+ * canonical + in-review blend and the machine matching now run in RESO's
+ * Variations Service. Both clients call this one function —
  *  - Desktop / web UI (members): pass the logged-in session bearer obtained
  *    from the cert endpoint at login;
  *  - CLI (non-members, the free path): omit the bearer and a provider token is

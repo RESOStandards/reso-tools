@@ -7,10 +7,9 @@ recognize as "they meant the standard field, they just spelled it differently."
 
 ## Thin Client Over a Backend Service
 
-The matching itself no longer runs here. The canonical + in-review blend and the
-fuzzy machine matching moved server-side (reso-services-v2); this module is the
-client. `computeVariationsViaService` POSTs the report to the cert-backend
-`/compute` endpoint and returns the variations report. The frozen v3.0.0 local
+The matching itself no longer runs here. It runs in RESO's Variations Service,
+and this module is the client: `computeVariationsViaService` posts the report to
+the service's `/compute` route and returns the variations report. The frozen v3.0.0 local
 matcher that used to live in `src/legacy/lib/variations` is being retired in
 favor of this path.
 
