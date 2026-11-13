@@ -47,15 +47,23 @@ const odataJson = (body: unknown, status = 200): Response =>
 
 const resourceOf = (path: string): string => path.split(/[?(/]/)[0];
 
+/** A request's path and query under the mock's service root, or undefined for any other origin. Compared by parsed
+ *  origin, not by string prefix, so a host such as `default-resources.local.example` is never taken for the mock. */
+const pathOf = (url: string): string | undefined => {
+  const parsed = new URL(url);
+  return parsed.origin === BASE ? `${parsed.pathname.replace(/^\//, '')}${parsed.search}` : undefined;
+};
+
 const installMock = (resources: ReadonlyArray<readonly [string, string]>): { readonly calls: ReadonlyArray<string> } => {
   const calls: string[] = [];
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: string | URL | Request) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     calls.push(url);
-    if (url.includes('/$metadata')) {
+    const path = pathOf(url);
+    if (path === undefined) return odataJson({ value: [] }, 404);
+    if (path.startsWith('$metadata')) {
       return new Response(buildEdmx(resources), { status: 200, headers: { 'content-type': 'application/xml', 'odata-version': '4.01' } });
     }
-    const path = url.startsWith(BASE) ? url.slice(BASE.length).replace(/^\//, '') : url;
     if (path === '' || path.startsWith('?')) {
       return odataJson({ '@odata.context': `${BASE}/$metadata`, value: resources.map(([n]) => ({ name: n, kind: 'EntitySet', url: n })) });
     }
@@ -66,7 +74,12 @@ const installMock = (resources: ReadonlyArray<readonly [string, string]>): { rea
 };
 
 const sampled = (calls: ReadonlyArray<string>): ReadonlyArray<string> => [
-  ...new Set(calls.filter(u => u.includes('?$top=1000')).map(u => resourceOf(u.slice(BASE.length).replace(/^\//, ''))))
+  ...new Set(
+    calls
+      .map(pathOf)
+      .filter((path): path is string => path?.includes('?$top=1000') ?? false)
+      .map(resourceOf)
+  )
 ];
 
 const makeConfig = (outputDir: string, over: Partial<CoreConfig> = {}): CoreConfig => ({
