@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+### Ask RESO's Assistant from the command line
+
+- **`reso-cert ask`** sends a question to RESO's Assistant with the credential in your `credentials.env`, shows the
+  Assistant's progress while it works, and prints the answer, any statements a reviewer could not confirm, and the
+  sources. `--json` prints one object for scripts.
+- The Assistant is in a closed beta. Its address comes with access: `--origin`, or `RESO_ASSISTANT_ORIGIN`.
+
 ### The reference server can serve your own resources, read-only
 
 - **`RESOURCES`** chooses the resources a deployment serves, by name. Define them in the metadata file and list them

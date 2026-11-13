@@ -53,9 +53,10 @@ environment a command will write to, look at the host in `TOKEN_URI`.
 |---|---|---|
 | `RESO_SERVICES_URL` | `find-variations`, `rcf`, `update-variations`, the variations-review commands, the `cloud` commands | Base URL of RESO's services, the Variations Service and cloud runs. Same for every environment. |
 | `RESO_CLOUD_UPDATES_URL` | `cloud watch` | Address of RESO's live updates on cloud runs, a `wss://` address. A bare host is read as `wss`, and a `ws` address is upgraded unless it is on your own machine. |
-| `TOKEN_URI` | the same commands, and `archive-report` | OAuth2 token endpoint. **This is what selects QA versus production.** `archive-report` also reads the Cert API host off it. |
-| `CLIENT_ID`, `CLIENT_SECRET` | the same commands, `restore` and `archive-report` | OAuth2 client credentials the token is minted from. `restore` and `archive-report` send `CLIENT_SECRET` only to the token endpoint of the Cert API they call, and present the token it returns. |
-| `CERT_API_TOKEN` | `restore` and `archive-report` | A bearer token for the Cert API, used as it is instead of minting one. Set it in the environment or the `.env`; there is no flag, so it never lands in shell history. |
+| `TOKEN_URI` | the same commands, `archive-report` and `ask` | OAuth2 token endpoint. **This is what selects QA versus production.** `archive-report` also reads the Cert API host off it. |
+| `CLIENT_ID`, `CLIENT_SECRET` | the same commands, `restore`, `archive-report` and `ask` | OAuth2 client credentials the token is minted from. `restore` and `archive-report` send `CLIENT_SECRET` only to the token endpoint of the Cert API they call, and present the token it returns. |
+| `CERT_API_TOKEN` | `restore`, `archive-report` and `ask` | A bearer token for the Cert API, used as it is instead of minting one. Set it in the environment or the `.env`; there is no flag, so it never lands in shell history. |
+| `RESO_ASSISTANT_ORIGIN` | `ask` | Where RESO's Assistant answers. The Assistant is in a closed beta, and its address comes with access. `--origin` overrides it. |
 | `FT_ADMIN_SECRET` | `update-variations --fast-track` | Fast Track admin credential. A fast-track submission is refused without it, before any request is made. |
 | `CERT_AUTH_API_BASE_URL`, `CERT_AUTH_API_USERNAME`, `CERTIFICATION_API_KEY`, `CURRENT_PROVIDER_UOI` | the SDK's provider-token fallback, and `CERTIFICATION_API_KEY` by `restore` and `archive-report` when neither `CERT_API_TOKEN` nor the client credentials are set | The second auth path, used when the OAuth2 variables are absent. |
 | `RESO_VARIATIONS_HANDLER` | the variations step of `dd`, `find-variations` and `rcf` | For a host that runs the SDK: the path of a module whose `computeVariations` computes variations in place of the Variations Service, so no service address or token is needed. Unset, the service is called as usual. See the [package README](https://tools.reso.org/packages/reso-certification/#computing-variations-with-your-own-module). |
@@ -95,6 +96,7 @@ different thing from the RESO service credentials above.
 | [`cloud watch`](#cloud-watch) | Follow your cloud runs live, and wait on many with `--until-done` (read-only) |
 | [`restore`](#restore) | Restore to a Cert API: a run's stored results, published as the run would have, or a certification server backup (admin) |
 | [`archive-report`](#archive-report) | Archive a certification report, with the site's warning first, and only with `--confirm` |
+| [`ask`](#ask) | Ask RESO's Assistant a question, as yourself (closed beta) |
 
 The first four are **endorsement runners** (a full compliance pipeline against a live
 server). The rest are **per-step utilities** – each does one stage of a run in isolation,
@@ -622,6 +624,37 @@ reso-cert archive-report <reportId> --confirm --json
   `--confirm`, `1` when the server did not confirm it or the report could not be read, and `2` on a
   usage or configuration error such as a missing credential, a missing Cert API address or a
   malformed id.
+
+## RESO's Assistant
+
+### `ask`
+
+Ask RESO's Assistant a question, as yourself. The Assistant answers from RESO's standards, documentation and
+certification knowledge, and what it shows depends on who is asking: the command sends the credential in your
+`credentials.env`, and the Assistant reads who you are from it. The Assistant is in a closed beta, and its address
+comes with access; to ask for access, write to dev+assistant@reso.org.
+
+```bash
+reso-cert ask "What changed in Data Dictionary 2.1?"
+reso-cert ask What is the certification process        # the words become the question
+reso-cert ask --json "What is the format of the variations report?"
+```
+
+| Option | Meaning |
+|---|---|
+| `--origin <url>` | Where the Assistant answers. Default: `RESO_ASSISTANT_ORIGIN`, in the environment or the `.env`. |
+| `--url <url>` | The Cert API origin, which issues a token for your client credentials. Default: taken from `TOKEN_URI`. |
+| `--json` | Print the answer, its sources and any unconfirmed statements as one JSON object, for scripts. |
+| `--quiet` | Leave out the progress lines. |
+
+- **Progress** goes to stderr while the Assistant works, each line once. **The answer** goes to stdout, followed by any
+  statements a reviewer could not confirm and the sources the answer drew on.
+- **The credential** is found the way `archive-report` finds it: `CERT_API_TOKEN`, else a token minted from
+  `TOKEN_URI`, `CLIENT_ID` and `CLIENT_SECRET`, else `CERTIFICATION_API_KEY`. It goes only to the Assistant's address
+  and is never printed.
+- **Nothing is sent** without an address for the Assistant and a credential.
+- **Exit codes:** 0 answered; 1 the Assistant did not accept the credential, or does not admit the account; 2 anything
+  else.
 
 ## Variations review (read-only)
 
