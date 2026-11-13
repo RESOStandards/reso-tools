@@ -639,6 +639,21 @@ administrator, can archive it. `--json` prints what was read and what happened a
 
 ---
 
+## Asking RESO's Assistant
+
+RESO's Assistant answers questions about RESO's standards, certification and your own reports, and you can ask it from
+the command line as yourself. Run from the directory that holds your `credentials.env`, with the Assistant's address in
+`RESO_ASSISTANT_ORIGIN`:
+
+```bash
+reso-cert ask "What changed in Data Dictionary 2.1?"
+```
+
+The Assistant's progress shows while it works, then the answer, any statements a reviewer could not confirm, and the
+sources it drew on. `--json` prints the same as one object for scripts. The Assistant is in a closed beta, and its
+address comes with access; to ask for access, write to dev+assistant@reso.org. See
+[`ask`](https://tools.reso.org/packages/reso-certification/cli/#ask) in the CLI reference for every option.
+
 ## Choosing the Output Format
 
 The default output is a progress display with spinners – good for interactive runs where a human is watching. For everything else, there are three other formats:

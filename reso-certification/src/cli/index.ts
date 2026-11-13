@@ -78,6 +78,7 @@ import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { addEditSelectionOf } from './add-edit-options.js';
 import { formatApplyItems, summarizeApplyPlan } from './apply-command.js';
 import { type ArchiveReportResult, archiveExitCode, runArchiveReport } from './archive-report-command.js';
+import { askExitCode, renderAnswer, runAsk, withoutRepeats } from './ask-command.js';
 import { mintOAuth2ClientCredentialsToken, resolveCliAuth } from './auth.js';
 import { resolveCertApiAuthorization, resolveCertApiOrigin } from './cert-api-credential.js';
 import {
@@ -2345,6 +2346,33 @@ program
     } catch (error) {
       console.error('Error:', maskSecrets(error instanceof Error ? error.message : String(error)));
       process.exitCode = 2;
+    }
+  });
+
+// Asking RESO's Assistant, with the credential the downloaded credentials file carries. A passthrough: the
+// Assistant decides what this person may see. Progress goes to stderr, the answer to stdout.
+program
+  .command('ask')
+  .description("Ask RESO's Assistant a question, as yourself. The Assistant is in a closed beta; its address comes with access.")
+  .argument('<question...>', 'The question. Quote it, or give it as words.')
+  .option('--origin <url>', 'Where the Assistant answers. Default: RESO_ASSISTANT_ORIGIN.')
+  .option('--url <url>', 'The Cert API origin, which issues the token. Default: taken from TOKEN_URI in the credentials file.')
+  .option('--json', 'Print the answer, its sources and any unconfirmed sections as one JSON object, for scripts')
+  .option('--quiet', "Leave out the Assistant's progress lines")
+  .action(async (words: string[], opts: { origin?: string; url?: string; json?: boolean; quiet?: boolean }) => {
+    try {
+      const showProgress = !opts.json && !opts.quiet;
+      const answer = await runAsk({
+        question: words.join(' '),
+        ...(opts.origin === undefined ? {} : { origin: opts.origin }),
+        ...(opts.url === undefined ? {} : { url: opts.url }),
+        ...(showProgress ? { onStatus: withoutRepeats(text => console.error(maskSecrets(`… ${text}`))) } : {})
+      });
+      console.log(maskSecrets(opts.json ? JSON.stringify(answer, null, 2) : renderAnswer(answer)));
+      process.exitCode = askExitCode();
+    } catch (error) {
+      console.error('Error:', maskSecrets(error instanceof Error ? error.message : String(error)));
+      process.exitCode = askExitCode(error);
     }
   });
 
