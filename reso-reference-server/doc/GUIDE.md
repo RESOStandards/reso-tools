@@ -257,7 +257,7 @@ The **[package README](../)** has the details.
 `/api/proxy` lets a browser UI call another server's API, which a browser cannot do directly. From the release after
 0.8.5 it forwards only to the service roots you allow with `ALLOWED_SERVICE_ROOTS`, and the caller's credentials go
 only to the server asked for. `ALLOW_ANY_SERVICE_ROOT=true` keeps the earlier behavior, with a warning at every start.
-A host that embeds the server, such as the **[RESO desktop app](../reso-desktop-client/)**, allows each server it
+A host that embeds the server, such as the **[RESO desktop app](https://tools.reso.org/guides/reso-desktop-client/)**, allows each server it
 connects to.
 
 ## Authentication
@@ -398,7 +398,7 @@ All four cert flows run against any of the three database backends. The MongoDB 
 ## Where to Next
 
 * **Filling the server with data** – the seed dataset above is committed to this repository. The generator that produced it moved to the private `reso-tools-private` repository in the v1.0.0 split, along with the browser UI and the CORS proxy.
-* **Querying the server interactively** – the **[RESO desktop app](../reso-desktop-client/)**, distributed from [Releases](https://github.com/RESOStandards/reso-tools/releases/latest), bundles a browser UI over this server. It is built around the **[RESO Client SDK](../reso-client/)**, which connects to any RESO server, including this one.
+* **Querying the server interactively** – the **[RESO desktop app](https://tools.reso.org/guides/reso-desktop-client/)**, distributed from [Releases](https://github.com/RESOStandards/reso-tools/releases/latest), bundles a browser UI over this server. It is built around the **[RESO Client SDK](../reso-client/)**, which connects to any RESO server, including this one.
 * **Validating records** – the **[reso-validation](../reso-validation/)** library runs on every Add/Edit write against the reference server. It is also a stand-alone library you can use in your own application to check records before sending them.
 * **Running the cert tools as code** – the **[RESO Certification](../reso-certification/)** package gives you a CLI and an SDK for running every cert flow programmatically, not just through Docker. Useful for CI pipelines and for embedding cert testing inside other tools.
 * **Connecting an AI agent** – the **[RESO MCP Server](../reso-mcp-server/)** exposes this exact server through the Model Context Protocol so any MCP-aware AI host (Claude Code, Claude Desktop, Cursor, others) can read, query and write through a real RESO server. The MCP guide walks through the full Add/Edit and EntityEvent flows against this reference server with verbatim tool calls.

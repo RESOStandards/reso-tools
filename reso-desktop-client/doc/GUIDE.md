@@ -15,7 +15,7 @@ Download the latest release for your platform from the
 * **macOS** – a signed and notarized `.dmg`. Open it and drag the app into Applications.
 * **Windows** – a signed installer.
 * **Linux** – an `.AppImage` or a `.deb` package. Mark an AppImage executable before its first run:
-  `chmod +x RESO-*.AppImage`.
+  `chmod +x reso-linux-x86_64.AppImage`.
 
 <!-- screenshot: dashboard-signed-out.png -->
 
@@ -29,13 +29,16 @@ Much of the app works without an account. Signing in adds the tools that come wi
 | Without signing in | Signed in as a RESO member |
 |---|---|
 | The dashboard, Organizations and Endorsements | Everything on the left, plus: |
-| Each organization's summary and its certified reports | Browse Data, Metadata Explorer and API Documentation |
+| Each organization's summary and its certified reports | Browse Data and Metadata Explorer for any server, and API Documentation for the built-in one |
 | A guide to each member feature | The Certification workspace: run tests, review results and submit them to RESO |
-| | Systems and the Data Generator |
-| | The RESO Assistant, while it is in a closed beta |
+| | Systems, and the Data Generator for the built-in reference server |
+| | The RESO Assistant, for members its closed beta admits |
 
 To sign in, choose **Sign in** at the top right and enter the email address on your RESO certification account.
 RESO emails you a code; enter it to finish.
+
+Signing in is for RESO members. If your organization is not a member, the app says so and points you to
+certification.reso.org and the RESO command-line tools, which everyone can use.
 
 <!-- screenshot: sign-in.png -->
 
@@ -70,8 +73,8 @@ industry, and its identifiers.
 * **A provider** also sees its own results that are still moving through certification.
 * **RESO staff** see every result.
 
-Search by organization, sort the list and filter it by endorsement and version, by date or to the endorsements whose
-two years are nearly up (**Expiring Soon**). Signed in, you can also filter by status, and a provider can narrow the
+Search by organization, sort the list and filter it by endorsement and version, by date or to certified endorsements more
+than two years old (**Expiring Soon**). Signed in, you can also filter by status, and a provider can narrow the
 list to its own results with **My Results**.
 
 <!-- screenshot: endorsements.png -->
@@ -217,9 +220,9 @@ text.
 
 ## The Built-In Reference Server
 
-The reference server inside the app starts when the app opens, on a free port of its own, with its own database. It
-serves the RESO Data Dictionary 2.0 by default; **Server → Data Dictionary Version** switches it, and
-**Server → Restart Server** restarts it.
+The reference server inside the app starts when the app opens, on a free port of its own that only this computer can
+reach, with its own database. It serves the RESO Data Dictionary 2.0 by default. **Server → Data Dictionary Version**
+switches it and offers to restart the app, and **Server → Restart Server** restarts the app, and the server with it.
 
 Because it is a real RESO server at `http://localhost:<port>`, other tools can use it too: the
 **[RESO Client SDK](../reso-client/)**, the **[RESO Certification](../reso-certification/)** command line, `curl`
